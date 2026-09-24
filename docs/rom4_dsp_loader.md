@@ -193,9 +193,9 @@ including calls to `0x48d0`, `0x42f6`, and `0x44b6`, does not execute on that
 first zero-input frame. These are observed branch PCs, not decoded purposes
 for the callees. ROM `0x4414..0x4460` is an initializer that stores `0x00ac`
 and `0x00af`; direct call sites include `0x09a4`, `0x0ab8`, `0x4de3`,
-`0x4e00`, and `0x9b62/0x9b9f/0x9bb0`. Which host request reaches this
-initializer in ordinary acquisition, and whether later frames take a different
-route, remain unproved. A focused 30-second coherent no-cell run recorded zero
+`0x4e00`, and `0x9b62/0x9b9f/0x9bb0`. Whether ordinary acquisition reaches
+this initializer at all remains unproved. A focused 30-second coherent no-cell
+run recorded zero
 executions at `0x4414/0x4428/0x4433/0x4460` while servicing 6,497 frame
 expiries and 207,232 port-`0x27` reads. Thus the observed baseline loop does
 not itself establish that this mode initializer or its result-publication
@@ -212,14 +212,21 @@ A changed-write watch over the same 30-second boot found no writes to
 `0x1973` or `0x00ac`. Word `0x00af` was decremented at PC `0x3273` on 6,476
 INT0 frames after the 21-frame startup interval, starting at `0xffff` after
 its zero-initialized first pass. The branch at `0x326f` therefore continues
-around `0x3274..0x32c2` instead of
-entering its processing calls. Candidate writers of `0x1973` in the ROM are
+around `0x3274..0x32c2` instead of entering its processing calls. Candidate
+writers of `0x1973` in the ROM are
 `0x4e33` and the immediate stores at `0x77c6/0x78f0/0x7c76`; which control
 transition reaches them in ordinary acquisition is still unresolved. All
 three immediate-store sites first OR bit `0x8000` into `0x1949`, so they are
 one repeated state-change pattern, not three independent host requests.
-The recovered ROM
-also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
+The `0x77c2` path reaches that pattern only when the `0x1953` value is not
+positive; it follows calls into the separate `0x7b0a` mode family. The
+`0x78ed/0x7c73` paths likewise follow `0x7a75` and join `0x7778` after
+setting the flag. In the coherent 30-second no-cell run, a changed-write watch
+recorded zero writes to `0x1949`, `0x1953`, or `0x1973`. These are dormant
+control-mode paths in that run, not evidence of a missing direct MCU command.
+The source of the transition, and whether it belongs to ordinary search or a
+later channel mode, remain open. The recovered ROM also has three `PORTR`
+sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
 port-`0x38` status reads. A coherent 12-second run records zero reads on both
 `0x38` and `0x39`; those sites are dormant while the `0x27` loop runs. Their
 activation and sample encoding must be recovered before a controlled GSM
