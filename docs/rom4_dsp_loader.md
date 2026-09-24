@@ -200,6 +200,22 @@ executions at `0x4414/0x4428/0x4433/0x4460` while servicing 6,497 frame
 expiries and 207,232 port-`0x27` reads. Thus the observed baseline loop does
 not itself establish that this mode initializer or its result-publication
 branches are reached. No firmware or DSP state was forced for this census.
+The host-command jump table is distinct: DSP code `0x398d..0x3997` adds the
+incoming type to data-ROM base `0xb00f`, reads the function pointer, and
+branches through it. Type `0x1a` selects table entry `0xb029 = 0x3d5e`,
+consistent with the observed `0x3d70` search-list handler; it does not select
+`0x4414`. Direct calls to `0x4414` instead come from `0x09a4`, `0x0ab8`,
+`0x4de3/0x4e00`, and `0x9b62/0x9b9f/0x9bb0`. The last group is reached from
+the separate `0x3660` control dispatch or ROM function lists. This classifies
+`0x4414` as a DSP control-mode operation, not a direct host-packet handler.
+A changed-write watch over the same 30-second boot found no writes to
+`0x1973` or `0x00ac`. Word `0x00af` was decremented at PC `0x3273` on 6,476
+INT0 frames after the 21-frame startup interval, starting at `0xffff` after
+its zero-initialized first pass. The branch at `0x326f` therefore continues
+around `0x3274..0x32c2` instead of
+entering its processing calls. Candidate writers of `0x1973` in the ROM are
+`0x4e33` and the immediate stores at `0x77c6/0x78f0/0x7c76`; which control
+transition reaches them in ordinary acquisition is still unresolved.
 The recovered ROM
 also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
 port-`0x38` status reads. A coherent 12-second run records zero reads on both
