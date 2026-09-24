@@ -215,7 +215,9 @@ its zero-initialized first pass. The branch at `0x326f` therefore continues
 around `0x3274..0x32c2` instead of
 entering its processing calls. Candidate writers of `0x1973` in the ROM are
 `0x4e33` and the immediate stores at `0x77c6/0x78f0/0x7c76`; which control
-transition reaches them in ordinary acquisition is still unresolved.
+transition reaches them in ordinary acquisition is still unresolved. All
+three immediate-store sites first OR bit `0x8000` into `0x1949`, so they are
+one repeated state-change pattern, not three independent host requests.
 The recovered ROM
 also has three `PORTR` sites for port `0x39` (`0x40ff/0x4102/0x41a4`) beside
 port-`0x38` status reads. A coherent 12-second run records zero reads on both
@@ -353,7 +355,8 @@ The next evidence should compare a no-cell boot with a real NSE-1 receiving
 one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
 DSP-to-MCU response words, DSP program counter around `0x407c`, `0x410e`,
 `0x4185`, `0x4414`, `0x3268..0x32c3` and `0x7b0a`, and DSP data words
-`0x00ac/0x00ad/0x00af` before and after each INT0 frame. Capture reads/writes
+`0x00ac/0x00ad/0x00af/0x1949/0x1973` before and after each INT0 frame.
+Capture reads/writes
 of DSP I/O ports `0x27`, `0x38`,
 `0x39`, `0x31` and `0x32` with timestamps. To establish electrical sample
 packing and tuning, also capture the COBBA parallel address/data, read/write
