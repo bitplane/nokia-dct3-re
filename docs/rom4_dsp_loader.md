@@ -327,6 +327,17 @@ address and delay-slot tests. This is required for these list and callback
 paths when firmware enters them, but it does not activate them by itself.
 The opcode and return semantics follow the
 [TI C54x CPU reference](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+Focused long-immediate load conformance also covers the dormant control
+paths: `LD #lk[,SHFT],dst` now respects `SXM` rather than unconditionally
+sign-extending its constant. The `LD #lk,16,B` encoding is `0xf162`, not the
+previously accepted `0xf362`. Six executable cases exercise signed/unsigned
+loads, the 15-bit shift, 40-bit guard extension, destination selection and
+preservation of the other accumulator. The encoding and sign-extension
+contract follow [TI SPRU172C, LD, pages 4-66--4-69](https://www.ti.com/lit/ug/spru172c/spru172c.pdf).
+Core conformance, coherent NSE-1 execution and the 30-second RF boundary gate
+pass; these arithmetic corrections do not activate acquisition or establish
+the unmeasured sample interface. They are not a claim of complete instruction
+timing or overflow-flag conformance.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory

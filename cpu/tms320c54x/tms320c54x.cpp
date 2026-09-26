@@ -712,7 +712,9 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 immediate = fetch();
 		const u64 source = accumulator(BIT(op, 9));
 		u64 &destination = accumulator(BIT(op, 8));
-		const u64 operand = operation <= 2 ?
+		// LD uses SXM; arithmetic long-immediates retain signed interpretation.
+		const u64 operand = operation == 2 ?
+				((data_operand(immediate) << shift) & ACC_MASK) : operation < 2 ?
 				((u64(s64(s16(immediate))) << shift) & ACC_MASK) :
 				(u64(immediate) << shift);
 		switch (operation)
@@ -1695,14 +1697,9 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf340: // OR #lk, B
 		m_b = (m_b | fetch()) & ACC_MASK;
 		return;
-	case 0xf020: // LD #lk, A
-		m_a = data_operand(fetch());
-		return;
 	case 0xf062: // LD #lk, 16, A
-		m_a = (data_operand(fetch()) << 16) & ACC_MASK;
-		return;
-	case 0xf362: // LD #lk, 16, B
-		m_b = (data_operand(fetch()) << 16) & ACC_MASK;
+	case 0xf162: // LD #lk, 16, B
+		accumulator(BIT(op, 8)) = (data_operand(fetch()) << 16) & ACC_MASK;
 		return;
 	case 0xf330: // AND #lk, B
 		m_b &= fetch();

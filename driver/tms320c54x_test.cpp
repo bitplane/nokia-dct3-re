@@ -999,6 +999,68 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
 					"CALAD delay slots and return address");
+			program.write_word(0x0480, 0xf120); // LD #ffff, B
+			program.write_word(0x0481, 0xffff);
+			program.write_word(0x0482, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0480);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 45;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 45 && m_phase <= 48)
+		{
+			static constexpr u64 expected[] = {
+				0x000000ffff, 0xffffff8000, 0xff80000000, 0x00ffff0000
+			};
+			osd_printf_info("TMS320C54x immediate B load: phase=%u pc=%04x a=%010llx b=%010llx expected=%010llx\n",
+					m_phase, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					m_cpu->state_int(tms320c54x_device::STATE_A),
+					m_cpu->state_int(tms320c54x_device::STATE_B), expected[m_phase - 45]);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0483 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == expected[m_phase - 45],
+					"long-immediate B load destination, SXM and guard extension");
+			if (m_phase != 48)
+			{
+				++m_phase;
+				program.write_word(0x0480, m_phase == 46 ? 0xf120 : 0xf162);
+				program.write_word(0x0481, m_phase == 48 ? 0xffff : 0x8000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0480);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, m_phase == 48 ? 0 : 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x0480, 0xf02f); // LD #8000, 15, A
+			program.write_word(0x0481, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0480);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 49;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 49 || m_phase == 50)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 49 ? 0x0040000000ULL : 0xffc0000000ULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x00ffff0000,
+					"shifted immediate A load respects SXM and preserves B");
+			if (m_phase == 49)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0480);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 50;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
