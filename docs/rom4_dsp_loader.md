@@ -345,7 +345,8 @@ offers no independent sample-format evidence. No valid signal fixture follows ye
 A focused consumer trace closes the direct type-`0x1a` activation hypothesis.
 The resident host-command dispatcher advances the transmit-ring consumer at
 C54x PC `0x3909`. The selected handler spans `0x3d70..0x3db6`: it derives
-local value `0x0010`, initializes workspace `0x1200..0x1219`, updates control
+local value `0x0010`, copies the payload into scratch words `0x1200..0x121f`,
+updates control
 words `0x0284/0x0286/0x0287`, sets bit 3 at `0x06bc`, and increments `0x06e3`
 from zero to one before returning. It performs no I/O-port access. Across the
 same 30-second receiver gate, none of those identified control words is read
@@ -353,10 +354,34 @@ after the handler returns; the existing port-`0x27` cadence continues and the
 `0x32/0x38/0x39` counts remain zero. Temporary write/read taps used for this
 classification were removed. Thus the observed search-list packet is accepted
 and stored, but does not by itself enter the dormant parallel receive path or
-establish an RF acquisition. The next software-side question is what consumes
-this stored workspace and which DSP path owns ordinary acquisition. Separately,
+establish an RF acquisition. Which lifecycle consumes the stored control state
+and which DSP path owns ordinary acquisition remain unresolved. Separately,
 the `0x7b0a` mode initializer remains useful for later dedicated-channel work;
 injecting a reply or waveform at type-`0x1a` would skip both boundaries.
+
+The post-handler reader census covers `0x1200..0x121f` and the complete
+`0x0284..0x02b0` control/vector interval: 77 DSP data words. Temporary
+read/write taps at the backend data bus observed zero accesses to those words
+from 1.52 seconds through the end of a coherent 30-second no-cell run. These
+taps see indirect and table-derived addresses as well as literal accesses;
+they do not cover another lifecycle or unexecuted ROM paths. The RF gate
+still recorded 6,497 frames and 207,232 sample reads. The taps were removed.
+The original `0x1219` bound was too short: the handler stores one word and
+repeats the payload copy 31 times, reaching `0x121f`.
+
+Static word scanning finds 95 occurrences of literal `0x1200`, 28 of
+`0x0284`, five of `0x0286`, and twelve of `0x0287`. These are candidate
+references, not a complete decoded call graph. `0x1200` is also used by host
+packet construction and memory-upload handlers, so its address alone does
+not identify persistent search-list ownership. Candidate control consumers
+include the `0x0926/0x0974` comparisons and the `0x6bxx/0x77xx/0x7axx`
+mode routines; low program addresses additionally require overlay validation
+before their raw-ROM instructions can be treated as the executing code.
+No active consumer or missing emulated activation input follows from this
+census. It does not distinguish an inactive command lifecycle from
+signal-dependent activation. The next discriminating evidence is the
+no-cell/carrier capture specified below, not a synthesized host reply or
+forced dormant mode.
 
 The next evidence should compare a no-cell boot with a real NSE-1 receiving
 one known GSM-900 test carrier. Capture the ordered MCU-to-DSP request and
