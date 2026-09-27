@@ -6,6 +6,8 @@
 #include "emu.h"
 #include "emuopts.h"
 #include "cpu/tms320c54x/tms320c54x.h"
+#include "nokia_dspif.h"
+#include <sstream>
 
 namespace {
 
@@ -15,7 +17,8 @@ public:
 	tms320c54x_test_state(const machine_config &mconfig, device_type type,
 			const char *tag) :
 		driver_device(mconfig, type, tag),
-		m_cpu(*this, "maincpu")
+		m_cpu(*this, "maincpu"),
+		m_transport(*this, "dspif")
 	{
 	}
 
@@ -1281,6 +1284,75 @@ private:
 					!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
 					"BD takes two cycles and defers IRQ through both delay slots");
 			m_cpu->set_input_line(2, CLEAR_LINE);
+			program.write_word(0x0500, 0x7726); // STM #TSS, TCR
+			program.write_word(0x0501, 0x0010);
+			program.write_word(0x0502, 0xf070); // RPT #65535
+			program.write_word(0x0503, 0xffff);
+			program.write_word(0x0504, 0x0082);
+			program.write_word(0x0505, 0xf5e1);
+			m_repeat_reads = 0;
+			m_irq_trigger_read = 1;
+			m_irq_accumulator = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0500);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 63;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 63)
+		{
+			expect(m_repeat_reads > 0 && m_repeat_reads < 65536 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 4),
+					"save checkpoint has active repeat and pending IRQ");
+			m_saved_repeat_reads = m_repeat_reads;
+			static constexpr u8 payload[] = { 0x12, 0x34, 0x56, 0x78 };
+			m_transport->peer_shared_w(0x1c8 / 2, 0x100 / 2);
+			m_transport->peer_shared_w(0x1ca / 2, 0x100 / 2);
+			expect(m_transport->enqueue_rx_packet(0x83, payload, sizeof(payload)) &&
+					m_transport->enqueue_rx_packet(0x89, payload, sizeof(payload)),
+					"queue transport packets before save");
+			m_transport->dspif_w(0, 0x5a);
+			for (unsigned i = 0; i != m_saved_transport.size(); ++i)
+				m_saved_transport[i] = m_transport->shared_word(i);
+			m_saved_repeat.str(std::string());
+			expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+					"write active-repeat save state");
+			m_phase = 64;
+			m_check_timer->adjust(attotime::from_msec(6));
+			return;
+		}
+		if (m_phase == 64 || m_phase == 65)
+		{
+			osd_printf_info("repeat state phase=%u reads=%u isr=%llu a=%llu pc=%04x\n", m_phase,
+					m_repeat_reads, (unsigned long long)m_irq_accumulator,
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			expect(m_repeat_reads == 65536 && m_irq_accumulator == 65536 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 65536 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0506,
+					"active-repeat save replay completes identically and services pending IRQ");
+			if (m_phase == 64)
+			{
+				for (unsigned i = 0; i != m_saved_transport.size(); ++i)
+					m_transport->peer_shared_w(i, 0);
+				m_transport->dspif_w(0, 0);
+				m_saved_repeat.clear();
+				m_saved_repeat.seekg(0);
+				expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE,
+						"restore active-repeat save state");
+				for (unsigned i = 0; i != m_saved_transport.size(); ++i)
+					expect(m_transport->shared_word(i) == m_saved_transport[i],
+							"restore queued DSPIF payloads and ring cursors");
+				expect(m_transport->dspif_r(0) == 0x5a,
+						"restore DSPIF interface registers");
+				m_repeat_reads = m_saved_repeat_reads;
+				m_irq_accumulator = 0;
+				m_phase = 65;
+				m_check_timer->adjust(attotime::from_msec(6));
+				return;
+			}
+			m_cpu->set_input_line(2, CLEAR_LINE);
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -1464,6 +1536,7 @@ private:
 	}
 
 	required_device<tms320c54x_device> m_cpu;
+	optional_device<nokia_dspif_device> m_transport;
 	emu_timer *m_check_timer = nullptr;
 	unsigned m_phase = 0;
 	unsigned m_rom4_checks = 0;
@@ -1473,11 +1546,15 @@ private:
 	u64 m_irq_accumulator = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
+	unsigned m_saved_repeat_reads = 0;
+	std::stringstream m_saved_repeat;
+	std::array<u16, 0x800> m_saved_transport = {};
 };
 
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
+	NOKIA_DSPIF(config, m_transport, 0);
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);
 }

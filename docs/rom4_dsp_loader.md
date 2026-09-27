@@ -474,6 +474,14 @@ seconds, restores it, verifies MAD2 and C54x idle state, and then opens the same
 Phone book menu through a physical key transition. This guards the C54x core,
 uploaded program/data overlays, DSPIF, COBBA, timers, and keypad composition
 against state-registration regressions.
+The core fixture additionally saves during a 65,536-iteration ADD repeat with
+IRQ2 pending, then compares original and restored completion (accumulator,
+ISR observation and continuation PC). Its DSPIF instance contains two queued
+RX packets; loading restores all 2,048 shared words, including payloads and
+ring cursors, and the interface register after deliberate fixture disturbance.
+The internal timer is stopped by an STM instruction in this fixture to isolate
+repeat/IRQ replay from unrelated timer wakeups. This is executable state
+restoration evidence, not just a source-level save-registration check.
 
 The historical harness's headline `74 acknowledgements` counter is not a count
 of DSP port-1 completion strobes. The local gate separately records shared
