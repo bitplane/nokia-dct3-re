@@ -1380,6 +1380,32 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0527 &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 					"CALLD two-cycle and RETD three-cycle timing with balanced delayed return");
+			program.write_word(0x0560, 0xf484);
+			program.write_word(0x0561, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8000000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0560);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 67;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 67 || m_phase == 68)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 67 ? 0x8000000000ULL : 0x007fffffffULL) &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
+					"NEG 40-bit minimum sets overflow and obeys OVM");
+			if (m_phase == 67)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0560);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 68;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

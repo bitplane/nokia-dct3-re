@@ -344,6 +344,10 @@ Executable cases cover the TI guard-bit example `03 1234 5678` and a following
 zero result; these are unary-operation checks, not general ALU conformance.
 The saturation and sticky-flag rules follow SPRU131G section 4.2.2 and
 SPRU172C's ABS description.
+NEG uses the same signed-result overflow/saturation rules as subtraction and
+retains its zero-only carry contract. Executable tests cover TI's 40-bit minimum
+example with OVM off and on; the guard-bit overflow is no longer limited to the
+previous special case at the signed-32-bit minimum.
 Ordinary immediate, accumulator and memory ADD/SUB forms now share bit-32
 carry/borrow, sticky destination overflow and signed-32-bit OVM saturation.
 The shifted-16 memory ADD form preserves carry when no carry occurs. Boundary

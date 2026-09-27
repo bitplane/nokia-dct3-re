@@ -1810,16 +1810,8 @@ void tms320c54x_device::execute_one(u16 op)
 		if ((op & 0xfcff) == 0xf484) // NEG source accumulator, destination
 		{
 			const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
-			const bool overflow = source == 0xff80000000ULL;
-			u64 result = u64(-(s64(source << 24) >> 24)) & ACC_MASK;
+			accumulator(BIT(op, 8)) = add_sub(0, source, true, BIT(op, 8));
 			m_st0 = (m_st0 & ~u16(0x0800)) | (source ? 0 : 0x0800);
-			if (overflow)
-			{
-				m_st0 |= BIT(op, 8) ? 0x0200 : 0x0400;
-				if (BIT(m_st1, 9))
-					result = 0x007fffffff;
-			}
-			accumulator(BIT(op, 8)) = result;
 			return;
 		}
 		if ((op & 0xffe0) == 0xed00) // LD #k5, ASM
