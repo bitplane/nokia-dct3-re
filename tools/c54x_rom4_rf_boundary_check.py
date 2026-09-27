@@ -37,7 +37,8 @@ def check(text: str, minimum_frames: int = 6000) -> dict[str, int]:
         )
     if result["rf_reads"] < 1000:
         raise ValueError(f"only {result['rf_reads']} RF reads; receiver did not become active")
-    expected_reads = 32 * (result["frame_expiries"] - 21)
+    # Two-cycle long-immediate execution starts RX on frame 23.
+    expected_reads = 32 * (result["frame_expiries"] - 22)
     if result["rf_reads"] != expected_reads:
         raise ValueError(
             f"RF read cadence changed: {result['rf_reads']} reads, "

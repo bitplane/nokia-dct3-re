@@ -640,6 +640,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const u64 value = u64(fetch()) << (low & 0x0f);
 		accumulator(BIT(op, 8)) = (accumulator(BIT(op, 9)) ^ value) & ACC_MASK;
+		--m_icount;
 		return;
 	}
 	if ((op & 0xfce0) == 0xf420) // SUB source accumulator, shift, destination accumulator
@@ -761,6 +762,7 @@ void tms320c54x_device::execute_one(u16 op)
 		case 4: destination = source | operand; break;
 		case 5: destination = source ^ operand; break;
 		}
+		--m_icount; // Long-immediate ALU instructions take two cycles.
 		return;
 	}
 	if (op == 0x70f8) // MVKD dmad, Smem (absolute destination form)

@@ -1406,6 +1406,24 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x0580, 0x0082);
+			program.write_word(0x0581, 0xf020); // LD #1234, A
+			program.write_word(0x0582, 0x1234);
+			program.write_word(0x0583, 0x0082);
+			program.write_word(0x0584, 0xf5e1);
+			m_repeat_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0580);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 69;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 69)
+		{
+			expect(m_repeat_reads == 2 && m_last_operand_cycle - m_first_operand_cycle == 3 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1235,
+					"long-immediate LD consumes two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

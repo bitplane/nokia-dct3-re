@@ -333,9 +333,10 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 	}
 	case 0x27:
 		if (m_rf_trace_count++ < 16)
-			machine().logerror("rom4_rf_read: sample=%u pc=%04x t=%.6f\n",
+			machine().logerror("rom4_rf_read: sample=%u pc=%04x frame=%llu t=%.6f\n",
 					m_rf_trace_count,
 					u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					m_frame_timer_expiries,
 					machine().time().as_double());
 		return m_cobba->rf_receive_sample();
 	case 0x38:

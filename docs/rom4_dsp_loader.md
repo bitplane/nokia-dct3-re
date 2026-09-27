@@ -370,6 +370,15 @@ CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
 documented six/four-cycle costs.
+The long-immediate ALU decoder charges two cycles, including the separately
+decoded XOR form. A cycle-stamped LD fixture checks the additional cycle;
+the LD contract is SPRU172C page 4-68. This does not cover all extended-address
+or repeated multicycle instruction timing.
+This documented timing correction deliberately re-banks the RF startup offset:
+the first port-27 read is at frame 23, 0.133172 s, rather than the historical
+0.128149 s. At 30 seconds there are 6,497 frame expiries and exactly 207,200
+reads (`32 * (6497 - 22)`), with unchanged terminal IMR/IFR and no burst-port
+activity. The gate retains an exact cadence assertion, not a tolerance.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory

@@ -3,7 +3,7 @@ import unittest
 from tools.c54x_rom4_rf_boundary_check import check
 
 
-def summary(*, frames=6497, reads=207232, pairs=0, port38=0, port39=0,
+def summary(*, frames=6497, reads=207200, pairs=0, port38=0, port39=0,
             ifr="0000", imr="035f"):
     return (
         "rom4_interface_summary: completion_strobes=2 mailbox_writes=3 "
@@ -28,7 +28,7 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
 
     def test_rejects_changed_read_cadence(self):
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
-            check(summary(reads=207231))
+            check(summary(reads=207199))
 
     def test_rejects_unexpected_burst_port_activity(self):
         with self.assertRaisesRegex(ValueError, "parallel burst path"):
