@@ -76,6 +76,7 @@ private:
 	void push(u16 value);
 	u16 pop();
 	u64 data_operand(u16 value) const;
+	u64 shifted_load(u64 source, int shift, bool destination_b);
 	u64 add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry = false);
 	u64 arithmetic_shift_right(u64 value, unsigned shift) const;
 	u64 &accumulator(bool b) { return b ? m_b : m_a; }

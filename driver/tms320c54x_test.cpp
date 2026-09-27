@@ -1173,6 +1173,37 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200);
+			program.write_word(0x04d0, 0xf02f);
+			program.write_word(0x04d1, 0xffff);
+			program.write_word(0x04d2, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04d0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 59;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 59)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x007fff8000ULL &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
+					"shifted unsigned immediate load preserves carry");
+			program.write_word(0x04d0, 0xf482); // LD A, ASM, A
+			program.write_word(0x04d1, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0040000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0202);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04d0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 60;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 60)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x007fffffffULL &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00,
+					"ASM shifted load saturates and preserves carry");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -343,6 +343,22 @@ u64 tms320c54x_device::data_operand(u16 value) const
 	return value;
 }
 
+u64 tms320c54x_device::shifted_load(u64 source, int shift, bool destination_b)
+{
+	source &= ACC_MASK;
+	if (shift < 0)
+		return BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift;
+	const s64 value = s64(source << 24) >> 24;
+	const s64 factor = s64(1) << shift;
+	if (value > 0x7fffffffLL / factor || value < -0x80000000LL / factor)
+	{
+		m_st0 |= destination_b ? 0x0200 : 0x0400;
+		if (BIT(m_st1, 9))
+			return value < 0 ? 0xff80000000ULL : 0x007fffffffULL;
+	}
+	return (source << shift) & ACC_MASK;
+}
+
 u64 tms320c54x_device::add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry)
 {
 	const bool carry = subtract ? u32(source) >= u32(operand) :
@@ -676,8 +692,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
 		const u64 source = accumulator(BIT(op, 9));
-		accumulator(BIT(op, 8)) = shift < 0 ? arithmetic_shift_right(source, -shift) :
-				(source << shift) & ACC_MASK;
+		accumulator(BIT(op, 8)) = shifted_load(source, shift, BIT(op, 8));
 		return;
 	}
 	if ((op & 0xff00) == 0x6f00)
@@ -703,7 +718,7 @@ void tms320c54x_device::execute_one(u16 op)
 				indirect_write(low, value);
 		};
 		if ((extension & 0xfee0) == 0x0c40) // LD Smem, shift, dst
-			accumulator(BIT(extension, 8)) = shifted(data_operand(read_operand()));
+			accumulator(BIT(extension, 8)) = shifted_load(data_operand(read_operand()), shift, BIT(extension, 8));
 		else if ((extension & 0xfee0) == 0x0c60) // STH src, shift, Smem
 			write_operand(u16(shifted(accumulator(BIT(extension, 8))) >> 16));
 		else if ((extension & 0xfee0) == 0x0c80) // STL src, shift, Smem
@@ -741,7 +756,7 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 		case 0: destination = add_sub(source, operand, false, BIT(op, 8)); break;
 		case 1: destination = add_sub(source, operand, true, BIT(op, 8)); break;
-		case 2: destination = operand; break;
+		case 2: destination = shifted_load(data_operand(immediate), shift, BIT(op, 8)); break;
 		case 3: destination = source & operand; break;
 		case 4: destination = source | operand; break;
 		case 5: destination = source ^ operand; break;
@@ -777,28 +792,10 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = result;
 		return;
 	}
-	if ((op & 0xfce0) == 0xf400 || (op & 0xfce0) == 0xf420 ||
-			(op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf460)
+	if ((op & 0xfce0) == 0xf440) // LD src, SHIFT, dst
 	{
-		// Accumulator arithmetic with a signed five-bit shift.  Bit 9 selects
-		// the source and bit 8 the destination.
-		const unsigned operation = (op >> 5) & 3;
 		const int shift = s8(u8(op << 3)) >> 3;
-		u64 source = accumulator(BIT(op, 9));
-		if (shift >= 0)
-			source = (source << shift) & ACC_MASK;
-		else if (operation == 3)
-			source = arithmetic_shift_right(source, -shift);
-		else
-			source >>= -shift;
-		u64 &destination = accumulator(BIT(op, 8));
-		switch (operation)
-		{
-		case 0: destination = (destination + source) & ACC_MASK; break;
-		case 1: destination = (destination - source) & ACC_MASK; break;
-		case 2: destination = source; break;
-		case 3: destination = source; break; // SFTA differs only in flag effects.
-		}
+		accumulator(BIT(op, 8)) = shifted_load(accumulator(BIT(op, 9)), shift, BIT(op, 8));
 		return;
 	}
 	if ((op & 0xfce0) == 0xf0c0) // XOR source accumulator, shift, destination accumulator

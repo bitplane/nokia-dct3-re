@@ -351,6 +351,11 @@ tests cover positive/negative saturation and memory wraparound/borrow. SFTA's
 right shift obeys SXM and publishes the outgoing bit as carry. This does not
 yet establish multiply-accumulate, dual-16-bit mode or complete shift/load
 overflow conformance; those require separate instruction-family tests.
+Shifted accumulator, ASM, long-immediate and extended-memory LD forms share
+SXM-aware shifting and sticky overflow/OVM handling while preserving carry.
+The executable ASM test crosses the signed-32-bit limit without requiring a
+40-bit wrap. Fixed-high-word loads and multiplier families remain separate
+audit surfaces.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory
