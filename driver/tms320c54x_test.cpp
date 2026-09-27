@@ -1450,6 +1450,36 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05c0, 0xf765); // SFTA B, +5, B
+			program.write_word(0x05c1, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x80aa001234ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05c0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 73;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 73 || m_phase == 74)
+		{
+			osd_printf_info("SFTA left phase=%u b=%010llx st0=%04x\n", m_phase,
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)));
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(m_phase == 73 ? 0x1540024680ULL : 0xff80000000ULL) &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0200,
+					"SFTA guard-bit left shift carry overflow and negative saturation");
+			if (m_phase == 73)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x80aa001234ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05c0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 74;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -364,6 +364,12 @@ SFTL shifts only the low 32 bits, clears destination guard bits and sets carry
 from the outgoing bit (or clears carry for shift zero), per SPRU172C page
 4-158. Executable left/right/zero-shift cases distinguish this from SFTA's
 40-bit arithmetic operation.
+SFTA left-shift tests cover the guard-bit operand `80 AA00 1234`, shift +5,
+with OVM off/on. SPRU172C page 4-156's example prints C=1, while page 4-155's
+explicit rule `src(39-SHIFT)` selects bit 34, which is zero for this operand.
+The implementation and fixture follow the explicit rule (C=0); this source
+contradiction remains unresolved by silicon evidence and is not advertised as
+hardware-validated carry behavior.
 Control-flow conformance includes an IRQ raised on the first operand read of
 `RPT #3; ADD`: the ISR observes all four results, and operand reads are one
 cycle apart. A separate BD fixture raises IRQ inside the first delay slot;
