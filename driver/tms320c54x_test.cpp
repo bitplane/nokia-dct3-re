@@ -1424,6 +1424,32 @@ private:
 			expect(m_repeat_reads == 2 && m_last_operand_cycle - m_first_operand_cycle == 3 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1235,
 					"long-immediate LD consumes two cycles");
+			program.write_word(0x05a0, 0xf0ff); // SFTL A, -1
+			program.write_word(0x05a1, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05a0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 70;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 70 && m_phase <= 72)
+		{
+			const u64 expected = m_phase == 70 ? 0x007fffffffULL :
+					m_phase == 71 ? 0x00fffffffeULL : 0x00ffffffffULL;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == expected &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == (m_phase != 72),
+					"SFTL uses low 32 bits clears guards and publishes carry");
+			if (m_phase != 72)
+			{
+				program.write_word(0x05a0, m_phase == 70 ? 0xf0e1 : 0xf0e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05a0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

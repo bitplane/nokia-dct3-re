@@ -360,6 +360,10 @@ SXM-aware shifting and sticky overflow/OVM handling while preserving carry.
 The executable ASM test crosses the signed-32-bit limit without requiring a
 40-bit wrap. Fixed-high-word loads and multiplier families remain separate
 audit surfaces.
+SFTL shifts only the low 32 bits, clears destination guard bits and sets carry
+from the outgoing bit (or clears carry for shift zero), per SPRU172C page
+4-158. Executable left/right/zero-shift cases distinguish this from SFTA's
+40-bit arithmetic operation.
 Control-flow conformance includes an IRQ raised on the first operand read of
 `RPT #3; ADD`: the ISR observes all four results, and operand reads are one
 cycle apart. A separate BD fixture raises IRQ inside the first delay slot;

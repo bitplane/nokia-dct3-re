@@ -684,9 +684,10 @@ void tms320c54x_device::execute_one(u16 op)
 	if ((op & 0xfce0) == 0xf0e0) // SFTL source accumulator, shift, destination accumulator
 	{
 		const int shift = s8((op & 0x1f) << 3) >> 3;
-		const u64 source = accumulator(BIT(op, 9));
-		accumulator(BIT(op, 8)) = shift < 0 ? source >> -shift :
-				(source << shift) & ACC_MASK;
+		const u32 source = u32(accumulator(BIT(op, 9)));
+		const bool carry = shift && BIT(source, shift < 0 ? -shift - 1 : 32 - shift);
+		m_st0 = (m_st0 & ~0x0800) | (carry ? 0x0800 : 0);
+		accumulator(BIT(op, 8)) = shift < 0 ? source >> -shift : u32(source << shift);
 		return;
 	}
 	if ((op & 0xfcff) == 0xf482) // LD source accumulator, ASM, destination accumulator
