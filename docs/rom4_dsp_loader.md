@@ -338,6 +338,12 @@ Core conformance, coherent NSE-1 execution and the 30-second RF boundary gate
 pass; these arithmetic corrections do not activate acquisition or establish
 the unmeasured sample interface. They are not a claim of complete instruction
 timing or overflow-flag conformance.
+`ABS` additionally clamps overflow to the signed 32-bit maximum under `OVM`,
+sets carry for a zero result, and preserves sticky destination overflow.
+Executable cases cover the TI guard-bit example `03 1234 5678` and a following
+zero result; these are unary-operation checks, not general ALU conformance.
+The saturation and sticky-flag rules follow SPRU131G section 4.2.2 and
+SPRU172C's ABS description.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory

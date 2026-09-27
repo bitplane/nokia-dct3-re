@@ -543,13 +543,15 @@ void tms320c54x_device::execute_one(u16 op)
 		const bool destination_b = BIT(op, 8);
 		const u64 raw = accumulator(source_b) & ACC_MASK;
 		const s64 value = s64(raw << 24) >> 24;
-		const bool overflow = raw == (u64(1) << 39);
+		const bool overflow = value > 0x7fffffffLL || value < -0x7fffffffLL;
 		u64 result = value < 0 ? (-value & ACC_MASK) : raw;
-		if (overflow && BIT(m_st1, 9)) // OVM
-			result = (u64(1) << 39) - 1;
+		if (BIT(m_st1, 9) && result > 0x007fffffffULL) // OVM clamps to signed 32 bits.
+			result = 0x007fffffffULL;
 		accumulator(destination_b) = result;
 		const u16 overflow_mask = u16(1) << (destination_b ? 9 : 10);
-		m_st0 = (m_st0 & ~overflow_mask) | (overflow ? overflow_mask : 0);
+		if (overflow)
+			m_st0 |= overflow_mask; // ALU overflow flags remain set until explicitly cleared.
+		m_st0 = (m_st0 & ~0x0800) | (result == 0 ? 0x0800 : 0);
 		return;
 	}
 	if ((op & 0xfd00) == 0xfd00) // XC n, condition

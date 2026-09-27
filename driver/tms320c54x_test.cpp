@@ -1061,6 +1061,34 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x0490, 0xf585); // ABS A, B
+			program.write_word(0x0491, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0312345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0490);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 51;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 51 || m_phase == 52)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(m_phase == 51 ? 0x007fffffffULL : 0) &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
+					(m_phase == 52), "ABS saturation and zero carry");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0200,
+					"ABS guard-bit overflow is sticky across a zero result");
+			if (m_phase == 51)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0490);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 52;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
