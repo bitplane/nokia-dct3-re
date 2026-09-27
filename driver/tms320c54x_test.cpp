@@ -1353,6 +1353,33 @@ private:
 				return;
 			}
 			m_cpu->set_input_line(2, CLEAR_LINE);
+			program.write_word(0x0520, 0x0082);
+			program.write_word(0x0521, 0xf274); // CALLD 0540
+			program.write_word(0x0522, 0x0540);
+			program.write_word(0x0523, 0xf495);
+			program.write_word(0x0524, 0xf495);
+			program.write_word(0x0525, 0x0082);
+			program.write_word(0x0526, 0xf5e1);
+			program.write_word(0x0540, 0x0082);
+			program.write_word(0x0541, 0xfe00); // RETD
+			program.write_word(0x0542, 0xf495);
+			program.write_word(0x0543, 0xf495);
+			m_repeat_reads = 0;
+			m_irq_trigger_read = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0520);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 66;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 66)
+		{
+			expect(m_repeat_reads == 3 && m_last_operand_cycle - m_first_operand_cycle == 11 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0527 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
+					"CALLD two-cycle and RETD three-cycle timing with balanced delayed return");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

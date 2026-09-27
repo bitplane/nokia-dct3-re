@@ -1571,7 +1571,7 @@ void tms320c54x_device::execute_one(u16 op)
 		push(u16(m_pc + 2));
 		m_delayed_target = destination;
 		m_delayed_words = 2;
-		m_icount -= 3;
+		m_icount -= 1;
 		return;
 	}
 	case 0xf273: // BD pmad
@@ -1601,7 +1601,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xfe00: // RETD
 		m_delayed_target = pop();
 		m_delayed_words = 2;
-		m_icount -= 3;
+		m_icount -= 2;
 		return;
 	case 0xf495: // NOP
 		return;

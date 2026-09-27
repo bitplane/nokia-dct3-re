@@ -362,6 +362,10 @@ cycle apart. A separate BD fixture raises IRQ inside the first delay slot;
 both slots complete before service, and cycle stamps establish BD's documented
 two-cycle cost (SPRU172C B, page 4-14). This corrects a previous four-cycle
 charge. These fixtures do not claim full pipeline/wait-state timing coverage.
+CALLD and RETD likewise use two and three cycles respectively, rather than
+four each. A cycle-stamped call/return fixture checks both delay pairs and
+stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
+documented six/four-cycle costs.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory
