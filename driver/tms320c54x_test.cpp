@@ -326,6 +326,23 @@ private:
 	void data_map(address_map &map) ATTR_COLD
 	{
 		map(0x0000, 0xffff).ram();
+		map(0x0060, 0x0061).r(FUNC(tms320c54x_test_state::repeat_irq_r));
+	}
+	u16 repeat_irq_r(offs_t offset)
+	{
+		if (offset)
+		{
+			m_irq_accumulator = m_cpu->state_int(tms320c54x_device::STATE_A);
+			return 0;
+		}
+		m_last_operand_cycle = m_cpu->total_cycles();
+		if (++m_repeat_reads == 1)
+		{
+			m_first_operand_cycle = m_last_operand_cycle;
+		}
+		if (m_repeat_reads == m_irq_trigger_read)
+			m_cpu->set_input_line(2, ASSERT_LINE);
+		return 1;
 	}
 
 	void rom4_program_map(address_map &map) ATTR_COLD
@@ -1204,6 +1221,66 @@ private:
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x007fffffffULL &&
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00,
 					"ASM shifted load saturates and preserves carry");
+			program.write_word(0x04e0, 0xec03); // RPT #3
+			program.write_word(0x04e1, 0x0082); // ADD *AR2, A
+			program.write_word(0x04e2, 0xf5e1);
+			program.write_word(0x0048, 0x0083); // Observe A on ISR entry.
+			program.write_word(0x0049, 0xf49b);
+			m_repeat_reads = 0;
+			m_irq_accumulator = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0060);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0061);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 61;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 61)
+		{
+			osd_printf_info("repeat IRQ: reads=%u isr_a=%llx a=%llx pc=%04x idle=%u\n",
+					m_repeat_reads, (unsigned long long)m_irq_accumulator,
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
+			expect(m_repeat_reads == 4 && m_irq_accumulator == 4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+					"pending interrupt defers until the complete single-repeat body retires");
+			expect(m_last_operand_cycle - m_first_operand_cycle == 3,
+					"repeated ADD consumes one cycle per body iteration");
+			m_cpu->set_input_line(2, CLEAR_LINE);
+			program.write_word(0x04f0, 0x0082); // Cycle marker before BD.
+			program.write_word(0x04f1, 0xf273);
+			program.write_word(0x04f2, 0x04f6);
+			program.write_word(0x04f3, 0x0082); // IRQ raised in first delay slot.
+			program.write_word(0x04f4, 0x0082);
+			program.write_word(0x04f5, 0xffff); // Must not execute.
+			program.write_word(0x04f6, 0xf5e1);
+			m_repeat_reads = 0;
+			m_irq_trigger_read = 2;
+			m_irq_accumulator = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04f0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 62;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 62)
+		{
+			expect(m_repeat_reads == 3 && m_irq_accumulator == 3 &&
+					m_last_operand_cycle - m_first_operand_cycle == 4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x04f7 &&
+					!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+					"BD takes two cycles and defers IRQ through both delay slots");
+			m_cpu->set_input_line(2, CLEAR_LINE);
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -1391,6 +1468,11 @@ private:
 	unsigned m_phase = 0;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
+	unsigned m_repeat_reads = 0;
+	unsigned m_irq_trigger_read = 1;
+	u64 m_irq_accumulator = 0;
+	u64 m_first_operand_cycle = 0;
+	u64 m_last_operand_cycle = 0;
 };
 
 void tms320c54x_test_state::test(machine_config &config)

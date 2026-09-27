@@ -1577,7 +1577,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf273: // BD pmad
 		m_delayed_target = fetch();
 		m_delayed_words = 2;
-		m_icount -= 3;
+		m_icount -= 1;
 		return;
 	case 0xfa45: // BCD pmad, AEQ
 	case 0xfa44: // BCD pmad, ANEQ
