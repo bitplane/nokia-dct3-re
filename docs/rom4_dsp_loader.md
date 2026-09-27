@@ -344,6 +344,13 @@ Executable cases cover the TI guard-bit example `03 1234 5678` and a following
 zero result; these are unary-operation checks, not general ALU conformance.
 The saturation and sticky-flag rules follow SPRU131G section 4.2.2 and
 SPRU172C's ABS description.
+Ordinary immediate, accumulator and memory ADD/SUB forms now share bit-32
+carry/borrow, sticky destination overflow and signed-32-bit OVM saturation.
+The shifted-16 memory ADD form preserves carry when no carry occurs. Boundary
+tests cover positive/negative saturation and memory wraparound/borrow. SFTA's
+right shift obeys SXM and publishes the outgoing bit as carry. This does not
+yet establish multiply-accumulate, dual-16-bit mode or complete shift/load
+overflow conformance; those require separate instruction-family tests.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory

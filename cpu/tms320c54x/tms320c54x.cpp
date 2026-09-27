@@ -343,6 +343,24 @@ u64 tms320c54x_device::data_operand(u16 value) const
 	return value;
 }
 
+u64 tms320c54x_device::add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry)
+{
+	const bool carry = subtract ? u32(source) >= u32(operand) :
+			u64(u32(source)) + u32(operand) > 0xffffffffULL;
+	if (!partial_carry || carry != subtract)
+		m_st0 = (m_st0 & ~0x0800) | (carry ? 0x0800 : 0);
+	const s64 left = s64(source << 24) >> 24;
+	const s64 right = s64(operand << 24) >> 24;
+	const s64 result = subtract ? left - right : left + right;
+	if (result > 0x7fffffffLL || result < -0x80000000LL)
+	{
+		m_st0 |= destination_b ? 0x0200 : 0x0400;
+		if (BIT(m_st1, 9))
+			return result < 0 ? 0xff80000000ULL : 0x007fffffffULL;
+	}
+	return u64(result) & ACC_MASK;
+}
+
 u64 tms320c54x_device::arithmetic_shift_right(u64 value, unsigned shift) const
 {
 	const s64 signed_value = s64(value << 24) >> 24;
@@ -615,7 +633,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
 				(source << shift) & ACC_MASK;
 		u64 &destination = accumulator(BIT(op, 8));
-		destination = (destination - value) & ACC_MASK;
+		destination = add_sub(destination, value, true, BIT(op, 8));
 		return;
 	}
 	if ((op & 0xfce0) == 0xf400) // ADD source accumulator, shift, destination accumulator
@@ -625,7 +643,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
 				(source << shift) & ACC_MASK;
 		u64 &destination = accumulator(BIT(op, 8));
-		destination = (destination + value) & ACC_MASK;
+		destination = add_sub(destination, value, false, BIT(op, 8));
 		return;
 	}
 	if ((op & 0xfce0) == 0xf080) // AND source accumulator, shift, destination accumulator
@@ -692,10 +710,10 @@ void tms320c54x_device::execute_one(u16 op)
 			write_operand(u16(shifted(accumulator(BIT(extension, 8)))));
 		else if ((extension & 0xfce0) == 0x0c00) // ADD Smem, shift, src, dst
 			accumulator(BIT(extension, 8)) =
-					(accumulator(BIT(extension, 9)) + shifted(data_operand(read_operand()))) & ACC_MASK;
+					add_sub(accumulator(BIT(extension, 9)), shifted(data_operand(read_operand())), false, BIT(extension, 8));
 		else if ((extension & 0xfce0) == 0x0c20) // SUB Smem, shift, src, dst
 			accumulator(BIT(extension, 8)) =
-					(accumulator(BIT(extension, 9)) - shifted(data_operand(read_operand()))) & ACC_MASK;
+					add_sub(accumulator(BIT(extension, 9)), shifted(data_operand(read_operand())), true, BIT(extension, 8));
 		else
 		{
 			logerror("%s: unimplemented C54x extended opcode %04x/%04x at %04x\n",
@@ -721,8 +739,8 @@ void tms320c54x_device::execute_one(u16 op)
 				(u64(immediate) << shift);
 		switch (operation)
 		{
-		case 0: destination = (source + operand) & ACC_MASK; break;
-		case 1: destination = (source - operand) & ACC_MASK; break;
+		case 0: destination = add_sub(source, operand, false, BIT(op, 8)); break;
+		case 1: destination = add_sub(source, operand, true, BIT(op, 8)); break;
 		case 2: destination = operand; break;
 		case 3: destination = source & operand; break;
 		case 4: destination = source | operand; break;
@@ -735,6 +753,28 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination = fetch();
 		const u16 source = fetch();
 		data_write(destination, data_read(source));
+		return;
+	}
+	if ((op & 0xfce0) == 0xf460) // SFTA src, SHIFT, dst
+	{
+		const int shift = s8(u8(op << 3)) >> 3;
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		if (shift)
+			m_st0 = (m_st0 & ~0x0800) |
+					(BIT(source, shift < 0 ? -shift - 1 : 39 - shift) ? 0x0800 : 0);
+		u64 result = shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) :
+				(source << shift) & ACC_MASK;
+		if (shift > 0)
+		{
+			const s64 full = (s64(source << 24) >> 24) * (s64(1) << shift);
+			if (full > 0x7fffffffLL || full < -0x80000000LL)
+			{
+				m_st0 |= BIT(op, 8) ? 0x0200 : 0x0400;
+				if (BIT(m_st1, 9))
+					result = full < 0 ? 0xff80000000ULL : 0x007fffffffULL;
+			}
+		}
+		accumulator(BIT(op, 8)) = result;
 		return;
 	}
 	if ((op & 0xfce0) == 0xf400 || (op & 0xfce0) == 0xf420 ||
@@ -848,17 +888,17 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		const s64 value = (BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory)) << 16;
 		const u64 source = accumulator(BIT(family, 1));
-		accumulator(BIT(family, 0)) = (source + u64(value)) & ACC_MASK;
+		accumulator(BIT(family, 0)) = add_sub(source, u64(value) & ACC_MASK, false, BIT(family, 0), true);
 		return;
 	}
 	case 0x0000: // ADD Smem, A
-		m_a = (m_a + data_operand(indirect_read(low))) & ACC_MASK;
+		m_a = add_sub(m_a, data_operand(indirect_read(low)), false, false);
 		return;
 	case 0x0100: // ADD Smem, B
-		m_b = (m_b + data_operand(indirect_read(low))) & ACC_MASK;
+		m_b = add_sub(m_b, data_operand(indirect_read(low)), false, true);
 		return;
 	case 0x0200: // ADD uns(Smem), A
-		m_a = (m_a + indirect_read(low)) & ACC_MASK;
+		m_a = add_sub(m_a, indirect_read(low), false, false);
 		return;
 	case 0x0600: // ADDC Smem, A
 	case 0x0700: // ADDC Smem, B
@@ -867,25 +907,20 @@ void tms320c54x_device::execute_one(u16 op)
 		// the 32-bit accumulator boundary, independently of the guard byte.
 		u64 &destination = accumulator(BIT(op, 8));
 		const u64 operand = u64(indirect_read(low)) + (BIT(m_st0, 11) ? 1 : 0);
-		const u64 low_result = u64(u32(destination)) + operand;
-		destination = (destination + operand) & ACC_MASK;
-		if (low_result > 0xffffffffU)
-			m_st0 |= 0x0800;
-		else
-			m_st0 &= ~u16(0x0800);
+		destination = add_sub(destination, operand, false, BIT(op, 8));
 		return;
 	}
 	case 0x0800: // SUB Smem, A
-		m_a = (m_a - data_operand(indirect_read(low))) & ACC_MASK;
+		m_a = add_sub(m_a, data_operand(indirect_read(low)), true, false);
 		return;
 	case 0x0900: // SUB Smem, B
-		m_b = (m_b - data_operand(indirect_read(low))) & ACC_MASK;
+		m_b = add_sub(m_b, data_operand(indirect_read(low)), true, true);
 		return;
 	case 0x0a00: // SUBS Smem, A
-		m_a = (m_a - indirect_read(low)) & ACC_MASK;
+		m_a = add_sub(m_a, indirect_read(low), true, false);
 		return;
 	case 0x0b00: // SUBS Smem, B
-		m_b = (m_b - indirect_read(low)) & ACC_MASK;
+		m_b = add_sub(m_b, indirect_read(low), true, true);
 		return;
 	case 0x1800: // AND Smem, A
 		m_a &= indirect_read(low);
@@ -1014,10 +1049,10 @@ void tms320c54x_device::execute_one(u16 op)
 		switch (operation)
 		{
 		case 0:
-			destination = (accumulator(source_b) + shifted_memory()) & ACC_MASK;
+			destination = add_sub(accumulator(source_b), shifted_memory(), false, destination_b, shift == 16);
 			break;
 		case 1:
-			destination = (accumulator(source_b) - shifted_memory()) & ACC_MASK;
+			destination = add_sub(accumulator(source_b), shifted_memory(), true, destination_b, shift == 16);
 			break;
 		case 2:
 			destination = shifted_memory();

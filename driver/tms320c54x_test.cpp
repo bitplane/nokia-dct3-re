@@ -1089,6 +1089,90 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x04a0, 0xf000); // ADD #1, A
+			program.write_word(0x04a1, 1);
+			program.write_word(0x04a2, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x007fffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04a0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 53;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 53 || m_phase == 54)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 53 ? 0x007fffffffULL : 0xff80000000ULL),
+					"immediate ADD/SUB signed saturation");
+			expect((m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) ==
+					(m_phase == 53 ? 0x0400 : 0x0c00),
+					"immediate ADD/SUB overflow and bit-32 carry");
+			if (m_phase == 53)
+			{
+				program.write_word(0x04a0, 0xf010); // SUB #1, A
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000000ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04a0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 54;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x04b0, 0xf47f); // SFTA A, -1
+			program.write_word(0x04b1, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04b0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 55;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 55 || m_phase == 56)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 55 ? 0x7fffffffffULL : 0xffffffffffULL) &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
+					"SFTA right shift respects SXM and copies outgoing bit to carry");
+			if (m_phase == 55)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04b0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 56;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x04c0, 0x00f8); // ADD *abs, A
+			program.write_word(0x04c1, 0x0a80);
+			program.write_word(0x04c2, 0xf5e1);
+			data.write_word(0x0a80, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04c0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 57;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 57 || m_phase == 58)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 57 ? 0 : 0xffffffffffULL) &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
+					(m_phase == 57), "memory ADD carry and SUB borrow at bit 32");
+			if (m_phase == 57)
+			{
+				program.write_word(0x04c0, 0x08f8); // SUB *abs, A
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x04c0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 58;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
