@@ -5557,6 +5557,66 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 SUB #lk,B sign-extends with SXM and costs two cycles");
+			program.write_word(0x05e0, 0x75f8);
+			program.write_word(0x05e1, 0x0d00);
+			program.write_word(0x05e2, 0x0124);
+			program.write_word(0x05e3, 0x6d8a); // MAR *AR2-
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f21);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // Standard addressing mode.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 274;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 274)
+		{
+			expect_opcode(0x6d8a, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 MAR *AR2- modifies the pointer in one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xf846); // BC 05f0,AGT
+			program.write_word(0x05e3, 0x05f0);
+			program.write_word(0x05e4, 0xf5e1); // Taken branch bypasses fallthrough.
+			program.write_word(0x05f0, 0x75d6);
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0100000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 275;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 275)
+		{
+			expect_opcode(0xf846, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 BC AGT uses the 40-bit sign and costs five cycles taken");
+			program.write_word(0x05e2, 0xf84d); // BC 05f0,BEQ
+			program.write_word(0x05e4, 0x75d6); // Fallthrough marker.
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0100000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 276;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 276)
+		{
+			expect_opcode(0xf84d, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 BC BEQ checks B's guard byte and costs three cycles false");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
