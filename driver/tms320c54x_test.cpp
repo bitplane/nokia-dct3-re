@@ -8512,6 +8512,61 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 ADD *AR3+,A saturates under OVM and sets sticky overflow in one cycle");
+			program.write_word(0x05e3, 0xf1a0); // OR A,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0c00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 429;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 429)
+		{
+			expect_opcode(0xf1a0, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff00000000ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff000000ffULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0c00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 OR A,B combines all 40 bits without changing source or status");
+			program.write_word(0x05e3, 0xf2c0); // XOR B,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff000000f0ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff0000000fULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 430;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 430)
+		{
+			expect_opcode(0xf2c0, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff0000000fULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0c00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 XOR B,A combines all 40 bits without changing source or status");
+			program.write_word(0x05e3, 0xf620); // SUB B,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 431;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 431)
+		{
+			expect_opcode(0xf620, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7fffffff &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffffffffffULL &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 SUB B,A saturates signed-32 overflow without changing B");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
