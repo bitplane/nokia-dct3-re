@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 378 distinct words: 295 overlap the ROM4 run, 83 occur
+The fixture dispatches 379 distinct words: 295 overlap the ROM4 run, 84 occur
 only in the fixture, and 162 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -666,6 +666,10 @@ Exact `f474` (`SFTA A,-12`) checks zero-fill and sign-fill under SXM=0/1,
 the shifted-out bit in carry, and one-cycle timing. Exact `7722`
 (`STM #lk,MMR22`) checks immediate-to-register transfer and two-cycle timing.
 They had 20 and 16 observed executions, respectively.
+Fixture-only `f537` (`SUB A >> 9,B`) checks SXM=0 zero-fill and SXM=1
+sign-fill of a negative 40-bit source, the unchanged A source, and one-cycle
+timing. This guards the SUB half of the generic shifted-arithmetic correction
+without claiming that ROM4 executed this exact word in the captured boot.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
