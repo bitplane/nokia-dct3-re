@@ -574,12 +574,12 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 183 have an `opassert` marker after a
-passing exact-word check, 42 execute in the fixture without such a marker,
-and 232 are absent from the fixture. The 42-word class includes setup and
+assertions. Of the 457 ROM4 words, 185 have an `opassert` marker after a
+passing exact-word check, 40 execute in the fixture without such a marker,
+and 232 are absent from the fixture. The 40-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 42 lack semantic tests. In particular, the leading `6d8c`,
-`8084`, `108a`, `1a8b`, `1c84`, and `e598` words participate in a checked
+claim that all 40 lack semantic tests. In particular, the leading `8084`,
+`108a`, `1a8b`, and `e598` words participate in a checked
 challenge-transform result, but have no isolated exact-word assertion.
 The 232-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
@@ -810,6 +810,9 @@ words without changing the decoder.
 The register-indirect `OR Smem` group now has independent result, pointer,
 and one-cycle assertions for `1a82`/`1a83` (A) and `1b82`/`1b83` (B),
 matching TI SPRU172C table 2-8's base cycle cost.
+The challenge loop's `6d8c` (`MAR *AR4-`) and `1c84` (`XOR *AR4,A`) now have
+independent one-cycle assertions. The paired test also proves that `XOR`
+reads the address selected by the preceding pointer decrement.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
