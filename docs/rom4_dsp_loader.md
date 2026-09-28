@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 485 distinct words: 387 overlap the ROM4 run, 98 occur
-only in the fixture, and 70 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 488 distinct words: 390 overlap the ROM4 run, 98 occur
+only in the fixture, and 67 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 387 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 390 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 70 are absent from the fixture. This closes the fixture-executed-only
+and 67 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1201,6 +1201,10 @@ paths, with BGT decided by B's 40-bit guard sign.
 Exact `4812`, `4813`, `4814`, `4817`, and `4910` are LDM reads of AR2/3/4/7/0,
 not stack operations. Interleaved STL stores preserve each A result for
 independent checks; all five loads zero-extend despite SXM and cost one cycle.
+Exact `f200` checks signed `ADD #lk,B,A`, source preservation, carry, and two
+cycles. Exact `f2a0` checks 40-bit `OR B,A` without status changes; exact `f540`
+checks unshifted `LD A,B`, including OVB when A is outside signed 32-bit range.
+Both accumulator-to-accumulator forms cost one cycle.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
