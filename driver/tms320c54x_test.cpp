@@ -8292,6 +8292,26 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"MPYU treats both operands as unsigned and doubles product under FRCT");
+			program.write_word(0x05e3, 0x4482); // LD *AR2,16,A
+			data.write_word(0x0f90, 0x8000);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0400); // Sticky OVA
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM, no SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 418;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 418)
+		{
+			expect_opcode(0x4482, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x80000000ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0600) == 0x0400 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"fixed-16 LD zero-extends without SXM and ignores OVM without changing overflow");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

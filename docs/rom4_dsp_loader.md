@@ -358,8 +358,10 @@ overflow conformance; those require separate instruction-family tests.
 Shifted accumulator, ASM, long-immediate and extended-memory LD forms share
 SXM-aware shifting and sticky overflow/OVM handling while preserving carry.
 The executable ASM test crosses the signed-32-bit limit without requiring a
-40-bit wrap. Fixed-high-word loads and multiplier families remain separate
-audit surfaces.
+40-bit wrap. Fixed-16 memory loads have separate SXM-on/off, pointer/timing,
+and OVM-on fixtures: the fixed shift does not saturate or change overflow
+status under OVM, unlike variable-SHIFT loads (SPRU172C, LD page 4-66).
+Other multiplier and shift combinations remain separate audit surfaces.
 The fractional multiply/MAC paths now double signed products with bounded
 multiplication instead of left-shifting potentially negative C++ values.
 Negative-product fixtures check memory MAC and dual-memory MPY results,
