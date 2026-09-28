@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 460 distinct words: 363 overlap the ROM4 run, 97 occur
-only in the fixture, and 94 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 463 distinct words: 366 overlap the ROM4 run, 97 occur
+only in the fixture, and 91 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 363 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 366 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 94 are absent from the fixture. This closes the fixture-executed-only
+and 91 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1176,6 +1176,11 @@ Exact `f028 00aa` checks the ROM4 two-word, two-cycle `LD #lk,8,A` stream.
 Exact `f1b8` checks a logical right shift in `OR A>>8,B`, source preservation,
 and unchanged status; `f468` checks one-cycle `SFTA A,8,A` and OVA when a
 positive source crosses the signed 32-bit boundary.
+Exact `3182` (`MPYA *AR2`) now checks a negative product from A's signed high
+word, transfer of Smem to T, unchanged AR2, and one-cycle timing. Exact `0885`
+(`SUB *AR5,A`) checks SXM sign extension without pointer motion in one cycle;
+`1df8` (`XOR *(lk),B`) checks absolute-address extension, guard/status
+preservation, and the two-cycle surcharge.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
