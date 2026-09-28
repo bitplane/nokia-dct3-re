@@ -388,17 +388,21 @@ and `5483` check that low-lane carry/borrow does not enter the high lane and
 that C16 mode does not saturate under OVM. None of these words appeared in the
 captured ROM4 boot. `DRSUB` now shares the long-word decoder; fixture-only
 `5893`/`588b` reproduce TI's reverse-subtract examples in both C16 modes,
-including the cleared borrow flag and AR3 movement by two words. The T-based
-Fixture-only `5a8b`/`5a93`, `5c8b`/`5c93`, and `5e8b`/`5e93` now check the
+including the cleared borrow flag and AR3 movement by two words. Fixture-only
+`5a8b`/`5a93`, `5c8b`/`5c93`, and `5e8b`/`5e93` now check the
 T-based long-word forms (`DADST`, `DSUBT`, `DSADT`) in both C16 modes against
 TI's published result examples. `5bf8` checks absolute B-destination
 addressing and its two-cycle cost. `5aea` checks long-offset preupdate,
-extension consumption, and the same two-cycle cost. The published DSADT C16 example sets C
+extension consumption, and the same two-cycle cost. The published DSADT C16
+example sets C
 despite an upper-lane subtraction borrow; the fixture does not assert C for
 that case, so its carry behavior still needs independent evidence. TI's
 opcode table also exposed a pre-existing `SUBC Smem,B` decode error: its
 encoding is `1f`, not `5e` (which belongs to DSADT). Fixture-only `1f83`
 checks the corrected B destination, unchanged A, carry, and indirect timing.
+The previously absent `SUBB` family now consumes the inverse of C as an
+incoming borrow. Fixture-only `0e83` and `0f83` check TI's A/B examples,
+including carry-out and one-cycle indirect timing.
 External-memory wait states also remain outside this fixture audit.
 `SQUR Smem` now copies its source word to T as SPRU172C specifies; the prior
 handler calculated the square but left T unchanged. Fixture-only `2682`
@@ -632,8 +636,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 582 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 125 occur only in the fixture. These are
+The fixture dispatches 584 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 127 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.

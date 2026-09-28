@@ -1038,6 +1038,14 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0b00: // SUBS Smem, B
 		m_b = add_sub(m_b, alu_smem(), true, true);
 		return;
+	case 0x0e00: // SUBB Smem, A
+	case 0x0f00: // SUBB Smem, B
+	{
+		u64 &destination = accumulator(BIT(op, 8));
+		const u64 operand = u64(alu_smem()) + (BIT(m_st0, 11) ? 0 : 1);
+		destination = add_sub(destination, operand, true, BIT(op, 8));
+		return;
+	}
 	case 0x1800: // AND Smem, A
 		m_a &= alu_smem();
 		return;

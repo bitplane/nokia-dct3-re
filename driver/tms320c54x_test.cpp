@@ -10943,6 +10943,48 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f06 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"long-offset DADST preupdates AR and costs two cycles");
+			program.write_word(0x05e2, 0x0e83); // SUBB *AR3,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f90, 6);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 6);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); // Borrow input.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 572;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 572)
+		{
+			expect_opcode(0x0e83,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffffffULL &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUBB A consumes inverted carry as borrow in one cycle");
+			program.write_word(0x05e2, 0x0f83); // SUBB *AR3,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff80000006ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // No borrow input.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 573;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 573)
+		{
+			expect_opcode(0x0f83,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80000000ULL &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUBB B preserves A and no-borrow carry");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
