@@ -381,6 +381,12 @@ SPRU172C explicitly lists FRCT as affecting MPYU; unsigned multiplication
 must not bypass the fractional shift. Dual-16 arithmetic (`DADD`/`DSUB`
 families) remains unimplemented and was not observed in the captured ROM4
 executed-opcode set, so it is not yet a claim of ROM4 conformance.
+`SQUR Smem` now copies its source word to T as SPRU172C specifies; the prior
+handler calculated the square but left T unchanged. Fixture-only `2682`
+checks FRCT doubling, OVM saturation, sticky OVA, and one-cycle indirect
+timing. Fixture-only `27f8` checks signed squaring into B, T publication,
+absolute-address extension consumption, and the two-cycle cost. These tests
+do not establish every square/rounding mode or external-memory wait state.
 Indirect MMR addressing was a separate core defect: `LDM`/`STLM` and the
 other seven-bit MMR operand forms previously read the opcode's low bits as a
 fixed address even when the indirect bit was set. They now select the AR's

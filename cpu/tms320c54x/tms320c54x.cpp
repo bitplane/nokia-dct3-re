@@ -1084,7 +1084,10 @@ void tms320c54x_device::execute_one(u16 op)
 		if (family == 0x04)
 			product = s64(u16(m_t)) * s64(memory);
 		else if (family == 0x06)
+		{
 			product = s64(s16(memory)) * s64(s16(memory));
+			m_t = memory;
+		}
 		else
 			product = s64(s16(m_t)) * s64(s16(memory));
 		if (BIT(m_st1, 6)) // FRCT
