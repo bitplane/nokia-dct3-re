@@ -405,6 +405,10 @@ private:
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
+		static constexpr u8 rom4_saved_mmr[] = {
+			0x0e, 0x10, 0x11, 0x13, 0x14, 0x15,
+			0x16, 0x17, 0x19, 0x1a, 0x1b, 0x1c
+		};
 		if (m_phase == 5)
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
@@ -3578,6 +3582,59 @@ private:
 			expect_opcode(0x4907, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8123 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"LDM ST1, B ignores SXM and zero-extends in one cycle");
+			u16 pc = 0x0600;
+			for (unsigned i = 0; i != std::size(rom4_saved_mmr); ++i)
+			{
+				program.write_word(pc++, 0x7700 | rom4_saved_mmr[i]); // STM #lk, MMR
+				program.write_word(pc++, 0x4000 + i);
+			}
+			for (u8 mmr : rom4_saved_mmr)
+				program.write_word(pc++, 0x4a00 | mmr); // PSHM MMR
+			program.write_word(pc, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 186;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 186)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02f4,
+					"ROM4 MMR burst pushes twelve values");
+			for (unsigned i = 0; i != std::size(rom4_saved_mmr); ++i)
+			{
+				const bool correct_value = data.read_word(0x02ff - i) == 0x4000 + i;
+				expect_opcode(0x7700 | rom4_saved_mmr[i], correct_value,
+						"ROM4 STM initializes the selected register");
+				expect_opcode(0x4a00 | rom4_saved_mmr[i], correct_value,
+						"ROM4 MMR burst pushes the selected register");
+			}
+			u16 pc = 0x0640;
+			for (unsigned i = 0; i != std::size(rom4_saved_mmr); ++i)
+			{
+				program.write_word(pc++, 0x7700 | rom4_saved_mmr[i]);
+				program.write_word(pc++, 0x5000 + i);
+			}
+			for (unsigned i = std::size(rom4_saved_mmr); i != 0; --i)
+				program.write_word(pc++, 0x8a00 | rom4_saved_mmr[i - 1]); // POPM MMR
+			for (u8 mmr : rom4_saved_mmr)
+				program.write_word(pc++, 0x4a00 | mmr);
+			program.write_word(pc, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0640);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 187;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 187)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02f4,
+					"ROM4 MMR burst pops then pushes twelve values");
+			for (unsigned i = 0; i != std::size(rom4_saved_mmr); ++i)
+				expect_opcode(0x8a00 | rom4_saved_mmr[i],
+						data.read_word(0x02ff - i) == 0x4000 + i,
+						"ROM4 MMR burst restores the selected register");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
