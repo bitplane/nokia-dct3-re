@@ -6821,6 +6821,87 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1357 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"MVMM AR3,AR6 transfers the MMR word in one cycle");
+			program.write_word(0x05e3, 0xfa4d); // BCD 05f0h, BEQ
+			program.write_word(0x05e4, 0x05f0);
+			program.write_word(0x05e5, 0xe801); // Delay slot 1
+			program.write_word(0x05e6, 0xe902); // Delay slot 2 changes B
+			program.write_word(0x05e7, 0xe803); // Fall-through only
+			program.write_word(0x05e8, 0x75f8);
+			program.write_word(0x05e9, 0x0d00);
+			program.write_word(0x05ea, 0x0124);
+			program.write_word(0x05eb, 0xf5e1);
+			program.write_word(0x05f0, 0x75f8);
+			program.write_word(0x05f1, 0x0d00);
+			program.write_word(0x05f2, 0x0124);
+			program.write_word(0x05f3, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 341;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 341)
+		{
+			expect_opcode(0xfa4d, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05f4 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"BCD BEQ uses pre-slot B and executes both delay words");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 342;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 342)
+		{
+			expect_opcode(0xfa4d, m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ec &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
+					"BCD BEQ false executes slots and falls through");
+			program.write_word(0x05e3, 0xfc4d); // RC BEQ
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x02ff, 0x05f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x02ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 343;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 343)
+		{
+			expect_opcode(0xfc4d, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05f4 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"RC BEQ pops return address in five cycles when B is zero");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x02ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 344;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 344)
+		{
+			expect_opcode(0xfc4d, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"RC BEQ leaves stack untouched in three cycles when B is nonzero");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
