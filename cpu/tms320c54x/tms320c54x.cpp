@@ -766,6 +766,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_illegal = true;
 			return;
 		}
+		m_icount -= absolute ? 2 : 1;
 		return;
 	}
 	if ((op & 0xfc00) == 0xf000 && ((op >> 4) & 0x0f) <= 5)
@@ -1093,54 +1094,6 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 immediate = fetch();
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
 		m_icount -= low == 0xf8 ? 2 : 1;
-		return;
-	}
-	case 0x6f00: // Extended ALU/load/store Smem, shift, accumulator
-	{
-		const u16 address = low == 0xf8 ? fetch() : m_ar[low & 7];
-		const u16 extension = fetch();
-		const unsigned operation = (extension >> 5) & 7;
-		const int shift = s8(u8(extension << 3)) >> 3;
-		const bool destination_b = BIT(extension, 8);
-		const bool source_b = BIT(extension, 9);
-		auto shifted_memory = [this, address, shift] () -> u64
-		{
-			s64 value = BIT(m_st1, 8) ? s16(data_read(address)) : data_read(address);
-			return shift >= 0 ? u64(value << shift) & ACC_MASK :
-					u64(value >> -shift) & ACC_MASK;
-		};
-		u64 &destination = accumulator(destination_b);
-		switch (operation)
-		{
-		case 0:
-			destination = add_sub(accumulator(source_b), shifted_memory(), false, destination_b, shift == 16);
-			break;
-		case 1:
-			destination = add_sub(accumulator(source_b), shifted_memory(), true, destination_b, shift == 16);
-			break;
-		case 2:
-			destination = shifted_memory();
-			break;
-		case 3:
-		{
-			const s64 high = s16(accumulator(destination_b) >> 16);
-			data_write(address, u16(shift >= 0 ? high << shift : high >> -shift));
-			break;
-		}
-		case 4:
-		{
-			const s64 value = s64(accumulator(destination_b) << 24) >> 24;
-			data_write(address, u16(shift >= 0 ? value << shift : value >> -shift));
-			break;
-		}
-		default:
-			logerror("%s: unimplemented C54x 6f extension %04x at %04x\n",
-					machine().describe_context(), extension, u16(m_pc - 3));
-			m_illegal = true;
-			break;
-		}
-		if (low != 0xf8)
-			indirect_modify(low);
 		return;
 	}
 	case 0x4800: // LDM MMR, A

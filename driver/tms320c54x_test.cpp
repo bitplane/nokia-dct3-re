@@ -3344,6 +3344,44 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0dd3 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"repeated MVDK advances both data addresses at one cycle after setup");
+			program.write_word(0x05e2, 0x6f8a); // LD *AR2-,0,A
+			program.write_word(0x05e3, 0x0c40);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0df0, 0x2345);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0df0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 172;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 172)
+		{
+			expect_opcode(0x6f8a, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2345 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0def &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 extended indirect LD consumes its extension in two cycles");
+			program.write_word(0x05e2, 0x6ff8); // LD *(absolute),0,A
+			program.write_word(0x05e3, 0x0df0);
+			program.write_word(0x05e4, 0x0c40);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 173;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 173)
+		{
+			expect_opcode(0x6ff8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2345 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 extended absolute LD consumes address then extension in three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

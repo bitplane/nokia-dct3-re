@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 186 distinct words: 149 overlap the ROM4 run, 37 occur
-only in the fixture, and 308 ROM4 words do not occur in the fixture. These are
+The fixture executes 187 distinct words: 150 overlap the ROM4 run, 37 occur
+only in the fixture, and 307 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 85 have an `opassert` marker after a
-passing exact-word check, 64 execute in the fixture without such a marker,
-and 308 are absent from the fixture. The 64-word class includes setup and
+assertions. Of the 457 ROM4 words, 87 have an `opassert` marker after a
+passing exact-word check, 63 execute in the fixture without such a marker,
+and 307 are absent from the fixture. The 63-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 64 lack semantic tests. The 308-word class is a priority list
+claim that all 63 lack semantic tests. The 307-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -750,6 +750,12 @@ extension order, data movement, and TI's three-cycle cost. A repeated
 `7192` fixture checks three distinct source and destination addresses and
 the one-cycle rate after its first two-cycle move. Both passed on the
 existing core; this was a coverage and contract check, not a behavior fix.
+The live extended `0x6f` Smem decoder now charges TI's two-cycle indirect
+and three-cycle absolute costs. Exact ROM4 `6f8a`/`6ff8` fixtures check
+shifted-load data, pointer/extension consumption, and both costs. The later
+`case 0x6f00` arm was unreachable behind the earlier unconditional decoder
+and has been removed. Other extension suboperations and long-offset modes
+still need separate tests.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
