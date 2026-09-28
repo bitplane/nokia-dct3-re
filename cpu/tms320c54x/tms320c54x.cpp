@@ -955,7 +955,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0100: // ADD Smem, B
 		m_b = add_sub(m_b, data_operand(alu_smem()), false, true);
 		return;
-	case 0x0200: // ADD uns(Smem), A
+	case 0x0200: // ADDS Smem, A
 		m_a = add_sub(m_a, alu_smem(), false, false);
 		return;
 	case 0x0600: // ADDC Smem, A
