@@ -1569,6 +1569,11 @@ checks consecutive program coefficients, T and AR3 updates, and the
 one-cycle rate after the first multiply. These are fixture-only encodings;
 long-offset/absolute extension order and other addressing variants remain
 unasserted.
+Fixture-only `798b` and `7b8b` extend those assertions to destination B:
+they check A preservation, B's signed product, T publication, AR3 decrement,
+the MACP/MACD successor distinction, and the same three-cycle base cost.
+The `79` and `7b` decoder groups therefore no longer have zero fixture words;
+neither group is observed in the current ROM4 trace union.
 TI SPRU307A assigns `FIRS` to `E0xx`, with a three-cycle first pass and
 one-cycle repeat rate. As with LMS, the detailed SPRU172C opcode diagram
 conflicts with the opcode table and live `B0xx` MAC encodings; the decoder

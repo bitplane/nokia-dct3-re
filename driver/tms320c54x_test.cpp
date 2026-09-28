@@ -12113,6 +12113,58 @@ private:
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"MACR rounds just below negative half-word to minus one word in one cycle");
+			program.write_word(0x05e2, 0x798b); // MACP *AR3-,0700,B.
+			program.write_word(0x05e3, 0x0700);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			program.write_word(0x0700, 0x1234);
+			data.write_word(0x0f90, 0x0055);
+			data.write_word(0x0f91, 0x0066);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 674;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 674)
+		{
+			expect_opcode(0x798b,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f8f &&
+				data.read_word(0x0f91) == 0x0066 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"MACP B preserves A and the successor while multiplying in three cycles");
+			program.write_word(0x05e2, 0x7b8b); // MACD *AR3-,0700,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 675;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 675)
+		{
+			expect_opcode(0x7b8b,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f8f &&
+				data.read_word(0x0f91) == 0x0055 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"MACD B preserves A, copies the successor, and costs three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
