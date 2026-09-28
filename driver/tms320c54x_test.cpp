@@ -7011,6 +7011,60 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"long-offset DLD keeps AR and sign-extends in two cycles");
+			program.write_word(0x05e3, 0x40ea); // SUB *+AR2(5),16,A
+			program.write_word(0x05e4, 5);
+			data.write_word(0x0f05, 1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x30000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 350;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 350)
+		{
+			expect_opcode(0x40ea, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x20000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"long-offset SUB preupdates AR and takes two cycles");
+			program.write_word(0x05e3, 0x34e2); // BITT *AR2(5)
+			program.write_word(0x05e4, 5);
+			data.write_word(0x0f05, 0x8000);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 351;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 351)
+		{
+			expect_opcode(0x34e2, bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"long-offset BITT keeps AR and takes two cycles");
+			program.write_word(0x05e3, 0x20ea); // MPY *+AR2(5),A
+			program.write_word(0x05e4, 5);
+			data.write_word(0x0f05, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 352;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 352)
+		{
+			expect_opcode(0x20ea, m_cpu->state_int(tms320c54x_device::STATE_A) == 6 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"long-offset MPY preupdates AR and takes two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

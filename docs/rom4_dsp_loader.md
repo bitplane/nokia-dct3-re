@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 349 distinct words: 278 overlap the ROM4 run, 71 occur
+The fixture dispatches 352 distinct words: 278 overlap the ROM4 run, 74 occur
 only in the fixture, and 179 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -600,6 +600,12 @@ data, AR update, and cycle cost.
 Fixture-only `4fea` and `57e2` check the Lmem long-offset decoder: `DST`
 preupdates AR and writes the high/low pair in three cycles; `DLD` leaves AR
 unchanged, reads both words, and sign-extends the result in two cycles.
+Fixture-only `40ea`, `34e2`, and `20ea` check the arithmetic/multiply Smem
+long-offset surcharge against TI's instruction tables: `SUB`, `BITT`, and
+`MPY` each consume an extension word and two cycles, with the expected AR
+preupdate or preservation and an asserted result. These tests correct timing
+for the corresponding decoded instruction families, but do not add a new
+exact-word assertion for the observed ROM4 run.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
