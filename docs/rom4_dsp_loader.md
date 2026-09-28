@@ -422,6 +422,14 @@ multiplication, square-to-B with T publication, and MAC/MAS accumulation or
 rounding in both accumulators. Each checks its result, T, the untouched
 accumulator, carry preservation, and one-cycle DARAM timing. They do not
 cover FRCT/OVM combinations or all memory-addressing variants.
+TI SPRU307A divides the dual-memory `0xb*` range into MAC/MACR (`b0..b7`)
+and MAS/MASR (`b8..bf`). The core previously added the product for both
+halves; it now subtracts for MAS. A 16-word table checks A/B source and
+destination routing, rounded and unrounded results, T publication, the two
+auxiliary-register paths, preserved carry, and one-cycle DARAM timing.
+Only `b03a` was already in the fixture; none of the 15 added encodings was
+observed in the current ROM4 idle trace. FRCT/OVM and other X/Y address
+combinations remain outside this table.
 Fixture-only `3383`, `3583`, and `3783` check `MASA`, `MACA`, and `MACAR`
 using A's high word as the multiplicand, including B accumulation, T
 publication, rounding, and one-cycle DARAM timing. `3693` uses TI's `POLY`
@@ -676,8 +684,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 618 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 161 occur only in the fixture. These are
+The fixture dispatches 633 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 176 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -687,8 +695,9 @@ also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
 That inventory matches top-level cases and opcode masks: 39,518 words match
-some declared path, of which 618 execute in the fixture and 38,900 do not;
-20 matching high-byte groups have no fixture word. These are **candidates**,
+some declared path, of which 633 execute in the fixture and 38,885 do not;
+seven matching high-byte groups have no fixture word (`d0..d5`, `d7`).
+These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
 grammar, and behavior are not established by a source mask. The report keeps
 the ROM4-observed/fixture-asserted class separate, so a new observed gap can

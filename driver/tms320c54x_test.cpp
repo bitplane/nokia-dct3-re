@@ -11382,6 +11382,65 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xb03a); // MAC *AR5,*AR4+,A,A
+			data.write_word(0x0f90, 2);
+			data.write_word(0x0f91, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x18000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x28000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 614;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 614 && m_phase <= 629)
+		{
+			struct dual_mac_case { u16 opcode; u64 a_after, b_after; };
+			static constexpr dual_mac_case cases[] = {
+				{ 0xb03a, 0x18006, 0x28000 }, { 0xb13a, 0x18000, 0x18006 },
+				{ 0xb23a, 0x28006, 0x28000 }, { 0xb33a, 0x18000, 0x28006 },
+				{ 0xb43a, 0x20000, 0x28000 }, { 0xb53a, 0x18000, 0x20000 },
+				{ 0xb63a, 0x30000, 0x28000 }, { 0xb73a, 0x18000, 0x30000 },
+				{ 0xb83a, 0x17ffa, 0x28000 }, { 0xb93a, 0x18000, 0x17ffa },
+				{ 0xba3a, 0x27ffa, 0x28000 }, { 0xbb3a, 0x18000, 0x27ffa },
+				{ 0xbc3a, 0x10000, 0x28000 }, { 0xbd3a, 0x18000, 0x10000 },
+				{ 0xbe3a, 0x20000, 0x28000 }, { 0xbf3a, 0x18000, 0x20000 }
+			};
+			const unsigned index = m_phase - 614;
+			const dual_mac_case &row = cases[index];
+			expect_opcode(row.opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"dual MAC/MAS source, destination, rounding, pointer, and one-cycle timing");
+			if (m_phase < 629)
+			{
+				const dual_mac_case &next = cases[index + 1];
+				program.write_word(0x05e2, next.opcode);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x18000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x28000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
