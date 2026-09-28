@@ -7420,6 +7420,41 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0e21 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 MVDD *AR2+,*AR5+ copies before both increments in one cycle");
+			program.write_word(0x05e3, 0x13d2); // LDU *AR2+%,B
+			data.write_word(0x0f23, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 371;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 371)
+		{
+			expect_opcode(0x13d2, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 unsigned LDU wraps AR2 circularly after the read in one cycle");
+			program.write_word(0x05e3, 0x1882); // AND *AR2,A
+			data.write_word(0x0f20, 0x0f0f);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 372;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 372)
+		{
+			expect_opcode(0x1882, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0204 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 AND *AR2,A masks without updating the pointer in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
