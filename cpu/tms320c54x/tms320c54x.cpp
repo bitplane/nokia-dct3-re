@@ -1642,7 +1642,7 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
-	if ((op & 0xf800) == 0xd000) // ST src, Ymem || MAC[R] Xmem, dst
+	if ((op & 0xf000) == 0xd000) // ST src, Ymem || MAC[R]/MAS[R] Xmem, dst
 	{
 		const u8 x = op >> 4;
 		const u8 y = op;
@@ -1662,7 +1662,7 @@ void tms320c54x_device::execute_one(u16 op)
 			product *= 2;
 		product = multiply_product(product);
 		const u64 old_destination = accumulator(BIT(op, 8)) & ACC_MASK;
-		s64 result = (s64(old_destination << 24) >> 24) + product;
+		s64 result = (s64(old_destination << 24) >> 24) + (BIT(op, 11) ? -product : product);
 		if (BIT(op, 10))
 			result = (result + 0x8000) & ~s64(0xffff);
 		accumulator(BIT(op, 8)) = multiply_result(result, BIT(op, 8));
