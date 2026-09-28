@@ -1119,7 +1119,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = indirect_read(low);
 		const u16 mask = fetch();
 		m_st0 = (m_st0 & ~0x1000) | ((value & mask) ? 0x1000 : 0);
-		m_icount -= low == 0xf8 ? 2 : 1;
+		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x6000: // CMPM Smem, #lk
@@ -1127,7 +1127,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = indirect_read(low);
 		const u16 immediate = fetch();
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
-		m_icount -= low == 0xf8 ? 2 : 1;
+		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x4800: // LDM MMR, A

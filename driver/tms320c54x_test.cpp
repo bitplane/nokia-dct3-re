@@ -6739,6 +6739,88 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 					m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
 					"PORTW *AR2 emits memory word without modifying AR2 in two cycles");
+			program.write_word(0x05e3, 0x61ea); // BITF *+AR2(5),#8000
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x8000);
+			program.write_word(0x05e6, 0x75f8);
+			program.write_word(0x05e7, 0x0d00);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			data.write_word(0x0f05, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 337;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 337)
+		{
+			expect_opcode(0x61ea, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1800) == 0x1800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"long-offset BITF sets TC and preserves carry in three cycles");
+			program.write_word(0x05e3, 0x60e2); // CMPM *AR2(5),#1235
+			program.write_word(0x05e5, 0x1235);
+			data.write_word(0x0f05, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 338;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 338)
+		{
+			expect_opcode(0x60e2, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1800) == 0x0800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"long-offset CMPM clears TC without AR update in three cycles");
+			program.write_word(0x05e3, 0x6180); // BITF *AR0,#0001
+			program.write_word(0x05e4, 1);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f20, 4);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 339;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 339)
+		{
+			expect_opcode(0x6180, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1800) == 0x0800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"BITF *AR0 clears TC when masked bit is absent in two cycles");
+			program.write_word(0x05e3, 0xe736); // MVMM AR3,AR6
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1357);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 340;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 340)
+		{
+			expect_opcode(0xe736, m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1357 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1357 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"MVMM AR3,AR6 transfers the MMR word in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
