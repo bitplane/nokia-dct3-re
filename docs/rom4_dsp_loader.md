@@ -360,6 +360,14 @@ SXM-aware shifting and sticky overflow/OVM handling while preserving carry.
 The executable ASM test crosses the signed-32-bit limit without requiring a
 40-bit wrap. Fixed-high-word loads and multiplier families remain separate
 audit surfaces.
+The fractional multiply/MAC paths now double signed products with bounded
+multiplication instead of left-shifting potentially negative C++ values.
+Negative-product fixtures check memory MAC and dual-memory MPY results,
+pointer/T effects, and one-cycle costs. A fixture-only `SQDST` case checks
+negative `(Xmem - Ymem) << 16` and fractional-square accumulation; its signed
+scaling is likewise defined C++ multiplication. These checks agree with TI
+SPRU172C's arithmetic expressions and class-7 timing, but do not establish
+all multiplier flag and rounding variants.
 SFTL shifts only the low 32 bits, clears destination guard bits and sets carry
 from the outgoing bit (or clears carry for shift zero), per SPRU172C page
 4-158. Executable left/right/zero-shift cases distinguish this from SFTA's
@@ -567,7 +575,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 399 distinct words: 314 overlap the ROM4 run, 85 occur
+The fixture dispatches 400 distinct words: 314 overlap the ROM4 run, 86 occur
 only in the fixture, and 143 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census

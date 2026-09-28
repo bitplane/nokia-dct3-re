@@ -937,7 +937,7 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 			s64 product = s64(s16(m_a >> 16)) * s64(s16(memory));
 			if (BIT(m_st1, 6))
-				product <<= 1;
+				product *= 2;
 			if (family != 1)
 				product = multiply_product(product);
 			s64 result = family == 1 ? product :
@@ -953,18 +953,18 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 			s64 product = s64(s16(m_a >> 16)) * s64(s16(m_t));
 			if (BIT(m_st1, 6))
-				product <<= 1;
+				product *= 2;
 			m_a = multiply_result((multiply_product(product) +
 					(s64(m_b << 24) >> 24) + 0x8000) & ~s64(0xffff), false);
 			const s64 value = BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory);
-			m_b = u64(value << 16) & ACC_MASK;
+			m_b = u64(value * 0x10000) & ACC_MASK;
 			return;
 		}
 		if (family >= 8 && family <= 0x0b)
 		{
 			s64 product = s64(s16(memory)) * s64(s16(memory));
 			if (BIT(m_st1, 6))
-				product <<= 1;
+				product *= 2;
 			m_t = memory;
 			u64 &destination = accumulator(BIT(family, 0));
 			const s64 current = s64(destination << 24) >> 24;
@@ -972,7 +972,7 @@ void tms320c54x_device::execute_one(u16 op)
 					BIT(family, 0));
 			return;
 		}
-		const s64 value = (BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory)) << 16;
+		const s64 value = (BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory)) * 0x10000;
 		const u64 source = accumulator(BIT(family, 1));
 		accumulator(BIT(family, 0)) = add_sub(source, u64(value) & ACC_MASK, false, BIT(family, 0), true);
 		return;
@@ -1058,7 +1058,7 @@ void tms320c54x_device::execute_one(u16 op)
 		else
 			product = s64(s16(m_t)) * s64(s16(memory));
 		if (BIT(m_st1, 6)) // FRCT
-			product <<= 1;
+			product *= 2;
 		if (family >= 0x08)
 			product = multiply_product(product);
 
@@ -1512,7 +1512,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 yvalue = data_read(m_ar[yar]);
 		s64 product = s64(s16(xvalue)) * s64(s16(yvalue));
 		if (BIT(m_st1, 6))
-			product <<= 1;
+			product *= 2;
 		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
 		m_t = xvalue;
 		dual_modify(x);
@@ -1530,7 +1530,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 yvalue = data_read(m_ar[yar]);
 		s64 product = s64(s16(xvalue)) * s64(s16(yvalue));
 		if (BIT(m_st1, 6))
-			product <<= 1;
+			product *= 2;
 		product = multiply_product(product);
 		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
 		s64 result = (s64(source << 24) >> 24) + product;
@@ -1558,7 +1558,7 @@ void tms320c54x_device::execute_one(u16 op)
 
 		s64 product = s64(s16(m_t)) * s64(s16(xvalue));
 		if (BIT(m_st1, 6))
-			product <<= 1;
+			product *= 2;
 		product = multiply_product(product);
 		const u64 old_destination = accumulator(BIT(op, 8)) & ACC_MASK;
 		s64 result = (s64(old_destination << 24) >> 24) + product;
@@ -1581,10 +1581,10 @@ void tms320c54x_device::execute_one(u16 op)
 		const s64 old_a_high = s16(m_a >> 16);
 		s64 square = old_a_high * old_a_high;
 		if (BIT(m_st1, 6))
-			square <<= 1;
+			square *= 2;
 		const u64 old_b = m_b & ACC_MASK;
 		m_b = u64((s64(old_b << 24) >> 24) + square) & ACC_MASK;
-		m_a = u64(s64(xvalue - yvalue) << 16) & ACC_MASK;
+		m_a = u64(s64(xvalue - yvalue) * 0x10000) & ACC_MASK;
 		dual_modify(x);
 		if (xar != yar)
 			dual_modify(y);
