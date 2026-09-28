@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 178 distinct words: 141 overlap the ROM4 run, 37 occur
-only in the fixture, and 316 ROM4 words do not occur in the fixture. These are
+The fixture executes 179 distinct words: 142 overlap the ROM4 run, 37 occur
+only in the fixture, and 315 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 74 have an `opassert` marker after a
-passing exact-word check, 67 execute in the fixture without such a marker,
-and 316 are absent from the fixture. The 67-word class includes setup and
+assertions. Of the 457 ROM4 words, 77 have an `opassert` marker after a
+passing exact-word check, 65 execute in the fixture without such a marker,
+and 315 are absent from the fixture. The 65-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 67 lack semantic tests. The 316-word class is a priority list
+claim that all 65 lack semantic tests. The 315-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -721,6 +721,13 @@ stack path. The saved word and SP round trip match TI SPRU172C; no core
 change was needed. The ROM4 trace exercises long-offset `MAR` explicitly,
 but does not establish generic long-offset Smem reads or writes. Those
 MOD12-14 forms remain a decoder and cycle-cost gap, not a validated feature.
+The one-word Smem arithmetic/logical handlers (`ADD`, `ADDC`, `SUB`, `SUBS`,
+`AND`, `OR`, `XOR`, and `SUBC`) now charge the extra cycle TI SPRU172C assigns
+to absolute addressing. Exact `07f8`, `1af8`, and `08f8` fixtures check an
+arithmetic carry input, a logical result, a signed subtraction result, and
+their two-cycle costs. The core previously charged one cycle to these
+absolute forms. This does not establish long-offset decoding or every flag
+and accumulator variant in the family.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool

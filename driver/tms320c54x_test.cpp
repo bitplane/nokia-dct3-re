@@ -3097,6 +3097,64 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0005 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 POPM ST0 restores the MMR in one cycle");
+			program.write_word(0x05e2, 0x07f8); // ADDC *(absolute),B
+			program.write_word(0x05e3, 0x0d70);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d70, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 159;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 159)
+		{
+			expect_opcode(0x07f8, m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute ADDC consumes carry and costs two cycles");
+			program.write_word(0x05e2, 0x1af8); // OR *(absolute),A
+			program.write_word(0x05e3, 0x0d70);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d70, 0x00f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 160;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 160)
+		{
+			expect_opcode(0x1af8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0ff0 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute OR combines the operand in two cycles");
+			program.write_word(0x05e2, 0x08f8); // SUB *(absolute),A
+			program.write_word(0x05e3, 0x0d70);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d70, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 161;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 161)
+		{
+			expect_opcode(0x08f8, m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute SUB subtracts the signed operand in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

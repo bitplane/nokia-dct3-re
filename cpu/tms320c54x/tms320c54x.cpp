@@ -843,6 +843,11 @@ void tms320c54x_device::execute_one(u16 op)
 		destination &= ACC_MASK;
 		return;
 	}
+	const auto alu_smem = [this, low]()
+	{
+		m_icount -= low == 0xf8;
+		return indirect_read(low);
+	};
 	switch (op & 0xff00)
 	{
 	case 0x1000: // LD Smem, A
@@ -938,13 +943,13 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x0000: // ADD Smem, A
-		m_a = add_sub(m_a, data_operand(indirect_read(low)), false, false);
+		m_a = add_sub(m_a, data_operand(alu_smem()), false, false);
 		return;
 	case 0x0100: // ADD Smem, B
-		m_b = add_sub(m_b, data_operand(indirect_read(low)), false, true);
+		m_b = add_sub(m_b, data_operand(alu_smem()), false, true);
 		return;
 	case 0x0200: // ADD uns(Smem), A
-		m_a = add_sub(m_a, indirect_read(low), false, false);
+		m_a = add_sub(m_a, alu_smem(), false, false);
 		return;
 	case 0x0600: // ADDC Smem, A
 	case 0x0700: // ADDC Smem, B
@@ -952,45 +957,45 @@ void tms320c54x_device::execute_one(u16 op)
 		// ADDC zero-extends Smem and consumes ST0.C. Carry is defined at
 		// the 32-bit accumulator boundary, independently of the guard byte.
 		u64 &destination = accumulator(BIT(op, 8));
-		const u64 operand = u64(indirect_read(low)) + (BIT(m_st0, 11) ? 1 : 0);
+		const u64 operand = u64(alu_smem()) + (BIT(m_st0, 11) ? 1 : 0);
 		destination = add_sub(destination, operand, false, BIT(op, 8));
 		return;
 	}
 	case 0x0800: // SUB Smem, A
-		m_a = add_sub(m_a, data_operand(indirect_read(low)), true, false);
+		m_a = add_sub(m_a, data_operand(alu_smem()), true, false);
 		return;
 	case 0x0900: // SUB Smem, B
-		m_b = add_sub(m_b, data_operand(indirect_read(low)), true, true);
+		m_b = add_sub(m_b, data_operand(alu_smem()), true, true);
 		return;
 	case 0x0a00: // SUBS Smem, A
-		m_a = add_sub(m_a, indirect_read(low), true, false);
+		m_a = add_sub(m_a, alu_smem(), true, false);
 		return;
 	case 0x0b00: // SUBS Smem, B
-		m_b = add_sub(m_b, indirect_read(low), true, true);
+		m_b = add_sub(m_b, alu_smem(), true, true);
 		return;
 	case 0x1800: // AND Smem, A
-		m_a &= indirect_read(low);
+		m_a &= alu_smem();
 		return;
 	case 0x1900: // AND Smem, B
-		m_b &= indirect_read(low);
+		m_b &= alu_smem();
 		return;
 	case 0x1a00: // OR Smem, A
-		m_a = (m_a | indirect_read(low)) & ACC_MASK;
+		m_a = (m_a | alu_smem()) & ACC_MASK;
 		return;
 	case 0x1b00: // OR Smem, B
-		m_b = (m_b | indirect_read(low)) & ACC_MASK;
+		m_b = (m_b | alu_smem()) & ACC_MASK;
 		return;
 	case 0x1c00: // XOR Smem, A
-		m_a = (m_a ^ indirect_read(low)) & ACC_MASK;
+		m_a = (m_a ^ alu_smem()) & ACC_MASK;
 		return;
 	case 0x1d00: // XOR Smem, B
-		m_b = (m_b ^ indirect_read(low)) & ACC_MASK;
+		m_b = (m_b ^ alu_smem()) & ACC_MASK;
 		return;
 	case 0x1e00: // SUBC Smem, A
 	case 0x5e00: // SUBC Smem, B
 	{
 		u64 &source = accumulator(BIT(op, 14));
-		const u64 divisor = data_operand(indirect_read(low));
+		const u64 divisor = data_operand(alu_smem());
 		const s64 difference = (s64(source << 24) >> 24) -
 				(s64(divisor << 24) >> 24) * 0x8000;
 		const bool subtract = difference >= 0;
