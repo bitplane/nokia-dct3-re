@@ -8567,6 +8567,45 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 SUB B,A saturates signed-32 overflow without changing B");
+			program.write_word(0x05e3, 0x818a); // STL B,*AR2-
+			data.write_word(0x0f10, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 432;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 432)
+		{
+			expect_opcode(0x818a, data.read_word(0x0f10) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f0f &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STL B,*AR2- stores before decrement without changing carry");
+			program.write_word(0x05e3, 0x81d3); // STL B,*AR3+%
+			data.write_word(0x0ffb, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0ffb);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 433;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 433)
+		{
+			expect_opcode(0x81d3, data.read_word(0x0ffb) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0ff8 &&
+					m_cpu->state_int(tms320c54x_device::STATE_BK) == 4 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STL B,*AR3+% wraps a four-word circular buffer after store");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
