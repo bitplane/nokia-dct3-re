@@ -7855,6 +7855,57 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f34 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 MVDD copies through X/Y pointers and increments only Y in one cycle");
+			program.write_word(0x05e3, 0x1083); // LD *AR3,A
+			data.write_word(0x0f35, 0x8002);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f35);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 395;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 395)
+		{
+			expect_opcode(0x1083, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff8002ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f35 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD *AR3,A sign-extends without pointer update in one cycle");
+			program.write_word(0x05e3, 0x1284); // LDU *AR4,A
+			data.write_word(0x0f36, 0x8002);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f36);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 396;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 396)
+		{
+			expect_opcode(0x1284, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8002 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f36 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LDU *AR4,A zero-extends without pointer update in one cycle");
+			program.write_word(0x05e3, 0x890e); // STLM B,T
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 397;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 397)
+		{
+			expect_opcode(0x890e, m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678ULL &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STLM B,T stores B's low word in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
