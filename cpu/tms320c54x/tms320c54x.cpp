@@ -801,7 +801,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_illegal = true;
 			return;
 		}
-		m_icount -= absolute ? 2 : 1;
+		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	if ((op & 0xfc00) == 0xf000 && ((op >> 4) & 0x0f) <= 5)

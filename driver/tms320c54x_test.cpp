@@ -7378,6 +7378,25 @@ private:
 					m_port_reads == 1 && m_port_writes == 2 &&
 					m_middle_port_cycle - m_first_port_cycle == 3,
 					"long-offset PORTR consumes port before offset and takes three cycles");
+			program.write_word(0x05e3, 0x6fea); // LD *+AR2(5),0,A
+			program.write_word(0x05e4, 0x0c40);
+			program.write_word(0x05e5, 5);
+			data.write_word(0x0f05, 0x2345);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 369;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 369)
+		{
+			expect_opcode(0x6fea, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2345 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"long-offset shifted LD consumes shift before offset in three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
