@@ -1356,7 +1356,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		m_program.write_word(destination, value);
 		if (!repeated || !m_rpt_iteration)
-			m_icount -= low == 0xf8 ? 4 : 3;
+			m_icount -= low >= 0xe0 ? 4 : 3;
 		return;
 	}
 	case 0x7c00: // MVPD pmad, Smem

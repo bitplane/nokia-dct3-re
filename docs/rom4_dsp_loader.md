@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 361 distinct words: 284 overlap the ROM4 run, 77 occur
+The fixture dispatches 362 distinct words: 284 overlap the ROM4 run, 78 occur
 only in the fixture, and 173 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -625,6 +625,9 @@ CPU correction does not change the captured ROM4 opcode-set coverage.
 Fixture-only `70ea` checks the MVKD counterpart: direct source before the
 long-offset destination extension, AR2 preupdate, copied data, and TI's
 three-cycle cost. It also leaves observed ROM4 word coverage unchanged.
+Fixture-only `7dea` checks MVDP with long-offset source addressing: offset
+before the program destination, AR2 preupdate, the program-memory word written,
+and TI's five-cycle cost. This also leaves observed ROM4 coverage unchanged.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.

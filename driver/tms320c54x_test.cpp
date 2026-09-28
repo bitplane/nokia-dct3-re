@@ -7274,6 +7274,25 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"long-offset MVKD consumes source before offset and takes three cycles");
+			program.write_word(0x05e3, 0x7dea); // MVDP *+AR2(5),0600
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x0600);
+			program.write_word(0x0600, 0);
+			data.write_word(0x0f05, 0xbeef);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 364;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 364)
+		{
+			expect_opcode(0x7dea, program.read_word(0x0600) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"long-offset MVDP consumes offset before pmad and takes five cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
