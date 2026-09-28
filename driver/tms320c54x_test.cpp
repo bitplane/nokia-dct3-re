@@ -4222,6 +4222,39 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0e02 &&
 					m_port_writes == 3 && m_last_port_cycle - m_middle_port_cycle == 3,
 					"ROM4 MVDD *AR2+0%,*AR4+ wraps the X pointer in one cycle");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x12f8); // LDU *(lk), A
+			program.write_word(0x05e3, 0x0d40);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0x138b); // LDU *AR3-, B
+			program.write_word(0x05e7, 0x75d6);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			data.write_word(0x0d40, 0x8001);
+			data.write_word(0x0d50, 0xff80);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d50);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM does not sign-extend LDU.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 218;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 218)
+		{
+			expect_opcode(0x12f8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8001 &&
+					m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute LDU zero-extends despite SXM and costs two cycles");
+			expect_opcode(0x138b, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d4f &&
+					m_last_port_cycle - m_middle_port_cycle == 3,
+					"ROM4 indirect LDU reads before decrement and costs one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

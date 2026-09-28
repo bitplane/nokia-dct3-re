@@ -563,16 +563,16 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 253 distinct words: 211 overlap the ROM4 run, 42 occur
-only in the fixture, and 246 ROM4 words do not occur in the fixture. These are
+The fixture executes 255 distinct words: 213 overlap the ROM4 run, 42 occur
+only in the fixture, and 244 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 169 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 171 have an `opassert` marker after a
 passing exact-word check, 42 execute in the fixture without such a marker,
-and 246 are absent from the fixture. The 42-word class includes setup and
+and 244 are absent from the fixture. The 42-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 42 lack semantic tests. The 254-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
@@ -668,6 +668,12 @@ DARAM operands, consistent with [TI SPRU172C](https://www.ti.com/lit/ug/spru172c
 [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf) defines the
 dual-operand address-modification rules. The fixture does not model external
 memory contention or wait states.
+Exact ROM4 `12f8` (`LDU *(lk),A`) and `138b` (`LDU *AR3-,B`) now check
+zero-extension of high-bit-set 16-bit data even when SXM is enabled. The
+absolute operand consumes its address extension and costs two cycles; the
+indirect form reads before decrementing AR3 and costs one. Separate port
+markers verify those costs against [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)'s
+DARAM LDU table. External-memory wait states are not covered.
 Exact ROM4 `f820` (`BC pmad, NTC`) and `f84c` (`BC pmad, BNEQ`) check taken
 and fall-through destinations at TI SPRU172C's five- and three-cycle costs.
 The BNEQ true case has a nonzero guard byte and zero low 32 bits, so a
