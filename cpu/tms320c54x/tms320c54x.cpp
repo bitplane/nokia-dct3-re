@@ -1047,6 +1047,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_rpt_end = 0xffff;
 		m_rpt_iteration = 0;
 		m_rpt_armed = true;
+		m_icount -= low == 0xf8 ? 3 : 2;
 		return;
 	case 0x4b00: // PSHD Smem
 		push(indirect_read(low));

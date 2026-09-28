@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 171 distinct words: 135 overlap the ROM4 run, 36 occur
+The fixture executes 172 distinct words: 135 overlap the ROM4 run, 37 occur
 only in the fixture, and 322 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 60 have an `opassert` marker after a
-passing exact-word check, 75 execute in the fixture without such a marker,
-and 322 are absent from the fixture. The 75-word class includes setup and
+assertions. Of the 457 ROM4 words, 61 have an `opassert` marker after a
+passing exact-word check, 74 execute in the fixture without such a marker,
+and 322 are absent from the fixture. The 74-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 75 lack semantic tests. The 322-word class is a priority list
+claim that all 74 lack semantic tests. The 322-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -688,6 +688,10 @@ OVM states, preservation of carry, and TI SPRU131G's `FRCT`/`SMUL` example
 assert saturated overflow in dual-memory and parallel-store MAC forms.
 Other rounded boundaries and encoded variants remain unaudited; fixture
 overlap does not claim those cases are complete.
+Exact `47f8` (`RPT *(absolute)`) now checks the three executions of its
+repeated instruction and the four-cycle setup cost specified by TI SPRU172C.
+The `4782` indirect form checks the three-cycle base cost and unchanged AR2.
+The core previously charged only its default single cycle to both forms.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
