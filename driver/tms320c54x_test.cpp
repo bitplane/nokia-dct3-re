@@ -8312,6 +8312,42 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0600) == 0x0400 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"fixed-16 LD zero-extends without SXM and ignores OVM without changing overflow");
+			program.write_word(0x05e3, 0x4815); // LDM AR5,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x8001);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0400);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 419;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 419)
+		{
+			expect_opcode(0x4815, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0400 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LDM AR5,A zero-extends under SXM and costs one cycle");
+			program.write_word(0x05e3, 0x4915); // LDM AR5,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 420;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 420)
+		{
+			expect_opcode(0x4915, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0400 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LDM AR5,B zero-extends under SXM without changing A or status");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
