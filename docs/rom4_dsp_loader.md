@@ -387,6 +387,13 @@ checks FRCT doubling, OVM saturation, sticky OVA, and one-cycle indirect
 timing. Fixture-only `27f8` checks signed squaring into B, T publication,
 absolute-address extension consumption, and the two-cycle cost. These tests
 do not establish every square/rounding mode or external-memory wait state.
+The accumulator-source `SQUR A,dst` forms are now implemented. Fixture-only
+`f48d`/`f58d` check signed AH as the source, unchanged T, destination choice,
+FRCT/OVM saturation, and one-cycle cost. Existing `SQURA`/`SQURS` handlers now
+have fixture-only `3882`/`3bf8` checks for signed square addition/subtraction,
+T publication, preserved carry, and indirect/absolute timing. Their encodings
+were cross-checked against TI SPRU307A's opcode table: text extraction from
+SPRU172C's bit diagrams misleadingly suggested a collision with XOR.
 Indirect MMR addressing was a separate core defect: `LDM`/`STLM` and the
 other seven-bit MMR operand forms previously read the opcode's low bits as a
 fixed address even when the indirect bit was set. They now select the AR's
@@ -606,8 +613,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 558 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 101 occur only in the fixture. These are
+The fixture dispatches 564 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 107 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.

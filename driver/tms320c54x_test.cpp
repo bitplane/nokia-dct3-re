@@ -10663,6 +10663,105 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"absolute SQUR squares signed input into B in two cycles");
+			program.write_word(0x05e2, 0xf48d); // SQUR A,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffe0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xbeef);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 550;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 550)
+		{
+			expect_opcode(0xf48d,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SQUR A,A squares signed AH without changing T in one cycle");
+			program.write_word(0x05e2, 0xf58d); // SQUR A,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0240); // OVM, FRCT
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 551;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 551)
+		{
+			expect_opcode(0xf58d,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff80000000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7fffffff &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xbeef &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0200) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SQUR A,B uses original signed AH and saturates under FRCT/OVM");
+			program.write_word(0x05e2, 0x3882); // SQURA *AR2,A
+			data.write_word(0x0f90, 0xfffe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 552;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 552)
+		{
+			expect_opcode(0x3882,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 14 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SQURA adds signed square, publishes T, and preserves carry");
+			program.write_word(0x05e2, 0x3bf8); // SQURS *(absolute),B
+			program.write_word(0x05e3, 0x0f90);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0f90, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 553;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 553)
+		{
+			expect_opcode(0x3bf8,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffffffcULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"absolute SQURS subtracts signed square and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

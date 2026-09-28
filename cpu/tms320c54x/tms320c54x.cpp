@@ -1878,6 +1878,15 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf84b: // BC pmad, BLT
 		branch_if((s64(m_b << 24) >> 24) < 0);
 		return;
+	case 0xf48d: // SQUR A,A
+	case 0xf58d: // SQUR A,B
+	{
+		s64 product = s64(s16(m_a >> 16)) * s64(s16(m_a >> 16));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
+		return;
+	}
 	case 0xf842: // BC pmad, AGEQ
 		branch_if((s64(m_a << 24) >> 24) >= 0);
 		return;
