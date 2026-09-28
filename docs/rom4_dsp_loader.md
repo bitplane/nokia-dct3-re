@@ -407,15 +407,21 @@ CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
 documented six/four-cycle costs.
+`XC 2` now charges the two rejected instruction words as NOP slots. Its
+interrupt guard retires by instruction words, so a single two-word guarded
+instruction releases a pending IRQ before the next instruction. Exact ROM4
+`ff4d` fixtures cover taken/rejected BEQ timing, and a port/ISR fixture
+checks the two-word guard boundary (SPRU172C, XC pages 4-198--200).
 The long-immediate ALU decoder charges two cycles, including the separately
 decoded XOR form. A cycle-stamped LD fixture checks the additional cycle;
 the LD contract is SPRU172C page 4-68. This does not cover all extended-address
 or repeated multicycle instruction timing.
-This documented timing correction deliberately re-banks the RF startup offset:
-the first port-27 read is at frame 23, 0.133172 s, rather than the historical
-0.128149 s. At 30 seconds there are 6,497 frame expiries and exactly 207,200
-reads (`32 * (6497 - 22)`), with unchanged terminal IMR/IFR and no burst-port
-activity. The gate retains an exact cadence assertion, not a tolerance.
+The XC timing correction deliberately re-banks the RF startup offset: the
+first port-27 read is now at frame 29, 0.160944 s. At 30 seconds there are
+6,497 frame expiries and 207,008 reads (`32 * (6497 - 28)`), with unchanged
+terminal IMR/IFR and no burst-port activity. The gate checks the first-read
+frame and the 32-reads-per-frame cadence, allowing only the previously
+documented bounded in-flight frame count at the fixed-time cutoff.
 The twelve-second verbose MCU trace contains a type-`0x1a` search-list
 publication at 1.511395 s (`00109800...`, 68 payload bytes). The seven
 type-`0x51` packets at 2.065--2.071 s are segmented command-`0x22` DSP memory
@@ -594,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 410 distinct words: 316 overlap the ROM4 run, 94 occur
-only in the fixture, and 141 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 411 distinct words: 317 overlap the ROM4 run, 94 occur
+only in the fixture, and 140 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 316 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 317 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 141 are absent from the fixture. This closes the fixture-executed-only
+and 140 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing

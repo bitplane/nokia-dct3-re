@@ -15,12 +15,16 @@ SUMMARY_RE = re.compile(
     r"rf_port38_reads=(\d+) rf_port39_reads=(\d+) .*?"
     r"ifr=([0-9a-fA-F]{4}) imr=([0-9a-fA-F]{4})"
 )
+FIRST_RF_READ_RE = re.compile(r"rom4_rf_read: sample=1 pc=[0-9a-fA-F]{4} frame=(\d+)")
 
 
 def check(text: str, minimum_frames: int = 6000) -> dict[str, int]:
     matches = list(SUMMARY_RE.finditer(text))
     if not matches:
         raise ValueError("missing rom4_interface_summary")
+    first_read = FIRST_RF_READ_RE.search(text)
+    if not first_read:
+        raise ValueError("missing first rom4_rf_read sample")
     match = matches[-1]
     result = {
         "frame_expiries": int(match.group(1)),
@@ -30,6 +34,7 @@ def check(text: str, minimum_frames: int = 6000) -> dict[str, int]:
         "rf_port39_reads": int(match.group(5)),
         "ifr": int(match.group(6), 16),
         "imr": int(match.group(7), 16),
+        "first_rf_frame": int(first_read.group(1)),
     }
     if result["frame_expiries"] < minimum_frames:
         raise ValueError(
@@ -37,8 +42,10 @@ def check(text: str, minimum_frames: int = 6000) -> dict[str, int]:
         )
     if result["rf_reads"] < 1000:
         raise ValueError(f"only {result['rf_reads']} RF reads; receiver did not become active")
-    # Two-cycle long-immediate execution starts RX on frame 23.
-    expected_reads = 32 * (result["frame_expiries"] - 22)
+    if result["first_rf_frame"] != 29:
+        raise ValueError(f"RF receiver started on frame {result['first_rf_frame']}, expected 29")
+    # XC's rejected words execute as NOPs; RX now starts on frame 29.
+    expected_reads = 32 * (result["frame_expiries"] - result["first_rf_frame"] + 1)
     # The fixed-time cutoff may leave two frames in flight after the
     # documented two-cycle XOR #lk,16 cost is applied.
     if result["rf_reads"] not in (expected_reads, expected_reads - 32,

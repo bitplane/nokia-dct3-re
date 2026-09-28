@@ -370,6 +370,7 @@ private:
 		if (offset)
 		{
 			m_irq_accumulator = m_cpu->state_int(tms320c54x_device::STATE_A);
+			m_port_writes_at_irq = m_port_writes;
 			return 0;
 		}
 		m_last_operand_cycle = m_cpu->total_cycles();
@@ -2765,8 +2766,8 @@ private:
 			expect_opcode(0xff0c, m_cpu->state_int(tms320c54x_device::STATE_B) ==
 					(carry_set ? 0xffffffedcbULL : 0x1234ULL) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
-					(carry_set ? 5 : 3),
-					"ROM4 ff0c executes or skips two words according to carry in one cycle");
+					5,
+					"ROM4 ff0c executes or replaces two words with NOPs according to carry");
 			if (!carry_set)
 			{
 				m_port_writes = 0;
@@ -8399,6 +8400,74 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0015 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"indirect LDM preincrements before selecting the seven-bit MMR address");
+			program.write_word(0x05e3, 0xff4d); // XC 2,BEQ
+			program.write_word(0x05e4, 0xe801); // LD #1,A
+			program.write_word(0x05e5, 0xe902); // LD #2,B
+			program.write_word(0x05e6, 0x75f8);
+			program.write_word(0x05e7, 0x0d00);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 424;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 424)
+		{
+			expect_opcode(0xff4d, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"ROM4 XC 2,BEQ executes two words after a one-cycle condition test");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 425;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 425)
+		{
+			expect_opcode(0xff4d, m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 1 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"rejected XC 2,BEQ executes two NOP slots at their cycle cost");
+			program.write_word(0x0048, 0x0083); // ISR samples A through *AR3.
+			program.write_word(0x0049, 0xf4eb); // RETE
+			program.write_word(0x05e3, 0xff4d); // XC 2,BEQ
+			program.write_word(0x05e4, 0x00f8); // ADD *(absolute),A
+			program.write_word(0x05e5, 0x0060); // Read raises INT2.
+			m_port_writes = 0;
+			m_port_writes_at_irq = 0;
+			m_repeat_reads = 0;
+			m_irq_trigger_read = 1;
+			m_irq_accumulator = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0061);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x02ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 426;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 426)
+		{
+			expect_opcode(0xff4d, m_repeat_reads == 1 && m_irq_accumulator == 1 &&
+					m_port_writes_at_irq == 1 && m_port_writes == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 1,
+					"XC 2 releases a pending interrupt after one two-word instruction");
+			m_cpu->set_input_line(2, CLEAR_LINE);
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -8590,6 +8659,7 @@ private:
 	unsigned m_repeat_reads = 0;
 	unsigned m_irq_trigger_read = 1;
 	u64 m_irq_accumulator = 0;
+	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
 	u64 m_first_port_cycle = 0;

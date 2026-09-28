@@ -710,7 +710,10 @@ void tms320c54x_device::execute_one(u16 op)
 			}
 		}
 		if (!execute)
+		{
 			m_pc += words;
+			m_icount -= words; // Rejected slots execute as NOPs.
+		}
 		else
 			m_xc_guard = words;
 		return;
@@ -2031,15 +2034,15 @@ void tms320c54x_device::execute_run()
 			// consume one of the requested body executions.
 			if (repeat_was_armed || !m_rpt_armed)
 				finish_repeats();
+			const unsigned words = u16(m_pc - instruction_pc);
 			if (delayed)
 			{
-				const unsigned words = u16(m_pc - instruction_pc);
 				m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;
 				if (!m_delayed_words)
 					m_pc = m_delayed_target;
 			}
 			if (xc_guarded)
-				--m_xc_guard;
+				m_xc_guard = words >= m_xc_guard ? 0 : m_xc_guard - words;
 		}
 		--m_icount;
 	}
