@@ -466,8 +466,10 @@ void tms320c54x_device::circular_modify(unsigned ar, s16 step)
 
 u16 tms320c54x_device::indirect_read(u8 mode)
 {
-	if (mode == 0xf8)
+	if (mode >= 0xf8)
 		return data_read(fetch());
+	if (mode >= 0xe0)
+		return data_read(long_offset_address(mode));
 	const unsigned ar = indirect_ar(mode);
 	const bool preincrement = (mode & 0x78) == 0x18;
 	if (preincrement)
@@ -480,9 +482,14 @@ u16 tms320c54x_device::indirect_read(u8 mode)
 
 void tms320c54x_device::indirect_write(u8 mode, u16 value)
 {
-	if (mode == 0xf8)
+	if (mode >= 0xf8)
 	{
 		data_write(fetch(), value);
+		return;
+	}
+	if (mode >= 0xe0)
+	{
+		data_write(long_offset_address(mode), value);
 		return;
 	}
 	const unsigned ar = indirect_ar(mode);
@@ -492,6 +499,27 @@ void tms320c54x_device::indirect_write(u8 mode, u16 value)
 	data_write(m_ar[ar], value);
 	if (!preincrement)
 		indirect_modify(mode);
+}
+
+u16 tms320c54x_device::long_offset_address(u8 mode)
+{
+	const unsigned ar = indirect_ar(mode);
+	const s16 offset = s16(fetch());
+	u16 address;
+	if ((mode & 0x78) == 0x70)
+	{
+		circular_modify(ar, offset);
+		address = m_ar[ar];
+	}
+	else
+	{
+		address = m_ar[ar] + offset;
+		if ((mode & 0x78) == 0x68)
+			m_ar[ar] = address;
+	}
+	if (BIT(m_st1, 5) && (mode & 7))
+		m_st0 = (m_st0 & ~u16(0xe000)) | u16((mode & 7) << 13);
+	return address;
 }
 
 void tms320c54x_device::finish_repeats()
@@ -852,7 +880,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	const auto alu_smem = [this, low]()
 	{
-		m_icount -= low == 0xf8;
+		m_icount -= low >= 0xe0;
 		return indirect_read(low);
 	};
 	switch (op & 0xff00)
@@ -1209,11 +1237,11 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x8000: // STL A, Smem
 		indirect_write(low, u16(m_a));
-		m_icount -= low == 0xf8;
+		m_icount -= low >= 0xe0;
 		return;
 	case 0x8100: // STL B, Smem
 		indirect_write(low, u16(m_b));
-		m_icount -= low == 0xf8;
+		m_icount -= low >= 0xe0;
 		return;
 	case 0x8200: // STH A, Smem
 		indirect_write(low, u16(m_a >> 16));

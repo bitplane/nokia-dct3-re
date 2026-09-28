@@ -6301,6 +6301,84 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0x06ea); // ADDC *+AR2(5),A
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f05, 4);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x13);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // C
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 312;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 312)
+		{
+			expect_opcode(0x06ea, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x18 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ADDC *+AR2(lk),A preupdates AR and costs two cycles");
+			program.write_word(0x05e3, 0x02e2); // ADDS *AR2(5),A
+			data.write_word(0x0f05, 0xffff);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 313;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 313)
+		{
+			expect_opcode(0x02e2, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ADDS *AR2(lk),A uses offset address without updating AR");
+			program.write_word(0x05e3, 0x02f2); // ADDS *+AR2(2)%,A
+			program.write_word(0x05e4, 2);
+			data.write_word(0x0f01, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 314;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 314)
+		{
+			expect_opcode(0x02f2, m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f01 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ADDS *+AR2(lk)%,A wraps circular address before read in two cycles");
+			program.write_word(0x05e3, 0x80ea); // STL A,*+AR2(-2)
+			program.write_word(0x05e4, 0xfffe);
+			data.write_word(0x0f0e, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 315;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 315)
+		{
+			expect_opcode(0x80ea, data.read_word(0x0f0e) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f0e &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"STL A,*+AR2(lk) stores after signed preupdate in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

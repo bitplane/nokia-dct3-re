@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 313 distinct words: 264 overlap the ROM4 run, 49 occur
+The fixture dispatches 317 distinct words: 264 overlap the ROM4 run, 53 occur
 only in the fixture, and 193 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -999,16 +999,20 @@ The core previously charged one cycle to both. Non-absolute forms retain the
 documented one-cycle charge; long-offset addressing is still unaudited.
 Exact `4a06`/`8a06` now check a one-cycle ST0 push/pop through the MMR
 stack path. The saved word and SP round trip match TI SPRU172C; no core
-change was needed. The ROM4 trace exercises long-offset `MAR`, now covered by
-exact `6dea`, but does not establish generic long-offset Smem reads or writes. Those
-MOD12-14 forms remain a decoder and cycle-cost gap, not a validated feature.
+change was needed. The ROM4 trace exercises long-offset `MAR`, covered by
+exact `6dea`. The shared Smem read/write path now consumes MOD12-14 extension
+words and applies no-update, signed preupdate, or circular preupdate as
+specified in TI SPRU131G table 5-4. Fixture-only `06ea`, `02e2`, `02f2`,
+and `80ea` check the three read modes and a long-offset store, including
+the ALU/STL extra cycle. Handlers that compute their own memory addresses
+still need separate long-offset review.
 The one-word Smem arithmetic/logical handlers (`ADD`, `ADDC`, `SUB`, `SUBS`,
 `AND`, `OR`, `XOR`, and `SUBC`) now charge the extra cycle TI SPRU172C assigns
 to absolute addressing. Exact `07f8`, `1af8`, and `08f8` fixtures check an
 arithmetic carry input, a logical result, a signed subtraction result, and
 their two-cycle costs. The core previously charged one cycle to these
-absolute forms. This does not establish long-offset decoding or every flag
-and accumulator variant in the family.
+absolute forms. The shared ALU operand path now handles long-offset forms,
+but this does not establish every flag and accumulator variant in the family.
 An indirect ROM4 sequence now asserts `0883` signed SUB under SXM,
 `1d83`/`1c83` unextended XOR source words, and `1c93` postincrement against
 two distinct memory operands. The four arithmetic operations take four
