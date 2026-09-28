@@ -587,7 +587,9 @@ instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
 `--group-report` with `--fixture-log` ranks unasserted ROM4 executions by
 opcode high byte. This is a workload ranking, not an instruction-family
-decoder. In the current 30-second run, `f4` leads because NOP executes over
+decoder. `--all-gaps` lists every unasserted word by observed use, with an
+`absent` or `executed-only` class; the default report shows only the leaders.
+In the current 30-second run, `f4` leads because NOP executes over
 one million times. The formerly dominant `4a`/`8a` gaps are now covered by
 a twelve-register MMR save/restore fixture: it initializes each register,
 checks all twelve stack values, overwrites the registers, and checks the

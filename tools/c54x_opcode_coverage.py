@@ -65,6 +65,16 @@ def group_gaps(result: dict[str, object], fixture: dict[str, object]) -> list[tu
                   key=lambda row: (-(row[2] + row[4]), row[0]))
 
 
+def ranked_gaps(result: dict[str, object], fixture: dict[str, object]) -> list[tuple[int, int, int, str]]:
+    """List unasserted ROM4 words in observed execution order."""
+    fixture_words = set(fixture["first_pc"])
+    asserted = fixture["asserted"]
+    rows = ((opcode, result["first_pc"][opcode], count,
+             "executed-only" if opcode in fixture_words else "absent")
+            for opcode, count in result["counts"].items() if opcode not in asserted)
+    return sorted(rows, key=lambda row: (-row[2], row[0]))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
@@ -72,6 +82,8 @@ def main() -> int:
     parser.add_argument("--fixture-log", type=pathlib.Path)
     parser.add_argument("--group-report", action="store_true",
                         help="rank unasserted ROM4 executions by opcode high byte")
+    parser.add_argument("--all-gaps", action="store_true",
+                        help="list every unasserted ROM4 word by observed execution count")
     args = parser.parse_args()
     if args.group_report and not args.fixture_log:
         parser.error("--group-report requires --fixture-log")
@@ -102,13 +114,17 @@ def main() -> int:
         executed_only = overlap - asserted
         print(f"ROM4 fixture classes: asserted={len(asserted)} "
               f"executed-only={len(executed_only)} absent={len(uncovered)}")
-        for opcode in sorted(executed_only,
-                             key=lambda op: (-result["counts"][op], op))[:10]:
-            print(f"  executed-only op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
-                  f"executions={result['counts'][opcode]}")
-        for opcode in sorted(uncovered, key=lambda op: (-result["counts"][op], op))[:20]:
-            print(f"  op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
-                  f"executions={result['counts'][opcode]}")
+        if args.all_gaps:
+            for opcode, pc, count, status in ranked_gaps(result, fixture):
+                print(f"  {status} op={opcode:04x} first_pc={pc:04x} executions={count}")
+        else:
+            for opcode in sorted(executed_only,
+                                 key=lambda op: (-result["counts"][op], op))[:10]:
+                print(f"  executed-only op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
+                      f"executions={result['counts'][opcode]}")
+            for opcode in sorted(uncovered, key=lambda op: (-result["counts"][op], op))[:20]:
+                print(f"  op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
+                      f"executions={result['counts'][opcode]}")
         if args.group_report:
             print("ROM4 high-byte gaps (group, executed-only words/executions, "
                   "absent words/executions):")

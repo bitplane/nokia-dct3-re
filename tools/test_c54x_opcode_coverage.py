@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_opcode_coverage import group_gaps, summarize
+from tools.c54x_opcode_coverage import group_gaps, ranked_gaps, summarize
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
@@ -51,6 +51,23 @@ class C54xOpcodeCoverageTest(unittest.TestCase):
         self.assertEqual(group_gaps(rom4, fixture), [
             (0x77, 1, 11, 0, 0),
             (0x4a, 1, 4, 1, 5),
+        ])
+
+    def test_ranked_gaps_lists_all_unasserted_words_by_observed_use(self):
+        rom4 = summarize("\n".join((
+            "[opcov] op=1002 first_pc=2002 count=7",
+            "[opcov] op=1001 first_pc=2001 count=7",
+            "[opcov] op=1003 first_pc=2003 count=3",
+        )))
+        fixture = summarize("\n".join((
+            "[opcov] op=1001 first_pc=3001",
+            "[opcov] op=1003 first_pc=3003",
+            "[opassert] op=1003",
+            "[opcov] op=2000 first_pc=3004",
+        )))
+        self.assertEqual(ranked_gaps(rom4, fixture), [
+            (0x1001, 0x2001, 7, "executed-only"),
+            (0x1002, 0x2002, 7, "absent"),
         ])
 
 
