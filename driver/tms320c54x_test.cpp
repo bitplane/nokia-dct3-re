@@ -3193,6 +3193,51 @@ private:
 			expect_opcode(0x24f8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2fffa &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"absolute MPYU keeps the unsigned product and costs two cycles");
+			program.write_word(0x05e2, 0x7192); // MVDK *AR2+,dmad
+			program.write_word(0x05e3, 0x0da0);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d90, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 164;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 164)
+		{
+			expect_opcode(0x7192, data.read_word(0x0da0) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d91 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 MVDK moves *AR2+ to immediate data address in two cycles");
+			program.write_word(0x05e2, 0xec02); // RPT #2
+			program.write_word(0x05e3, 0x7093); // MVKD dmad,*AR3+
+			program.write_word(0x05e4, 0x0d90);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0d90, 0x1111);
+			data.write_word(0x0d91, 0x2222);
+			data.write_word(0x0d92, 0x3333);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0db0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 165;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 165)
+		{
+			expect_opcode(0x7093, data.read_word(0x0db0) == 0x1111 &&
+					data.read_word(0x0db1) == 0x2222 &&
+					data.read_word(0x0db2) == 0x3333 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0db3 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"repeated MVKD advances source and destination at one cycle after setup");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

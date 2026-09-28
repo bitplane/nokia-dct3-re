@@ -1260,13 +1260,15 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x8900: // STLM B, MMR
 		data_write(low & 0x7f, u16(m_b));
 		return;
-	case 0x7100: // MVDM Smem, dmad
+	case 0x7100: // MVDK Smem, dmad
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
 		const u16 value = indirect_read(low);
 		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		data_write(destination, value);
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	}
 	case 0x7300: // MVMD MMR, dmad
@@ -1296,8 +1298,15 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x7000: // MVKD dmad, Smem
-		indirect_write(low, data_read(fetch()));
+	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
+		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
+		indirect_write(low, data_read(source));
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= low == 0xf8 ? 2 : 1;
 		return;
+	}
 	case 0x7200: // MVDM dmad, MMR
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
