@@ -1548,6 +1548,12 @@ coefficient multiply into B, unchanged T, pointer update, and three-cycle
 cost. A repeated case checks coefficient progression, use of the previous
 A value, and one-cycle steady rate. The observed 5110 trace union does not
 execute FIRS; other status and addressing variants remain unasserted.
+The dual-memory `A0xx/A1xx` ADD and `A2xx/A3xx` SUB families now have
+fixtures for both accumulator destinations, shifted X/Y results, pointer
+updates, and TI's one-cycle cost. `E3xx` ABDST reproduces TI SPRU172C's
+absolute-distance example and a separate SXM-negative/FRCT case. These are
+fixture-only families in the current 5110 trace union; overflow and shared-AR
+variants still need separate evidence.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

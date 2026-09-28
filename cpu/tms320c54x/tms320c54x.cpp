@@ -1799,6 +1799,47 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xfc00) == 0xa000) // ADD/SUB Xmem, Ymem, A/B
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 yvalue = data_read(m_ar[yar]);
+		const s64 xsigned = BIT(m_st1, 8) ? s64(s16(xvalue)) : s64(xvalue);
+		const s64 ysigned = BIT(m_st1, 8) ? s64(s16(yvalue)) : s64(yvalue);
+		accumulator(BIT(op, 8)) = add_sub(u64(xsigned * 0x10000) & ACC_MASK,
+				u64(ysigned * 0x10000) & ACC_MASK, BIT(op, 9), BIT(op, 8));
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
+	if ((op & 0xff00) == 0xe300) // ABDST Xmem, Ymem
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 yvalue = data_read(m_ar[yar]);
+		s64 a_high = s64((m_a >> 16) & 0x1ffff);
+		if (a_high & 0x10000)
+			a_high -= 0x20000;
+		s64 distance = a_high < 0 ? -a_high : a_high;
+		if (BIT(m_st1, 6))
+			distance *= 2;
+		m_b = add_sub(m_b, u64(distance), false, true);
+		const s64 xsigned = BIT(m_st1, 8) ? s64(s16(xvalue)) : s64(xvalue);
+		const s64 ysigned = BIT(m_st1, 8) ? s64(s16(yvalue)) : s64(yvalue);
+		m_a = add_sub(u64(xsigned * 0x10000) & ACC_MASK,
+				u64(ysigned * 0x10000) & ACC_MASK, true, false);
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
 	if ((op & 0xff80) == 0xf900) // CC pmad, condition
 	{
 		const u8 condition = op;

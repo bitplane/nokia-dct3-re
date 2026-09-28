@@ -11874,6 +11874,101 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 				"repeated FIRS uses old A, advances coefficients, and pipelines after first pass");
+			program.write_word(0x05e2, 0xa03a); // ADD *AR5,*AR4+,A.
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f90, 0x0055);
+			data.write_word(0x0f91, 0x00aa);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4444);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 661;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 661 && m_phase <= 664)
+		{
+			const u16 opcode = 0xa03a + ((m_phase - 661) << 8);
+			const bool subtract = m_phase >= 663;
+			const bool destination_b = BIT(m_phase - 661, 0);
+			const u64 result = subtract ? 0xffffab0000ULL : 0xff0000;
+			expect_opcode(opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (destination_b ? 0x1234 : result) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (destination_b ? result : 0x5678) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"dual-memory ADD/SUB selects A/B, shifts both operands, and costs one cycle");
+			if (m_phase < 664)
+			{
+				program.write_word(0x05e2, opcode + 0x100);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xe33a); // ABDST *AR5,*AR4+.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffabcd0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 665;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 665)
+		{
+			expect_opcode(0xe33a,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffab0000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5433 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI ABDST example adds absolute old A high to B and subtracts dual operands");
+			data.write_word(0x0f90, 0xfffe);
+			data.write_word(0x0f91, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffabcd0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // SXM, FRCT.
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 666;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 666)
+		{
+			expect_opcode(0xe33a,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffb0000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xa866 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ABDST sign-extends X/Y under SXM and doubles distance under FRCT");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
