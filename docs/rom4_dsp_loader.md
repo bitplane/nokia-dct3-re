@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 364 distinct words: 284 overlap the ROM4 run, 80 occur
+The fixture dispatches 365 distinct words: 284 overlap the ROM4 run, 81 occur
 only in the fixture, and 173 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -619,23 +619,28 @@ Exact ROM4 `fa30` (`BCD pmad,TC`) checks both condition outcomes, both delay
 words, the selected destination, and delayed-branch timing. Exact `8914`
 (`STLM B,AR4`) checks the low-word transfer and one-cycle cost.
 Fixture-only `71ea` and `75ea` check the long-offset surcharge for MVDK and
-PORTW, respectively. Both assert offset-before-destination/port extension
+PORTW, respectively. Both assert destination/port-before-offset extension
 order, AR2 preupdate, transferred data, and three-cycle timing. The shared
 CPU correction does not change the captured ROM4 opcode-set coverage.
 Fixture-only `70ea` checks the MVKD counterpart: direct source before the
 long-offset destination extension, AR2 preupdate, copied data, and TI's
 three-cycle cost. It also leaves observed ROM4 word coverage unchanged.
-Fixture-only `7dea` checks MVDP with long-offset source addressing: offset
-before the program destination, AR2 preupdate, the program-memory word written,
+Fixture-only `7dea` checks MVDP with long-offset source addressing: program
+destination before offset, AR2 preupdate, the program-memory word written,
 and TI's five-cycle cost. This also leaves observed ROM4 coverage unchanged.
 Fixture-only `7fea` and `7eea` check long-offset WRITA and READA in opposite
 directions: the word transferred between data and A-addressed program memory,
 AR2 preupdate, and TI's six-cycle cost. They do not alter observed ROM4 word
 coverage.
+TI SPRU131G section 5.5.3.2 states that the long offset is the last code
+word of a two- or three-word instruction. The three-word fixtures for MVDK,
+PORTW, and MVDP were re-encoded accordingly; fixture-only `7cea` now checks
+MVPD's long-offset destination decode and four-cycle cost. Absolute Smem
+forms retain their separately tested address-before-immediate ordering.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
-The 179-word class is a priority list
+The 173-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -1061,10 +1066,10 @@ and `80ea` check the three read modes and a long-offset store, including
 the ALU/STL extra cycle. Handlers that compute their own memory addresses
 still need separate long-offset review. The first such handler pass covers
 fixture-only `6bea`, `68e2`, and `69f2`: ADDM, ANDM, and ORM consume the
-offset before their immediate, honor preupdate/no-update/circular addressing,
+immediate before the final offset, honor preupdate/no-update/circular addressing,
 and charge TI's three-cycle long-offset RMW class. Other manual-address
 handlers remain open. Fixture-only `76ea` now checks long-offset `STM`:
-the address extension precedes its immediate, signed preupdate reaches the
+the immediate precedes the final address offset, signed preupdate reaches the
 destination, and the instruction costs three cycles.
 Fixture-only `82ea` and `83e2` assert the two-cycle long-offset surcharge
 for `STH A/B,Smem` and the distinct preupdate/no-update addressing behavior.

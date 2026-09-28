@@ -6387,8 +6387,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"STL A,*+AR2(lk) stores after signed preupdate in two cycles");
 			program.write_word(0x05e3, 0x6bea); // ADDM #1,*+AR2(5)
-			program.write_word(0x05e4, 5);
-			program.write_word(0x05e5, 1);
+			program.write_word(0x05e4, 1);
+			program.write_word(0x05e5, 5);
 			program.write_word(0x05e6, 0x75f8);
 			program.write_word(0x05e7, 0x0d00);
 			program.write_word(0x05e8, 0x0124);
@@ -6409,10 +6409,10 @@ private:
 			expect_opcode(0x6bea, data.read_word(0x0f05) == 4 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"ADDM *+AR2(lk) consumes offset before immediate and costs three cycles");
+					"ADDM *+AR2(lk) consumes immediate before offset in three cycles");
 			program.write_word(0x05e3, 0x68e2); // ANDM #0f0f,*AR2(5)
-			program.write_word(0x05e4, 5);
-			program.write_word(0x05e5, 0x0f0f);
+			program.write_word(0x05e4, 0x0f0f);
+			program.write_word(0x05e5, 5);
 			data.write_word(0x0f05, 0xff00);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
@@ -6431,8 +6431,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ANDM *AR2(lk) uses offset without AR update or status change");
 			program.write_word(0x05e3, 0x69f2); // ORM #8000,*+AR2(2)%
-			program.write_word(0x05e4, 2);
-			program.write_word(0x05e5, 0x8000);
+			program.write_word(0x05e4, 0x8000);
+			program.write_word(0x05e5, 2);
 			data.write_word(0x0f01, 1);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f03);
@@ -6451,8 +6451,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ORM *+AR2(lk)% wraps circular address and preserves carry");
 			program.write_word(0x05e3, 0x76ea); // STM #cafe,*+AR2(5)
-			program.write_word(0x05e4, 5);
-			program.write_word(0x05e5, 0xcafe);
+			program.write_word(0x05e4, 0xcafe);
+			program.write_word(0x05e5, 5);
 			data.write_word(0x0f05, 0);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
@@ -6467,7 +6467,7 @@ private:
 			expect_opcode(0x76ea, data.read_word(0x0f05) == 0xcafe &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"STM *+AR2(lk) consumes offset before immediate in three cycles");
+					"STM *+AR2(lk) consumes immediate before offset in three cycles");
 			program.write_word(0x05e3, 0x82ea); // STH A,*+AR2(5)
 			program.write_word(0x05e4, 5);
 			program.write_word(0x05e5, 0x75f8);
@@ -6740,8 +6740,8 @@ private:
 					m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
 					"PORTW *AR2 emits memory word without modifying AR2 in two cycles");
 			program.write_word(0x05e3, 0x61ea); // BITF *+AR2(5),#8000
-			program.write_word(0x05e4, 5);
-			program.write_word(0x05e5, 0x8000);
+			program.write_word(0x05e4, 0x8000);
+			program.write_word(0x05e5, 5);
 			program.write_word(0x05e6, 0x75f8);
 			program.write_word(0x05e7, 0x0d00);
 			program.write_word(0x05e8, 0x0124);
@@ -6763,7 +6763,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"long-offset BITF sets TC and preserves carry in three cycles");
 			program.write_word(0x05e3, 0x60e2); // CMPM *AR2(5),#1235
-			program.write_word(0x05e5, 0x1235);
+			program.write_word(0x05e4, 0x1235);
+			program.write_word(0x05e5, 5);
 			data.write_word(0x0f05, 0x1234);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
@@ -7216,8 +7217,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 STLM B,AR4 stores BL in one cycle");
 			program.write_word(0x05e3, 0x71ea); // MVDK *+AR2(5),0f20
-			program.write_word(0x05e4, 5);
-			program.write_word(0x05e5, 0x0f20);
+			program.write_word(0x05e4, 0x0f20);
+			program.write_word(0x05e5, 5);
 			program.write_word(0x05e6, 0x75f8);
 			program.write_word(0x05e7, 0x0d00);
 			program.write_word(0x05e8, 0x0124);
@@ -7237,9 +7238,10 @@ private:
 			expect_opcode(0x71ea, data.read_word(0x0f20) == 0xbeef &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"long-offset MVDK consumes offset before destination in three cycles");
+					"long-offset MVDK consumes destination before offset in three cycles");
 			program.write_word(0x05e3, 0x75ea); // PORTW *+AR2(5),0124
-			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 5);
 			data.write_word(0x0f05, 0xabcd);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
@@ -7254,7 +7256,7 @@ private:
 			expect_opcode(0x75ea, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 3 && m_middle_port_value == 0xabcd &&
 					m_last_port_cycle - m_middle_port_cycle == 3,
-					"long-offset PORTW consumes offset before port and takes three cycles");
+					"long-offset PORTW consumes port before offset and takes three cycles");
 			program.write_word(0x05e3, 0x70ea); // MVKD 0f20,*+AR2(5)
 			program.write_word(0x05e4, 0x0f20);
 			program.write_word(0x05e5, 5);
@@ -7275,8 +7277,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"long-offset MVKD consumes source before offset and takes three cycles");
 			program.write_word(0x05e3, 0x7dea); // MVDP *+AR2(5),0600
-			program.write_word(0x05e4, 5);
-			program.write_word(0x05e5, 0x0600);
+			program.write_word(0x05e4, 0x0600);
+			program.write_word(0x05e5, 5);
 			program.write_word(0x0600, 0);
 			data.write_word(0x0f05, 0xbeef);
 			m_port_writes = 0;
@@ -7292,7 +7294,7 @@ private:
 			expect_opcode(0x7dea, program.read_word(0x0600) == 0xbeef &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-					"long-offset MVDP consumes offset before pmad and takes five cycles");
+					"long-offset MVDP consumes pmad before offset and takes five cycles");
 			program.write_word(0x05e3, 0x7fea); // WRITA *+AR2(5)
 			program.write_word(0x05e4, 5);
 			program.write_word(0x05e5, 0x75f8);
@@ -7333,6 +7335,29 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 					"long-offset READA stores the A-addressed program word in six cycles");
+			program.write_word(0x05e3, 0x7cea); // MVPD 0600,*+AR2(5)
+			program.write_word(0x05e4, 0x0600);
+			program.write_word(0x05e5, 5);
+			program.write_word(0x05e6, 0x75f8);
+			program.write_word(0x05e7, 0x0d00);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			program.write_word(0x0600, 0xbeef);
+			data.write_word(0x0f05, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 367;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 367)
+		{
+			expect_opcode(0x7cea, data.read_word(0x0f05) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"long-offset MVPD consumes pmad before offset in four cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

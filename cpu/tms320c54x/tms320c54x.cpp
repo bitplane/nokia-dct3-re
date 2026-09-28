@@ -1116,16 +1116,36 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6100: // BITF Smem, #lk
 	{
-		const u16 value = indirect_read(low);
-		const u16 mask = fetch();
+		u16 value;
+		u16 mask;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			mask = fetch();
+			value = indirect_read(low);
+		}
+		else
+		{
+			value = indirect_read(low);
+			mask = fetch();
+		}
 		m_st0 = (m_st0 & ~0x1000) | ((value & mask) ? 0x1000 : 0);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x6000: // CMPM Smem, #lk
 	{
-		const u16 value = indirect_read(low);
-		const u16 immediate = fetch();
+		u16 value;
+		u16 immediate;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			immediate = fetch();
+			value = indirect_read(low);
+		}
+		else
+		{
+			value = indirect_read(low);
+			immediate = fetch();
+		}
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
@@ -1182,9 +1202,18 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x6900: // ORM #lk, Smem
 	{
 		const unsigned ar = indirect_ar(low);
-		const u16 address = low >= 0xf8 ? fetch() :
-				low >= 0xe0 ? long_offset_address(low) : m_ar[ar];
-		const u16 immediate = fetch();
+		u16 address;
+		u16 immediate;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			immediate = fetch();
+			address = long_offset_address(low);
+		}
+		else
+		{
+			address = low >= 0xf8 ? fetch() : m_ar[ar];
+			immediate = fetch();
+		}
 		const u16 value = data_read(address);
 		data_write(address, (op & 0xff00) == 0x6800
 				? value & immediate : value | immediate);
@@ -1196,9 +1225,18 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x6b00: // ADDM #lk, Smem
 	{
 		const unsigned ar = indirect_ar(low);
-		const u16 address = low >= 0xf8 ? fetch() :
-				low >= 0xe0 ? long_offset_address(low) : m_ar[ar];
-		const u16 immediate = fetch();
+		u16 address;
+		u16 immediate;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			immediate = fetch();
+			address = long_offset_address(low);
+		}
+		else
+		{
+			address = low >= 0xf8 ? fetch() : m_ar[ar];
+			immediate = fetch();
+		}
 		const u16 value = data_read(address);
 		const s32 left = BIT(m_st1, 8) ? s16(value) : s32(value);
 		const s32 right = BIT(m_st1, 8) ? s16(immediate) : s32(immediate);
@@ -1276,8 +1314,18 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
-		const u16 value = indirect_read(low);
-		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		u16 value;
+		u16 destination;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			destination = fetch() + (repeated ? m_rpt_iteration : 0);
+			value = indirect_read(low);
+		}
+		else
+		{
+			value = indirect_read(low);
+			destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		}
 		data_write(destination, value);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 2 : 1;
@@ -1304,8 +1352,19 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x7500: // PORTW Smem, port
 	{
-		const u16 value = indirect_read(low);
-		m_io.write_word(fetch(), value);
+		u16 value;
+		u16 port;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			port = fetch();
+			value = indirect_read(low);
+		}
+		else
+		{
+			value = indirect_read(low);
+			port = fetch();
+		}
+		m_io.write_word(port, value);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
@@ -1331,9 +1390,18 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x7600: // STM #lk, Smem
 		if (low >= 0xe0)
 		{
-			// Extended Smem addressing precedes the immediate extension.
-			const u16 address = low >= 0xf8 ? fetch() : long_offset_address(low);
-			const u16 value = fetch();
+			u16 address;
+			u16 value;
+			if (low < 0xf8)
+			{
+				value = fetch();
+				address = long_offset_address(low);
+			}
+			else
+			{
+				address = fetch();
+				value = fetch();
+			}
 			data_write(address, value);
 		}
 		else
@@ -1352,8 +1420,18 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
-		const u16 value = indirect_read(low);
-		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		u16 value;
+		u16 destination;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			destination = fetch() + (repeated ? m_rpt_iteration : 0);
+			value = indirect_read(low);
+		}
+		else
+		{
+			value = indirect_read(low);
+			destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		}
 		m_program.write_word(destination, value);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 4 : 3;
@@ -1363,13 +1441,24 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
-		const u16 destination = low == 0xf8 ? fetch() : m_ar[low & 7];
-		const u16 value = m_program.read_word(fetch() + (repeated ? m_rpt_iteration : 0));
+		u16 destination;
+		u16 source;
+		if (low == 0xf8)
+		{
+			destination = fetch();
+			source = fetch();
+		}
+		else
+		{
+			source = fetch();
+			destination = low >= 0xe0 ? long_offset_address(low) : m_ar[low & 7];
+		}
+		const u16 value = m_program.read_word(source + (repeated ? m_rpt_iteration : 0));
 		data_write(destination, value);
-		if (low != 0xf8)
+		if (low < 0xe0)
 			indirect_modify(low);
 		if (!repeated || !m_rpt_iteration)
-			m_icount -= low == 0xf8 ? 3 : 2;
+			m_icount -= low >= 0xe0 ? 3 : 2;
 		return;
 	}
 	case 0x7e00: // READA Smem
