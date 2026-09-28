@@ -567,16 +567,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 372 distinct words: 289 overlap the ROM4 run, 83 occur
-only in the fixture, and 168 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 374 distinct words: 291 overlap the ROM4 run, 83 occur
+only in the fixture, and 166 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 281 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 283 have an `opassert` marker after a
 passing exact-word check, 8 execute in the fixture without such a marker,
-and 168 are absent from the fixture. The 8-word class includes setup and
+and 166 are absent from the fixture. The 8-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 8 lack semantic tests. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -651,10 +651,14 @@ cost. They were the next two most-used absent words (23 executions each).
 Exact `1081` (`LD *AR1,A`) checks SXM sign extension, unchanged AR1, and
 one-cycle cost. Exact `ee01` (`FRAME #1`) checks SP advancement across a
 page boundary and its one-cycle cost. Both had 22 observed executions.
+Exact `f340` (`OR #lk,B`) checks preservation of B's upper bits; exact `f230`
+(`AND #lk,B,A`) checks the zero-filled result in A and unchanged B. Both assert
+TI's two-cycle immediate-logical timing and had 22 and 21 observed executions,
+respectively.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
-The 168-word class is a priority list
+The 166-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
