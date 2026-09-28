@@ -6004,6 +6004,84 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x1a23 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 MVMM AR1,AR3 copies without modifying source in one cycle");
+			program.write_word(0x05e3, 0x6c8b); // BANZ 05eb,*AR3-
+			program.write_word(0x05e4, 0x05eb);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			program.write_word(0x05eb, 0x75f8);
+			program.write_word(0x05ec, 0x0d00);
+			program.write_word(0x05ed, 0x0124);
+			program.write_word(0x05ee, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 295;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 295 || m_phase == 296)
+		{
+			expect_opcode(0x6c8b, m_cpu->state_int(tms320c54x_device::STATE_AR3) ==
+					(m_phase == 295 ? 0 : 0xffff) && m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (m_phase == 295 ? 7 : 5),
+					"ROM4 BANZ *AR3- tests before decrement and has taken/false cycle costs");
+			if (m_phase == 295)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 296;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e3, 0xf847); // BC 05eb,ALEQ
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 297;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 297 || m_phase == 298)
+		{
+			expect_opcode(0xf847, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (m_phase == 297 ? 8 : 6),
+					"ROM4 BC ALEQ uses the 40-bit sign and has taken/false cycle costs");
+			if (m_phase == 297)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 298;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e3, 0x880e); // STLM A,T
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 299;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 299)
+		{
+			expect_opcode(0x880e, m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STLM A,T copies AL into T in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
