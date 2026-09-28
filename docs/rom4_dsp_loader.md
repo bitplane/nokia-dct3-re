@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 324 distinct words: 264 overlap the ROM4 run, 60 occur
+The fixture dispatches 327 distinct words: 264 overlap the ROM4 run, 63 occur
 only in the fixture, and 193 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -1015,6 +1015,9 @@ destination, and the instruction costs three cycles.
 Fixture-only `82ea` and `83e2` assert the two-cycle long-offset surcharge
 for `STH A/B,Smem` and the distinct preupdate/no-update addressing behavior.
 Fixture-only `8cea` checks the same surcharge for `ST T,Smem`.
+The direct `LD`/`LDU` accumulator handlers now charge that surcharge too.
+Fixture-only `10ea`, `12e2`, and `45ea` distinguish sign extension, unsigned
+loading, 16-bit shift, address update, and two-cycle long-offset timing.
 The one-word Smem arithmetic/logical handlers (`ADD`, `ADDC`, `SUB`, `SUBS`,
 `AND`, `OR`, `XOR`, and `SUBC`) now charge the extra cycle TI SPRU172C assigns
 to absolute addressing. Exact `07f8`, `1af8`, and `08f8` fixtures check an

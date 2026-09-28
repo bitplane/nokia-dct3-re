@@ -6517,6 +6517,54 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ST T,*+AR2(lk) stores after preupdate in two cycles");
+			program.write_word(0x05e3, 0x10ea); // LD *+AR2(5),A
+			data.write_word(0x0f05, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 323;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 323)
+		{
+			expect_opcode(0x10ea, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff8001ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"LD *+AR2(lk),A sign-extends in two cycles");
+			program.write_word(0x05e3, 0x12e2); // LDU *AR2(5),A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 324;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 324)
+		{
+			expect_opcode(0x12e2, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"LDU *AR2(lk),A zero-extends without AR update in two cycles");
+			program.write_word(0x05e3, 0x45ea); // LD *+AR2(5),16,B
+			data.write_word(0x0f05, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 325;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 325)
+		{
+			expect_opcode(0x45ea, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12340000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"LD *+AR2(lk),16,B shifts in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
