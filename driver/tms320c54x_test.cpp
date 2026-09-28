@@ -9031,6 +9031,60 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0130 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"rejected ROM4 XC 2,NTC charges two NOP slots without modifying ARs");
+			program.write_word(0x05e2, 0xe741); // MVMM AR4,AR1
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0xcdef);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 456;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 456)
+		{
+			expect_opcode(0xe741, m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0xcdef &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xcdef &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 MVMM AR4,AR1 copies only the destination in one cycle");
+			program.write_word(0x05e2, 0x1181); // LD *AR1,B
+			data.write_word(0x0f20, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 457;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 457)
+		{
+			expect_opcode(0x1181, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffffff8001ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 LD *AR1,B sign-extends under SXM in one cycle");
+			program.write_word(0x05e2, 0x1a8a); // OR *AR2-,A
+			data.write_word(0x0f20, 0x00f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x120000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 458;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 458)
+		{
+			expect_opcode(0x1a8a, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1200f0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f1f &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 OR *AR2-,A uses the old address and decrements in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
