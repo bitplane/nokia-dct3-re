@@ -1153,6 +1153,12 @@ OVM states, preservation of carry, and TI SPRU131G's `FRCT`/`SMUL` example
 assert saturated overflow in dual-memory and parallel-store MAC forms.
 Other rounded boundaries and encoded variants remain unaudited; fixture
 overlap does not claim those cases are complete.
+PMST.SST now saturates the shifted 40-bit accumulator value to 32 bits before
+ordinary `STH`, `STL`, `STLM`, and `DST` stores, without modifying the
+accumulator. Focused fixtures reproduce TI SPRU131G's signed `STH` and
+unsigned `DST` examples and preserve their one- and two-cycle costs. The
+parallel `ST||` family still needs its own SST audit; the ordinary-store
+fixtures do not cover it.
 Exact `47f8` (`RPT *(absolute)`) now checks the three executions of its
 repeated instruction and the four-cycle setup cost specified by TI SPRU172C.
 The `4782` indirect form checks the three-cycle base cost and unchanged AR2.

@@ -83,6 +83,7 @@ private:
 	u64 add_sub(u64 source, u64 operand, bool subtract, bool destination_b, bool partial_carry = false);
 	s64 multiply_product(s64 product) const;
 	u64 multiply_result(s64 result, bool destination_b);
+	u32 saturated_store(u64 value) const;
 	u64 arithmetic_shift_right(u64 value, unsigned shift) const;
 	u64 &accumulator(bool b) { return b ? m_b : m_a; }
 

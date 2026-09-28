@@ -8606,6 +8606,45 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 STL B,*AR3+% wraps a four-word circular buffer after store");
+			program.write_word(0x05e3, 0x8282); // STH A,*AR2
+			data.write_word(0x0f90, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7ffff0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0001); // SST
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 434;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 434)
+		{
+			expect_opcode(0x8282, data.read_word(0x0f90) == 0x7fff &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7ffff0000ULL &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"PMST.SST clamps signed STH without changing accumulator or cycle cost");
+			program.write_word(0x05e3, 0x4f82); // DST B,*AR2
+			data.write_word(0x0f90, 0);
+			data.write_word(0x0f91, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x8ffff0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 435;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 435)
+		{
+			expect_opcode(0x4f82, data.read_word(0x0f90) == 0xffff &&
+					data.read_word(0x0f91) == 0xffff &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8ffff0000ULL &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"PMST.SST clamps unsigned DST without changing accumulator or two-cycle cost");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

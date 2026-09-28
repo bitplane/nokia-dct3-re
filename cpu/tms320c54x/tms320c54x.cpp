@@ -397,6 +397,17 @@ u64 tms320c54x_device::multiply_result(s64 result, bool destination_b)
 	return u64(result) & ACC_MASK;
 }
 
+u32 tms320c54x_device::saturated_store(u64 value) const
+{
+	value &= ACC_MASK;
+	if (!BIT(m_pmst, 0)) // SST
+		return u32(value);
+	if (!BIT(m_st1, 8)) // SXM clear: unsigned saturation
+		return value > 0xffffffffULL ? 0xffffffffU : u32(value);
+	return u32(std::clamp(s64(value << 24) >> 24,
+			s64(-0x80000000LL), s64(0x7fffffffLL)));
+}
+
 u64 tms320c54x_device::arithmetic_shift_right(u64 value, unsigned shift) const
 {
 	const s64 signed_value = s64(value << 24) >> 24;
@@ -804,9 +815,9 @@ void tms320c54x_device::execute_one(u16 op)
 		if ((extension & 0xfee0) == 0x0c40) // LD Smem, shift, dst
 			accumulator(BIT(extension, 8)) = shifted_load(data_operand(read_operand()), shift, BIT(extension, 8));
 		else if ((extension & 0xfee0) == 0x0c60) // STH src, shift, Smem
-			write_operand(u16(shifted(accumulator(BIT(extension, 8))) >> 16));
+			write_operand(u16(saturated_store(shifted(accumulator(BIT(extension, 8)))) >> 16));
 		else if ((extension & 0xfee0) == 0x0c80) // STL src, shift, Smem
-			write_operand(u16(shifted(accumulator(BIT(extension, 8)))));
+			write_operand(u16(saturated_store(shifted(accumulator(BIT(extension, 8))))));
 		else if ((extension & 0xfce0) == 0x0c00) // ADD Smem, shift, src, dst
 			accumulator(BIT(extension, 8)) =
 					add_sub(accumulator(BIT(extension, 9)), shifted(data_operand(read_operand())), false, BIT(extension, 8));
@@ -1185,7 +1196,7 @@ void tms320c54x_device::execute_one(u16 op)
 			indirect_modify(low, true);
 		const u16 address = low >= 0xf8 ? fetch() :
 				low >= 0xe0 ? long_offset_address(low) : m_ar[ar];
-		const u64 value = accumulator(BIT(op, 8));
+		const u32 value = saturated_store(accumulator(BIT(op, 8)));
 		data_write(address, u16(value >> 16));
 		data_write(address ^ 1, u16(value));
 		if (!extended && !preincrement)
@@ -1299,19 +1310,19 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x8000: // STL A, Smem
-		indirect_write(low, u16(m_a));
+		indirect_write(low, u16(saturated_store(m_a)));
 		m_icount -= low >= 0xe0;
 		return;
 	case 0x8100: // STL B, Smem
-		indirect_write(low, u16(m_b));
+		indirect_write(low, u16(saturated_store(m_b)));
 		m_icount -= low >= 0xe0;
 		return;
 	case 0x8200: // STH A, Smem
-		indirect_write(low, u16(m_a >> 16));
+		indirect_write(low, u16(saturated_store(m_a) >> 16));
 		m_icount -= low >= 0xe0;
 		return;
 	case 0x8300: // STH B, Smem
-		indirect_write(low, u16(m_b >> 16));
+		indirect_write(low, u16(saturated_store(m_b) >> 16));
 		m_icount -= low >= 0xe0;
 		return;
 	case 0xe800: // LD #k, A
@@ -1324,10 +1335,10 @@ void tms320c54x_device::execute_one(u16 op)
 		m_sp = u16(m_sp + s8(low));
 		return;
 	case 0x8800: // STLM A, MMR
-		data_write(mmr_address(low), u16(m_a));
+		data_write(mmr_address(low), u16(saturated_store(m_a)));
 		return;
 	case 0x8900: // STLM B, MMR
-		data_write(mmr_address(low), u16(m_b));
+		data_write(mmr_address(low), u16(saturated_store(m_b)));
 		return;
 	case 0x7100: // MVDK Smem, dmad
 	{
