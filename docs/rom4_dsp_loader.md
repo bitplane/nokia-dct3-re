@@ -567,21 +567,21 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 290 distinct words: 242 overlap the ROM4 run, 48 occur
-only in the fixture, and 215 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 293 distinct words: 245 overlap the ROM4 run, 48 occur
+only in the fixture, and 212 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 227 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 230 have an `opassert` marker after a
 passing exact-word check, 15 execute in the fixture without such a marker,
-and 215 are absent from the fixture. The 15-word class includes setup and
+and 212 are absent from the fixture. The 15-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 15 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
-The 215-word class is a priority list
+The 212-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -657,6 +657,11 @@ dispatches) checks the source/destination split and two-cycle cost. Exact
 `7482` (`PORTR PA,*AR2`, 79 dispatches) checks the port-to-memory value,
 unchanged pointer, and two-cycle interval between consecutive reads; external
 I/O wait-state timing remains outside this fixture.
+Exact `56f8` (`DLD *(lk),A`, 65 dispatches) checks high/low word ordering,
+SXM guard extension, and the absolute-address two-cycle cost. Exact `7213`
+(`MVDM dmad,AR3`, 66 dispatches) checks the MMR destination and two-cycle
+cost. Exact `708a` (`MVKD dmad,*AR2-`, 64 dispatches) checks source/destination
+direction, postdecrement, and two-cycle cost.
 Exact ROM4 `6d90` (`MAR *AR0+`) now checks the compatibility-mode AR0 alias:
 with CMPT set, an AR0 operand modifies the register selected by ST0.ARP and
 leaves physical AR0 and ARP unchanged. Fixture-only `1090` checks the same
