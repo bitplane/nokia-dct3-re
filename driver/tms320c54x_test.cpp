@@ -9542,6 +9542,77 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 MVMM copies AR5 to AR4; three moves cost one cycle each");
+			program.write_word(0x05e2, 0xf843); // BC 05f0,ALT
+			program.write_word(0x05e3, 0x05f0);
+			program.write_word(0x05e4, 0x75d6); // Rejected-branch marker.
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			program.write_word(0x05f0, 0x75d6); // Taken-branch marker.
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 481;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 481 || m_phase == 482)
+		{
+			expect_opcode(0xf843,
+					m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (m_phase == 481 ? 7 : 5) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) ==
+						(m_phase == 481 ? 0x05f3 : 0x05e7),
+					"ROM4 BC ALT tests A's guard sign and costs five/three cycles");
+			if (m_phase == 481)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0100000000ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 482;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xff30); // XC 2,TC
+			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
+			program.write_word(0x05e4, 0x6d92); // MAR *AR2+
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 483;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 483 || m_phase == 484)
+		{
+			expect_opcode(0xff30,
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
+						(m_phase == 483 ? 0x0121 : 0x0120) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
+						(m_phase == 483 ? 0x0131 : 0x0130) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 XC 2,TC executes or rejects two slots at five-cycle marker span");
+			if (m_phase == 483)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 484;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
