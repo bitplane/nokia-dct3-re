@@ -3713,6 +3713,43 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f10 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 STL A,*AR3 stores the low word without pointer change in one cycle");
+			program.write_word(0x05e2, 0xf490); // ROR A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xab80000002ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 191;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 191)
+		{
+			expect_opcode(0xf490, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xc0000001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 ROR A rotates old C into bit 31, clears guard and updates C in one cycle");
+			program.write_word(0x05e2, 0xf590); // ROR B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff00000001ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 192;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 192)
+		{
+			expect_opcode(0xf590, m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0xc0000001 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROR B clears guard, rotates old zero C and captures outgoing bit in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
