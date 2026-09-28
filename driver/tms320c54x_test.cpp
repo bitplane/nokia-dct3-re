@@ -7156,6 +7156,65 @@ private:
 			expect_opcode(0xec01, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f02 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ROM4 RPT #1 executes MAR twice after one-cycle setup");
+			program.write_word(0x05e3, 0xfa30); // BCD 05f0,TC
+			program.write_word(0x05e4, 0x05f0);
+			program.write_word(0x05e5, 0xe801); // Delay slot 1
+			program.write_word(0x05e6, 0xe902); // Delay slot 2
+			program.write_word(0x05e7, 0xe803); // Fallthrough only
+			program.write_word(0x05e8, 0x75f8);
+			program.write_word(0x05e9, 0x0d00);
+			program.write_word(0x05ea, 0x0124);
+			program.write_word(0x05eb, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000); // TC true
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 358;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 358 || m_phase == 359)
+		{
+			expect_opcode(0xfa30,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (m_phase == 358 ? 1 : 3) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (m_phase == 358 ? 0x05f4 : 0x05ec) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
+						(m_phase == 358 ? 8 : 9),
+					"ROM4 BCD TC executes both delay words and selects the correct target");
+			if (m_phase == 358)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); // TC false
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 359;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e3, 0x8914); // STLM B,AR4
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678cafe);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 360;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 360)
+		{
+			expect_opcode(0x8914, m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xcafe &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STLM B,AR4 stores BL in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

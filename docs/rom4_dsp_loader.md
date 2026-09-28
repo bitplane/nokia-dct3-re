@@ -567,16 +567,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 356 distinct words: 282 overlap the ROM4 run, 74 occur
-only in the fixture, and 175 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 358 distinct words: 284 overlap the ROM4 run, 74 occur
+only in the fixture, and 173 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 274 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 276 have an `opassert` marker after a
 passing exact-word check, 8 execute in the fixture without such a marker,
-and 175 are absent from the fixture. The 8-word class includes setup and
+and 173 are absent from the fixture. The 8-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 8 lack semantic tests. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -615,6 +615,9 @@ targets, a negative 40-bit B test, and TI's five/three-cycle costs. It was the
 next most-executed absent word (28 observed executions).
 Exact ROM4 `ec01` (`RPT #1`) asserts two MAR body executions, the resulting
 AR0 value, and the one-cycle repeat setup. It was observed 25 times.
+Exact ROM4 `fa30` (`BCD pmad,TC`) checks both condition outcomes, both delay
+words, the selected destination, and delayed-branch timing. Exact `8914`
+(`STLM B,AR4`) checks the low-word transfer and one-cycle cost.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
