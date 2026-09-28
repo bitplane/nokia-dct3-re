@@ -1432,6 +1432,11 @@ execution count. This is a prioritization list, not an implementation count:
 the static mask scan does not evaluate nested validity checks or prove the
 instruction's arithmetic, flags, addressing, or cycle cost. Exact-word
 fixtures remain the evidence for those claims.
+Fixture-only `f43f` (`SUB A>>1,A`) now checks the accumulator arithmetic
+family's right-shift fill under both SXM states: a negative 40-bit source
+sign-fills when SXM is set and zero-fills when clear. Both cases assert TI
+SPRU172C's one-cycle cost. This does not establish the remaining shift
+amounts, source/destination combinations, or status variants.
 Exact `47f8` (`RPT *(absolute)`) now checks the three executions of its
 repeated instruction and the four-cycle setup cost specified by TI SPRU172C.
 The `4782` indirect form checks the three-cycle base cost and unchanged AR2.

@@ -12009,6 +12009,39 @@ private:
 				data.read_word(0x0f91) == 0x1234 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"LTD postincrements only after writing the original address successor");
+			program.write_word(0x05e2, 0xf43f); // SUB A>>1,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffffffcULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 669;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 669)
+		{
+			expect_opcode(0xf43f,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffffeULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUB A>>1,A sign-fills the 40-bit source when SXM is set in one cycle");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffffffcULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 670;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 670)
+		{
+			expect_opcode(0xf43f,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7ffffffffeULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUB A>>1,A zero-fills the 40-bit source when SXM is clear in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
