@@ -1247,11 +1247,11 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x8200: // STH A, Smem
 		indirect_write(low, u16(m_a >> 16));
-		m_icount -= low == 0xf8;
+		m_icount -= low >= 0xe0;
 		return;
 	case 0x8300: // STH B, Smem
 		indirect_write(low, u16(m_b >> 16));
-		m_icount -= low == 0xf8;
+		m_icount -= low >= 0xe0;
 		return;
 	case 0xe800: // LD #k, A
 		m_a = data_operand(low);
