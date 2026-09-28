@@ -7065,6 +7065,44 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"long-offset MPY preupdates AR and takes two cycles");
+			program.write_word(0x05e3, 0x1282); // LDU *AR2,A
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0f00, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-extend LDU.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 353;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 353)
+		{
+			expect_opcode(0x1282, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LDU *AR2,A zero-extends without changing AR2 in one cycle");
+			program.write_word(0x05e3, 0x1082); // LD *AR2,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 354;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 354)
+		{
+			expect_opcode(0x1082, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff8001ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD *AR2,A sign-extends without changing AR2 in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
