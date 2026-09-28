@@ -11575,6 +11575,71 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f91 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"parallel MAS reads X before aliased Y store and applies Xmod once");
+			program.write_word(0x05e2, 0xb83a); // MAS *AR5,*AR4+,A,A with FRCT.
+			data.write_word(0x0f90, 2);
+			data.write_word(0x0f91, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x18000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x28000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // SXM, FRCT.
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 649;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 649 && m_phase <= 652)
+		{
+			struct multiply_mode_case {
+				u16 opcode, x, y, t_before, t_after, st1, st0_after, store;
+				u64 a_before, b_before, a_after, b_after;
+			};
+			static constexpr multiply_mode_case cases[] = {
+				{ 0xb83a, 2,      3, 0, 2,      0x0140, 0,      3,
+				  0x18000,    0x28000, 0x17ff4,    0x28000 },
+				{ 0xd93a, 3,      0, 2, 2,      0x0140, 0,      1,
+				  0x18000,    0x28000, 0x18000,    0x27ff4 },
+				{ 0xb83a, 0xffff, 2, 0, 0xffff, 0x0300, 0x0400, 2,
+				  0x7fffffff, 0,       0x7fffffff, 0 },
+				{ 0xd93a, 0xffff, 0, 2, 2,      0x0300, 0x0200, 1,
+				  0x18000,    0x7fffffff, 0x18000, 0x7fffffff }
+			};
+			const unsigned index = m_phase - 649;
+			const multiply_mode_case &row = cases[index];
+			expect_opcode(row.opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == row.t_after &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0600) == row.st0_after &&
+				data.read_word(0x0f91) == row.store &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"dual and parallel MAS FRCT doubling, OVM saturation, and one-cycle timing");
+			if (m_phase < 652)
+			{
+				const multiply_mode_case &next = cases[index + 1];
+				program.write_word(0x05e2, next.opcode);
+				data.write_word(0x0f90, next.x);
+				data.write_word(0x0f91, next.y);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next.b_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, next.t_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next.st1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

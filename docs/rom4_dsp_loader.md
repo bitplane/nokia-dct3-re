@@ -435,7 +435,7 @@ TI SPRU307A likewise defines parallel `ST||MAC[R]` at `d0..d7` and
 it now decodes the MAS half with a subtracted product. Sixteen fixture-only
 words check the old source value stored to Ymem, destination A/B, rounded
 and unrounded accumulation, untouched T, X/Y pointer updates, preserved
-carry, and one-cycle DARAM timing. Different ASM, FRCT/OVM, and most aliased
+carry, and one-cycle DARAM timing. Other ASM, FRCT/OVM, and most aliased
 X/Y addressing cases remain unaudited.
 TI SPRU172C's published `ST A || MAS *AR5,B` and `ST A || MASR *AR5+,B`
 examples now have exact-result fixtures. They check the negative 40-bit
@@ -447,6 +447,11 @@ opposing Xmod/Ymod. It checks the TI SPRU131G section 5.5.4 rule: X is read
 before the parallel store overwrites that address, and only Xmod updates the
 shared auxiliary register. This covers one alias case, not every dual-memory
 form.
+Additional `b83a` and `d93a` runs check FRCT product doubling and OVM
+saturation after subtracting a negative product. They assert the appropriate
+OVA/OVB flag, T and store side effects, and one-cycle DARAM cost. These are
+status-mode variants of existing fixture words, not new opcode encodings;
+other FRCT/OVM product and rounding boundaries remain unaudited.
 Fixture-only `3383`, `3583`, and `3783` check `MASA`, `MACA`, and `MACAR`
 using A's high word as the multiplicand, including B accumulation, T
 publication, rounding, and one-cycle DARAM timing. `3693` uses TI's `POLY`
