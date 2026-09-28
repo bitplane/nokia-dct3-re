@@ -1325,15 +1325,21 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = indirect_read(low);
 		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		m_program.write_word(destination, value);
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= low == 0xf8 ? 4 : 3;
 		return;
 	}
 	case 0x7c00: // MVPD pmad, Smem
 	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
 		const u16 destination = low == 0xf8 ? fetch() : m_ar[low & 7];
-		const u16 value = m_program.read_word(fetch());
+		const u16 value = m_program.read_word(fetch() + (repeated ? m_rpt_iteration : 0));
 		data_write(destination, value);
 		if (low != 0xf8)
 			indirect_modify(low);
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= low == 0xf8 ? 3 : 2;
 		return;
 	}
 	case 0x7e00: // READA Smem

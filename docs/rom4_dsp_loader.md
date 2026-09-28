@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 172 distinct words: 135 overlap the ROM4 run, 37 occur
-only in the fixture, and 322 ROM4 words do not occur in the fixture. These are
+The fixture executes 173 distinct words: 136 overlap the ROM4 run, 37 occur
+only in the fixture, and 321 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 61 have an `opassert` marker after a
-passing exact-word check, 74 execute in the fixture without such a marker,
-and 322 are absent from the fixture. The 74-word class includes setup and
+assertions. Of the 457 ROM4 words, 65 have an `opassert` marker after a
+passing exact-word check, 71 execute in the fixture without such a marker,
+and 321 are absent from the fixture. The 71-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 74 lack semantic tests. The 322-word class is a priority list
+claim that all 71 lack semantic tests. The 321-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -692,6 +692,14 @@ Exact `47f8` (`RPT *(absolute)`) now checks the three executions of its
 repeated instruction and the four-cycle setup cost specified by TI SPRU172C.
 The `4782` indirect form checks the three-cycle base cost and unchanged AR2.
 The core previously charged only its default single cycle to both forms.
+Observed `7d92`/`7c92` program-memory moves now have exact-word direction,
+pointer, and cycle assertions. TI SPRU172C gives `MVDP` four cycles and
+`MVPD` three, with one additional cycle for absolute Smem; the `7df8`/`7cf8`
+fixtures check that surcharge and extension-word order. A repeated `7c92`
+fixture checks three distinct program source words, consecutive data addresses,
+and one cycle per move after the first. Previously `MVPD` reread its initial
+program word on every repeat iteration. These checks do not establish bus
+wait-state timing or untested addressing variants.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
