@@ -4668,6 +4668,63 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d81 &&
 					m_last_port_cycle - m_middle_port_cycle == 3,
 					"ROM4 MVDD copies from decremented AR3 and advances both pointers in one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xe742); // MVMM AR4,AR2
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xe743); // MVMM AR4,AR3
+			program.write_word(0x05e6, 0x75d6);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0d90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 234;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 234)
+		{
+			expect_opcode(0xe742, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d90 &&
+					m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 3,
+					"ROM4 MVMM AR4,AR2 copies an auxiliary register in one cycle");
+			expect_opcode(0xe743, m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d90 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0d90 &&
+					m_last_port_cycle - m_middle_port_cycle == 3,
+					"ROM4 MVMM AR4,AR3 preserves its source in one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xe748); // MVMM AR4,SP
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xe782); // MVMM SP,AR2
+			program.write_word(0x05e6, 0x75d6);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0d90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 235;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 235)
+		{
+			expect_opcode(0xe748, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0d90 &&
+					m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 3,
+					"MVMM AR4,SP accepts SP as destination in one cycle");
+			expect_opcode(0xe782, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d90 &&
+					m_last_port_cycle - m_middle_port_cycle == 3,
+					"MVMM SP,AR2 accepts SP as source in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

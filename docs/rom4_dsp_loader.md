@@ -567,21 +567,21 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 270 distinct words: 225 overlap the ROM4 run, 45 occur
-only in the fixture, and 232 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 274 distinct words: 228 overlap the ROM4 run, 46 occur
+only in the fixture, and 229 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 189 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 192 have an `opassert` marker after a
 passing exact-word check, 36 execute in the fixture without such a marker,
-and 232 are absent from the fixture. The 36-word class includes setup and
+and 229 are absent from the fixture. The 36-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 36 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
-The 232-word class is a priority list
+The 229-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -817,6 +817,11 @@ Exact-word fixtures also separate `108a` (`LD *AR2-,A`), `8084` (`STL A,*AR4`),
 `1a8b` (`OR *AR3-,A`), and `e598` (`MVDD *AR3+,*AR2+`) from the aggregate
 challenge response. They check signed loads, stores, source/destination
 addressing, both pointer updates, and TI's one-cycle base costs.
+The high-use `e742`/`e743` words are `MVMM AR4,AR2/AR3`, not `MVDK` as the
+decoder comment formerly claimed. TI SPRU172C includes SP as the ninth
+allowed register. The decoder now uses the full four-bit source/destination
+fields and MMR accessors; fixtures cover those two ROM4 words and the SP forms
+`e748`/`e782`. The 30-second ROM4 trace also dispatches `e782` 25 times.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

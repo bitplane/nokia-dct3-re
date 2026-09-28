@@ -1351,11 +1351,13 @@ void tms320c54x_device::execute_one(u16 op)
 			m_icount -= low == 0xf8 ? 5 : 4;
 		return;
 	}
-	case 0xe700: // MVDK source auxiliary register to destination MMR
+	case 0xe700: // MVMM MMRx, MMRy
 	{
-		const unsigned source = (low >> 4) & 7;
-		const unsigned destination = low & 7;
-		m_ar[destination] = m_ar[source];
+		const unsigned source = low >> 4;
+		const unsigned destination = low & 0x0f;
+		if (source > 8 || destination > 8)
+			break;
+		data_write(0x10 + destination, data_read(0x10 + source));
 		return;
 	}
 	default:
