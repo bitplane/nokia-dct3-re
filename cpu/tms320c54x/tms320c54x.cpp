@@ -464,6 +464,22 @@ void tms320c54x_device::circular_modify(unsigned ar, s16 step)
 	m_ar[ar] = base | u16(index);
 }
 
+u16 tms320c54x_device::mmr_address(u8 mode)
+{
+	if (!BIT(mode, 7))
+		return mode & 0x7f;
+	const unsigned ar = indirect_ar(mode);
+	const bool preincrement = (mode & 0x78) == 0x18;
+	if (preincrement)
+		indirect_modify(mode);
+	const u16 address = m_ar[ar] & 0x7f;
+	if (!preincrement)
+		indirect_modify(mode);
+	// MMR addressing clears the selected AR's upper nine bits after the access.
+	m_ar[ar] &= 0x7f;
+	return address;
+}
+
 u16 tms320c54x_device::indirect_read(u8 mode)
 {
 	if (mode >= 0xf8)
@@ -1151,10 +1167,10 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x4800: // LDM MMR, A
-		m_a = data_read(low & 0x7f);
+		m_a = data_read(mmr_address(low));
 		return;
 	case 0x4900: // LDM MMR, B
-		m_b = data_read(low & 0x7f);
+		m_b = data_read(mmr_address(low));
 		return;
 	case 0x4e00: // DST A, Lmem
 	case 0x4f00: // DST B, Lmem
@@ -1305,10 +1321,10 @@ void tms320c54x_device::execute_one(u16 op)
 		m_sp = u16(m_sp + s8(low));
 		return;
 	case 0x8800: // STLM A, MMR
-		data_write(low & 0x7f, u16(m_a));
+		data_write(mmr_address(low), u16(m_a));
 		return;
 	case 0x8900: // STLM B, MMR
-		data_write(low & 0x7f, u16(m_b));
+		data_write(mmr_address(low), u16(m_b));
 		return;
 	case 0x7100: // MVDK Smem, dmad
 	{
@@ -1336,7 +1352,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
 		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
-		data_write(destination, data_read(low & 0x7f));
+		data_write(destination, data_read(mmr_address(low)));
 		m_icount -= !repeated || !m_rpt_iteration;
 		return;
 	}
@@ -1383,7 +1399,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
 		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
-		data_write(low & 0x7f, data_read(source));
+		data_write(mmr_address(low), data_read(source));
 		m_icount -= !repeated || !m_rpt_iteration;
 		return;
 	}
@@ -1411,7 +1427,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x7700: // STM #lk, MMR
 	{
 		const u16 value = fetch();
-		const unsigned reg = low & 0x7f;
+		const u16 reg = mmr_address(low);
 		data_write(reg, value);
 		m_icount -= 1;
 		return;

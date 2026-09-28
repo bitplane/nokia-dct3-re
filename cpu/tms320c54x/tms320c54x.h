@@ -66,6 +66,7 @@ private:
 	u16 data_read(u16 address);
 	void data_write(u16 address, u16 value);
 	u16 indirect_read(u8 mode);
+	u16 mmr_address(u8 mode);
 	void indirect_write(u8 mode, u16 value);
 	u16 long_offset_address(u8 mode);
 	unsigned indirect_ar(u8 mode) const;

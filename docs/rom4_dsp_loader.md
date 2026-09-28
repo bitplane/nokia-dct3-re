@@ -381,6 +381,12 @@ SPRU172C explicitly lists FRCT as affecting MPYU; unsigned multiplication
 must not bypass the fractional shift. Dual-16 arithmetic (`DADD`/`DSUB`
 families) remains unimplemented and was not observed in the captured ROM4
 executed-opcode set, so it is not yet a claim of ROM4 conformance.
+Indirect MMR addressing was a separate core defect: `LDM`/`STLM` and the
+other seven-bit MMR operand forms previously read the opcode's low bits as a
+fixed address even when the indirect bit was set. They now select the AR's
+low seven bits, apply pre/post modification, and clear its upper nine bits
+after the access, per SPRU131G section 5.6. Fixture-only `4882`, `8892`, and
+`489a` check read, postincrement write, and preincrement read at one cycle.
 SFTL shifts only the low 32 bits, clears destination guard bits and sets carry
 from the outgoing bit (or clears carry for shift zero), per SPRU172C page
 4-158. Executable left/right/zero-shift cases distinguish this from SFTA's
@@ -588,7 +594,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 407 distinct words: 316 overlap the ROM4 run, 91 occur
+The fixture dispatches 410 distinct words: 316 overlap the ROM4 run, 94 occur
 only in the fixture, and 141 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
