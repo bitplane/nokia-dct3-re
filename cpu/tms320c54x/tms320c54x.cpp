@@ -1773,12 +1773,6 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf3ff: // SFTA B, -1
 		m_b = arithmetic_shift_right(m_b, 1);
 		return;
-	case 0xf0b0: // OR A >> 16, A
-		m_a |= arithmetic_shift_right(m_a, 16);
-		return;
-	case 0xf3b0: // OR B >> 16, B
-		m_b |= arithmetic_shift_right(m_b, 16);
-		return;
 	case 0xf000: // ADD #lk, A
 		m_a = (m_a + data_operand(fetch())) & ACC_MASK;
 		return;
