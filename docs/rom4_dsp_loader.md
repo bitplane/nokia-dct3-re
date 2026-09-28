@@ -567,16 +567,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 354 distinct words: 280 overlap the ROM4 run, 74 occur
-only in the fixture, and 177 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 355 distinct words: 281 overlap the ROM4 run, 74 occur
+only in the fixture, and 176 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 272 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 273 have an `opassert` marker after a
 passing exact-word check, 8 execute in the fixture without such a marker,
-and 177 are absent from the fixture. The 8-word class includes setup and
+and 176 are absent from the fixture. The 8-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 8 lack semantic tests. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -610,6 +610,9 @@ Exact ROM4 `1282` (`LDU *AR2,A`) and `1082` (`LD *AR2,A`) fixtures use the same
 negative 16-bit operand to distinguish zero- from sign-extension under SXM.
 Both assert unchanged AR2 and the one-cycle indirect cost; this retires the
 previously most-executed absent word (`1282`, 32 observed executions).
+Exact ROM4 `f84e` (`BC pmad,BGT`) now asserts both the taken and fallthrough
+targets, a negative 40-bit B test, and TI's five/three-cycle costs. It was the
+next most-executed absent word (28 observed executions).
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.

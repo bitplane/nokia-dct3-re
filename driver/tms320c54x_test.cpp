@@ -7103,6 +7103,40 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 LD *AR2,A sign-extends without changing AR2 in one cycle");
+			program.write_word(0x05e3, 0xf84e); // BC 05f0,BGT
+			program.write_word(0x05e4, 0x05f0);
+			program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			program.write_word(0x05f0, 0x75f8); // Taken marker.
+			program.write_word(0x05f1, 0x0d00);
+			program.write_word(0x05f2, 0x0124);
+			program.write_word(0x05f3, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 355;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 355 || m_phase == 356)
+		{
+			expect_opcode(0xf84e, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (m_phase == 355 ? 8 : 6) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (m_phase == 355 ? 0x05f4 : 0x05e9),
+					"ROM4 BC BGT tests signed 40-bit B and costs five/three cycles");
+			if (m_phase == 355)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff00000000ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 356;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
