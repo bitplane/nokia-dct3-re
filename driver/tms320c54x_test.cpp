@@ -2532,6 +2532,79 @@ private:
 			expect_opcode(0xf065, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff00ff0000ULL &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 f065 XORs the shifted immediate and costs two cycles");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xf071); // RPTZ A,#lk
+			program.write_word(0x05e3, 0x0000);
+			program.write_word(0x05e4, 0xf495); // NOP
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 129;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 129)
+		{
+			expect_opcode(0xf071, m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 f071 clears A, repeats one NOP, and costs two cycles");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xf272); // RPTBD 05e6h
+			program.write_word(0x05e3, 0x05e6);
+			program.write_word(0x05e4, 0xf495); // delay slot 1
+			program.write_word(0x05e5, 0xf495); // delay slot 2
+			program.write_word(0x05e6, 0xf495); // one-word repeat body
+			program.write_word(0x05e7, 0x75d6);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 130;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 130)
+		{
+			expect_opcode(0xf272, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 7 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ea &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+					"ROM4 f272 costs two cycles and retires after its one-word block");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xf072); // RPTB 05e4h
+			program.write_word(0x05e3, 0x05e4);
+			program.write_word(0x05e4, 0xf495); // one-word repeat body
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 131;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 131)
+		{
+			expect_opcode(0xf072, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 7 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+					"ROM4 f072 costs four cycles and retires after its one-word block");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

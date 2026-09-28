@@ -1586,7 +1586,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_rsa = u16(m_pc + 2);
 		m_block_repeat_active = true;
 		m_st1 |= ST1_BRAF;
-		m_icount -= 3;
+		--m_icount;
 		return;
 	case 0xf071: // RPTZ A, #lk
 	case 0xf171: // RPTZ B, #lk
@@ -1596,6 +1596,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_rpt_end = 0xffff;
 		m_rpt_iteration = 0;
 		m_rpt_armed = true;
+		--m_icount;
 		return;
 	case 0xf074: // CALL pmad
 	{

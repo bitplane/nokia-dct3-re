@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 166 distinct words: 130 overlap the ROM4 run, 36 occur
-only in the fixture, and 327 ROM4 words do not occur in the fixture. These are
+The fixture executes 167 distinct words: 131 overlap the ROM4 run, 36 occur
+only in the fixture, and 326 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 48 have an `opassert` marker after a
-passing exact-word check, 82 execute in the fixture without such a marker,
-and 327 are absent from the fixture. The 83-word class includes setup and
+assertions. Of the 457 ROM4 words, 51 have an `opassert` marker after a
+passing exact-word check, 80 execute in the fixture without such a marker,
+and 326 are absent from the fixture. The 80-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 83 lack semantic tests. The 337-word class is a priority list
+claim that all 80 lack semantic tests. The 326-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -593,6 +593,13 @@ two. The 30-second RF-boundary run retains 6,498 frame expiries and
 and 276,480 reads. Both differ from the ideal completed-frame count by
 two 32-read frames at the fixed-time cutoff, so the gate admits up to two
 in-flight frames and still rejects a three-frame deficit.
+TI SPRU172C table 2-16 specifies two cycles for both `RPTZ dst,#lk` and the
+delayed `RPTBD pmad` form. Exact ROM4 words `f071` and `f272` now have
+result/control-flow and cycle assertions; their shared A/B and block-repeat
+paths previously charged one and four cycles respectively. The non-delayed
+`RPTB` form remains at its documented four cycles, now checked directly with
+exact `f072` and the same one-word-block fixture. The five-ROM cross-regression
+passes after both timing corrections.
 
 Execution counts identified `ROL A` (`f491`) and `ROL B` (`f591`) as the largest
 previously unasserted ROM4 encodings, at roughly 524,000 executions each in
