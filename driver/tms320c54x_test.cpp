@@ -331,6 +331,35 @@ private:
 		map(0x0000, 0xffff).ram();
 		map(0x0060, 0x0061).r(FUNC(tms320c54x_test_state::repeat_irq_r));
 	}
+	void io_map(address_map &map) ATTR_COLD
+	{
+		map(0x0000, 0xffff).ram();
+		map(0x0123, 0x0123).r(FUNC(tms320c54x_test_state::test_port_r));
+		map(0x0124, 0x0124).w(FUNC(tms320c54x_test_state::test_port_w));
+	}
+	u16 test_port_r()
+	{
+		const u64 cycle = m_cpu->total_cycles();
+		if (m_port_reads++ == 0)
+			m_first_port_cycle = cycle;
+		else
+			m_last_port_cycle = cycle;
+		return 0xabcd;
+	}
+	void test_port_w(u16 value)
+	{
+		const u64 cycle = m_cpu->total_cycles();
+		if (m_port_writes++ == 0)
+		{
+			m_first_port_cycle = cycle;
+			m_first_port_value = value;
+		}
+		else
+		{
+			m_last_port_cycle = cycle;
+			m_last_port_value = value;
+		}
+	}
 	u16 repeat_irq_r(offs_t offset)
 	{
 		if (offset)
@@ -1524,13 +1553,103 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 77)
-		{
+	if (m_phase == 77)
+	{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345687ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e3,
 					"XOR long immediate consumes extension and preserves carry, guards and B");
+			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
+			program.write_word(0x05e1, 0x0123);
+			program.write_word(0x05e2, 0x74d6);
+			program.write_word(0x05e3, 0x0123);
+			program.write_word(0x05e4, 0xf5e1); // IDLE
+			data.write_word(0x0a03, 0);
+			data.write_word(0x0a00, 0);
+			m_port_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 78;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 78)
+		{
+			expect(m_port_reads == 2 && data.read_word(0x0a03) == 0xabcd &&
+					data.read_word(0x0a00) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0a01 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e5 &&
+					m_last_port_cycle - m_first_port_cycle == 2,
+					"PORTR port reads take two cycles and circularly update AR6");
+			program.write_word(0x05e0, 0xb03a); // MAC *AR5, *AR4+, A, A
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0b00, 0xfffe);
+			data.write_word(0x0c00, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0b00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 79;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 79)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 20 &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c01 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00,
+					"ROM4 b03a signed MAC updates T and one pointer");
+			program.write_word(0x05e0, 0xb3be); // MAC *AR5+, *AR4+%, B, B
+			data.write_word(0x0b00, 0xfffd);
+			data.write_word(0x0c03, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0b00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 80;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 80)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
+					"ROM4 b3be signed MAC updates both pointer modes");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x75d6);
+			program.write_word(0x05e3, 0x0124);
+			program.write_word(0x05e4, 0xf5e1); // IDLE
+			data.write_word(0x0a03, 0x1234);
+			data.write_word(0x0a00, 0x5678);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 81;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 81)
+		{
+			expect(m_port_writes == 2 && m_first_port_value == 0x1234 &&
+					m_last_port_value == 0x5678 &&
+					m_last_port_cycle - m_first_port_cycle == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0a01,
+					"PORTW memory source takes two cycles and circularly updates AR6");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -1724,6 +1843,12 @@ private:
 	u64 m_irq_accumulator = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
+	u64 m_first_port_cycle = 0;
+	u64 m_last_port_cycle = 0;
+	unsigned m_port_reads = 0;
+	unsigned m_port_writes = 0;
+	u16 m_first_port_value = 0;
+	u16 m_last_port_value = 0;
 	unsigned m_saved_repeat_reads = 0;
 	std::stringstream m_saved_repeat;
 	std::array<u16, 0x800> m_saved_transport = {};
@@ -1735,6 +1860,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	NOKIA_DSPIF(config, m_transport, 0);
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);
+	m_cpu->set_addrmap(AS_IO, &tms320c54x_test_state::io_map);
 }
 
 void tms320c54x_test_state::rom4(machine_config &config)

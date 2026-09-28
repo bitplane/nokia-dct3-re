@@ -1208,11 +1208,13 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		else
 			indirect_write(low, m_io.read_word(fetch()));
+		m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	case 0x7500: // PORTW Smem, port
 	{
 		const u16 value = indirect_read(low);
 		m_io.write_word(fetch(), value);
+		m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	}
 	case 0x7000: // MVKD dmad, Smem

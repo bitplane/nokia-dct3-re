@@ -574,9 +574,14 @@ this run. Both now have core assertions for carry transfer, cleared guard bits,
 and preservation of the other accumulator, checked against TI SPRU172C
 section 4. Immediate `XOR` (`f050`, about 262,000 executions) now has an
 exact-encoding result and extension-word assertion. The next high-use group
-for focused semantic and cycle tests is `74d6`/`b03a`/`b0be`/`b3be`
-(155,000-207,000 executions each). Decode those in context before assigning
-them names or changing timing. Re-run
+was `74d6`/`b03a`/`b0be`/`b3be` (155,000-207,000 executions each). `74d6`
+is `PORTR` into circularly post-incremented AR6; its exact-word fixture now
+checks port data, pointer wrap, and TI SPRU172C's two-cycle base cost. The
+paired `PORTW` path has the same cycle-cost correction and a symmetric
+fixture. `b03a` and `b3be` now have exact-word signed-MAC and pointer-update
+assertions; `b0be` still relies on the shared MAC decoder's family tests.
+The I/O wait-state component of `PORTR`/`PORTW` timing remains unmodeled.
+Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
 directly to rank ROM4-only words by execution count. `make check-c54x-cross-rom`
