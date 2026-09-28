@@ -1905,6 +1905,110 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0e00,
 					"ROM4 5781 DLD sign-extends B without modifying AR1");
+			program.write_word(0x05e0, 0xa5be); // MPY *AR5+, *AR4+0%, B
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0b00, 0xfffe);
+			data.write_word(0x0c03, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0b00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 95;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 95)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffffffaULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
+					"ROM4 a5be signed dual MPY loads T and updates both pointers");
+			program.write_word(0x05e0, 0xb736); // MACR *AR5, *AR4-, B, B
+			data.write_word(0x0b00, 3);
+			data.write_word(0x0c03, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0b00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 96;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 96)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c02 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00,
+					"ROM4 b736 MACR rounds and updates Y pointer");
+			program.write_word(0x05e0, 0xd6e1); // ST B,*AR3 || MACR *AR4+0%,A
+			data.write_word(0x0c03, 0xfffe);
+			data.write_word(0x0d00, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8008);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0012345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 97;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 97)
+		{
+			expect(data.read_word(0x0d00) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d00,
+					"ROM4 d6e1 stores old B and rounds MAC into A");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x6c8a); // BANZ 05e4, *AR2-
+			program.write_word(0x05e3, 0x05e4);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0a03, 0x1234);
+			data.write_word(0x0a00, 0x5678);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 98;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 98 || m_phase == 99)
+		{
+			expect(m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
+					(m_phase == 98 ? 6 : 4) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
+					(m_phase == 98 ? 0 : 0xffff),
+					"ROM4 6c8a BANZ costs four cycles taken, two not taken, and decrements AR2");
+			if (m_phase == 98)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 99;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

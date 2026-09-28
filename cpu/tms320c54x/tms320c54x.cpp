@@ -1174,6 +1174,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination = fetch();
 		if (branch)
 			m_pc = destination;
+		m_icount -= branch ? 3 : 1;
 		return;
 	}
 	case 0x6e00: // BANZD pmad, *ARx modification

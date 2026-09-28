@@ -18,6 +18,9 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
     def test_accepts_quantified_int0_receiver_activation(self):
         self.assertEqual(check(summary())["frame_expiries"], 6497)
 
+    def test_accepts_one_in_flight_frame_at_time_cutoff(self):
+        self.assertEqual(check(summary(frames=6498))["rf_reads"], 207200)
+
     def test_rejects_short_run(self):
         with self.assertRaisesRegex(ValueError, "only 100"):
             check(summary(frames=100))
@@ -29,6 +32,8 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
     def test_rejects_changed_read_cadence(self):
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
             check(summary(reads=207199))
+        with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
+            check(summary(frames=6499))
 
     def test_rejects_unexpected_burst_port_activity(self):
         with self.assertRaisesRegex(ValueError, "parallel burst path"):
