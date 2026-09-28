@@ -1312,12 +1312,14 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		else
 			indirect_write(low, fetch());
+		m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	case 0x7700: // STM #lk, MMR
 	{
 		const u16 value = fetch();
 		const unsigned reg = low & 0x7f;
 		data_write(reg, value);
+		m_icount -= 1;
 		return;
 	}
 	case 0x7d00: // MVDP Smem, pmad

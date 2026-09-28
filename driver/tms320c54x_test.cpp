@@ -2968,6 +2968,60 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d43 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
 					"repeated WRITA advances program and data addresses at one cycle after setup");
+			program.write_word(0x05e2, 0x771a); // STM #lk,BRC
+			program.write_word(0x05e3, 0x0042);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 152;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 152)
+		{
+			expect_opcode(0x771a, m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0x0042 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STM #lk,BRC writes the MMR in two cycles");
+			program.write_word(0x05e2, 0x76f8); // ST #lk,*(absolute)
+			program.write_word(0x05e3, 0x0d50);
+			program.write_word(0x05e4, 0x5678);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 153;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 153)
+		{
+			expect_opcode(0x76f8, data.read_word(0x0d50) == 0x5678 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"absolute ST #lk,Smem fetches address first and costs three cycles");
+			program.write_word(0x05e2, 0x7682); // ST #lk,*AR2
+			program.write_word(0x05e3, 0x9abc);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d51);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 154;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 154)
+		{
+			expect_opcode(0x7682, data.read_word(0x0d51) == 0x9abc &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d51 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"indirect ST #lk,Smem preserves AR2 and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
