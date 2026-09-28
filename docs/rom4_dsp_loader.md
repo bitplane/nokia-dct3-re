@@ -644,7 +644,15 @@ of every possible ROM4 path.
 `make check-c54x-observed-coverage` regenerates both verbose logs and fails if
 the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
-instruction variants or silicon-level timing.
+instruction variants or silicon-level timing. The tool is given the current
+core source for a separate static decoder inventory.
+That inventory matches top-level cases and opcode masks: 39,518 words match
+some declared path, of which 584 execute in the fixture and 38,934 do not;
+51 matching high-byte groups have no fixture word. These are **candidates**,
+not a verified implemented-instruction count: nested validity, extension-word
+grammar, and behavior are not established by a source mask. The report keeps
+the ROM4-observed/fixture-asserted class separate, so a new observed gap can
+be ranked by execution count before expanding tests into unused encodings.
 
 The coverage tool now separates fixture execution from explicit result
 assertions. All 457 observed ROM4 words have an `opassert` marker after a

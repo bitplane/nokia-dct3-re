@@ -17,6 +17,29 @@ ASSERTION = re.compile(r"^(?:\[:\] )?\[opassert\] op=([0-9a-fA-F]{4})$")
 ROM4_IDLE_OPCODE_COUNT = 457
 ROM4_IDLE_GROUP_COUNT = 91
 ROM4_IDLE_SET_SHA256 = "e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc"
+DECODER_MASK = re.compile(r"\(op\s*&\s*0x([0-9a-fA-F]+)\)\s*==\s*0x([0-9a-fA-F]+)")
+DECODER_EXACT = re.compile(r"\bop\s*==\s*0x([0-9a-fA-F]{4})\b")
+DECODER_CASE = re.compile(r"\bcase\s+0x([0-9a-fA-F]{4})\s*:")
+
+
+def decoder_declared_words(source: str) -> set[int]:
+    """Overapproximate top-level decoder matches; nested validity is not proven."""
+    start = source.index("void tms320c54x_device::execute_one(u16 op)")
+    end = source.index("void tms320c54x_device::execute_run()", start)
+    body = source[start:end]
+    masks = [(int(mask, 16), int(value, 16))
+             for mask, value in DECODER_MASK.findall(body)]
+    exact = {int(value, 16) for value in DECODER_EXACT.findall(body)}
+    grouped_switch = body.index("switch (op & 0xff00)")
+    exact_switch = body.index("switch (op)", grouped_switch)
+    masks.extend((0xff00, int(value, 16))
+                 for value in DECODER_CASE.findall(body[grouped_switch:exact_switch]))
+    exact.update(int(value, 16)
+                 for value in DECODER_CASE.findall(body[exact_switch:]))
+    if not masks or not exact:
+        raise ValueError("decoder cases or masks not found")
+    return exact | {opcode for opcode in range(0x10000)
+                    if any(opcode & mask == value for mask, value in masks)}
 
 
 def summarize(text: str) -> dict[str, object]:
@@ -80,6 +103,8 @@ def main() -> int:
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("--require-rom4-idle", action="store_true")
     parser.add_argument("--fixture-log", type=pathlib.Path)
+    parser.add_argument("--decoder-source", type=pathlib.Path,
+                        help="report source-declared opcode matches absent from the fixture")
     parser.add_argument("--group-report", action="store_true",
                         help="rank unasserted ROM4 executions by opcode high byte")
     parser.add_argument("--all-gaps", action="store_true",
@@ -91,9 +116,12 @@ def main() -> int:
         parser.error("--group-report requires --fixture-log")
     if args.require_all_asserted and not args.fixture_log:
         parser.error("--require-all-asserted requires --fixture-log")
+    if args.decoder_source and not args.fixture_log:
+        parser.error("--decoder-source requires --fixture-log")
     try:
         result = summarize(args.log.read_text(errors="replace"))
         fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
+        declared = decoder_declared_words(args.decoder_source.read_text()) if args.decoder_source else None
         if args.require_rom4_idle:
             actual = (result["opcodes"], result["high_byte_groups"], result["set_sha256"])
             expected = (ROM4_IDLE_OPCODE_COUNT, ROM4_IDLE_GROUP_COUNT,
@@ -118,6 +146,19 @@ def main() -> int:
         executed_only = overlap - asserted
         print(f"ROM4 fixture classes: asserted={len(asserted)} "
               f"executed-only={len(executed_only)} absent={len(uncovered)}")
+        if declared is not None:
+            untested = declared - fixture_only
+            groups = {}
+            for opcode in untested:
+                groups[opcode >> 8] = groups.get(opcode >> 8, 0) + 1
+            no_fixture_groups = sorted(group for group in groups
+                                       if not any(opcode >> 8 == group for opcode in fixture_only))
+            print(f"Decoder-declared words: {len(declared)}; fixture-executed: "
+                  f"{len(declared & fixture_only)}; not fixture-executed: {len(untested)}")
+            print("  Static match only: nested validity and behavior are not verified")
+            print(f"  High-byte groups with no fixture word: {len(no_fixture_groups)}")
+            for group in no_fixture_groups[:24]:
+                print(f"  no-fixture group={group:02x} static_matches={groups[group]}")
         if args.all_gaps:
             for opcode, pc, count, status in ranked_gaps(result, fixture):
                 print(f"  {status} op={opcode:04x} first_pc={pc:04x} executions={count}")
