@@ -1204,6 +1204,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_delayed_target = destination;
 			m_delayed_words = 2;
 		}
+		--m_icount;
 		return;
 	}
 	case 0x8000: // STL A, Smem
@@ -1504,11 +1505,12 @@ void tms320c54x_device::execute_one(u16 op)
 			take = !BIT(m_st0, 11);
 		else
 			take = true;
+		m_icount -= 2;
 		if (take)
 		{
 			push(m_pc);
 			m_pc = destination;
-			m_icount -= 3;
+			m_icount -= 2;
 		}
 		return;
 	}
