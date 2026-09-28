@@ -1417,7 +1417,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= !repeated || !m_rpt_iteration;
 		return;
 	}
-	case 0x7600: // STM #lk, Smem
+	case 0x7600: // ST #lk, Smem
 		if (low >= 0xe0)
 		{
 			u16 address;

@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 431 distinct words: 335 overlap the ROM4 run, 96 occur
-only in the fixture, and 122 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 433 distinct words: 337 overlap the ROM4 run, 96 occur
+only in the fixture, and 120 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 335 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 337 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 122 are absent from the fixture. This closes the fixture-executed-only
+and 120 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -620,7 +620,14 @@ MMR load/move direction and their one-/two-cycle costs; `6882` and `6884`
 assert indirect `ANDM` masking, distinct AR selection, unchanged status, and
 two-cycle costs. `6db1` and `6dc2` now assert AR0-offset and circular `MAR`
 updates in one cycle; `e900` and `e901` assert short-immediate B loads reset
-the guard and leave status unchanged. The previously leading absent word,
+the guard and leave status unchanged. A synthetic fixture combining the
+observed `ec1f` and `7693` words checks that `RPT #31` executes 32
+consecutive `ST #lk,*AR3+` stores at TI's two-cycle body rate; it does not
+claim those words are adjacent in the ROM. TI SPRU172C's opcode diagrams
+distinguish `0x76xx` ordinary-memory `ST` from `0x77xx` page-zero `STM`;
+the core comment was corrected, and the earlier `768a` ordinary-memory
+fixture remains valid.
+The previously leading absent word,
 `fa20`, now has taken and not-taken `BCD NTC` fixtures
 that check both delay slots, branch destination, and cycle cost. The leading
 observed `1183` and `0093` fixtures cover negative Smem sign extension under
