@@ -6619,6 +6619,43 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ec &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 					"BCD NTC false executes delay words and falls through");
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_phase = 328;
+		}
+		if (m_phase >= 328 && m_phase <= 331)
+		{
+			static constexpr u16 opcodes[] = { 0x8814, 0x8813, 0x8811, 0x8912 };
+			static constexpr unsigned registers[] = { 4, 3, 1, 2 };
+			const unsigned index = m_phase - 328;
+			if (index)
+			{
+				expect_opcode(opcodes[index - 1],
+						m_cpu->state_int(tms320c54x_device::STATE_AR0 + registers[index - 1]) ==
+							0xbeef &&
+						m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+						"STLM writes the selected address register in one cycle");
+			}
+			program.write_word(0x05e3, opcodes[index]);
+			m_port_writes = 0;
+			for (unsigned ar = 0; ar != 8; ++ar)
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234beef);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678cafe);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			++m_phase;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 332)
+		{
+			expect_opcode(0x8912,
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0xcafe &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"STLM B writes AR2 in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
