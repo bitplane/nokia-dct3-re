@@ -2136,6 +2136,104 @@ private:
 			expect(data.read_word(0x0d00) == 0xabcd && m_port_writes == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 74f8 consumes absolute destination and port words in three cycles");
+			program.write_word(0x05e0, 0x2883); // MAC *AR3,A
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0d00, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // Preserve C.
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 107;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 107 || m_phase == 108)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 107 ? 0x0080000000ULL : 0x007fffffffULL) &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00,
+					"MAC sets sticky OVA, preserves C, and saturates only with OVM");
+			if (m_phase == 107)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 108;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			data.write_word(0x0d00, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0240); // OVM, FRCT
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 109;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 109 || m_phase == 110)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 109 ? 0x7fffffff : 0x7ffffffe) &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) == 0,
+					"PMST.SMUL saturates fractional product before accumulation");
+			if (m_phase == 109)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0002); // SMUL
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 110;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e0, 0xb03a); // MAC *AR5+,*AR4-,A,A
+			data.write_word(0x0b00, 1);
+			data.write_word(0x0c00, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0b00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 111;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 111)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7fffffff &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400),
+					"dual-memory MAC sets OVA and clamps A with OVM");
+			program.write_word(0x05e0, 0xd6e1); // ST B,*AR3 || MACR *AR4+0%,A
+			data.write_word(0x0c00, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12340000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 112;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 112)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7fffffff &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
+					data.read_word(0x0d00) == 0x1234,
+					"parallel ST/MACR stores old B and sets OVA on saturated A");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

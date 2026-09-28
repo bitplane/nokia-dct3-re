@@ -377,6 +377,26 @@ u64 tms320c54x_device::add_sub(u64 source, u64 operand, bool subtract, bool dest
 	return u64(result) & ACC_MASK;
 }
 
+s64 tms320c54x_device::multiply_product(s64 product) const
+{
+	// PMST.SMUL saturates the product before MAC/MAS accumulation only in
+	// fractional overflow mode (SPRU131G section 4.5.3).
+	if (BIT(m_pmst, 1) && BIT(m_st1, 9) && BIT(m_st1, 6))
+		return std::clamp(product, s64(-0x80000000LL), s64(0x7fffffffLL));
+	return product;
+}
+
+u64 tms320c54x_device::multiply_result(s64 result, bool destination_b)
+{
+	if (result > 0x7fffffffLL || result < -0x80000000LL)
+	{
+		m_st0 |= destination_b ? 0x0200 : 0x0400;
+		if (BIT(m_st1, 9))
+			return result < 0 ? 0xff80000000ULL : 0x007fffffffULL;
+	}
+	return u64(result) & ACC_MASK;
+}
+
 u64 tms320c54x_device::arithmetic_shift_right(u64 value, unsigned shift) const
 {
 	const s64 signed_value = s64(value << 24) >> 24;
@@ -876,12 +896,14 @@ void tms320c54x_device::execute_one(u16 op)
 			s64 product = s64(s16(m_a >> 16)) * s64(s16(memory));
 			if (BIT(m_st1, 6))
 				product <<= 1;
+			if (family != 1)
+				product = multiply_product(product);
 			s64 result = family == 1 ? product :
 					family == 3 ? (s64(m_b << 24) >> 24) - product :
 					(s64(m_b << 24) >> 24) + product;
 			if (family == 7)
 				result = (result + 0x8000) & ~s64(0xffff);
-			m_b = u64(result) & ACC_MASK;
+			m_b = multiply_result(result, true);
 			m_t = memory;
 			return;
 		}
@@ -890,7 +912,8 @@ void tms320c54x_device::execute_one(u16 op)
 			s64 product = s64(s16(m_a >> 16)) * s64(s16(m_t));
 			if (BIT(m_st1, 6))
 				product <<= 1;
-			m_a = u64((product + (s64(m_b << 24) >> 24) + 0x8000) & ~s64(0xffff)) & ACC_MASK;
+			m_a = multiply_result((multiply_product(product) +
+					(s64(m_b << 24) >> 24) + 0x8000) & ~s64(0xffff), false);
 			const s64 value = BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory);
 			m_b = u64(value << 16) & ACC_MASK;
 			return;
@@ -903,7 +926,8 @@ void tms320c54x_device::execute_one(u16 op)
 			m_t = memory;
 			u64 &destination = accumulator(BIT(family, 0));
 			const s64 current = s64(destination << 24) >> 24;
-			destination = u64(BIT(family, 1) ? current - product : current + product) & ACC_MASK;
+			destination = multiply_result(BIT(family, 1) ? current - product : current + product,
+					BIT(family, 0));
 			return;
 		}
 		const s64 value = (BIT(m_st1, 8) ? s64(s16(memory)) : s64(memory)) << 16;
@@ -993,6 +1017,8 @@ void tms320c54x_device::execute_one(u16 op)
 			product = s64(s16(m_t)) * s64(s16(memory));
 		if (BIT(m_st1, 6)) // FRCT
 			product <<= 1;
+		if (family >= 0x08)
+			product = multiply_product(product);
 
 		u64 &destination = accumulator(BIT(op, 8));
 		s64 result;
@@ -1004,7 +1030,7 @@ void tms320c54x_device::execute_one(u16 op)
 			result = (s64(destination << 24) >> 24) + product;
 		if (family == 0x02 || family == 0x0a || family == 0x0e)
 			result = (result + 0x8000) & ~s64(0xffff);
-		destination = u64(result) & ACC_MASK;
+		destination = multiply_result(result, BIT(op, 8));
 		return;
 	}
 	case 0x4400: // LD Smem, 16, A
@@ -1339,7 +1365,7 @@ void tms320c54x_device::execute_one(u16 op)
 		s64 product = s64(s16(xvalue)) * s64(s16(yvalue));
 		if (BIT(m_st1, 6))
 			product <<= 1;
-		accumulator(BIT(op, 8)) = u64(product) & ACC_MASK;
+		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
 		m_t = xvalue;
 		dual_modify(x);
 		if (xar != yar)
@@ -1357,11 +1383,12 @@ void tms320c54x_device::execute_one(u16 op)
 		s64 product = s64(s16(xvalue)) * s64(s16(yvalue));
 		if (BIT(m_st1, 6))
 			product <<= 1;
+		product = multiply_product(product);
 		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
 		s64 result = (s64(source << 24) >> 24) + product;
 		if (BIT(op, 10))
 			result = (result + 0x8000) & ~s64(0xffff);
-		accumulator(BIT(op, 8)) = u64(result) & ACC_MASK;
+		accumulator(BIT(op, 8)) = multiply_result(result, BIT(op, 8));
 		m_t = xvalue;
 		dual_modify(x);
 		if (xar != yar)
@@ -1384,11 +1411,12 @@ void tms320c54x_device::execute_one(u16 op)
 		s64 product = s64(s16(m_t)) * s64(s16(xvalue));
 		if (BIT(m_st1, 6))
 			product <<= 1;
+		product = multiply_product(product);
 		const u64 old_destination = accumulator(BIT(op, 8)) & ACC_MASK;
 		s64 result = (s64(old_destination << 24) >> 24) + product;
 		if (BIT(op, 10))
 			result = (result + 0x8000) & ~s64(0xffff);
-		accumulator(BIT(op, 8)) = u64(result) & ACC_MASK;
+		accumulator(BIT(op, 8)) = multiply_result(result, BIT(op, 8));
 		dual_modify(x);
 		if (xar != yar)
 			dual_modify(y);

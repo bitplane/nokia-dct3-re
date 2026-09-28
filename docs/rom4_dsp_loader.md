@@ -563,7 +563,7 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 146 distinct words: 111 overlap the ROM4 run, 35 occur
+The fixture executes 147 distinct words: 111 overlap the ROM4 run, 36 occur
 only in the fixture, and 346 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -615,9 +615,13 @@ ROM4-only word is now `f040` (`OR #lk,A`).
 specifies four and two cycles, respectively. Long-offset Smem access outside
 `MAR` remains a separate
 decoder audit; this correction does not establish those addressing forms.
-The multiply-accumulate fixtures assert ordinary results and pointer updates,
-but not TI's `OVdst`/`OVM` effects for overflow. That remains a core semantic
-audit item even for words counted as fixture-overlapping.
+The multiplier paths now set sticky `OVdst` on 32-bit overflow and clamp the
+destination when `OVM` is set. A dedicated `MAC *AR3,A` fixture checks both
+OVM states, preservation of carry, and TI SPRU131G's `FRCT`/`SMUL` example
+(`0x7fffffff` versus `0x7ffffffe`). Exact `b03a` and `d6e1` fixtures also
+assert saturated overflow in dual-memory and parallel-store MAC forms.
+Other rounded boundaries and encoded variants remain unaudited; fixture
+overlap does not claim those cases are complete.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
