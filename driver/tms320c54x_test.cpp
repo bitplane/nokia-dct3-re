@@ -10205,6 +10205,71 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 absolute LD *,16,B sign-extends before shift in two cycles");
+			program.write_word(0x05e0, 0x7586); // PORTW *AR6,port: marker must not mutate AR6.
+			program.write_word(0x05e2, 0x4816); // LDM AR6,A
+			program.write_word(0x05e3, 0x4913); // LDM AR3,B
+			program.write_word(0x05e4, 0x7586);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x8006);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x8003);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 514;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 514)
+		{
+			expect_opcode(0x4816,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8006 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x8006,
+					"ROM4 LDM AR6,A zero-extends without changing AR6");
+			expect_opcode(0x4913,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8003 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x8003 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LDM AR3,B zero-extends despite SXM; both loads cost one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e2, 0x7215); // MVDM dmad,AR5
+			program.write_word(0x05e3, 0x0f60);
+			program.write_word(0x05e4, 0x7314); // MVMD AR4,dmad
+			program.write_word(0x05e5, 0x0f62);
+			program.write_word(0x05e6, 0x7315); // MVMD AR5,dmad
+			program.write_word(0x05e7, 0x0f63);
+			program.write_word(0x05e8, 0x75d6);
+			program.write_word(0x05e9, 0x0124);
+			program.write_word(0x05ea, 0xf5e1);
+			data.write_word(0x0f60, 0x4321);
+			data.write_word(0x0f62, 0);
+			data.write_word(0x0f63, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 515;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 515)
+		{
+			expect_opcode(0x7215,
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x4321 &&
+					data.read_word(0x0f60) == 0x4321,
+					"ROM4 MVDM copies data into AR5 without altering the source");
+			expect_opcode(0x7314,
+					data.read_word(0x0f62) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xabcd,
+					"ROM4 MVMD copies AR4 into data memory");
+			expect_opcode(0x7315,
+					data.read_word(0x0f63) == 0x4321 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"ROM4 MVMD copies the new AR5; three MMR moves cost two cycles each");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

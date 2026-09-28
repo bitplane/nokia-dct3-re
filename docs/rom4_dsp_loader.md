@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 514 distinct words: 414 overlap the ROM4 run, 100 occur
-only in the fixture, and 43 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 520 distinct words: 419 overlap the ROM4 run, 101 occur
+only in the fixture, and 38 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 414 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 419 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 43 are absent from the fixture. This closes the fixture-executed-only
+and 38 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1231,6 +1231,13 @@ motion. `1b84` and `1bf8` check indirect and absolute OR into B, preserving
 its guard byte and status. `45f8` checks an absolute `LD Smem,16,B` with SXM
 extension before shifting. Their marker spans cover TI SPRU172C's one-cycle
 indirect forms and the extra word/cycle for absolute Smem.
+Exact `4816`/`4913` check direct AR6/AR3 MMR loads into A/B, including zero
+extension despite SXM and one-cycle costs. The AR6 case uses a non-mutating
+port marker so the timing probe cannot advance the register before the load.
+Exact `7215`/`7314`/`7315` check a data-to-AR5 move followed by AR4/AR5-to-data
+moves; their preserved source values and eight-cycle marker span establish
+three two-cycle transfers under TI SPRU172C. The ROM4 `4920` MMR-0x20 load
+remains outside these register checks pending a separate peripheral contract.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
