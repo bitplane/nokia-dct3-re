@@ -395,6 +395,12 @@ private:
 			throw emu_fatalerror("TMS320C54x core conformance: %s", message);
 	}
 
+	void expect_opcode(u16 opcode, bool condition, const char *message)
+	{
+		expect(condition, message);
+		logerror("[opassert] op=%04x\n", opcode);
+	}
+
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -878,7 +884,7 @@ private:
 		}
 		if (m_phase == 36)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+			expect_opcode(0xa43a, m_cpu->state_int(tms320c54x_device::STATE_A) ==
 					((u64(1) << 40) - 6) &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe,
 					"dual-memory multiply result and T load");
@@ -901,7 +907,7 @@ private:
 		}
 		if (m_phase == 37)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
+			expect_opcode(0xb336, m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd,
 					"dual-memory signed multiply-accumulate");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0940 &&
@@ -946,7 +952,7 @@ private:
 		}
 		if (m_phase == 39)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+			expect_opcode(0xe210, m_cpu->state_int(tms320c54x_device::STATE_A) ==
 					((u64(1) << 40) - 0x30000),
 					"square-distance signed vector difference");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 14,
@@ -1525,7 +1531,7 @@ private:
 		if (m_phase == 75 || m_phase == 76)
 		{
 			const bool first = m_phase == 75;
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+			expect_opcode(first ? 0xf491 : 0xf591, m_cpu->state_int(tms320c54x_device::STATE_A) ==
 					(first ? 0 : 0x0012345678ULL) &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) ==
 					(first ? 0x0012345678ULL : 0x002468acf1ULL) &&
@@ -1557,7 +1563,7 @@ private:
 		}
 	if (m_phase == 77)
 	{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345687ULL &&
+			expect_opcode(0xf050, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345687ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e3,
@@ -1580,7 +1586,7 @@ private:
 		}
 		if (m_phase == 78)
 		{
-			expect(m_port_reads == 2 && data.read_word(0x0a03) == 0xabcd &&
+			expect_opcode(0x74d6, m_port_reads == 2 && data.read_word(0x0a03) == 0xabcd &&
 					data.read_word(0x0a00) == 0xabcd &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0a01 &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e5 &&
@@ -1603,7 +1609,7 @@ private:
 		}
 		if (m_phase == 79)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
+			expect_opcode(0xb03a, m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 20 &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c01 &&
@@ -1624,7 +1630,7 @@ private:
 		}
 		if (m_phase == 80)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
+			expect_opcode(0xb3be, m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
@@ -1671,7 +1677,7 @@ private:
 		}
 		if (m_phase == 82 || m_phase == 83)
 		{
-			expect(m_port_reads == 2 && m_last_port_cycle - m_first_port_cycle ==
+			expect_opcode(0xf844, m_port_reads == 2 && m_last_port_cycle - m_first_port_cycle ==
 					(m_phase == 82 ? 7 : 5),
 					"BC ANEQ costs five cycles taken and three cycles not taken");
 			if (m_phase == 82)
@@ -1700,7 +1706,7 @@ private:
 		}
 		if (m_phase == 84)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffffeULL &&
+			expect_opcode(0x10f8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffffeULL &&
 					m_port_reads == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 4,
 					"LD absolute Smem sign-extends and costs an extra cycle");
@@ -1723,7 +1729,7 @@ private:
 		}
 		if (m_phase == 85)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 8 &&
+			expect_opcode(0xb0be, m_cpu->state_int(tms320c54x_device::STATE_A) == 8 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 9 &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
@@ -1748,7 +1754,7 @@ private:
 		}
 		if (m_phase == 86)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffe0000ULL &&
+			expect_opcode(0xe2e4, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffe0000ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 19 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0cff,
@@ -1772,7 +1778,7 @@ private:
 		}
 		if (m_phase == 87)
 		{
-			expect(data.read_word(0x0d00) == 0x1234 &&
+			expect_opcode(0x4f81, data.read_word(0x0d00) == 0x1234 &&
 					data.read_word(0x0d01) == 0x5678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0d00 &&
 					m_port_reads == 2 &&
@@ -1846,7 +1852,7 @@ private:
 		}
 		if (m_phase == 91)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0ff9 &&
+			expect_opcode(0x6ded, m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0ff9 &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
 					m_port_reads == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 4,
@@ -1864,7 +1870,7 @@ private:
 		}
 		if (m_phase == 92)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+			expect_opcode(0x6ddc, m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e2,
 					"ROM4 6ddc circular MAR uses AR0 and consumes no extension");
 			program.write_word(0x05e0, 0x4092); // SUB *AR2+, 16, A
@@ -1883,7 +1889,7 @@ private:
 		}
 		if (m_phase == 93)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00020000 &&
+			expect_opcode(0x4092, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00020000 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d01 &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e2,
@@ -1903,7 +1909,7 @@ private:
 		}
 		if (m_phase == 94)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80012345ULL &&
+			expect_opcode(0x5781, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80012345ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0e00,
 					"ROM4 5781 DLD sign-extends B without modifying AR1");
@@ -1924,7 +1930,7 @@ private:
 		}
 		if (m_phase == 95)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffffffaULL &&
+			expect_opcode(0xa5be, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffffffaULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
@@ -1943,7 +1949,7 @@ private:
 		}
 		if (m_phase == 96)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
+			expect_opcode(0xb736, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c02 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00,
@@ -1967,7 +1973,7 @@ private:
 		}
 		if (m_phase == 97)
 		{
-			expect(data.read_word(0x0d00) == 0x1234 &&
+			expect_opcode(0xd6e1, data.read_word(0x0d00) == 0x1234 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_T) == 4 &&
@@ -1995,7 +2001,7 @@ private:
 		}
 		if (m_phase == 98 || m_phase == 99)
 		{
-			expect(m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
+			expect_opcode(0x6c8a, m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
 					(m_phase == 98 ? 6 : 4) &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
 					(m_phase == 98 ? 0 : 0xffff),
@@ -2031,7 +2037,7 @@ private:
 		}
 		if (m_phase == 100)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffff800000ULL &&
+			expect_opcode(0x4593, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffff800000ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01 &&
 					m_port_writes == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 3,
@@ -2055,7 +2061,7 @@ private:
 		}
 		if (m_phase == 101 || m_phase == 102)
 		{
-			expect(m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
+			expect_opcode(0xf830, m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
 					(m_phase == 101 ? 7 : 5),
 					"ROM4 f830 BC TC costs five cycles taken and three not taken");
 			if (m_phase == 101)
@@ -2082,7 +2088,7 @@ private:
 		}
 		if (m_phase == 103)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x30 &&
+			expect_opcode(0xf030, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x30 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 f030 AND uses zero-extended immediate and costs two cycles");
 			program.write_word(0x05e2, 0xf073); // B 05e4
@@ -2097,7 +2103,7 @@ private:
 		}
 		if (m_phase == 104)
 		{
-			expect(m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+			expect_opcode(0xf073, m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ROM4 f073 B consumes its target word and costs four cycles");
 			program.write_word(0x05e2, 0x75f8); // PORTW *(0d00), 0124
 			program.write_word(0x05e3, 0x0d00);
@@ -2116,7 +2122,7 @@ private:
 		}
 		if (m_phase == 105)
 		{
-			expect(m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5 &&
+			expect_opcode(0x75f8, m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5 &&
 					m_first_port_value == 0x1234 && m_middle_port_value == 0x9abc,
 					"ROM4 75f8 consumes absolute source and port words in three cycles");
 			program.write_word(0x05e2, 0x74f8); // PORTR 0123, *(0d00)
@@ -2133,7 +2139,7 @@ private:
 		}
 		if (m_phase == 106)
 		{
-			expect(data.read_word(0x0d00) == 0xabcd && m_port_writes == 2 &&
+			expect_opcode(0x74f8, data.read_word(0x0d00) == 0xabcd && m_port_writes == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 74f8 consumes absolute destination and port words in three cycles");
 			program.write_word(0x05e0, 0x2883); // MAC *AR3,A
@@ -2252,7 +2258,7 @@ private:
 		}
 		if (m_phase == 113)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff000000f0ULL &&
+			expect_opcode(0xf040, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff000000f0ULL &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 f040 OR zero-extends its immediate and costs two cycles");
 			program.write_word(0x05e2, 0x6082); // CMPM *AR2,#lk
@@ -2270,7 +2276,7 @@ private:
 		}
 		if (m_phase == 114 || m_phase == 115)
 		{
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) ==
+			expect_opcode(0x6082, bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) ==
 					(m_phase == 114) &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0e00 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
@@ -2298,7 +2304,7 @@ private:
 		}
 		if (m_phase == 116)
 		{
-			expect(data.read_word(0x0d00) == 0x5678 &&
+			expect_opcode(0x8093, data.read_word(0x0d00) == 0x5678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01,
 					"ROM4 8093 stores the low accumulator word and post-increments AR3");
 			program.write_word(0x05e0, 0xf7bb); // SSBX INTM
@@ -2315,10 +2321,11 @@ private:
 		}
 		if (m_phase == 117)
 		{
-			expect((m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
-					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
+			expect_opcode(0xf7bb, m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800,
+					"ROM4 f7bb masks interrupts");
+			expect_opcode(0x4a08, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
 					data.read_word(0x02ff) == 0x5678,
-					"ROM4 f7bb masks interrupts and 4a08 pushes AL to TOS");
+					"ROM4 4a08 pushes AL to TOS");
 			program.write_word(0x05e0, 0x8a08); // POPM AL
 			program.write_word(0x05e1, 0xf5e1);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12340000);
@@ -2330,7 +2337,7 @@ private:
 		}
 		if (m_phase == 118)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+			expect_opcode(0x8a08, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 					"ROM4 8a08 restores AL from TOS and advances SP");
 			program.write_word(0x05e0, 0xf6bb); // RSBX INTM
@@ -2344,7 +2351,7 @@ private:
 		}
 		if (m_phase == 119)
 		{
-			expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
+			expect_opcode(0xf6bb, !(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
 					"ROM4 f6bb clears INTM for interrupt return");
 			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 			program.write_word(0x05e1, 0x0124);
@@ -2365,7 +2372,7 @@ private:
 		}
 		if (m_phase == 120)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1234 &&
+			expect_opcode(0x7212, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 7212 MVDM moves data to AR2 in two cycles");
 			program.write_word(0x05e2, 0x7312); // MVMD AR2,0e01
@@ -2381,7 +2388,7 @@ private:
 		}
 		if (m_phase == 121)
 		{
-			expect(data.read_word(0x0e01) == 0x1234 &&
+			expect_opcode(0x7312, data.read_word(0x0e01) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"MVMD moves AR2 to data memory in two cycles");
 			program.write_word(0x05e2, 0xec02); // RPT #2
@@ -2404,7 +2411,7 @@ private:
 		}
 		if (m_phase == 122)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x3333 &&
+			expect_opcode(0x7212, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x3333 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"repeated MVDM advances data source and pipelines after first move");
 			program.write_word(0x05e3, 0x7312); // MVMD AR2,0e10
@@ -2423,7 +2430,7 @@ private:
 		}
 		if (m_phase == 123)
 		{
-			expect(data.read_word(0x0e10) == 0x4455 &&
+			expect_opcode(0x7312, data.read_word(0x0e10) == 0x4455 &&
 					data.read_word(0x0e11) == 0x4455 &&
 					data.read_word(0x0e12) == 0x4455 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,

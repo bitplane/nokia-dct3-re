@@ -16,6 +16,17 @@ class C54xOpcodeCoverageTest(unittest.TestCase):
         self.assertEqual(result["high_byte_groups"], 2)
         self.assertEqual(result["first_pc"][0xF074], 0x4B73)
         self.assertEqual(result["counts"][0xF074], 11)
+        self.assertEqual(result["asserted"], set())
+
+    def test_assertions_require_execution_and_are_deduplicated(self):
+        result = summarize("\n".join((
+            "[opcov] op=7212 first_pc=0f1d count=3",
+            "[:] [opassert] op=7212",
+            "[opassert] op=7212",
+        )))
+        self.assertEqual(result["asserted"], {0x7212})
+        with self.assertRaisesRegex(ValueError, "absent from the execution trace"):
+            summarize("[opcov] op=7212 first_pc=0f1d\n[opassert] op=7312")
 
     def test_rejects_empty_log(self):
         with self.assertRaisesRegex(ValueError, "no.*records"):

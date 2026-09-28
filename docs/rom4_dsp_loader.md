@@ -569,6 +569,16 @@ only in the fixture, and 337 ROM4 words do not occur in the fixture. These are
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
+The coverage tool now separates fixture execution from explicit result
+assertions. Of the 457 ROM4 words, 37 have an `opassert` marker after a
+passing exact-word check, 83 execute in the fixture without such a marker,
+and 337 are absent from the fixture. The 83-word class includes setup and
+control instructions as well as older checks not yet tagged; it is not a
+claim that all 83 lack semantic tests. The 337-word class is a priority list
+for new fixtures, ordered by observed execution count, not proof that those
+instructions are incorrect. A marker establishes the checked outcome only,
+not complete coverage of an instruction's operand or flag variants.
+
 Execution counts identified `ROL A` (`f491`) and `ROL B` (`f591`) as the largest
 previously unasserted ROM4 encodings, at roughly 524,000 executions each in
 this run. Both now have core assertions for carry transfer, cleared guard bits,
