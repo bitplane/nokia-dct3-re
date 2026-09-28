@@ -585,6 +585,7 @@ void tms320c54x_device::execute_one(u16 op)
 	if ((op & 0xfcff) == 0xf4e1) // IDLE 1/2/3
 	{
 		m_idle = true;
+		m_icount -= 3; // Four-cycle minimum before the idle interval (SPRU172C).
 		return;
 	}
 	if ((op & 0xfdf0) == 0xf5b0) // SSBX bit, ST0/ST1

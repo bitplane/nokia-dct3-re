@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 233 distinct words: 193 overlap the ROM4 run, 40 occur
-only in the fixture, and 264 ROM4 words do not occur in the fixture. These are
+The fixture executes 234 distinct words: 194 overlap the ROM4 run, 40 occur
+only in the fixture, and 263 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 135 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 136 have an `opassert` marker after a
 passing exact-word check, 58 execute in the fixture without such a marker,
-and 264 are absent from the fixture. The 58-word class includes setup and
+and 263 are absent from the fixture. The 58-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 58 lack semantic tests. The 264-word class is a priority list
+claim that all 58 lack semantic tests. The 263-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -601,6 +601,11 @@ write, read, and stack round trip at their one-cycle costs. TI SPRU172C
 states that `LDM MMR,dst` ignores SXM; a status value with bit 15 set exposed
 the core's erroneous sign extension. Both A and B LDM destinations now
 zero-extend, with `4907` exercising the B form in the fixture.
+TI SPRU172C gives `IDLE K` a four-cycle minimum before its unbounded idle
+interval. The core now charges that minimum instead of one cycle. An exact
+ROM4 `f4e1` fixture checks `IDLE 1` entry, retained continuation PC, and no
+premature execution of the next word; it does not independently time the
+minimum or establish all wake-source distinctions among IDLE 1/2/3.
 Exact `f065` (`XOR #lk,16,A`) now checks the shifted result and TI SPRU172C's
 two-cycle cost. The core previously charged one cycle to all four
 source/destination variants of this encoding; the shared path now charges
