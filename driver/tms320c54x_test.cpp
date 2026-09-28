@@ -11667,6 +11667,60 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"TI LMS example updates both accumulators without overwriting T in one cycle");
+			program.write_word(0x05e2, 0xa6ab); // MACSU *AR4+,*AR5+,A.
+			data.write_word(0x0f90, 0x8765);
+			data.write_word(0x0f91, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x2222);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 654;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 654)
+		{
+			expect_opcode(0xa6ab,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x09a0aa84 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x2222 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8765 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f91 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI MACSU example uses unsigned X, signed Y, and one-cycle dual addressing");
+			program.write_word(0x05e2, 0xa7ab); // MACSU *AR4+,*AR5+,B.
+			data.write_word(0x0f90, 0x8765);
+			data.write_word(0x0f91, 0xfffe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // SXM, FRCT.
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 655;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 655)
+		{
+			expect_opcode(0xa7ab,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffde26cULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8765 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f91 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"MACSU B uses signed Y, unsigned X, FRCT doubling, and one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

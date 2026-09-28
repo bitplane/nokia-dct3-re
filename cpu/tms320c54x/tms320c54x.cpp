@@ -1638,6 +1638,26 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xfe00) == 0xa600) // MACSU Xmem, Ymem, A/B
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 yvalue = data_read(m_ar[yar]);
+		s64 product = s64(xvalue) * s64(s16(yvalue));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		const bool b = BIT(op, 8);
+		accumulator(b) = multiply_result((s64(accumulator(b) << 24) >> 24) +
+				multiply_product(product), b);
+		m_t = xvalue;
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
 	if ((op & 0xf000) == 0xb000) // MAC[R]/MAS[R] Xmem, Ymem, src, dst
 	{
 		const u8 x = op >> 4;

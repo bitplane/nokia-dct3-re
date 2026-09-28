@@ -1527,6 +1527,11 @@ encodings; the decoder uses `E1xx`. Fixture-only `e13a` checks TI's LMS
 example values for A and B, unchanged T, dual-address update, and one-cycle
 cost. No observed 5110 trace executes this family, so this is instruction
 coverage, not evidence about the ROM4 boot path.
+TI SPRU307A assigns `MACSU` to `A6xx/A7xx`, one word and one cycle.
+Fixture-only `a6ab` reproduces TI SPRU172C's unsigned-X positive-product
+example; `a7ab` additionally checks signed-negative Y, FRCT doubling, the B
+destination, unchanged A, T update, and both pointer increments. Neither
+encoding appeared in the observed 5110 trace union.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
