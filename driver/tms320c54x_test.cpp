@@ -6118,6 +6118,42 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0x1e82); // SUBC *AR2,A
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0f65, 1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f65);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 302;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 302 || m_phase == 303)
+		{
+			expect_opcode(0x1e82,
+					m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 302 ? 1 : 0xfffe) &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
+					(m_phase == 302) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f65 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 SUBC sets quotient and carry only on successful subtraction in one cycle");
+			if (m_phase == 302)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fff);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 303;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
