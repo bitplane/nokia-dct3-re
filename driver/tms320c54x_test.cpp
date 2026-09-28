@@ -3382,6 +3382,78 @@ private:
 			expect_opcode(0x6ff8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2345 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 extended absolute LD consumes address then extension in three cycles");
+			program.write_word(0x05e2, 0x6f82); // ADD *AR2,1,A
+			program.write_word(0x05e3, 0x0c01);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0df0, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0df0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 174;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 174)
+		{
+			expect_opcode(0x6f82, m_cpu->state_int(tms320c54x_device::STATE_A) == 14 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0df0 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 extended ADD shifts Smem and costs two cycles");
+			program.write_word(0x05e2, 0x6f83); // SUB *AR3,1,A
+			program.write_word(0x05e3, 0x0c21);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0df0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 175;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 175)
+		{
+			expect_opcode(0x6f83, m_cpu->state_int(tms320c54x_device::STATE_A) == 6 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0df0 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 extended SUB shifts Smem and costs two cycles");
+			program.write_word(0x05e2, 0x6f92); // STL A,0,*AR2+
+			program.write_word(0x05e3, 0x0c80);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0df1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 176;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 176)
+		{
+			expect_opcode(0x6f92, data.read_word(0x0df1) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0df2 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 extended STL writes low accumulator word and postincrements");
+			program.write_word(0x05e2, 0x6f93); // STH A,0,*AR3+
+			program.write_word(0x05e3, 0x0c60);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0df2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 177;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 177)
+		{
+			expect_opcode(0x6f93, data.read_word(0x0df2) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0df3 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 extended STH writes high accumulator word and postincrements");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
