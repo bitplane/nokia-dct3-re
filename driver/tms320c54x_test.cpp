@@ -8076,6 +8076,78 @@ private:
 			expect_opcode(0x7726, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0010 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ROM4 STM #TSS,TCR survives MMR readback with two-cycle store");
+			program.write_word(0x05e3, 0xf945); // CC 05f0,AEQ
+			program.write_word(0x05e4, 0x05f0);
+			program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			program.write_word(0x05f0, 0x75f8); // Taken marker.
+			program.write_word(0x05f1, 0x0d00);
+			program.write_word(0x05f2, 0x0124);
+			program.write_word(0x05f3, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 407;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 407 || m_phase == 408)
+		{
+			expect_opcode(0xf945, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (m_phase == 407 ? 8 : 6) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (m_phase == 407 ? 0x05f4 : 0x05e9) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == (m_phase == 407 ? 0x02ff : 0x0300) &&
+					data.read_word(0x02ff) == (m_phase == 407 ? 0x05e5 : 0xa55a),
+					"ROM4 CC AEQ pushes return only on the five-cycle taken path");
+			if (m_phase == 407)
+			{
+				data.write_word(0x02ff, 0xa55a);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 408;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e3, 0xfc44); // RC ANEQ
+			program.write_word(0x05e4, 0x75f8); // Fallthrough marker.
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x02ff, 0x05f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x02ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 409;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 409 || m_phase == 410)
+		{
+			expect_opcode(0xfc44, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (m_phase == 409 ? 8 : 6) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (m_phase == 409 ? 0x05f4 : 0x05e8) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == (m_phase == 409 ? 0x0300 : 0x02ff),
+					"ROM4 RC ANEQ pops only on the five-cycle taken path");
+			if (m_phase == 409)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x02ff);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 410;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
