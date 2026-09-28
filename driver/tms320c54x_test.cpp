@@ -3807,6 +3807,39 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 OR B >> 16 zero-fills, preserves flags and A, and costs one cycle");
+			program.write_word(0x05e2, 0xf3e8); // SFTL B, 8
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff80000081ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 196;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 196 || m_phase == 197)
+		{
+			expect_opcode(m_phase == 196 ? 0xf3e8 : 0xf3f8,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (m_phase == 196 ? 0x8100 : 0x800000) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == (m_phase == 197) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 SFTL B shifts low 32 bits, clears guard, updates C, and costs one cycle");
+			if (m_phase == 196)
+			{
+				program.write_word(0x05e2, 0xf3f8); // SFTL B, -8
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff80000081ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 197;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

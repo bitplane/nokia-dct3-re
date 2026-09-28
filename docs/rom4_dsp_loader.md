@@ -563,16 +563,16 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 240 distinct words: 199 overlap the ROM4 run, 41 occur
-only in the fixture, and 258 ROM4 words do not occur in the fixture. These are
+The fixture executes 241 distinct words: 200 overlap the ROM4 run, 41 occur
+only in the fixture, and 257 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 142 have an `opassert` marker after a
-passing exact-word check, 57 execute in the fixture without such a marker,
-and 258 are absent from the fixture. The 57-word class includes setup and
+assertions. Of the 457 ROM4 words, 144 have an `opassert` marker after a
+passing exact-word check, 56 execute in the fixture without such a marker,
+and 257 are absent from the fixture. The 56-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 57 lack semantic tests. The 260-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
@@ -623,6 +623,11 @@ negative 40-bit source, unchanged A and carry, and one-cycle cost. TI SPRU172C
 specifies no sign extension for this OR shift. The generic decoder already
 implemented that rule; two unreachable switch cases beneath it instead used
 arithmetic shift and have been removed to prevent a misleading fallback.
+Exact ROM4 `f3e8` and `f3f8` are `SFTL B, 8` and `SFTL B, -8`, not 40-bit
+rotates. Their fixtures check the low-32-bit shift, cleared guard byte,
+outgoing carry bit, unchanged A, and TI SPRU172C's one-cycle cost. Six
+unreachable switch cases labeling these shifts as rotates or arithmetic shifts
+were removed; the generic SFTL decoder was already taking precedence.
 Exact `f065` (`XOR #lk,16,A`) now checks the shifted result and TI SPRU172C's
 two-cycle cost. The core previously charged one cycle to all four
 source/destination variants of this encoding; the shared path now charges

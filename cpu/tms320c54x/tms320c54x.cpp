@@ -1755,24 +1755,6 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf230: // AND #lk, B, A
 		m_a = m_b & fetch();
 		return;
-	case 0xf0e8: // ROL A, 8
-		m_a = ((m_a << 8) | (m_a >> 32)) & ACC_MASK;
-		return;
-	case 0xf3e8: // ROL B, 8
-		m_b = ((m_b << 8) | (m_b >> 32)) & ACC_MASK;
-		return;
-	case 0xf0f8: // ROR A, 8
-		m_a = ((m_a >> 8) | (m_a << 32)) & ACC_MASK;
-		return;
-	case 0xf3f8: // ROR B, 8
-		m_b = ((m_b >> 8) | (m_b << 32)) & ACC_MASK;
-		return;
-	case 0xf0ff: // SFTA A, -1
-		m_a = arithmetic_shift_right(m_a, 1);
-		return;
-	case 0xf3ff: // SFTA B, -1
-		m_b = arithmetic_shift_right(m_b, 1);
-		return;
 	case 0xf000: // ADD #lk, A
 		m_a = (m_a + data_operand(fetch())) & ACC_MASK;
 		return;
