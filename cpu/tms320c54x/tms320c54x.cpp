@@ -1316,7 +1316,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
 		indirect_write(low, data_read(source));
 		if (!repeated || !m_rpt_iteration)
-			m_icount -= low == 0xf8 ? 2 : 1;
+			m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x7200: // MVDM dmad, MMR

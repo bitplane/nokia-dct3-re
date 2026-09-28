@@ -7255,6 +7255,25 @@ private:
 					m_port_writes == 3 && m_middle_port_value == 0xabcd &&
 					m_last_port_cycle - m_middle_port_cycle == 3,
 					"long-offset PORTW consumes offset before port and takes three cycles");
+			program.write_word(0x05e3, 0x70ea); // MVKD 0f20,*+AR2(5)
+			program.write_word(0x05e4, 0x0f20);
+			program.write_word(0x05e5, 5);
+			data.write_word(0x0f20, 0x5678);
+			data.write_word(0x0f05, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 363;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 363)
+		{
+			expect_opcode(0x70ea, data.read_word(0x0f05) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"long-offset MVKD consumes source before offset and takes three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
