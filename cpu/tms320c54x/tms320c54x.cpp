@@ -1513,6 +1513,16 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 
+	const auto return_if = [this](bool take)
+	{
+		if (take)
+		{
+			m_pc = pop();
+			m_icount -= 4;
+		}
+		else
+			m_icount -= 2;
+	};
 	switch (op)
 	{
 	case 0xfc00: // RET
@@ -1531,53 +1541,25 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 2;
 		return;
 	case 0xfc30: // RETC TC
-		if (m_st0 & 0x1000)
-		{
-			m_pc = pop();
-			m_icount -= 4;
-		}
+		return_if(m_st0 & 0x1000);
 		return;
 	case 0xfc45: // RETC AEQ
-		if ((m_a & ACC_MASK) == 0)
-		{
-			m_pc = pop();
-			m_icount -= 4;
-		}
+		return_if((m_a & ACC_MASK) == 0);
 		return;
 	case 0xfc47: // RETC ALEQ
-		if ((s64(m_a << 24) >> 24) <= 0)
-		{
-			m_pc = pop();
-			m_icount -= 4;
-		}
+		return_if((s64(m_a << 24) >> 24) <= 0);
 		return;
 	case 0xfc20: // RETC NTC
-		if (!(m_st0 & 0x1000))
-		{
-			m_pc = pop();
-			m_icount -= 4;
-		}
+		return_if(!(m_st0 & 0x1000));
 		return;
 	case 0xfc4b: // RC BLT
-		if ((s64(m_b << 24) >> 24) < 0)
-		{
-			m_pc = pop();
-			m_icount -= 4;
-		}
+		return_if((s64(m_b << 24) >> 24) < 0);
 		return;
 	case 0xfc4d: // RC BEQ
-		if ((m_b & ACC_MASK) == 0)
-		{
-			m_pc = pop();
-			m_icount -= 4;
-		}
+		return_if((m_b & ACC_MASK) == 0);
 		return;
 	case 0xfc44: // RC ANEQ
-		if ((m_a & ACC_MASK) != 0)
-		{
-			m_pc = pop();
-			m_icount -= 4;
-		}
+		return_if((m_a & ACC_MASK) != 0);
 		return;
 	case 0xf072: // RPTB pmad
 		m_rsa = u16(m_pc + 1);

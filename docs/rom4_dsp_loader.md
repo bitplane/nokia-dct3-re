@@ -574,11 +574,11 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 197 have an `opassert` marker after a
-passing exact-word check, 31 execute in the fixture without such a marker,
-and 229 are absent from the fixture. The 31-word class includes setup and
+assertions. Of the 457 ROM4 words, 198 have an `opassert` marker after a
+passing exact-word check, 30 execute in the fixture without such a marker,
+and 229 are absent from the fixture. The 30-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 31 lack semantic tests. The formerly leading challenge-loop
+claim that all 30 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
 The 229-word class is a priority list
@@ -831,6 +831,10 @@ Independent exact-word tests now also cover `1293` (`LDU *AR3+,A`) with SXM
 set, `f0c8` (`XOR A<<8,A`) across the 40-bit guard field, and `e800`
 (`LD #0,A`). Each checks its one-cycle cost rather than relying on the
 combined startup/challenge sequence.
+TI SPRU172C specifies five cycles for a taken `RC` and three when false.
+The core previously charged only one for false conditions. A shared return
+path now applies the documented costs to the decoded `RC` variants; exact
+`fc30` (`RC TC`) fixtures verify both outcomes, stack behavior, and timing.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
