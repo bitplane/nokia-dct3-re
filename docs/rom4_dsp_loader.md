@@ -574,11 +574,11 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 199 have an `opassert` marker after a
-passing exact-word check, 29 execute in the fixture without such a marker,
-and 229 are absent from the fixture. The 29-word class includes setup and
+assertions. Of the 457 ROM4 words, 200 have an `opassert` marker after a
+passing exact-word check, 28 execute in the fixture without such a marker,
+and 229 are absent from the fixture. The 28-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 29 lack semantic tests. The formerly leading challenge-loop
+claim that all 28 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
 The 229-word class is a priority list
@@ -841,6 +841,9 @@ when even and the previous address when odd. DST/DLD formerly rounded every
 address down, swapping the halves for odd addresses. The corrected handlers
 have an exact ROM4 `4ef8` absolute-DST test for word order and three-cycle
 cost, plus odd-address DST/DLD fixtures for the shared memory rule.
+Exact ROM4 `fe00` (`RETD`) now checks that two one-word delay-slot instructions
+retire before the saved return target, the stack pops once, and the return
+itself has TI's three-cycle delayed-return cost.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
