@@ -4982,6 +4982,30 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"ROM4 RETD executes two delay words before return and costs three cycles");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x1092); // LD *AR2+, A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f20, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 247;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 247)
+		{
+			expect_opcode(0x1092, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff8001ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f21 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 LD *AR2+,A sign-extends, postincrements, and costs one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -5141,9 +5165,9 @@ private:
 		for (unsigned i = 0; i != 26; ++i)
 			expect(data.read_word(0x0882 + i) == 0x6000 + i,
 					"MVDD dual-operand circular transfer");
-		expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x089c &&
+		expect_opcode(0xe59c, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x089c &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x131a,
-				"MVDD dual-operand address updates");
+				"ROM4 MVDD receive-ring copy updates both operands after 26 checked words");
 
 		// IDLE3 must retain its continuation PC, then an enabled source must
 		// vector through PMST.IPTR and preserve the return address on stack.
