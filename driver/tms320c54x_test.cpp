@@ -1650,6 +1650,83 @@ private:
 					m_last_port_cycle - m_first_port_cycle == 2 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0a01,
 					"PORTW memory source takes two cycles and circularly updates AR6");
+			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
+			program.write_word(0x05e1, 0x0123);
+			program.write_word(0x05e2, 0xf844); // BC 05e4, ANEQ
+			program.write_word(0x05e3, 0x05e4);
+			program.write_word(0x05e4, 0x74d6);
+			program.write_word(0x05e5, 0x0123);
+			program.write_word(0x05e6, 0xf5e1); // IDLE
+			m_port_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 82;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 82 || m_phase == 83)
+		{
+			expect(m_port_reads == 2 && m_last_port_cycle - m_first_port_cycle ==
+					(m_phase == 82 ? 7 : 5),
+					"BC ANEQ costs five cycles taken and three cycles not taken");
+			if (m_phase == 82)
+			{
+				m_port_reads = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 83;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0x10f8); // LD *(lk), A
+			program.write_word(0x05e3, 0x0d00);
+			data.write_word(0x0d00, 0xfffe);
+			m_port_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 84;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 84)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffffeULL &&
+					m_port_reads == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 4,
+					"LD absolute Smem sign-extends and costs an extra cycle");
+			program.write_word(0x05e0, 0xb0be); // MAC *AR5+, *AR4+%, A, A
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0b00, 0xfffd);
+			data.write_word(0x0c03, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0b00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 9);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 85;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 85)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 8 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 9 &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
+					"ROM4 b0be signed MAC preserves B and updates both pointers");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

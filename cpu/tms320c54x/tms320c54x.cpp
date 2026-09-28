@@ -554,6 +554,13 @@ bool tms320c54x_device::service_interrupt()
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	const auto branch_if = [this](bool condition)
+	{
+		const u16 destination = fetch();
+		if (condition)
+			m_pc = destination;
+		m_icount -= condition ? 4 : 2;
+	};
 	if ((op & 0xfcff) == 0xf4e1) // IDLE 1/2/3
 	{
 		m_idle = true;
@@ -818,15 +825,19 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 	case 0x1000: // LD Smem, A
 		m_a = data_operand(indirect_read(low));
+		m_icount -= low == 0xf8;
 		return;
 	case 0x1100: // LD Smem, B
 		m_b = data_operand(indirect_read(low));
+		m_icount -= low == 0xf8;
 		return;
 	case 0x1200: // LD uns(Smem), A
 		m_a = indirect_read(low);
+		m_icount -= low == 0xf8;
 		return;
 	case 0x1300: // LD uns(Smem), B
 		m_b = indirect_read(low);
+		m_icount -= low == 0xf8;
 		return;
 	case 0x3000: case 0x3100: case 0x3200: case 0x3300:
 	case 0x3400: case 0x3500: case 0x3600: case 0x3700:
@@ -1625,96 +1636,44 @@ void tms320c54x_device::execute_one(u16 op)
 			m_pc += 2;
 		return;
 	case 0xf846: // BC pmad, AGT
-	{
-		const u16 destination = fetch();
-		if ((s64(m_a << 24) >> 24) > 0)
-			m_pc = destination;
+		branch_if((s64(m_a << 24) >> 24) > 0);
 		return;
-	}
 	case 0xf843: // BC pmad, ALT
-	{
-		const u16 destination = fetch();
-		if ((s64(m_a << 24) >> 24) < 0)
-			m_pc = destination;
+		branch_if((s64(m_a << 24) >> 24) < 0);
 		return;
-	}
 	case 0xf820: // BC pmad, NTC
-	{
-		const u16 destination = fetch();
-		if (!(m_st0 & 0x1000))
-			m_pc = destination;
+		branch_if(!(m_st0 & 0x1000));
 		return;
-	}
 	case 0xf830: // BC pmad, TC
-	{
-		const u16 destination = fetch();
-		if (m_st0 & 0x1000)
-			m_pc = destination;
+		branch_if(m_st0 & 0x1000);
 		return;
-	}
 	case 0xf847: // BC pmad, ALEQ
-	{
-		const u16 destination = fetch();
-		if ((s64(m_a << 24) >> 24) <= 0)
-			m_pc = destination;
+		branch_if((s64(m_a << 24) >> 24) <= 0);
 		return;
-	}
 	case 0xf845: // BC pmad, AEQ
-	{
-		const u16 destination = fetch();
-		if ((m_a & ACC_MASK) == 0)
-			m_pc = destination;
+		branch_if((m_a & ACC_MASK) == 0);
 		return;
-	}
 	case 0xf844: // BC pmad, ANEQ
-	{
-		const u16 destination = fetch();
-		if ((m_a & ACC_MASK) != 0)
-			m_pc = destination;
+		branch_if((m_a & ACC_MASK) != 0);
 		return;
-	}
 	case 0xf84c: // BC pmad, BNEQ
-	{
-		const u16 destination = fetch();
-		if ((m_b & ACC_MASK) != 0)
-			m_pc = destination;
+		branch_if((m_b & ACC_MASK) != 0);
 		return;
-	}
 	case 0xf84d: // BC pmad, BEQ
-	{
-		const u16 destination = fetch();
-		if ((m_b & ACC_MASK) == 0)
-			m_pc = destination;
+		branch_if((m_b & ACC_MASK) == 0);
 		return;
-	}
 	case 0xf84e: // BC pmad, BGT
-	{
-		const u16 destination = fetch();
-		if ((s64(m_b << 24) >> 24) > 0)
-			m_pc = destination;
+		branch_if((s64(m_b << 24) >> 24) > 0);
 		return;
-	}
 	case 0xf84a: // BC pmad, BGEQ
-	{
-		const u16 destination = fetch();
-		if ((s64(m_b << 24) >> 24) >= 0)
-			m_pc = destination;
+		branch_if((s64(m_b << 24) >> 24) >= 0);
 		return;
-	}
 	case 0xf84b: // BC pmad, BLT
-	{
-		const u16 destination = fetch();
-		if ((s64(m_b << 24) >> 24) < 0)
-			m_pc = destination;
+		branch_if((s64(m_b << 24) >> 24) < 0);
 		return;
-	}
 	case 0xf842: // BC pmad, AGEQ
-	{
-		const u16 destination = fetch();
-		if ((s64(m_a << 24) >> 24) >= 0)
-			m_pc = destination;
+		branch_if((s64(m_a << 24) >> 24) >= 0);
 		return;
-	}
 	case 0xf0c8: // XOR A << 8, A
 		m_a = (m_a ^ (m_a << 8)) & ACC_MASK;
 		return;
