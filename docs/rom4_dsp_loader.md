@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 191 distinct words: 154 overlap the ROM4 run, 37 occur
-only in the fixture, and 303 ROM4 words do not occur in the fixture. These are
+The fixture executes 193 distinct words: 156 overlap the ROM4 run, 37 occur
+only in the fixture, and 301 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 91 have an `opassert` marker after a
-passing exact-word check, 63 execute in the fixture without such a marker,
-and 303 are absent from the fixture. The 63-word class includes setup and
+assertions. Of the 457 ROM4 words, 94 have an `opassert` marker after a
+passing exact-word check, 62 execute in the fixture without such a marker,
+and 301 are absent from the fixture. The 62-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 63 lack semantic tests. The 307-word class is a priority list
+claim that all 62 lack semantic tests. The 301-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -584,7 +584,9 @@ the low accumulator word, and final SP restoration. The corresponding
 `4a0b`/`4a0c`/`4a0d` and `8a0d`/`8a0c`/`8a0b` fixtures check all three B
 slices, LIFO order, A preservation, and SP restoration. TI SPRU172C specifies
 one word and one cycle for each PSHM/POPM form; the core has no extra cycle
-charge for these opcodes. Other MMR register encodings remain separate tests.
+charge for these opcodes. It specifies two cycles for `STM #lk, MMR`;
+exact ROM4 `7712`, `4a12`, and `8a12` now check AR2 transfer, stack
+movement, and those costs. Other MMR register encodings remain separate tests.
 Exact `f065` (`XOR #lk,16,A`) now checks the shifted result and TI SPRU172C's
 two-cycle cost. The core previously charged one cycle to all four
 source/destination variants of this encoding; the shared path now charges

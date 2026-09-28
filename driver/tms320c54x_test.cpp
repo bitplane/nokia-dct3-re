@@ -3454,6 +3454,57 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0df3 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 extended STH writes high accumulator word and postincrements");
+			program.write_word(0x05e2, 0x7712); // STM #lk, AR2
+			program.write_word(0x05e3, 0x4567);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 178;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 178)
+		{
+			expect_opcode(0x7712, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x4567 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STM #lk, AR2 stores the immediate in two cycles");
+			program.write_word(0x05e2, 0x4a12); // PSHM AR2
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 179;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 179)
+		{
+			expect_opcode(0x4a12, data.read_word(0x02ff) == 0x4567 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 PSHM AR2 pushes the register in one cycle");
+			program.write_word(0x05e2, 0x8a12); // POPM AR2
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 180;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 180)
+		{
+			expect_opcode(0x8a12, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x4567 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 POPM AR2 restores the register in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
