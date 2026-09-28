@@ -8820,6 +8820,75 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 ANDM #lk,*AR4 selects its own pointer in two cycles");
+			program.write_word(0x05e3, 0x6db1); // MAR *AR1+0
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // CMPT clear
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 445;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 445)
+		{
+			expect_opcode(0x6db1, m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0f13 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 3 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe800) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 MAR *AR1+0 adds AR0 without changing ARP in one cycle");
+			program.write_word(0x05e3, 0x6dc2); // MAR *AR2-%
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f08);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 446;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 446)
+		{
+			expect_opcode(0x6dc2, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f0b &&
+					m_cpu->state_int(tms320c54x_device::STATE_BK) == 4 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe800) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 MAR *AR2-% wraps at BK without changing status in one cycle");
+			program.write_word(0x05e3, 0xe900); // LD #0,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 447;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 447)
+		{
+			expect_opcode(0xe900, m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe800) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD #0,B clears guard and payload in one cycle");
+			program.write_word(0x05e3, 0xe901); // LD #1,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 448;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 448)
+		{
+			expect_opcode(0xe901, m_cpu->state_int(tms320c54x_device::STATE_B) == 1 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe800) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD #1,B clears prior guard bits in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
