@@ -1184,7 +1184,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6c00: // BANZ pmad, *ARx modification
 	{
-		const unsigned ar = low & 7;
+		const unsigned ar = indirect_ar(low);
 		const bool branch = m_ar[ar] != 0;
 		indirect_modify(low);
 		const u16 destination = fetch();
@@ -1195,7 +1195,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6e00: // BANZD pmad, *ARx modification
 	{
-		const unsigned ar = low & 7;
+		const unsigned ar = indirect_ar(low);
 		const bool branch = m_ar[ar] != 0;
 		indirect_modify(low);
 		const u16 destination = fetch();

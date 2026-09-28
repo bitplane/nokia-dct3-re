@@ -5808,6 +5808,76 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f22 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 MVDK copies *AR4+ to dmad in two cycles");
+			program.write_word(0x05e0, 0x75f8);
+			program.write_word(0x05e1, 0x0d00);
+			program.write_word(0x05e2, 0x0124);
+			program.write_word(0x05e3, 0x6c88); // BANZ 05f0,*AR0-
+			program.write_word(0x05e4, 0x05f0);
+			program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
+			program.write_word(0x05e6, 0x0d01);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			program.write_word(0x05f0, 0x75f8); // Taken marker.
+			program.write_word(0x05f1, 0x0d02);
+			program.write_word(0x05f2, 0x0124);
+			program.write_word(0x05f3, 0xf5e1);
+			data.write_word(0x0d00, 0x1111);
+			data.write_word(0x0d01, 0x2222);
+			data.write_word(0x0d02, 0x3333);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x8000); // ARP=4
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020); // CMPT
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 286;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 286 || m_phase == 287)
+		{
+			const bool taken = m_phase == 286;
+			expect_opcode(0x6c88, m_port_writes == 2 &&
+					m_last_port_value == (taken ? 0x3333 : 0x2222) &&
+					m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 5) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == (taken ? 0 : 1) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == (taken ? 0 : 0xffff),
+					"ROM4 BANZ *AR0- tests and updates ARP-selected AR4 in compatibility mode");
+			if (taken)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 287;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e3, 0x6e88); // BANZD 05f0,*AR0-
+			program.write_word(0x05e5, 0xf495); // First delay word.
+			program.write_word(0x05e6, 0xf495); // Second delay word.
+			program.write_word(0x05e7, 0x75f8); // Must be bypassed.
+			program.write_word(0x05e8, 0x0d01);
+			program.write_word(0x05e9, 0x0124);
+			program.write_word(0x05ea, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 288;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 288)
+		{
+			expect_opcode(0x6e88, m_port_writes == 2 && m_last_port_value == 0x3333 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0 &&
+					m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 BANZD *AR0- tests ARP-selected AR4 before delayed branch");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
