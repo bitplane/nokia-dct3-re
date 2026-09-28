@@ -433,7 +433,7 @@ private:
 		{
 			expect(data.read_word(0x0910) == 0x5678,
 					"absolute STM extension order");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xabcd,
+			expect_opcode(0x7214, m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xabcd,
 					"data-memory to MMR move");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_B) ==
 					(0x12345678 ^ ((u64(1) << 40) - 1)),
@@ -539,7 +539,7 @@ private:
 		}
 		if (m_phase == 14)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+			expect_opcode(0xf5e2, m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x03b1,
 					"accumulator-indirect branch");
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03b2);
@@ -593,7 +593,7 @@ private:
 		}
 		if (m_phase == 18)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 6,
+			expect_opcode(0xf520, m_cpu->state_int(tms320c54x_device::STATE_B) == 6,
 					"accumulator subtract with independent destination");
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03d4);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0940);
@@ -618,7 +618,7 @@ private:
 		}
 		if (m_phase == 20)
 		{
-			expect((m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x1f) == 1,
+			expect_opcode(0x3292, (m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x1f) == 1,
 					"data-memory load into ST1.ASM");
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x03da);
 			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
@@ -680,6 +680,8 @@ private:
 			expect_opcode(0xe801, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
 					"BANZD executes two delay words");
+			expect_opcode(0xe902, m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
+					"BANZD second delay word loads B");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0,
 					"BANZD address-register modification");
 			program.write_word(0x03f0, 0x24f8); // MPYU *(absolute), A
@@ -986,6 +988,8 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 3,
 					"delayed accumulator-not-equal branch and delay slots");
+			expect_opcode(0xe903, m_cpu->state_int(tms320c54x_device::STATE_B) == 3,
+					"conditional branch second delay word loads B");
 			program.write_word(0x0444, 0xf484); // NEG A
 			program.write_word(0x0445, 0xf5e1);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0444);
@@ -1090,6 +1094,9 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == expected[m_phase - 45],
 					"long-immediate B load destination, SXM and guard extension");
+			if (m_phase == 45)
+				expect_opcode(0xf120, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffff,
+						"long-immediate LD B preserves unsigned value with SXM clear");
 			if (m_phase != 48)
 			{
 				++m_phase;
