@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 510 distinct words: 410 overlap the ROM4 run, 100 occur
-only in the fixture, and 47 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 514 distinct words: 414 overlap the ROM4 run, 100 occur
+only in the fixture, and 43 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 410 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 414 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 47 are absent from the fixture. This closes the fixture-executed-only
+and 43 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1226,6 +1226,11 @@ Exact `fc47` checks `RC ALEQ` against A's 40-bit guard sign, including the
 stack pop only on return and the five-/three-cycle costs. Exact `ff47` and
 `ff4c` check `XC 2,ALEQ/BNEQ` with both accepted and rejected two-slot paths;
 the guarded MAR effects and five-cycle marker spans agree with TI SPRU172C.
+Exact `0882` checks an SXM-sign-extending indirect subtraction without AR2
+motion. `1b84` and `1bf8` check indirect and absolute OR into B, preserving
+its guard byte and status. `45f8` checks an absolute `LD Smem,16,B` with SXM
+extension before shifting. Their marker spans cover TI SPRU172C's one-cycle
+indirect forms and the extra word/cycle for absolute Smem.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

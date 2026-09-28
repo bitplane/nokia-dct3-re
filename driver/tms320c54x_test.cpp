@@ -10126,6 +10126,85 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0x0882); // SUB *AR2,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f22, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f22);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 510;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 510)
+		{
+			expect_opcode(0x0882,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x17fff &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f22 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 SUB *AR2,A sign-extends without pointer motion in one cycle");
+			program.write_word(0x05e2, 0x1b84); // OR *AR4,B
+			data.write_word(0x0f24, 0x00f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff0000000fULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f24);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 511;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 511)
+		{
+			expect_opcode(0x1b84,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff000000ffULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f24 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 OR *AR4,B preserves guard, status, and pointer in one cycle");
+			program.write_word(0x05e2, 0x1bf8); // OR *(lk),B
+			program.write_word(0x05e3, 0x0f24);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff0000000fULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 512;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 512)
+		{
+			expect_opcode(0x1bf8,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff000000ffULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute OR into B consumes address and costs two cycles");
+			program.write_word(0x05e2, 0x45f8); // LD *(lk),16,B
+			data.write_word(0x0f24, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 513;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 513)
+		{
+			expect_opcode(0x45f8,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80010000ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute LD *,16,B sign-extends before shift in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
