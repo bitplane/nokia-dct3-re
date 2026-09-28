@@ -1075,6 +1075,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = indirect_read(low);
 		const u16 immediate = fetch();
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
+		m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	}
 	case 0x6f00: // Extended ALU/load/store Smem, shift, accumulator

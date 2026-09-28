@@ -563,8 +563,8 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 147 distinct words: 111 overlap the ROM4 run, 36 occur
-only in the fixture, and 346 ROM4 words do not occur in the fixture. These are
+The fixture executes 154 distinct words: 118 overlap the ROM4 run, 36 occur
+only in the fixture, and 339 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -610,7 +610,15 @@ Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
 (about 13,000 executions each) now have exact-word assertions for their
 three-cycle cost, extension-word order, and data movement. The highest-use
-ROM4-only word is now `f040` (`OR #lk,A`).
+ROM4-only word was `f040` (`OR #lk,A`); it now has a zero-extension and
+two-cycle fixture. `6082` (`CMPM *AR2,#lk`) exposed a missing cycle charge:
+TI specifies two cycles, or three with absolute/long-offset addressing.
+The exact-word fixture checks both TC outcomes, pointer preservation, and the
+two-cycle form. `8093` (`STL A,*AR3+`) now checks the stored low word and
+post-increment. Exact `f7bb`/`f6bb` fixtures cover setting and clearing
+ST1.INTM; `4a08`/`8a08` cover an AL push/pop with stack-pointer restoration.
+The highest-use remaining ROM4-only words are other `4a`/`8a` MMR register
+encodings (not individually asserted) and `7212` (`MVDM`).
 `6c8a` (`BANZ`) has taken/not-taken timing and pointer-update assertions; TI SPRU172C
 specifies four and two cycles, respectively. Long-offset Smem access outside
 `MAR` remains a separate
