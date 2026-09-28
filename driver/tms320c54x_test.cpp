@@ -4774,6 +4774,70 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 SFTL A,-8 clears guard bits, captures carry, and costs one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x1293); // LDU *AR3+,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0ef0, 0xff80);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffabcdef00ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0ef0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not affect LDU.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 238;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 238)
+		{
+			expect_opcode(0x1293, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff80 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0ef1 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 LDU *AR3+,A ignores SXM, clears upper bits, and costs one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xf0c8); // XOR A<<8,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0001020304ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 239;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 239)
+		{
+			expect_opcode(0xf0c8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0103010704ULL &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 XOR A<<8,A preserves the full 40-bit shifted result in one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xe800); // LD #0,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 240;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 240)
+		{
+			expect_opcode(0xe800, m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 LD #0,A clears the 40-bit accumulator in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
