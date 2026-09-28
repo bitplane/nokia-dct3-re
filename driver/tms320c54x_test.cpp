@@ -11550,6 +11550,31 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xd9b7); // ST A,*AR5- || MAS *AR5+,B.
+			data.write_word(0x0f90, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x18000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x28000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 648;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 648)
+		{
+			expect_opcode(0xd9b7,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x18000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x27ffa &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
+				data.read_word(0x0f90) == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f91 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"parallel MAS reads X before aliased Y store and applies Xmod once");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
