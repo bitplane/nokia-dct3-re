@@ -674,7 +674,7 @@ private:
 		}
 		if (m_phase == 24)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+			expect_opcode(0xe801, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 2,
 					"BANZD executes two delay words");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0,
@@ -829,7 +829,7 @@ private:
 			osd_printf_info("TMS320C54x logical shift: actual=%010llx expected=%010llx\n",
 					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
 					(unsigned long long)((negative | (negative >> 16)) & ((u64(1) << 40) - 1)));
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+			expect_opcode(0xf0b0, m_cpu->state_int(tms320c54x_device::STATE_A) ==
 					((negative | (negative >> 16)) & ((u64(1) << 40) - 1)),
 					"logical accumulator right shift zero-fills guard bits");
 			program.write_word(0x041c, 0xed18); // LD #-8, ASM
@@ -977,7 +977,7 @@ private:
 		}
 		if (m_phase == 40)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+			expect_opcode(0xfa44, m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0443 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 3,
@@ -994,7 +994,7 @@ private:
 		}
 		if (m_phase == 41)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+			expect_opcode(0xf484, m_cpu->state_int(tms320c54x_device::STATE_A) ==
 					((u64(1) << 40) - 5) &&
 					!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
 					"accumulator negate result and carry");
