@@ -437,6 +437,12 @@ words check the old source value stored to Ymem, destination A/B, rounded
 and unrounded accumulation, untouched T, X/Y pointer updates, preserved
 carry, and one-cycle DARAM timing. Different ASM, FRCT/OVM, and aliased
 X/Y addressing cases remain unaudited.
+TI SPRU172C's published `ST A || MAS *AR5,B` and `ST A || MASR *AR5+,B`
+examples now have exact-result fixtures. They check the negative 40-bit
+accumulator outputs, ASM=5/1 stored words (`0222`/`0022`), rounding, both
+pointer updates, and one-cycle cost. The second example adds one new fixture
+word; the first reuses `d93a` from the routing table. Other ASM and aliased
+X/Y cases remain separate checks.
 Fixture-only `3383`, `3583`, and `3783` check `MASA`, `MACA`, and `MACAR`
 using A's high word as the multiplicand, including B accumulation, T
 publication, rounding, and one-cycle DARAM timing. `3693` uses TI's `POLY`
@@ -691,8 +697,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 649 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 192 occur only in the fixture. These are
+The fixture dispatches 650 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 193 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -702,7 +708,7 @@ also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
 That inventory matches top-level cases and opcode masks: 41,566 words match
-some declared path, of which 649 execute in the fixture and 40,917 do not.
+some declared path, of which 650 execute in the fixture and 40,916 do not.
 Every matching high-byte group now has at least one fixture word, but that
 does not establish the remaining words in those groups. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
