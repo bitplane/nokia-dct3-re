@@ -6680,6 +6680,65 @@ private:
 					"RPT #12 executes MAR thirteen times after one-cycle setup");
 			expect_opcode(0xe80f, m_cpu->state_int(tms320c54x_device::STATE_A) == 15,
 					"LD #15,A writes the accumulator after the repeated body");
+			program.write_word(0x05e3, 0x13f8); // LDU *(0f20h),B
+			program.write_word(0x05e4, 0x0f20);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f20, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 334;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 334)
+		{
+			expect_opcode(0x13f8, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8001 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"absolute LDU B zero-extends even with SXM set in two cycles");
+			program.write_word(0x05e3, 0x81f8); // STL B,*(0f21h)
+			program.write_word(0x05e4, 0x0f21);
+			data.write_word(0x0f21, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234beef);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 335;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 335)
+		{
+			expect_opcode(0x81f8, data.read_word(0x0f21) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234beef &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"absolute STL B stores the low word in two cycles");
+			program.write_word(0x05e3, 0x7582); // PORTW *AR2,0124h
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f20, 0xface);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 336;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 336)
+		{
+			expect_opcode(0x7582, m_middle_port_value == 0xface &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+					m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
+					"PORTW *AR2 emits memory word without modifying AR2 in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
