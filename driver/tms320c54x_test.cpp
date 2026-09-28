@@ -9613,6 +9613,49 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0x1192); // LD *AR2+,B
+			program.write_word(0x05e3, 0x6dd2); // MAR *AR2+%
+			program.write_word(0x05e4, 0x7683); // ST #lk,*AR3
+			program.write_word(0x05e5, 0x5aa5);
+			program.write_word(0x05e6, 0x8085); // STL A,*AR5
+			program.write_word(0x05e7, 0x75d6);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			data.write_word(0x0f22, 0x8000);
+			data.write_word(0x0f30, 0);
+			data.write_word(0x0f31, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234abcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f22);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f31);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 485;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 485)
+		{
+			expect_opcode(0x1192,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffffff8000ULL,
+					"ROM4 LD *AR2+,B sign-extends under SXM");
+			expect_opcode(0x6dd2,
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20,
+					"ROM4 MAR *AR2+% wraps after the preceding linear load");
+			expect_opcode(0x7683, data.read_word(0x0f30) == 0x5aa5 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f30,
+					"ROM4 ST immediate writes the direct AR3 destination");
+			expect_opcode(0x8085, data.read_word(0x0f31) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f31 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234abcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 load/MAR/immediate-store/accumulator-store cost 1+1+2+1 cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
