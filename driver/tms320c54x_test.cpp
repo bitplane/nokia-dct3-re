@@ -9465,6 +9465,49 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 absolute XOR into B preserves guard and status in two cycles");
+			program.write_word(0x05e2, 0x80d3); // STL A,*AR3+%
+			program.write_word(0x05e3, 0x818d); // STL B,*AR5-
+			program.write_word(0x05e4, 0x81d2); // STL B,*AR2+%
+			program.write_word(0x05e5, 0x8395); // STH B,*AR5+
+			program.write_word(0x05e6, 0x75d6);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f22, 0);
+			data.write_word(0x0f23, 0);
+			data.write_word(0x0f24, 0);
+			data.write_word(0x0f25, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x89ababcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f22);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f23);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f25);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); // SST clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 479;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 479)
+		{
+			expect_opcode(0x80d3, data.read_word(0x0f23) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f20,
+					"ROM4 STL A,*AR3+% stores before circular wrap");
+			expect_opcode(0x818d, data.read_word(0x0f25) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f25,
+					"ROM4 STL B,*AR5- stores at the old address");
+			expect_opcode(0x81d2, data.read_word(0x0f22) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f23,
+					"ROM4 STL B,*AR2+% stores before circular advance");
+			expect_opcode(0x8395, data.read_word(0x0f24) == 0x89ab &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x89ababcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"four ROM4 accumulator stores preserve status and cost one cycle each");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
