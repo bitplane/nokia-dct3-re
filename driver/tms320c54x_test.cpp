@@ -9837,6 +9837,56 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0a00 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 LD A,0,B preserves all 40 bits and sets OVB in one cycle");
+			program.write_word(0x05e2, 0x10da); // LD *AR2+0%,A
+			program.write_word(0x05e3, 0x6d93); // MAR *AR3+
+			program.write_word(0x05e4, 0x7308); // MVMD AL,dmad
+			program.write_word(0x05e5, 0x0f50);
+			program.write_word(0x05e6, 0x7313); // MVMD AR3,dmad
+			program.write_word(0x05e7, 0x0f51);
+			program.write_word(0x05e8, 0x7681); // ST #lk,*AR1
+			program.write_word(0x05e9, 0x5a5a);
+			program.write_word(0x05ea, 0x75d6);
+			program.write_word(0x05eb, 0x0124);
+			program.write_word(0x05ec, 0xf5e1);
+			data.write_word(0x0f22, 0x8001);
+			data.write_word(0x0f50, 0);
+			data.write_word(0x0f51, 0);
+			data.write_word(0x0f52, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f52);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f22);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 495;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 495)
+		{
+			expect_opcode(0x10da,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff8001ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20,
+					"ROM4 LD *AR2+0%,A sign-extends before circular advance");
+			expect_opcode(0x6d93,
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f31,
+					"ROM4 MAR *AR3+ updates the register in one cycle");
+			expect_opcode(0x7308, data.read_word(0x0f50) == 0x8001,
+					"ROM4 MVMD AL,dmad captures A's low word");
+			expect_opcode(0x7313, data.read_word(0x0f51) == 0x0f31,
+					"ROM4 MVMD AR3,dmad captures the modified register");
+			expect_opcode(0x7681, data.read_word(0x0f52) == 0x5a5a &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0f52 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
+					"ROM4 load/MAR/two MVMDs/ST cost 1+1+2+2+2 cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
