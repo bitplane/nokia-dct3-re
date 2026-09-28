@@ -1170,8 +1170,9 @@ void tms320c54x_device::execute_one(u16 op)
 		const s32 right = BIT(m_st1, 8) ? s16(immediate) : s32(immediate);
 		const s32 result = left + right;
 		const bool overflow = result < -0x8000 || result > 0x7fff;
+		// ADDM stores 16 bits, but the ALU carry is taken at bit 32.
 		m_st0 = (m_st0 & ~u16(0x0800)) |
-				(u32(value) + immediate > 0xffff ? 0x0800 : 0);
+				(u64(u32(left)) + u32(right) > 0xffffffffULL ? 0x0800 : 0);
 		if (overflow)
 			m_st0 |= 0x0400;
 		data_write(address, overflow && BIT(m_st1, 9)

@@ -4386,6 +4386,24 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0d30 &&
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe000) == 0x8000,
 					"ORM compatibility AR0 uses ARP without modifying either pointer");
+			program.write_word(0x05e0, 0x6b8a); // ADDM #8000h, *AR2-
+			program.write_word(0x05e1, 0x8000);
+			program.write_word(0x05e2, 0xf5e1);
+			data.write_word(0x0d60, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d60);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM and OVM clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 225;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 225)
+		{
+			expect(data.read_word(0x0d60) == 0 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
+					"ADDM SXM-clear 16-bit wrap does not carry out of the 32-bit ALU");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

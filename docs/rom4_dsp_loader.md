@@ -688,8 +688,12 @@ separate fixtures for positive overflow with OVM clear and unsigned carry
 without signed overflow. Fixture-only `6b80` verifies compatibility-mode AR0
 selection through ARP; `6880`/`6980` check the same selection for ANDM/ORM.
 [TI SPRU538](https://www.ti.com/lit/ug/spru538/spru538.pdf) confirms that a
-memory-plus-immediate addition affects C. The fixtures cover signed SXM cases
-and one non-overflow SXM-clear case, not every SXM-clear overflow combination.
+memory-plus-immediate addition affects C. [TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+defines carry at bit 32, even though ADDM stores a 16-bit result. A separate
+SXM-clear fixture checks `0x8000 + 0x8000`: the stored word wraps to zero and
+sets OVA, but produces no bit-32 carry. This corrected the first
+implementation's 16-bit carry test.
+The fixtures do not cover every SXM-clear overflow and OVM combination.
 Exact ROM4 `f820` (`BC pmad, NTC`) and `f84c` (`BC pmad, BNEQ`) check taken
 and fall-through destinations at TI SPRU172C's five- and three-cycle costs.
 The BNEQ true case has a nonzero guard byte and zero low 32 bits, so a
