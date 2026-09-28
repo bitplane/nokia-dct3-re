@@ -574,11 +574,11 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 192 have an `opassert` marker after a
-passing exact-word check, 36 execute in the fixture without such a marker,
-and 229 are absent from the fixture. The 36-word class includes setup and
+assertions. Of the 457 ROM4 words, 193 have an `opassert` marker after a
+passing exact-word check, 35 execute in the fixture without such a marker,
+and 229 are absent from the fixture. The 35-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 36 lack semantic tests. The formerly leading challenge-loop
+claim that all 35 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
 The 229-word class is a priority list
@@ -822,6 +822,9 @@ decoder comment formerly claimed. TI SPRU172C includes SP as the ninth
 allowed register. The decoder now uses the full four-bit source/destination
 fields and MMR accessors; fixtures cover those two ROM4 words and the SP forms
 `e748`/`e782`. The 30-second ROM4 trace also dispatches `e782` 25 times.
+Exact `e5c9` (`MVDD *AR2+0%,*AR3+`) now verifies a five-word circular
+source wrap, independent linear destination increment, data copy, and TI's
+one-cycle base cost. It was previously only executed in a broader fixture.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

@@ -4725,6 +4725,33 @@ private:
 			expect_opcode(0xe782, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d90 &&
 					m_last_port_cycle - m_middle_port_cycle == 3,
 					"MVMM SP,AR2 accepts SP as source in one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xe5c9); // MVDD *AR2+0%,*AR3+
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0e04, 0x2468);
+			data.write_word(0x0e10, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0e04);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 236;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 236)
+		{
+			expect_opcode(0xe5c9, data.read_word(0x0e10) == 0x2468 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0e00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e11 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 MVDD wraps source AR2 and increments destination AR3 in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
