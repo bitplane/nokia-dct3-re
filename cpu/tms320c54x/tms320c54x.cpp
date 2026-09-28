@@ -1639,6 +1639,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf365:
 		accumulator(BIT(op, 8)) =
 				(accumulator(BIT(op, 9)) ^ (u64(fetch()) << 16)) & ACC_MASK;
+		--m_icount;
 		return;
 	case 0xf274: // CALLD pmad
 	{

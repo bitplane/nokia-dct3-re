@@ -570,8 +570,8 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 47 have an `opassert` marker after a
-passing exact-word check, 83 execute in the fixture without such a marker,
+assertions. Of the 457 ROM4 words, 48 have an `opassert` marker after a
+passing exact-word check, 82 execute in the fixture without such a marker,
 and 327 are absent from the fixture. The 83-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 83 lack semantic tests. The 337-word class is a priority list
@@ -585,6 +585,14 @@ the low accumulator word, and final SP restoration. The corresponding
 slices, LIFO order, A preservation, and SP restoration. TI SPRU172C specifies
 one word and one cycle for each PSHM/POPM form; the core has no extra cycle
 charge for these opcodes. Other MMR register encodings remain separate tests.
+Exact `f065` (`XOR #lk,16,A`) now checks the shifted result and TI SPRU172C's
+two-cycle cost. The core previously charged one cycle to all four
+source/destination variants of this encoding; the shared path now charges
+two. The 30-second RF-boundary run retains 6,498 frame expiries and
+`IMR=0x035f`, with 207,168 RF reads; at 40 seconds it has 8,664 expiries
+and 276,480 reads. Both differ from the ideal completed-frame count by
+two 32-read frames at the fixed-time cutoff, so the gate admits up to two
+in-flight frames and still rejects a three-frame deficit.
 
 Execution counts identified `ROL A` (`f491`) and `ROL B` (`f591`) as the largest
 previously unasserted ROM4 encodings, at roughly 524,000 executions each in
