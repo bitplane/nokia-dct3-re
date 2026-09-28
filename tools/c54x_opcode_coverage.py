@@ -98,6 +98,23 @@ def ranked_gaps(result: dict[str, object], fixture: dict[str, object]) -> list[t
     return sorted(rows, key=lambda row: (-row[2], row[0]))
 
 
+def ranked_variant_candidates(result: dict[str, object], fixture: dict[str, object],
+                              declared: set[int]) -> list[tuple[int, int, int, int]]:
+    """Rank untested static matches in observed groups, without claiming they decode."""
+    counts = result["counts"]
+    fixture_words = set(fixture["first_pc"])
+    untested = declared - fixture_words
+    rows = []
+    for group in {opcode >> 8 for opcode in counts}:
+        candidates = sum(opcode >> 8 == group for opcode in untested)
+        if candidates:
+            executions = sum(count for opcode, count in counts.items()
+                             if opcode >> 8 == group)
+            observed = sum(opcode >> 8 == group for opcode in counts)
+            rows.append((group, executions, observed, candidates))
+    return sorted(rows, key=lambda row: (-row[1], -row[3], row[0]))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
@@ -109,6 +126,8 @@ def main() -> int:
                         help="report source-declared opcode matches absent from the fixture")
     parser.add_argument("--group-report", action="store_true",
                         help="rank unasserted ROM4 executions by opcode high byte")
+    parser.add_argument("--variant-report", action="store_true",
+                        help="rank untested static decoder matches by observed ROM4 family use")
     parser.add_argument("--all-gaps", action="store_true",
                         help="list every unasserted ROM4 word by observed execution count")
     parser.add_argument("--require-all-asserted", action="store_true",
@@ -120,6 +139,8 @@ def main() -> int:
         parser.error("--require-all-asserted requires --fixture-log")
     if args.decoder_source and not args.fixture_log:
         parser.error("--decoder-source requires --fixture-log")
+    if args.variant_report and not args.decoder_source:
+        parser.error("--variant-report requires --decoder-source")
     try:
         primary_text = args.log.read_text(errors="replace")
         primary = summarize(primary_text)
@@ -171,6 +192,13 @@ def main() -> int:
             print(f"  High-byte groups with no fixture word: {len(no_fixture_groups)}")
             for group in no_fixture_groups[:24]:
                 print(f"  no-fixture group={group:02x} static_matches={groups[group]}")
+            if args.variant_report:
+                print("Untested static-match candidates in ROM4-observed high-byte groups "
+                      "(not validated instruction encodings):")
+                for group, executions, observed, candidates in ranked_variant_candidates(
+                        result, fixture, declared):
+                    print(f"  group={group:02x} rom4_executions={executions} "
+                          f"observed_words={observed} untested_static_matches={candidates}")
         if args.all_gaps:
             for opcode, pc, count, status in ranked_gaps(result, fixture):
                 print(f"  {status} op={opcode:04x} first_pc={pc:04x} executions={count}")

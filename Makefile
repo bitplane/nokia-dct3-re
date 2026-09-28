@@ -1101,7 +1101,7 @@ check-c54x-rom4-snapshot:
 	$(PYTHON) tools/c54x_rom4_snapshot_check.py $(PREFIX)
 
 check-c54x-opcode-coverage:
-	$(PYTHON) tools/c54x_opcode_coverage.py $(LOG) $(if $(ROM4_IDLE),--require-rom4-idle) $(if $(FIXTURE_LOG),--fixture-log $(FIXTURE_LOG)) $(if $(DECODE_SOURCE),--decoder-source $(DECODE_SOURCE)) $(if $(GROUPS),--group-report) $(if $(ALL_GAPS),--all-gaps)
+	$(PYTHON) tools/c54x_opcode_coverage.py $(LOG) $(if $(ROM4_IDLE),--require-rom4-idle) $(if $(FIXTURE_LOG),--fixture-log $(FIXTURE_LOG)) $(if $(DECODE_SOURCE),--decoder-source $(DECODE_SOURCE)) $(if $(GROUPS),--group-report) $(if $(VARIANTS),--variant-report) $(if $(ALL_GAPS),--all-gaps)
 
 check-c54x-observed-coverage: build
 	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-c54x-coverage.XXXXXX)"; \
@@ -1147,6 +1147,7 @@ check-c54x-observed-coverage: build
 			--additional-log "$$tmp/power/error.log" \
 			--fixture-log "$$tmp/core/error.log" \
 			--decoder-source $(abspath cpu/tms320c54x/tms320c54x.cpp) \
+			--variant-report \
 			--require-all-asserted
 
 check-c54x-cross-rom:

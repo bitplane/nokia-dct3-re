@@ -5,7 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from tools.c54x_opcode_coverage import decoder_declared_words, group_gaps, main, ranked_gaps, summarize
+from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main,
+                                        ranked_gaps, ranked_variant_candidates, summarize)
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
@@ -90,6 +91,20 @@ void tms320c54x_device::execute_run() {}
         self.assertEqual(ranked_gaps(rom4, fixture), [
             (0x1001, 0x2001, 7, "executed-only"),
             (0x1002, 0x2002, 7, "absent"),
+        ])
+
+    def test_variant_candidates_rank_observed_families_without_claiming_decode(self):
+        rom4 = summarize("\n".join((
+            "[opcov] op=1001 first_pc=2001 count=4",
+            "[opcov] op=1002 first_pc=2002 count=6",
+            "[opcov] op=2001 first_pc=2003 count=8",
+        )))
+        fixture = summarize("[opcov] op=1001 first_pc=3001\n"
+                            "[opcov] op=2001 first_pc=3002\n")
+        declared = {0x1001, 0x1002, 0x1003, 0x2001, 0x2002, 0x3001}
+        self.assertEqual(ranked_variant_candidates(rom4, fixture, declared), [
+            (0x10, 10, 2, 2),
+            (0x20, 8, 1, 1),
         ])
 
     def test_require_all_asserted_rejects_missing_and_executed_only_words(self):

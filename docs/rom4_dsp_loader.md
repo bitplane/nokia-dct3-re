@@ -1426,7 +1426,12 @@ implemented parallel `ST||MAC[R]` form also saturates the pre-MAC store
 source after its ASM shift. Exact `d6e1` fixtures check both zero and nonzero
 ASM shifts, the old B value, unchanged B, A's MACR result, and the one-cycle
 cost. Other parallel store mnemonics are not implemented or covered by this
-fixture.
+fixture. The opcode-coverage gate also ranks untested static decoder matches
+within high-byte groups observed on the 5110, ordered by the group's observed
+execution count. This is a prioritization list, not an implementation count:
+the static mask scan does not evaluate nested validity checks or prove the
+instruction's arithmetic, flags, addressing, or cycle cost. Exact-word
+fixtures remain the evidence for those claims.
 Exact `47f8` (`RPT *(absolute)`) now checks the three executions of its
 repeated instruction and the four-cycle setup cost specified by TI SPRU172C.
 The `4782` indirect form checks the three-cycle base cost and unchanged AR2.
