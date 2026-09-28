@@ -1421,7 +1421,7 @@ private:
 		}
 		if (m_phase == 66)
 		{
-			expect(m_repeat_reads == 3 && m_last_operand_cycle - m_first_operand_cycle == 11 &&
+			expect_opcode(0xf274, m_repeat_reads == 3 && m_last_operand_cycle - m_first_operand_cycle == 11 &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0527 &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 					"CALLD two-cycle and RETD three-cycle timing with balanced delayed return");
@@ -4982,6 +4982,8 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"ROM4 RETD executes two delay words before return and costs three cycles");
+			expect_opcode(0xe802, m_cpu->state_int(tms320c54x_device::STATE_A) == 2,
+					"ROM4 LD #2,A executes as the second RETD delay word");
 			program.write_word(0x05e0, 0x75d6);
 			program.write_word(0x05e1, 0x0124);
 			program.write_word(0x05e2, 0x1092); // LD *AR2+, A
@@ -5173,6 +5175,43 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ef &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ROM4 BANZD branches on pre-decrement AR7 after delay words in two cycles");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xf020); // LD #lk, A
+			program.write_word(0x05e3, 0xff80);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 256;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 256 || m_phase == 257)
+		{
+			const bool sign_extend = m_phase == 257;
+			expect_opcode(0xf020,
+					m_cpu->state_int(tms320c54x_device::STATE_A) ==
+							(sign_extend ? 0xffffffff80ULL : 0xff80ULL) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD #lk,A obeys SXM and costs two cycles");
+			if (!sign_extend)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 257;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
