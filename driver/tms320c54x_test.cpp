@@ -8645,6 +8645,50 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8ffff0000ULL &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"PMST.SST clamps unsigned DST without changing accumulator or two-cycle cost");
+			program.write_word(0x05e3, 0xd6e1); // ST B,*AR3 || MACR *AR4+0%,A
+			data.write_word(0x0f90, 0);
+			data.write_word(0x0fa0, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7ffff0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0fa0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM, ASM=0
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 436;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 436)
+		{
+			expect_opcode(0xd6e1, data.read_word(0x0fa0) == 0x7fff &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7ffff0000ULL &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"PMST.SST clamps parallel ST old B while MACR keeps one-cycle cost");
+			data.write_word(0x0fa0, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x3ffff0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0fa0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0101); // SXM, ASM=1
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 437;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 437)
+		{
+			expect_opcode(0xd6e1, data.read_word(0x0fa0) == 0x7fff &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x3ffff0000ULL &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"parallel ST shifts by ASM before SST clamps the stored value");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

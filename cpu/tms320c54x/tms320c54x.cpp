@@ -1583,8 +1583,10 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination_address = m_ar[yar];
 		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
 		const int asm_shift = s8((m_st1 & 0x001f) << 3) >> 3;
-		data_write(destination_address,
-			u16(arithmetic_shift_right(source, 16 - asm_shift)));
+		const u64 shifted_source = asm_shift < 0 ?
+				arithmetic_shift_right(source, -asm_shift) :
+				(source << asm_shift) & ACC_MASK;
+		data_write(destination_address, u16(saturated_store(shifted_source) >> 16));
 
 		s64 product = s64(s16(m_t)) * s64(s16(xvalue));
 		if (BIT(m_st1, 6))

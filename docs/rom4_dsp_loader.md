@@ -600,7 +600,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 418 distinct words: 324 overlap the ROM4 run, 94 occur
+The fixture dispatches 420 distinct words: 324 overlap the ROM4 run, 96 occur
 only in the fixture, and 133 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -1157,8 +1157,11 @@ PMST.SST now saturates the shifted 40-bit accumulator value to 32 bits before
 ordinary `STH`, `STL`, `STLM`, and `DST` stores, without modifying the
 accumulator. Focused fixtures reproduce TI SPRU131G's signed `STH` and
 unsigned `DST` examples and preserve their one- and two-cycle costs. The
-parallel `ST||` family still needs its own SST audit; the ordinary-store
-fixtures do not cover it.
+implemented parallel `ST||MAC[R]` form also saturates the pre-MAC store
+source after its ASM shift. Exact `d6e1` fixtures check both zero and nonzero
+ASM shifts, the old B value, unchanged B, A's MACR result, and the one-cycle
+cost. Other parallel store mnemonics are not implemented or covered by this
+fixture.
 Exact `47f8` (`RPT *(absolute)`) now checks the three executions of its
 repeated instruction and the four-cycle setup cost specified by TI SPRU172C.
 The `4782` indirect form checks the three-cycle base cost and unchanged AR2.
