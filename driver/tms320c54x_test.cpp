@@ -7700,6 +7700,44 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0xe908); // LD #8,B
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 387;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 387)
+		{
+			expect_opcode(0xe908, m_cpu->state_int(tms320c54x_device::STATE_B) == 8 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD #8,B replaces B without changing A in one cycle");
+			program.write_word(0x05e3, 0x4914); // LDM AR4,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x8001);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 388;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 388)
+		{
+			expect_opcode(0x4914, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LDM AR4,B zero-fills despite SXM in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
