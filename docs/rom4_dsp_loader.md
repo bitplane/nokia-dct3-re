@@ -600,23 +600,26 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 411 distinct words: 317 overlap the ROM4 run, 94 occur
-only in the fixture, and 140 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 413 distinct words: 319 overlap the ROM4 run, 94 occur
+only in the fixture, and 138 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 317 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 319 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 140 are absent from the fixture. This closes the fixture-executed-only
+and 138 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
 them from the executed-only class without changing CPU behavior. The formerly
 most-used absent word, `fa20`, now has taken and not-taken `BCD NTC` fixtures
 that check both delay slots, branch destination, and cycle cost. The leading
-observed MMR-load words `4815` and `4915` now assert that LDM AR5 zero-extends
+observed `1183` and `0093` fixtures cover negative Smem sign extension under
+SXM, a fixed versus postincrementing AR3, OVM saturation and sticky overflow,
+and the one-cycle DARAM cost. Together they account for 18 ROM4 executions.
+The observed MMR-load words `4815` and `4915` assert that LDM AR5 zero-extends
 under SXM, replaces the full destination accumulator without changing the
 other one or status, and costs one cycle (SPRU172C, LDM page 4-73). They
 remove 18 observed executions from the exact-word gap list. The leading

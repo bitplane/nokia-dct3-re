@@ -8468,6 +8468,50 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 1,
 					"XC 2 releases a pending interrupt after one two-word instruction");
 			m_cpu->set_input_line(2, CLEAR_LINE);
+			program.write_word(0x05e3, 0x1183); // LD *AR3,B
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0fa0, 0xfffe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0fa0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 427;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 427)
+		{
+			expect_opcode(0x1183, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffffffeULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0fa0 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD *AR3,B sign-extends under SXM without modifying AR3");
+			program.write_word(0x05e3, 0x0093); // ADD *AR3+,A
+			data.write_word(0x0fa1, 1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0fa1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 428;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 428)
+		{
+			expect_opcode(0x0093, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7fffffff &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0fa2 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 ADD *AR3+,A saturates under OVM and sets sticky overflow in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
