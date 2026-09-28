@@ -1427,11 +1427,16 @@ source after its ASM shift. Exact `d6e1` fixtures check both zero and nonzero
 ASM shifts, the old B value, unchanged B, A's MACR result, and the one-cycle
 cost. Other parallel store mnemonics are not implemented or covered by this
 fixture. The opcode-coverage gate also ranks untested static decoder matches
-within high-byte groups observed on the 5110, ordered by the group's observed
-execution count. This is a prioritization list, not an implementation count:
+within high-byte groups observed on the 5110. The ranking discounts each
+group's most-executed word so the `f495` NOP does not make every untested `f4`
+variant look urgent. It is a prioritization list, not an implementation count:
 the static mask scan does not evaluate nested validity checks or prove the
 instruction's arithmetic, flags, addressing, or cycle cost. Exact-word
 fixtures remain the evidence for those claims.
+On the current 30-second ROM4 idle/Menu/power union, `f4` still leads after
+discounting `f495`: 1,626,477 executions of its other observed words, versus
+1,029,136 for `f0`. The result warrants an exact-word `f4` audit; it does not
+make its 137 untested static matches valid instruction encodings.
 Fixture-only `f43f` (`SUB A>>1,A`) now checks the accumulator arithmetic
 family's right-shift fill under both SXM states: a negative 40-bit source
 sign-fills when SXM is set and zero-fills when clear. Both cases assert TI

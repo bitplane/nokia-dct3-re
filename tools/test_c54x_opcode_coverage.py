@@ -103,9 +103,22 @@ void tms320c54x_device::execute_run() {}
                             "[opcov] op=2001 first_pc=3002\n")
         declared = {0x1001, 0x1002, 0x1003, 0x2001, 0x2002, 0x3001}
         self.assertEqual(ranked_variant_candidates(rom4, fixture, declared), [
-            (0x10, 10, 2, 2),
-            (0x20, 8, 1, 1),
+            (0x10, 4, 10, 0x1002, 2, 2),
+            (0x20, 0, 8, 0x2001, 1, 1),
         ])
+
+    def test_variant_ranking_discounts_a_hot_nop(self):
+        rom4 = summarize("\n".join((
+            "[opcov] op=f495 first_pc=1000 count=1000",
+            "[opcov] op=f400 first_pc=1001 count=1",
+            "[opcov] op=1001 first_pc=1002 count=60",
+            "[opcov] op=1002 first_pc=1003 count=40",
+        )))
+        fixture = summarize("[opcov] op=f495 first_pc=2000\n"
+                            "[opcov] op=1001 first_pc=2001\n")
+        declared = {0xf495, 0xf400, 0xf401, 0x1001, 0x1002, 0x1003}
+        self.assertEqual([row[0] for row in ranked_variant_candidates(
+            rom4, fixture, declared)], [0x10, 0xf4])
 
     def test_require_all_asserted_rejects_missing_and_executed_only_words(self):
         with TemporaryDirectory() as directory:

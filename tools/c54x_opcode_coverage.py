@@ -99,8 +99,8 @@ def ranked_gaps(result: dict[str, object], fixture: dict[str, object]) -> list[t
 
 
 def ranked_variant_candidates(result: dict[str, object], fixture: dict[str, object],
-                              declared: set[int]) -> list[tuple[int, int, int, int]]:
-    """Rank untested static matches in observed groups, without claiming they decode."""
+                              declared: set[int]) -> list[tuple[int, int, int, int, int, int]]:
+    """Rank static candidates by observed use after discounting one dominant word."""
     counts = result["counts"]
     fixture_words = set(fixture["first_pc"])
     untested = declared - fixture_words
@@ -108,11 +108,13 @@ def ranked_variant_candidates(result: dict[str, object], fixture: dict[str, obje
     for group in {opcode >> 8 for opcode in counts}:
         candidates = sum(opcode >> 8 == group for opcode in untested)
         if candidates:
-            executions = sum(count for opcode, count in counts.items()
-                             if opcode >> 8 == group)
-            observed = sum(opcode >> 8 == group for opcode in counts)
-            rows.append((group, executions, observed, candidates))
-    return sorted(rows, key=lambda row: (-row[1], -row[3], row[0]))
+            observed_counts = [(opcode, count) for opcode, count in counts.items()
+                               if opcode >> 8 == group]
+            executions = sum(count for _, count in observed_counts)
+            dominant, dominant_count = max(observed_counts, key=lambda row: (row[1], -row[0]))
+            rows.append((group, executions - dominant_count, executions,
+                         dominant, len(observed_counts), candidates))
+    return sorted(rows, key=lambda row: (-row[1], -row[2], -row[5], row[0]))
 
 
 def main() -> int:
@@ -194,10 +196,11 @@ def main() -> int:
                 print(f"  no-fixture group={group:02x} static_matches={groups[group]}")
             if args.variant_report:
                 print("Untested static-match candidates in ROM4-observed high-byte groups "
-                      "(not validated instruction encodings):")
-                for group, executions, observed, candidates in ranked_variant_candidates(
+                      "(dominant word discounted; not validated instruction encodings):")
+                for group, residual, executions, dominant, observed, candidates in ranked_variant_candidates(
                         result, fixture, declared):
-                    print(f"  group={group:02x} rom4_executions={executions} "
+                    print(f"  group={group:02x} non_dominant_executions={residual} "
+                          f"rom4_executions={executions} dominant_word={dominant:04x} "
                           f"observed_words={observed} untested_static_matches={candidates}")
         if args.all_gaps:
             for opcode, pc, count, status in ranked_gaps(result, fixture):
