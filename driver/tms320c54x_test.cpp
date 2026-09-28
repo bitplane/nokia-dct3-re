@@ -3840,6 +3840,45 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xf330); // AND #lk, B
+			program.write_word(0x05e3, 0x0ff0);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffab12cd34ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 198;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 198 || m_phase == 199)
+		{
+			expect_opcode(m_phase == 198 ? 0xf330 : 0xf130,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (m_phase == 198 ? 0x0d30 : 0x1030) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) ==
+							(m_phase == 198 ? 0x1234 : 0xffabcd1234ULL) &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 AND #lk zeroes upper bits, preserves source and C, and costs two cycles");
+			if (m_phase == 198)
+			{
+				program.write_word(0x05e2, 0xf130); // AND #lk, A, B
+				program.write_word(0x05e3, 0xf0f0);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffabcd1234ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 199;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
