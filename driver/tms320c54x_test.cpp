@@ -4279,6 +4279,113 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 XOR B<<8,B uses the original 40-bit B, truncates the shift, and costs one cycle");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x6b8a); // ADDM #lk, *AR2-
+			program.write_word(0x05e3, 0xfff8);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d20, 0x8007);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0300); // OVM and SXM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 220;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 220)
+		{
+			expect_opcode(0x6b8a, data.read_word(0x0d20) == 0x8000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d1f &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 ADDM saturates signed underflow, sets C/OVA, and costs two cycles");
+			program.write_word(0x05e0, 0x6b80); // ADDM #lk, *AR0 (ARP-selected in CMPT)
+			program.write_word(0x05e1, 0x123b);
+			program.write_word(0x05e2, 0xf5e1);
+			data.write_word(0x0d30, 4);
+			data.write_word(0x0d40, 0x7777);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0d40);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0d30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 4 << 13);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020); // CMPT
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 221;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 221)
+		{
+			expect_opcode(0x6b80, data.read_word(0x0d30) == 0x123f &&
+					data.read_word(0x0d40) == 0x7777 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0d40 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0d30 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xec00) == 0x8000,
+					"ADDM with compatibility AR0 selects ARP and clears carry without overflow");
+			program.write_word(0x05e0, 0x6b8a); // ADDM #1, *AR2-
+			program.write_word(0x05e1, 1);
+			program.write_word(0x05e2, 0xf5e1);
+			data.write_word(0x0d60, 0x7fff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d60);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM; OVM clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 222;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 222)
+		{
+			expect(data.read_word(0x0d60) == 0x8000 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
+					"ADDM wraps positive overflow with OVM clear and sets OVA without carry");
+			data.write_word(0x0d60, 0xffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d60);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 223;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 223)
+		{
+			expect(data.read_word(0x0d60) == 0 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0800,
+					"ADDM propagates unsigned carry without signed overflow");
+			program.write_word(0x05e0, 0x6880); // ANDM #lk, *AR0
+			program.write_word(0x05e1, 0x0f0f);
+			program.write_word(0x05e2, 0x6980); // ORM #lk, *AR0
+			program.write_word(0x05e3, 0x0033);
+			program.write_word(0x05e4, 0xf5e1);
+			data.write_word(0x0d30, 0x00f0);
+			data.write_word(0x0d40, 0x7777);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0d40);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0d30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 4 << 13);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020); // CMPT
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 224;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 224)
+		{
+			expect_opcode(0x6880, data.read_word(0x0d30) == 0x0033 &&
+					data.read_word(0x0d40) == 0x7777,
+					"ANDM compatibility AR0 uses ARP before ORM");
+			expect_opcode(0x6980, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0d40 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0d30 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0xe000) == 0x8000,
+					"ORM compatibility AR0 uses ARP without modifying either pointer");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

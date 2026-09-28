@@ -1149,7 +1149,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x6800: // AND #lk, Smem
 	case 0x6900: // OR #lk, Smem
 	{
-		const unsigned ar = low & 7;
+		const unsigned ar = indirect_ar(low);
 		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
 		const u16 immediate = fetch();
 		const u16 value = data_read(address);
@@ -1160,12 +1160,22 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	}
-	case 0x6b00: // ADD #lk, Smem
+	case 0x6b00: // ADDM #lk, Smem
 	{
-		const unsigned ar = low & 7;
+		const unsigned ar = indirect_ar(low);
 		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
 		const u16 immediate = fetch();
-		data_write(address, data_read(address) + immediate);
+		const u16 value = data_read(address);
+		const s32 left = BIT(m_st1, 8) ? s16(value) : s32(value);
+		const s32 right = BIT(m_st1, 8) ? s16(immediate) : s32(immediate);
+		const s32 result = left + right;
+		const bool overflow = result < -0x8000 || result > 0x7fff;
+		m_st0 = (m_st0 & ~u16(0x0800)) |
+				(u32(value) + immediate > 0xffff ? 0x0800 : 0);
+		if (overflow)
+			m_st0 |= 0x0400;
+		data_write(address, overflow && BIT(m_st1, 9)
+				? u16(std::clamp(result, s32(-0x8000), s32(0x7fff))) : u16(result));
 		if (low != 0xf8)
 			indirect_modify(low);
 		m_icount -= low == 0xf8 ? 2 : 1;
