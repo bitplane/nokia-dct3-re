@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 167 distinct words: 131 overlap the ROM4 run, 36 occur
-only in the fixture, and 326 ROM4 words do not occur in the fixture. These are
+The fixture executes 168 distinct words: 132 overlap the ROM4 run, 36 occur
+only in the fixture, and 325 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 51 have an `opassert` marker after a
-passing exact-word check, 80 execute in the fixture without such a marker,
-and 326 are absent from the fixture. The 80-word class includes setup and
+assertions. Of the 457 ROM4 words, 53 have an `opassert` marker after a
+passing exact-word check, 79 execute in the fixture without such a marker,
+and 325 are absent from the fixture. The 79-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 80 lack semantic tests. The 326-word class is a priority list
+claim that all 79 lack semantic tests. The 325-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -600,6 +600,15 @@ paths previously charged one and four cycles respectively. The non-delayed
 `RPTB` form remains at its documented four cycles, now checked directly with
 exact `f072` and the same one-word-block fixture. The five-ROM cross-regression
 passes after both timing corrections.
+TI SPRU172C's Smem tables add one word and cycle for absolute addressing.
+ROM4 `34f8` (`BITT absolute`) now checks both T=0 (bit 15) and T=15 (bit 0),
+and its two-cycle cost. The decoder's broad `0x30..0x3f` Smem handler already
+implemented `15 - T[3:0]` correctly; a later exact-`34f8` handler was
+unreachable and used the wrong bit mapping. The unreachable case is removed,
+and the absolute cycle surcharge is applied in the actual broad handler.
+Exact `70f8` (`MVKD dmad, absolute Smem`) now checks its data movement and
+three-cycle cost: two base cycles plus one for absolute Smem. The five-ROM
+cross-regression passes with these corrections.
 
 Execution counts identified `ROL A` (`f491`) and `ROL B` (`f591`) as the largest
 previously unasserted ROM4 encodings, at roughly 524,000 executions each in

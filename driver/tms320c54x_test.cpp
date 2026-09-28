@@ -2605,6 +2605,60 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
 					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
 					"ROM4 f072 costs four cycles and retires after its one-word block");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x34f8); // BITT *(absolute)
+			program.write_word(0x05e3, 0x0d00);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d00, 0x8000);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 132;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 132 || m_phase == 133)
+		{
+			const bool high_bit = m_phase == 132;
+			expect_opcode(0x34f8, bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) == high_bit &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 34f8 tests bit 15 minus T and costs two cycles when absolute");
+			if (high_bit)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, 15);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 133;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0x70f8); // MVKD dmad, *(absolute)
+			program.write_word(0x05e3, 0x0d00);
+			program.write_word(0x05e4, 0x0e00);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0d00, 0);
+			data.write_word(0x0e00, 0x4567);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 134;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 134)
+		{
+			expect_opcode(0x70f8, data.read_word(0x0d00) == 0x4567 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 70f8 copies absolute data and costs three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

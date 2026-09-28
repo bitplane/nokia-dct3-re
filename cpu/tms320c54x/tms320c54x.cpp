@@ -799,6 +799,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination = fetch();
 		const u16 source = fetch();
 		data_write(destination, data_read(source));
+		m_icount -= 2;
 		return;
 	}
 	if ((op & 0xfce0) == 0xf460) // SFTA src, SHIFT, dst
@@ -875,6 +876,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const unsigned family = (op >> 8) & 0x0f;
 		const u16 memory = indirect_read(low);
+		m_icount -= low == 0xf8;
 		if (family == 0)
 		{
 			m_t = memory;
@@ -1501,13 +1503,6 @@ void tms320c54x_device::execute_one(u16 op)
 
 	switch (op)
 	{
-	case 0x34f8: // BITT dmad
-	{
-		const u16 value = data_read(fetch());
-		m_st0 = (m_st0 & ~0x1000) |
-			(BIT(value, m_t & 0x0f) ? 0x1000 : 0);
-		return;
-	}
 	case 0xfc00: // RET
 		m_pc = pop();
 		m_icount -= 4;
