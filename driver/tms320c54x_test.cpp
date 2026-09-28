@@ -7666,6 +7666,40 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0x6184); // BITF *AR4,#00f0
+			program.write_word(0x05e4, 0x00f0);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f20, 0x00a0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 385;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 385 || m_phase == 386)
+		{
+			expect_opcode(0x6184,
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1800) ==
+					(m_phase == 385 ? 0x1800 : 0x0800) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 BITF *AR4 sets and clears TC while preserving carry in two cycles");
+			if (m_phase == 385)
+			{
+				data.write_word(0x0f20, 0x0a00);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 386;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
