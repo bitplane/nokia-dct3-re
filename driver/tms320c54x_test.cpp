@@ -4255,6 +4255,30 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d4f &&
 					m_last_port_cycle - m_middle_port_cycle == 3,
 					"ROM4 indirect LDU reads before decrement and costs one cycle");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xf3c8); // XOR B << 8, B
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x8080000001ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 219;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 219)
+		{
+			expect_opcode(0xf3c8, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0080000101ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 XOR B<<8,B uses the original 40-bit B, truncates the shift, and costs one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
