@@ -7906,6 +7906,61 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678ULL &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 STLM B,T stores B's low word in one cycle");
+			program.write_word(0x05e3, 0xf1f4); // SFTL A,-12,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345e78);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 398;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 398)
+		{
+			expect_opcode(0xf1f4, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345e78 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 SFTL A,-12,B zero-fills B and moves source bit 11 into carry");
+			program.write_word(0x05e3, 0xf280); // AND B,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xf0f0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0ff0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 399;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 399)
+		{
+			expect_opcode(0xf280, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00f0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0ff0 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 AND B,A updates only A in one cycle");
+			program.write_word(0x05e3, 0xf350); // XOR #lk,B
+			program.write_word(0x05e4, 0x00ff);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 400;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 400)
+		{
+			expect_opcode(0xf350, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345687 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcd &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 XOR #lk,B changes only B and takes two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
