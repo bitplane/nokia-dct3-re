@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 452 distinct words: 355 overlap the ROM4 run, 97 occur
-only in the fixture, and 102 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 453 distinct words: 356 overlap the ROM4 run, 97 occur
+only in the fixture, and 101 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 355 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 356 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 102 are absent from the fixture. This closes the fixture-executed-only
+and 101 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1162,6 +1162,10 @@ Exact `4595` checks shifted signed load into B and AR5 post-increment, while
 `4917` checks that LDM reads AR7 without SXM extension. Both cost one cycle.
 Exact `6883` and `6983` check the complementary ANDM/ORM operations through
 AR3 with immediate extension, unchanged pointer/status, and two-cycle cost.
+The ROM4 stream at DSP PC `0x3c5e` contains exact `6fd2 0c45` (`LD
+*AR2+%,5,A`). Its fixture checks SXM sign extension before the five-bit
+left shift, AR2's post-read circular wrap, and TI's two-cycle cost for the
+two-word shifted-load form.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
