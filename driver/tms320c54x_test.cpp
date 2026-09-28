@@ -11325,6 +11325,63 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0x5583); // DSUB *AR3,B
+			data.write_word(0x0f90, 1);
+			data.write_word(0x0f91, 0xffff);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x20001);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 606;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 606 && m_phase <= 613)
+		{
+			struct long_b_case { u16 opcode, high, low, st1; u64 b_before, b_after; };
+			static constexpr long_b_case cases[] = {
+				{ 0x5583, 1, 0xffff, 0x0100, 0x20001, 2 },
+				{ 0x5583, 1, 0xffff, 0x0180, 0x20001, 0x10002 },
+				{ 0x5983, 2, 1,      0x0100, 0x1ffff, 2 },
+				{ 0x5983, 2, 1,      0x0180, 0x1ffff, 0x10002 },
+				{ 0x5d83, 1, 1,      0x0100, 0x5678,  0xfffffeffff },
+				{ 0x5d83, 1, 1,      0x0180, 0x5678,  0xffffffffff },
+				{ 0x5f83, 1, 1,      0x0100, 0x5678,  0xfffffeffff },
+				{ 0x5f83, 1, 1,      0x0180, 0x5678,  0xffffff0003 }
+			};
+			const unsigned index = m_phase - 606;
+			const long_b_case &row = cases[index];
+			expect_opcode(row.opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"B long-arithmetic C16 mode and one-cycle DARAM timing");
+			if (m_phase < 613)
+			{
+				const long_b_case &next = cases[index + 1];
+				program.write_word(0x05e2, next.opcode);
+				data.write_word(0x0f90, next.high);
+				data.write_word(0x0f91, next.low);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next.b_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next.st1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
