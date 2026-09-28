@@ -122,8 +122,8 @@ void tms320c54x_device::device_stop()
 
 	for (unsigned opcode = 0; opcode != m_opcode_first_pc.size(); ++opcode)
 		if (m_opcode_first_pc[opcode] != 0xffff)
-			machine().logerror("[opcov] op=%04x first_pc=%04x\n",
-					opcode, m_opcode_first_pc[opcode]);
+			machine().logerror("[opcov] op=%04x first_pc=%04x count=%u\n",
+					opcode, m_opcode_first_pc[opcode], m_opcode_count[opcode]);
 }
 
 void tms320c54x_device::device_reset()
@@ -1888,6 +1888,7 @@ void tms320c54x_device::execute_run()
 		m_op = fetch();
 		if (m_opcode_first_pc[m_op] == 0xffff)
 			m_opcode_first_pc[m_op] = instruction_pc;
+		++m_opcode_count[m_op];
 		execute_one(m_op);
 		if (!m_illegal)
 		{

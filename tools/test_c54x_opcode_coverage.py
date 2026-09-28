@@ -10,10 +10,12 @@ class C54xOpcodeCoverageTest(unittest.TestCase):
             "[opcov] op=f072 first_pc=7ff5",
             "[opcov] op=7712 first_pc=7f2d",
             "[opcov] op=f074 first_pc=3900",
+            "[opcov] op=f074 first_pc=4b73 count=9",
         )))
         self.assertEqual(result["opcodes"], 3)
         self.assertEqual(result["high_byte_groups"], 2)
         self.assertEqual(result["first_pc"][0xF074], 0x4B73)
+        self.assertEqual(result["counts"][0xF074], 11)
 
     def test_rejects_empty_log(self):
         with self.assertRaisesRegex(ValueError, "no.*records"):

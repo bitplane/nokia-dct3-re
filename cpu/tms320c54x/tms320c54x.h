@@ -125,6 +125,7 @@ private:
 	bool m_idle = false;
 	bool m_illegal = false;
 	std::array<u16, 0x10000> m_opcode_first_pc;
+	std::array<u32, 0x10000> m_opcode_count = {};
 	int m_icount = 0;
 };
 

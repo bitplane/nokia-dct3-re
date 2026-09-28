@@ -10,19 +10,23 @@ import re
 import sys
 
 
-OPCODE = re.compile(r"^\[opcov\] op=([0-9a-fA-F]{4}) first_pc=([0-9a-fA-F]{4})$")
-ROM4_IDLE_OPCODE_COUNT = 628
-ROM4_IDLE_GROUP_COUNT = 112
-ROM4_IDLE_SET_SHA256 = "63ae45c872ccea39112898bfde7f5926acd675701675a860d765a66a35815d34"
+OPCODE = re.compile(
+    r"^\[opcov\] op=([0-9a-fA-F]{4}) first_pc=([0-9a-fA-F]{4})(?: count=(\d+))?$"
+)
+ROM4_IDLE_OPCODE_COUNT = 457
+ROM4_IDLE_GROUP_COUNT = 89
+ROM4_IDLE_SET_SHA256 = "be44191a6fd1207eb9b7b00c3673f60e4f4dbc0fbb801585c53acc4a91e96c22"
 
 
 def summarize(text: str) -> dict[str, object]:
     first_pc = {}
+    counts = {}
     for line in text.splitlines():
         match = OPCODE.match(line)
         if match:
-            opcode, pc = (int(value, 16) for value in match.groups())
+            opcode, pc = (int(value, 16) for value in match.groups()[:2])
             first_pc.setdefault(opcode, pc)
+            counts[opcode] = counts.get(opcode, 0) + int(match.group(3) or 1)
     if not first_pc:
         raise ValueError("no [opcov] records")
     opcodes = sorted(first_pc)
@@ -32,6 +36,7 @@ def summarize(text: str) -> dict[str, object]:
         "high_byte_groups": len({opcode >> 8 for opcode in opcodes}),
         "set_sha256": hashlib.sha256(encoded).hexdigest(),
         "first_pc": first_pc,
+        "counts": counts,
     }
 
 
@@ -39,9 +44,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("--require-rom4-idle", action="store_true")
+    parser.add_argument("--fixture-log", type=pathlib.Path)
     args = parser.parse_args()
     try:
         result = summarize(args.log.read_text(errors="replace"))
+        fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
         if args.require_rom4_idle:
             actual = (result["opcodes"], result["high_byte_groups"], result["set_sha256"])
             expected = (ROM4_IDLE_OPCODE_COUNT, ROM4_IDLE_GROUP_COUNT,
@@ -55,6 +62,15 @@ def main() -> int:
         f"C54x opcode coverage: opcodes={result['opcodes']} "
         f"groups={result['high_byte_groups']} sha256={result['set_sha256']}"
     )
+    if fixture:
+        rom4 = set(result["first_pc"])
+        fixture_only = set(fixture["first_pc"])
+        uncovered = rom4 - fixture_only
+        print(f"ROM4-only encodings: {len(uncovered)}; fixture overlap: {len(rom4 & fixture_only)}; "
+              f"fixture-only encodings: {len(fixture_only - rom4)}")
+        for opcode in sorted(uncovered, key=lambda op: (-result["counts"][op], op))[:20]:
+            print(f"  op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
+                  f"executions={result['counts'][opcode]}")
     return 0
 
 

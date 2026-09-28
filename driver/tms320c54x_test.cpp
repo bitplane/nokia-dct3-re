@@ -1480,6 +1480,57 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e0, 0xf491); // ROL A
+			program.write_word(0x05e1, 0xf5e1); // IDLE
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0012345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 75;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 75 || m_phase == 76)
+		{
+			const bool first = m_phase == 75;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(first ? 0 : 0x0012345678ULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(first ? 0x0012345678ULL : 0x002468acf1ULL) &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == first,
+					"ROL rotates through carry, clears guard bits and preserves the other accumulator");
+			if (first)
+			{
+				program.write_word(0x05e0, 0xf591); // ROL B
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0012345678ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0012345678ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 76;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e0, 0xf050); // XOR #lk, 0, A, A
+			program.write_word(0x05e1, 0x00ff);
+			program.write_word(0x05e2, 0xf5e1); // IDLE
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0012345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 77;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 77)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345687ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e3,
+					"XOR long immediate consumes extension and preserves carry, guards and B");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

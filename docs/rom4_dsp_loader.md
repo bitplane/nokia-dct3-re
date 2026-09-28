@@ -556,6 +556,32 @@ branch/call/return families, signed `FRAME`, immediate cross-accumulator ALU,
 and dual-memory moves. Each family has focused core conformance coverage;
 none recognizes a Nokia address or loader byte pattern.
 
+## Executed-opcode coverage
+
+`tools/c54x_opcode_coverage.py` compares `[opcov]` records from a verbose
+30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
+idle run executes 457 distinct opcode words in 89 high-byte groups (set SHA-256
+`be44191a6fd1207eb9b7b00c3673f60e4f4dbc0fbb801585c53acc4a91e96c22`).
+The fixture executes 120 distinct words: 89 overlap the ROM4 run, 31 occur
+only in the fixture, and 368 ROM4 words do not occur in the fixture. These are
+*word* counts, not instruction-family counts. Fixture execution alone is not
+proof that a particular result is asserted, and this one boot is not a census
+of every possible ROM4 path.
+
+Execution counts identified `ROL A` (`f491`) and `ROL B` (`f591`) as the largest
+previously unasserted ROM4 encodings, at roughly 524,000 executions each in
+this run. Both now have core assertions for carry transfer, cleared guard bits,
+and preservation of the other accumulator, checked against TI SPRU172C
+section 4. Immediate `XOR` (`f050`, about 262,000 executions) now has an
+exact-encoding result and extension-word assertion. The next high-use group
+for focused semantic and cycle tests is `74d6`/`b03a`/`b0be`/`b3be`
+(155,000-207,000 executions each). Decode those in context before assigning
+them names or changing timing. Re-run
+`make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
+opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
+directly to rank ROM4-only words by execution count. `make check-c54x-cross-rom`
+runs the 3210 frontier, 5110 menu, and 3310/3330/3410 idle gates in order.
+
 The retained NSE-1 trace fixes reset polarity and edge behavior without an
 inference: MCU writes to MAD2 byte `0x20002` are `1` (cold release), `0`
 (hold), `0`, then `1` (warm release). A later value `3` leaves the DSP running.
