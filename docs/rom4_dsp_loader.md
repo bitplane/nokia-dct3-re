@@ -563,8 +563,8 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 140 distinct words: 105 overlap the ROM4 run, 35 occur
-only in the fixture, and 352 ROM4 words do not occur in the fixture. These are
+The fixture executes 141 distinct words: 106 overlap the ROM4 run, 35 occur
+only in the fixture, and 351 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -603,8 +603,10 @@ implemented or asserted in the core fixture. The corrected stream still
 passes the 5110 coherent, 30-second RF-boundary, and menu gates. Exact-word
 fixtures now cover signed dual-memory `a5be` (`MPY`), rounded `b736`
 (`MACR`), and parallel `d6e1` (`ST`/`MACR`). The most-executed remaining
-ROM4-only word is `4593` (`LD Smem,16,B`, 32,770 executions). `6c8a` (`BANZ`)
-now has taken/not-taken timing and pointer-update assertions; TI SPRU172C
+ROM4-only word was `4593` (`LD Smem,16,B`, 32,770 executions); an exact-word
+fixture now checks sign extension, post-increment, and its one-cycle cost.
+`f830` (`BC pmad,TC`, 19,564 executions) is the next ROM4-only word by count.
+`6c8a` (`BANZ`) has taken/not-taken timing and pointer-update assertions; TI SPRU172C
 specifies four and two cycles, respectively. Long-offset Smem access outside
 `MAR` remains a separate
 decoder audit; this correction does not establish those addressing forms.
