@@ -2659,6 +2659,76 @@ private:
 			expect_opcode(0x70f8, data.read_word(0x0d00) == 0x4567 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 70f8 copies absolute data and costs three cycles");
+			program.write_word(0x05e2, 0x61f8); // BITF *(absolute),#lk
+			program.write_word(0x05e3, 0x0d00);
+			program.write_word(0x05e4, 0x0040);
+			data.write_word(0x0d00, 0x0140);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 135;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 135)
+		{
+			expect_opcode(0x61f8, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 61f8 tests the masked absolute word in three cycles");
+			program.write_word(0x05e2, 0x6182); // BITF *AR2,#lk
+			program.write_word(0x05e3, 0x0040);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d00, 0x0100);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 136;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 136)
+		{
+			expect_opcode(0x6182, !(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 6182 tests indirect Smem in two cycles without pointer movement");
+			program.write_word(0x05e2, 0x68f8); // ANDM #lk,*(absolute)
+			program.write_word(0x05e3, 0x0d00);
+			program.write_word(0x05e4, 0x00f0);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0d00, 0x0ff0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 137;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 137 && m_phase <= 139)
+		{
+			const u16 opcode = m_phase == 137 ? 0x68f8 : m_phase == 138 ? 0x69f8 : 0x6bf8;
+			const u16 expected = m_phase == 137 ? 0x00f0 : m_phase == 138 ? 0x0ff0 : 0x00f3;
+			expect_opcode(opcode, data.read_word(0x0d00) == expected &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 absolute immediate memory operator costs three cycles");
+			if (m_phase != 139)
+			{
+				program.write_word(0x05e2, m_phase == 137 ? 0x69f8 : 0x6bf8);
+				program.write_word(0x05e4, m_phase == 137 ? 0x0f00 : 0x0003);
+				data.write_word(0x0d00, 0x00f0);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
