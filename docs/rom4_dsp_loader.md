@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 433 distinct words: 337 overlap the ROM4 run, 96 occur
-only in the fixture, and 120 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 437 distinct words: 341 overlap the ROM4 run, 96 occur
+only in the fixture, and 116 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 337 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 341 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 120 are absent from the fixture. This closes the fixture-executed-only
+and 116 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -627,6 +627,10 @@ claim those words are adjacent in the ROM. TI SPRU172C's opcode diagrams
 distinguish `0x76xx` ordinary-memory `ST` from `0x77xx` page-zero `STM`;
 the core comment was corrected, and the earlier `768a` ordinary-memory
 fixture remains valid.
+Observed `f032`/`f035` assert shifted long-immediate `AND` results,
+unchanged carry and two-cycle cost. `f0fb`/`f0fe` assert one-cycle logical
+right shifts, outgoing-bit carry and cleared accumulator guard bits against
+TI SPRU172C's `SFTL` contract.
 The previously leading absent word,
 `fa20`, now has taken and not-taken `BCD NTC` fixtures
 that check both delay slots, branch destination, and cycle cost. The leading

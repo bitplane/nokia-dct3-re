@@ -8919,6 +8919,78 @@ private:
 			expect_opcode(0x7693, all_stored &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d20,
 					"ROM4 ST #lk,*AR3+ writes consecutive ordinary-memory words");
+			program.write_word(0x05e2, 0xf495); // NOP between marker and target
+			program.write_word(0x05e3, 0xf032); // AND #lk,2,A
+			program.write_word(0x05e4, 0x0f0f);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 450;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 450)
+		{
+			expect_opcode(0xf032, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1438 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 AND #lk,2,A masks the shifted immediate without changing carry");
+			program.write_word(0x05e3, 0xf035); // AND #lk,5,A
+			program.write_word(0x05e4, 0x00ff);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 451;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 451)
+		{
+			expect_opcode(0xf035, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1660 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 AND #lk,5,A uses five-bit immediate alignment in two cycles");
+			program.write_word(0x05e3, 0xf0fb); // SFTL A,-5,A
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000013ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 452;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 452)
+		{
+			expect_opcode(0xf0fb, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x04000000 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 SFTL A,-5 clears guard and copies outgoing bit four to carry");
+			program.write_word(0x05e3, 0xf0fe); // SFTL A,-2,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff80000003ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 453;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 453)
+		{
+			expect_opcode(0xf0fe, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x20000000 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 SFTL A,-2 logically shifts bit 31 and publishes bit one");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
