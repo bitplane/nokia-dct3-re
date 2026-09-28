@@ -1207,6 +1207,46 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= extended ? 2 : 1;
 		return;
 	}
+	case 0x5000: case 0x5100: case 0x5200: case 0x5300: // DADD Lmem, src, dst
+	case 0x5400: case 0x5500: // DSUB Lmem, src
+	{
+		const unsigned ar = low & 7;
+		const bool extended = low >= 0xe0;
+		const bool preincrement = (low & 0x78) == 0x18;
+		if (!extended && preincrement)
+			indirect_modify(low, true);
+		const u16 address = low >= 0xf8 ? fetch() :
+				low >= 0xe0 ? long_offset_address(low) : m_ar[ar];
+		const u16 high = data_read(address);
+		const u16 low_word = data_read(address ^ 1);
+		if (!extended && !preincrement)
+			indirect_modify(low, true);
+		const bool subtract = (op & 0xfe00) == 0x5400;
+		const bool destination_b = BIT(op, 8);
+		const u64 source = accumulator(subtract ? destination_b : BIT(op, 9));
+		u64 &destination = accumulator(destination_b);
+		if (!BIT(m_st1, 7)) // Double-precision mode.
+		{
+			u64 operand = (u64(high) << 16) | low_word;
+			if (BIT(m_st1, 8) && BIT(high, 15))
+				operand |= u64(0xff) << 32;
+			destination = add_sub(source, operand, subtract, destination_b);
+		}
+		else // Dual 16-bit mode: the two lanes do not carry into one another.
+		{
+			const u16 source_high_word = u16(source >> 16);
+			const s32 source_high = BIT(m_st1, 8) ? s32(s16(source >> 16)) : s32(u16(source >> 16));
+			const s32 memory_high = BIT(m_st1, 8) ? s32(s16(high)) : s32(high);
+			const s32 result_high = subtract ? source_high - memory_high : source_high + memory_high;
+			const u16 result_low = subtract ? u16(source) - low_word : u16(source) + low_word;
+			const bool carry = subtract ? source_high_word >= high :
+					u32(source_high_word) + high > 0xffff;
+			m_st0 = (m_st0 & ~u16(0x0800)) | (carry ? 0x0800 : 0);
+			destination = (u64(u32(result_high) & 0xffffff) << 16) | result_low;
+		}
+		m_icount -= extended;
+		return;
+	}
 	case 0x5600: // DLD Lmem, A
 	case 0x5700: // DLD Lmem, B
 	{

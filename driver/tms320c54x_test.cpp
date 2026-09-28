@@ -10762,6 +10762,69 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"absolute SQURS subtracts signed square and costs two cycles");
+			program.write_word(0x05e2, 0x5193); // DADD *AR3+,A,B
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f90, 0x1534);
+			data.write_word(0x0f91, 0x3456);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x56788933);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 554;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 554 && m_phase <= 560)
+		{
+			struct long_alu_case { u16 opcode; u64 a_before; u16 st1; u16 high; u16 low; u64 a_after; u64 b_after; u16 ar3_after; u16 st0_after; unsigned cycles; };
+			static constexpr long_alu_case cases[] = {
+				{ 0x5193, 0x56788933, 0x0100, 0x1534, 0x3456, 0x56788933, 0x6bacbd89, 0x0f92, 0, 3 },
+				{ 0x518b, 0x56783933, 0x0180, 0x1534, 0x3456, 0x56783933, 0x6bac6d89, 0x0f8e, 0, 3 },
+				{ 0x5493, 0x56788933, 0x0100, 0x1534, 0x3456, 0x414454dd, 0, 0x0f92, 0x0800, 3 },
+				{ 0x548b, 0x56783933, 0x0180, 0x1534, 0x3456, 0x414404dd, 0, 0x0f8e, 0x0800, 3 },
+				{ 0x50f8, 0x7fffffff, 0x0300, 0, 1, 0x7fffffff, 0, 0x0f90, 0x0400, 4 },
+				{ 0x5083, 0x7fffffff, 0x0380, 1, 1, 0x80000000, 0, 0x0f90, 0, 3 },
+				{ 0x5483, 0x00010000, 0x0380, 0, 1, 0x0001ffff, 0, 0x0f90, 0x0800, 3 }
+			};
+			const unsigned index = m_phase - 554;
+			const long_alu_case &row = cases[index];
+			expect_opcode(row.opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == row.ar3_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == row.st0_after &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == row.cycles,
+				"DADD/DSUB long-word arithmetic matches TI C16 examples and cycle costs");
+			if (m_phase < 560)
+			{
+				const long_alu_case &next = cases[index + 1];
+				program.write_word(0x05e2, next.opcode);
+				program.write_word(0x05e3, next.opcode == 0x50f8 ? 0x0f90 : 0x75d6);
+				program.write_word(0x05e4, next.opcode == 0x50f8 ? 0x75d6 : 0x0124);
+				program.write_word(0x05e5, next.opcode == 0x50f8 ? 0x0124 : 0xf5e1);
+				program.write_word(0x05e6, 0xf5e1);
+				data.write_word(0x0f90, next.high);
+				data.write_word(0x0f91, next.low);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next.st1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
