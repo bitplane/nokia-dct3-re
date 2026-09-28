@@ -567,16 +567,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 367 distinct words: 284 overlap the ROM4 run, 83 occur
-only in the fixture, and 173 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 368 distinct words: 285 overlap the ROM4 run, 83 occur
+only in the fixture, and 172 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 276 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 277 have an `opassert` marker after a
 passing exact-word check, 8 execute in the fixture without such a marker,
-and 173 are absent from the fixture. The 8-word class includes setup and
+and 172 are absent from the fixture. The 8-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 8 lack semantic tests. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -641,10 +641,13 @@ Fixture-only `74ea` checks PORTR's port-before-offset order, port-read value,
 AR2 preupdate, and TI's three-cycle long-offset cost.
 Fixture-only `6fea` checks the shifted Smem decoder's shift-word-before-offset
 order, accumulator result, AR2 preupdate, and three-cycle long-offset cost.
+Exact ROM4 `e58b` (`MVDD *AR2+,*AR5+`) asserts the copied word, both pointer
+increments, and its one-cycle cost; it was the most-used absent word in the
+captured boot (24 executions).
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
-The 173-word class is a priority list
+The 172-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
