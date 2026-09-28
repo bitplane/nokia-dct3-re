@@ -6173,6 +6173,42 @@ private:
 			expect_opcode(0x6dea, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0ff9 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 MAR long-offset consumes signed extension and costs two cycles");
+			program.write_word(0x05e3, 0xf300); // ADD #lk,B
+			program.write_word(0x05e4, 0xffff);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 305;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 305 || m_phase == 306)
+		{
+			expect_opcode(0xf300,
+					m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(m_phase == 305 ? 0xffffffffffULL : 0x100000000ULL) &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
+					(m_phase == 306) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 ADD #lk,B sign-extends under SXM and carries at bit 32 in two cycles");
+			if (m_phase == 305)
+			{
+				program.write_word(0x05e4, 1);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 306;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
