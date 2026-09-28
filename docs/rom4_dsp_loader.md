@@ -403,6 +403,11 @@ checks the corrected B destination, unchanged A, carry, and indirect timing.
 The previously absent `SUBB` family now consumes the inverse of C as an
 incoming borrow. Fixture-only `0e83` and `0f83` check TI's A/B examples,
 including carry-out and one-cycle indirect timing.
+Fixture-only `0183` checks ADD to B carrying across bit 32; `0b83` checks
+SUBS to B using the unsigned memory word despite SXM. `1983` checks AND to B
+zeroing the upper bits without changing carry, and `2183` checks a negative
+signed MPY to B without changing T or carry. All four check one-cycle DARAM
+timing and cover high-byte groups absent from the earlier fixture.
 External-memory wait states also remain outside this fixture audit.
 `SQUR Smem` now copies its source word to T as SPRU172C specifies; the prior
 handler calculated the square but left T unchanged. Fixture-only `2682`
@@ -636,8 +641,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 584 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 127 occur only in the fixture. These are
+The fixture dispatches 588 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 131 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -647,8 +652,8 @@ also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
 That inventory matches top-level cases and opcode masks: 39,518 words match
-some declared path, of which 584 execute in the fixture and 38,934 do not;
-51 matching high-byte groups have no fixture word. These are **candidates**,
+some declared path, of which 588 execute in the fixture and 38,930 do not;
+47 matching high-byte groups have no fixture word. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
 grammar, and behavior are not established by a source mask. The report keeps
 the ROM4-observed/fixture-asserted class separate, so a new observed gap can
