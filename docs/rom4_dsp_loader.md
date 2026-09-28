@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 531 distinct words: 430 overlap the ROM4 run, 101 occur
-only in the fixture, and 27 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 546 distinct words: 445 overlap the ROM4 run, 101 occur
+only in the fixture, and 12 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 430 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 445 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 27 are absent from the fixture. This closes the fixture-executed-only
+and 12 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1250,6 +1250,12 @@ writes at the wrapped address before incrementing; MVPD copies program to
 data at the old AR3 address; MVDP copies data back to a separate program
 address; STL overwrites only the data word. The marker span checks TI
 SPRU172C's 2+2+3+4+1 cycle costs and the direction and order of each move.
+Exact `e762` checks a one-cycle MVMM AR6-to-AR2 transfer without changing
+the source. A seven-word table checks `e80d`, `e820`, `e905`, `e906`, `e90c`,
+`e90f`, and `e97c`: each one-cycle `LD #K` changes only its destination
+accumulator and preserves status. Seven `RPT #K` words (`ec09`, `ec0a`,
+`ec0f`, `ec11`, `ec13`, `ec1e`, `ec9f`) repeat MAR exactly K+1 times after
+one setup cycle; the longest fixture executes 160 MAR iterations.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

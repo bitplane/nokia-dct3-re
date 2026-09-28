@@ -10371,6 +10371,110 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f22 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 14,
 					"ROM4 STL B,*AR2 overwrites data only; transfers cost 2+2+3+4+1 cycles");
+			program.write_word(0x05e0, 0x7586); // Preserve source AR6 across markers.
+			program.write_word(0x05e2, 0xe762); // MVMM AR6,AR2
+			program.write_word(0x05e3, 0x7586);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 518;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 518)
+		{
+			expect_opcode(0xe762,
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0xabcd &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 MVMM AR6,AR2 preserves the source and costs one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e2, 0xe80d); // LD #13,A
+			program.write_word(0x05e3, 0x75d6);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 519;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 519 && m_phase <= 525)
+		{
+			static constexpr u16 immediate_words[] = {
+				0xe80d, 0xe820, 0xe905, 0xe906, 0xe90c, 0xe90f, 0xe97c
+			};
+			const unsigned index = m_phase - 519;
+			const u16 opcode = immediate_words[index];
+			const bool destination_b = (opcode & 0xff00) == 0xe900;
+			expect_opcode(opcode,
+					m_cpu->state_int(destination_b ? tms320c54x_device::STATE_B :
+						tms320c54x_device::STATE_A) == (opcode & 0xff) &&
+					m_cpu->state_int(destination_b ? tms320c54x_device::STATE_A :
+						tms320c54x_device::STATE_B) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 LD #K writes only its destination without flags in one cycle");
+			if (m_phase < 525)
+			{
+				program.write_word(0x05e2, immediate_words[index + 1]);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xec09); // RPT #9
+			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 526;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 526 && m_phase <= 532)
+		{
+			static constexpr u16 repeat_words[] = {
+				0xec09, 0xec0a, 0xec0f, 0xec11, 0xec13, 0xec1e, 0xec9f
+			};
+			const unsigned index = m_phase - 526;
+			const u16 opcode = repeat_words[index];
+			const unsigned count = (opcode & 0xff) + 1;
+			expect_opcode(opcode,
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0120 + count &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == count + 3,
+					"ROM4 RPT #K executes MAR K+1 times after one setup cycle");
+			if (m_phase < 532)
+			{
+				program.write_word(0x05e2, repeat_words[index + 1]);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
