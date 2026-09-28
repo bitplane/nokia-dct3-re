@@ -9275,6 +9275,28 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 shifted LD sign-extends before shift and wraps AR2 in two cycles");
+			program.write_word(0x05e2, 0x7e8b); // READA *AR3-
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			program.write_word(0x0d40, 0xabcd);
+			data.write_word(0x0f33, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0d40);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f33);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 469;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 469)
+		{
+			expect_opcode(0x7e8b, data.read_word(0x0f33) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0d40 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f32 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 READA uses A as program source and decrements AR3 after five cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
