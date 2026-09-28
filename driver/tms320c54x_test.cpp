@@ -416,9 +416,9 @@ private:
 		{
 			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 					"long-immediate RPT terminal IDLE3");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == 3,
+			expect_opcode(0xf070, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 3,
 					"long-immediate RPT iteration count");
-			 expect(data.read_word(0x090c) == 0x1234 &&
+			expect_opcode(0xf062, data.read_word(0x090c) == 0x1234 &&
 					data.read_word(0x090d) == 0,
 					"long-immediate load and long-memory store");
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0360);
@@ -733,7 +733,7 @@ private:
 		}
 		if (m_phase == 27)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x5a,
+			expect_opcode(0xf944, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x5a,
 					"conditional call ANEQ");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 					"conditional call return stack");
@@ -769,7 +769,7 @@ private:
 		}
 		if (m_phase == 29)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 7,
+			expect_opcode(0xf485, m_cpu->state_int(tms320c54x_device::STATE_A) == 7,
 					"ABS signed accumulator magnitude");
 			program.write_word(0x0410, 0x1ef8); // SUBC *(absolute), A
 			program.write_word(0x0411, 0x0928);
@@ -1304,7 +1304,7 @@ private:
 					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
-			expect(m_repeat_reads == 4 && m_irq_accumulator == 4 &&
+			expect_opcode(0xec03, m_repeat_reads == 4 && m_irq_accumulator == 4 &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
 					m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 					"pending interrupt defers until the complete single-repeat body retires");

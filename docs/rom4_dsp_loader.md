@@ -574,11 +574,12 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 304 have an `opassert` marker after a
-passing exact-word check, 8 execute in the fixture without such a marker,
-and 145 are absent from the fixture. The 8-word class includes setup and
-control instructions as well as older checks not yet tagged; it is not a
-claim that all 8 lack semantic tests. Existing result checks now explicitly
+assertions. Of the 457 ROM4 words, 309 have an `opassert` marker after a
+passing exact-word check, 3 execute in the fixture without such a marker,
+and 145 are absent from the fixture. The remaining executed-only words are
+`0083`, `7726`, and `e726`; surrounding scenarios exercise them, but their
+individual results are not independently asserted. Existing result checks
+now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
 them from the executed-only class without changing CPU behavior. The formerly
 most-used absent word, `fa20`, now has taken and not-taken `BCD NTC` fixtures
@@ -703,6 +704,10 @@ Exact `71d2` (`MVDK *AR2+%,dmad`) checks the copied word, circular AR2
 post-update with BK=4, and two-cycle cost. Exact `f842` (`BC pmad,AGEQ`)
 checks both the zero-A taken path and negative-A fallthrough, their PCs,
 and five/three-cycle costs. Both had 10 observed executions.
+Five older result checks now carry exact-word markers: `f062` and `f070`
+for the long-immediate load/repeat sequence, `f944` for conditional call,
+`f485` for signed absolute value, and `ec03` for the four-iteration repeat.
+These are existing scenario assertions, not new isolated timing fixtures.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
@@ -719,8 +724,8 @@ one million times. The formerly dominant `4a`/`8a` gaps are now covered by
 a twelve-register MMR save/restore fixture: it initializes each register,
 checks all twelve stack values, overwrites the registers, and checks the
 restored values after the reverse pops. This adds exact checks for 24 ROM4
-stack words and the ROM4 `STM` initializer words. The next high-volume
-unasserted group is `77` (mostly executed-only immediate MMR stores).
+stack words and the ROM4 `STM` initializer words. The current group report
+ranks `ff` highest among unasserted groups (7 absent words, 26 executions).
 The asserted MMR stack words `4a09`/`4a0a` and `8a0a`/`8a09` check
 accumulator-A high and guard-word stack order, guard width, preservation of
 the low accumulator word, and final SP restoration. The corresponding
