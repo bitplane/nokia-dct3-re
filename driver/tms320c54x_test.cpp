@@ -9960,6 +9960,36 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 					"four ROM4 STLM stores and one MVMD cost 1+1+2+1+1 cycles");
+			program.write_word(0x05e2, 0xe589); // MVDD *AR2+,*AR3+
+			program.write_word(0x05e3, 0xe734); // MVMM AR3,AR4
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0f60, 0xbeef);
+			data.write_word(0x0f70, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f60);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f70);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 498;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 498)
+		{
+			expect_opcode(0xe589,
+					data.read_word(0x0f70) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f61 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f71,
+					"ROM4 MVDD reads/writes old addresses before both ARs advance");
+			expect_opcode(0xe734,
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f71 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 MVMM copies the advanced AR3 in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
