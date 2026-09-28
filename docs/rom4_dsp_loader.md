@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 317 distinct words: 264 overlap the ROM4 run, 53 occur
+The fixture dispatches 320 distinct words: 264 overlap the ROM4 run, 56 occur
 only in the fixture, and 193 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -1005,7 +1005,11 @@ words and applies no-update, signed preupdate, or circular preupdate as
 specified in TI SPRU131G table 5-4. Fixture-only `06ea`, `02e2`, `02f2`,
 and `80ea` check the three read modes and a long-offset store, including
 the ALU/STL extra cycle. Handlers that compute their own memory addresses
-still need separate long-offset review.
+still need separate long-offset review. The first such handler pass covers
+fixture-only `6bea`, `68e2`, and `69f2`: ADDM, ANDM, and ORM consume the
+offset before their immediate, honor preupdate/no-update/circular addressing,
+and charge TI's three-cycle long-offset RMW class. Other manual-address
+handlers remain open.
 The one-word Smem arithmetic/logical handlers (`ADD`, `ADDC`, `SUB`, `SUBS`,
 `AND`, `OR`, `XOR`, and `SUBC`) now charge the extra cycle TI SPRU172C assigns
 to absolute addressing. Exact `07f8`, `1af8`, and `08f8` fixtures check an
