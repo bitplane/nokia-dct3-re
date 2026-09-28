@@ -578,6 +578,12 @@ claim that all 62 lack semantic tests. The 297-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
+`--group-report` with `--fixture-log` ranks unasserted ROM4 executions by
+opcode high byte. This is a workload ranking, not an instruction-family
+decoder. In the current 30-second run, `f4` leads because NOP executes over
+one million times; excluding that bookkeeping-heavy group, `4a` and `8a`
+each have 12 absent MMR stack words and 71,658 executions. Those register
+variants are the next high-volume exact-word fixture target.
 The asserted MMR stack words `4a09`/`4a0a` and `8a0a`/`8a09` check
 accumulator-A high and guard-word stack order, guard width, preservation of
 the low accumulator word, and final SP restoration. The corresponding
@@ -767,8 +773,9 @@ two-cycle indirect costs. Other shift, flag, and long-offset variants remain
 unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
-opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
-directly to rank ROM4-only words by execution count. `make check-c54x-cross-rom`
+opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
+unasserted words and high-byte groups by observed execution count.
+`make check-c54x-cross-rom`
 runs the 3210 frontier, 5110 menu, and 3310/3330/3410 idle gates in order.
 
 The retained NSE-1 trace fixes reset polarity and edge behavior without an

@@ -1101,7 +1101,7 @@ check-c54x-rom4-snapshot:
 	$(PYTHON) tools/c54x_rom4_snapshot_check.py $(PREFIX)
 
 check-c54x-opcode-coverage:
-	$(PYTHON) tools/c54x_opcode_coverage.py $(LOG) $(if $(ROM4_IDLE),--require-rom4-idle)
+	$(PYTHON) tools/c54x_opcode_coverage.py $(LOG) $(if $(ROM4_IDLE),--require-rom4-idle) $(if $(FIXTURE_LOG),--fixture-log $(FIXTURE_LOG)) $(if $(GROUPS),--group-report)
 
 check-c54x-cross-rom:
 	$(MAKE) --no-print-directory check-c54x-core check-c54x-rom4-rf-boundary verify-frontier verify-5110-menu verify-3310-frontier verify-3330-frontier verify-3410-frontier

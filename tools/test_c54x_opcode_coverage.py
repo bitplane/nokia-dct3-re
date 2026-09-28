@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_opcode_coverage import summarize
+from tools.c54x_opcode_coverage import group_gaps, summarize
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
@@ -31,6 +31,27 @@ class C54xOpcodeCoverageTest(unittest.TestCase):
     def test_rejects_empty_log(self):
         with self.assertRaisesRegex(ValueError, "no.*records"):
             summarize("ordinary log line")
+
+    def test_group_gaps_uses_rom4_execution_counts_and_assertion_class(self):
+        rom4 = summarize("\n".join((
+            "[opcov] op=4a07 first_pc=1000 count=10",
+            "[opcov] op=4a12 first_pc=1001 count=4",
+            "[opcov] op=4a13 first_pc=1002 count=5",
+            "[opcov] op=6f82 first_pc=1003 count=30",
+            "[opcov] op=7712 first_pc=1004 count=11",
+        )))
+        fixture = summarize("\n".join((
+            "[opcov] op=4a07 first_pc=2000",
+            "[opassert] op=4a07",
+            "[opcov] op=4a12 first_pc=2001",
+            "[opcov] op=6f82 first_pc=2002",
+            "[opassert] op=6f82",
+            "[opcov] op=7712 first_pc=2003",
+        )))
+        self.assertEqual(group_gaps(rom4, fixture), [
+            (0x77, 1, 11, 0, 0),
+            (0x4a, 1, 4, 1, 5),
+        ])
 
 
 if __name__ == "__main__":

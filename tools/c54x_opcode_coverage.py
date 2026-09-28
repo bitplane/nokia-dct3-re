@@ -48,12 +48,33 @@ def summarize(text: str) -> dict[str, object]:
     }
 
 
+def group_gaps(result: dict[str, object], fixture: dict[str, object]) -> list[tuple[int, int, int, int, int]]:
+    """Rank high-byte groups by unasserted ROM4 executions."""
+    counts = result["counts"]
+    rom4 = set(result["first_pc"])
+    fixture_words = set(fixture["first_pc"])
+    asserted = fixture["asserted"] & rom4
+    groups = {}
+    for opcode in rom4 - asserted:
+        group = opcode >> 8
+        row = groups.setdefault(group, [0, 0, 0, 0])
+        index = 0 if opcode in fixture_words else 2
+        row[index] += 1
+        row[index + 1] += counts[opcode]
+    return sorted(((group, *row) for group, row in groups.items()),
+                  key=lambda row: (-(row[2] + row[4]), row[0]))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("--require-rom4-idle", action="store_true")
     parser.add_argument("--fixture-log", type=pathlib.Path)
+    parser.add_argument("--group-report", action="store_true",
+                        help="rank unasserted ROM4 executions by opcode high byte")
     args = parser.parse_args()
+    if args.group_report and not args.fixture_log:
+        parser.error("--group-report requires --fixture-log")
     try:
         result = summarize(args.log.read_text(errors="replace"))
         fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
@@ -88,6 +109,12 @@ def main() -> int:
         for opcode in sorted(uncovered, key=lambda op: (-result["counts"][op], op))[:20]:
             print(f"  op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
                   f"executions={result['counts'][opcode]}")
+        if args.group_report:
+            print("ROM4 high-byte gaps (group, executed-only words/executions, "
+                  "absent words/executions):")
+            for group, executed_words, executed_count, absent_words, absent_count in group_gaps(result, fixture):
+                print(f"  {group:02x}: {executed_words}/{executed_count} "
+                      f"{absent_words}/{absent_count}")
     return 0
 
 
