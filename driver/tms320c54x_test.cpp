@@ -2729,6 +2729,42 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xff0c); // XC 2,C
+			program.write_word(0x05e3, 0xf495); // NOP
+			program.write_word(0x05e4, 0xf793); // CMPL B,B
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 140;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 140 || m_phase == 141)
+		{
+			const bool carry_set = m_phase == 141;
+			expect_opcode(0xff0c, m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(carry_set ? 0xffffffedcbULL : 0x1234ULL) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle ==
+					(carry_set ? 5 : 3),
+					"ROM4 ff0c executes or skips two words according to carry in one cycle");
+			if (!carry_set)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 141;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			expect_opcode(0xf793, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffffffedcbULL,
+					"ROM4 f793 complements the full 40-bit B accumulator");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

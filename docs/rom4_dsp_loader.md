@@ -570,11 +570,11 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 58 have an `opassert` marker after a
-passing exact-word check, 77 execute in the fixture without such a marker,
-and 322 are absent from the fixture. The 77-word class includes setup and
+assertions. Of the 457 ROM4 words, 60 have an `opassert` marker after a
+passing exact-word check, 75 execute in the fixture without such a marker,
+and 322 are absent from the fixture. The 75-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 77 lack semantic tests. The 322-word class is a priority list
+claim that all 75 lack semantic tests. The 322-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -616,6 +616,12 @@ and `6bf8` fixtures check ANDM, ORM, and ADDM data movement plus their
 three-cycle absolute costs; their handlers likewise charged one cycle.
 The underlying two-cycle indirect forms receive the same corrected base
 charge. The five-ROM cross-regression passes after these timing changes.
+The most-executed non-NOP fixture-executed-only word was `ff0c` (over one
+million ROM4 executions). TI SPRU172C's condition table identifies it as
+`XC 2,C`: it tests carry, not TC. Exact-word fixtures now check both C=0
+(skip two following words) and C=1 (execute both), the one-cycle XC cost,
+and the resulting `f793` full-width B complement. No core behavior changed
+for this test; both words are now explicit assertions in the coverage report.
 
 Execution counts identified `ROL A` (`f491`) and `ROL B` (`f591`) as the largest
 previously unasserted ROM4 encodings, at roughly 524,000 executions each in
