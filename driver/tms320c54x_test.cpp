@@ -2435,6 +2435,41 @@ private:
 					data.read_word(0x0e12) == 0x4455 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"repeated MVMD advances data destination and pipelines after first move");
+			program.write_word(0x05e0, 0x4a09); // PSHM AH
+			program.write_word(0x05e1, 0x4a0a); // PSHM AG
+			program.write_word(0x05e2, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 124;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 124)
+		{
+			expect_opcode(0x4a09, data.read_word(0x02ff) == 0x3456,
+					"ROM4 4a09 pushes AH before decrementing SP again");
+			expect_opcode(0x4a0a, data.read_word(0x02fe) == 0x0012 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02fe,
+					"ROM4 4a0a pushes the eight-bit guard and decrements SP");
+			program.write_word(0x05e0, 0x8a0a); // POPM AG
+			program.write_word(0x05e1, 0x8a09); // POPM AH
+			program.write_word(0x05e2, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcd987654ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 125;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 125)
+		{
+			expect_opcode(0x8a0a, (m_cpu->state_int(tms320c54x_device::STATE_A) >> 32) == 0x12,
+					"ROM4 8a0a restores AG without sign extension");
+			expect_opcode(0x8a09, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
+					"ROM4 8a09 restores AH, preserves AL, and advances SP");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
