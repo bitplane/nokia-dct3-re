@@ -9085,6 +9085,46 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f1f &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 OR *AR2-,A uses the old address and decrements in one cycle");
+			program.write_word(0x05e2, 0x12d2); // LDU *AR2+%,A
+			data.write_word(0x0f23, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-extend LDU.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 459;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 459)
+		{
+			expect_opcode(0x12d2, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 LDU *AR2+%,A zero-extends and wraps after the read in one cycle");
+			program.write_word(0x05e2, 0x1cf8); // XOR *(lk),A
+			program.write_word(0x05e3, 0x0f20);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0f20, 0x00f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12000f);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 460;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 460)
+		{
+			expect_opcode(0x1cf8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1200ff &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute XOR uses its extension, preserves status, and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
