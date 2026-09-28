@@ -8215,6 +8215,64 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f81 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"SQDST sign-extends negative X-Y while accumulating fractional square");
+			program.write_word(0x05e3, 0x2282); // MPYR *AR2,A
+			data.write_word(0x0f90, 0x4000);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xfffd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 414;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 414)
+		{
+			expect_opcode(0x2282, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff0000ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"MPYR rounds negative product after adding 0x8000 and preserves carry");
+			program.write_word(0x05e3, 0x2a82); // MACR *AR2,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x4000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 415;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 415)
+		{
+			expect_opcode(0x2a82, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"MACR rounds after accumulation, not before, in one cycle");
+			program.write_word(0x05e3, 0x2e82); // MASR *AR2,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 416;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 416)
+		{
+			expect_opcode(0x2e82, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff0000ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"MASR rounds negative accumulator-minus-product in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

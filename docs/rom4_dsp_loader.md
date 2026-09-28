@@ -368,6 +368,11 @@ negative `(Xmem - Ymem) << 16` and fractional-square accumulation; its signed
 scaling is likewise defined C++ multiplication. These checks agree with TI
 SPRU172C's arithmetic expressions and class-7 timing, but do not establish
 all multiplier flag and rounding variants.
+Fixture-only `MPYR`, `MACR`, and `MASR` Smem tests now check TI SPRU172C's
+rounding rule (add `0x8000`, then clear the low word) for negative product,
+accumulate-before-round, and negative subtract results. Each also checks
+T/AR preservation, carry preservation, and one-cycle DARAM timing. This
+does not establish every OVM, FRCT, or long-offset combination.
 SFTL shifts only the low 32 bits, clears destination guard bits and sets carry
 from the outgoing bit (or clears carry for shift zero), per SPRU172C page
 4-158. Executable left/right/zero-shift cases distinguish this from SFTA's
@@ -575,7 +580,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 400 distinct words: 314 overlap the ROM4 run, 86 occur
+The fixture dispatches 403 distinct words: 314 overlap the ROM4 run, 89 occur
 only in the fixture, and 143 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
