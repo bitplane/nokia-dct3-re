@@ -6968,6 +6968,49 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"long-offset POPD preupdates AR and pops in two cycles");
+			program.write_word(0x05e3, 0x4fea); // DST B,*+AR2(6)
+			program.write_word(0x05e4, 6);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f06, 0);
+			data.write_word(0x0f07, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 348;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 348)
+		{
+			expect_opcode(0x4fea, data.read_word(0x0f06) == 0x1234 &&
+					data.read_word(0x0f07) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f06 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"long-offset DST preupdates AR and stores high/low in three cycles");
+			program.write_word(0x05e3, 0x57e2); // DLD *AR2(6),B
+			data.write_word(0x0f06, 0x8001);
+			data.write_word(0x0f07, 0x2345);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 349;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 349)
+		{
+			expect_opcode(0x57e2, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80012345ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"long-offset DLD keeps AR and sign-extends in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -1140,26 +1140,30 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4f00: // DST B, Lmem
 	{
 		const unsigned ar = low & 7;
+		const bool extended = low >= 0xe0;
 		const bool preincrement = (low & 0x78) == 0x18;
-		if (low != 0xf8 && preincrement)
+		if (!extended && preincrement)
 			indirect_modify(low, true);
-		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
+		const u16 address = low >= 0xf8 ? fetch() :
+				low >= 0xe0 ? long_offset_address(low) : m_ar[ar];
 		const u64 value = accumulator(BIT(op, 8));
 		data_write(address, u16(value >> 16));
 		data_write(address ^ 1, u16(value));
-		if (low != 0xf8 && !preincrement)
+		if (!extended && !preincrement)
 			indirect_modify(low, true);
-		m_icount -= low == 0xf8 ? 2 : 1;
+		m_icount -= extended ? 2 : 1;
 		return;
 	}
 	case 0x5600: // DLD Lmem, A
 	case 0x5700: // DLD Lmem, B
 	{
 		const unsigned ar = low & 7;
+		const bool extended = low >= 0xe0;
 		const bool preincrement = (low & 0x78) == 0x18;
-		if (low != 0xf8 && preincrement)
+		if (!extended && preincrement)
 			indirect_modify(low, true);
-		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
+		const u16 address = low >= 0xf8 ? fetch() :
+				low >= 0xe0 ? long_offset_address(low) : m_ar[ar];
 		const u16 high = data_read(address);
 		const u16 low_word = data_read(address ^ 1);
 		u64 value = (u64(high) << 16) | low_word;
@@ -1169,9 +1173,9 @@ void tms320c54x_device::execute_one(u16 op)
 		if (BIT(m_st1, 8) && BIT(high, 15))
 			value |= u64(0xff) << 32;
 		accumulator(BIT(op, 8)) = value;
-		if (low != 0xf8 && !preincrement)
+		if (!extended && !preincrement)
 			indirect_modify(low, true);
-		m_icount -= low == 0xf8;
+		m_icount -= extended;
 		return;
 	}
 	case 0x6800: // ANDM #lk, Smem
