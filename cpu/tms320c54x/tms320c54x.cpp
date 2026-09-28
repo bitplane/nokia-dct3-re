@@ -1057,9 +1057,9 @@ void tms320c54x_device::execute_one(u16 op)
 		m_b = (m_b ^ alu_smem()) & ACC_MASK;
 		return;
 	case 0x1e00: // SUBC Smem, A
-	case 0x5e00: // SUBC Smem, B
+	case 0x1f00: // SUBC Smem, B
 	{
-		u64 &source = accumulator(BIT(op, 14));
+		u64 &source = accumulator(BIT(op, 8));
 		const u64 divisor = data_operand(alu_smem());
 		const s64 difference = (s64(source << 24) >> 24) -
 				(s64(divisor << 24) >> 24) * 0x8000;
@@ -1210,6 +1210,9 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x5000: case 0x5100: case 0x5200: case 0x5300: // DADD Lmem, src, dst
 	case 0x5400: case 0x5500: // DSUB Lmem, src
 	case 0x5800: case 0x5900: // DRSUB Lmem, src
+	case 0x5a00: case 0x5b00: // DADST Lmem, dst
+	case 0x5c00: case 0x5d00: // DSUBT Lmem, dst
+	case 0x5e00: case 0x5f00: // DSADT Lmem, dst
 	{
 		const unsigned ar = low & 7;
 		const bool extended = low >= 0xe0;
@@ -1222,30 +1225,39 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 low_word = data_read(address ^ 1);
 		if (!extended && !preincrement)
 			indirect_modify(low, true);
-		const bool reverse = (op & 0xfe00) == 0x5800;
-		const bool subtract = (op & 0xfe00) == 0x5400 || reverse;
+		const unsigned family = (op >> 8) & 0x0f;
+		const bool t_variant = family >= 0x0a;
+		const bool memory_first = family >= 0x08;
+		const bool subtract_high = family == 0x04 || family == 0x05 ||
+				family == 0x08 || family == 0x09 || family >= 0x0c;
+		const bool subtract_low = (family >= 0x04 && family <= 0x05) ||
+				(family >= 0x08 && family <= 0x0d);
 		const bool destination_b = BIT(op, 8);
-		const u64 source = accumulator(subtract ? destination_b : BIT(op, 9));
+		const u64 source = accumulator(family < 4 ? BIT(op, 9) : destination_b);
 		u64 &destination = accumulator(destination_b);
+		u64 memory = (u64(high) << 16) | low_word;
+		if (BIT(m_st1, 8) && BIT(high, 15))
+			memory |= u64(0xff) << 32;
 		if (!BIT(m_st1, 7)) // Double-precision mode.
 		{
-			u64 operand = (u64(high) << 16) | low_word;
-			if (BIT(m_st1, 8) && BIT(high, 15))
-				operand |= u64(0xff) << 32;
-			destination = reverse ? add_sub(operand, source, true, destination_b) :
-					add_sub(source, operand, subtract, destination_b);
+			u64 t_pair = (u64(m_t) << 16) | m_t;
+			if (BIT(m_st1, 8) && BIT(m_t, 15))
+				t_pair |= u64(0xff) << 32;
+			const u64 left = memory_first ? memory : source;
+			const u64 right = t_variant ? t_pair : memory_first ? source : memory;
+			destination = add_sub(left, right, subtract_high, destination_b);
 		}
 		else // Dual 16-bit mode: the two lanes do not carry into one another.
 		{
-			const u16 left_high_word = reverse ? high : u16(source >> 16);
-			const u16 right_high_word = reverse ? u16(source >> 16) : high;
-			const u16 left_low_word = reverse ? low_word : u16(source);
-			const u16 right_low_word = reverse ? u16(source) : low_word;
+			const u16 left_high_word = memory_first ? high : u16(source >> 16);
+			const u16 right_high_word = t_variant ? m_t : memory_first ? u16(source >> 16) : high;
+			const u16 left_low_word = memory_first ? low_word : u16(source);
+			const u16 right_low_word = t_variant ? m_t : memory_first ? u16(source) : low_word;
 			const s32 left_high = BIT(m_st1, 8) ? s32(s16(left_high_word)) : s32(left_high_word);
 			const s32 right_high = BIT(m_st1, 8) ? s32(s16(right_high_word)) : s32(right_high_word);
-			const s32 result_high = subtract ? left_high - right_high : left_high + right_high;
-			const u16 result_low = subtract ? left_low_word - right_low_word : left_low_word + right_low_word;
-			const bool carry = subtract ? left_high_word >= right_high_word :
+			const s32 result_high = subtract_high ? left_high - right_high : left_high + right_high;
+			const u16 result_low = subtract_low ? left_low_word - right_low_word : left_low_word + right_low_word;
+			const bool carry = subtract_high ? left_high_word >= right_high_word :
 					u32(left_high_word) + right_high_word > 0xffff;
 			m_st0 = (m_st0 & ~u16(0x0800)) | (carry ? 0x0800 : 0);
 			destination = (u64(u32(result_high) & 0xffffff) << 16) | result_low;

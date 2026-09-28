@@ -10828,6 +10828,95 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0x5a8b); // DADST *AR3-,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f90, 0x1534);
+			data.write_word(0x0f91, 0x3456);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x2345);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0180); // SXM, C16
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 563;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 563 && m_phase <= 569)
+		{
+			struct t_long_case { u16 opcode; u16 st1; u64 a_after; u64 b_after; u16 ar3_after; int carry; unsigned cycles; };
+			static constexpr t_long_case cases[] = {
+				{ 0x5a8b, 0x0180, 0x38791111, 0, 0x0f8e, 0, 3 },
+				{ 0x5a93, 0x0100, 0x3879579b, 0, 0x0f92, 0, 3 },
+				{ 0x5e93, 0x0100, 0xfff1ef1111ULL, 0, 0x0f92, 0, 3 },
+				{ 0x5e8b, 0x0180, 0xfff1ef579bULL, 0, 0x0f8e, -1, 3 },
+				{ 0x5c93, 0x0100, 0xfff1ef1111ULL, 0, 0x0f92, 0, 3 },
+				{ 0x5c8b, 0x0180, 0xfff1ef1111ULL, 0, 0x0f8e, 0, 3 },
+				{ 0x5bf8, 0x0180, 0, 0x38791111, 0x0f90, 0, 4 }
+			};
+			const unsigned index = m_phase - 563;
+			const t_long_case &row = cases[index];
+			expect_opcode(row.opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x2345 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == row.ar3_after &&
+				(row.carry < 0 || bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == bool(row.carry)) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == row.cycles,
+				"T-based long-word arithmetic matches TI result and cycle examples");
+			if (m_phase < 569)
+			{
+				const t_long_case &next = cases[index + 1];
+				program.write_word(0x05e2, next.opcode);
+				program.write_word(0x05e3, next.opcode == 0x5bf8 ? 0x0f90 : 0x75d6);
+				program.write_word(0x05e4, next.opcode == 0x5bf8 ? 0x75d6 : 0x0124);
+				program.write_word(0x05e5, next.opcode == 0x5bf8 ? 0x0124 : 0xf5e1);
+				program.write_word(0x05e6, 0xf5e1);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x2345);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next.st1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0x1f83); // SUBC *AR3,B
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f90, 1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 570;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 570)
+		{
+			expect_opcode(0x1f83,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10001 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUBC B uses the 1f encoding and leaves A unchanged");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
