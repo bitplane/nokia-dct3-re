@@ -600,21 +600,23 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 420 distinct words: 324 overlap the ROM4 run, 96 occur
-only in the fixture, and 133 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 423 distinct words: 327 overlap the ROM4 run, 96 occur
+only in the fixture, and 130 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 324 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 327 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 133 are absent from the fixture. This closes the fixture-executed-only
+and 130 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
-them from the executed-only class without changing CPU behavior. The formerly
-most-used absent word, `fa20`, now has taken and not-taken `BCD NTC` fixtures
+them from the executed-only class without changing CPU behavior. Observed
+`1093`, `1084`, and `1094` now check `LD` sign/zero extension, pointer behavior,
+preserved status and one-cycle cost. The previously leading absent word,
+`fa20`, now has taken and not-taken `BCD NTC` fixtures
 that check both delay slots, branch destination, and cycle cost. The leading
 observed `1183` and `0093` fixtures cover negative Smem sign extension under
 SXM, a fixed versus postincrementing AR3, OVM saturation and sticky overflow,

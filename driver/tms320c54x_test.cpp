@@ -8689,6 +8689,63 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x3ffff0000ULL &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"parallel ST shifts by ASM before SST clamps the stored value");
+			program.write_word(0x05e3, 0x1093); // LD *AR3+,A
+			data.write_word(0x0fa0, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0fa0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 438;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 438)
+		{
+			expect_opcode(0x1093, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffff8001ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0fa1 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD *AR3+,A sign-extends and postincrements in one cycle");
+			program.write_word(0x05e3, 0x1084); // LD *AR4,A
+			data.write_word(0x0f90, 0x8002);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 439;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 439)
+		{
+			expect_opcode(0x1084, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8002 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f90 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD *AR4,A zero-extends without SXM and leaves pointer unchanged");
+			program.write_word(0x05e3, 0x1094); // LD *AR4+,A
+			data.write_word(0x0f90, 0xfffd);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 440;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 440)
+		{
+			expect_opcode(0x1094, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffffdULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f91 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 LD *AR4+,A sign-extends and postincrements in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
