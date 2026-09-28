@@ -1743,6 +1743,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xf063: // AND #lk << 16, A
 		m_a &= u64(fetch()) << 16;
+		--m_icount;
 		return;
 	case 0xf340: // OR #lk, B
 		m_b = (m_b | fetch()) & ACC_MASK;
@@ -1750,6 +1751,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf062: // LD #lk, 16, A
 	case 0xf162: // LD #lk, 16, B
 		accumulator(BIT(op, 8)) = (data_operand(fetch()) << 16) & ACC_MASK;
+		--m_icount;
 		return;
 	case 0xf330: // AND #lk, B
 		m_b &= fetch();
