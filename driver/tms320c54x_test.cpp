@@ -3938,6 +3938,49 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xf820); // BC 05f0, NTC
+			program.write_word(0x05e3, 0x05f0);
+			program.write_word(0x05e4, 0x75d6); // fall-through marker
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			program.write_word(0x05f0, 0x75d6); // branch marker
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0); // NTC true
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 204;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 204 && m_phase <= 207)
+		{
+			const bool taken = (m_phase & 1) == 0;
+			expect_opcode(m_phase <= 205 ? 0xf820 : 0xf84c,
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 5) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x05f3 : 0x05e7),
+					"ROM4 BC NTC/BNEQ takes five cycles true and three cycles false");
+			if (m_phase < 207)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				if (m_phase == 204)
+					m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000); // NTC false
+				else if (m_phase == 205)
+				{
+					program.write_word(0x05e2, 0xf84c); // BC 05f0, BNEQ
+					m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0100000000ULL);
+				}
+				else
+					m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
