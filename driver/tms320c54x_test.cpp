@@ -9125,6 +9125,64 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 absolute XOR uses its extension, preserves status, and costs two cycles");
+			program.write_word(0x05e2, 0x6982); // ORM #lk,*AR2
+			program.write_word(0x05e3, 0x00a0);
+			data.write_word(0x0f20, 0x1001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 461;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 461)
+		{
+			expect_opcode(0x6982, data.read_word(0x0f20) == 0x10a1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 ORM #lk,*AR2 preserves pointer and status in two cycles");
+			program.write_word(0x05e2, 0x6984); // ORM #lk,*AR4
+			program.write_word(0x05e3, 0x0005);
+			data.write_word(0x0f24, 0x8000);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f24);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 462;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 462)
+		{
+			expect_opcode(0x6984, data.read_word(0x0f24) == 0x8005 &&
+					data.read_word(0x0f20) == 0x10a1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f24 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 ORM #lk,*AR4 selects a distinct data address without pointer motion");
+			program.write_word(0x05e2, 0x1b8d); // OR *AR5-,B
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f25, 0x00f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x34000f);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f25);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 463;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 463)
+		{
+			expect_opcode(0x1b8d, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x3400ff &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f24 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 OR *AR5-,B preserves status and decrements after one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
