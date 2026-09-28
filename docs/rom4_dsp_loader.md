@@ -563,8 +563,8 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 154 distinct words: 118 overlap the ROM4 run, 36 occur
-only in the fixture, and 339 ROM4 words do not occur in the fixture. These are
+The fixture executes 156 distinct words: 120 overlap the ROM4 run, 36 occur
+only in the fixture, and 337 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -617,8 +617,11 @@ The exact-word fixture checks both TC outcomes, pointer preservation, and the
 two-cycle form. `8093` (`STL A,*AR3+`) now checks the stored low word and
 post-increment. Exact `f7bb`/`f6bb` fixtures cover setting and clearing
 ST1.INTM; `4a08`/`8a08` cover an AL push/pop with stack-pointer restoration.
+`7212` (`MVDM`) and `7312` (`MVMD`) now have exact-word data-direction and
+two-cycle assertions. Their core handlers previously charged one cycle.
+TI's repeated-move pipeline rule (one cycle after entry) remains untested.
 The highest-use remaining ROM4-only words are other `4a`/`8a` MMR register
-encodings (not individually asserted) and `7212` (`MVDM`).
+encodings, not individually asserted.
 `6c8a` (`BANZ`) has taken/not-taken timing and pointer-update assertions; TI SPRU172C
 specifies four and two cycles, respectively. Long-offset Smem access outside
 `MAR` remains a separate

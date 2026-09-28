@@ -1253,8 +1253,9 @@ void tms320c54x_device::execute_one(u16 op)
 		data_write(destination, value);
 		return;
 	}
-	case 0x7300: // MVDM MMR, dmad
+	case 0x7300: // MVMD MMR, dmad
 		data_write(fetch(), data_read(low & 0x7f));
+		--m_icount;
 		return;
 	case 0x7400: // PORTR port, Smem
 		if (low == 0xf8)
@@ -1278,6 +1279,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x7200: // MVDM dmad, MMR
 		data_write(low & 0x7f, data_read(fetch()));
+		--m_icount;
 		return;
 	case 0x7600: // STM #lk, Smem
 		if (low == 0xf8)
