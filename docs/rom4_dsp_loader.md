@@ -452,6 +452,11 @@ saturation after subtracting a negative product. They assert the appropriate
 OVA/OVB flag, T and store side effects, and one-cycle DARAM cost. These are
 status-mode variants of existing fixture words, not new opcode encodings;
 other FRCT/OVM product and rounding boundaries remain unaudited.
+Fixture-only `b43a` now checks the negative `MACR` half-word boundary from
+TI SPRU172C: adding `0x8000` and clearing the low 16 bits rounds `-0x8000`
+to zero, but `-0x8001` to `-0x10000`. Both cases assert T publication,
+pointer update, preserved carry, and one-cycle DARAM timing. This does not
+cover rounded FRCT overflow or other X/Y addressing combinations.
 Fixture-only `3383`, `3583`, and `3783` check `MASA`, `MACA`, and `MACAR`
 using A's high word as the multiplicand, including B accumulation, T
 publication, rounding, and one-cycle DARAM timing. `3693` uses TI's `POLY`
