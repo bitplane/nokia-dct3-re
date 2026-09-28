@@ -10317,6 +10317,60 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 					"ROM4 LDM MMR 0x20,B zero-extends; six MMR transfers cost one cycle each");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e2, 0x71da); // MVDK *AR2+0%,dmad
+			program.write_word(0x05e3, 0x0f40);
+			program.write_word(0x05e4, 0x7692); // ST #lk,*AR2+
+			program.write_word(0x05e5, 0xabcd);
+			program.write_word(0x05e6, 0x7c8b); // MVPD pmad,*AR3-
+			program.write_word(0x05e7, 0x0610);
+			program.write_word(0x05e8, 0x7d82); // MVDP *AR2,pmad
+			program.write_word(0x05e9, 0x0620);
+			program.write_word(0x05ea, 0x8182); // STL B,*AR2
+			program.write_word(0x05eb, 0x75d6);
+			program.write_word(0x05ec, 0x0124);
+			program.write_word(0x05ed, 0xf5e1);
+			program.write_word(0x0610, 0xbeef);
+			program.write_word(0x0620, 0);
+			data.write_word(0x0f21, 0);
+			data.write_word(0x0f22, 0x1234);
+			data.write_word(0x0f23, 0x5a3c);
+			data.write_word(0x0f40, 0);
+			data.write_word(0x0f50, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f50);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xcafe);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 517;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 517)
+		{
+			expect_opcode(0x71da,
+					data.read_word(0x0f40) == 0x5a3c &&
+					data.read_word(0x0f23) == 0x5a3c,
+					"ROM4 MVDK copies old AR2 word before AR0-step circular wrap");
+			expect_opcode(0x7692,
+					data.read_word(0x0f21) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f22,
+					"ROM4 ST #lk,*AR2+ writes at the wrapped address before advancing");
+			expect_opcode(0x7c8b,
+					data.read_word(0x0f50) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f4f,
+					"ROM4 MVPD copies program memory to old AR3 address then decrements");
+			expect_opcode(0x7d82,
+					program.read_word(0x0620) == 0x1234,
+					"ROM4 MVDP copies old AR2 data word into program memory");
+			expect_opcode(0x8182,
+					data.read_word(0x0f22) == 0xcafe &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f22 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 14,
+					"ROM4 STL B,*AR2 overwrites data only; transfers cost 2+2+3+4+1 cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

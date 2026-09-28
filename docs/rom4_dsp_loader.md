@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 526 distinct words: 425 overlap the ROM4 run, 101 occur
-only in the fixture, and 32 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 531 distinct words: 430 overlap the ROM4 run, 101 occur
+only in the fixture, and 27 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 425 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 430 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 32 are absent from the fixture. This closes the fixture-executed-only
+and 27 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1244,6 +1244,12 @@ and from MMR `0x20` through test backing memory, including LDM zero extension.
 The six one-cycle transfers have an eight-cycle marker span. TI's C54x MMR
 map identifies `0x20/0x21` as peripheral space on related parts; this fixture
 does not validate the Nokia product's peripheral semantics or external timing.
+Exact `71da`, `7692`, `7c8b`, `7d82`, and `8182` form a composed transfer
+fixture: MVDK reads the old AR2 word before an AR0-step circular wrap; ST
+writes at the wrapped address before incrementing; MVPD copies program to
+data at the old AR3 address; MVDP copies data back to a separate program
+address; STL overwrites only the data word. The marker span checks TI
+SPRU172C's 2+2+3+4+1 cycle costs and the direction and order of each move.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
