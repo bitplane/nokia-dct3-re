@@ -1520,6 +1520,13 @@ and has been removed. Exact `6f82`/`6f83` fixtures check shifted ADD/SUB;
 two-cycle indirect costs. Exact ROM4 `6f8b` additionally checks SXM extension,
 postdecrement, extension consumption, and the two-cycle cost. Other shift, flag, and long-offset variants remain
 unasserted.
+TI SPRU307A's opcode table assigns `LMS Xmem,Ymem` to `E1xx`, one word and
+one cycle. The detailed opcode diagram in SPRU172C prints an `F0`-shaped
+pattern, which conflicts with that table and live `F0xx` control/ALU
+encodings; the decoder uses `E1xx`. Fixture-only `e13a` checks TI's LMS
+example values for A and B, unchanged T, dual-address update, and one-cycle
+cost. No observed 5110 trace executes this family, so this is instruction
+coverage, not evidence about the ROM4 boot path.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

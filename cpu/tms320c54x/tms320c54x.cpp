@@ -834,6 +834,25 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
+	if ((op & 0xff00) == 0xe100) // LMS Xmem, Ymem
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 yvalue = data_read(m_ar[yar]);
+		const s64 xadd = BIT(m_st1, 8) ? s64(s16(xvalue)) : s64(xvalue);
+		m_a = add_sub(m_a, u64(xadd * 0x10000 + 0x8000) & ACC_MASK, false, false);
+		s64 product = s64(s16(xvalue)) * s64(s16(yvalue));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		m_b = multiply_result((s64(m_b << 24) >> 24) + multiply_product(product), true);
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
 	if ((op & 0xfc00) == 0xf000 && ((op >> 4) & 0x0f) <= 5)
 	{
 		// Immediate accumulator ALU family.  Bit 9 selects the source,
