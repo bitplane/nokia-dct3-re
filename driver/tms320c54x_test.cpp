@@ -485,7 +485,7 @@ private:
 		}
 		if (m_phase == 10)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+			expect_opcode(0xf273, m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0391,
 					"delayed branch executes both delay-slot words");
 			data.write_word(0x02ff, 0x0398);
@@ -499,7 +499,7 @@ private:
 		}
 		if (m_phase == 11)
 		{
-			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+			expect_opcode(0xf4eb, m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0399 &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
 					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
@@ -3981,6 +3981,71 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xf495); // NOP
+			program.write_word(0x05e3, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x34);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 208;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 208)
+		{
+			expect_opcode(0xf495, m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x34 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e6,
+					"ROM4 NOP preserves state and costs one cycle");
+			program.write_word(0x05e2, 0xf074); // CALL 05f0
+			program.write_word(0x05e3, 0x05f0);
+			program.write_word(0x05e4, 0xf5e1);
+			program.write_word(0x05f0, 0x75d6); // subroutine port marker
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xfc00); // RET
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 209;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 209)
+		{
+			expect_opcode(0xf074, m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6 &&
+					data.read_word(0x02ff) == 0x05e4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e5,
+					"ROM4 CALL pushes continuation, branches, and costs four cycles");
+			program.write_word(0x05e2, 0xfc00); // RET
+			program.write_word(0x05f0, 0x75d6); // return port marker
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xf5e1);
+			data.write_word(0x0300, 0x05f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 210;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 210)
+		{
+			expect_opcode(0xfc00, m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05f3,
+					"ROM4 RET pops continuation and costs five cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
