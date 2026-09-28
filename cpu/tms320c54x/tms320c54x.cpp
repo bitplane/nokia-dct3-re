@@ -927,7 +927,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const u64 operand = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
 		accumulator(BIT(op, 8)) = add_sub(accumulator(BIT(op, 9)), operand,
-				true, BIT(op, 8));
+				true, BIT(op, 8), true);
 		m_icount -= low >= 0xe0;
 		return;
 	}
