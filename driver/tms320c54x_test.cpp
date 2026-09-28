@@ -10270,6 +10270,53 @@ private:
 					data.read_word(0x0f63) == 0x4321 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 					"ROM4 MVMD copies the new AR5; three MMR moves cost two cycles each");
+			program.write_word(0x05e0, 0x7586); // Preserve AR6 across both timing markers.
+			program.write_word(0x05e2, 0x8816); // STLM A,AR6
+			program.write_word(0x05e3, 0x8817); // STLM A,AR7
+			program.write_word(0x05e4, 0x8821); // STLM A,MMR 0x21
+			program.write_word(0x05e5, 0x8910); // STLM B,AR0
+			program.write_word(0x05e6, 0x8911); // STLM B,AR1
+			program.write_word(0x05e7, 0x4920); // LDM MMR 0x20,B
+			program.write_word(0x05e8, 0x7586);
+			program.write_word(0x05e9, 0x0124);
+			program.write_word(0x05ea, 0xf5e1);
+			data.write_word(0x0020, 0x9abc);
+			data.write_word(0x0021, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 516;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 516)
+		{
+			expect_opcode(0x8816,
+					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x1234,
+					"ROM4 STLM A,AR6 publishes A's low word");
+			expect_opcode(0x8817,
+					m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1234,
+					"ROM4 STLM A,AR7 publishes A's low word");
+			expect_opcode(0x8821, data.read_word(0x0021) == 0x1234,
+					"ROM4 STLM A,MMR 0x21 writes the peripheral-facing data space");
+			expect_opcode(0x8910,
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x5678,
+					"ROM4 STLM B,AR0 publishes B's low word");
+			expect_opcode(0x8911,
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x5678,
+					"ROM4 STLM B,AR1 publishes B's low word");
+			expect_opcode(0x4920,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9abc &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"ROM4 LDM MMR 0x20,B zero-extends; six MMR transfers cost one cycle each");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
