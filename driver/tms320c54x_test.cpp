@@ -8991,6 +8991,46 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 SFTL A,-2 logically shifts bit 31 and publishes bit one");
+			program.write_word(0x05e2, 0xff20); // XC 2,NTC
+			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
+			program.write_word(0x05e4, 0x6d92); // MAR *AR2+
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 454;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 454)
+		{
+			expect_opcode(0x6d92, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0131,
+					"ROM4 MAR *AR2+ advances the second auxiliary register");
+			expect_opcode(0xff20, m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0121 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0131 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 XC 2,NTC executes two one-word MAR slots when TC is clear");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 455;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 455)
+		{
+			expect_opcode(0xff20, m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0120 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0130 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"rejected ROM4 XC 2,NTC charges two NOP slots without modifying ARs");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
