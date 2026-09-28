@@ -9656,8 +9656,77 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"ROM4 load/MAR/immediate-store/accumulator-store cost 1+1+2+1 cycles");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			program.write_word(0x05e2, 0x771d); // STM #lk,PMST
+			program.write_word(0x05e3, 0x4567);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f13);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 486;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 486)
+		{
+			expect_opcode(0x771d,
+					m_cpu->state_int(tms320c54x_device::STATE_PMST) == 0x4567 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f13 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 STM writes direct PMST without pointer motion in two cycles");
+			program.write_word(0x05e2, 0xff45); // XC 2,AEQ
+			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
+			program.write_word(0x05e4, 0x6d92); // MAR *AR2+
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 487;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 487 && m_phase <= 490)
+		{
+			const bool accepted = m_phase == 487 || m_phase == 489;
+			expect_opcode(m_phase < 489 ? 0xff45 : 0xff4e,
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
+						(accepted ? 0x0121 : 0x0120) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
+						(accepted ? 0x0131 : 0x0130) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 XC AEQ/BGT executes or rejects two guarded MAR slots");
+			if (m_phase == 490)
+			{
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			if (m_phase == 488)
+				program.write_word(0x05e2, 0xff4e); // XC 2,BGT
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A,
+					m_phase == 487 ? 1 : 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B,
+					m_phase == 488 ? 0x0100000000ULL : 0xff00000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			++m_phase;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
 		}
 		if (m_phase == 4)
 		{
