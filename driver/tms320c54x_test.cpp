@@ -3505,6 +3505,79 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 POPM AR2 restores the register in one cycle");
+			program.write_word(0x05e2, 0x8807); // STLM A, ST1
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8123);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 181;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 181)
+		{
+			expect_opcode(0x8807, m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x8123 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 STLM A, ST1 writes the status MMR in one cycle");
+			program.write_word(0x05e2, 0x4807); // LDM ST1, A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 182;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 182)
+		{
+			expect_opcode(0x4807, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8123 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 LDM ST1, A reads the status MMR in one cycle");
+			program.write_word(0x05e2, 0x4a07); // PSHM ST1
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 183;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 183)
+		{
+			expect_opcode(0x4a07, data.read_word(0x02ff) == 0x8123 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 PSHM ST1 pushes the status register in one cycle");
+			program.write_word(0x05e2, 0x8a07); // POPM ST1
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 184;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 184)
+		{
+			expect_opcode(0x8a07, m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x8123 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 POPM ST1 restores status in one cycle");
+			program.write_word(0x05e2, 0x4907); // LDM ST1, B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 185;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 185)
+		{
+			expect_opcode(0x4907, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8123 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"LDM ST1, B ignores SXM and zero-extends in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

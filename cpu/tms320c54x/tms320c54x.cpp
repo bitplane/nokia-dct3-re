@@ -1097,10 +1097,10 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x4800: // LDM MMR, A
-		m_a = data_operand(data_read(low & 0x7f));
+		m_a = data_read(low & 0x7f);
 		return;
 	case 0x4900: // LDM MMR, B
-		m_b = data_operand(data_read(low & 0x7f));
+		m_b = data_read(low & 0x7f);
 		return;
 	case 0x4e00: // DST A, Lmem
 	case 0x4f00: // DST B, Lmem
