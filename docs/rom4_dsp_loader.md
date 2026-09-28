@@ -563,8 +563,8 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 144 distinct words: 109 overlap the ROM4 run, 35 occur
-only in the fixture, and 348 ROM4 words do not occur in the fixture. These are
+The fixture executes 146 distinct words: 111 overlap the ROM4 run, 35 occur
+only in the fixture, and 346 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -607,12 +607,17 @@ ROM4-only word was `4593` (`LD Smem,16,B`, 32,770 executions); an exact-word
 fixture now checks sign extension, post-increment, and its one-cycle cost.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
-(`B pmad`) four-cycle cost. The next ROM4-only words by count are absolute
-port transfers `75f8` and `74f8` (about 13,000 executions each).
+(`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
+(about 13,000 executions each) now have exact-word assertions for their
+three-cycle cost, extension-word order, and data movement. The highest-use
+ROM4-only word is now `f040` (`OR #lk,A`).
 `6c8a` (`BANZ`) has taken/not-taken timing and pointer-update assertions; TI SPRU172C
 specifies four and two cycles, respectively. Long-offset Smem access outside
 `MAR` remains a separate
 decoder audit; this correction does not establish those addressing forms.
+The multiply-accumulate fixtures assert ordinary results and pointer updates,
+but not TI's `OVdst`/`OVM` effects for overflow. That remains a core semantic
+audit item even for words counted as fixture-overlapping.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool

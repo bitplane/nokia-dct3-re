@@ -356,6 +356,8 @@ private:
 		}
 		else
 		{
+			if (m_port_writes == 2)
+				m_middle_port_value = value;
 			m_last_port_cycle = cycle;
 			m_last_port_value = value;
 		}
@@ -2097,6 +2099,43 @@ private:
 		{
 			expect(m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ROM4 f073 B consumes its target word and costs four cycles");
+			program.write_word(0x05e2, 0x75f8); // PORTW *(0d00), 0124
+			program.write_word(0x05e3, 0x0d00);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0d00, 0x9abc);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 105;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 105)
+		{
+			expect(m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5 &&
+					m_first_port_value == 0x1234 && m_middle_port_value == 0x9abc,
+					"ROM4 75f8 consumes absolute source and port words in three cycles");
+			program.write_word(0x05e2, 0x74f8); // PORTR 0123, *(0d00)
+			program.write_word(0x05e3, 0x0d00);
+			program.write_word(0x05e4, 0x0123);
+			data.write_word(0x0d00, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 106;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 106)
+		{
+			expect(data.read_word(0x0d00) == 0xabcd && m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 74f8 consumes absolute destination and port words in three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -2295,6 +2334,7 @@ private:
 	unsigned m_port_reads = 0;
 	unsigned m_port_writes = 0;
 	u16 m_first_port_value = 0;
+	u16 m_middle_port_value = 0;
 	u16 m_last_port_value = 0;
 	unsigned m_saved_repeat_reads = 0;
 	std::stringstream m_saved_repeat;
