@@ -563,24 +563,26 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 160 distinct words: 124 overlap the ROM4 run, 36 occur
-only in the fixture, and 333 ROM4 words do not occur in the fixture. These are
+The fixture executes 166 distinct words: 130 overlap the ROM4 run, 36 occur
+only in the fixture, and 327 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 41 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 47 have an `opassert` marker after a
 passing exact-word check, 83 execute in the fixture without such a marker,
-and 333 are absent from the fixture. The 83-word class includes setup and
+and 327 are absent from the fixture. The 83-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 83 lack semantic tests. The 337-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
-The four newly asserted MMR stack words `4a09`/`4a0a` and `8a0a`/`8a09`
-check accumulator-high and guard-word stack order, guard width, preservation
-of the low accumulator word, and final SP restoration. TI SPRU172C specifies
+The asserted MMR stack words `4a09`/`4a0a` and `8a0a`/`8a09` check
+accumulator-A high and guard-word stack order, guard width, preservation of
+the low accumulator word, and final SP restoration. The corresponding
+`4a0b`/`4a0c`/`4a0d` and `8a0d`/`8a0c`/`8a0b` fixtures check all three B
+slices, LIFO order, A preservation, and SP restoration. TI SPRU172C specifies
 one word and one cycle for each PSHM/POPM form; the core has no extra cycle
 charge for these opcodes. Other MMR register encodings remain separate tests.
 

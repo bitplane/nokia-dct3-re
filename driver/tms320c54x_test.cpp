@@ -2470,6 +2470,47 @@ private:
 			expect_opcode(0x8a09, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 					"ROM4 8a09 restores AH, preserves AL, and advances SP");
+			program.write_word(0x05e0, 0x4a0b); // PSHM BL
+			program.write_word(0x05e1, 0x4a0c); // PSHM BH
+			program.write_word(0x05e2, 0x4a0d); // PSHM BG
+			program.write_word(0x05e3, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7f1234abcdULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 126;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 126)
+		{
+			expect_opcode(0x4a0b, data.read_word(0x02ff) == 0xabcd,
+					"ROM4 4a0b pushes BL");
+			expect_opcode(0x4a0c, data.read_word(0x02fe) == 0x1234,
+					"ROM4 4a0c pushes BH");
+			expect_opcode(0x4a0d, data.read_word(0x02fd) == 0x007f &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02fd,
+					"ROM4 4a0d pushes the eight-bit B guard");
+			program.write_word(0x05e0, 0x8a0d); // POPM BG
+			program.write_word(0x05e1, 0x8a0c); // POPM BH
+			program.write_word(0x05e2, 0x8a0b); // POPM BL
+			program.write_word(0x05e3, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5511223344ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 127;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 127)
+		{
+			expect_opcode(0x8a0d, (m_cpu->state_int(tms320c54x_device::STATE_B) >> 32) == 0x7f,
+					"ROM4 8a0d restores BG without sign extension");
+			expect_opcode(0x8a0c, (m_cpu->state_int(tms320c54x_device::STATE_B) >> 16 & 0xffff) == 0x1234,
+					"ROM4 8a0c restores BH");
+			expect_opcode(0x8a0b, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7f1234abcdULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234567654ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
+					"ROM4 8a0b restores BL, preserves A, and advances SP");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
