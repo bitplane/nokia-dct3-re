@@ -168,6 +168,24 @@ void tms320c54x_device::execute_run() {}
             self.assertIn("opcodes=2", output.getvalue())
             self.assertIn("new_vs_idle=1", output.getvalue())
 
+    def test_observed_group_reports_exact_counts_and_fixture_class(self):
+        with TemporaryDirectory() as directory:
+            rom4 = Path(directory) / "rom4.log"
+            fixture = Path(directory) / "fixture.log"
+            rom4.write_text("[opcov] op=f495 first_pc=1000 count=9\n"
+                            "[opcov] op=f400 first_pc=1001 count=2\n")
+            fixture.write_text("[opcov] op=f495 first_pc=2000\n"
+                               "[opassert] op=f495\n")
+            output = StringIO()
+            with patch("sys.argv", ["coverage", str(rom4), "--fixture-log",
+                                    str(fixture), "--observed-group", "f4"]), \
+                    redirect_stdout(output):
+                self.assertEqual(main(), 0)
+            self.assertIn("op=f495 first_pc=1000 executions=9 fixture=asserted",
+                          output.getvalue())
+            self.assertIn("op=f400 first_pc=1001 executions=2 fixture=absent",
+                          output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

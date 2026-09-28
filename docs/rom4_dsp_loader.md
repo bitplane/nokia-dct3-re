@@ -917,8 +917,10 @@ not complete coverage of an instruction's operand or flag variants.
 opcode high byte. This is a workload ranking, not an instruction-family
 decoder. `--all-gaps` lists every unasserted word by observed use, with an
 `absent` or `executed-only` class; the default report shows only the leaders.
-In the current 30-second run, `f4` leads because NOP executes over
-one million times. The formerly dominant `4a`/`8a` gaps are now covered by
+In the current 30-second idle/Menu/power union, `f4` leads with 3,155,723
+executions of `f495` NOP and 1,572,960 of `f491` ROL A. Both exact words
+are asserted; group frequency is not an untested-opcode count. The formerly
+dominant `4a`/`8a` gaps are now covered by
 a twelve-register MMR save/restore fixture: it initializes each register,
 checks all twelve stack values, overwrites the registers, and checks the
 restored values after the reverse pops. This adds exact checks for 24 ROM4
@@ -1435,8 +1437,15 @@ instruction's arithmetic, flags, addressing, or cycle cost. Exact-word
 fixtures remain the evidence for those claims.
 On the current 30-second ROM4 idle/Menu/power union, `f4` still leads after
 discounting `f495`: 1,626,477 executions of its other observed words, versus
-1,029,136 for `f0`. The result warrants an exact-word `f4` audit; it does not
+1,029,136 for `f0`. The result prompted an exact-word `f4` audit; it does not
 make its 137 untested static matches valid instruction encodings.
+The exact-word report resolves the apparent `f4` lead: `f491` ROL A accounts
+for 1,572,960 of those remaining executions and already has carry/guard
+assertions. In `f0`, `f050` and `f065` XOR-immediate forms account for
+786,564 and 786,540 executions and are likewise asserted. Fixture-only
+`f165` now checks the two-cycle, shifted-immediate XOR across accumulators:
+it updates B from A while preserving A's guard and carry. The report does
+not establish the other `f0` encodings or all XOR status variants.
 Fixture-only `f43f` (`SUB A>>1,A`) now checks the accumulator arithmetic
 family's right-shift fill under both SXM states: a negative 40-bit source
 sign-fills when SXM is set and zero-fills when clear. Both cases assert TI

@@ -130,6 +130,9 @@ def main() -> int:
                         help="rank unasserted ROM4 executions by opcode high byte")
     parser.add_argument("--variant-report", action="store_true",
                         help="rank untested static decoder matches by observed ROM4 family use")
+    parser.add_argument("--observed-group", type=lambda value: int(value, 16),
+                        action="append", default=[], metavar="HEX",
+                        help="list exact observed words and counts in a high-byte group")
     parser.add_argument("--all-gaps", action="store_true",
                         help="list every unasserted ROM4 word by observed execution count")
     parser.add_argument("--require-all-asserted", action="store_true",
@@ -143,6 +146,8 @@ def main() -> int:
         parser.error("--decoder-source requires --fixture-log")
     if args.variant_report and not args.decoder_source:
         parser.error("--variant-report requires --decoder-source")
+    if any(group < 0 or group > 0xff for group in args.observed_group):
+        parser.error("--observed-group must be a hexadecimal byte")
     try:
         primary_text = args.log.read_text(errors="replace")
         primary = summarize(primary_text)
@@ -170,6 +175,16 @@ def main() -> int:
         new = set(extra["first_pc"]) - set(primary["first_pc"])
         print(f"  additional ROM4 trace {path}: opcodes={extra['opcodes']} "
               f"new_vs_idle={len(new)}")
+    for group in sorted(set(args.observed_group)):
+        print(f"Observed ROM4 words in group {group:02x} (exact execution counts):")
+        words = sorted(((opcode, count) for opcode, count in result["counts"].items()
+                        if opcode >> 8 == group), key=lambda row: (-row[1], row[0]))
+        for opcode, count in words:
+            fixture_class = ("asserted" if fixture and opcode in fixture["asserted"]
+                             else "executed-only" if fixture and opcode in fixture["first_pc"]
+                             else "absent" if fixture else "unclassified")
+            print(f"  op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
+                  f"executions={count} fixture={fixture_class}")
     if fixture:
         rom4 = set(result["first_pc"])
         fixture_only = set(fixture["first_pc"])

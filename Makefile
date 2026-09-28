@@ -1148,6 +1148,8 @@ check-c54x-observed-coverage: build
 			--fixture-log "$$tmp/core/error.log" \
 			--decoder-source $(abspath cpu/tms320c54x/tms320c54x.cpp) \
 			--variant-report \
+			--observed-group f4 \
+			--observed-group f0 \
 			--require-all-asserted
 
 check-c54x-cross-rom:
