@@ -9920,6 +9920,46 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 					"ROM4 CLKMD write reads back modeled status; three STMs cost two cycles each");
+			program.write_word(0x05e2, 0x8812); // STLM A,AR2
+			program.write_word(0x05e3, 0x881a); // STLM A,BRC
+			program.write_word(0x05e4, 0x731a); // MVMD BRC,dmad
+			program.write_word(0x05e5, 0x0f50);
+			program.write_word(0x05e6, 0x8915); // STLM B,AR5
+			program.write_word(0x05e7, 0x891a); // STLM B,BRC
+			program.write_word(0x05e8, 0x75d6);
+			program.write_word(0x05e9, 0x0124);
+			program.write_word(0x05ea, 0xf5e1);
+			data.write_word(0x0f50, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 497;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 497)
+		{
+			expect_opcode(0x8812,
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1234,
+					"ROM4 STLM A,AR2 writes AL");
+			expect_opcode(0x881a, data.read_word(0x0f50) == 0x1234,
+					"ROM4 STLM A,BRC is captured before B overwrites BRC");
+			expect_opcode(0x8915,
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x5678,
+					"ROM4 STLM B,AR5 writes BL");
+			expect_opcode(0x891a,
+					m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"four ROM4 STLM stores and one MVMD cost 1+1+2+1+1 cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
