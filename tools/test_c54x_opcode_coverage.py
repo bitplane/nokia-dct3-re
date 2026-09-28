@@ -118,6 +118,28 @@ void tms320c54x_device::execute_run() {}
                 with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
                     self.assertEqual(main(), 0)
 
+    def test_additional_trace_adds_observed_words_to_assertion_gate(self):
+        with TemporaryDirectory() as directory:
+            idle = Path(directory) / "idle.log"
+            menu = Path(directory) / "menu.log"
+            fixture = Path(directory) / "fixture.log"
+            idle.write_text("[opcov] op=1001 first_pc=2000 count=3\n")
+            menu.write_text("[opcov] op=1001 first_pc=2000 count=5\n"
+                            "[opcov] op=1002 first_pc=2001 count=7\n")
+            fixture.write_text("[opcov] op=1001 first_pc=3000\n[opassert] op=1001\n")
+            argv = ["coverage", str(idle), "--additional-log", str(menu),
+                    "--fixture-log", str(fixture), "--require-all-asserted"]
+            with patch("sys.argv", argv):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    self.assertEqual(main(), 1)
+            fixture.write_text("[opcov] op=1001 first_pc=3000\n[opassert] op=1001\n"
+                               "[opcov] op=1002 first_pc=3001\n[opassert] op=1002\n")
+            output = StringIO()
+            with patch("sys.argv", argv), redirect_stdout(output), redirect_stderr(StringIO()):
+                self.assertEqual(main(), 0)
+            self.assertIn("opcodes=2", output.getvalue())
+            self.assertIn("new_vs_idle=1", output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

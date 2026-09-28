@@ -101,6 +101,8 @@ def ranked_gaps(result: dict[str, object], fixture: dict[str, object]) -> list[t
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
+    parser.add_argument("--additional-log", type=pathlib.Path, action="append", default=[],
+                        help="include another observed ROM4 trace in coverage")
     parser.add_argument("--require-rom4-idle", action="store_true")
     parser.add_argument("--fixture-log", type=pathlib.Path)
     parser.add_argument("--decoder-source", type=pathlib.Path,
@@ -119,11 +121,17 @@ def main() -> int:
     if args.decoder_source and not args.fixture_log:
         parser.error("--decoder-source requires --fixture-log")
     try:
-        result = summarize(args.log.read_text(errors="replace"))
+        primary_text = args.log.read_text(errors="replace")
+        primary = summarize(primary_text)
+        additional_texts = [(path, path.read_text(errors="replace"))
+                            for path in args.additional_log]
+        additional = [(path, summarize(text)) for path, text in additional_texts]
+        result = summarize("\n".join([primary_text] +
+                                     [text for _, text in additional_texts]))
         fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
         declared = decoder_declared_words(args.decoder_source.read_text()) if args.decoder_source else None
         if args.require_rom4_idle:
-            actual = (result["opcodes"], result["high_byte_groups"], result["set_sha256"])
+            actual = (primary["opcodes"], primary["high_byte_groups"], primary["set_sha256"])
             expected = (ROM4_IDLE_OPCODE_COUNT, ROM4_IDLE_GROUP_COUNT,
                         ROM4_IDLE_SET_SHA256)
             if actual != expected:
@@ -135,6 +143,10 @@ def main() -> int:
         f"C54x opcode coverage: opcodes={result['opcodes']} "
         f"groups={result['high_byte_groups']} sha256={result['set_sha256']}"
     )
+    for path, extra in additional:
+        new = set(extra["first_pc"]) - set(primary["first_pc"])
+        print(f"  additional ROM4 trace {path}: opcodes={extra['opcodes']} "
+              f"new_vs_idle={len(new)}")
     if fixture:
         rom4 = set(result["first_pc"])
         fixture_only = set(fixture["first_pc"])

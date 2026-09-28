@@ -701,6 +701,13 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
+The coverage gate now runs a second 30-second 5110 trace with an organic Menu
+keypress from the same seeded EEPROM, checks that the key was pressed and
+released, and unions its opcode set with the idle run before checking fixture
+assertions. The Menu trace currently adds zero opcode words; this is a
+measured negative result, not evidence that other interactive or radio paths
+cannot execute more DSP instructions. The fixed idle fingerprint still
+applies only to the untouched primary run.
 The fixture dispatches 651 distinct words: all 457 observed ROM4 words overlap
 the fixture, and 194 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not

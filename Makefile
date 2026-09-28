@@ -1106,7 +1106,7 @@ check-c54x-opcode-coverage:
 check-c54x-observed-coverage: build
 	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-c54x-coverage.XXXXXX)"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
-		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110"; \
+		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110" "$$tmp/menu/nvram/noki5110"; \
 		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test \
 			-rompath $(abspath $(MAME_DIR))/roms -video none -sound none \
 			-log -verbose -nothrottle -seconds_to_run 1 >output.log 2>&1 \
@@ -1116,12 +1116,24 @@ check-c54x-observed-coverage: build
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
 			--output "$$tmp/rom4/nvram/noki5110/eeprom"; \
+		cp "$$tmp/rom4/nvram/noki5110/eeprom" "$$tmp/menu/nvram/noki5110/eeprom"; \
 		(cd "$$tmp/rom4"; $(abspath $(MAME_DIR))/mame noki5110 \
 			-rompath $(abspath $(MAME_DIR))/roms \
 			-nvram_directory "$$tmp/rom4/nvram" -video none -sound none \
 			-log -verbose -skip_gameinfo -nothrottle -seconds_to_run 30 >/dev/null 2>&1); \
+		(cd "$$tmp/menu"; NOKIA_DCT3_POST_READY_KEYS=menu \
+			NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
+			NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+			$(abspath $(MAME_DIR))/mame noki5110 \
+			-rompath $(abspath $(MAME_DIR))/roms \
+			-nvram_directory "$$tmp/menu/nvram" -video none -sound none \
+			-log -verbose -skip_gameinfo -nothrottle -seconds_to_run 30 \
+			-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null 2>&1); \
+		grep -q 'input-press: .* name=menu' "$$tmp/menu/error.log"; \
+		grep -q 'input-release: .* name=menu' "$$tmp/menu/error.log"; \
 		$(PYTHON) $(abspath tools/c54x_opcode_coverage.py) \
 			"$$tmp/rom4/error.log" --require-rom4-idle \
+			--additional-log "$$tmp/menu/error.log" \
 			--fixture-log "$$tmp/core/error.log" \
 			--decoder-source $(abspath cpu/tms320c54x/tms320c54x.cpp) \
 			--require-all-asserted
