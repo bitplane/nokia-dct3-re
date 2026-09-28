@@ -562,8 +562,8 @@ none recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 89 high-byte groups (set SHA-256
 `be44191a6fd1207eb9b7b00c3673f60e4f4dbc0fbb801585c53acc4a91e96c22`).
-The fixture executes 127 distinct words: 95 overlap the ROM4 run, 32 occur
-only in the fixture, and 362 ROM4 words do not occur in the fixture. These are
+The fixture executes 129 distinct words: 97 overlap the ROM4 run, 32 occur
+only in the fixture, and 360 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -585,8 +585,15 @@ TI specifies five cycles taken and three not taken. Both outcomes now have
 executable cycle assertions, and the decoded `BC` variants share that charge.
 `10f8` (`LD` with absolute Smem) likewise has an exact-word sign-extension
 and two-cycle assertion; the other signed/unsigned accumulator-load variants share
-the absolute-address surcharge. The next ROM4-only priority is the group
-executed about 51,800 times each around DSP PC `0x324c..0x3268`.
+the absolute-address surcharge. In the next loop at DSP PC
+`0x324c..0x3268`, exact `e2e4` (`SQDST`) asserts that B receives the square
+of A's *old* high word while A receives the signed vector difference. Exact
+`4f81` (`DST B,Lmem`) asserts high/low store order and TI's two-cycle cost;
+the absolute `DST` and `DLD` forms also receive their documented extension
+cycle surcharge. Long-operand AR increment/decrement-by-two behavior remains
+to be audited separately: `4f81` uses a non-modifying AR mode and cannot prove
+that contract. The remaining 51,800-execution loop words include `6ddc`,
+`6ded`, `a5be`, `b736`, `d6e1`, and `fff9`.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool

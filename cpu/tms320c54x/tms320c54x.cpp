@@ -1106,6 +1106,7 @@ void tms320c54x_device::execute_one(u16 op)
 		data_write(address + 1, u16(value));
 		if (low != 0xf8)
 			indirect_modify(low);
+		m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	}
 	case 0x5600: // DLD Lmem, A
@@ -1124,6 +1125,7 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = value;
 		if (low != 0xf8)
 			indirect_modify(low);
+		m_icount -= low == 0xf8;
 		return;
 	}
 	case 0x6800: // AND #lk, Smem

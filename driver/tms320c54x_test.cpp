@@ -1727,6 +1727,55 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b01,
 					"ROM4 b0be signed MAC preserves B and updates both pointers");
+			program.write_word(0x05e0, 0xe2e4); // SQDST *AR4+%, *AR2-
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0c03, 5);
+			data.write_word(0x0d00, 7);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0000030000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 86;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 86)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffe0000ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 19 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0cff,
+					"ROM4 e2e4 SQDST squares old A and loads signed vector difference");
+			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
+			program.write_word(0x05e1, 0x0123);
+			program.write_word(0x05e2, 0x4f81); // DST B, *AR1
+			program.write_word(0x05e3, 0x74d6);
+			program.write_word(0x05e4, 0x0123);
+			program.write_word(0x05e5, 0xf5e1); // IDLE
+			m_port_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0d00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 87;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 87)
+		{
+			expect(data.read_word(0x0d00) == 0x1234 &&
+					data.read_word(0x0d01) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0d00 &&
+					m_port_reads == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 4f81 DST writes both halves and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
