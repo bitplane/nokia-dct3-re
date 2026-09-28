@@ -1187,6 +1187,20 @@ void tms320c54x_device::execute_one(u16 op)
 		push(indirect_read(low));
 		m_icount -= low >= 0xe0;
 		return;
+	case 0x4c00: // LTD Smem
+	{
+		const bool preincrement = low < 0xe0 && (low & 0x78) == 0x18;
+		if (preincrement)
+			indirect_modify(low);
+		const u16 address = low >= 0xf8 ? fetch() :
+				low >= 0xe0 ? long_offset_address(low) : m_ar[indirect_ar(low)];
+		m_t = data_read(address);
+		data_write(u16(address + 1), m_t);
+		if (low < 0xe0 && !preincrement)
+			indirect_modify(low);
+		m_icount -= low >= 0xe0;
+		return;
+	}
 	case 0x8c00: // ST T, Smem
 		indirect_write(low, m_t);
 		m_icount -= low >= 0xe0;

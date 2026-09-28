@@ -11969,6 +11969,46 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ABDST sign-extends X/Y under SXM and doubles distance under FRCT");
+			program.write_word(0x05e2, 0x4c83); // LTD *AR3.
+			data.write_word(0x0f90, 0x6cac);
+			data.write_word(0x0f91, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 667;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 667)
+		{
+			expect_opcode(0x4c83,
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x6cac &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				data.read_word(0x0f90) == 0x6cac &&
+				data.read_word(0x0f91) == 0x6cac &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI LTD example copies Smem into T and the next data address in one cycle");
+			program.write_word(0x05e2, 0x4c93); // LTD *AR3+.
+			data.write_word(0x0f90, 0x1234);
+			data.write_word(0x0f91, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 668;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 668)
+		{
+			expect_opcode(0x4c93,
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f91 &&
+				data.read_word(0x0f91) == 0x1234 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"LTD postincrements only after writing the original address successor");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

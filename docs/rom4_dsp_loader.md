@@ -1554,6 +1554,11 @@ updates, and TI's one-cycle cost. `E3xx` ABDST reproduces TI SPRU172C's
 absolute-distance example and a separate SXM-negative/FRCT case. These are
 fixture-only families in the current 5110 trace union; overflow and shared-AR
 variants still need separate evidence.
+TI SPRU307A assigns `LTD Smem` to `4Cxx`; `4c83` now checks the SPRU172C
+source/T/successor example and one-cycle cost. `4c93` checks postincrement
+after the successor write. These fixture-only encodings guard the standalone
+delay primitive used by program-memory MACD; absolute and long-offset
+addressing remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
