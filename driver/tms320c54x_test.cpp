@@ -11805,6 +11805,75 @@ private:
 				data.read_word(0x0f91) == 2 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 				"repeated MACP advances program coefficient and pipelines after first multiply");
+			program.write_word(0x05e2, 0xe03a); // FIRS *AR5,*AR4+,0700.
+			program.write_word(0x05e3, 0x0700);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			program.write_word(0x0700, 0x1234);
+			data.write_word(0x0f90, 0x0055);
+			data.write_word(0x0f91, 0x00aa);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4444);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 659;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 659)
+		{
+			expect_opcode(0xe03a,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff0000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8762c &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f92 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"TI FIRS example accumulates old A high into B and sums X/Y into A");
+			program.write_word(0x05e2, 0xec02); // RPT #2.
+			program.write_word(0x05e3, 0xe03a); // FIRS *AR5,*AR4+,0700.
+			program.write_word(0x05e4, 0x0700);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			program.write_word(0x0700, 1);
+			program.write_word(0x0701, 2);
+			program.write_word(0x0702, 3);
+			data.write_word(0x0f90, 1);
+			data.write_word(0x0f91, 2);
+			data.write_word(0x0f92, 2);
+			data.write_word(0x0f93, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4444);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f91);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 660;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 660)
+		{
+			expect_opcode(0xe03a,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x30000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x86 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f94 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+				"repeated FIRS uses old A, advances coefficients, and pipelines after first pass");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -1540,6 +1540,14 @@ checks consecutive program coefficients, T and AR3 updates, and the
 one-cycle rate after the first multiply. These are fixture-only encodings;
 long-offset/absolute extension order and other addressing variants remain
 unasserted.
+TI SPRU307A assigns `FIRS` to `E0xx`, with a three-cycle first pass and
+one-cycle repeat rate. As with LMS, the detailed SPRU172C opcode diagram
+conflicts with the opcode table and live `B0xx` MAC encodings; the decoder
+uses `E0xx`. Fixture-only `e03a` checks TI's X/Y sum into A, previous-A
+coefficient multiply into B, unchanged T, pointer update, and three-cycle
+cost. A repeated case checks coefficient progression, use of the previous
+A value, and one-cycle steady rate. The observed 5110 trace union does not
+execute FIRS; other status and addressing variants remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

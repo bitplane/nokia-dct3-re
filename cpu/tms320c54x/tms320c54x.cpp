@@ -834,6 +834,37 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
+	if ((op & 0xff00) == 0xe000) // FIRS Xmem, Ymem, pmad
+	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 yvalue = data_read(m_ar[yar]);
+		const u16 coefficient_address = fetch();
+		const u16 coefficient = m_program.read_word(u16(coefficient_address +
+				(repeated ? m_rpt_iteration : 0)));
+		s64 a_high = s64((m_a >> 16) & 0x1ffff);
+		if (a_high & 0x10000)
+			a_high -= 0x20000;
+		s64 product = a_high * s64(s16(coefficient));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		m_b = multiply_result((s64(m_b << 24) >> 24) +
+				multiply_product(product), true);
+		const s64 xsum = BIT(m_st1, 8) ? s64(s16(xvalue)) : s64(xvalue);
+		const s64 ysum = BIT(m_st1, 8) ? s64(s16(yvalue)) : s64(yvalue);
+		m_a = add_sub(0, u64((xsum + ysum) * 0x10000) & ACC_MASK, false, false);
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= 2;
+		return;
+	}
 	if ((op & 0xff00) == 0xe100) // LMS Xmem, Ymem
 	{
 		const u8 x = op >> 4;
