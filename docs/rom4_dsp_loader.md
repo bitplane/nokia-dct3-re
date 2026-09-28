@@ -386,7 +386,11 @@ operand pointer steps, carry, and one-cycle DARAM timing. `50f8` checks
 absolute-address extension and two-cycle cost with OVM saturation; `5083`
 and `5483` check that low-lane carry/borrow does not enter the high lane and
 that C16 mode does not saturate under OVM. None of these words appeared in the
-captured ROM4 boot. `DRSUB` now shares the long-word decoder; fixture-only
+captured ROM4 boot. Fixture-only `5283` and `5383` additionally check B as
+the DADD source with A/B destinations, under both C16 modes. The same
+low-word carry yields `0x50001` in double-precision mode and `0x40001` in
+independent-lane mode; these are two opcode words across four state cases,
+not four distinct encodings. `DRSUB` now shares the long-word decoder; fixture-only
 `5893`/`588b` reproduce TI's reverse-subtract examples in both C16 modes,
 including the cleared borrow flag and AR3 movement by two words. Fixture-only
 `5a8b`/`5a93`, `5c8b`/`5c93`, and `5e8b`/`5e93` now check the
@@ -667,8 +671,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 612 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 155 occur only in the fixture. These are
+The fixture dispatches 614 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 157 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -678,8 +682,8 @@ also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
 That inventory matches top-level cases and opcode masks: 39,518 words match
-some declared path, of which 612 execute in the fixture and 38,906 do not;
-26 matching high-byte groups have no fixture word. These are **candidates**,
+some declared path, of which 614 execute in the fixture and 38,904 do not;
+24 matching high-byte groups have no fixture word. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
 grammar, and behavior are not established by a source mask. The report keeps
 the ROM4-observed/fixture-asserted class separate, so a new observed gap can
