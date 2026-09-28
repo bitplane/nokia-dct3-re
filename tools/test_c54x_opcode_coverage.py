@@ -1,6 +1,11 @@
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from tools.c54x_opcode_coverage import group_gaps, ranked_gaps, summarize
+from tools.c54x_opcode_coverage import group_gaps, main, ranked_gaps, summarize
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
@@ -69,6 +74,32 @@ class C54xOpcodeCoverageTest(unittest.TestCase):
             (0x1001, 0x2001, 7, "executed-only"),
             (0x1002, 0x2002, 7, "absent"),
         ])
+
+    def test_require_all_asserted_rejects_missing_and_executed_only_words(self):
+        with TemporaryDirectory() as directory:
+            rom4 = Path(directory) / "rom4.log"
+            fixture = Path(directory) / "fixture.log"
+            rom4.write_text("[opcov] op=1001 first_pc=2000\n"
+                            "[opcov] op=1002 first_pc=2001\n")
+            fixture.write_text("[opcov] op=1001 first_pc=3000\n")
+            with patch("sys.argv", ["coverage", str(rom4), "--fixture-log",
+                                    str(fixture), "--require-all-asserted"]):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    self.assertEqual(main(), 1)
+            fixture.write_text("[opcov] op=1001 first_pc=3000\n"
+                               "[opcov] op=1002 first_pc=3001\n"
+                               "[opassert] op=1001\n")
+            with patch("sys.argv", ["coverage", str(rom4), "--fixture-log",
+                                    str(fixture), "--require-all-asserted"]):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    self.assertEqual(main(), 1)
+            fixture.write_text("[opcov] op=1001 first_pc=3000\n"
+                               "[opcov] op=1002 first_pc=3001\n"
+                               "[opassert] op=1001\n[opassert] op=1002\n")
+            with patch("sys.argv", ["coverage", str(rom4), "--fixture-log",
+                                    str(fixture), "--require-all-asserted"]):
+                with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                    self.assertEqual(main(), 0)
 
 
 if __name__ == "__main__":

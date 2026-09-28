@@ -605,6 +605,10 @@ the fixture, and 101 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
+`make check-c54x-observed-coverage` regenerates both verbose logs and fails if
+the ROM4 idle word set changes or any observed word lacks an assertion. It is
+also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
+instruction variants or silicon-level timing.
 
 The coverage tool now separates fixture execution from explicit result
 assertions. All 457 observed ROM4 words have an `opassert` marker after a

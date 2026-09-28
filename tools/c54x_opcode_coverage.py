@@ -84,9 +84,13 @@ def main() -> int:
                         help="rank unasserted ROM4 executions by opcode high byte")
     parser.add_argument("--all-gaps", action="store_true",
                         help="list every unasserted ROM4 word by observed execution count")
+    parser.add_argument("--require-all-asserted", action="store_true",
+                        help="fail unless every observed ROM4 word has a fixture assertion")
     args = parser.parse_args()
     if args.group_report and not args.fixture_log:
         parser.error("--group-report requires --fixture-log")
+    if args.require_all_asserted and not args.fixture_log:
+        parser.error("--require-all-asserted requires --fixture-log")
     try:
         result = summarize(args.log.read_text(errors="replace"))
         fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
@@ -131,6 +135,10 @@ def main() -> int:
             for group, executed_words, executed_count, absent_words, absent_count in group_gaps(result, fixture):
                 print(f"  {group:02x}: {executed_words}/{executed_count} "
                       f"{absent_words}/{absent_count}")
+        if args.require_all_asserted and (executed_only or uncovered):
+            print("C54x opcode coverage rejected: observed ROM4 words lack fixture assertions",
+                  file=sys.stderr)
+            return 1
     return 0
 
 
