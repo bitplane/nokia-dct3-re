@@ -6209,6 +6209,60 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0xf210); // SUB #lk,B,A
+			program.write_word(0x05e4, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 307;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 307 || m_phase == 308)
+		{
+			expect_opcode(0xf210,
+					m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 307 ? 8 : 0xffffffffffULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(m_phase == 307 ? 10 : 0) &&
+					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
+					(m_phase == 307) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 SUB #lk,B,A uses B as source, preserves it, and costs two cycles");
+			if (m_phase == 307)
+			{
+				program.write_word(0x05e4, 1);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 308;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e3, 0xf150); // XOR #lk,A,B
+			program.write_word(0x05e4, 0xff00);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff12345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // C
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 309;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 309)
+		{
+			expect_opcode(0xf150,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff12345678ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff1234a978ULL &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 XOR #lk,A,B uses unextended operand, preserves A/C, and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
