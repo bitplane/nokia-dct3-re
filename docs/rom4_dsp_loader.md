@@ -373,6 +373,12 @@ rounding rule (add `0x8000`, then clear the low word) for negative product,
 accumulate-before-round, and negative subtract results. Each also checks
 T/AR preservation, carry preservation, and one-cycle DARAM timing. This
 does not establish every OVM, FRCT, or long-offset combination.
+An `MPYU *AR2,A` fixture checks that FRCT doubles an **unsigned** 16-by-16
+product without changing T or AR2, at the documented one-cycle DARAM cost.
+SPRU172C explicitly lists FRCT as affecting MPYU; unsigned multiplication
+must not bypass the fractional shift. Dual-16 arithmetic (`DADD`/`DSUB`
+families) remains unimplemented and was not observed in the captured ROM4
+executed-opcode set, so it is not yet a claim of ROM4 conformance.
 SFTL shifts only the low 32 bits, clears destination guard bits and sets carry
 from the outgoing bit (or clears carry for shift zero), per SPRU172C page
 4-158. Executable left/right/zero-shift cases distinguish this from SFTA's
