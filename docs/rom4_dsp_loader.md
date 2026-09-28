@@ -600,18 +600,18 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 546 distinct words: 445 overlap the ROM4 run, 101 occur
-only in the fixture, and 12 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 558 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 101 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 445 have an `opassert` marker after a
-passing exact-word check, none execute in the fixture without such a marker,
-and 12 are absent from the fixture. This closes the fixture-executed-only
-classification, not the untested ROM4 encodings or the instruction-family
-audit. Existing result checks now explicitly
+assertions. All 457 observed ROM4 words have an `opassert` marker after a
+passing exact-word check; none are executed-only or absent. This closes the
+observed exact-word fixture gap for this captured boot, not unexecuted ROM4
+paths, unobserved encodings, or the instruction-family audit. Existing result
+checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
 them from the executed-only class without changing CPU behavior. Observed
 `1093`, `1084`, and `1094` now check `LD` sign/zero extension, pointer behavior,
@@ -1256,6 +1256,13 @@ the source. A seven-word table checks `e80d`, `e820`, `e905`, `e906`, `e90c`,
 accumulator and preserves status. Seven `RPT #K` words (`ec09`, `ec0a`,
 `ec0f`, `ec11`, `ec13`, `ec1e`, `ec9f`) repeat MAR exactly K+1 times after
 one setup cycle; the longest fixture executes 160 MAR iterations.
+Exact `f6bd`, `f6bf`, `f7bd`, and `f7be` check one-cycle ST1 bit clear/set
+operations while preserving ST0. Exact `fd30`, `fd4b`, and `fd4d` check both
+accepted and rejected `XC 1` guarded slots, including 40-bit B sign tests and
+the one-cycle conditional-execute cost. Exact `f1fc`, `f463`, `f470`, `f578`,
+and `f763` check logical and arithmetic shifts, carry, sign/guard behavior,
+and one-cycle costs. These checks follow TI SPRU172C; they do not establish
+unobserved status-bit selectors or shift variants.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

@@ -10475,6 +10475,140 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xf6bd); // RSBX ST1 bit 13
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x2000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 533;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 533 && m_phase <= 536)
+		{
+			static constexpr u16 status_words[] = { 0xf6bd, 0xf6bf, 0xf7bd, 0xf7be };
+			static constexpr u16 before[] = { 0x2000, 0x8000, 0, 0 };
+			static constexpr u16 after[] = { 0, 0, 0x2000, 0x4000 };
+			const unsigned index = m_phase - 533;
+			expect_opcode(status_words[index],
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == after[index] &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 RSBX/SSBX changes only the selected ST1 bit in one cycle");
+			if (m_phase < 536)
+			{
+				program.write_word(0x05e2, status_words[index + 1]);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, before[index + 1]);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xfd30); // XC 1,TC
+			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 537;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 537 && m_phase <= 542)
+		{
+			static constexpr u16 xc_words[] = {
+				0xfd30, 0xfd30, 0xfd4b, 0xfd4b, 0xfd4d, 0xfd4d
+			};
+			static constexpr u16 st0_values[] = { 0x1000, 0, 0, 0, 0, 0 };
+			static constexpr u64 b_values[] = {
+				0, 0, 0xff00000000ULL, 0, 0, 1
+			};
+			const unsigned index = m_phase - 537;
+			const bool accepted = (index & 1) == 0;
+			expect_opcode(xc_words[index],
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
+						(accepted ? 0x0121 : 0x0120) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 XC 1 tests TC/BLT/BEQ and executes or rejects one MAR slot");
+			if (m_phase < 542)
+			{
+				program.write_word(0x05e2, xc_words[index + 1]);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, st0_values[index + 1]);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, b_values[index + 1]);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xf1fc); // SFTL A,-4,B
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 543;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 543 && m_phase <= 547)
+		{
+			struct shift_case { u16 opcode; u64 a_before; u64 b_before; u64 a_after; u64 b_after; u16 st0_before; u16 st0_after; };
+			static constexpr shift_case cases[] = {
+				{ 0xf1fc, 0x12345678, 0, 0x12345678, 0x01234567, 0, 0x0800 },
+				{ 0xf463, 0x1001, 0, 0x8008, 0, 0x0800, 0 },
+				{ 0xf470, 0xff80000000ULL, 0, 0xffffff8000ULL, 0, 0x0800, 0 },
+				{ 0xf578, 0x123456ff, 0, 0x123456ff, 0x123456, 0, 0x0800 },
+				{ 0xf763, 0, 0x1234, 0, 0x91a0, 0x0800, 0 }
+			};
+			const unsigned index = m_phase - 543;
+			const shift_case &row = cases[index];
+			expect_opcode(row.opcode,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == row.st0_after &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 SFTL/SFTA checks source, destination, carry, and one-cycle cost");
+			if (m_phase < 547)
+			{
+				const shift_case &next = cases[index + 1];
+				program.write_word(0x05e2, next.opcode);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next.b_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, next.st0_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
