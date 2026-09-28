@@ -859,6 +859,7 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // Standard addressing: MAR names physical AR0.
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			m_phase = 35;
 			m_check_timer->adjust(attotime::from_usec(100));
@@ -4086,6 +4087,39 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 SFTL A clears guard, shifts low 32 bits, updates C, and costs one cycle");
+			program.write_word(0x05e0, 0x6d90); // MAR *AR0+ (ARP-selected in compatibility mode)
+			program.write_word(0x05e1, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0010);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0e00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 4 << 13);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0020); // CMPT
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 213;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 213)
+		{
+			expect_opcode(0x6d90, m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0e01 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0010 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) >> 13) == 4,
+					"ROM4 MAR AR0 aliases ARP in compatibility mode");
+			program.write_word(0x05e0, 0x1090); // LD *AR0+, A
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0e01, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 214;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 214)
+		{
+			expect_opcode(0x1090, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0e02 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0010,
+					"indirect AR0 read and postincrement use ARP in compatibility mode");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

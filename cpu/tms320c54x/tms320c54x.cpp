@@ -403,9 +403,15 @@ u64 tms320c54x_device::arithmetic_shift_right(u64 value, unsigned shift) const
 	return u64(signed_value >> shift) & ACC_MASK;
 }
 
-void tms320c54x_device::indirect_modify(u8 mode, bool long_operand)
+unsigned tms320c54x_device::indirect_ar(u8 mode) const
 {
 	const unsigned ar = mode & 7;
+	return BIT(m_st1, 5) && !ar ? (m_st0 >> 13) & 7 : ar;
+}
+
+void tms320c54x_device::indirect_modify(u8 mode, bool long_operand)
+{
+	const unsigned ar = indirect_ar(mode);
 	const s16 word_step = long_operand ? 2 : 1;
 	switch (mode & 0x78)
 	{
@@ -425,8 +431,8 @@ void tms320c54x_device::indirect_modify(u8 mode, bool long_operand)
 	// In compatibility mode, a nonzero ARF both selects the auxiliary register
 	// and publishes it into ST0.ARP.  Standard mode addresses ARF directly and
 	// must leave ARP cleared/unchanged (TMS320C54x CPU Reference Guide 5.5.1).
-	if (BIT(m_st1, 5) && ar)
-		m_st0 = (m_st0 & ~u16(0xe000)) | u16(ar << 13);
+	if (BIT(m_st1, 5) && (mode & 7))
+		m_st0 = (m_st0 & ~u16(0xe000)) | u16((mode & 7) << 13);
 }
 
 void tms320c54x_device::dual_modify(u8 operand)
@@ -462,7 +468,7 @@ u16 tms320c54x_device::indirect_read(u8 mode)
 {
 	if (mode == 0xf8)
 		return data_read(fetch());
-	const unsigned ar = mode & 7;
+	const unsigned ar = indirect_ar(mode);
 	const bool preincrement = (mode & 0x78) == 0x18;
 	if (preincrement)
 		indirect_modify(mode);
@@ -479,7 +485,7 @@ void tms320c54x_device::indirect_write(u8 mode, u16 value)
 		data_write(fetch(), value);
 		return;
 	}
-	const unsigned ar = mode & 7;
+	const unsigned ar = indirect_ar(mode);
 	const bool preincrement = (mode & 0x78) == 0x18;
 	if (preincrement)
 		indirect_modify(mode);
@@ -1841,14 +1847,14 @@ void tms320c54x_device::execute_one(u16 op)
 			const unsigned mod = (low >> 3) & 0x0f;
 			if (mod >= 12)
 			{
-				const unsigned ar = low & 7;
+				const unsigned ar = indirect_ar(low);
 				const u16 offset = fetch();
 				if (mod == 13)
 					m_ar[ar] += s16(offset);
 				else if (mod == 14)
 					circular_modify(ar, s16(offset));
-				if (BIT(m_st1, 5) && ar)
-					m_st0 = (m_st0 & ~u16(0xe000)) | u16(ar << 13);
+				if (BIT(m_st1, 5) && (low & 7))
+					m_st0 = (m_st0 & ~u16(0xe000)) | u16((low & 7) << 13);
 				--m_icount;
 			}
 			else
