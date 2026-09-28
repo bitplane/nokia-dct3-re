@@ -3879,6 +3879,65 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xf010); // SUB #lk, A
+			program.write_word(0x05e3, 0xff80);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 200;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 200 || m_phase == 201)
+		{
+			expect_opcode(0xf010, m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 200 ? 0x80 : 0x10080) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 SUB #lk respects SXM and costs two cycles");
+			if (m_phase == 200)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM set
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 201;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xf000); // ADD #lk, A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 202;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 202 || m_phase == 203)
+		{
+			expect_opcode(0xf000, m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(m_phase == 202 ? 0x1ff80 : 0xff80) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 ADD #lk respects SXM and costs two cycles");
+			if (m_phase == 202)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM set
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 203;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

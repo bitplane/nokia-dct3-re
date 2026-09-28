@@ -570,9 +570,9 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 146 have an `opassert` marker after a
-passing exact-word check, 55 execute in the fixture without such a marker,
-and 256 are absent from the fixture. The 55-word class includes setup and
+assertions. Of the 457 ROM4 words, 148 have an `opassert` marker after a
+passing exact-word check, 53 execute in the fixture without such a marker,
+and 256 are absent from the fixture. The 53-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 57 lack semantic tests. The 260-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
@@ -632,6 +632,12 @@ Exact ROM4 `f330` (`AND #lk, B`) and `f130` (`AND #lk, A, B`) now check the
 zero-filled immediate mask, source preservation in the cross-accumulator form,
 unchanged carry, and TI SPRU172C's two-cycle cost. The latter was previously
 absent from the fixture; neither marker claims all shift-count variants.
+Exact ROM4 `f010` (`SUB #lk, A`) and `f000` (`ADD #lk, A`) now check both SXM
+states with immediate `0xff80` and the two-cycle cost. The SXM-clear SUB test
+failed before the correction: the shared long-immediate arithmetic path
+sign-extended the operand unconditionally. It now uses the existing SXM-aware
+operand helper; logical immediates remain unextended. These checks do not
+cover all shift counts or saturation cases.
 Exact `f065` (`XOR #lk,16,A`) now checks the shifted result and TI SPRU172C's
 two-cycle cost. The core previously charged one cycle to all four
 source/destination variants of this encoding; the shared path now charges

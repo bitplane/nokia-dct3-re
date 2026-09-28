@@ -779,10 +779,9 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 immediate = fetch();
 		const u64 source = accumulator(BIT(op, 9));
 		u64 &destination = accumulator(BIT(op, 8));
-		// LD uses SXM; arithmetic long-immediates retain signed interpretation.
-		const u64 operand = operation == 2 ?
-				((data_operand(immediate) << shift) & ACC_MASK) : operation < 2 ?
-				((u64(s64(s16(immediate))) << shift) & ACC_MASK) :
+		// Arithmetic and load operands obey SXM; logical immediates are unextended.
+		const u64 operand = operation < 3 ?
+				((data_operand(immediate) << shift) & ACC_MASK) :
 				(u64(immediate) << shift);
 		switch (operation)
 		{
