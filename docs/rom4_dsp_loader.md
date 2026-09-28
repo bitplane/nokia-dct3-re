@@ -574,11 +574,11 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 202 have an `opassert` marker after a
-passing exact-word check, 26 execute in the fixture without such a marker,
-and 229 are absent from the fixture. The 26-word class includes setup and
+assertions. Of the 457 ROM4 words, 204 have an `opassert` marker after a
+passing exact-word check, 24 execute in the fixture without such a marker,
+and 229 are absent from the fixture. The 24-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 26 lack semantic tests. The formerly leading challenge-loop
+claim that all 24 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
 The 229-word class is a priority list
@@ -848,6 +848,11 @@ ROM4 `1092` (`LD *AR2+,A`) now has an isolated signed-load, postincrement,
 and one-cycle assertion. The existing 26-word `e59c` (`MVDD`) receive-ring
 copy checks its copied words and final X/Y pointers and is now tagged as an
 exact-word assertion rather than misclassified as executed-only.
+Exact ROM4 `fc4b` (`RC BLT`) fixtures check the signed 40-bit B predicate
+and TI's five/three-cycle taken/false costs. `fa45` (`BCD pmad,AEQ`) fixtures
+check both outcomes, both delay words, and the three-cycle cost. The latter
+found a shared-core defect: the false path had cost only one cycle because
+the cycle charge was inside the taken branch; both paths now pay it.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

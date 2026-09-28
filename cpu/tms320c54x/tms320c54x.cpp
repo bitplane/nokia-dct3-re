@@ -1656,11 +1656,11 @@ void tms320c54x_device::execute_one(u16 op)
 				op == 0xfa44 ? (m_a & ACC_MASK) != 0 :
 				op == 0xfa4d ? (m_b & ACC_MASK) == 0 :
 				op == 0xfa30 ? bool(m_st0 & 0x1000) : !(m_st0 & 0x1000);
+		m_icount -= 2;
 		if (condition)
 		{
 			m_delayed_target = destination;
 			m_delayed_words = 2;
-			m_icount -= 2;
 		}
 		return;
 	}

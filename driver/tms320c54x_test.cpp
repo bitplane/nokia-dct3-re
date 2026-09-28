@@ -5006,6 +5006,89 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f21 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 LD *AR2+,A sign-extends, postincrements, and costs one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xfc4b); // RC BLT, false
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 248;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 248)
+		{
+			expect_opcode(0xfc4b, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 RC BLT false retains SP and costs three cycles");
+			program.write_word(0x05e3, 0xf5e1); // Must be bypassed by the return.
+			program.write_word(0x05e8, 0x75d6);
+			program.write_word(0x05e9, 0x0124);
+			program.write_word(0x05ea, 0xf5e1);
+			data.write_word(0x0300, 0x05e8);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff00000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 249;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 249)
+		{
+			expect_opcode(0xfc4b, m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 RC BLT true tests the 40-bit sign and costs five cycles");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xfa45); // BCD pmad, AEQ
+			program.write_word(0x05e3, 0x05ec);
+			program.write_word(0x05e4, 0xe801); // First delay word
+			program.write_word(0x05e5, 0xe802); // Second delay word
+			program.write_word(0x05e6, 0x75d6); // Fallthrough marker
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			program.write_word(0x05ec, 0x75d6); // Taken marker
+			program.write_word(0x05ed, 0x0124);
+			program.write_word(0x05ee, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 250;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 250)
+		{
+			expect_opcode(0xfa45, m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e9 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 BCD AEQ false executes both delay words and costs three cycles");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 251;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 251)
+		{
+			expect_opcode(0xfa45, m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ef &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 BCD AEQ true executes both delay words before target in three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
