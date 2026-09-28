@@ -563,16 +563,16 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 251 distinct words: 209 overlap the ROM4 run, 42 occur
-only in the fixture, and 248 ROM4 words do not occur in the fixture. These are
+The fixture executes 253 distinct words: 211 overlap the ROM4 run, 42 occur
+only in the fixture, and 246 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 167 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 169 have an `opassert` marker after a
 passing exact-word check, 42 execute in the fixture without such a marker,
-and 248 are absent from the fixture. The 42-word class includes setup and
+and 246 are absent from the fixture. The 42-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 42 lack semantic tests. The 254-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
@@ -660,6 +660,14 @@ word is stored at the decremented address before increment. A middle port
 marker checks their separate two-cycle and one-cycle costs, matching TI
 SPRU172C's DARAM instruction table. This does not establish external-memory
 wait-state behavior.
+Exact ROM4 `e5a8` and `e5ca` now check MVDD X/Y memory transfers. The first
+copies `*AR4+` to `*AR2+`; the second reads `*AR2+0%`, writes `*AR4+`, and
+wraps AR2 with BK=4. Both fetch the source and destination addresses before
+modifying either pointer. Port markers check one cycle each for the fixture's
+DARAM operands, consistent with [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf);
+[TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf) defines the
+dual-operand address-modification rules. The fixture does not model external
+memory contention or wait states.
 Exact ROM4 `f820` (`BC pmad, NTC`) and `f84c` (`BC pmad, BNEQ`) check taken
 and fall-through destinations at TI SPRU172C's five- and three-cycle costs.
 The BNEQ true case has a nonzero guard byte and zero low 32 bits, so a
