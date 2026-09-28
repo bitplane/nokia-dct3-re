@@ -6443,6 +6443,24 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ORM *+AR2(lk)% wraps circular address and preserves carry");
+			program.write_word(0x05e3, 0x76ea); // STM #cafe,*+AR2(5)
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0xcafe);
+			data.write_word(0x0f05, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 319;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 319)
+		{
+			expect_opcode(0x76ea, data.read_word(0x0f05) == 0xcafe &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"STM *+AR2(lk) consumes offset before immediate in three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

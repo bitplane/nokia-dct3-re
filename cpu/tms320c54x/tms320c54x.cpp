@@ -1325,19 +1325,16 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x7600: // STM #lk, Smem
-		if (low == 0xf8)
+		if (low >= 0xe0)
 		{
-			// The absolute Smem extension precedes the immediate extension.
-			// Keep the fetch order explicit; passing fetch() as the helper
-			// argument reverses these words before indirect_write fetches the
-			// address.
-			const u16 address = fetch();
+			// Extended Smem addressing precedes the immediate extension.
+			const u16 address = low >= 0xf8 ? fetch() : long_offset_address(low);
 			const u16 value = fetch();
 			data_write(address, value);
 		}
 		else
 			indirect_write(low, fetch());
-		m_icount -= low == 0xf8 ? 2 : 1;
+		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	case 0x7700: // STM #lk, MMR
 	{
