@@ -386,8 +386,13 @@ operand pointer steps, carry, and one-cycle DARAM timing. `50f8` checks
 absolute-address extension and two-cycle cost with OVM saturation; `5083`
 and `5483` check that low-lane carry/borrow does not enter the high lane and
 that C16 mode does not saturate under OVM. None of these words appeared in the
-captured ROM4 boot. Other long-word arithmetic (`DADST`, `DRSUB`, `DSADT`,
-`DSUBT`) and external-memory wait states remain outside this fixture audit.
+captured ROM4 boot. `DRSUB` now shares the long-word decoder; fixture-only
+`5893`/`588b` reproduce TI's reverse-subtract examples in both C16 modes,
+including the cleared borrow flag and AR3 movement by two words. The T-based
+long-word forms (`DADST`, `DSADT`, `DSUBT`) remain open: the published DSADT
+C16 example sets C despite an upper-lane subtraction borrow, so a generic
+high-lane carry rule would be an unverified assumption for those operations.
+External-memory wait states also remain outside this fixture audit.
 `SQUR Smem` now copies its source word to T as SPRU172C specifies; the prior
 handler calculated the square but left T unchanged. Fixture-only `2682`
 checks FRCT doubling, OVM saturation, sticky OVA, and one-cycle indirect
@@ -620,8 +625,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 571 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 114 occur only in the fixture. These are
+The fixture dispatches 573 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 116 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.

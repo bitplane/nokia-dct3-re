@@ -1209,6 +1209,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x5000: case 0x5100: case 0x5200: case 0x5300: // DADD Lmem, src, dst
 	case 0x5400: case 0x5500: // DSUB Lmem, src
+	case 0x5800: case 0x5900: // DRSUB Lmem, src
 	{
 		const unsigned ar = low & 7;
 		const bool extended = low >= 0xe0;
@@ -1221,7 +1222,8 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 low_word = data_read(address ^ 1);
 		if (!extended && !preincrement)
 			indirect_modify(low, true);
-		const bool subtract = (op & 0xfe00) == 0x5400;
+		const bool reverse = (op & 0xfe00) == 0x5800;
+		const bool subtract = (op & 0xfe00) == 0x5400 || reverse;
 		const bool destination_b = BIT(op, 8);
 		const u64 source = accumulator(subtract ? destination_b : BIT(op, 9));
 		u64 &destination = accumulator(destination_b);
@@ -1230,17 +1232,21 @@ void tms320c54x_device::execute_one(u16 op)
 			u64 operand = (u64(high) << 16) | low_word;
 			if (BIT(m_st1, 8) && BIT(high, 15))
 				operand |= u64(0xff) << 32;
-			destination = add_sub(source, operand, subtract, destination_b);
+			destination = reverse ? add_sub(operand, source, true, destination_b) :
+					add_sub(source, operand, subtract, destination_b);
 		}
 		else // Dual 16-bit mode: the two lanes do not carry into one another.
 		{
-			const u16 source_high_word = u16(source >> 16);
-			const s32 source_high = BIT(m_st1, 8) ? s32(s16(source >> 16)) : s32(u16(source >> 16));
-			const s32 memory_high = BIT(m_st1, 8) ? s32(s16(high)) : s32(high);
-			const s32 result_high = subtract ? source_high - memory_high : source_high + memory_high;
-			const u16 result_low = subtract ? u16(source) - low_word : u16(source) + low_word;
-			const bool carry = subtract ? source_high_word >= high :
-					u32(source_high_word) + high > 0xffff;
+			const u16 left_high_word = reverse ? high : u16(source >> 16);
+			const u16 right_high_word = reverse ? u16(source >> 16) : high;
+			const u16 left_low_word = reverse ? low_word : u16(source);
+			const u16 right_low_word = reverse ? u16(source) : low_word;
+			const s32 left_high = BIT(m_st1, 8) ? s32(s16(left_high_word)) : s32(left_high_word);
+			const s32 right_high = BIT(m_st1, 8) ? s32(s16(right_high_word)) : s32(right_high_word);
+			const s32 result_high = subtract ? left_high - right_high : left_high + right_high;
+			const u16 result_low = subtract ? left_low_word - right_low_word : left_low_word + right_low_word;
+			const bool carry = subtract ? left_high_word >= right_high_word :
+					u32(left_high_word) + right_high_word > 0xffff;
 			m_st0 = (m_st0 & ~u16(0x0800)) | (carry ? 0x0800 : 0);
 			destination = (u64(u32(result_high) & 0xffffff) << 16) | result_low;
 		}
