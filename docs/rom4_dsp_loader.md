@@ -567,21 +567,21 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 279 distinct words: 231 overlap the ROM4 run, 48 occur
-only in the fixture, and 226 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 281 distinct words: 233 overlap the ROM4 run, 48 occur
+only in the fixture, and 224 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 216 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 218 have an `opassert` marker after a
 passing exact-word check, 15 execute in the fixture without such a marker,
-and 226 are absent from the fixture. The 15-word class includes setup and
+and 224 are absent from the fixture. The 15-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 15 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
-The 226-word class is a priority list
+The 224-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -874,6 +874,9 @@ Exact ROM4 `8091` (`STL A,*AR1+`, 160 observed dispatches) checks its AL
 store, postincrement, and one-cycle cost. `7593` (`PORTW *AR3+,PA`, 128
 dispatches) checks the transferred source word, postincrement, and TI's
 two-cycle indirect port-write cost.
+Exact ROM4 `fc20` (`RC NTC`, 127 dispatches) checks the three-cycle false
+and five-cycle taken paths, including SP behavior. `1086` (`LD *AR6,A`, 120
+dispatches) checks SXM sign extension, an unchanged AR6, and one-cycle cost.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
