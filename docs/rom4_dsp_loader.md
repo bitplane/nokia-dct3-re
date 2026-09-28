@@ -1532,6 +1532,14 @@ Fixture-only `a6ab` reproduces TI SPRU172C's unsigned-X positive-product
 example; `a7ab` additionally checks signed-negative Y, FRCT doubling, the B
 destination, unchanged A, T update, and both pointer increments. Neither
 encoding appeared in the observed 5110 trace union.
+The `78xx/79xx` MACP and `7axx/7bxx` MACD program-memory multiply families
+now have TI SPRU172C example fixtures (`788b` and `7a8b`). Both check the
+three-cycle base cost; MACD additionally copies the source word to its
+successor, while MACP leaves that word alone. A repeated `7893` fixture
+checks consecutive program coefficients, T and AR3 updates, and the
+one-cycle rate after the first multiply. These are fixture-only encodings;
+long-offset/absolute extension order and other addressing variants remain
+unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

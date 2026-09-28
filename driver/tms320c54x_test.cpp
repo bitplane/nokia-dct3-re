@@ -11721,6 +11721,90 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"MACSU B uses signed Y, unsigned X, FRCT doubling, and one cycle");
+			program.write_word(0x05e2, 0x788b); // MACP *AR3-,0700,A.
+			program.write_word(0x05e3, 0x0700);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			program.write_word(0x0700, 0x1234);
+			data.write_word(0x0f90, 0x0055);
+			data.write_word(0x0f91, 0x0066);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 656;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 656)
+		{
+			expect_opcode(0x788b,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f8f &&
+				data.read_word(0x0f91) == 0x0066 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"TI MACP example reads program coefficient without delay write in three cycles");
+			program.write_word(0x05e2, 0x7a8b); // MACD *AR3-,0700,A.
+			data.write_word(0x0f91, 0x0066);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 657;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 657)
+		{
+			expect_opcode(0x7a8b,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f8f &&
+				data.read_word(0x0f91) == 0x0055 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"TI MACD example copies Smem to successor and costs three cycles");
+			program.write_word(0x05e2, 0xec02); // RPT #2.
+			program.write_word(0x05e3, 0x7893); // MACP *AR3+,0700,A.
+			program.write_word(0x05e4, 0x0700);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			program.write_word(0x0700, 4);
+			program.write_word(0x0701, 5);
+			program.write_word(0x0702, 6);
+			data.write_word(0x0f90, 1);
+			data.write_word(0x0f91, 2);
+			data.write_word(0x0f92, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 658;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 658)
+		{
+			expect_opcode(0x7893,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 32 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f93 &&
+				data.read_word(0x0f91) == 2 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+				"repeated MACP advances program coefficient and pipelines after first multiply");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

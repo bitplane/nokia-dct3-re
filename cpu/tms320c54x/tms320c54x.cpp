@@ -1534,6 +1534,44 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 1;
 		return;
 	}
+	case 0x7800: case 0x7900: // MACP Smem, pmad, A/B
+	case 0x7a00: case 0x7b00: // MACD Smem, pmad, A/B
+	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
+		u16 coefficient_address;
+		u16 address;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			coefficient_address = fetch();
+			address = long_offset_address(low);
+		}
+		else
+		{
+			const bool preincrement = low < 0xe0 && (low & 0x78) == 0x18;
+			if (preincrement)
+				indirect_modify(low);
+			address = low >= 0xf8 ? fetch() : m_ar[indirect_ar(low)];
+			coefficient_address = fetch();
+		}
+		const u16 value = data_read(address);
+		const u16 coefficient = m_program.read_word(u16(coefficient_address +
+				(repeated ? m_rpt_iteration : 0)));
+		s64 product = s64(s16(value)) * s64(s16(coefficient));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		const bool b = BIT(op, 8);
+		accumulator(b) = multiply_result((s64(accumulator(b) << 24) >> 24) +
+				multiply_product(product), b);
+		m_t = value;
+		if (BIT(op, 9))
+			data_write(u16(address + 1), value);
+		if (low < 0xe0 && (low & 0x78) != 0x18)
+			indirect_modify(low);
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= low >= 0xe0 ? 3 : 2;
+		return;
+	}
 	case 0x7d00: // MVDP Smem, pmad
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
