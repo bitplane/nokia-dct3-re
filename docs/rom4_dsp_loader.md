@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 493 distinct words: 395 overlap the ROM4 run, 98 occur
-only in the fixture, and 62 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 497 distinct words: 398 overlap the ROM4 run, 99 occur
+only in the fixture, and 59 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 395 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 398 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 62 are absent from the fixture. This closes the fixture-executed-only
+and 59 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1208,6 +1208,9 @@ Both accumulator-to-accumulator forms cost one cycle.
 Exact `10da`, `6d93`, `7308`, `7313`, and `7681` now check a circular load
 through AR2 using AR0's step, a linear MAR update, two MMR-to-data moves, and
 an immediate store. The marker span verifies their combined 1+1+2+2+2 cycles.
+Exact `7718`, `7728`, and `7758` check direct `STM` writes to SP, page-zero
+data, and CLKMD at two cycles each. A fixture-only `LDM CLKMD,A` reads back
+the model's status bit; this is not a silicon PLL-lock timing assertion.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
