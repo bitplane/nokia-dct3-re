@@ -5357,6 +5357,49 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
 					"ROM4 RPT #5 runs its one-cycle ADD body six times after one-cycle setup");
+			program.write_word(0x05e2, 0x8091); // STL A,*AR1+
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f20, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 265;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 265)
+		{
+			expect_opcode(0x8091, data.read_word(0x0f20) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0f21 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 STL A,*AR1+ stores AL and postincrements in one cycle");
+			program.write_word(0x05e2, 0x7593); // PORTW *AR3+,PA
+			program.write_word(0x05e3, 0x0124);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0f20, 0xabcd);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 266;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 266)
+		{
+			expect_opcode(0x7593, m_middle_port_value == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f21 &&
+					m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 2 &&
+					m_last_port_cycle - m_middle_port_cycle == 2,
+					"ROM4 PORTW *AR3+,PA transfers the old source and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
