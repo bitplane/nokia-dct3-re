@@ -567,19 +567,18 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 396 distinct words: 312 overlap the ROM4 run, 84 occur
+The fixture dispatches 397 distinct words: 312 overlap the ROM4 run, 85 occur
 only in the fixture, and 145 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 309 have an `opassert` marker after a
-passing exact-word check, 3 execute in the fixture without such a marker,
-and 145 are absent from the fixture. The remaining executed-only words are
-`0083`, `7726`, and `e726`; surrounding scenarios exercise them, but their
-individual results are not independently asserted. Existing result checks
-now explicitly
+assertions. Of the 457 ROM4 words, 312 have an `opassert` marker after a
+passing exact-word check, none execute in the fixture without such a marker,
+and 145 are absent from the fixture. This closes the fixture-executed-only
+classification, not the untested ROM4 encodings or the instruction-family
+audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
 them from the executed-only class without changing CPU behavior. The formerly
 most-used absent word, `fa20`, now has taken and not-taken `BCD NTC` fixtures
@@ -708,6 +707,11 @@ Five older result checks now carry exact-word markers: `f062` and `f070`
 for the long-immediate load/repeat sequence, `f944` for conditional call,
 `f485` for signed absolute value, and `ec03` for the four-iteration repeat.
 These are existing scenario assertions, not new isolated timing fixtures.
+The last three executed-only words now have isolated checks: `0083`
+(`ADD *AR3,A`) checks SXM sign extension, unchanged AR3, and one-cycle cost;
+`e726` (`MVMM AR2,AR6`) checks the register transfer and one-cycle cost;
+`7726` (`STM #TSS,TCR`) checks the two-cycle store by reading TCR back
+through fixture-only `4826` (`LDM TCR,A`).
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.

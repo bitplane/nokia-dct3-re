@@ -8018,6 +8018,64 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0x0083); // ADD *AR3,A
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0f52, 0xfffe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f52);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 404;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 404)
+		{
+			expect_opcode(0x0083, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffffffULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f52 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 ADD *AR3,A sign-extends negative Smem without pointer update");
+			program.write_word(0x05e3, 0xe726); // MVMM AR2,AR6
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x4567);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 405;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 405)
+		{
+			expect_opcode(0xe726, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x4567 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x4567 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 MVMM copies AR2 into AR6 in one cycle");
+			program.write_word(0x05e3, 0x7726); // STM #TSS,TCR
+			program.write_word(0x05e4, 0x0010);
+			program.write_word(0x05e5, 0x4826); // LDM TCR,A
+			program.write_word(0x05e6, 0x75f8);
+			program.write_word(0x05e7, 0x0d00);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 406;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 406)
+		{
+			expect_opcode(0x7726, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0010 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"ROM4 STM #TSS,TCR survives MMR readback with two-cycle store");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
