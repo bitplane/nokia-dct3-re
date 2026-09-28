@@ -1111,7 +1111,7 @@ void tms320c54x_device::execute_one(u16 op)
 		m_program.write_word(u16(m_a) + (repeated ? m_rpt_iteration : 0),
 				indirect_read(low));
 		if (!repeated || !m_rpt_iteration)
-			m_icount -= low == 0xf8 ? 5 : 4;
+			m_icount -= low >= 0xe0 ? 5 : 4;
 		return;
 	}
 	case 0x6100: // BITF Smem, #lk
@@ -1380,7 +1380,7 @@ void tms320c54x_device::execute_one(u16 op)
 				(repeated ? m_rpt_iteration : 0));
 		indirect_write(low, value);
 		if (!repeated || !m_rpt_iteration)
-			m_icount -= low == 0xf8 ? 5 : 4;
+			m_icount -= low >= 0xe0 ? 5 : 4;
 		return;
 	}
 	case 0xe700: // MVMM MMRx, MMRy

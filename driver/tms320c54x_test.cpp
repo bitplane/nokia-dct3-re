@@ -7293,6 +7293,46 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 					"long-offset MVDP consumes offset before pmad and takes five cycles");
+			program.write_word(0x05e3, 0x7fea); // WRITA *+AR2(5)
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			program.write_word(0x0600, 0);
+			data.write_word(0x0f05, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 365;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 365)
+		{
+			expect_opcode(0x7fea, program.read_word(0x0600) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
+					"long-offset WRITA stores the data word at A in six cycles");
+			program.write_word(0x05e3, 0x7eea); // READA *+AR2(5)
+			program.write_word(0x0600, 0xabcd);
+			data.write_word(0x0f05, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 366;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 366)
+		{
+			expect_opcode(0x7eea, data.read_word(0x0f05) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
+					"long-offset READA stores the A-addressed program word in six cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
