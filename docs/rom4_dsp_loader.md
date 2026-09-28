@@ -394,9 +394,8 @@ T-based long-word forms (`DADST`, `DSUBT`, `DSADT`) in both C16 modes against
 TI's published result examples. `5bf8` checks absolute B-destination
 addressing and its two-cycle cost. `5aea` checks long-offset preupdate,
 extension consumption, and the same two-cycle cost. The published DSADT C16
-example sets C
-despite an upper-lane subtraction borrow; the fixture does not assert C for
-that case, so its carry behavior still needs independent evidence. TI's
+example sets C despite an upper-lane subtraction borrow; the fixture does not
+assert C for that case, so its carry behavior still needs independent evidence. TI's
 opcode table also exposed a pre-existing `SUBC Smem,B` decode error: its
 encoding is `1f`, not `5e` (which belongs to DSADT). Fixture-only `1f83`
 checks the corrected B destination, unchanged A, carry, and indirect timing.
@@ -408,6 +407,12 @@ SUBS to B using the unsigned memory word despite SXM. `1983` checks AND to B
 zeroing the upper bits without changing carry, and `2183` checks a negative
 signed MPY to B without changing T or carry. All four check one-cycle DARAM
 timing and cover high-byte groups absent from the earlier fixture.
+The table-driven fixture-only `2383`, `2583`, `2783`, `2983`, `2b83`,
+`2c83`, `2d83`, `2e83`, and `2f83` cases check rounded/signed/unsigned
+multiplication, square-to-B with T publication, and MAC/MAS accumulation or
+rounding in both accumulators. Each checks its result, T, the untouched
+accumulator, carry preservation, and one-cycle DARAM timing. They do not
+cover FRCT/OVM combinations or all memory-addressing variants.
 External-memory wait states also remain outside this fixture audit.
 `SQUR Smem` now copies its source word to T as SPRU172C specifies; the prior
 handler calculated the square but left T unchanged. Fixture-only `2682`
@@ -641,8 +646,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 588 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 131 occur only in the fixture. These are
+The fixture dispatches 597 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 140 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -652,8 +657,8 @@ also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
 That inventory matches top-level cases and opcode masks: 39,518 words match
-some declared path, of which 588 execute in the fixture and 38,930 do not;
-47 matching high-byte groups have no fixture word. These are **candidates**,
+some declared path, of which 597 execute in the fixture and 38,921 do not;
+40 matching high-byte groups have no fixture word. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
 grammar, and behavior are not established by a source mask. The report keeps
 the ROM4-observed/fixture-asserted class separate, so a new observed gap can

@@ -11064,6 +11064,63 @@ private:
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"MPY Smem,B signs both factors and leaves carry unchanged");
+			program.write_word(0x05e2, 0x2383); // MPYR *AR3,B
+			data.write_word(0x0f90, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 578;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 578 && m_phase <= 586)
+		{
+			struct multiply_case { u16 opcode, t, memory, t_after; u64 a_before, b_before, a_after, b_after; };
+			static constexpr multiply_case cases[] = {
+				{ 0x2383, 0x4000, 3,      0x4000, 0x1234, 0,       0x1234, 0x10000 },
+				{ 0x2583, 0xfffe, 3,      0xfffe, 0x1234, 0,       0x1234, 0x2fffa },
+				{ 0x2783, 0x4000, 0xfffe, 0xfffe, 0x1234, 0,       0x1234, 4 },
+				{ 0x2983, 0xfffe, 3,      0xfffe, 0x1234, 10,      0x1234, 4 },
+				{ 0x2b83, 0x4000, 3,      0x4000, 0x1234, 0x10000, 0x1234, 0x20000 },
+				{ 0x2c83, 2,      3,      2,      10,     0x5678,  4,      0x5678 },
+				{ 0x2d83, 2,      3,      2,      0x1234, 10,      0x1234, 4 },
+				{ 0x2e83, 0x4000, 3,      0x4000, 0x30000, 0x5678, 0x20000, 0x5678 },
+				{ 0x2f83, 0x4000, 3,      0x4000, 0x1234, 0x30000, 0x1234, 0x20000 }
+			};
+			const unsigned index = m_phase - 578;
+			const multiply_case &row = cases[index];
+			expect_opcode(row.opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == row.t_after &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"multiply/MAC family result, side effects, and one-cycle DARAM timing");
+			if (m_phase < 586)
+			{
+				const multiply_case &next = cases[index + 1];
+				program.write_word(0x05e2, next.opcode);
+				data.write_word(0x0f90, next.memory);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next.b_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, next.t);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
