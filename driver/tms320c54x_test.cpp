@@ -4504,6 +4504,74 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d00 &&
 					m_last_port_cycle - m_middle_port_cycle == 3,
 					"ROM4 LD *AR2-,16,B loads positive data and decrements in one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x1a82); // OR *AR2,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0x1b83); // OR *AR3,B
+			program.write_word(0x05e6, 0x75d6);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0d20, 0x00f0);
+			data.write_word(0x0d30, 0x0f0f);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12340000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xaaaa0000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 229;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 229)
+		{
+			expect_opcode(0x1a82, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123400f0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d20 &&
+					m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 3,
+					"ROM4 OR *AR2,A preserves AR2 and costs one cycle");
+			expect_opcode(0x1b83, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xaaaa0f0f &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d30 &&
+					m_last_port_cycle - m_middle_port_cycle == 3,
+					"ROM4 OR *AR3,B preserves AR3 and costs one cycle");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x1a83); // OR *AR3,A
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0x1b82); // OR *AR2,B
+			program.write_word(0x05e6, 0x75d6);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0d20, 0x3333);
+			data.write_word(0x0d30, 0x5555);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xaaaa0000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xcccc0000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 230;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 230)
+		{
+			expect_opcode(0x1a83, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xaaaa5555 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d30 &&
+					m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 3,
+					"ROM4 OR *AR3,A loads AR3 data in one cycle");
+			expect_opcode(0x1b82, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xcccc3333 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d20 &&
+					m_last_port_cycle - m_middle_port_cycle == 3,
+					"ROM4 OR *AR2,B loads AR2 data in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
