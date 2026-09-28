@@ -383,21 +383,22 @@ u64 tms320c54x_device::arithmetic_shift_right(u64 value, unsigned shift) const
 	return u64(signed_value >> shift) & ACC_MASK;
 }
 
-void tms320c54x_device::indirect_modify(u8 mode)
+void tms320c54x_device::indirect_modify(u8 mode, bool long_operand)
 {
 	const unsigned ar = mode & 7;
+	const s16 word_step = long_operand ? 2 : 1;
 	switch (mode & 0x78)
 	{
-	case 0x08: --m_ar[ar]; break;
-	case 0x10: ++m_ar[ar]; break;
-	case 0x18: ++m_ar[ar]; break;
+	case 0x08: m_ar[ar] -= word_step; break;
+	case 0x10: m_ar[ar] += word_step; break;
+	case 0x18: m_ar[ar] += word_step; break;
 	case 0x20: m_ar[ar] -= m_ar[0]; break;
 	case 0x28: m_ar[ar] -= m_ar[0]; break;
 	case 0x30: m_ar[ar] += m_ar[0]; break;
 	case 0x38: m_ar[ar] += m_ar[0]; break;
-	case 0x40: circular_modify(ar, -1); break;
+	case 0x40: circular_modify(ar, -word_step); break;
 	case 0x48: circular_modify(ar, -s16(m_ar[0])); break;
-	case 0x50: circular_modify(ar, 1); break;
+	case 0x50: circular_modify(ar, word_step); break;
 	case 0x58: circular_modify(ar, s16(m_ar[0])); break;
 	default: break;
 	}
@@ -831,6 +832,14 @@ void tms320c54x_device::execute_one(u16 op)
 		m_b = data_operand(indirect_read(low));
 		m_icount -= low == 0xf8;
 		return;
+	case 0x4000: case 0x4100: case 0x4200: case 0x4300: // SUB Smem, 16, src, dst
+	{
+		const u64 operand = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
+		accumulator(BIT(op, 8)) = add_sub(accumulator(BIT(op, 9)), operand,
+				true, BIT(op, 8));
+		m_icount -= low == 0xf8;
+		return;
+	}
 	case 0x1200: // LD uns(Smem), A
 		m_a = indirect_read(low);
 		m_icount -= low == 0xf8;
@@ -1100,12 +1109,15 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4f00: // DST B, Lmem
 	{
 		const unsigned ar = low & 7;
+		const bool preincrement = (low & 0x78) == 0x18;
+		if (low != 0xf8 && preincrement)
+			indirect_modify(low, true);
 		const u16 address = (low == 0xf8 ? fetch() : m_ar[ar]) & 0xfffe;
 		const u64 value = accumulator(BIT(op, 8));
 		data_write(address, u16(value >> 16));
 		data_write(address + 1, u16(value));
-		if (low != 0xf8)
-			indirect_modify(low);
+		if (low != 0xf8 && !preincrement)
+			indirect_modify(low, true);
 		m_icount -= low == 0xf8 ? 2 : 1;
 		return;
 	}
@@ -1113,6 +1125,9 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x5700: // DLD Lmem, B
 	{
 		const unsigned ar = low & 7;
+		const bool preincrement = (low & 0x78) == 0x18;
+		if (low != 0xf8 && preincrement)
+			indirect_modify(low, true);
 		const u16 address = (low == 0xf8 ? fetch() : m_ar[ar]) & 0xfffe;
 		const u16 high = data_read(address);
 		const u16 low_word = data_read(address + 1);
@@ -1123,8 +1138,8 @@ void tms320c54x_device::execute_one(u16 op)
 		if (BIT(m_st1, 8) && BIT(high, 15))
 			value |= u64(0xff) << 32;
 		accumulator(BIT(op, 8)) = value;
-		if (low != 0xf8)
-			indirect_modify(low);
+		if (low != 0xf8 && !preincrement)
+			indirect_modify(low, true);
 		m_icount -= low == 0xf8;
 		return;
 	}
@@ -1815,7 +1830,21 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		if ((op & 0xff00) == 0x6d00) // MAR indirect auxiliary-register modification
 		{
-			indirect_modify(low);
+			const unsigned mod = (low >> 3) & 0x0f;
+			if (mod >= 12)
+			{
+				const unsigned ar = low & 7;
+				const u16 offset = fetch();
+				if (mod == 13)
+					m_ar[ar] += s16(offset);
+				else if (mod == 14)
+					circular_modify(ar, s16(offset));
+				if (BIT(m_st1, 5) && ar)
+					m_st0 = (m_st0 & ~u16(0xe000)) | u16(ar << 13);
+				--m_icount;
+			}
+			else
+				indirect_modify(low);
 			return;
 		}
 		break;

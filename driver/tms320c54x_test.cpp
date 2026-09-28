@@ -1776,6 +1776,135 @@ private:
 					m_port_reads == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 4f81 DST writes both halves and costs two cycles");
+			program.write_word(0x05e0, 0x4f13); // DST B, *AR3+
+			program.write_word(0x05e1, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 88;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 88)
+		{
+			expect(data.read_word(0x0e00) == 0x1234 &&
+					data.read_word(0x0e01) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e02,
+					"DST long operand post-increments AR by two");
+			program.write_word(0x05e0, 0x561b); // DLD *+AR3, A
+			data.write_word(0x0e02, 0xabcd);
+			data.write_word(0x0e03, 0xef01);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 89;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 89)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e02,
+					"DLD long operand pre-increments AR before the read");
+			program.write_word(0x05e0, 0x4f53); // DST B, *AR3+%
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x76543210);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e02);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 90;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 90)
+		{
+			expect(data.read_word(0x0e02) == 0x7654 &&
+					data.read_word(0x0e03) == 0x3210 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00,
+					"DST long circular operand advances by two and wraps");
+			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
+			program.write_word(0x05e1, 0x0123);
+			program.write_word(0x05e2, 0x6ded); // MAR *+AR5(-7)
+			program.write_word(0x05e3, 0xfff9);
+			program.write_word(0x05e4, 0x74d6);
+			program.write_word(0x05e5, 0x0123);
+			program.write_word(0x05e6, 0xf5e1); // IDLE
+			m_port_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 91;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 91)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0ff9 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
+					m_port_reads == 2 &&
+					m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 6ded consumes signed MAR offset and costs two cycles");
+			program.write_word(0x05e0, 0x6ddc); // MAR *AR4+0%
+			program.write_word(0x05e1, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 92;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 92)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e2,
+					"ROM4 6ddc circular MAR uses AR0 and consumes no extension");
+			program.write_word(0x05e0, 0x4092); // SUB *AR2+, 16, A
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0d00, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x00050000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 93;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 93)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00020000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d01 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e2,
+					"ROM4 4092 subtracts the shifted Smem and advances AR2");
+			program.write_word(0x05e0, 0x5781); // DLD *AR1, B
+			program.write_word(0x05e1, 0xf5e1);
+			data.write_word(0x0e00, 0x8001);
+			data.write_word(0x0e01, 0x2345);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0e00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 94;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 94)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80012345ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0e00,
+					"ROM4 5781 DLD sign-extends B without modifying AR1");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

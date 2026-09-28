@@ -553,17 +553,18 @@ Operational ROM execution has additionally established signed/unsigned
 accumulator arithmetic, accumulator-shift-mode loads, memory compare,
 accumulator-addressed program writes, stack data pushes, conditional
 branch/call/return families, signed `FRAME`, immediate cross-accumulator ALU,
-and dual-memory moves. Each family has focused core conformance coverage;
-none recognizes a Nokia address or loader byte pattern.
+and dual-memory moves. Focused core tests cover selected encodings in these
+families; execution alone does not establish every variant's semantics. None
+recognizes a Nokia address or loader byte pattern.
 
 ## Executed-opcode coverage
 
 `tools/c54x_opcode_coverage.py` compares `[opcov]` records from a verbose
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
-idle run executes 457 distinct opcode words in 89 high-byte groups (set SHA-256
-`be44191a6fd1207eb9b7b00c3673f60e4f4dbc0fbb801585c53acc4a91e96c22`).
-The fixture executes 129 distinct words: 97 overlap the ROM4 run, 32 occur
-only in the fixture, and 360 ROM4 words do not occur in the fixture. These are
+idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
+`e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
+The fixture executes 136 distinct words: 101 overlap the ROM4 run, 35 occur
+only in the fixture, and 356 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -590,10 +591,19 @@ the absolute-address surcharge. In the next loop at DSP PC
 of A's *old* high word while A receives the signed vector difference. Exact
 `4f81` (`DST B,Lmem`) asserts high/low store order and TI's two-cycle cost;
 the absolute `DST` and `DLD` forms also receive their documented extension
-cycle surcharge. Long-operand AR increment/decrement-by-two behavior remains
-to be audited separately: `4f81` uses a non-modifying AR mode and cannot prove
-that contract. The remaining 51,800-execution loop words include `6ddc`,
-`6ded`, `a5be`, `b736`, `d6e1`, and `fff9`.
+cycle surcharge. TI SPRU131G table 5-4 specifies that single-operand MOD
+increment/decrement is two words for a 32-bit operand. Separate `DST`/`DLD`
+fixtures now cover post-increment, pre-increment-before-read, and circular
+wrap with a two-word step; `4f81` itself uses a non-modifying AR mode.
+
+The same loop exposed a decoder error at `0x3262`: `6ded fff9` is a two-word
+`MAR *+AR5(-7)`, not `MAR` followed by an `XC` opcode. Consuming the signed
+extension reveals `4092` (`SUB *AR2+,16,A`) and `5781` (`DLD *AR1,B`), both now
+implemented or asserted in the core fixture. The corrected stream still
+passes the 5110 coherent, 30-second RF-boundary, and menu gates. The remaining
+51,800-execution loop words without exact fixture coverage are `a5be`,
+`b736`, and `d6e1`. Long-offset Smem access outside `MAR` remains a separate
+decoder audit; this correction does not establish those addressing forms.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool

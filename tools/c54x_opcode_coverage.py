@@ -14,8 +14,8 @@ OPCODE = re.compile(
     r"^\[opcov\] op=([0-9a-fA-F]{4}) first_pc=([0-9a-fA-F]{4})(?: count=(\d+))?$"
 )
 ROM4_IDLE_OPCODE_COUNT = 457
-ROM4_IDLE_GROUP_COUNT = 89
-ROM4_IDLE_SET_SHA256 = "be44191a6fd1207eb9b7b00c3673f60e4f4dbc0fbb801585c53acc4a91e96c22"
+ROM4_IDLE_GROUP_COUNT = 91
+ROM4_IDLE_SET_SHA256 = "e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc"
 
 
 def summarize(text: str) -> dict[str, object]:
