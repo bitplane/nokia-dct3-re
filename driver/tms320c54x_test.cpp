@@ -4120,6 +4120,42 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0e02 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0010,
 					"indirect AR0 read and postincrement use ARP in compatibility mode");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x1c8b); // XOR *AR3-, A
+			program.write_word(0x05e3, 0x1d93); // XOR *AR3+, B
+			program.write_word(0x05e4, 0x1c82); // XOR *AR2, A
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0f00, 0x00f0);
+			data.write_word(0x0eff, 0xff80);
+			data.write_word(0x0f10, 0x0f00);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800); // Preserve C.
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-extend XOR.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 215;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 215)
+		{
+			const bool xor_results = m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1dc4 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0xa9f8 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f10 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f00 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5;
+			expect_opcode(0x1c8b, xor_results, "ROM4 XOR *AR3- selects A and decrements AR3");
+			expect_opcode(0x1d93, xor_results, "ROM4 XOR *AR3+ selects B without SXM extension");
+			expect_opcode(0x1c82, xor_results, "ROM4 XOR *AR2 selects A; three XORs cost three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
