@@ -570,11 +570,11 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 159 have an `opassert` marker after a
-passing exact-word check, 44 execute in the fixture without such a marker,
-and 254 are absent from the fixture. The 44-word class includes setup and
+assertions. Of the 457 ROM4 words, 161 have an `opassert` marker after a
+passing exact-word check, 42 execute in the fixture without such a marker,
+and 254 are absent from the fixture. The 42-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 44 lack semantic tests. The 254-word class is a priority list
+claim that all 42 lack semantic tests. The 254-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -656,6 +656,10 @@ assertion markers: `f484` checks negate result, carry, and overflow;
 `f0b0` checks zero-filled `OR A >> 16`; `fa44` checks delayed ANEQ branch
 continuation; and `e801` checks the loaded A value in a BANZD delay slot.
 These markers do not add cycle-cost claims for those words.
+Exact ROM4 `f493` (`CMPL A`) now checks all 40 complemented bits, unaffected
+B and carry, and the one-cycle cost. Exact `f0e8` (`SFTL A, 8`) checks a
+guarded input's low-32-bit shift, cleared guard, outgoing carry, unaffected B,
+and the one-cycle cost. Other source/destination variants remain separate.
 Exact `f065` (`XOR #lk,16,A`) now checks the shifted result and TI SPRU172C's
 two-cycle cost. The core previously charged one cycle to all four
 source/destination variants of this encoding; the shared path now charges
