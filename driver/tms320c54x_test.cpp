@@ -3238,6 +3238,68 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0db3 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"repeated MVKD advances source and destination at one cycle after setup");
+			program.write_word(0x05e2, 0x44f8); // LD *(absolute),16,A
+			program.write_word(0x05e3, 0x0dc0);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0dc0, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 166;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 166)
+		{
+			expect_opcode(0x44f8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12340000 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute LD Smem,16,A shifts the word in two cycles");
+			program.write_word(0x05e2, 0x80f8); // STL A,*(absolute)
+			program.write_word(0x05e3, 0x0dc1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 167;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 167)
+		{
+			expect_opcode(0x80f8, data.read_word(0x0dc1) == 0x5678 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute STL stores the low accumulator word in two cycles");
+			program.write_word(0x05e2, 0x82f8); // STH A,*(absolute)
+			program.write_word(0x05e3, 0x0dc2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 168;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 168)
+		{
+			expect_opcode(0x82f8, data.read_word(0x0dc2) == 0x1234 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute STH stores the high accumulator word in two cycles");
+			program.write_word(0x05e2, 0x8cf8); // ST T,*(absolute)
+			program.write_word(0x05e3, 0x0dc3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4321);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 169;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 169)
+		{
+			expect_opcode(0x8cf8, data.read_word(0x0dc3) == 0x4321 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 absolute ST T stores the register in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

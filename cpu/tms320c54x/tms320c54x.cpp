@@ -1043,9 +1043,11 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x4400: // LD Smem, 16, A
 		m_a = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
+		m_icount -= low == 0xf8;
 		return;
 	case 0x4500: // LD Smem, 16, B
 		m_b = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
+		m_icount -= low == 0xf8;
 		return;
 	case 0x4700: // RPT Smem
 		m_rptc = indirect_read(low);
@@ -1061,6 +1063,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x8c00: // ST T, Smem
 		indirect_write(low, m_t);
+		m_icount -= low == 0xf8;
 		return;
 	case 0x8b00: // POPD Smem
 		indirect_write(low, pop());
@@ -1235,15 +1238,19 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x8000: // STL A, Smem
 		indirect_write(low, u16(m_a));
+		m_icount -= low == 0xf8;
 		return;
 	case 0x8100: // STL B, Smem
 		indirect_write(low, u16(m_b));
+		m_icount -= low == 0xf8;
 		return;
 	case 0x8200: // STH A, Smem
 		indirect_write(low, u16(m_a >> 16));
+		m_icount -= low == 0xf8;
 		return;
 	case 0x8300: // STH B, Smem
 		indirect_write(low, u16(m_b >> 16));
+		m_icount -= low == 0xf8;
 		return;
 	case 0xe800: // LD #k, A
 		m_a = data_operand(low);
