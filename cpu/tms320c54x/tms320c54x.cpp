@@ -1064,6 +1064,8 @@ void tms320c54x_device::execute_one(u16 op)
 			u16(m_pc - 1) == m_rpt_address;
 		m_program.write_word(u16(m_a) + (repeated ? m_rpt_iteration : 0),
 				indirect_read(low));
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= low == 0xf8 ? 5 : 4;
 		return;
 	}
 	case 0x6100: // BITF Smem, #lk
@@ -1349,6 +1351,8 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 value = m_program.read_word(u16(m_a) +
 				(repeated ? m_rpt_iteration : 0));
 		indirect_write(low, value);
+		if (!repeated || !m_rpt_iteration)
+			m_icount -= low == 0xf8 ? 5 : 4;
 		return;
 	}
 	case 0xe700: // MVDK source auxiliary register to destination MMR

@@ -2903,6 +2903,71 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d23 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
 					"repeated MVPD advances program and data addresses at one cycle after setup");
+			program.write_word(0x05e2, 0x7f92); // WRITA *AR2+
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0d30, 0xabcd);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0b20);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 149;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 149)
+		{
+			expect_opcode(0x7f92, program.read_word(0x0b20) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0b20 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d31 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"ROM4 WRITA writes A-addressed program memory in five cycles");
+			program.write_word(0x05e2, 0x7ef8); // READA *(absolute)
+			program.write_word(0x05e3, 0x0d31);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 150;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 150)
+		{
+			expect_opcode(0x7ef8, data.read_word(0x0d31) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0b20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"absolute READA reads A-addressed program memory in six cycles");
+			program.write_word(0x05e2, 0xec02); // RPT #2
+			program.write_word(0x05e3, 0x7f92); // WRITA *AR2+
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0d40, 0x1357);
+			data.write_word(0x0d41, 0x2468);
+			data.write_word(0x0d42, 0x369a);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0b30);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d40);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 151;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 151)
+		{
+			expect_opcode(0x7f92, program.read_word(0x0b30) == 0x1357 &&
+					program.read_word(0x0b31) == 0x2468 &&
+					program.read_word(0x0b32) == 0x369a &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0b30 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d43 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
+					"repeated WRITA advances program and data addresses at one cycle after setup");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

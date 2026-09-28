@@ -570,11 +570,11 @@ proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 65 have an `opassert` marker after a
-passing exact-word check, 71 execute in the fixture without such a marker,
-and 321 are absent from the fixture. The 71-word class includes setup and
+assertions. Of the 457 ROM4 words, 67 have an `opassert` marker after a
+passing exact-word check, 69 execute in the fixture without such a marker,
+and 321 are absent from the fixture. The 69-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 71 lack semantic tests. The 321-word class is a priority list
+claim that all 69 lack semantic tests. The 321-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -700,6 +700,13 @@ fixture checks three distinct program source words, consecutive data addresses,
 and one cycle per move after the first. Previously `MVPD` reread its initial
 program word on every repeat iteration. These checks do not establish bus
 wait-state timing or untested addressing variants.
+Exact `7f92` (`WRITA *AR2+`) now checks the A-addressed program write, pointer
+update, unchanged accumulator, and TI SPRU172C's five-cycle base cost. Exact
+`7ef8` (`READA *(absolute)`) checks the reciprocal read and six-cycle
+absolute cost. A repeated `7f92` fixture checks three consecutive program
+writes and the documented one-cycle rate after the repeat pipeline starts.
+The shared handlers previously charged only one cycle per transfer. Other
+Smem addressing variants and external-memory wait states remain unaudited.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool
