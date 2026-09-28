@@ -1090,11 +1090,11 @@ void tms320c54x_device::execute_one(u16 op)
 		m_rpt_end = 0xffff;
 		m_rpt_iteration = 0;
 		m_rpt_armed = true;
-		m_icount -= low == 0xf8 ? 3 : 2;
+		m_icount -= low >= 0xe0 ? 3 : 2;
 		return;
 	case 0x4b00: // PSHD Smem
 		push(indirect_read(low));
-		m_icount -= low == 0xf8;
+		m_icount -= low >= 0xe0;
 		return;
 	case 0x8c00: // ST T, Smem
 		indirect_write(low, m_t);
@@ -1102,7 +1102,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x8b00: // POPD Smem
 		indirect_write(low, pop());
-		m_icount -= low == 0xf8;
+		m_icount -= low >= 0xe0;
 		return;
 	case 0x7f00: // WRITA Smem
 	{

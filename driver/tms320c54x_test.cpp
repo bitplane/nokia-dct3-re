@@ -6902,6 +6902,72 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"RC BEQ leaves stack untouched in three cycles when B is nonzero");
+			program.write_word(0x05e3, 0x47e2); // RPT *AR2(5)
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x6d10); // MAR *AR0+
+			program.write_word(0x05e6, 0x75f8);
+			program.write_word(0x05e7, 0x0d00);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			data.write_word(0x0f05, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 345;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 345)
+		{
+			expect_opcode(0x47e2, m_cpu->state_int(tms320c54x_device::STATE_AR0) == 3 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f00 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
+					"long-offset RPT Smem runs MAR three times after four-cycle setup");
+			program.write_word(0x05e3, 0x4bea); // PSHD *+AR2(5)
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f05, 0x1234);
+			data.write_word(0x02ff, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 346;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 346)
+		{
+			expect_opcode(0x4bea, data.read_word(0x02ff) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02ff &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"long-offset PSHD preupdates AR and pushes in two cycles");
+			program.write_word(0x05e3, 0x8bea); // POPD *+AR2(5)
+			data.write_word(0x02ff, 0xbeef);
+			data.write_word(0x0f05, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 347;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 347)
+		{
+			expect_opcode(0x8bea, data.read_word(0x0f05) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"long-offset POPD preupdates AR and pops in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

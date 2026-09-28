@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 344 distinct words: 278 overlap the ROM4 run, 66 occur
+The fixture dispatches 347 distinct words: 278 overlap the ROM4 run, 69 occur
 only in the fixture, and 179 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -594,6 +594,9 @@ Long-offset `BITF` and `CMPM` now charge TI's extra cycle; fixture-only
 checks a false bit-field test, while `e736` checks AR3-to-AR6 MMR transfer.
 Exact `fa4d` and `fc4d` fixtures check B-equal branch/return decisions in
 both directions, delayed-slot execution, stack effects, and TI's cycle counts.
+Fixture-only `47e2`, `4bea`, and `8bea` now check the long-offset surcharge
+for `RPT Smem`, `PSHD Smem`, and `POPD Smem`, including repeat count, stack
+data, AR update, and cycle cost.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.
