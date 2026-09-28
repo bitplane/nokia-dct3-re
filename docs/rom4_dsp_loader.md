@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 454 distinct words: 357 overlap the ROM4 run, 97 occur
-only in the fixture, and 100 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 457 distinct words: 360 overlap the ROM4 run, 97 occur
+only in the fixture, and 97 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 357 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 360 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 100 are absent from the fixture. This closes the fixture-executed-only
+and 97 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1168,6 +1168,10 @@ left shift, AR2's post-read circular wrap, and TI's two-cycle cost for the
 two-word shifted-load form.
 Exact `7e8b` (`READA *AR3-`) checks the accumulator-addressed program read,
 the old AR3 data destination, post-decrement, and TI's five-cycle cost.
+Accumulator ALU exact-word checks now cover ROM4 `f1c0` (`XOR A,B`) preserving
+the 40-bit guard and status, `f508` (`ADD A<<8,B`) updating only B, and
+`f400` (`ADD A,A`) setting OVA across the signed 32-bit boundary. Each takes
+one cycle, as specified in TI SPRU172C.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

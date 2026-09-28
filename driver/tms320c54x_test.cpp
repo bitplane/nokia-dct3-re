@@ -9297,6 +9297,57 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f32 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"ROM4 READA uses A as program source and decrements AR3 after five cycles");
+			program.write_word(0x05e2, 0xf1c0); // XOR A,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff0000000fULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x00abcd0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 470;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 470)
+		{
+			expect_opcode(0xf1c0, m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffabcd000fULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff0000000fULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 XOR A,B preserves the 40-bit guard and status in one cycle");
+			program.write_word(0x05e2, 0xf508); // ADD A<<8,B
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 471;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 471)
+		{
+			expect_opcode(0xf508, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x133400 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 ADD A<<8,B updates B only in one cycle");
+			program.write_word(0x05e2, 0xf400); // ADD A,A
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 472;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 472)
+		{
+			expect_opcode(0xf400, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffeULL &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 ADD A,A sets overflow across the 32-bit boundary in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
