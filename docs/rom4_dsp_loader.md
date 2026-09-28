@@ -600,16 +600,16 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 504 distinct words: 404 overlap the ROM4 run, 100 occur
-only in the fixture, and 53 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 507 distinct words: 407 overlap the ROM4 run, 100 occur
+only in the fixture, and 50 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 404 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 407 have an `opassert` marker after a
 passing exact-word check, none execute in the fixture without such a marker,
-and 53 are absent from the fixture. This closes the fixture-executed-only
+and 50 are absent from the fixture. This closes the fixture-executed-only
 classification, not the untested ROM4 encodings or the instruction-family
 audit. Existing result checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
@@ -1218,6 +1218,10 @@ one two-cycle MMR move.
 Exact `e589` checks a dual-memory move through AR2+ and AR3+, with both words
 addressed before the pointers advance. Exact `e734` then copies the advanced
 AR3 into AR4. Both moves cost one cycle under TI SPRU172C.
+Exact `ec06` checks `RPT #6` executing `MAR *AR1+` seven times after a
+one-cycle setup. Exact `f84a` and `f84b` check `BC pmad,BGEQ/BLT` against
+B's 40-bit guard sign, each with taken and rejected paths and TI SPRU172C's
+five-/three-cycle costs.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`

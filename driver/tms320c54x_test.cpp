@@ -9990,6 +9990,64 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 MVMM copies the advanced AR3 in one cycle");
+			program.write_word(0x05e2, 0xec06); // RPT #6
+			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 499;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 499)
+		{
+			expect_opcode(0xec06,
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0127 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
+					"ROM4 RPT #6 executes MAR seven times and costs one setup cycle");
+			program.write_word(0x05e2, 0xf84a); // BC 05f0,BGEQ
+			program.write_word(0x05e3, 0x05f0);
+			program.write_word(0x05e4, 0x75d6); // Rejected-branch marker.
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			program.write_word(0x05f0, 0x75d6); // Taken-branch marker.
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 500;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 500 && m_phase <= 503)
+		{
+			const bool taken = m_phase == 500 || m_phase == 502;
+			const u16 opcode = m_phase <= 501 ? 0xf84a : 0xf84b;
+			expect_opcode(opcode,
+					m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 5) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x05f3 : 0x05e7),
+					"ROM4 BC tests B's 40-bit sign and costs five/three cycles");
+			if (m_phase < 503)
+			{
+				if (m_phase == 501)
+					program.write_word(0x05e2, 0xf84b); // BC 05f0,BLT
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B,
+						m_phase == 500 || m_phase == 501 ? 0xff00000000ULL : 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
