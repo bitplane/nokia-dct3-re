@@ -567,7 +567,7 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 358 distinct words: 284 overlap the ROM4 run, 74 occur
+The fixture dispatches 360 distinct words: 284 overlap the ROM4 run, 76 occur
 only in the fixture, and 173 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -618,6 +618,10 @@ AR0 value, and the one-cycle repeat setup. It was observed 25 times.
 Exact ROM4 `fa30` (`BCD pmad,TC`) checks both condition outcomes, both delay
 words, the selected destination, and delayed-branch timing. Exact `8914`
 (`STLM B,AR4`) checks the low-word transfer and one-cycle cost.
+Fixture-only `71ea` and `75ea` check the long-offset surcharge for MVDK and
+PORTW, respectively. Both assert offset-before-destination/port extension
+order, AR2 preupdate, transferred data, and three-cycle timing. The shared
+CPU correction does not change the captured ROM4 opcode-set coverage.
 The challenge-loop words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598`
 now have isolated
 assertions as well as the aggregate transform-result check.

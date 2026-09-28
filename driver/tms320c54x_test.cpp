@@ -7215,6 +7215,46 @@ private:
 			expect_opcode(0x8914, m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0xcafe &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 STLM B,AR4 stores BL in one cycle");
+			program.write_word(0x05e3, 0x71ea); // MVDK *+AR2(5),0f20
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x0f20);
+			program.write_word(0x05e6, 0x75f8);
+			program.write_word(0x05e7, 0x0d00);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			data.write_word(0x0f05, 0xbeef);
+			data.write_word(0x0f20, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 361;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 361)
+		{
+			expect_opcode(0x71ea, data.read_word(0x0f20) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"long-offset MVDK consumes offset before destination in three cycles");
+			program.write_word(0x05e3, 0x75ea); // PORTW *+AR2(5),0124
+			program.write_word(0x05e5, 0x0124);
+			data.write_word(0x0f05, 0xabcd);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 362;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 362)
+		{
+			expect_opcode(0x75ea, m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+					m_port_writes == 3 && m_middle_port_value == 0xabcd &&
+					m_last_port_cycle - m_middle_port_cycle == 3,
+					"long-offset PORTW consumes offset before port and takes three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
