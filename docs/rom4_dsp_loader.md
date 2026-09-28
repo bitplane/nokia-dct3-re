@@ -561,20 +561,24 @@ recognizes a Nokia address or loader byte pattern.
 
 `tools/c54x_opcode_coverage.py` compares `[opcov]` records from a verbose
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
-idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
+idle run dispatches 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 260 distinct words: 215 overlap the ROM4 run, 45 occur
-only in the fixture, and 242 ROM4 words do not occur in the fixture. These are
+The tap is in `execute_run` immediately before `execute_one`, not in the
+extension-word fetch helper: these are instructions dispatched by the current
+emulated core, not raw program-memory reads or independent silicon evidence.
+`first_pc` is only the first observed site; each count aggregates all sites.
+The fixture dispatches 262 distinct words: 217 overlap the ROM4 run, 45 occur
+only in the fixture, and 240 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 173 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 175 have an `opassert` marker after a
 passing exact-word check, 42 execute in the fixture without such a marker,
-and 242 are absent from the fixture. The 42-word class includes setup and
+and 240 are absent from the fixture. The 42-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 42 lack semantic tests. The 242-word class is a priority list
+claim that all 42 lack semantic tests. The 240-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -694,6 +698,11 @@ SXM-clear fixture checks `0x8000 + 0x8000`: the stored word wraps to zero and
 sets OVA, but produces no bit-32 carry. This corrected the first
 implementation's 16-bit carry test.
 The fixtures do not cover every SXM-clear overflow and OVM combination.
+Exact ROM4 `7182` (`MVDK *AR2,dmad`) checks the extension-addressed copy and
+unchanged AR2 in two cycles. Exact `8183` (`STL B,*AR3`) checks that only BL
+is stored while AR3 stays fixed in one cycle. Separate port markers verify
+the DARAM costs against [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf);
+external-memory wait states remain outside this fixture.
 Exact ROM4 `f820` (`BC pmad, NTC`) and `f84c` (`BC pmad, BNEQ`) check taken
 and fall-through destinations at TI SPRU172C's five- and three-cycle costs.
 The BNEQ true case has a nonzero guard byte and zero low 32 bits, so a

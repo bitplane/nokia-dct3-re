@@ -4404,6 +4404,39 @@ private:
 			expect(data.read_word(0x0d60) == 0 &&
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0400,
 					"ADDM SXM-clear 16-bit wrap does not carry out of the 32-bit ALU");
+			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0x7182); // MVDK *AR2, dmad
+			program.write_word(0x05e3, 0x0d71);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0x8183); // STL B, *AR3
+			program.write_word(0x05e7, 0x75d6);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			data.write_word(0x0d70, 0xaaa5);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234abcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d70);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d72);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 226;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 226)
+		{
+			expect_opcode(0x7182, data.read_word(0x0d71) == 0xaaa5 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d70 &&
+					m_port_writes == 3 && m_middle_port_cycle - m_first_port_cycle == 4,
+					"ROM4 MVDK *AR2,dmad copies through a fixed pointer in two cycles");
+			expect_opcode(0x8183, data.read_word(0x0d72) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d72 &&
+					m_last_port_cycle - m_middle_port_cycle == 3,
+					"ROM4 STL B,*AR3 stores BL without changing AR3 in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
