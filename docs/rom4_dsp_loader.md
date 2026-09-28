@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 179 distinct words: 142 overlap the ROM4 run, 37 occur
-only in the fixture, and 315 ROM4 words do not occur in the fixture. These are
+The fixture executes 180 distinct words: 143 overlap the ROM4 run, 37 occur
+only in the fixture, and 314 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 77 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 78 have an `opassert` marker after a
 passing exact-word check, 65 execute in the fixture without such a marker,
-and 315 are absent from the fixture. The 65-word class includes setup and
+and 314 are absent from the fixture. The 65-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 65 lack semantic tests. The 315-word class is a priority list
+claim that all 65 lack semantic tests. The 314-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -728,6 +728,11 @@ arithmetic carry input, a logical result, a signed subtraction result, and
 their two-cycle costs. The core previously charged one cycle to these
 absolute forms. This does not establish long-offset decoding or every flag
 and accumulator variant in the family.
+The Smem multiply/MAC handler now charges TI SPRU172C's extra cycle for an
+absolute operand. Exact ROM4 `2494` checks an unsigned `MPYU` product,
+postincrement, and one-cycle indirect cost. Fixture-only `24f8` checks the
+same product and the two-cycle absolute form. ROM4 did not execute `24f8`
+in this capture; this fixture tests a family rule, not observed boot traffic.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `--fixture-log <core-log>` when invoking the tool

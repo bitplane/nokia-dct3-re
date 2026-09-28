@@ -1038,6 +1038,7 @@ void tms320c54x_device::execute_one(u16 op)
 		if (family == 0x02 || family == 0x0a || family == 0x0e)
 			result = (result + 0x8000) & ~s64(0xffff);
 		destination = multiply_result(result, BIT(op, 8));
+		m_icount -= low == 0xf8;
 		return;
 	}
 	case 0x4400: // LD Smem, 16, A
