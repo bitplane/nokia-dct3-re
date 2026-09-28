@@ -9710,8 +9710,36 @@ private:
 					"ROM4 XC AEQ/BGT executes or rejects two guarded MAR slots");
 			if (m_phase == 490)
 			{
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				program.write_word(0x05e2, 0x4812); // LDM AR2,A
+				program.write_word(0x05e3, 0x8095); // STL A,*AR5+
+				program.write_word(0x05e4, 0x4813); // LDM AR3,A
+				program.write_word(0x05e5, 0x8095);
+				program.write_word(0x05e6, 0x4814); // LDM AR4,A
+				program.write_word(0x05e7, 0x8095);
+				program.write_word(0x05e8, 0x4817); // LDM AR7,A
+				program.write_word(0x05e9, 0x8095);
+				program.write_word(0x05ea, 0x4910); // LDM AR0,B
+				program.write_word(0x05eb, 0x75d6);
+				program.write_word(0x05ec, 0x0124);
+				program.write_word(0x05ed, 0xf5e1);
+				for (u16 address = 0x0f40; address != 0x0f44; ++address)
+					data.write_word(address, 0);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x8000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x8002);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x8003);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x8004);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f40);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x8007);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 491;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
 			}
 			if (m_phase == 488)
 				program.write_word(0x05e2, 0xff4e); // XC 2,BGT
@@ -9727,6 +9755,26 @@ private:
 			++m_phase;
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
+		}
+		if (m_phase == 491)
+		{
+			expect_opcode(0x4812, data.read_word(0x0f40) == 0x8002,
+					"ROM4 LDM AR2,A preserves the zero-extended load via STL");
+			expect_opcode(0x4813, data.read_word(0x0f41) == 0x8003,
+					"ROM4 LDM AR3,A preserves the zero-extended load via STL");
+			expect_opcode(0x4814, data.read_word(0x0f42) == 0x8004,
+					"ROM4 LDM AR4,A preserves the zero-extended load via STL");
+			expect_opcode(0x4817, data.read_word(0x0f43) == 0x8007 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x8007,
+					"ROM4 LDM AR7,A zero-extends despite SXM");
+			expect_opcode(0x4910,
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f44 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 11,
+					"five ROM4 LDM words and four STL stores cost one cycle each");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
 		if (m_phase == 4)
 		{
