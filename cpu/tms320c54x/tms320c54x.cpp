@@ -1115,10 +1115,10 @@ void tms320c54x_device::execute_one(u16 op)
 		const bool preincrement = (low & 0x78) == 0x18;
 		if (low != 0xf8 && preincrement)
 			indirect_modify(low, true);
-		const u16 address = (low == 0xf8 ? fetch() : m_ar[ar]) & 0xfffe;
+		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
 		const u64 value = accumulator(BIT(op, 8));
 		data_write(address, u16(value >> 16));
-		data_write(address + 1, u16(value));
+		data_write(address ^ 1, u16(value));
 		if (low != 0xf8 && !preincrement)
 			indirect_modify(low, true);
 		m_icount -= low == 0xf8 ? 2 : 1;
@@ -1131,9 +1131,9 @@ void tms320c54x_device::execute_one(u16 op)
 		const bool preincrement = (low & 0x78) == 0x18;
 		if (low != 0xf8 && preincrement)
 			indirect_modify(low, true);
-		const u16 address = (low == 0xf8 ? fetch() : m_ar[ar]) & 0xfffe;
+		const u16 address = low == 0xf8 ? fetch() : m_ar[ar];
 		const u16 high = data_read(address);
-		const u16 low_word = data_read(address + 1);
+		const u16 low_word = data_read(address ^ 1);
 		u64 value = (u64(high) << 16) | low_word;
 		// C16 dual mode and ordinary double-precision mode have the same
 		// 32-bit payload layout here. SXM extends the high halfword into the

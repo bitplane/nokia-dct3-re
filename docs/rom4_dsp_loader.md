@@ -567,18 +567,18 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 274 distinct words: 228 overlap the ROM4 run, 46 occur
+The fixture dispatches 276 distinct words: 228 overlap the ROM4 run, 48 occur
 only in the fixture, and 229 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 198 have an `opassert` marker after a
-passing exact-word check, 30 execute in the fixture without such a marker,
-and 229 are absent from the fixture. The 30-word class includes setup and
+assertions. Of the 457 ROM4 words, 199 have an `opassert` marker after a
+passing exact-word check, 29 execute in the fixture without such a marker,
+and 229 are absent from the fixture. The 29-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 30 lack semantic tests. The formerly leading challenge-loop
+claim that all 29 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
 The 229-word class is a priority list
@@ -835,6 +835,12 @@ TI SPRU172C specifies five cycles for a taken `RC` and three when false.
 The core previously charged only one for false conditions. A shared return
 path now applies the documented costs to the decoded `RC` variants; exact
 `fc30` (`RC TC`) fixtures verify both outcomes, stack behavior, and timing.
+TI SPRU131G section 5.8 specifies that the addressed word of a 32-bit
+operand is the most-significant word; the second word is at the next address
+when even and the previous address when odd. DST/DLD formerly rounded every
+address down, swapping the halves for odd addresses. The corrected handlers
+have an exact ROM4 `4ef8` absolute-DST test for word order and three-cycle
+cost, plus odd-address DST/DLD fixtures for the shared memory rule.
 Exact-word fixtures now also cover `f830` (`BC pmad,TC`) taken/not-taken timing,
 `f030` (`AND #lk,A`) zero-extended immediate and two-cycle cost, and `f073`
 (`B pmad`) four-cycle cost. Absolute port transfers `75f8` and `74f8`
