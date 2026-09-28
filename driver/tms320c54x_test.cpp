@@ -10048,6 +10048,84 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0xfc47); // RC ALEQ
+			program.write_word(0x05e3, 0x75d6); // Rejected-return marker.
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			program.write_word(0x05f0, 0x75d6); // Accepted-return marker.
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xf5e1);
+			data.write_word(0x0300, 0x05f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 504;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 504 || m_phase == 505)
+		{
+			const bool taken = m_phase == 505;
+			expect_opcode(0xfc47,
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == (taken ? 0x0301 : 0x0300) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x05f3 : 0x05e6) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 5),
+					"ROM4 RC ALEQ checks 40-bit guard, stack pop, and five/three cycles");
+			if (!taken)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 505;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xff47); // XC 2,ALEQ
+			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
+			program.write_word(0x05e4, 0x6d92); // MAR *AR2+
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 506;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 506 && m_phase <= 509)
+		{
+			const bool accepted = m_phase == 506 || m_phase == 508;
+			const u16 opcode = m_phase <= 507 ? 0xff47 : 0xff4c;
+			expect_opcode(opcode,
+					m_cpu->state_int(tms320c54x_device::STATE_AR1) == (accepted ? 0x0121 : 0x0120) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == (accepted ? 0x0131 : 0x0130) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 XC ALEQ/BNEQ executes or rejects two guarded MAR slots");
+			if (m_phase < 509)
+			{
+				if (m_phase == 507)
+					program.write_word(0x05e2, 0xff4c); // XC 2,BNEQ
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A,
+						m_phase == 506 ? 1 : 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B,
+						m_phase == 507 ? 0xff00000000ULL : 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
