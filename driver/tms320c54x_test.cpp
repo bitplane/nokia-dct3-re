@@ -7738,6 +7738,45 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 LDM AR4,B zero-fills despite SXM in one cycle");
+			program.write_word(0x05e3, 0xf3ff); // SFTL B,-1
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff80000003ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must not sign-fill SFTL.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 389;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 389)
+		{
+			expect_opcode(0xf3ff, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x40000001 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456 &&
+					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 SFTL B,-1 zero-fills guard bits and shifts bit 0 into carry");
+			program.write_word(0x05e3, 0x60f8); // CMPM *(lk),#1234
+			program.write_word(0x05e4, 0x0f24);
+			program.write_word(0x05e5, 0x1234);
+			program.write_word(0x05e6, 0x75f8);
+			program.write_word(0x05e7, 0x0d00);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			data.write_word(0x0f24, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 390;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 390)
+		{
+			expect_opcode(0x60f8, (m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1800) == 0x1800 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"ROM4 absolute CMPM consumes address before immediate and takes three cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
