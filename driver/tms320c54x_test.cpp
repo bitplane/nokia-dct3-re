@@ -3750,6 +3750,41 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROR B clears guard, rotates old zero C and captures outgoing bit in one cycle");
+			program.write_word(0x05e2, 0xf845); // BC 05f0, AEQ
+			program.write_word(0x05e3, 0x05f0);
+			program.write_word(0x05e4, 0xffff);
+			program.write_word(0x05f0, 0x75d6); // PORTW *AR6+%, port
+			program.write_word(0x05f1, 0x0124);
+			program.write_word(0x05f2, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 193;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 193 || m_phase == 194)
+		{
+			expect_opcode(0xf845, m_port_writes == 2 &&
+					m_last_port_cycle - m_first_port_cycle == (m_phase == 193 ? 7 : 5) &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == (m_phase == 193 ? 0x05f3 : 0x05e7),
+					"ROM4 BC AEQ uses the full 40-bit A and costs five cycles taken, three not taken");
+			if (m_phase == 193)
+			{
+				program.write_word(0x05e4, 0x75d6);
+				program.write_word(0x05e5, 0x0124);
+				program.write_word(0x05e6, 0xf5e1);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0100000000ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 194;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
