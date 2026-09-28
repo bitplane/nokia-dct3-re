@@ -392,7 +392,8 @@ including the cleared borrow flag and AR3 movement by two words. The T-based
 Fixture-only `5a8b`/`5a93`, `5c8b`/`5c93`, and `5e8b`/`5e93` now check the
 T-based long-word forms (`DADST`, `DSUBT`, `DSADT`) in both C16 modes against
 TI's published result examples. `5bf8` checks absolute B-destination
-addressing and its two-cycle cost. The published DSADT C16 example sets C
+addressing and its two-cycle cost. `5aea` checks long-offset preupdate,
+extension consumption, and the same two-cycle cost. The published DSADT C16 example sets C
 despite an upper-lane subtraction borrow; the fixture does not assert C for
 that case, so its carry behavior still needs independent evidence. TI's
 opcode table also exposed a pre-existing `SUBC Smem,B` decode error: its
@@ -631,8 +632,8 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 581 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 124 occur only in the fixture. These are
+The fixture dispatches 582 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 125 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.

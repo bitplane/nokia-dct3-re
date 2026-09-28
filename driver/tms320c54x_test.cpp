@@ -10917,6 +10917,32 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"SUBC B uses the 1f encoding and leaves A unchanged");
+			program.write_word(0x05e2, 0x5aea); // DADST *+AR2(6),A
+			program.write_word(0x05e3, 6);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0f06, 0x1534);
+			data.write_word(0x0f07, 0x3456);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x2345);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM, C16 clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 571;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 571)
+		{
+			expect_opcode(0x5aea,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x3879579b &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x2345 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f06 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"long-offset DADST preupdates AR and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
