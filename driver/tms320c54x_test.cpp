@@ -3635,6 +3635,42 @@ private:
 				expect_opcode(0x8a00 | rom4_saved_mmr[i],
 						data.read_word(0x02ff - i) == 0x4000 + i,
 						"ROM4 MMR burst restores the selected register");
+			program.write_word(0x05e2, 0x0883); // SUB *AR3,A
+			program.write_word(0x05e3, 0x1d83); // XOR *AR3,B
+			program.write_word(0x05e4, 0x1c83); // XOR *AR3,A
+			program.write_word(0x05e5, 0x7713); // STM #0f01,AR3
+			program.write_word(0x05e6, 0x0f01);
+			program.write_word(0x05e7, 0x1c93); // XOR *AR3+,A
+			program.write_word(0x05e8, 0x75d6);
+			program.write_word(0x05e9, 0x0124);
+			program.write_word(0x05ea, 0xf5e1);
+			data.write_word(0x0f00, 0xffff);
+			data.write_word(0x0f01, 0x00f0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123400);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 188;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 188)
+		{
+			expect_opcode(0x0883, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff09,
+					"ROM4 signed SUB and distinct XOR operands produce the expected A result");
+			expect_opcode(0x1d83, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12cbff,
+					"ROM4 XOR Smem,B uses the unextended word");
+			expect_opcode(0x1c83, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff09,
+					"ROM4 XOR Smem,A uses the unextended first word");
+			expect_opcode(0x7713, m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f02,
+					"ROM4 STM switches the indirect source address");
+			expect_opcode(0x1c93, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff09 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"ROM4 XOR *AR3+ uses the second word and advances in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

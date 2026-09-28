@@ -563,18 +563,18 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
 idle run executes 457 distinct opcode words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
-The fixture executes 229 distinct words: 189 overlap the ROM4 run, 40 occur
-only in the fixture, and 268 ROM4 words do not occur in the fixture. These are
+The fixture executes 233 distinct words: 193 overlap the ROM4 run, 40 occur
+only in the fixture, and 264 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 131 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 135 have an `opassert` marker after a
 passing exact-word check, 58 execute in the fixture without such a marker,
-and 268 are absent from the fixture. The 58-word class includes setup and
+and 264 are absent from the fixture. The 58-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
-claim that all 58 lack semantic tests. The 268-word class is a priority list
+claim that all 58 lack semantic tests. The 264-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -744,6 +744,12 @@ arithmetic carry input, a logical result, a signed subtraction result, and
 their two-cycle costs. The core previously charged one cycle to these
 absolute forms. This does not establish long-offset decoding or every flag
 and accumulator variant in the family.
+An indirect ROM4 sequence now asserts `0883` signed SUB under SXM,
+`1d83`/`1c83` unextended XOR source words, and `1c93` postincrement against
+two distinct memory operands. The four arithmetic operations take four
+cycles in aggregate as specified by TI SPRU172C; `7713` changes the source
+address between XORs and adds its separate two-cycle cost. Individual flag
+variants and unexecuted addressing forms remain unaudited.
 The Smem multiply/MAC handler now charges TI SPRU172C's extra cycle for an
 absolute operand. Exact ROM4 `2494` checks an unsigned `MPYU` product,
 postincrement, and one-cycle indirect cost. Fixture-only `24f8` checks the
