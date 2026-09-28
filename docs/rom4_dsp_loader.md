@@ -567,21 +567,21 @@ The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
 `first_pc` is only the first observed site; each count aggregates all sites.
-The fixture dispatches 281 distinct words: 233 overlap the ROM4 run, 48 occur
-only in the fixture, and 224 ROM4 words do not occur in the fixture. These are
+The fixture dispatches 282 distinct words: 234 overlap the ROM4 run, 48 occur
+only in the fixture, and 223 ROM4 words do not occur in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. Of the 457 ROM4 words, 218 have an `opassert` marker after a
+assertions. Of the 457 ROM4 words, 219 have an `opassert` marker after a
 passing exact-word check, 15 execute in the fixture without such a marker,
-and 224 are absent from the fixture. The 15-word class includes setup and
+and 223 are absent from the fixture. The 15-word class includes setup and
 control instructions as well as older checks not yet tagged; it is not a
 claim that all 15 lack semantic tests. The formerly leading challenge-loop
 words `6d8c`, `8084`, `108a`, `1a8b`, `1c84`, and `e598` now have isolated
 assertions as well as the aggregate transform-result check.
-The 224-word class is a priority list
+The 223-word class is a priority list
 for new fixtures, ordered by observed execution count, not proof that those
 instructions are incorrect. A marker establishes the checked outcome only,
 not complete coverage of an instruction's operand or flag variants.
@@ -980,7 +980,8 @@ shifted-load data, pointer/extension consumption, and both costs. The later
 `case 0x6f00` arm was unreachable behind the earlier unconditional decoder
 and has been removed. Exact `6f82`/`6f83` fixtures check shifted ADD/SUB;
 `6f92`/`6f93` check shifted low/high stores, indirect pointer updates, and
-two-cycle indirect costs. Other shift, flag, and long-offset variants remain
+two-cycle indirect costs. Exact ROM4 `6f8b` additionally checks SXM extension,
+postdecrement, extension consumption, and the two-cycle cost. Other shift, flag, and long-offset variants remain
 unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the

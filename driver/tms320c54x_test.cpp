@@ -5467,6 +5467,32 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0f20 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 LD *AR6,A sign-extends without pointer update in one cycle");
+			program.write_word(0x05e0, 0x75f8);
+			program.write_word(0x05e1, 0x0d00);
+			program.write_word(0x05e2, 0x0124);
+			program.write_word(0x05e3, 0x6f8b); // LD *AR3-,0,A
+			program.write_word(0x05e4, 0x0c40);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0f21, 0xff80);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f21);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 270;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 270)
+		{
+			expect_opcode(0x6f8b, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffff80ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f20 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+					"ROM4 extended LD *AR3-,0,A sign-extends and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
