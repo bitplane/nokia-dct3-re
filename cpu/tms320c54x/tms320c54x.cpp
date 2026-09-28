@@ -710,7 +710,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const int shift = s8((op & 0x1f) << 3) >> 3;
 		const u64 source = accumulator(BIT(op, 9));
-		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
+		const u64 value = shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) :
 				(source << shift) & ACC_MASK;
 		u64 &destination = accumulator(BIT(op, 8));
 		destination = add_sub(destination, value, true, BIT(op, 8));
@@ -720,7 +720,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const int shift = s8((op & 0x1f) << 3) >> 3;
 		const u64 source = accumulator(BIT(op, 9));
-		const u64 value = shift < 0 ? arithmetic_shift_right(source, -shift) :
+		const u64 value = shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) :
 				(source << shift) & ACC_MASK;
 		u64 &destination = accumulator(BIT(op, 8));
 		destination = add_sub(destination, value, false, BIT(op, 8));
@@ -1884,12 +1884,6 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xf300: // ADD #lk, B
 		m_b = (m_b + data_operand(fetch())) & ACC_MASK;
-		return;
-	case 0xf508: // ADD A << 8, B
-		m_b = (m_b + (m_a << 8)) & ACC_MASK;
-		return;
-	case 0xf517: // ADD A >> 9, B
-		m_b = (m_b + arithmetic_shift_right(m_a, 9)) & ACC_MASK;
 		return;
 	case 0xf010: // SUB #lk, A
 		m_a = (m_a - data_operand(fetch())) & ACC_MASK;
