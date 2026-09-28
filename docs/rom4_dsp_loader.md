@@ -619,7 +619,8 @@ post-increment. Exact `f7bb`/`f6bb` fixtures cover setting and clearing
 ST1.INTM; `4a08`/`8a08` cover an AL push/pop with stack-pointer restoration.
 `7212` (`MVDM`) and `7312` (`MVMD`) now have exact-word data-direction and
 two-cycle assertions. Their core handlers previously charged one cycle.
-TI's repeated-move pipeline rule (one cycle after entry) remains untested.
+Repeated-move fixtures cover three successive data addresses in each direction
+and TI's one-cycle pipeline rate after the first two-cycle move.
 The highest-use remaining ROM4-only words are other `4a`/`8a` MMR register
 encodings, not individually asserted.
 `6c8a` (`BANZ`) has taken/not-taken timing and pointer-update assertions; TI SPRU172C

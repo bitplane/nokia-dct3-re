@@ -2384,6 +2384,50 @@ private:
 			expect(data.read_word(0x0e01) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"MVMD moves AR2 to data memory in two cycles");
+			program.write_word(0x05e2, 0xec02); // RPT #2
+			program.write_word(0x05e3, 0x7212); // MVDM 0e00,AR2
+			program.write_word(0x05e4, 0x0e00);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0e00, 0x1111);
+			data.write_word(0x0e01, 0x2222);
+			data.write_word(0x0e02, 0x3333);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 122;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 122)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x3333 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"repeated MVDM advances data source and pipelines after first move");
+			program.write_word(0x05e3, 0x7312); // MVMD AR2,0e10
+			program.write_word(0x05e4, 0x0e10);
+			data.write_word(0x0e10, 0);
+			data.write_word(0x0e11, 0);
+			data.write_word(0x0e12, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x4455);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 123;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 123)
+		{
+			expect(data.read_word(0x0e10) == 0x4455 &&
+					data.read_word(0x0e11) == 0x4455 &&
+					data.read_word(0x0e12) == 0x4455 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+					"repeated MVMD advances data destination and pipelines after first move");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

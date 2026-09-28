@@ -1254,9 +1254,14 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x7300: // MVMD MMR, dmad
-		data_write(fetch(), data_read(low & 0x7f));
-		--m_icount;
+	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
+		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		data_write(destination, data_read(low & 0x7f));
+		m_icount -= !repeated || !m_rpt_iteration;
 		return;
+	}
 	case 0x7400: // PORTR port, Smem
 		if (low == 0xf8)
 		{
@@ -1278,9 +1283,14 @@ void tms320c54x_device::execute_one(u16 op)
 		indirect_write(low, data_read(fetch()));
 		return;
 	case 0x7200: // MVDM dmad, MMR
-		data_write(low & 0x7f, data_read(fetch()));
-		--m_icount;
+	{
+		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+			u16(m_pc - 1) == m_rpt_address;
+		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
+		data_write(low & 0x7f, data_read(source));
+		m_icount -= !repeated || !m_rpt_iteration;
 		return;
+	}
 	case 0x7600: // STM #lk, Smem
 		if (low == 0xf8)
 		{
