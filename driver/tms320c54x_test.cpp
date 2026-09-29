@@ -12970,6 +12970,111 @@ private:
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"MIN B compares the signed guard byte and selects A in one cycle");
+			program.write_word(0x05e2, 0xf48e); // EXP A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffcbULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 713;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 713)
+		{
+			expect_opcode(0xf48e,
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x19 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffffcbULL &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI EXP A example computes 25 redundant sign shifts in one cycle");
+			program.write_word(0x05e2, 0xf58e); // EXP B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0785432105ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 714;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 714)
+		{
+			expect_opcode(0xf58e,
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffc &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0785432105ULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI EXP B example reports negative exponent for guard-byte content");
+			program.write_word(0x05e2, 0xf48f); // NORM A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffff001ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x13);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 715;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 715)
+		{
+			expect_opcode(0xf48f,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff80080000ULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI NORM A example shifts negative A left by 19 in one cycle");
+			program.write_word(0x05e2, 0xf68f); // NORM B,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffff001ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x210a0a0a0aULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xfff9); // TS=-7.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 716;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 716)
+		{
+			expect_opcode(0xf68f,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0042141414ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x210a0a0a0aULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI NORM B,A example shifts guarded B right by seven");
+			program.write_word(0x05e2, 0xf48e); // EXP A with zero source.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 717;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 717)
+		{
+			expect_opcode(0xf48e,
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"EXP zero source publishes zero exponent");
+			program.write_word(0x05e2, 0xf48f); // NORM A with OVM.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x40000000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0300); // SXM, OVM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 718;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 718)
+		{
+			expect_opcode(0xf48f,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7fffffff &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"NORM left shift saturates on OVM and preserves carry in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -827,6 +827,25 @@ void tms320c54x_device::execute_one(u16 op)
 		m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
 		return;
 	}
+	if ((op & 0xfeff) == 0xf48e) // EXP A/B
+	{
+		const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
+		int exponent = -8;
+		if (source)
+		{
+			const bool sign = BIT(source, 39);
+			for (int bit = 38; bit >= 0 && BIT(source, bit) == sign; --bit)
+				++exponent;
+		}
+		m_t = source ? u16(s16(exponent)) : 0;
+		return;
+	}
+	if ((op & 0xfcff) == 0xf48f) // NORM source accumulator, destination
+	{
+		const int shift = s8(u8(m_t << 2)) >> 2;
+		accumulator(BIT(op, 8)) = shifted_load(accumulator(BIT(op, 9)), shift, BIT(op, 8));
+		return;
+	}
 	if ((op & 0xff00) == 0x6f00)
 	{
 		const bool absolute = low == 0xf8;

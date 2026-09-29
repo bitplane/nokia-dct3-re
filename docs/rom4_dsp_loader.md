@@ -1683,6 +1683,16 @@ A wins or sets C when B wins. In a MIN tie, TI's example chooses B. Fixtures
 assert both destinations, negative values, tie selection, guard-byte
 comparison, C, and one-cycle timing. These four words are not in the current
 5110 trace union.
+TI SPRU172C's `EXP` (`f48e/f58e`) counts redundant sign bits in the full
+40-bit accumulator, subtracts eight, and writes the signed exponent to T;
+zero writes T=0. `NORM` (`f48f/f58f/f68f/f78f`) shifts the selected source
+by T's low-six-bit signed TS and writes the selected destination, applying
+SXM and OVM. Both are one-cycle instructions. Fixtures reproduce TI's EXP
+examples for -53 (T=25) and a positive guard-byte value (T=-4), and its
+NORM examples for A shifted left by 19 and B shifted right by seven into A.
+Additional cases assert EXP zero, NORM saturation/overflow, carry preservation,
+and timing. Neither family occurs in the observed 5110 trace union; TS values
+outside TI's -16..31 range remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
