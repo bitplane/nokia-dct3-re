@@ -1909,6 +1909,16 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xfc00) == 0x9000) // ADD/SUB Xmem, SHFT, A/B
+	{
+		const u8 x = op >> 4;
+		const unsigned xar = 2 + (x & 3);
+		const u64 operand = (data_operand(data_read(m_ar[xar])) << (op & 0x0f)) & ACC_MASK;
+		u64 &destination = accumulator(BIT(op, 8));
+		destination = add_sub(destination, operand, BIT(op, 9), BIT(op, 8));
+		dual_modify(x);
+		return;
+	}
 	if ((op & 0xfc00) == 0xa000) // ADD/SUB Xmem, Ymem, A/B
 	{
 		const u8 x = op >> 4;

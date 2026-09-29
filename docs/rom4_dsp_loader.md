@@ -1668,6 +1668,14 @@ Fixture-only `0483` and `0d83` check positive TS with ADD/SUB carry behavior;
 `1583` reproduces TI's signed `LD *AR1,TS,B` example using `fedc` shifted by
 eight; `1483` checks arithmetic right shift for TS=-1. These do not establish
 out-of-range TS values or memory wait states.
+SPRU172C's adjacent `ADD/SUB Xmem,SHFT` diagrams assign `90xx/91xx` and
+`92xx/93xx` to the single-X dual-address forms. The core now reads Xmem,
+applies SXM and the four-bit left shift, updates the selected accumulator and
+its X pointer, and charges one DARAM cycle. Fixture-only `9083` checks an
+X-pointer postincrement and positive ADD; `9304` checks signed SUB, borrow,
+unchanged other accumulator, and the unmodified-pointer form. Neither opcode
+appears in the observed 5110 trace union; other X modes and overflow cases
+remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

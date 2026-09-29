@@ -12855,6 +12855,47 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffc000ULL &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"LD Smem,TS sign-fills a negative T shift in one cycle");
+			program.write_word(0x05e2, 0x9083); // ADD *AR2+,3,A.
+			data.write_word(0x0300, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 707;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 707)
+		{
+			expect_opcode(0x9083,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 17 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0301 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ADD Xmem,SHFT shifts Xmem and postincrements its pointer in one cycle");
+			program.write_word(0x05e2, 0x9304); // SUB *AR2,4,B.
+			data.write_word(0x0300, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 708;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 708)
+		{
+			expect_opcode(0x9304,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7fff0 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0300 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUB Xmem,SHFT sign-extends Xmem and records borrow in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
