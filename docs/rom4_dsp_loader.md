@@ -1711,6 +1711,17 @@ checks FRCT, T, and two-cycle timing; `f166` reproduces TI's signed
 extension order and the absolute three-cycle cost. `629b` checks that the
 preincrement updates AR3 before reading Smem. Long-offset word order, other
 addressing modes, and multiplier saturation variants remain unasserted.
+SPRU172C specifies A(32–16) as a signed **17-bit** multiplicand. The existing
+`MPYA/MACA/MASA` Smem path had narrowed it to `s16`, reversing the product's
+sign when bit 31 was set but bit 32 was clear. A shared 17-bit extraction now
+serves those forms, FIRS, POLY, ABDST, SQDST, and accumulator-source SQUR.
+The T-source `MPYA` (`f48c/f58c`) and `MACA[R]/MASA[R]`
+(`f488..f78b`) forms are now decoded at TI's one-cycle cost. Fixtures
+`f58c`, `3183`, and `f488` distinguish the 17-bit result from the old 16-bit
+result; `f48b` checks rounded subtraction, while `e211` and `f48d` check
+the shared high-word rule for SQDST and SQUR. Other FRCT/OVM boundaries and
+the remaining source/destination combinations are not established by these
+fixtures.
 TI SPRU172C's `ADD/SUB src,ASM,dst` diagrams assign `f480..f780` and
 `f481..f781` to the one-word, one-cycle accumulator forms. They were absent
 from the decoder despite the corresponding immediate-SHIFT forms already

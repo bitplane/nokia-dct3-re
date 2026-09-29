@@ -9,6 +9,12 @@ namespace {
 
 constexpr u16 ST1_BRAF = 0x4000;
 
+s32 accumulator_high17(u64 value)
+{
+	const u32 high = (value >> 16) & 0x1ffff;
+	return (high & 0x10000) ? s32(high) - 0x20000 : s32(high);
+}
+
 class tms320c54x_disassembler : public util::disasm_interface
 {
 public:
@@ -838,6 +844,27 @@ void tms320c54x_device::execute_one(u16 op)
 		m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
 		return;
 	}
+	if ((op & 0xfcfc) == 0xf488) // MACA[R]/MASA[R] T, source, destination
+	{
+		s64 product = s64(accumulator_high17(m_a)) * s64(s16(m_t));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		product = multiply_product(product);
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		s64 result = (s64(source << 24) >> 24) + (BIT(op, 1) ? -product : product);
+		if (BIT(op, 0))
+			result = (result + 0x8000) & ~s64(0xffff);
+		accumulator(BIT(op, 8)) = multiply_result(result, BIT(op, 8));
+		return;
+	}
+	if ((op & 0xfeff) == 0xf48c) // MPYA T, A/B
+	{
+		s64 product = s64(accumulator_high17(m_a)) * s64(s16(m_t));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
+		return;
+	}
 	if ((op & 0xfeff) == 0xf48e) // EXP A/B
 	{
 		const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
@@ -933,10 +960,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 coefficient_address = fetch();
 		const u16 coefficient = m_program.read_word(u16(coefficient_address +
 				(repeated ? m_rpt_iteration : 0)));
-		s64 a_high = s64((m_a >> 16) & 0x1ffff);
-		if (a_high & 0x10000)
-			a_high -= 0x20000;
-		s64 product = a_high * s64(s16(coefficient));
+		s64 product = s64(accumulator_high17(m_a)) * s64(s16(coefficient));
 		if (BIT(m_st1, 6))
 			product *= 2;
 		m_b = multiply_result((s64(m_b << 24) >> 24) +
@@ -1119,7 +1143,7 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		if (family == 1 || family == 3 || family == 5 || family == 7)
 		{
-			s64 product = s64(s16(m_a >> 16)) * s64(s16(memory));
+			s64 product = s64(accumulator_high17(m_a)) * s64(s16(memory));
 			if (BIT(m_st1, 6))
 				product *= 2;
 			if (family != 1)
@@ -1135,7 +1159,7 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		if (family == 6)
 		{
-			s64 product = s64(s16(m_a >> 16)) * s64(s16(m_t));
+			s64 product = s64(accumulator_high17(m_a)) * s64(s16(m_t));
 			if (BIT(m_st1, 6))
 				product *= 2;
 			m_a = multiply_result((multiply_product(product) +
@@ -1993,7 +2017,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const unsigned yar = 2 + (y & 3);
 		const s32 xvalue = s16(data_read(m_ar[xar]));
 		const s32 yvalue = s16(data_read(m_ar[yar]));
-		const s64 old_a_high = s16(m_a >> 16);
+		const s64 old_a_high = accumulator_high17(m_a);
 		s64 square = old_a_high * old_a_high;
 		if (BIT(m_st1, 6))
 			square *= 2;
@@ -2040,9 +2064,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const unsigned yar = 2 + (y & 3);
 		const u16 xvalue = data_read(m_ar[xar]);
 		const u16 yvalue = data_read(m_ar[yar]);
-		s64 a_high = s64((m_a >> 16) & 0x1ffff);
-		if (a_high & 0x10000)
-			a_high -= 0x20000;
+		const s64 a_high = accumulator_high17(m_a);
 		s64 distance = a_high < 0 ? -a_high : a_high;
 		if (BIT(m_st1, 6))
 			distance *= 2;
@@ -2312,7 +2334,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf48d: // SQUR A,A
 	case 0xf58d: // SQUR A,B
 	{
-		s64 product = s64(s16(m_a >> 16)) * s64(s16(m_a >> 16));
+		s64 product = s64(accumulator_high17(m_a)) * s64(accumulator_high17(m_a));
 		if (BIT(m_st1, 6))
 			product *= 2;
 		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));

@@ -13299,6 +13299,115 @@ private:
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"SUB B,ASM,A uses B as source and records borrow in one cycle");
+			program.write_word(0x05e2, 0xf58c); // MPYA T,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 730;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 730)
+		{
+			expect_opcode(0xf58c,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0080000000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"MPYA T uses signed 17-bit A high word in one cycle");
+			program.write_word(0x05e2, 0x3183); // MPYA *AR3.
+			data.write_word(0x0200, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 731;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 731)
+		{
+			expect_opcode(0x3183,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"MPYA Smem publishes T and uses the same signed 17-bit A high word");
+			program.write_word(0x05e2, 0xf488); // MACA T,A,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 732;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 732)
+		{
+			expect_opcode(0xf488,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0080008000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"MACA T preserves old A as multiplicand and accumulator source");
+			program.write_word(0x05e2, 0xf48b); // MASAR T,A,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 733;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 733)
+		{
+			expect_opcode(0xf48b,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x20000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"MASAR T subtracts a negative 17-bit product and rounds in one cycle");
+			program.write_word(0x05e2, 0xe211); // SQDST *AR3,*AR3.
+			data.write_word(0x0200, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080010000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 734;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 734)
+		{
+			expect_opcode(0xe211,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x40010001 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SQDST squares signed 17-bit A high word before replacing A");
+			program.write_word(0x05e2, 0xf48d); // SQUR A,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080010000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 735;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 735)
+		{
+			expect_opcode(0xf48d,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x40010001 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SQUR A uses the full signed 17-bit high word in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
