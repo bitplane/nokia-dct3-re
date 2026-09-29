@@ -1404,14 +1404,17 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low >= 0xe0;
 		return;
 	case 0x4c00: // LTD Smem
+	case 0x4d00: // DELAY Smem
 	{
 		const bool preincrement = low >= 0x80 && low < 0xe0 && (low & 0x78) == 0x18;
 		if (preincrement)
 			indirect_modify(low);
 		const u16 address = low >= 0xf8 ? fetch() :
 				low >= 0xe0 ? long_offset_address(low) : short_smem_address(low);
-		m_t = data_read(address);
-		data_write(u16(address + 1), m_t);
+		const u16 value = data_read(address);
+		data_write(u16(address + 1), value);
+		if ((op & 0xff00) == 0x4c00)
+			m_t = value;
 		if (low >= 0x80 && low < 0xe0 && !preincrement)
 			indirect_modify(low);
 		m_icount -= low >= 0xe0;

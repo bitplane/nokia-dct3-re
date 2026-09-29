@@ -13619,6 +13619,74 @@ private:
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0200) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"MAC immediate saturates a fractional product and records OVB");
+			program.write_word(0x05e2, 0x4d83); // DELAY *AR3.
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0200, 0x6cac);
+			data.write_word(0x0201, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 745;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 745)
+		{
+			expect_opcode(0x4d83,
+				data.read_word(0x0200) == 0x6cac &&
+				data.read_word(0x0201) == 0x6cac &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"DELAY copies Smem to its successor without changing T or AR in one cycle");
+			program.write_word(0x05e2, 0x4d9b); // DELAY *+AR3.
+			data.write_word(0x01ff, 0x1111);
+			data.write_word(0x0200, 0x2222);
+			data.write_word(0x0201, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x01ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 746;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 746)
+		{
+			expect_opcode(0x4d9b,
+				data.read_word(0x01ff) == 0x1111 &&
+				data.read_word(0x0201) == 0x2222 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"DELAY preincrements AR3 before its source read");
+			program.write_word(0x05e2, 0x4df8); // DELAY *(0200h).
+			program.write_word(0x05e3, 0x0200);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0200, 0x55aa);
+			data.write_word(0x0201, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 747;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 747)
+		{
+			expect_opcode(0x4df8,
+				data.read_word(0x0200) == 0x55aa &&
+				data.read_word(0x0201) == 0x55aa &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"DELAY absolute consumes its address extension and surcharge cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
