@@ -12637,6 +12637,106 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0301 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ST||MPY stores the old destination before replacing it with the product");
+			program.write_word(0x05e2, 0xc131); // ST A,*AR3 || ADD *AR5,B.
+			data.write_word(0x0200, 0);
+			data.write_word(0x0300, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdead);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 697;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 697)
+		{
+			expect_opcode(0xc131,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12365678 &&
+				data.read_word(0x0200) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0300 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ST||ADD uses opposite accumulator and stores old source in one cycle");
+			program.write_word(0x05e2, 0xc5f5); // ST A,*AR3- || SUB *AR5+0%,B.
+			data.write_word(0x01ff, 0x1111);
+			data.write_word(0x0300, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff84210000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0010000001ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x01ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); // SST clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0101); // SXM, ASM=1.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 698;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 698)
+		{
+			expect_opcode(0xc5f5,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff84210000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffbe00000ULL &&
+				data.read_word(0x01ff) == 0x0842 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x01fe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0302 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI ST||SUB example subtracts opposite accumulator in one cycle");
+			program.write_word(0x05e2, 0xca31); // ST B,*AR3 || LD *AR5,A.
+			data.write_word(0x0200, 0);
+			data.write_word(0x0300, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 699;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 699)
+		{
+			expect_opcode(0xca31,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff80010000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				data.read_word(0x0200) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0300 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ST||LD sign-extends Xmem into A and stores B in one cycle");
+			program.write_word(0x05e2, 0xe411); // ST A,*AR3 || LD *AR3,T.
+			data.write_word(0x0200, 0x80ff);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 700;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 700)
+		{
+			expect_opcode(0xe411,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x80ff &&
+				data.read_word(0x0200) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ST||LD T reads Xmem before writing the same Ymem cell");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

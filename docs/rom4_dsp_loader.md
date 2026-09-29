@@ -1646,6 +1646,15 @@ multiply. Fixture-only `cdb9` reproduces TI's FRCT example (old A stored,
 a same-register store uses old B before the multiply replaces B. These tests
 do not establish the other parallel store arithmetic families or all ASM/SST
 and overflow variants.
+TI's adjacent opcode diagrams also assign `c0xx..c3xx` to `ST||ADD`,
+`c4xx..c7xx` to `ST||SUB`, `c8xx..cbxx` to `ST||LD` into an accumulator, and
+`e4xx/e6xx` to `ST||LD` into T. The core now implements those forms through a
+shared pre-operation store path. Fixture-only `c131` checks the opposite
+accumulator as the ADD source; `c5f5` reproduces TI's signed `ST||SUB` result,
+ASM-shifted store, and circular pointer update; `ca31` checks signed load into
+A; `e411` checks that Xmem is read before the same cell is overwritten as
+Ymem. Each asserts the one-cycle DARAM cost. Store-side carry and hardware
+memory-bank wait states remain outside these fixtures.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

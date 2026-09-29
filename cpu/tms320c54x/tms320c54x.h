@@ -86,6 +86,7 @@ private:
 	s64 multiply_product(s64 product) const;
 	u64 multiply_result(s64 result, bool destination_b);
 	u32 saturated_store(u64 value) const;
+	void parallel_store(u16 op, u16 address);
 	u64 arithmetic_shift_right(u64 value, unsigned shift) const;
 	u64 &accumulator(bool b) { return b ? m_b : m_a; }
 

@@ -408,6 +408,16 @@ u32 tms320c54x_device::saturated_store(u64 value) const
 			s64(-0x80000000LL), s64(0x7fffffffLL)));
 }
 
+void tms320c54x_device::parallel_store(u16 op, u16 address)
+{
+	const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+	const int asm_shift = s8((m_st1 & 0x001f) << 3) >> 3;
+	const u64 shifted_source = asm_shift < 0 ?
+			arithmetic_shift_right(source, -asm_shift) :
+			(source << asm_shift) & ACC_MASK;
+	data_write(address, u16(saturated_store(shifted_source) >> 16));
+}
+
 u64 tms320c54x_device::arithmetic_shift_right(u64 value, unsigned shift) const
 {
 	const s64 signed_value = s64(value << 24) >> 24;
@@ -1777,6 +1787,42 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xf800) == 0xc000) // ST src, Ymem || ADD/SUB Xmem, dst
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u64 other = accumulator(!BIT(op, 8)) & ACC_MASK;
+		const u64 operand = (data_operand(xvalue) << 16) & ACC_MASK;
+		parallel_store(op, m_ar[yar]);
+		const bool subtract = BIT(op, 10);
+		accumulator(BIT(op, 8)) = subtract ?
+				add_sub(operand, other, true, BIT(op, 8)) :
+				add_sub(other, operand, false, BIT(op, 8));
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
+	if ((op & 0xfc00) == 0xc800 || (op & 0xfd00) == 0xe400) // ST src, Ymem || LD Xmem, dst/T
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		parallel_store(op, m_ar[yar]);
+		if ((op & 0xfd00) == 0xe400)
+			m_t = xvalue;
+		else
+			accumulator(BIT(op, 8)) = (data_operand(xvalue) << 16) & ACC_MASK;
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
 	if ((op & 0xfc00) == 0xcc00) // ST src, Ymem || MPY Xmem, dst
 	{
 		const u8 x = op >> 4;
@@ -1784,13 +1830,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const unsigned xar = 2 + (x & 3);
 		const unsigned yar = 2 + (y & 3);
 		const u16 xvalue = data_read(m_ar[xar]);
-		const u16 destination_address = m_ar[yar];
-		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
-		const int asm_shift = s8((m_st1 & 0x001f) << 3) >> 3;
-		const u64 shifted_source = asm_shift < 0 ?
-				arithmetic_shift_right(source, -asm_shift) :
-				(source << asm_shift) & ACC_MASK;
-		data_write(destination_address, u16(saturated_store(shifted_source) >> 16));
+		parallel_store(op, m_ar[yar]);
 		s64 product = s64(s16(m_t)) * s64(s16(xvalue));
 		if (BIT(m_st1, 6))
 			product *= 2;
@@ -1807,13 +1847,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const unsigned xar = 2 + (x & 3);
 		const unsigned yar = 2 + (y & 3);
 		const u16 xvalue = data_read(m_ar[xar]);
-		const u16 destination_address = m_ar[yar];
-		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
-		const int asm_shift = s8((m_st1 & 0x001f) << 3) >> 3;
-		const u64 shifted_source = asm_shift < 0 ?
-				arithmetic_shift_right(source, -asm_shift) :
-				(source << asm_shift) & ACC_MASK;
-		data_write(destination_address, u16(saturated_store(shifted_source) >> 16));
+		parallel_store(op, m_ar[yar]);
 
 		s64 product = s64(s16(m_t)) * s64(s16(xvalue));
 		if (BIT(m_st1, 6))
