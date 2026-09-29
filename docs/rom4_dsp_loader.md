@@ -1503,6 +1503,12 @@ Fixture-only `82ea` and `83e2` assert the two-cycle long-offset surcharge
 for `STH A/B,Smem` and the distinct preupdate/no-update addressing behavior.
 Fixture-only `8cea` checks the same surcharge for `ST T,Smem`.
 The direct `LD`/`LDU` accumulator handlers now charge that surcharge too.
+An arithmetic decoder audit removed shadowed exact-case switch arms for
+`f000`/`f300` ADD, `f010`/`f310`/`f210` SUB, several immediate AND/OR forms,
+and `f0c8`/`f3c8` shifted XOR. The earlier generic ALU and shifted-XOR paths
+already own these encodings; the dead arms omitted some flag or cycle handling
+and could be mistaken for live behavior. Existing exact-word fixtures and the
+cross-ROM gate establish that deleting them does not change execution.
 Fixture-only `10ea`, `12e2`, and `45ea` distinguish sign extension, unsigned
 loading, 16-bit shift, address update, and two-cycle long-offset timing.
 The one-word Smem arithmetic/logical handlers (`ADD`, `ADDC`, `SUB`, `SUBS`,

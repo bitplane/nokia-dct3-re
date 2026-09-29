@@ -2119,53 +2119,14 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf842: // BC pmad, AGEQ
 		branch_if((s64(m_a << 24) >> 24) >= 0);
 		return;
-	case 0xf0c8: // XOR A << 8, A
-		m_a = (m_a ^ (m_a << 8)) & ACC_MASK;
-		return;
-	case 0xf3c8: // XOR B << 8, B
-		m_b = (m_b ^ (m_b << 8)) & ACC_MASK;
-		return;
-	case 0xf030: // AND #lk, A
-		m_a &= fetch();
-		return;
-	case 0xf130: // AND #lk, A, B
-		m_b = m_a & fetch();
-		return;
-	case 0xf040: // OR #lk, A
-		m_a = (m_a | fetch()) & ACC_MASK;
-		return;
 	case 0xf063: // AND #lk << 16, A
 		m_a &= u64(fetch()) << 16;
 		--m_icount;
-		return;
-	case 0xf340: // OR #lk, B
-		m_b = (m_b | fetch()) & ACC_MASK;
 		return;
 	case 0xf062: // LD #lk, 16, A
 	case 0xf162: // LD #lk, 16, B
 		accumulator(BIT(op, 8)) = (data_operand(fetch()) << 16) & ACC_MASK;
 		--m_icount;
-		return;
-	case 0xf330: // AND #lk, B
-		m_b &= fetch();
-		return;
-	case 0xf230: // AND #lk, B, A
-		m_a = m_b & fetch();
-		return;
-	case 0xf000: // ADD #lk, A
-		m_a = (m_a + data_operand(fetch())) & ACC_MASK;
-		return;
-	case 0xf300: // ADD #lk, B
-		m_b = (m_b + data_operand(fetch())) & ACC_MASK;
-		return;
-	case 0xf010: // SUB #lk, A
-		m_a = (m_a - data_operand(fetch())) & ACC_MASK;
-		return;
-	case 0xf310: // SUB #lk, B
-		m_b = (m_b - data_operand(fetch())) & ACC_MASK;
-		return;
-	case 0xf210: // SUB #lk, B, A
-		m_a = (m_b - data_operand(fetch())) & ACC_MASK;
 		return;
 	case 0xf491: // ROL A through carry
 	case 0xf591: // ROL B through carry
