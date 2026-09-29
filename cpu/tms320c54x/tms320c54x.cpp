@@ -811,6 +811,17 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = shift < 0 ? source >> -shift : u32(source << shift);
 		return;
 	}
+	if ((op & 0xfcff) == 0xf480 || (op & 0xfcff) == 0xf481) // ADD/SUB src, ASM, dst
+	{
+		const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		const u64 operand = shift < 0 ?
+			(BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) :
+			(source << shift) & ACC_MASK;
+		u64 &destination = accumulator(BIT(op, 8));
+		destination = add_sub(destination, operand, BIT(op, 0), BIT(op, 8));
+		return;
+	}
 	if ((op & 0xfcff) == 0xf482) // LD source accumulator, ASM, destination accumulator
 	{
 		const int shift = s8((m_st1 & 0x1f) << 3) >> 3;

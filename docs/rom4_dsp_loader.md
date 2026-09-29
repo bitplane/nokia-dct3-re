@@ -1711,6 +1711,14 @@ checks FRCT, T, and two-cycle timing; `f166` reproduces TI's signed
 extension order and the absolute three-cycle cost. `629b` checks that the
 preincrement updates AR3 before reading Smem. Long-offset word order, other
 addressing modes, and multiplier saturation variants remain unasserted.
+TI SPRU172C's `ADD/SUB src,ASM,dst` diagrams assign `f480..f780` and
+`f481..f781` to the one-word, one-cycle accumulator forms. They were absent
+from the decoder despite the corresponding immediate-SHIFT forms already
+working. The core now shifts the selected source by ST1.ASM with SXM-controlled
+right fill, then performs the signed addition/subtraction into the selected
+destination. Fixture-only `f480` checks negative ASM, sign fill and carry;
+`f681` checks B-to-A subtraction, unchanged B and borrow. Other ASM values
+and saturation boundaries remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
