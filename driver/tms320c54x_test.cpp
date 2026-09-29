@@ -12165,6 +12165,93 @@ private:
 				data.read_word(0x0f91) == 0x0055 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"MACD B preserves A, copies the successor, and costs three cycles");
+			program.write_word(0x05e2, 0x79f8); // MACP *(absolute),0700,B.
+			program.write_word(0x05e3, 0x0f90);
+			program.write_word(0x05e4, 0x0700);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0f90, 0x0055);
+			data.write_word(0x0f91, 0x0066);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 676;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 676)
+		{
+			expect_opcode(0x79f8,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				data.read_word(0x0f91) == 0x0066 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+				"absolute MACP consumes data address before coefficient in four cycles");
+			program.write_word(0x05e2, 0x7bf8); // MACD *(absolute),0700,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 677;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 677)
+		{
+			expect_opcode(0x7bf8,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				data.read_word(0x0f91) == 0x0055 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+				"absolute MACD copies the successor and costs four cycles");
+			program.write_word(0x05e2, 0x79ea); // MACP *+AR2(5),0700,B.
+			program.write_word(0x05e3, 0x0700);
+			program.write_word(0x05e4, 5);
+			data.write_word(0x0f05, 0x0055);
+			data.write_word(0x0f06, 0x0066);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 678;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 678)
+		{
+			expect_opcode(0x79ea,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+				data.read_word(0x0f06) == 0x0066 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+				"long-offset MACP consumes coefficient before offset in four cycles");
+			program.write_word(0x05e2, 0x7bea); // MACD *+AR2(5),0700,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x770000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 679;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 679)
+		{
+			expect_opcode(0x7bea,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7d0b44 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0055 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
+				data.read_word(0x0f06) == 0x0055 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+				"long-offset MACD copies successor after AR2 preupdate in four cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
