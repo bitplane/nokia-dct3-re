@@ -1041,6 +1041,14 @@ void tms320c54x_device::execute_one(u16 op)
 		--m_icount; // Long-immediate ALU instructions take two cycles.
 		return;
 	}
+	if ((op & 0xfcfe) == 0xf060) // ADD/SUB #lk,16,source,destination
+	{
+		const u64 operand = (data_operand(fetch()) << 16) & ACC_MASK;
+		accumulator(BIT(op, 8)) = add_sub(accumulator(BIT(op, 9)), operand,
+				BIT(op, 0), BIT(op, 8));
+		--m_icount;
+		return;
+	}
 	if ((op & 0xfeff) == 0xf066) // MPY #lk, A/B
 	{
 		const u16 immediate = fetch();

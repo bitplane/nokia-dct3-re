@@ -13503,6 +13503,69 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"MAC preincrements AR3 before reading Smem in two cycles");
+			program.write_word(0x05e2, 0xf160); // ADD #ffffh,16,A,B.
+			program.write_word(0x05e3, 0xffff);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x00010000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 740;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 740)
+		{
+			expect_opcode(0xf160,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00010000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ADD #lk,16 sign-extends with SXM, preserves source and sets carry");
+			program.write_word(0x05e2, 0xf361); // SUB #1,16,B,B.
+			program.write_word(0x05e3, 1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x00020000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 741;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 741)
+		{
+			expect_opcode(0xf361,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x00010000 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"SUB #lk,16 subtracts from B and records no borrow in two cycles");
+			program.write_word(0x05e2, 0xf060); // ADD #ffffh,16,A,A with SXM clear.
+			program.write_word(0x05e3, 0xffff);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 742;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 742)
+		{
+			expect_opcode(0xf060,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x00ffff0000ULL &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ADD #lk,16 zero-extends with SXM clear and records overflow");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

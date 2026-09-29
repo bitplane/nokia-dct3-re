@@ -746,8 +746,8 @@ the exact observed-word assertion gate remains the higher-priority regression.
 
 | TI table | Decoder and fixture state | Remaining contract |
 | --- | --- | --- |
-| 2-1 ADD | Smem, TS, shifted Smem/Xmem, dual X/Y, immediate SHFT, and accumulator SHIFT/ASM forms have selected value/status/cycle fixtures. | `ADD #lk,16,src,dst` has no decoder path; other status/addressing variants remain unasserted. |
-| 2-2 SUB | Smem, TS, shifted Smem/Xmem, dual X/Y, immediate SHFT, and accumulator SHIFT/ASM forms have selected fixtures; SUBB/SUBC are separately asserted. | `SUB #lk,16,src,dst` has no decoder path; other status/addressing variants remain unasserted. |
+| 2-1 ADD | Smem, TS, shifted Smem/Xmem, dual X/Y, immediate SHFT/16, and accumulator SHIFT/ASM forms have selected value/status/cycle fixtures. | Other status/addressing variants remain unasserted. |
+| 2-2 SUB | Smem, TS, shifted Smem/Xmem, dual X/Y, immediate SHFT/16, and accumulator SHIFT/ASM forms have selected fixtures; SUBB/SUBC are separately asserted. | Other status/addressing variants remain unasserted. |
 | 2-3 multiply | MPY/MPYR, MPYU, MPYA, and SQUR syntax families have decoder paths and selected fixtures, including signed 17-bit A-high cases. | FRCT/OVM and long-offset variants are only partly asserted. |
 | 2-4 MAC/MAS | Smem, dual X/Y, T-source A-high, immediate MAC, MACSU, MACD/P, and SQURA/SQURS families have selected fixtures. | Rounded/overflow and remaining addressing variants are incomplete. |
 | 2-5 double operand | All six named Lmem families are decoded; C16=0/1 and long-offset fixtures cover selected forms. | Other addressing and overflow/carry boundaries remain unasserted. |
@@ -762,6 +762,10 @@ The immediate-MAC fixtures reproduce SPRU172C's `MAC #345h,A,B` fractional
 example and `MAC *AR5+,#1234h,A` example. They also assert absolute extension
 order, preincrement timing, T publication, and DARAM cycle cost. The shared
 Smem/immediate operand reader preserves the corresponding MPY behavior.
+The `ADD/SUB #lk,16` fixtures assert the TI table-2-1/2-2 two-word,
+two-cycle forms, including SXM sign extension, a distinct destination,
+carry/no-borrow, and overflow with SXM clear. These forms are fixture-only;
+the observed 5110 union has not executed them.
 
 The coverage tool now separates fixture execution from explicit result
 assertions. All 457 observed ROM4 words have an `opassert` marker after a
