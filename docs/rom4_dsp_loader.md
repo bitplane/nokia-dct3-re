@@ -1623,6 +1623,11 @@ Fixture-only `26ea` checks TI SPRU172C's two-cycle long-offset `SQUR` form:
 the signed source squares into A, T receives that source, and AR2 preupdates
 by the extension offset. The ordinary short-operand and FRCT variants remain
 separate assertions.
+TI SPRU172C's direct-address examples for `SQUR 30,B`, `SQURA 30,B`, and
+`SQURS 9,A` now have exact fixtures (`271e`, `391e`, `3a09`). They check DP
+selection, the documented accumulator and T results, and the one-cycle
+short-operand cost. FRCT, OVM, and other source/destination variants are not
+inferred from these examples.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

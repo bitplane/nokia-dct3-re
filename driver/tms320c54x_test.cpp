@@ -12460,6 +12460,64 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"long-offset SQUR publishes T, preupdates AR, and costs two cycles");
+			program.write_word(0x05e2, 0x271e); // SQUR 30, B (TI SPRU172C example).
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x031e, 0x000f);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0006);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x01f4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 689;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 689)
+		{
+			expect_opcode(0x271e,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x00e1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x000f &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI direct SQUR example squares 15 into B in one cycle");
+			program.write_word(0x05e2, 0x391e); // SQURA 30, B (TI SPRU172C example).
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x03200000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 690;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 690)
+		{
+			expect_opcode(0x391e,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x032000e1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x000f &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI direct SQURA example adds 15 squared in one cycle");
+			program.write_word(0x05e2, 0x3a09); // SQURS 9, A (TI SPRU172C example).
+			data.write_word(0x0309, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x014b5db0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8765);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 691;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 691)
+		{
+			expect_opcode(0x3a09,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0320 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI direct SQURS example subtracts 1234h squared in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
