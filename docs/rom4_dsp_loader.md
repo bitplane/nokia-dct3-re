@@ -1601,8 +1601,11 @@ variants still need separate evidence.
 TI SPRU307A assigns `LTD Smem` to `4Cxx`; `4c83` now checks the SPRU172C
 source/T/successor example and one-cycle cost. `4c93` checks postincrement
 after the successor write. These fixture-only encodings guard the standalone
-delay primitive used by program-memory MACD; absolute and long-offset
-addressing remain unasserted.
+delay primitive used by program-memory MACD. Fixture-only `4cf8` and `4cea`
+also check absolute and long-offset addressing: T receives the selected
+word, its successor receives the same word, AR2 preupdates only for the
+long-offset form, and both cost two cycles. Other addressing and bus
+wait-state combinations remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
