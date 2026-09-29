@@ -536,6 +536,28 @@ u16 tms320c54x_device::indirect_read(u8 mode)
 	return value;
 }
 
+u16 tms320c54x_device::immediate_smem_read(u8 mode, u16 &immediate)
+{
+	u16 address;
+	const bool preincrement = mode >= 0x80 && mode < 0xe0 && (mode & 0x78) == 0x18;
+	if (mode >= 0xe0 && mode < 0xf8)
+	{
+		immediate = fetch();
+		address = long_offset_address(mode);
+	}
+	else
+	{
+		if (preincrement)
+			indirect_modify(mode);
+		address = mode >= 0xf8 ? fetch() : short_smem_address(mode);
+		immediate = fetch();
+	}
+	const u16 value = data_read(address);
+	if (mode >= 0x80 && mode < 0xe0 && !preincrement)
+		indirect_modify(mode);
+	return value;
+}
+
 void tms320c54x_device::indirect_write(u8 mode, u16 value)
 {
 	if (!BIT(mode, 7))
@@ -1029,6 +1051,19 @@ void tms320c54x_device::execute_one(u16 op)
 		--m_icount;
 		return;
 	}
+	if ((op & 0xfcff) == 0xf067) // MAC #lk, source, destination
+	{
+		const u16 immediate = fetch();
+		s64 product = s64(s16(m_t)) * s64(s16(immediate));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		product = multiply_product(product);
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		accumulator(BIT(op, 8)) = multiply_result((s64(source << 24) >> 24) + product,
+				BIT(op, 8));
+		--m_icount;
+		return;
+	}
 	if (op == 0x70f8) // MVKD dmad, Smem (absolute destination form)
 	{
 		const u16 destination = fetch();
@@ -1315,29 +1350,28 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6200: case 0x6300: // MPY Smem, #lk, A/B
 	{
-		u16 address;
 		u16 immediate;
-		const bool preincrement = low >= 0x80 && low < 0xe0 && (low & 0x78) == 0x18;
-		if (low >= 0xe0 && low < 0xf8)
-		{
-			immediate = fetch();
-			address = long_offset_address(low);
-		}
-		else
-		{
-			if (preincrement)
-				indirect_modify(low);
-			address = low >= 0xf8 ? fetch() : short_smem_address(low);
-			immediate = fetch();
-		}
-		const u16 memory = data_read(address);
+		const u16 memory = immediate_smem_read(low, immediate);
 		m_t = memory;
 		s64 product = s64(s16(memory)) * s64(s16(immediate));
 		if (BIT(m_st1, 6))
 			product *= 2;
 		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
-		if (low >= 0x80 && low < 0xe0 && !preincrement)
-			indirect_modify(low);
+		m_icount -= low >= 0xe0 ? 2 : 1;
+		return;
+	}
+	case 0x6400: case 0x6500: case 0x6600: case 0x6700: // MAC Smem, #lk, src, dst
+	{
+		u16 immediate;
+		const u16 memory = immediate_smem_read(low, immediate);
+		m_t = memory;
+		s64 product = s64(s16(memory)) * s64(s16(immediate));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		product = multiply_product(product);
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		accumulator(BIT(op, 8)) = multiply_result((s64(source << 24) >> 24) + product,
+				BIT(op, 8));
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}

@@ -13408,6 +13408,101 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x40010001 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"SQUR A uses the full signed 17-bit high word in one cycle");
+			program.write_word(0x05e2, 0xf167); // MAC #0345h,A,B.
+			program.write_word(0x05e3, 0x0345);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x0400);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0040); // FRCT.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 736;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 736)
+		{
+			expect_opcode(0xf167,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x001a3800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x0400 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"MAC #lk uses T, FRCT and a separate source accumulator in two cycles");
+			program.write_word(0x05e2, 0x6495); // MAC *AR5+,#1234h,A.
+			program.write_word(0x05e3, 0x1234);
+			data.write_word(0x0100, 0x5678);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 737;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 737)
+		{
+			expect_opcode(0x6495,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x06261060 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0101 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"MAC Smem,#lk writes T and postincrements AR5 in two cycles");
+			program.write_word(0x05e2, 0x65f8); // MAC *(0200h),#5,A,B.
+			program.write_word(0x05e3, 0x0200);
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x75d6);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0200, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 738;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 738)
+		{
+			expect_opcode(0x65f8,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x100 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10f &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"MAC absolute Smem fetches address before immediate with cycle surcharge");
+			program.write_word(0x05e2, 0x649b); // MAC *+AR3,#4,A.
+			program.write_word(0x05e3, 4);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x01ff, 7);
+			data.write_word(0x0200, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x01ff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 739;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 739)
+		{
+			expect_opcode(0x649b,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1c &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"MAC preincrements AR3 before reading Smem in two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

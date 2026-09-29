@@ -737,6 +737,32 @@ grammar, and behavior are not established by a source mask. The report keeps
 the ROM4-observed/fixture-asserted class separate, so a new observed gap can
 be ranked by execution count before expanding tests into unused encodings.
 
+### TI Arithmetic Family Audit
+
+This is a syntax-level comparison against SPRU172C tables 2-1 through 2-6,
+not a claim that every opcode variant or memory-bank timing is validated.
+The current 5110 idle/Menu/power union uses none of the missing forms below;
+the exact observed-word assertion gate remains the higher-priority regression.
+
+| TI table | Decoder and fixture state | Remaining contract |
+| --- | --- | --- |
+| 2-1 ADD | Smem, TS, shifted Smem/Xmem, dual X/Y, immediate SHFT, and accumulator SHIFT/ASM forms have selected value/status/cycle fixtures. | `ADD #lk,16,src,dst` has no decoder path; other status/addressing variants remain unasserted. |
+| 2-2 SUB | Smem, TS, shifted Smem/Xmem, dual X/Y, immediate SHFT, and accumulator SHIFT/ASM forms have selected fixtures; SUBB/SUBC are separately asserted. | `SUB #lk,16,src,dst` has no decoder path; other status/addressing variants remain unasserted. |
+| 2-3 multiply | MPY/MPYR, MPYU, MPYA, and SQUR syntax families have decoder paths and selected fixtures, including signed 17-bit A-high cases. | FRCT/OVM and long-offset variants are only partly asserted. |
+| 2-4 MAC/MAS | Smem, dual X/Y, T-source A-high, immediate MAC, MACSU, MACD/P, and SQURA/SQURS families have selected fixtures. | Rounded/overflow and remaining addressing variants are incomplete. |
+| 2-5 double operand | All six named Lmem families are decoded; C16=0/1 and long-offset fixtures cover selected forms. | Other addressing and overflow/carry boundaries remain unasserted. |
+| 2-6 application | The named arithmetic/application families have decoder paths and selected fixtures, including EXP/NORM, MAX/MIN, RND/SAT, FIRS/LMS and SQDST. | Full operand-mode and status coverage remains open. |
+
+SPRU172C's listed cycle counts assume DARAM. The focused tests assert those
+baseline costs and selected absolute/long-offset surcharges; they do not
+model external-memory wait states. A static decoder mask match is not counted
+as a validated instruction in this matrix.
+
+The immediate-MAC fixtures reproduce SPRU172C's `MAC #345h,A,B` fractional
+example and `MAC *AR5+,#1234h,A` example. They also assert absolute extension
+order, preincrement timing, T publication, and DARAM cycle cost. The shared
+Smem/immediate operand reader preserves the corresponding MPY behavior.
+
 The coverage tool now separates fixture execution from explicit result
 assertions. All 457 observed ROM4 words have an `opassert` marker after a
 passing exact-word check; none are executed-only or absent. This closes the

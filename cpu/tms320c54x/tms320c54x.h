@@ -68,6 +68,7 @@ private:
 	u16 direct_address(u8 mode) const;
 	u16 short_smem_address(u8 mode) const;
 	u16 indirect_read(u8 mode);
+	u16 immediate_smem_read(u8 mode, u16 &immediate);
 	u16 mmr_address(u8 mode);
 	void indirect_write(u8 mode, u16 value);
 	u16 long_offset_address(u8 mode);
