@@ -1619,6 +1619,10 @@ Fixture-only `2045` and `2945` check the arithmetic side of the same boundary:
 DP-relative `MPY` produces a signed product, SP-relative `MAC` accumulates a
 negative product into B, both preserve AR5, and both cost one cycle. They do
 not cover every multiplier status or overflow variant.
+Fixture-only `26ea` checks TI SPRU172C's two-cycle long-offset `SQUR` form:
+the signed source squares into A, T receives that source, and AR2 preupdates
+by the extension offset. The ordinary short-operand and FRCT variants remain
+separate assertions.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
