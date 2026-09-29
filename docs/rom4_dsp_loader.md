@@ -1708,8 +1708,9 @@ and the Smem form publishes its memory operand to T. They cost two DARAM
 cycles, plus one for long-offset or absolute Smem. Fixture-only `6283`
 checks FRCT, T, and two-cycle timing; `f166` reproduces TI's signed
 `MPY #fffe,B` example and preserves T; `62f8` checks address-before-immediate
-extension order and the absolute three-cycle cost. Long-offset word order,
-other addressing modes, and multiplier saturation variants remain unasserted.
+extension order and the absolute three-cycle cost. `629b` checks that the
+preincrement updates AR3 before reading Smem. Long-offset word order, other
+addressing modes, and multiplier saturation variants remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

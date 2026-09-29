@@ -1282,6 +1282,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		u16 address;
 		u16 immediate;
+		const bool preincrement = low >= 0x80 && low < 0xe0 && (low & 0x78) == 0x18;
 		if (low >= 0xe0 && low < 0xf8)
 		{
 			immediate = fetch();
@@ -1289,6 +1290,8 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		else
 		{
+			if (preincrement)
+				indirect_modify(low);
 			address = low >= 0xf8 ? fetch() : short_smem_address(low);
 			immediate = fetch();
 		}
@@ -1298,7 +1301,7 @@ void tms320c54x_device::execute_one(u16 op)
 		if (BIT(m_st1, 6))
 			product *= 2;
 		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
-		if (low >= 0x80 && low < 0xe0)
+		if (low >= 0x80 && low < 0xe0 && !preincrement)
 			indirect_modify(low);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
