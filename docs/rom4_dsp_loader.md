@@ -1432,8 +1432,9 @@ unsigned `DST` examples and preserve their one- and two-cycle costs. The
 implemented parallel `ST||MAC[R]` form also saturates the pre-MAC store
 source after its ASM shift. Exact `d6e1` fixtures check both zero and nonzero
 ASM shifts, the old B value, unchanged B, A's MACR result, and the one-cycle
-cost. Other parallel store mnemonics are not implemented or covered by this
-fixture. The opcode-coverage gate also ranks untested static decoder matches
+cost. The additional `ST||ADD/SUB/LD/MPY` tests below cover selected encodings,
+not the entire parallel-store family. The opcode-coverage gate also ranks
+untested static decoder matches
 within high-byte groups observed on the 5110. The ranking discounts each
 group's most-executed word so the `f495` NOP does not make every untested `f4`
 variant look urgent. It is a prioritization list, not an implementation count:
@@ -1654,7 +1655,9 @@ accumulator as the ADD source; `c5f5` reproduces TI's signed `ST||SUB` result,
 ASM-shifted store, and circular pointer update; `ca31` checks signed load into
 A; `e411` checks that Xmem is read before the same cell is overwritten as
 Ymem. Each asserts the one-cycle DARAM cost. Store-side carry and hardware
-memory-bank wait states remain outside these fixtures.
+memory-bank wait states remain outside these fixtures. A further `c131` OVM
+fixture checks saturated B, sticky OVB, cleared carry, and the unaffected
+pre-arithmetic store.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
