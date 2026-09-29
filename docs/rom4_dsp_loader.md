@@ -741,8 +741,9 @@ be ranked by execution count before expanding tests into unused encodings.
 
 This is a syntax-level comparison against SPRU172C tables 2-1 through 2-6,
 not a claim that every opcode variant or memory-bank timing is validated.
-The current 5110 idle/Menu/power union uses none of the missing forms below;
-the exact observed-word assertion gate remains the higher-priority regression.
+The newly added immediate-16 arithmetic, immediate MAC and DELAY forms are
+fixture-only in the current 5110 idle/Menu/power union; the exact observed-word
+assertion gate remains the higher-priority regression.
 
 | TI table | Decoder and fixture state | Remaining contract |
 | --- | --- | --- |
@@ -752,6 +753,11 @@ the exact observed-word assertion gate remains the higher-priority regression.
 | 2-4 MAC/MAS | Smem, dual X/Y, T-source A-high, immediate MAC, MACSU, MACD/P, and SQURA/SQURS families have selected fixtures. | Rounded/overflow and remaining addressing variants are incomplete. |
 | 2-5 double operand | All six named Lmem families are decoded; C16=0/1 and long-offset fixtures cover selected forms. | Other addressing and overflow/carry boundaries remain unasserted. |
 | 2-6 application | The named arithmetic/application families have decoder paths and selected fixtures, including DELAY, EXP/NORM, MAX/MIN, RND/SAT, FIRS/LMS and SQDST. | Full operand-mode and status coverage remains open. |
+
+Every syntax listed in those six TI summary tables now has a decoder owner.
+That is the result of a manual syntax inventory, not an exhaustive opcode or
+silicon-conformance claim. The next audit layer is the unasserted status and
+addressing combinations in the right-hand column.
 
 SPRU172C's listed cycle counts assume DARAM. The focused tests assert those
 baseline costs and selected absolute/long-offset surcharges; they do not
@@ -770,8 +776,9 @@ carry/no-borrow, and overflow with SXM clear. These forms are fixture-only;
 the observed 5110 union has not executed them.
 The table-2-6 comparison exposed a missing `DELAY Smem` decoder path. It now
 shares `LTD`'s source-to-successor memory copy without updating T. Fixtures
-cover the manual's `*AR3` example, preincrement, and the absolute-address
-extension and cycle surcharge; no current 5110 trace executes this family.
+cover the manual's `*AR3` example, preincrement, and both absolute and
+long-offset extension-cycle surcharges; no current 5110 trace executes this
+family.
 
 The coverage tool now separates fixture execution from explicit result
 assertions. All 457 observed ROM4 words have an `opassert` marker after a
