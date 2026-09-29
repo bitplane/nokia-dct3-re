@@ -1606,6 +1606,15 @@ also check absolute and long-offset addressing: T receives the selected
 word, its successor receives the same word, AR2 preupdates only for the
 long-offset form, and both cost two cycles. Other addressing and bus
 wait-state combinations remain unasserted.
+TI SPRU131G defines `Smem` bit 7 clear as direct addressing: with
+`ST1.CPL=0`, `ST0.DP` supplies the page and the operand supplies a seven-bit
+offset; with `CPL=1`, the address is `SP+offset`. The core formerly treated
+those operands as AR-indirect. Fixtures now check DP-relative load/store and
+`ADDM`, SP-relative load/store and `LTD`, their cycle costs, and unchanged ARs.
+The hand-written delay, long-word arithmetic, read-modify-write, MACP/MACD,
+and program/data move paths share that direct-address calculation. Existing
+AR-increment fixtures were corrected to use bit-7-set encodings. DP/CPL
+write-pipeline timing and external-memory wait states remain unmodeled.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

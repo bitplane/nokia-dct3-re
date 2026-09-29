@@ -1800,7 +1800,7 @@ private:
 					m_port_reads == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 4f81 DST writes both halves and costs two cycles");
-			program.write_word(0x05e0, 0x4f13); // DST B, *AR3+
+			program.write_word(0x05e0, 0x4f93); // DST B, *AR3+
 			program.write_word(0x05e1, 0xf5e1);
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e00);
@@ -1816,7 +1816,7 @@ private:
 					data.read_word(0x0e01) == 0x5678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e02,
 					"DST long operand post-increments AR by two");
-			program.write_word(0x05e0, 0x561b); // DLD *+AR3, A
+			program.write_word(0x05e0, 0x569b); // DLD *+AR3, A
 			data.write_word(0x0e02, 0xabcd);
 			data.write_word(0x0e03, 0xef01);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e00);
@@ -1832,7 +1832,7 @@ private:
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e02,
 					"DLD long operand pre-increments AR before the read");
-			program.write_word(0x05e0, 0x4f53); // DST B, *AR3+%
+			program.write_word(0x05e0, 0x4fd3); // DST B, *AR3+%
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x76543210);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e02);
 			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
@@ -12297,6 +12297,102 @@ private:
 				data.read_word(0x0f06) == 0x1234 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"long-offset LTD preupdates AR2 and copies to its successor in two cycles");
+			program.write_word(0x05e2, 0x1045); // LD 45h,A, direct Smem.
+			program.write_word(0x05e3, 0x8046); // STL A,46h, direct Smem.
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0945, 0x1234);
+			data.write_word(0x0946, 0);
+			data.write_word(0x0f90, 0xabcd);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0012); // DP 12h.
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // CPL clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0f00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f90);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 682;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 682)
+		{
+			expect_opcode(0x1045,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				data.read_word(0x0946) == 0x1234 &&
+				data.read_word(0x0f90) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0f00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"direct Smem load/store use DP:offset with CPL clear in one cycle each");
+			data.write_word(0x0f45, 0x5678);
+			data.write_word(0x0f46, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4100); // CPL set.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 683;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 683)
+		{
+			expect_opcode(0x1045,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x5678 &&
+				data.read_word(0x0f46) == 0x5678 &&
+				data.read_word(0x0946) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0f00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"direct Smem load/store use SP+offset with CPL set in one cycle each");
+			program.write_word(0x05e2, 0x6b45); // ADDM #1, 45h.
+			program.write_word(0x05e3, 1);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0945, 0x1234);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 684;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 684)
+		{
+			expect_opcode(0x6b45,
+				data.read_word(0x0945) == 0x1235 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"direct ADDM uses DP:offset without modifying an AR");
+			program.write_word(0x05e2, 0x4c45); // LTD 45h.
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0f45, 0x5678);
+			data.write_word(0x0f46, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 685;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 685)
+		{
+			expect_opcode(0x4c45,
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x5678 &&
+				data.read_word(0x0f46) == 0x5678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f90 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0f00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"direct LTD uses SP+offset without modifying an AR");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
