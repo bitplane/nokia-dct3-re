@@ -12518,6 +12518,43 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"TI direct SQURS example subtracts 1234h squared in one cycle");
+			program.write_word(0x05e2, 0x0605); // ADDC 5, A.
+			data.write_word(0x0405, 0xffff);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0808); // C=1, DP=8.
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM must be ignored.
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 692;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 692)
+		{
+			expect_opcode(0x0605,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"direct ADDC zero-extends FFFFh and consumes carry despite SXM");
+			program.write_word(0x05e2, 0x0e05); // SUBB 5, A (TI SPRU172C example).
+			data.write_word(0x0405, 6);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0008); // C=0, DP=8.
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 6);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 693;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 693)
+		{
+			expect_opcode(0x0e05,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffffffULL &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI direct SUBB example subtracts inverted carry as borrow");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

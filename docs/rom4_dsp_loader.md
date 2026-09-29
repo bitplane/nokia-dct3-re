@@ -1631,6 +1631,10 @@ selection, the documented accumulator and T results, and the one-cycle
 short-operand cost. FRCT, OVM, and other source/destination variants are not
 inferred from these examples; the separate status fixtures above supply the
 specific FRCT/OVM evidence.
+Fixture-only `0605` and `0e05` check direct-page carry arithmetic under SXM:
+`ADDC` zero-extends `ffffh` before adding incoming C, while TI SPRU172C's
+`SUBB 5,A` example subtracts the inverse of C and leaves the 40-bit result
+at `ff ffffffff`. Both assert outgoing C and the one-cycle short-Smem cost.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
