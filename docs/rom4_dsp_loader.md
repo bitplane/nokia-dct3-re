@@ -1657,7 +1657,8 @@ A; `e411` checks that Xmem is read before the same cell is overwritten as
 Ymem. Each asserts the one-cycle DARAM cost. Store-side carry and hardware
 memory-bank wait states remain outside these fixtures. A further `c131` OVM
 fixture checks saturated B, sticky OVB, cleared carry, and the unaffected
-pre-arithmetic store.
+pre-arithmetic store. A `c531` OVM fixture checks negative saturation, sticky
+OVB, set carry, and the opposite subtraction order (`Xmem<<16 - A`).
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

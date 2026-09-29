@@ -12760,6 +12760,29 @@ private:
 				data.read_word(0x0200) == 0x7fff &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ST||ADD saturates B, sets OVB and clears carry without altering the store");
+			program.write_word(0x05e2, 0xc531); // ST A,*AR3 || SUB *AR5,B.
+			data.write_word(0x0300, 0x8000);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x00010000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0300); // SXM, OVM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 702;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 702)
+		{
+			expect_opcode(0xc531,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff80000000ULL &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0e00) == 0x0a00 &&
+				data.read_word(0x0200) == 1 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ST||SUB saturates negative B, sets OVB and carry, and stores old A");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
