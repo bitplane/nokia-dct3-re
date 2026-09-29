@@ -61,7 +61,7 @@ none is an unintended consequence of the migration.
 | Became phony | 3 | `verify-dct3-type-1f-static`, `verify-radio-a5-1-degraded` and `verify-vibrator` were absent from `.PHONY`. A stray file with one of those names would have made make consider the gate up to date and skip it. The generator marks every gate phony. |
 | One fewer command | 1 | `verify-3410-radio-periodic-location-update` copied `error.log` after `run-captured`, which already performs that exact copy. |
 | Gained `--radio-profile nhm2` | 1 | `verify-3410-radio-reselection-same-lac` relied on the checker's NSE-8 default while its sibling gates named their profile. Harmless today, because the checker treats `nhm2` and `nse8` alike on that path, but it would silently keep the wrong branch the moment an NHM-2 case is added. |
-| Absolute path to `libgsm.a` | 1 | Measurement artifact. `verify-gsm-fr-codec` uses `$(abspath ...)`, which resolves to the worktree directory in the parent measurement. Not a migration difference. |
+| Absolute path to `libgsm.a` | 1 | Historical measurement artifact from the external codec archive integration, now replaced by the tracked library build. Not a migration difference. |
 
 Apart from the explicitly adjudicated `--radio-profile nhm2` correction above,
 no gate lost a checker, changed a checker's arguments or changed its run

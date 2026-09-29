@@ -1,0 +1,96 @@
+diff --git a/3rdparty/README.md b/3rdparty/README.md
+index 25c4fc0..5a4d76e 100644
+--- a/3rdparty/README.md
++++ b/3rdparty/README.md
+@@ -32,6 +32,8 @@ glm - [The MIT License (MIT)](http://opensource.org/licenses/MIT)
+ 
+ libjpeg - [Custom BSD-like](https://github.com/numenta/nupic/blob/master/external/licenses/LICENSE.libjpeg-6b.txt)
+ 
++libgsm - [Custom permissive license](libgsm/COPYRIGHT)
++
+ linenoise - [The BSD 2-Clause License](http://opensource.org/licenses/BSD-2-Clause)
+ 
+ lsqlite3 - [The MIT License (MIT)](http://opensource.org/licenses/MIT)
+diff --git a/scripts/src/3rdparty.lua b/scripts/src/3rdparty.lua
+index 8ded6d9..242bf5b 100755
+--- a/scripts/src/3rdparty.lua
++++ b/scripts/src/3rdparty.lua
+@@ -1826,6 +1826,53 @@ links {
+ end
+ 
+ 
++--------------------------------------------------
++-- GSM 06.10 speech codec library objects
++--------------------------------------------------
++
++project "gsm"
++	uuid "7081ac36-5d2b-4baf-9378-8fc926241807"
++	kind "StaticLib"
++
++	defines {
++		"SASR",
++	}
++
++	configuration { "gmake or ninja" }
++		buildoptions_c {
++			"-Wno-undef", -- upstream checks __cplusplus with #if in C headers
++			"-Wno-comment", -- upstream config.h comments out optional #defines
++			"-Wno-unused-const-variable", -- upstream retains its RCS ident strings
++		}
++
++	configuration { }
++
++	includedirs {
++		MAME_DIR .. "3rdparty/libgsm/inc",
++	}
++
++	files {
++		MAME_DIR .. "3rdparty/libgsm/src/add.c",
++		MAME_DIR .. "3rdparty/libgsm/src/code.c",
++		MAME_DIR .. "3rdparty/libgsm/src/debug.c",
++		MAME_DIR .. "3rdparty/libgsm/src/decode.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_create.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_decode.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_destroy.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_encode.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_explode.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_implode.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_option.c",
++		MAME_DIR .. "3rdparty/libgsm/src/gsm_print.c",
++		MAME_DIR .. "3rdparty/libgsm/src/long_term.c",
++		MAME_DIR .. "3rdparty/libgsm/src/lpc.c",
++		MAME_DIR .. "3rdparty/libgsm/src/preprocess.c",
++		MAME_DIR .. "3rdparty/libgsm/src/rpe.c",
++		MAME_DIR .. "3rdparty/libgsm/src/short_term.c",
++		MAME_DIR .. "3rdparty/libgsm/src/table.c",
++	}
++
++
+ --------------------------------------------------
+ -- wdlfft library objects (from Cockos WDL)
+ --------------------------------------------------
+diff --git a/scripts/src/lib.lua b/scripts/src/lib.lua
+index 7179ac4..9337c40 100644
+--- a/scripts/src/lib.lua
++++ b/scripts/src/lib.lua
+@@ -77,6 +77,8 @@ end
+ 		MAME_DIR .. "src/lib/util/endianness.h",
+ 		MAME_DIR .. "src/lib/util/flac.cpp",
+ 		MAME_DIR .. "src/lib/util/flac.h",
++		MAME_DIR .. "src/lib/util/gsmfr.cpp",
++		MAME_DIR .. "src/lib/util/gsmfr.h",
+ 		MAME_DIR .. "src/lib/util/harddisk.cpp",
+ 		MAME_DIR .. "src/lib/util/harddisk.h",
+ 		MAME_DIR .. "src/lib/util/hash.cpp",
+diff --git a/scripts/src/main.lua b/scripts/src/main.lua
+index 70946f4..341cded 100644
+--- a/scripts/src/main.lua
++++ b/scripts/src/main.lua
+@@ -160,6 +160,7 @@ end
+ 		"softfloat3",
+ 		"wdlfft",
+ 		"ymfm",
++		"gsm",
+ 		ext_lib("jpeg"),
+ 		"7z",
+ 	}

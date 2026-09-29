@@ -37,15 +37,15 @@
           "step": "compile",
           "silent": false,
           "sources": [
-            "driver/nokia_gsm_fr_codec.cpp",
+            "lib/util/gsmfr.cpp",
             "tools/test_gsm_fr_codec.cpp"
           ],
-          "command": "$(CXX) -std=c++17 -O2 driver/nokia_gsm_fr_codec.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o $(LIBGSM_DIR)/lib/test_gsm_fr_codec"
+          "command": "$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Ilib -Ithird_party lib/util/gsmfr.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o scratchpad/test_gsm_fr_codec"
         },
         {
           "step": "execute",
           "silent": false,
-          "command": "$(LIBGSM_DIR)/lib/test_gsm_fr_codec"
+          "command": "scratchpad/test_gsm_fr_codec"
         }
       ]
     },

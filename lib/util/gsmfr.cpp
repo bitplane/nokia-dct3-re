@@ -1,61 +1,36 @@
 // license:BSD-3-Clause
 // copyright-holders:Gaz
 
-#include "nokia_gsm_fr_codec.h"
+#include "gsmfr.h"
+
+#include "libgsm/inc/gsm.h"
+#include "libgsm/inc/private.h"
+#include "libgsm/inc/unproto.h"
 
 #include <algorithm>
 #include <iterator>
 #include <limits>
 
-extern "C"
-{
-	// The linked, pinned libgsm 1.0.24 exposes gsm_state only in private.h.
-	// Repeat that stable algorithmic layout here so snapshots can name every
-	// predictor value without serializing pointers or ABI padding.
-	struct gsm_state
-	{
-		short dp0[280];
-		short e[50];
-		short z1;
-		long l_z2;
-		int mp;
-		short u[8];
-		short larpp[2][8];
-		short j;
-		short ltp_cut;
-		short nrp;
-		short v[9];
-		short msr;
-		char verbose;
-		char fast;
-		char wav_fmt;
-		unsigned char frame_index;
-		unsigned char frame_chain;
-	};
-	gsm_state *gsm_create();
-	void gsm_destroy(gsm_state *);
-	void gsm_encode(gsm_state *, short *, unsigned char *);
-	int gsm_decode(gsm_state *, unsigned char *, short *);
-}
-
 static_assert(sizeof(short) == sizeof(std::int16_t));
 static_assert(sizeof(int) == sizeof(std::int32_t));
 static_assert(sizeof(long) <= sizeof(std::int64_t));
 
+namespace util {
+
 namespace {
 
-nokia_gsm_fr_codec::channel_state export_state(const gsm_state &source)
+gsm_fr_codec::channel_state export_state(const gsm_state &source)
 {
-	nokia_gsm_fr_codec::channel_state result{};
+	gsm_fr_codec::channel_state result{};
 	std::copy(std::begin(source.dp0), std::end(source.dp0), result.dp0.begin());
 	std::copy(std::begin(source.e), std::end(source.e), result.e.begin());
 	result.z1 = source.z1;
-	result.l_z2 = source.l_z2;
+	result.l_z2 = source.L_z2;
 	result.mp = source.mp;
 	std::copy(std::begin(source.u), std::end(source.u), result.u.begin());
 	for (unsigned bank = 0; bank < 2; ++bank)
-		std::copy(std::begin(source.larpp[bank]),
-				std::end(source.larpp[bank]),
+		std::copy(std::begin(source.LARpp[bank]),
+				std::end(source.LARpp[bank]),
 				result.larpp.begin() + bank * 8);
 	result.j = source.j;
 	result.ltp_cut = source.ltp_cut;
@@ -71,26 +46,30 @@ nokia_gsm_fr_codec::channel_state export_state(const gsm_state &source)
 }
 
 bool import_state(
-		const nokia_gsm_fr_codec::channel_state &source, gsm_state &result)
+		const gsm_fr_codec::channel_state &source, gsm_state &result)
 {
 	// nrp is a 40..120 decoder lag and j selects one of two LAR histories.
 	// Reject malformed external state rather than indexing libgsm out of range.
 	if (source.j < 0 || source.j > 1 ||
 			source.nrp < 40 || source.nrp > 120 ||
-			source.l_z2 < std::numeric_limits<long>::min() ||
-			source.l_z2 > std::numeric_limits<long>::max())
+			source.l_z2 < std::numeric_limits<std::int32_t>::min() ||
+			source.l_z2 > std::numeric_limits<std::int32_t>::max() ||
+			source.mp < std::numeric_limits<std::int16_t>::min() ||
+			source.mp > std::numeric_limits<std::int16_t>::max() ||
+			source.ltp_cut || source.verbose || source.fast || source.wav_fmt ||
+			source.frame_index || source.frame_chain)
 		return false;
 
 	std::copy(source.dp0.begin(), source.dp0.end(), std::begin(result.dp0));
 	std::copy(source.e.begin(), source.e.end(), std::begin(result.e));
 	result.z1 = source.z1;
-	result.l_z2 = long(source.l_z2);
+	result.L_z2 = long(source.l_z2);
 	result.mp = source.mp;
 	std::copy(source.u.begin(), source.u.end(), std::begin(result.u));
 	for (unsigned bank = 0; bank < 2; ++bank)
 		std::copy(source.larpp.begin() + bank * 8,
 				source.larpp.begin() + (bank + 1) * 8,
-				std::begin(result.larpp[bank]));
+				std::begin(result.LARpp[bank]));
 	result.j = source.j;
 	result.ltp_cut = source.ltp_cut;
 	result.nrp = source.nrp;
@@ -106,86 +85,93 @@ bool import_state(
 
 } // anonymous namespace
 
-nokia_gsm_fr_codec::nokia_gsm_fr_codec()
+// Only this translation unit sees the bundled implementation's private
+// structure. Field-wise snapshots remain independent of its ABI and padding.
+struct gsm_fr_codec::implementation
+{
+	gsm encoder = gsm_create();
+	gsm decoder = gsm_create();
+
+	~implementation()
+	{
+		if (encoder)
+			gsm_destroy(encoder);
+		if (decoder)
+			gsm_destroy(decoder);
+	}
+};
+
+gsm_fr_codec::gsm_fr_codec()
 {
 	reset();
 }
 
-nokia_gsm_fr_codec::~nokia_gsm_fr_codec()
-{
-	release();
-}
+gsm_fr_codec::~gsm_fr_codec() = default;
 
-void nokia_gsm_fr_codec::release()
+void gsm_fr_codec::reset()
 {
-	if (m_encoder)
-		gsm_destroy(static_cast<gsm_state *>(m_encoder));
-	if (m_decoder)
-		gsm_destroy(static_cast<gsm_state *>(m_decoder));
-	m_encoder = nullptr;
-	m_decoder = nullptr;
-}
-
-void nokia_gsm_fr_codec::reset()
-{
-	release();
-	m_encoder = gsm_create();
-	m_decoder = gsm_create();
+	m_impl = std::make_unique<implementation>();
 	if (!available())
-		release();
+		m_impl.reset();
 }
 
-bool nokia_gsm_fr_codec::encode(const pcm_block &pcm, speech_frame &frame)
+bool gsm_fr_codec::available() const
 {
-	if (!m_encoder)
+	return m_impl && m_impl->encoder && m_impl->decoder;
+}
+
+bool gsm_fr_codec::encode(const pcm_block &pcm, speech_frame &frame)
+{
+	if (!available())
 		return false;
-	// libgsm predates const-correct interfaces but does not modify input.
-	gsm_encode(static_cast<gsm_state *>(m_encoder),
-			const_cast<short *>(reinterpret_cast<const short *>(pcm.data())),
-			frame.data());
+	std::array<gsm_signal, pcm_samples> input;
+	std::copy(pcm.begin(), pcm.end(), input.begin());
+	gsm_encode(m_impl->encoder, input.data(), frame.data());
 	return true;
 }
 
-bool nokia_gsm_fr_codec::decode(const speech_frame &frame, pcm_block &pcm)
+bool gsm_fr_codec::decode(const speech_frame &frame, pcm_block &pcm)
 {
-	if (!m_decoder)
+	if (!available())
 		return false;
-	return gsm_decode(static_cast<gsm_state *>(m_decoder),
-			const_cast<unsigned char *>(frame.data()),
-			reinterpret_cast<short *>(pcm.data())) == 0;
+	auto input = frame;
+	std::array<gsm_signal, pcm_samples> output;
+	if (gsm_decode(m_impl->decoder, input.data(), output.data()) != 0)
+		return false;
+	std::copy(output.begin(), output.end(), pcm.begin());
+	return true;
 }
 
-nokia_gsm_fr_codec::state nokia_gsm_fr_codec::snapshot() const
+gsm_fr_codec::state gsm_fr_codec::snapshot() const
 {
 	state result{};
-	if (m_encoder)
-		result.channels[0] =
-				export_state(*static_cast<const gsm_state *>(m_encoder));
-	if (m_decoder)
-		result.channels[1] =
-				export_state(*static_cast<const gsm_state *>(m_decoder));
+	if (available())
+	{
+		result.channels[0] = export_state(*m_impl->encoder);
+		result.channels[1] = export_state(*m_impl->decoder);
+	}
 	return result;
 }
 
-bool nokia_gsm_fr_codec::restore(const state &state)
+bool gsm_fr_codec::restore(const state &state)
 {
 	if (!available())
 		return false;
 
 	// Validate both directions before changing either one.
-	gsm_state encoder = *static_cast<gsm_state *>(m_encoder);
-	gsm_state decoder = *static_cast<gsm_state *>(m_decoder);
+	gsm_state encoder = *m_impl->encoder;
+	gsm_state decoder = *m_impl->decoder;
 	if (!import_state(state.channels[0], encoder) ||
 			!import_state(state.channels[1], decoder))
 		return false;
-	*static_cast<gsm_state *>(m_encoder) = encoder;
-	*static_cast<gsm_state *>(m_decoder) = decoder;
+	*m_impl->encoder = encoder;
+	*m_impl->decoder = decoder;
 	return true;
 }
 
-bool nokia_gsm_fr_receiver::decode(nokia_gsm_fr_codec &codec,
-		const nokia_gsm_fr_codec::speech_frame *frame,
-		nokia_gsm_fr_codec::pcm_block &pcm)
+bool gsm_fr_receiver::decode(gsm_fr_codec &codec,
+		const gsm_fr_codec::speech_frame *frame,
+		gsm_fr_codec::pcm_block &pcm)
 {
 	if (frame)
 	{
@@ -224,7 +210,7 @@ bool nokia_gsm_fr_receiver::decode(nokia_gsm_fr_codec &codec,
 	return true;
 }
 
-bool nokia_gsm_fr_receiver::restore(const state &saved)
+bool gsm_fr_receiver::restore(const state &saved)
 {
 	if (saved.have_good > 1 ||
 			saved.lost_frames > mute_after_lost_frames)
@@ -232,3 +218,5 @@ bool nokia_gsm_fr_receiver::restore(const state &saved)
 	m_state = saved;
 	return true;
 }
+
+} // namespace util

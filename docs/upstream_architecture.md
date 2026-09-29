@@ -22,6 +22,7 @@ environment variables.
 | DSP execution | clean-room TMS320C54x core and product-correct internal ROMs | selected by the 5110; other handsets retain HLE pending their own ROMs and integration |
 | DSP backend contract | `nokia_dsp_backend_interface` | present; transport-facing substitution seam |
 | DSP compatibility backend | `nokia_dsp_hle_device` | present and explicitly provisional implementation of that seam |
+| GSM-FR codec | `util::gsm_fr_codec` and bundled libgsm | generic utility, independently built and linked by MAME; explicit predictor snapshots |
 | laboratory cellular network | radio/link/session/network peer devices beyond the DSP boundary | present; deterministic test infrastructure rather than RF hardware |
 
 Device boundaries follow independently stateful hardware interfaces, not
@@ -157,7 +158,7 @@ MAD2, DSPIF or COBBA.
 
 ## Upstream series
 
-The current overlay contains seven MAME patches plus local CPU and Nokia
+The current overlay contains eight MAME patches plus local CPU, utility and Nokia
 sources. `make check-mame-patches` replays the patches in Makefile order against
 the pinned MAME commit in a temporary Git index. It does not inspect the dirty
 overlay worktree or prove that the resulting source builds. Run it before
@@ -166,7 +167,7 @@ and CPU gates after any behavior change.
 
 The likely reviewable sequence is:
 
-1. generic flash and PCD8544-family corrections;
+1. generic flash and PCD8544-family corrections, plus GSM-FR utility integration;
 2. independently useful Nokia hardware devices;
 3. the Nokia DCT3 family driver with explicit HLE status;
 4. the clean-room, MAME-compatible TMS320C54x CPU core now exercised by 5110;
@@ -184,11 +185,13 @@ Before submitting that series:
   firmware-PC probes are observation-only but are research instrumentation,
   not a MAME hardware contract; preserve their accepted conclusions in the
   subsystem documents and retain focused checks here.
-- Resolve the GSM-FR build dependency. The local Makefile downloads and builds
-  libgsm 1.0.24 separately, and `nokia_gsm_fr_codec.cpp` serializes libgsm's
-  private `gsm_state` layout. The driver cannot be submitted as a self-contained
-  MAME build while it relies on that private external ABI. Keep voice support
-  working while choosing an upstreamable codec dependency or integration.
+- Review the proposed bundled libgsm dependency and generic GSM-FR utility as
+  their own change. MAME now builds and links the library through its ordinary
+  project rules; handset sources contain no private C structure declaration.
+  The utility's snapshot adapter includes the same bundled release's private
+  header, so library updates require explicit state and codec regression checks.
+  The dependency's acceptance remains a maintainer review decision; the local
+  integration no longer needs a network download or custom linker flags.
 - Review the generic flash, EEPROM, LCD, PulseAudio and C54x build/test patches
   independently. Clean patch application is necessary, but each patch still
   needs its own behavior tests and a scope appropriate to its MAME owner.

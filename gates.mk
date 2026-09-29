@@ -212,8 +212,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-frontier-stability verify-structure-subset verify-structure
 
 verify-gsm-fr-codec: $(LIBGSM_ARCHIVE)
-	$(CXX) -std=c++17 -O2 driver/nokia_gsm_fr_codec.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o $(LIBGSM_DIR)/lib/test_gsm_fr_codec
-	$(LIBGSM_DIR)/lib/test_gsm_fr_codec
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Ilib -Ithird_party lib/util/gsmfr.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o scratchpad/test_gsm_fr_codec
+	scratchpad/test_gsm_fr_codec
 
 verify-gsm-tch-f-l1:
 	mkdir -p scratchpad

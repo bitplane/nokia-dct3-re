@@ -8,6 +8,13 @@ deleted incrementally as observed contracts become components.
 the real-DSP/HLE substitution seam and internal-ROM ownership. This document
 describes the current source layout within that target.
 
+The generic GSM-FR codec and receive-side bad-frame substitution live in
+`lib/util/gsmfr.cpp/.h`, over the bundled `third_party/libgsm` C library. MAME's
+utility and third-party projects build them independently of the handset source
+list. `driver/nokia_gsm_fr_codec.h` retains type aliases for the device snapshot
+declarations; it contains no codec algorithm or C-library ABI declaration.
+See `gsm_fr_codec.md` for the state and dependency contract.
+
 ## Entry points vs. quarantine
 
 The memory-map-registered handlers are thin. Diagnostic execution observations

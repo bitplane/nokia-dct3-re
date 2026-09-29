@@ -14,7 +14,9 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-i2cmem-write-cycle.patch \
 	patches/mame-pulseaudio-input.patch \
 	patches/mame-tms320c54x-build.patch \
-	patches/mame-tms320c54x-test.patch
+	patches/mame-tms320c54x-test.patch \
+	patches/mame-libgsm-build.patch
+LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
 	cpu/tms320c54x/tms320c54x.h
 DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
@@ -38,7 +40,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/gsm_subscriber.h \
 	driver/gsm_tch_f_l1.cpp driver/gsm_tch_f_l1.h \
 	driver/gsm_xcch_l1.cpp driver/gsm_xcch_l1.h \
-	driver/nokia_gsm_fr_codec.cpp driver/nokia_gsm_fr_codec.h \
+	driver/nokia_gsm_fr_codec.h \
 	driver/nokia_gsm_network.cpp driver/nokia_gsm_network.h \
 	driver/nokia_gsm_session.cpp driver/nokia_gsm_session.h \
 	driver/nokia_gsm_voice_peer.cpp driver/nokia_gsm_voice_peer.h \
@@ -58,13 +60,12 @@ TEST_DRIVER_COMPONENTS := driver/tms320c54x_test.cpp
 PHONE ?= noki3210
 BIOS ?=
 
-LIBGSM_VERSION := 1.0.24
-LIBGSM_TARBALL := third_party/gsm-$(LIBGSM_VERSION).tar.gz
-LIBGSM_DIR := third_party/libgsm-$(LIBGSM_VERSION)
-LIBGSM_ARCHIVE := $(abspath $(LIBGSM_DIR)/lib/libgsm.a)
-LIBGSM_SHA256 := a3c40c6471928383f4abfcb2e8f24012a1f562be2f17b8d672145d5986681a92
-LIBGSM_SOURCES := add code decode gsm_create gsm_decode gsm_destroy gsm_encode \
-	gsm_option long_term lpc preprocess rpe short_term table
+LIBGSM_DIR := third_party/libgsm
+LIBGSM_COMPONENTS := $(wildcard $(LIBGSM_DIR)/src/*.c $(LIBGSM_DIR)/inc/*.h) \
+	$(LIBGSM_DIR)/COPYRIGHT $(LIBGSM_DIR)/README.md
+# Standalone codec tests use the same bundled sources as the MAME project.
+LIBGSM_ARCHIVE := scratchpad/libgsm/libgsm.a
+LIBGSM_OBJECTS := $(patsubst $(LIBGSM_DIR)/src/%.c,scratchpad/libgsm/%.o,$(wildcard $(LIBGSM_DIR)/src/*.c))
 
 # Bring-your-own firmware (see roms/README.md). Git-ignored.
 ROM  ?= roms/3210f600a.fls
@@ -512,25 +513,23 @@ overlay: download-mame
 	@set -e; for src in $(DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
 	@set -e; for src in $(TEST_DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
 	@set -e; for src in $(CPU_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/devices/$$src"; done
+	@set -e; for src in $(LIB_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/$$src"; done
+	@set -e; for src in $(LIBGSM_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/3rdparty/$${src#third_party/}"; done
+	# makedep discovers a .cpp beside an included header; remove the retired overlay source.
+	rm -f $(MAME_DIR)/src/mame/nokia/nokia_gsm_fr_codec.cpp
 
 # Replay in a temporary Git index; leave the local MAME overlay untouched.
 check-mame-patches: download-mame
 	$(PYTHON) tools/check_mame_patch_stack.py --repo $(MAME_DIR) --commit $(MAME_COMMIT) $(MAME_PATCHES)
 
-$(LIBGSM_TARBALL):
-	mkdir -p third_party
-	curl --fail --location --output $@ https://www.quut.com/gsm/gsm-$(LIBGSM_VERSION).tar.gz
-	echo "$(LIBGSM_SHA256)  $@" | sha256sum --check
+.PHONY: check-mame-patches
 
-$(LIBGSM_ARCHIVE): $(LIBGSM_TARBALL)
-	echo "$(LIBGSM_SHA256)  $<" | sha256sum --check
-	mkdir -p $(LIBGSM_DIR)/src $(LIBGSM_DIR)/inc $(LIBGSM_DIR)/lib
-	tar -xzf $< -C $(LIBGSM_DIR) --strip-components=1
-	@set -e; for source in $(LIBGSM_SOURCES); do \
-		$(CC) -O2 -DNeedFunctionPrototypes=1 -DSASR -I$(LIBGSM_DIR)/inc \
-			-c $(LIBGSM_DIR)/src/$$source.c -o $(LIBGSM_DIR)/lib/$$source.o; \
-	done
-	$(AR) rcs $@ $(addprefix $(LIBGSM_DIR)/lib/,$(addsuffix .o,$(LIBGSM_SOURCES)))
+scratchpad/libgsm/%.o: $(LIBGSM_DIR)/src/%.c $(wildcard $(LIBGSM_DIR)/inc/*.h)
+	mkdir -p $(@D)
+	$(CC) -O2 -DSASR -I$(LIBGSM_DIR)/inc -c $< -o $@
+
+$(LIBGSM_ARCHIVE): $(LIBGSM_OBJECTS)
+	$(AR) rcs $@ $^
 
 
 eeprom-profile:
@@ -699,8 +698,8 @@ rom4-dsp-inputs:
 		roms/research/nse1-rom4/working/dsp_drom.txt \
 		roms/noki5110/nse1_rom4_dsp_data.bin
 
-build: overlay roms $(LIBGSM_ARCHIVE)
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/tms320c54x_test.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_fr_codec.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 LDFLAGS="-Wl,--whole-archive $(LIBGSM_ARCHIVE) -Wl,--no-whole-archive" -j$(JOBS)
+build: overlay roms
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/tms320c54x_test.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 -j$(JOBS)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

@@ -27,6 +27,17 @@ class RadioCallAudioWireTraceCheckTest(unittest.TestCase):
         self.assertEqual(3, result["stable_tch_polls"])
         self.assertEqual(5, result["wire_transitions"])
 
+    def test_accepts_v501_audio_enable_before_connect(self):
+        lines = GOOD.splitlines()
+        lines[1], lines[2] = lines[2], lines[1]
+        self.assertEqual(3, verify("\n".join(lines))["stable_tch_polls"])
+
+    def test_acknowledge_must_follow_both_local_publications(self):
+        lines = GOOD.splitlines()
+        lines[2], lines[3] = lines[3], lines[2]
+        with self.assertRaisesRegex(ValueError, "Connect Acknowledge"):
+            verify("\n".join(lines))
+
     def test_rejects_missing_answer_word(self):
         with self.assertRaisesRegex(ValueError, "answered wire word"):
             verify(GOOD.replace("data=860b", "data=860a"))

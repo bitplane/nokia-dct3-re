@@ -32,6 +32,7 @@ distinction.
 | `product_configuration_audit.md` | Post-refactor product-contract dependency audit and next bounded refactor. |
 | `external_call_bridge.md` | Versioned host telephony API for network state, calls, GSM-FR media, SMS and USSD. |
 | `subscriber_profile.md` | Shared immutable SIM/network identity and authentication contract. |
+| `gsm_fr_codec.md` | Generic GSM-FR utility, bundled dependency, predictor snapshots and voice regression gates. |
 | `ccont_subsystem.md` | Current CCONT contract, conclusions and fidelity backlog. |
 | `gensio_controller.md` | Extracted GENSIO endpoint, serial and SELECT-latch contract. |
 | `mbus_controller.md` | Extracted MBUS controller, firmware data path, and attachment boundary. |

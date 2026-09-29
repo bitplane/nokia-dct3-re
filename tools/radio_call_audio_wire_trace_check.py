@@ -36,7 +36,17 @@ EVENTS = (
 def verify(text: str) -> dict[str, int]:
     cursor = 0
     positions = {}
-    for label, pattern in EVENTS:
+    # Physical Answer starts two local publications. v5.01 writes the speech
+    # word before CC Connect; v6.00 posts Connect first. The network's Connect
+    # Acknowledge must follow both, and all later transitions remain ordered.
+    for label, pattern in EVENTS[:2]:
+        match = pattern.search(text)
+        if not match:
+            raise ValueError(
+                f"missing cross-ROM audio wire event: {label}")
+        positions[label] = match.start()
+        cursor = max(cursor, match.end())
+    for label, pattern in EVENTS[2:]:
         match = pattern.search(text, cursor)
         if not match:
             raise ValueError(

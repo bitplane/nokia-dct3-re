@@ -889,9 +889,13 @@ independent network speech checkpoints to match exactly, then evaluates
 continuing bidirectional media and normal physical-End teardown only on the
 canonical restored timeline. The v6.00 run additionally checks its decoded
 speech-control lifecycle; the independently relocated v5.01 run checks its
-older MCU/DSP audio-control wire lifecycle. Both replay four checkpoints
+older MCU/DSP audio-control wire lifecycle. Both replay 21 checkpoints
 exactly before clean teardown, demonstrating that codec, Layer-1 and peer
 state ownership is not tied to one firmware revision.
+The local CC Connect publication and answered speech-control word have no
+fixed relative order: v5.01 writes `860b` before posting Connect, whereas
+v6.00 posts Connect first. Connect Acknowledge follows both; the adjacent
+active/idle control and release transitions retain their ordered checks.
 See the
 [NSE-3 system-module description](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6110/03SYS%20%5B73%5D.pdf).
 The edge convention is corroborated by Nokia's

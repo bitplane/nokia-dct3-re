@@ -6,9 +6,67 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <limits>
+
+namespace {
+
+void check_reference_vectors()
+{
+	// FNV-1a over 64 frames and little-endian decoded PCM for each deterministic
+	// input. Captured from the original pinned libgsm 1.0.24 integration; these
+	// are compatibility vectors, not an ETSI conformance claim.
+	constexpr std::uint64_t expected_frames[] = {
+		0x71fe46fc24e03765ULL, 0xbaf759748531aaabULL, 0xf72ab9b235e7a50dULL,
+		0xaa2e0c25868d2ad1ULL, 0xf47fccdc04e8e41bULL
+	};
+	constexpr std::uint64_t expected_pcm[] = {
+		0x39bfe49685b5083dULL, 0x853d11de0aaade31ULL, 0x744d693c57ae37b0ULL,
+		0xe70530259aa7c17aULL, 0x29e3fccf83718cacULL
+	};
+	for (unsigned pattern = 0; pattern < std::size(expected_frames); ++pattern)
+	{
+		nokia_gsm_fr_codec codec;
+		std::uint64_t frames = 14695981039346656037ULL;
+		std::uint64_t pcm = frames;
+		std::uint32_t random = 0x12345678;
+		for (unsigned block = 0; block < 64; ++block)
+		{
+			nokia_gsm_fr_codec::pcm_block input{};
+			for (unsigned i = 0; i < input.size(); ++i)
+			{
+				random = random * 1664525 + 1013904223;
+				switch (pattern)
+				{
+				case 0: input[i] = 0; break;
+				case 1: input[i] = i == block % 160 ? 32767 : 0; break;
+				case 2: input[i] = i & 1 ? 32767 : -32768; break;
+				case 3: input[i] = std::int16_t(std::int32_t((i + block * 160) % 65536) - 32768); break;
+				case 4: input[i] = std::int16_t(std::int32_t(random >> 16) - 32768); break;
+				}
+			}
+			nokia_gsm_fr_codec::speech_frame frame{};
+			nokia_gsm_fr_codec::pcm_block output{};
+			assert(codec.encode(input, frame));
+			assert(codec.decode(frame, output));
+			for (auto byte : frame)
+				frames = (frames ^ byte) * 1099511628211ULL;
+			for (auto sample : output)
+			{
+				const auto word = std::uint16_t(sample);
+				pcm = (pcm ^ (word & 255)) * 1099511628211ULL;
+				pcm = (pcm ^ (word >> 8)) * 1099511628211ULL;
+			}
+		}
+		assert(frames == expected_frames[pattern]);
+		assert(pcm == expected_pcm[pattern]);
+	}
+}
+
+} // anonymous namespace
 
 int main()
 {
+	check_reference_vectors();
 	nokia_gsm_fr_codec codec;
 	assert(codec.available());
 
@@ -28,7 +86,10 @@ int main()
 
 	auto malformed = encoded;
 	malformed[0] = 0;
+	decoded.fill(1234);
 	assert(!codec.decode(malformed, decoded));
+	assert(std::all_of(decoded.begin(), decoded.end(),
+			[](std::int16_t sample) { return sample == 1234; }));
 
 	// Predictor histories must continue identically after an emulator
 	// save/load, independently in the encoder and decoder directions.
@@ -78,8 +139,19 @@ int main()
 		}
 	}
 
-	auto invalid_state = codec.snapshot();
+	const auto before_invalid_state = codec.snapshot();
+	auto invalid_state = before_invalid_state;
 	invalid_state.channels[1].nrp = 0;
+	invalid_state.channels[0].dp0[0] ^= 1;
+	assert(!codec.restore(invalid_state));
+	// A bad decoder state must not partially install the encoder history.
+	assert(codec.snapshot().channels[0].dp0 == before_invalid_state.channels[0].dp0);
+	invalid_state = codec.snapshot();
+	invalid_state.channels[0].wav_fmt = 1;
+	assert(!codec.restore(invalid_state));
+	invalid_state = codec.snapshot();
+	invalid_state.channels[0].l_z2 =
+			std::int64_t(std::numeric_limits<std::int32_t>::max()) + 1;
 	assert(!codec.restore(invalid_state));
 
 	// GSM 06.11 receive-side substitution is independent of Layer 1.  The

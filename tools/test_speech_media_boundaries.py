@@ -22,7 +22,7 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         self.assertNotIn("mcu_control", gate)
 
     def test_codec_has_only_frame_and_pcm_contracts(self):
-        header = (ROOT / "driver/nokia_gsm_fr_codec.h").read_text()
+        header = (ROOT / "lib/util/gsmfr.h").read_text()
         self.assertIn("pcm_samples = 160", header)
         self.assertIn("frame_octets = 33", header)
         self.assertNotIn("radio_peer", header)
