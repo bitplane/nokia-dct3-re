@@ -12896,6 +12896,80 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0300 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"SUB Xmem,SHFT sign-extends Xmem and records borrow in one cycle");
+			program.write_word(0x05e2, 0xf486); // MAX A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffffff6ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffcbULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 709;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 709)
+		{
+			expect_opcode(0xf486,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffffff6ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xffffffffcbULL &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI MAX A chooses the larger signed accumulator and clears carry");
+			program.write_word(0x05e2, 0xf586); // MAX B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x55);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 710;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 710)
+		{
+			expect_opcode(0xf586,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x55 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"MAX B preserves B and sets carry when B is larger");
+			program.write_word(0x05e2, 0xf487); // MIN A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 711;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 711)
+		{
+			expect_opcode(0xf487,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI MIN tie chooses B and sets carry");
+			program.write_word(0x05e2, 0xf587); // MIN B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 712;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 712)
+		{
+			expect_opcode(0xf587,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff00000000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff00000000ULL &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"MIN B compares the signed guard byte and selects A in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

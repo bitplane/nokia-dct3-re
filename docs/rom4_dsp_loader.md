@@ -1676,6 +1676,13 @@ X-pointer postincrement and positive ADD; `9304` checks signed SUB, borrow,
 unchanged other accumulator, and the unmodified-pointer form. Neither opcode
 appears in the observed 5110 trace union; other X modes and overflow cases
 remain unasserted.
+TI SPRU172C also assigns `f486/f586` to `MAX A/B` and `f487/f587` to
+`MIN A/B`, each one word and one cycle. The core now compares signed 40-bit
+accumulators, copies the chosen value to the destination, and clears C when
+A wins or sets C when B wins. In a MIN tie, TI's example chooses B. Fixtures
+assert both destinations, negative values, tie selection, guard-byte
+comparison, C, and one-cycle timing. These four words are not in the current
+5110 trace union.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

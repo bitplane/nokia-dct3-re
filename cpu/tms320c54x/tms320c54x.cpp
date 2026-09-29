@@ -818,6 +818,15 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = shifted_load(source, shift, BIT(op, 8));
 		return;
 	}
+	if ((op & 0xfeff) == 0xf486 || (op & 0xfeff) == 0xf487) // MAX/MIN A,B
+	{
+		const s64 a = s64(m_a << 24) >> 24;
+		const s64 b = s64(m_b << 24) >> 24;
+		const bool choose_a = BIT(op, 0) ? a < b : a >= b;
+		accumulator(BIT(op, 8)) = choose_a ? m_a : m_b;
+		m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
+		return;
+	}
 	if ((op & 0xff00) == 0x6f00)
 	{
 		const bool absolute = low == 0xf8;
