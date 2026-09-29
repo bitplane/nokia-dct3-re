@@ -718,8 +718,8 @@ currently adds an opcode word; these are measured negative results, not
 evidence that other interactive or radio paths cannot execute more DSP
 instructions. The fixed idle fingerprint still applies only to the untouched
 primary run.
-The fixture dispatches 651 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 194 occur only in the fixture. These are
+The fixture dispatches 685 distinct words: all 457 observed ROM4 words overlap
+the fixture, and 228 occur only in the fixture. These are
 *word* counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
@@ -728,8 +728,8 @@ the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
-That inventory matches top-level cases and opcode masks: 41,566 words match
-some declared path, of which 651 execute in the fixture and 40,915 do not.
+That inventory matches top-level cases and opcode masks: 45,150 words match
+some declared path, of which 685 execute in the fixture and 44,465 do not.
 Every matching high-byte group now has at least one fixture word, but that
 does not establish the remaining words in those groups. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
@@ -1621,13 +1621,16 @@ negative product into B, both preserve AR5, and both cost one cycle. They do
 not cover every multiplier status or overflow variant.
 Fixture-only `26ea` checks TI SPRU172C's two-cycle long-offset `SQUR` form:
 the signed source squares into A, T receives that source, and AR2 preupdates
-by the extension offset. The ordinary short-operand and FRCT variants remain
-separate assertions.
+by the extension offset. Earlier `2682` and `f58d` fixtures already assert
+FRCT/OVM saturation for short Smem and accumulator-source SQUR respectively;
+`3882` asserts SQURA's carry preservation. Those assertions do not establish
+every status and source/destination combination.
 TI SPRU172C's direct-address examples for `SQUR 30,B`, `SQURA 30,B`, and
 `SQURS 9,A` now have exact fixtures (`271e`, `391e`, `3a09`). They check DP
 selection, the documented accumulator and T results, and the one-cycle
 short-operand cost. FRCT, OVM, and other source/destination variants are not
-inferred from these examples.
+inferred from these examples; the separate status fixtures above supply the
+specific FRCT/OVM evidence.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
