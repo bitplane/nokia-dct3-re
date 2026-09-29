@@ -760,7 +760,9 @@ as a validated instruction in this matrix.
 
 The immediate-MAC fixtures reproduce SPRU172C's `MAC #345h,A,B` fractional
 example and `MAC *AR5+,#1234h,A` example. They also assert absolute extension
-order, preincrement timing, T publication, and DARAM cycle cost. The shared
+order, preincrement timing, T publication, and DARAM cycle cost. A long-offset
+fixture verifies immediate-before-offset fetch and the extra cycle; a separate
+FRCT/OVM fixture verifies saturation and OVB for the immediate form. The shared
 Smem/immediate operand reader preserves the corresponding MPY behavior.
 The `ADD/SUB #lk,16` fixtures assert the TI table-2-1/2-2 two-word,
 two-cycle forms, including SXM sign extension, a distinct destination,
