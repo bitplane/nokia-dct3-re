@@ -846,6 +846,25 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = shifted_load(accumulator(BIT(op, 9)), shift, BIT(op, 8));
 		return;
 	}
+	if ((op & 0xfcff) == 0xf49f) // RND source accumulator, destination
+	{
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		s64 result = (s64(source << 24) >> 24) + 0x8000;
+		if (BIT(m_st1, 9))
+			result = std::clamp(result, s64(-0x80000000LL), s64(0x7fffffffLL));
+		accumulator(BIT(op, 8)) = u64(result) & ACC_MASK;
+		return;
+	}
+	if ((op & 0xfeff) == 0xf483) // SAT A/B
+	{
+		u64 &source = accumulator(BIT(op, 8));
+		const s64 value = s64((source & ACC_MASK) << 24) >> 24;
+		const bool overflow = value < -0x80000000LL || value > 0x7fffffffLL;
+		const u16 mask = BIT(op, 8) ? 0x0200 : 0x0400;
+		m_st0 = (m_st0 & ~mask) | (overflow ? mask : 0);
+		source = u64(std::clamp(value, s64(-0x80000000LL), s64(0x7fffffffLL))) & ACC_MASK;
+		return;
+	}
 	if ((op & 0xff00) == 0x6f00)
 	{
 		const bool absolute = low == 0xf8;

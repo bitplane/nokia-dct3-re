@@ -13075,6 +13075,95 @@ private:
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"NORM left shift saturates on OVM and preserves carry in one cycle");
+			program.write_word(0x05e2, 0xf59f); // RND A,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0a00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 719;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 719)
+		{
+			expect_opcode(0xf59f,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffffffULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7fff &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0a00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI RND A,B example adds 8000h without changing status flags");
+			program.write_word(0x05e2, 0xf49f); // RND A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0200); // OVM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 720;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 720)
+		{
+			expect_opcode(0xf49f,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7fffffff &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0a00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI RND A example saturates under OVM without changing flags");
+			program.write_word(0x05e2, 0xf583); // SAT B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7123456789ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // OVM clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 721;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 721)
+		{
+			expect_opcode(0xf583,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x7fffffff &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0a00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI SAT B example clamps positive guard overflow with OVM clear");
+			program.write_word(0x05e2, 0xf483); // SAT A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xf812345678ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 722;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 722)
+		{
+			expect_opcode(0xf483,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff80000000ULL &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0c00 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI SAT A example clamps negative guard overflow and sets OVA");
+			program.write_word(0x05e2, 0xf583); // SAT B without overflow.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x00123456);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0a00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 723;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 723)
+		{
+			expect_opcode(0xf583,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x00123456 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0800 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI SAT B in-range example clears OVB and preserves carry");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

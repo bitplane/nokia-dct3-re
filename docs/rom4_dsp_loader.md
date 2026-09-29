@@ -1693,6 +1693,15 @@ NORM examples for A shifted left by 19 and B shifted right by seven into A.
 Additional cases assert EXP zero, NORM saturation/overflow, carry preservation,
 and timing. Neither family occurs in the observed 5110 trace union; TS values
 outside TI's -16..31 range remain unasserted.
+TI SPRU172C assigns `RND` to `f49f/f59f/f69f/f79f`: it adds `8000h`
+to the selected source, clamps on OVM, writes the destination, and does not
+change status flags. `SAT A/B` (`f483/f583`) instead clamps the signed
+40-bit source to 32 bits regardless of OVM and sets or clears the destination
+overflow bit according to whether clamping occurred. Both cost one cycle.
+Fixtures reproduce TI's negative-source and OVM RND examples and all three
+SAT examples (positive overflow, negative overflow, and in-range); they also
+assert carry preservation and the unaffected other accumulator. These are
+fixture-only words in the current 5110 trace union.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
