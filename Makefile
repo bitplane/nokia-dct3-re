@@ -513,6 +513,10 @@ overlay: download-mame
 	@set -e; for src in $(TEST_DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
 	@set -e; for src in $(CPU_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/devices/$$src"; done
 
+# Replay in a temporary Git index; leave the local MAME overlay untouched.
+check-mame-patches: download-mame
+	$(PYTHON) tools/check_mame_patch_stack.py --repo $(MAME_DIR) --commit $(MAME_COMMIT) $(MAME_PATCHES)
+
 $(LIBGSM_TARBALL):
 	mkdir -p third_party
 	curl --fail --location --output $@ https://www.quut.com/gsm/gsm-$(LIBGSM_VERSION).tar.gz

@@ -157,6 +157,13 @@ MAD2, DSPIF or COBBA.
 
 ## Upstream series
 
+The current overlay contains seven MAME patches plus local CPU and Nokia
+sources. `make check-mame-patches` replays the patches in Makefile order against
+the pinned MAME commit in a temporary Git index. It does not inspect the dirty
+overlay worktree or prove that the resulting source builds. Run it before
+reordering patches or updating the MAME pin, followed by the relevant handset
+and CPU gates after any behavior change.
+
 The likely reviewable sequence is:
 
 1. generic flash and PCD8544-family corrections;
@@ -170,6 +177,28 @@ Research traces, firmware-address symbol maps, raw captures and exploratory
 checkers remain in this repository. Upstream source keeps concise hardware
 comments, citations, ROM metadata, save-state support and user-visible
 limitations.
+
+Before submitting that series:
+
+- Retire `nokia_dct3_trace.inc` from the production source list. Its current
+  firmware-PC probes are observation-only but are research instrumentation,
+  not a MAME hardware contract; preserve their accepted conclusions in the
+  subsystem documents and retain focused checks here.
+- Resolve the GSM-FR build dependency. The local Makefile downloads and builds
+  libgsm 1.0.24 separately, and `nokia_gsm_fr_codec.cpp` serializes libgsm's
+  private `gsm_state` layout. The driver cannot be submitted as a self-contained
+  MAME build while it relies on that private external ABI. Keep voice support
+  working while choosing an upstreamable codec dependency or integration.
+- Review the generic flash, EEPROM, LCD, PulseAudio and C54x build/test patches
+  independently. Clean patch application is necessary, but each patch still
+  needs its own behavior tests and a scope appropriate to its MAME owner.
+- Run MAME's source-format and build checks on the proposed source series, then
+  the product gates for every affected handset. Keep private ROMs, generated
+  EEPROM identities and research captures out of distributable patches.
+- Follow the current [MAME contribution rules](https://docs.mamedev.org/contributing/),
+  including disclosure of AI assistance and model versions in the initial PR
+  description. Attribution and licensing must be reviewed for the final patch
+  series, not inferred from the local source headers alone.
 
 ## DSP promotion gates
 

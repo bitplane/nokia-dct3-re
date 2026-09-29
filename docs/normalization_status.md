@@ -219,7 +219,7 @@ configuration:
 
 The small firmware-address-specific set retained by focused radio, display,
 alarm, and watchdog gates lives in `driver/nokia_dct3_trace.inc`. A compliance
-test keeps this quarantine below 260 lines and rejects state-changing APIs.
+test keeps this quarantine below 400 lines and rejects state-changing APIs.
 Hardware
 boundary traces remain beside their owning handlers. Closed task, service,
 SIM-registration, and generic-display probes have been removed rather than
