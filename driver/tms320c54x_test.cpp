@@ -12555,6 +12555,30 @@ private:
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"TI direct SUBB example subtracts inverted carry as borrow");
+			program.write_word(0x05e2, 0x6b94); // ADDM #FFF8h, *AR4+ (TI example).
+			program.write_word(0x05e3, 0xfff8);
+			program.write_word(0x05e4, 0x75d6);
+			program.write_word(0x05e5, 0x0124);
+			program.write_word(0x05e6, 0xf5e1);
+			data.write_word(0x0100, 0x8007);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0300); // SXM, OVM.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 694;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 694)
+		{
+			expect_opcode(0x6b94,
+				data.read_word(0x0100) == 0x8000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0101 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"TI ADDM example saturates negative overflow and costs two cycles");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

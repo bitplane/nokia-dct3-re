@@ -1635,6 +1635,9 @@ Fixture-only `0605` and `0e05` check direct-page carry arithmetic under SXM:
 `ADDC` zero-extends `ffffh` before adding incoming C, while TI SPRU172C's
 `SUBB 5,A` example subtracts the inverse of C and leaves the 40-bit result
 at `ff ffffffff`. Both assert outgoing C and the one-cycle short-Smem cost.
+Fixture-only `6b94` reproduces TI SPRU172C's saturated `ADDM` example:
+`8007h + fff8h` stores `8000h` under SXM/OVM, sets OVA, advances AR4, and
+charges two cycles. The fixture does not establish every RMW flag combination.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
