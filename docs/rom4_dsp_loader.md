@@ -1659,6 +1659,15 @@ memory-bank wait states remain outside these fixtures. A further `c131` OVM
 fixture checks saturated B, sticky OVB, cleared carry, and the unaffected
 pre-arithmetic store. A `c531` OVM fixture checks negative saturation, sticky
 OVB, set carry, and the opposite subtraction order (`Xmem<<16 - A`).
+The TI SPRU172C `ADD`, `SUB`, and `LD` diagrams also assign `04xx/05xx`,
+`0cxx/0dxx`, and `14xx/15xx` to the single-memory forms shifted by TS, the
+signed shift quantity in T's low six bits. These groups were absent from the
+decoder. The core now applies SXM to the memory source, shifts by TS, and
+charges one DARAM cycle (plus the existing long-offset/absolute surcharge).
+Fixture-only `0483` and `0d83` check positive TS with ADD/SUB carry behavior;
+`1583` reproduces TI's signed `LD *AR1,TS,B` example using `fedc` shifted by
+eight; `1483` checks arithmetic right shift for TS=-1. These do not establish
+out-of-range TS values or memory wait states.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank

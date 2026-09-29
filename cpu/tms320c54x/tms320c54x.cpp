@@ -991,6 +991,14 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low >= 0xe0;
 		return indirect_read(low);
 	};
+	const auto shifted_by_t = [this](u16 memory)
+	{
+		const int shift = s8(u8(m_t << 2)) >> 2;
+		const u64 source = data_operand(memory);
+		return shift < 0 ?
+			(BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift) :
+			(source << shift) & ACC_MASK;
+	};
 	switch (op & 0xff00)
 	{
 	case 0x1000: // LD Smem, A
@@ -1094,6 +1102,13 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0200: // ADDS Smem, A
 		m_a = add_sub(m_a, alu_smem(), false, false);
 		return;
+	case 0x0400: // ADD Smem, TS, A
+	case 0x0500: // ADD Smem, TS, B
+	{
+		u64 &destination = accumulator(BIT(op, 8));
+		destination = add_sub(destination, shifted_by_t(alu_smem()), false, BIT(op, 8));
+		return;
+	}
 	case 0x0600: // ADDC Smem, A
 	case 0x0700: // ADDC Smem, B
 	{
@@ -1116,6 +1131,13 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x0b00: // SUBS Smem, B
 		m_b = add_sub(m_b, alu_smem(), true, true);
 		return;
+	case 0x0c00: // SUB Smem, TS, A
+	case 0x0d00: // SUB Smem, TS, B
+	{
+		u64 &destination = accumulator(BIT(op, 8));
+		destination = add_sub(destination, shifted_by_t(alu_smem()), true, BIT(op, 8));
+		return;
+	}
 	case 0x0e00: // SUBB Smem, A
 	case 0x0f00: // SUBB Smem, B
 	{
@@ -1124,6 +1146,10 @@ void tms320c54x_device::execute_one(u16 op)
 		destination = add_sub(destination, operand, true, BIT(op, 8));
 		return;
 	}
+	case 0x1400: // LD Smem, TS, A
+	case 0x1500: // LD Smem, TS, B
+		accumulator(BIT(op, 8)) = shifted_by_t(alu_smem());
+		return;
 	case 0x1800: // AND Smem, A
 		m_a &= alu_smem();
 		return;

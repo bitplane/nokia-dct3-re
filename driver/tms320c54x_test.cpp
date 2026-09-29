@@ -12783,6 +12783,78 @@ private:
 				data.read_word(0x0200) == 1 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ST||SUB saturates negative B, sets OVB and carry, and stores old A");
+			program.write_word(0x05e2, 0x0483); // ADD *AR3,TS,A.
+			data.write_word(0x0200, 0x0100);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 703;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 703)
+		{
+			expect_opcode(0x0483,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1010 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ADD Smem,TS uses T low six bits and costs one cycle");
+			program.write_word(0x05e2, 0x0d83); // SUB *AR3,TS,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 704;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 704)
+		{
+			expect_opcode(0x0d83,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0800 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUB Smem,TS sets no-borrow carry and costs one cycle");
+			program.write_word(0x05e2, 0x1583); // LD *AR3,TS,B.
+			data.write_word(0x0200, 0xfedc);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 705;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 705)
+		{
+			expect_opcode(0x1583,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xfffffedc00ULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI LD Smem,TS example sign-extends fedc and shifts by eight");
+			program.write_word(0x05e2, 0x1483); // LD *AR3,TS,A.
+			data.write_word(0x0200, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x003f); // TS=-1.
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 706;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 706)
+		{
+			expect_opcode(0x1483,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffffffc000ULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"LD Smem,TS sign-fills a negative T shift in one cycle");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
