@@ -1615,6 +1615,10 @@ The hand-written delay, long-word arithmetic, read-modify-write, MACP/MACD,
 and program/data move paths share that direct-address calculation. Existing
 AR-increment fixtures were corrected to use bit-7-set encodings. DP/CPL
 write-pipeline timing and external-memory wait states remain unmodeled.
+Fixture-only `2045` and `2945` check the arithmetic side of the same boundary:
+DP-relative `MPY` produces a signed product, SP-relative `MAC` accumulates a
+negative product into B, both preserve AR5, and both cost one cycle. They do
+not cover every multiplier status or overflow variant.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
