@@ -718,9 +718,9 @@ currently adds an opcode word; these are measured negative results, not
 evidence that other interactive or radio paths cannot execute more DSP
 instructions. The fixed idle fingerprint still applies only to the untouched
 primary run.
-The fixture dispatches 685 distinct words: all 457 observed ROM4 words overlap
-the fixture, and 228 occur only in the fixture. These are
-*word* counts, not instruction-family counts. Fixture execution alone is not
+The fixture dispatches all 457 observed ROM4 words plus fixture-only words.
+The generated report gives the current fixture-only total; these are *word*
+counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
 of every possible ROM4 path.
 `make check-c54x-observed-coverage` regenerates both verbose logs and fails if
@@ -728,8 +728,8 @@ the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
-That inventory matches top-level cases and opcode masks: 45,150 words match
-some declared path, of which 685 execute in the fixture and 44,465 do not.
+That inventory matches top-level cases and opcode masks and reports the
+current number of matching words that do and do not execute in the fixture.
 Every matching high-byte group now has at least one fixture word, but that
 does not establish the remaining words in those groups. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
