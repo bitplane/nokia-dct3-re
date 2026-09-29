@@ -59,6 +59,9 @@ mutes at 320 ms; its history is saved independently of the codec predictors.
   saves replay exact ordered handset/network media checkpoints.
 - Product-specific physical-duplex gates check that the shared utility still
   carries microphone and receiver media through each handset's existing routes.
+  Their per-run configuration copies preserve handset input settings but omit
+  saved host mixer routes, allowing the temporary audio devices to be discovered
+  afresh without writing host settings back into the shared fixture.
 
 These checks validate the software codec integration and established HLE media
 paths. The real-DSP backend must execute its own speech algorithm and satisfy

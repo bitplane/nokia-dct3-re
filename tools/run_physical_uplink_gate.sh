@@ -103,6 +103,14 @@ default_sink_changed=true
 pactl set-default-source "$input_sink_name.monitor"
 default_source_changed=true
 mkdir -p "$run_dir"
+# Mixer routes are host state, not handset fixture data. Let MAME discover the
+# temporary PulseAudio devices and keep its saved settings out of the fixture.
+audio_fixture=$fixture
+if [[ -n "$host_media_port" ]]; then
+	audio_fixture=fixtures/radio_outgoing_host_adapter
+fi
+python3 tools/prepare_physical_audio_config.py "$audio_fixture" "$run_dir/audio_cfg"
+audio_cfg=$(realpath "$run_dir/audio_cfg")
 ffmpeg -hide_banner -loglevel error -re \
 	-f lavfi -i sine=frequency=1000:sample_rate=48000 \
 	-filter:a volume=0.02 -device "$input_sink_name" -f pulse - &
@@ -135,7 +143,7 @@ if [[ -n "$host_media_port" ]]; then
 			-joystickprovider none -midiprovider none -skip_gameinfo -throttle \
 			-autoboot_script ../mame_nokia_dct3_input_exerciser.lua \
 			"${bios_args[@]}" -verbose \
-			-cfg_directory ../fixtures/radio_outgoing_host_adapter \
+			-cfg_directory "$audio_cfg" \
 			-http -http_port "$host_media_port" \
 			-nvram_directory "$(realpath "$run_dir")/nvram" \
 			-seconds_to_run "$run_seconds" ) &
@@ -156,7 +164,7 @@ else
 		RUN_DIR="$run_dir" SECONDS="$run_seconds" \
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		"${nvram_args[@]}" \
-		RUN_EXTRA_ARGS="-cfg_directory ../$fixture -sound pulse -throttle" \
+		RUN_EXTRA_ARGS="-cfg_directory $audio_cfg -sound pulse -throttle" \
 		RUN_ENV="PULSE_SOURCE=$input_sink_name.monitor NOKIA_DCT3_POST_READY_KEYS=$post_ready_keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$post_ready_delay_ms NOKIA_DCT3_POST_READY_KEY_DURATION_MS=$post_ready_duration_ms NOKIA_DCT3_POST_READY_KEY_GAP_MS=$post_ready_gap_ms"
 fi
 
@@ -164,8 +172,10 @@ test -f "$run_dir/error.log"
 kill "$router_pid" >/dev/null 2>&1 || true
 wait "$router_pid" >/dev/null 2>&1 || true
 router_pid=
-grep -q '^pulse_route: source-output ' "$run_dir/pulse_routes.log"
-grep -q '^pulse_route: sink-input ' "$run_dir/pulse_routes.log"
+grep -q '^pulse_route: source-output ' "$run_dir/pulse_routes.log" ||
+	{ echo "No MAME microphone stream: see $run_dir/pulse_routes.log" >&2; exit 1; }
+grep -q '^pulse_route: sink-input ' "$run_dir/pulse_routes.log" ||
+	{ echo "No MAME speaker stream: see $run_dir/pulse_routes.log" >&2; exit 1; }
 kill -INT "$capture_pid" >/dev/null 2>&1 || true
 wait "$capture_pid" >/dev/null 2>&1 || true
 capture_pid=
