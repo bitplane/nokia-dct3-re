@@ -984,6 +984,16 @@ void tms320c54x_device::execute_one(u16 op)
 		--m_icount; // Long-immediate ALU instructions take two cycles.
 		return;
 	}
+	if ((op & 0xfeff) == 0xf066) // MPY #lk, A/B
+	{
+		const u16 immediate = fetch();
+		s64 product = s64(s16(m_t)) * s64(s16(immediate));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
+		--m_icount;
+		return;
+	}
 	if (op == 0x70f8) // MVKD dmad, Smem (absolute destination form)
 	{
 		const u16 destination = fetch();
@@ -1266,6 +1276,31 @@ void tms320c54x_device::execute_one(u16 op)
 			result = (result + 0x8000) & ~s64(0xffff);
 		destination = multiply_result(result, BIT(op, 8));
 		m_icount -= low >= 0xe0;
+		return;
+	}
+	case 0x6200: case 0x6300: // MPY Smem, #lk, A/B
+	{
+		u16 address;
+		u16 immediate;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			immediate = fetch();
+			address = long_offset_address(low);
+		}
+		else
+		{
+			address = low >= 0xf8 ? fetch() : short_smem_address(low);
+			immediate = fetch();
+		}
+		const u16 memory = data_read(address);
+		m_t = memory;
+		s64 product = s64(s16(memory)) * s64(s16(immediate));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
+		if (low >= 0x80 && low < 0xe0)
+			indirect_modify(low);
+		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x4400: // LD Smem, 16, A

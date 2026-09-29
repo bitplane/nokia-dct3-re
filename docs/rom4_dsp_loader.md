@@ -1702,6 +1702,14 @@ Fixtures reproduce TI's negative-source and OVM RND examples and all three
 SAT examples (positive overflow, negative overflow, and in-range); they also
 assert carry preservation and the unaffected other accumulator. These are
 fixture-only words in the current 5110 trace union.
+TI SPRU172C's multiply table assigns `62xx/63xx` to `MPY Smem,#lk,A/B`
+and `f066/f166` to `MPY #lk,A/B`. Both use signed 16-bit operands and FRCT,
+and the Smem form publishes its memory operand to T. They cost two DARAM
+cycles, plus one for long-offset or absolute Smem. Fixture-only `6283`
+checks FRCT, T, and two-cycle timing; `f166` reproduces TI's signed
+`MPY #fffe,B` example and preserves T; `62f8` checks address-before-immediate
+extension order and the absolute three-cycle cost. Long-offset word order,
+other addressing modes, and multiplier saturation variants remain unasserted.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
