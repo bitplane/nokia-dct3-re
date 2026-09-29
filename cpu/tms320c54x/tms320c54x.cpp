@@ -1777,6 +1777,29 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xfc00) == 0xcc00) // ST src, Ymem || MPY Xmem, dst
+	{
+		const u8 x = op >> 4;
+		const u8 y = op;
+		const unsigned xar = 2 + (x & 3);
+		const unsigned yar = 2 + (y & 3);
+		const u16 xvalue = data_read(m_ar[xar]);
+		const u16 destination_address = m_ar[yar];
+		const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
+		const int asm_shift = s8((m_st1 & 0x001f) << 3) >> 3;
+		const u64 shifted_source = asm_shift < 0 ?
+				arithmetic_shift_right(source, -asm_shift) :
+				(source << asm_shift) & ACC_MASK;
+		data_write(destination_address, u16(saturated_store(shifted_source) >> 16));
+		s64 product = s64(s16(m_t)) * s64(s16(xvalue));
+		if (BIT(m_st1, 6))
+			product *= 2;
+		accumulator(BIT(op, 8)) = multiply_result(product, BIT(op, 8));
+		dual_modify(x);
+		if (xar != yar)
+			dual_modify(y);
+		return;
+	}
 	if ((op & 0xf000) == 0xd000) // ST src, Ymem || MAC[R]/MAS[R] Xmem, dst
 	{
 		const u8 x = op >> 4;

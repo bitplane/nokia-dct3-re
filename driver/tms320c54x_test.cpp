@@ -12579,6 +12579,64 @@ private:
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"TI ADDM example saturates negative overflow and costs two cycles");
+			program.write_word(0x05e2, 0xcdb9); // ST A,*AR3+ || MPY *AR5+,B.
+			program.write_word(0x05e3, 0x75d6);
+			program.write_word(0x05e4, 0x0124);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0200, 0x1111);
+			data.write_word(0x0300, 0x4000);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff84211234ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x4000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // SXM, FRCT.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 695;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 695)
+		{
+			expect_opcode(0xcdb9,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xff84211234ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x20000000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4000 &&
+				data.read_word(0x0200) == 0x8421 &&
+				data.read_word(0x0300) == 0x4000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0201 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0301 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"TI ST||MPY stores old A and squares fractional 4000h into B in one cycle");
+			program.write_word(0x05e2, 0xcfb9); // ST B,*AR3+ || MPY *AR5+,B.
+			data.write_word(0x0200, 0);
+			data.write_word(0x0300, 3);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xabcdef);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 2);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0200);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 696;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 696)
+		{
+			expect_opcode(0xcfb9,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 6 &&
+				data.read_word(0x0200) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0201 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0301 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ST||MPY stores the old destination before replacing it with the product");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

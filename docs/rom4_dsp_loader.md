@@ -1638,6 +1638,14 @@ at `ff ffffffff`. Both assert outgoing C and the one-cycle short-Smem cost.
 Fixture-only `6b94` reproduces TI SPRU172C's saturated `ADDM` example:
 `8007h + fff8h` stores `8000h` under SXM/OVM, sets OVA, advances AR4, and
 charges two cycles. The fixture does not establish every RMW flag combination.
+The TI SPRU172C opcode diagrams were checked from the PDF page image, not its
+scrambled extracted text: `e5xx` is `MVDD`, while `ccxx..cfxx` is the distinct
+`ST src,Ymem || MPY Xmem,dst` family. The core now decodes that parallel
+multiply. Fixture-only `cdb9` reproduces TI's FRCT example (old A stored,
+`4000h * 4000h` into B, both ARs advanced, one cycle); `cfb9` checks that
+a same-register store uses old B before the multiply replaces B. These tests
+do not establish the other parallel store arithmetic families or all ASM/SST
+and overflow variants.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
