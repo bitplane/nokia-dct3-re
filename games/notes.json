@@ -288,6 +288,72 @@
    "lines": [
     "Hypothesis (unnamed): temporarily points the context's entry table at a sub-table (0x10b2dc+0x20 + 8*n) to set widget 0x1b's text from the resolved entry, then restores it; looks like the title/softkey text for a submenu."
    ]
+  },
+  {
+   "addr": "0x2437c4",
+   "lines": [
+    "Sets widget field +0x3f for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. +0x3f is initialised from class-map byte 2 by widget_init_2432e0; its meaning (font/style) is not yet proven, hence the field name."
+   ]
+  },
+  {
+   "addr": "0x24383c",
+   "lines": [
+    "Sets the top 3 bits of widget field +0x41 (value * 0x20, low 5 bits kept), marks dirty, clears flag bit 4. menu_render_2629d0 passes 0 or 5. Field meaning not yet proven."
+   ]
+  },
+  {
+   "addr": "0x24387a",
+   "lines": [
+    "Sets or clears highlight bit arg2 (0..2) in widget +0x28 bits 25..27 for (class, index), marking dirty on change; menu_render_2629d0 calls it as (0x21, selected_row, 2, 1) to highlight the selection."
+   ]
+  },
+  {
+   "addr": "0x26281e",
+   "lines": [
+    "Builds the menu path indicator shown top-right (e.g. \"6-2-...\"): for each menu level, utoa_2a3dc2 of the level's item number joined with \"-\" (0x2629ac); the current item number is appended, or \"...\" (0x2629b0) when it would not fit; for right-to-left languages (flag at 0x11fd16 bit 3, language != 0x19) the numeric groups are reversed. Result set through 0x2a5e8c(6, str). Returns early via 0x2a5e1c(6) when the context flags bit 3 disable the indicator."
+   ]
+  },
+  {
+   "addr": "0x2b65c8",
+   "lines": [
+    "strcat: appends src to dst, returns dst."
+   ]
+  },
+  {
+   "addr": "0x2b6680",
+   "lines": [
+    "strlen."
+   ]
+  },
+  {
+   "addr": "0x2b6638",
+   "lines": [
+    "strcpy: returns dst."
+   ]
+  },
+  {
+   "addr": "0x2b6660",
+   "lines": [
+    "isdigit: ctype_table_2e1929[c] & 4. atoi_2b6018 tests the same table: bit 3 = space (skipped), bit 2 = digit."
+   ]
+  },
+  {
+   "addr": "0x2b6018",
+   "lines": [
+    "atoi: skips leading space class, handles '+'/'-', accumulates decimal digits."
+   ]
+  },
+  {
+   "addr": "0x2a3dc2",
+   "lines": [
+    "utoa: writes the decimal digits of arg0 (no leading zeros, '0' for zero) into arg1 and returns the digit count; divides by 10000 downward via divmod_2b5388."
+   ]
+  },
+  {
+   "addr": "0x2ac70e",
+   "lines": [
+    "Hypothesis (unnamed): dispatches through an 8-byte handler table at 0x2db720 with constant 0x5ec; menu_render_2629d0 calls it once."
+   ]
   }
  ]
 }

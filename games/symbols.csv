@@ -79,3 +79,14 @@ address,kind,name
 0x002453ec,function,widget_get_style_2453ec
 0x00296f4e,function,menu_layout_by_language_296f4e
 0x0011fcb1,label,ui_language_11fcb1
+0x002437c4,function,widget_set_attr_3f_2437c4
+0x0024383c,function,widget_set_attr_41_24383c
+0x0024387a,function,widget_set_highlight_24387a
+0x0026281e,function,menu_build_path_string_26281e
+0x002b65c8,function,strcat_2b65c8
+0x002b6680,function,strlen_2b6680
+0x002b6638,function,strcpy_2b6638
+0x002b6660,function,isdigit_2b6660
+0x002b6018,function,atoi_2b6018
+0x002a3dc2,function,utoa_2a3dc2
+0x002e1929,data,ctype_table_2e1929
