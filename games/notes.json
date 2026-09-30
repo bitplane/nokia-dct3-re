@@ -191,6 +191,49 @@
    "lines": [
     "Selects menu item arg0: if the list fits in menu_visible_rows_11fd18 it just stores the first enabled item; otherwise stores the selection (+8), adjusts the top-of-window item (+7) with next/previous enabled items so the selection is visible."
    ]
+  },
+  {
+   "addr": "0x2b64e8",
+   "lines": [
+    "srand: stores arg0 into rand_seed_11250c (same literal as rand_2b64d4). game3_spawn_objects_242dd0 reseeds before spawning."
+   ]
+  },
+  {
+   "addr": "0x2626a8",
+   "lines": [
+    "Previous enabled menu item before arg0, wrapping from 1 to the item count; mirror of menu_next_enabled_item_2625f2."
+   ]
+  },
+  {
+   "addr": "0x262670",
+   "lines": [
+    "Row of item arg0 within the visible window: counts next-enabled steps from the window's top item (context +7, table 0x10bbf3)."
+   ]
+  },
+  {
+   "addr": "0x26265c",
+   "lines": [
+    "Number of enabled items in the current menu (0 when none): first enabled item then 0x26263a() to count onward. Consumed by menu_render_2629d0 as the rows-remaining counter and by menu_select_item_2626f4 against menu_visible_rows_11fd18."
+   ]
+  },
+  {
+   "addr": "0x262306",
+   "lines": [
+    "Maps item ordinal arg0 to its entry index in the 0x1c-byte menu entry table at 0x10b32c: starts at the context's first entry (descriptor +1) and follows the next-entry byte at entry-2, n times; returns index-1."
+   ]
+  },
+  {
+   "addr": "0x243180",
+   "lines": [
+    "Refresh timer control for the games UI: arg0 == 2 -> if state (0x110902) is 2, repaint via games_ui_refresh_243170 and, when state is 1, post delayed scheduler event 0x50 (delay 0x3c3d); otherwise cancel event 0x50 if pending and store arg0 as the state.",
+    "Medium confidence on the exact state meanings."
+   ]
+  },
+  {
+   "addr": "0x2629d0",
+   "lines": [
+    "Renders the current menu page: clears widgets 0x19-0x21, computes the scrollbar position with the software-float helpers (title widget 0x19, bar 0x1a), then for each visible row from the window top builds text widget 0x21 (and 0x1d icon / 0x1e mark 0x28/0x29 for checkable menus), links them with widget_link_243428/0x2438e8, re-paginating when rows overflow; finally highlights the selected row via 0x24387a and 0x296f4e. arg0 == 0xff tears the menu down (0x2a5e1c(6))."
+   ]
   }
  ]
 }

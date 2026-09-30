@@ -64,3 +64,10 @@ address,kind,name
 0x002625f2,function,menu_next_enabled_item_2625f2
 0x002626f4,function,menu_select_item_2626f4
 0x0011fd18,label,menu_visible_rows_11fd18
+0x002b64e8,function,srand_2b64e8
+0x002626a8,function,menu_prev_enabled_item_2626a8
+0x00262670,function,menu_item_row_262670
+0x0026265c,function,menu_enabled_count_26265c
+0x00262306,function,menu_entry_index_262306
+0x00243180,function,ui_refresh_timer_243180
+0x002629d0,function,menu_render_2629d0
