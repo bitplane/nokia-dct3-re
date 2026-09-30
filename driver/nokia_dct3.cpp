@@ -339,6 +339,11 @@ constexpr nokia_gensio_device::wiring_contract GENSIO_NAM1 = {
 constexpr nokia_gensio_device::wiring_contract GENSIO_NSM3 = {
 	0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true
 };
+// NPE-3 v5.56 0x4ec7b0 selects 0x22, writes 0x2c, then polls
+// status bit 2 at 0x4ec7bc; control bit 2 is not a receive trigger.
+constexpr nokia_gensio_device::wiring_contract GENSIO_NPE3 = {
+	0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true
+};
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM5 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM6 = { 5, 0x04 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
@@ -927,6 +932,23 @@ constexpr nokia_product_config make_8210_config()
 }
 constexpr nokia_product_config PRODUCT_8210 = make_8210_config();
 
+constexpr nokia_product_config make_6210_config()
+{
+	nokia_product_config result;
+	// NPE-3 v5.56 0x4dc0e4 sets release bit 2 at CTSI+2, then
+	// 0x4dc0fa tests bit 4 via LSRS #5/carry. No bootstrap reply is assumed.
+	result.dsp_reset_wiring = { 0x10, 0x04 };
+	result.gensio_wiring = GENSIO_NPE3;
+	// 0x426c58 alternates the two shared-buffer ownership words. Keep
+	// transfer acknowledgements separate from the unresolved final verdict.
+	result.dsp_bootstrap = {
+		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+		0, {}, 0, std::nullopt, std::nullopt, 0
+	};
+	return result;
+}
+constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
+
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
 constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
@@ -1055,6 +1077,7 @@ public:
 	void noki6110(machine_config &config);
 	void noki7110(machine_config &config);
 	void noki6210(machine_config &config);
+	void noki6250(machine_config &config);
 	void dct3_base(machine_config &config);
 	void dct3_32mbit_flash_base(machine_config &config);
 	void noki3310(machine_config &config);
@@ -3241,6 +3264,12 @@ void nokia_dct3_state::noki7110(machine_config &config)
 void nokia_dct3_state::noki6210(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
+	apply_product_config(PRODUCT_6210);
+}
+
+void nokia_dct3_state::noki6250(machine_config &config)
+{
+	dct3_32mbit_flash_base(config);
 	apply_product_config(PRODUCT_DEFAULT);
 }
 
@@ -3480,7 +3509,7 @@ SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empt
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6210, 0,      0,      noki6210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, noki6250, 0,      0,      noki6210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki6250, 0,      0,      noki6250, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

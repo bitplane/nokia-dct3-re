@@ -399,7 +399,8 @@ class MachineProfileTest(unittest.TestCase):
             "noki5210": ("dct3_32mbit_flash_base(config);", "PRODUCT_5210"),
             "noki8xxx": ("dct3_base(config);", "PRODUCT_8XXX"),
             "noki7110": ("dct3_32mbit_flash_base(config);", "PRODUCT_DEFAULT"),
-            "noki6210": ("dct3_32mbit_flash_base(config);", "PRODUCT_DEFAULT"),
+            "noki6210": ("dct3_32mbit_flash_base(config);", "PRODUCT_6210"),
+            "noki6250": ("dct3_32mbit_flash_base(config);", "PRODUCT_DEFAULT"),
         }
         for machine, (base, product) in expected.items():
             with self.subTest(machine=machine):

@@ -27,6 +27,15 @@
   },
   "gates": [
     {
+      "name": "verify-6210-bootstrap",
+      "prerequisites": ["build"],
+      "variables": {"PHONE": "noki6210", "BIOS": "556"},
+      "steps": [
+        {"step": "run", "silent": false, "make_flags": ["--no-print-directory"], "run_target": "run-prebuilt", "tokens": ["PHONE=noki6210", "BIOS=556", "RUN_DIR=$(RUN_DIR)", "SECONDS=3", "RUN_VERBOSE=1"]},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/npe3_bootstrap_trace_check.py", "arguments": ["$(RUN_DIR)/error.log", "$(RUN_DIR)/boot_summary.txt"]}
+      ]
+    },
+    {
       "name": "verify-8210-verifier",
       "prerequisites": ["normalize-8210", "build"],
       "variables": {},

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 318 gates: 175 generated from typed steps, 143 copied verbatim (shell).
+# 319 gates: 176 generated from typed steps, 143 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,9 +44,9 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-8210-verifier verify-8210-bootstrap verify-gsm-fr-codec \
-	verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 verify-gsm-xcch-l1 \
-	verify-gsm-mobility verify-gsm-sms-transport \
+.PHONY: verify-6210-bootstrap verify-8210-verifier verify-8210-bootstrap \
+	verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 \
+	verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
@@ -211,6 +211,12 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure
+
+verify-6210-bootstrap: PHONE=noki6210
+verify-6210-bootstrap: BIOS=556
+verify-6210-bootstrap: build
+	$(MAKE) --no-print-directory run-prebuilt PHONE=noki6210 BIOS=556 RUN_DIR=$(RUN_DIR) SECONDS=3 RUN_VERBOSE=1
+	$(PYTHON) tools/npe3_bootstrap_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
 
 verify-8210-verifier: normalize-8210 build
 	$(PYTHON) tools/nsm3_verifier_check.py $(MAME_DIR)/mame roms/noki8210/8210_5.31ppm_c.fls $(RUN_DIR)
