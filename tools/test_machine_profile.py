@@ -407,7 +407,7 @@ class MachineProfileTest(unittest.TestCase):
             "noki3210": ("dct3_base(config);", "PRODUCT_3210"),
             "noki5210": ("dct3_32mbit_flash_base(config);", "PRODUCT_5210"),
             "noki8xxx": ("dct3_base(config);", "PRODUCT_8XXX"),
-            "noki7110": ("dct3_32mbit_flash_base(config);", "PRODUCT_DEFAULT"),
+            "noki7110": ("dct3_32mbit_flash_base(config);", "PRODUCT_7110"),
             "noki6210": ("dct3_32mbit_flash_base(config);", "PRODUCT_6210"),
             "noki6250": ("dct3_32mbit_flash_base(config);", "PRODUCT_DEFAULT"),
         }

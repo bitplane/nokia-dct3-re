@@ -961,6 +961,20 @@ constexpr nokia_product_config make_6210_config()
 }
 constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
 
+constexpr nokia_product_config make_7110_config()
+{
+	nokia_product_config result;
+	// NSE-5 v5.01 0x432eae uploads 227 full sparse-flash blocks and
+	// one terminal block before 0x432f96 waits for a DSP-owned verdict.
+	// Ownership acknowledgements do not establish the final publication.
+	result.dsp_bootstrap = {
+		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+		0, {}, 0, std::nullopt, std::nullopt, 0
+	};
+	return result;
+}
+constexpr nokia_product_config PRODUCT_7110 = make_7110_config();
+
 constexpr offs_t NOKIA_RAM_BASE = 0x100000;
 constexpr offs_t NOKIA_RAM_END = 0x180000;
 constexpr offs_t NOKIA_FLASH1_BASE = 0x00200000;
@@ -3284,7 +3298,7 @@ void nokia_dct3_state::noki6110(machine_config &config)
 void nokia_dct3_state::noki7110(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
-	apply_product_config(PRODUCT_DEFAULT);
+	apply_product_config(PRODUCT_7110);
 }
 
 void nokia_dct3_state::noki6210(machine_config &config)

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 321 gates: 178 generated from typed steps, 143 copied verbatim (shell).
+# 322 gates: 179 generated from typed steps, 143 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,10 +44,10 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-6210-keypad-controller verify-6210-verifier \
-	verify-6210-bootstrap verify-8210-verifier verify-8210-bootstrap \
-	verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 \
-	verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
+.PHONY: verify-7110-bootstrap verify-6210-keypad-controller \
+	verify-6210-verifier verify-6210-bootstrap verify-8210-verifier \
+	verify-8210-bootstrap verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 \
+	verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
@@ -212,6 +212,12 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure
+
+verify-7110-bootstrap: PHONE=noki7110
+verify-7110-bootstrap: BIOS=501
+verify-7110-bootstrap: build
+	$(MAKE) --no-print-directory run-prebuilt PHONE=noki7110 BIOS=501 RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_VERBOSE=1
+	$(PYTHON) tools/nse5_bootstrap_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
 
 verify-6210-keypad-controller: build
 	$(PYTHON) tools/npe3_keypad_check.py $(MAME_DIR)/mame $(MAME_DIR)/roms $(RUN_DIR)
