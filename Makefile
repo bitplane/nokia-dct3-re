@@ -731,7 +731,7 @@ KEY_DURATION_MS ?= 70
 KEY_GAP_MS ?= 430
 KEY_CAPTURE_MS ?= 2000
 
-.PHONY: games-entries games-callgraph games-decomp games-worklist games-packet games-next run-keys
+.PHONY: games-entries games-callgraph games-decomp games-doc games-worklist games-packet games-next run-keys
 
 games-entries:
 	@mkdir -p $(GAMES_RUN_DIR)
@@ -751,6 +751,9 @@ games-decomp:
 		-postScript ImportSymbolsCsv.java $(abspath ghidra/symbols/3210.csv) \
 		-postScript ExportFunctionsByAddress.java $(abspath $(GAMES_RUN_DIR))/decomp/_all.c $$addrs 2>&1 | grep -E "ImportSymbolsCsv|ERROR" || true; \
 	$(PYTHON) tools/split_decompile_export.py $(GAMES_RUN_DIR)/decomp/_all.c $(GAMES_RUN_DIR)/decomp
+
+games-doc:
+	$(PYTHON) tools/games_doc_tables.py
 
 games-worklist:
 	$(PYTHON) tools/naming_worklist.py $(WORKLIST_ARGS)

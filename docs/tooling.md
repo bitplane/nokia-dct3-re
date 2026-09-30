@@ -163,6 +163,9 @@
     `mame_nokia_dct3_coverage.lua`.
   - `lcd_frame_sheet.py` / `lcd_pgm_to_png.py` — contact sheets of the LCD
     mirror frames a run captured.
+  - `games_doc_tables.py` — regenerates the address-map tables in
+    `docs/games_applications.md` from the symbol map and the notes JSON
+    (`make games-doc`; `--check` for CI-style staleness).
   - `split_decompile_export.py` — splits an `ExportFunctionsByAddress` file
     into one file per function under an ignored run directory.
 - `ghidra/scripts/*.java` — headless Ghidra scripts (run via `analyzeHeadless`).

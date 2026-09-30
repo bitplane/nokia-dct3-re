@@ -427,6 +427,60 @@
    "lines": [
     "Logic: draws a row's score pegs at column arg0*8 from the packed score byte (high nibble exact = 3x2 marks, low nibble misplaced = 3x1 marks), two layouts depending on how many fit."
    ]
+  },
+  {
+   "addr": "0x242754",
+   "lines": [
+    "Rotation: rotates the selected block's contents counter-clockwise (values move top-right -> top-left -> bottom-left -> bottom-right). Block origin from the 4-byte cursor arg1 (row, col; cells are 6 apart per row); 2x2 below level 4, 3x3 ring of 8 cells otherwise."
+   ]
+  },
+  {
+   "addr": "0x2427f4",
+   "lines": [
+    "Rotation: the clockwise counterpart of rotation_rotate_block_ccw_242754 (same block geometry, inverse cycle)."
+   ]
+  },
+  {
+   "addr": "0x242220",
+   "lines": [
+    "Not a function: interior of rotation_handler_241fd0 (no prologue; 0x24221e falls into it). Wraps the cursor after a move using divmod by the board size and posts tick event 0x30 with delay 3 for the rotation animation. Listed as a label so the worklist stops offering it."
+   ]
+  },
+  {
+   "addr": "0x2b5068",
+   "lines": [
+    "Software double multiply (sign = a.sign ^ b.sign, exponent add). menu_render_2629d0 computes the scrollbar thumb as (pos-1) * ((rows-7) op c) / (count-1) with this, double_div_2b49b8 and 0x2b44f6; Snake's tick delay uses the same family."
+   ]
+  },
+  {
+   "addr": "0x2b44f6",
+   "lines": [
+    "Hypothesis (unnamed): software double add or subtract (aligns exponents, no sign combination); used once by menu_render_2629d0 on the scrollbar height."
+   ]
+  },
+  {
+   "addr": "0x26309c",
+   "lines": [
+    "Activates menu item arg0 in the current level: rejects items beyond the count or disabled; stores it as the level's selection (+6); if the level flags bit 6 it posts task-5 status 0x38c (or 0x38e for item 0) with the item's payload word and does not return; otherwise renders the menu (or clears the pending 0x2b4fd6(1) state). Returns 1 on success, 0 if rejected."
+   ]
+  },
+  {
+   "addr": "0x263154",
+   "lines": [
+    "Enters menu level arg0 at item id arg1: after 0x262fa4() it binds the level's context descriptor (0x10bbec[...]) to the level record (0x10b2b4 + idx*8 + 0x48), resolves the item ordinal by id, applies the descriptor flags (bit 0 -> 0x263006 sets a 16-bit pair at +4/+6; bits 4/5 start/stop something through 0x24b174/0x24af00), then activates the item (falling back to the first enabled) and ui_context_switch_2a5dec(1). Posts task-5 status 0x5de/0x5eb when the level has no enabled item."
+   ]
+  },
+  {
+   "addr": "0x263468",
+   "lines": [
+    "Returns to the current level's remembered selection (+6 of its descriptor) and re-activates it, stopping the 0x24af00 side effect if active; this is the 'Last view' style return after a game ends."
+   ]
+  },
+  {
+   "addr": "0x24af00",
+   "lines": [
+    "Hypothesis (unnamed): stops a screen effect started by 0x24b174 (0x24b174 calls 0x24af70(buf, table, 0x578)); the pair is driven by menu descriptor flag bits 4/5 in menu_enter_263154 and by menu_return_263468."
+   ]
   }
  ]
 }

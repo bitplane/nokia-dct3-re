@@ -1007,3 +1007,10 @@ address,kind,name
 0x001103a8,label,logic_secret_1103a8
 0x001103b0,label,logic_palette_1103b0
 0x002d9760,data,logic_params_2d9760
+0x00242754,function,rotation_rotate_block_ccw_242754
+0x002427f4,function,rotation_rotate_block_cw_2427f4
+0x00242220,label,rotation_handler_cursor_wrap_242220
+0x002b5068,function,double_mul_2b5068
+0x0026309c,function,menu_activate_item_26309c
+0x00263154,function,menu_enter_263154
+0x00263468,function,menu_return_263468
