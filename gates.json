@@ -27,6 +27,14 @@
   },
   "gates": [
     {
+      "name": "verify-6210-verifier",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/nsm3_verifier_check.py", "arguments": ["$(MAME_DIR)/mame", "roms/noki6210/6210_556c.fls", "$(RUN_DIR)", "--product", "6210"]}
+      ]
+    },
+    {
       "name": "verify-6210-bootstrap",
       "prerequisites": ["build"],
       "variables": {"PHONE": "noki6210", "BIOS": "556"},

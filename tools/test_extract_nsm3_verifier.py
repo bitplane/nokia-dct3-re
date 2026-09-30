@@ -35,6 +35,19 @@ class VerifierExtractionTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "program"):
                 verifier.extract(self.image())
 
+    def test_npe3_uses_its_own_descriptor(self):
+        image = bytearray(verifier.NPE3_DESCRIPTOR_OFFSET + 12)
+        struct.pack_into(">6H", image, verifier.NPE3_DESCRIPTOR_OFFSET,
+                         0x0f00, 0, 223, 0x0f00, 0xdc, 0)
+        image += b"\x12\x34" * 223
+        with patch.object(verifier.hashlib, "sha1", side_effect=[
+                self.digest(verifier.NPE3_FLASH_SHA1), self.digest(verifier.PROGRAM_SHA1)]):
+            self.assertEqual(verifier.extract(image, "6210"), b"\x12\x34" * 223)
+
+    def test_rejects_unknown_product(self):
+        with self.assertRaisesRegex(ValueError, "unsupported"):
+            verifier.extract(self.image(), "6250")
+
 
 if __name__ == "__main__":
     unittest.main()

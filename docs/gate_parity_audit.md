@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 48
-Differences found: 89
+Families with more than one product: 49
+Differences found: 90
 
 ## ROM normalisation reachability
 
@@ -68,6 +68,7 @@ absent product is a coverage question, not a drifted gate.
 | `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — |
 | `save-state` | — | — | — | — | — | — | yes | yes | — | — | — |
 | `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — |
+| `verifier` | — | — | — | — | — | — | — | — | — | yes | yes |
 
 ## Different checker scripts
 
@@ -342,6 +343,11 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `--radio-profile`
 - **5210**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - shared: `--profile`
+
+### `verifier` — `tools/nsm3_verifier_check.py`
+
+- **6210**: `--product`
+- **8210**: _(none)_
 
 ## Different prerequisites
 

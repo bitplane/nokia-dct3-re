@@ -2,13 +2,14 @@ diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 index 240e84a4..d21bdb89 100644
 --- a/src/mame/mame.lst
 +++ b/src/mame/mame.lst
-@@ -36180,5 +36180,10 @@
+@@ -36180,5 +36180,11 @@
  noki8890
  
 +@source:nokia/tms320c54x_test.cpp
 +tms54test
 +tms54rom4
 +nsm3verify
++npe3verify
 +
  @source:northstar/horizon.cpp
  nshrz

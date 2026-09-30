@@ -50,6 +50,30 @@ explicit ROM-version and COBBA assumptions must not be promoted as measured
 6210 values. The collaborator's self-test responder is a later request/reply
 lead, not evidence for this earlier bootstrap completion.
 
+### Executable calculation and remaining inputs
+
+`make verify-6210-verifier` runs the actual 223-word program with NPE-3's
+own flash samples, remaining count `0001:d000` and 232 handoffs. It first
+fails closed at the unsupported peripheral read (`port 002d`, PC `0f9f`).
+Three explicit sensitivity configurations then attach the existing COBBA
+register model and supply PROM word `ff87` as either 6 or 4. All calculate
+fingerprint `f65a:0d46` at DSP data `04f7:04f8`, with PMST `ffa8`.
+The companion 8210 fixture still calculates `c2e0:6006` over 116 blocks.
+
+These are core-fixture calculations, not measured silicon results. At the
+final publication, shared word 0 follows the supplied COBBA register-F value
+(0 or `0016`), while words 1/2 follow the supplied immutable PROM value
+(6 or 4). Neither is selected by the calculated fingerprint. Thus the
+larger NPE-3 stream does not itself resolve the missing publication input;
+ROM6 PROM mapping/content and the peripheral contract remain unvalidated.
+The handset profile does not receive any of these sensitivity values.
+
+At MCU `426cca..426cd2`, the loader stores shared word 1 at `16fff0`
+and word 0 at `16ffee`, relative to bootstrap structure `16ffe4`.
+The base pointer comes from literal `426ddc`. This identifies the result's
+firmware-owned destination without claiming the later self-test responder
+or its IRQ4 upload-completion flag supplies the earlier verifier result.
+
 ## Acceptance
 
 `make verify-6210-bootstrap` performs a fresh isolated run and checks CCONT
