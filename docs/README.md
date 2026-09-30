@@ -40,7 +40,7 @@ distinction.
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |
-| `8210_bringup.md` | NSM-3 stock inputs, GENSIO/ROM6 bootstrap and final DSP verification boundary. |
+| `8210_bringup.md` | NSM-3 stock inputs, staged-verifier execution and unresolved final DSP publication contract. |
 | `2100_bringup.md` | Bounded NAM-2 v5.84 portability frontier and display resumption contract. |
 | `3610_bringup.md` | NAM-1 v5.11 executable profile, GENSIO/CCONT evidence and current bring-up boundary. |
 | `6110_bootstrap_capture.md` | Physical NSE-3 DSP-bootstrap capture format and acceptance contract. |

@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nsm3_verifier_check import check
+from tools.nsm3_verifier_check import check, check_cobba
 
 
 class VerifierFrontierTest(unittest.TestCase):
@@ -24,6 +24,35 @@ class VerifierFrontierTest(unittest.TestCase):
     def test_changed_peripheral_write(self):
         with self.assertRaises(ValueError):
             check(self.output, self.trace.replace("data=0010", "data=0011"), 1)
+
+    def comparison(self, value, version=6):
+        trace = self.trace + "nsm3_verifier: immutable_version_write=0006\n"
+        for select in ("001f", "001d", "001f"):
+            trace += f"nsm3_verifier: port_write=002c data={select} blocks=116\n"
+        for read in [value] * 3 + [12, 12, value]:
+            trace += f"nsm3_verifier: port_read=002d data={read:04x} blocks=116\n"
+        output = f"publication: blocks=116 word0={value:04x} word1={version:04x} word2={version:04x} word3=0006 pc=0f64"
+        return output, trace
+
+    def test_cobba_publication(self):
+        for value in (0, 0x16):
+            check_cobba(*self.comparison(value), 3, value)
+
+    def test_wrong_peripheral_value(self):
+        with self.assertRaises(ValueError):
+            check_cobba(*self.comparison(0), 3, 0x16)
+
+    def test_wrong_status_handshake(self):
+        output, trace = self.comparison(0)
+        with self.assertRaises(ValueError):
+            check_cobba(output, trace.replace("data=001d", "data=001c"), 3, 0)
+
+    def test_immutable_version_sensitivity(self):
+        check_cobba(*self.comparison(0, 4), 3, 0, 4)
+
+    def test_no_shadow_ram_version(self):
+        with self.assertRaises(ValueError):
+            check_cobba(*self.comparison(0, 6), 3, 0, 4)
 
 
 if __name__ == "__main__":

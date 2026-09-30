@@ -32,7 +32,7 @@ python3 tools/nse3_bootstrap_capture_check.py \
 
 This deliberately does not turn a ROM4 package label or historical mismatch
 report into a presumed `4/4` pair. It also rejects the collaborator emulator's
-hard-coded completion, the measured 8210/ROM6 verdict, or a non-sentinel chosen
+hard-coded completion, a collaborator-reported 8210/ROM6 verdict, or a non-sentinel chosen
 merely because the external MCU does not inspect its numeric value.
 Once a physical capture passes, its exact verdict can enter the typed
 product bootstrap contract with the raw trace and provenance retained outside

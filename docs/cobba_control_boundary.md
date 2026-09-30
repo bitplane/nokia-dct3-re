@@ -79,6 +79,13 @@ not call this test path.
 
 ## Physical capture option
 
+The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair
+`2c/2d` to read register F around a register-D status handshake. The isolated
+core fixture corroborates the existing register-selection grammar and checks
+input sensitivity, not the real 8210 register-F value or its meaning. See
+`8210_bringup.md` for the unresolved DSP memory contract. No production
+COBBA/DSP response is promoted from those fixture inputs.
+
 The Nokia 5110 NSE-1 service material names factory test points for `DSPXF`,
 `VCOBBA`, `COBBARSTX`, `COBBAWRX`, `COBBARDX` and `COBBACLK`. This makes a
 logic-analyser capture plausible using test pads rather than soldering onto

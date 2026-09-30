@@ -7,6 +7,7 @@
 #include "emuopts.h"
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "nokia_dspif.h"
+#include "nokia_cobba.h"
 #include <sstream>
 
 namespace {
@@ -13966,30 +13967,61 @@ class nsm3_verifier_state : public driver_device
 {
 public:
 	nsm3_verifier_state(const machine_config &config, device_type type, const char *tag) :
-		driver_device(config, type, tag), m_cpu(*this, "maincpu") { }
+		driver_device(config, type, tag), m_cpu(*this, "maincpu"), m_cobba(*this, "cobba") { }
 	void verifier(machine_config &config)
 	{
 		TMS320C54X(config, m_cpu, 13'000'000);
+		NOKIA_COBBA(config, m_cobba, 0);
 		m_cpu->set_addrmap(AS_PROGRAM, &nsm3_verifier_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &nsm3_verifier_state::data_map);
 		m_cpu->set_addrmap(AS_IO, &nsm3_verifier_state::io_map);
 	}
 
 private:
-	void program_map(address_map &map) { map(0, 0xffff).ram(); }
+	void program_map(address_map &map)
+	{
+		map(0, 0xffff).ram();
+		// ROM4's acquired PROM has the immutable version word here. This
+		// fixture supplies an explicit version input, not missing ROM code.
+		map(0xff87, 0xff87).rw(FUNC(nsm3_verifier_state::version_r), FUNC(nsm3_verifier_state::version_w));
+	}
+	u16 version_r() { return !strcmp(machine().options().bios(), "rom4") ? 4 : 6; }
+	void version_w(u16 value)
+	{
+		logerror("nsm3_verifier: immutable_version_write=%04x\n", value);
+	}
 	void data_map(address_map &map) { map(0, 0xffff).ram(); }
 	void io_map(address_map &map)
 	{
 		map(0, 0xffff).rw(FUNC(nsm3_verifier_state::io_r), FUNC(nsm3_verifier_state::io_w));
 	}
+	bool using_cobba() const
+	{
+		return !strcmp(machine().options().bios(), "cobba") ||
+				!strcmp(machine().options().bios(), "cobba_alt") ||
+				!strcmp(machine().options().bios(), "rom4");
+	}
 	u16 io_r(offs_t offset)
 	{
+		if (using_cobba() && offset == 0x2d)
+		{
+			u16 const value = m_cobba->control_data_r();
+			logerror("nsm3_verifier: port_read=%04x data=%04x blocks=%u\n", u16(offset), value, m_block);
+			return value;
+		}
 		throw emu_fatalerror(1, "NSM3 verifier requires peripheral read: port=%04x pc=%04x blocks=%u",
 			u16(offset), u16(m_cpu->state_int(tms320c54x_device::STATE_PC)), m_block);
 	}
 	void io_w(offs_t offset, u16 data)
 	{
 		logerror("nsm3_verifier: port_write=%04x data=%04x blocks=%u\n", u16(offset), data, m_block);
+		if (using_cobba())
+		{
+			if (offset == 0x2c)
+				m_cobba->control_select_w(data);
+			else if (offset == 0x2d)
+				m_cobba->control_data_w(data);
+		}
 	}
 	void machine_start() override
 	{
@@ -14000,7 +14032,8 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		for (unsigned i = 0; i != 0x10000; ++i)
-			program.write_word(i, 0xffff);
+			if (i != 0xff87)
+				program.write_word(i, 0xffff);
 		u16 const *const staged = &memregion("verifier")->as_u16();
 		for (unsigned i = 0; i != 223; ++i)
 			program.write_word(0x0f00 + i, staged[i]);
@@ -14018,6 +14051,12 @@ private:
 		data.write_word(0x0881, 0x0200);
 		m_block = 0;
 		m_ticks = 0;
+		// Metamorphic peripheral input, not a proposed handset identity.
+		if (!strcmp(machine().options().bios(), "cobba_alt"))
+		{
+			m_cobba->control_data_w(0x0016);
+			m_cobba->control_select_w(0x000f);
+		}
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0f00);
 		m_timer->adjust(attotime::from_usec(1), 0, attotime::from_usec(1));
 	}
@@ -14052,12 +14091,17 @@ private:
 		++m_block;
 	}
 	required_device<tms320c54x_device> m_cpu;
+	required_device<nokia_cobba_device> m_cobba;
 	emu_timer *m_timer = nullptr;
 	unsigned m_block = 0;
 	unsigned m_ticks = 0;
 };
 
 ROM_START(nsm3verify)
+	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
+	ROM_SYSTEM_BIOS(1, "cobba", "Compare existing COBBA register model (not handset validation)")
+	ROM_SYSTEM_BIOS(2, "cobba_alt", "COBBA register-F sensitivity fixture (not handset identity)")
+	ROM_SYSTEM_BIOS(3, "rom4", "Immutable PROM version sensitivity fixture (not NSM-3 hardware)")
 	ROM_REGION16_LE(446, "verifier", 0)
 	ROM_LOAD16_WORD_SWAP("nsm3_verifier.bin", 0, 446,
 		CRC(53e2de79) SHA1(6646da3c5be9c70deda7e0b5b9f257d5d2ace815))
