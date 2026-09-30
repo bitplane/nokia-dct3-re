@@ -36,7 +36,8 @@ The initial remaining count is `0x0001:c800`. `0x432f2c..0x432f60` sends
 The terminal block contains 510 further samples and two `0xffff` terminators.
 Ownership cells are MCU `0x100fe` and `0x10100`, alternating 114 times each.
 After completion, `0x432f9e..0x432fa6` copies words 1 and 0 into the
-bootstrap structure at `0x1670b0`, offsets `0x0c` and `0x0a` respectively.
+bootstrap state at `0x16702c`, offsets `0x0c` and `0x0a` respectively.
+`0x1670b0` is the descriptor-pointer slot, not the result structure.
 
 GENSIO selection `0x25`, CCONT command/data at `0x2c`, read at `0x6c` and
 status at `0x6d` operate through the existing controller contract in this
@@ -81,6 +82,38 @@ reset/read contract and product-specific PMST mapping are not promoted merely
 because the sensitivity fixture finishes.
 
 ## Next question
+
+### Immediate MCU consumer
+
+The loader returns at `0x432fb8`. Its direct call at `0x49ff12` is followed
+by a test of the caller's saved `r4`, not the loader's mailbox fields:
+`0x49ff16..0x49ff1c` optionally calls `0x45c61c`, and `0x49ff20` calls
+service initialization at `0x3bc2a8`. Thus the immediate caller does not
+validate the copied word-0/word-1 pair as a checksum verdict. This does not
+exclude later readers of the bootstrap structure or identify the correct
+COBBA reply.
+
+The result-store literal is at `0x4330b0` and contains `0x16702c`.
+The descriptor-pointer literal at `0x433160` contains `0x1670b0`.
+These are distinct objects. Four halfword-aligned literal occurrences of
+`0x16702c` appear in the pinned image (`0x4330b0`, `0x4334e8`, `0x433754`,
+`0x49ff30`); scanning every halfword for Thumb-1 PC-relative loads targeting
+those occurrences yields 15 candidate loads. Code/data classification and
+indirect or derived pointers remain outside that count.
+
+An additional literal at `0x45c33c` points directly to `0x167036`, the
+word-0 result field. Its reader at `0x45bf8a..0x45bfb0` emits three bytes:
+bits 8..11 plus `0x37`, bits 4..7 plus `0x30`, and bits 0..3 plus `0x30`,
+then a zero terminator. This is a concrete formatting use of the returned
+COBBA word, not a pass/fail comparison. The containing command selector and
+the register-F hardware meaning have not yet been established; the formatting
+alone does not justify assuming a zero reset value.
+
+This is a bounded disassembly result from the pinned flash: the linear Thumb
+scan found one direct `BL 0x432eae`. It is not an exhaustive indirect-call or
+bootstrap-structure reader census. Decode the flash in big-endian Thumb
+order without an additional halfword swap; swapping it again produces
+plausible-looking but incorrect instructions.
 
 Does primary hardware material or the firmware's consumers establish the
 7110's COBBA register-F reset/read result and the PMST-dependent `0xff87`
