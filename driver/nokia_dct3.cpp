@@ -307,8 +307,14 @@ constexpr display_geometry_contract DISPLAY_3610 = {
 constexpr display_geometry_contract DISPLAY_5210 = {
 	84, 48, 84, 48, true
 };
+// NPE-3 clears eight 96-byte banks at 0x4e656c; Nokia's board sheet
+// labels the fitted GD45 module 96x60. Remaining controller identity is open.
+constexpr display_geometry_contract DISPLAY_6210 = {
+	96, 64, 96, 60
+};
 static_assert(display_geometry_contract{}.valid());
 static_assert(DISPLAY_3410.valid());
+static_assert(DISPLAY_6210.valid());
 
 constexpr nokia_mad2_device::dsp_reset_wiring_contract
 		DSP_RESET_WIRING_3410 = {
@@ -350,6 +356,9 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NHM2 = { 5, 0x02 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSM5 = { 5, 0x10 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE3 = { 5, 0x01 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NAM2 = { 5, 0x04 };
+// NPE-3 v5.56 scanner 0x4f84c8 drives five bits; special map 0x2869d4
+// decodes bit 4 as Power (0x0d). Normal map 0x2869b8 matches NSM-5.
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NPE3 = { 5, 0x10 };
 static_assert(KEYPAD_NSE8.valid());
 static_assert(KEYPAD_NSE1.valid());
 static_assert(KEYPAD_NHM5.valid());
@@ -358,6 +367,7 @@ static_assert(KEYPAD_NHM2.valid());
 static_assert(KEYPAD_NSM5.valid());
 static_assert(KEYPAD_NSE3.valid());
 static_assert(KEYPAD_NAM2.valid());
+static_assert(KEYPAD_NPE3.valid());
 
 // These values currently match but remain separate evidence: NSE-8 and NHM-5
 // have independent organic startup and call gates. A new product must supply
@@ -935,6 +945,8 @@ constexpr nokia_product_config PRODUCT_8210 = make_8210_config();
 constexpr nokia_product_config make_6210_config()
 {
 	nokia_product_config result;
+	result.keypad_wiring = KEYPAD_NPE3;
+	result.display = DISPLAY_6210;
 	// NPE-3 v5.56 0x4dc0e4 sets release bit 2 at CTSI+2, then
 	// 0x4dc0fa tests bit 4 via LSRS #5/carry. No bootstrap reply is assumed.
 	result.dsp_reset_wiring = { 0x10, 0x04 };
@@ -2776,6 +2788,12 @@ static INPUT_PORTS_START( noki5210 )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki6210 )
+	// Independently checked NPE-3 normal/special tables and board switches;
+	// reuse the identical logical matrix, not the NSM-5 hardware profile.
+	PORT_INCLUDE(noki5210)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki3310 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3508,7 +3526,7 @@ SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empt
 SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, noki6210, 0,      0,      noki6210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6250, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

@@ -22,13 +22,14 @@ local is_3410 = machine.system.name == "noki3410"
 local is_2100 = machine.system.name == "noki2100"
 local is_3610 = machine.system.name == "noki3610"
 local is_5210 = machine.system.name == "noki5210"
+local is_6210 = machine.system.name == "noki6210"
 local is_early_serial = machine.system.name == "noki5110" or
 		machine.system.name == "noki6110"
 local dsp_cpu = machine.devices[":dsp_c54x:cpu"]
-local lcd_controller_width = is_3410 and 102 or ((is_2100 or is_3610) and 96 or 84)
-local lcd_controller_banks = (is_3410 or is_2100 or is_3610) and 9 or 6
-local lcd_visible_width = (is_3410 or is_2100 or is_3610) and 96 or 84
-local lcd_visible_height = (is_3410 or is_2100 or is_3610) and 65 or 48
+local lcd_controller_width = is_3410 and 102 or ((is_2100 or is_3610 or is_6210) and 96 or 84)
+local lcd_controller_banks = is_6210 and 8 or ((is_3410 or is_2100 or is_3610) and 9 or 6)
+local lcd_visible_width = (is_3410 or is_2100 or is_3610 or is_6210) and 96 or 84
+local lcd_visible_height = is_6210 and 60 or ((is_3410 or is_2100 or is_3610) and 65 or 48)
 local lcd_x_mirror = is_2100 or is_3610 or is_5210
 local lcd_data_port = is_early_serial and 0x2b or 0x2e
 local lcd_command_port = is_early_serial and 0x2c or 0x6e
@@ -194,7 +195,7 @@ if machine.system.name == "noki5110" then
 		star = field_by_name("COL.2", "Keypad *"),
 		power = field_by_name("PWR", "Power"),
 	}
-elseif is_5210 then
+elseif is_5210 or machine.system.name == "noki6210" then
 	key_fields = {
 		enter = field_by_mask("COL.1", 0x02), up = field_by_mask("COL.1", 0x04),
 		down = field_by_mask("COL.1", 0x08), ["0"] = field_by_mask("COL.3", 0x10),

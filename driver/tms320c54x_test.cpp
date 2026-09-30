@@ -13978,6 +13978,8 @@ public:
 	}
 
 private:
+	bool npe3() const { return !strcmp(machine().system().name, "npe3verify"); }
+	unsigned block_count() const { return npe3() ? 232 : 116; }
 	void program_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
@@ -14044,8 +14046,8 @@ private:
 		data.write_word(0x0803, 0xffff);
 		data.write_word(0x087b, 0x0100);
 		data.write_word(0x087c, 0x0300);
-		data.write_word(0x087d, 0);
-		data.write_word(0x087e, 0xe800);
+		data.write_word(0x087d, npe3() ? 1 : 0);
+		data.write_word(0x087e, npe3() ? 0xd000 : 0xe800);
 		data.write_word(0x087f, 1);
 		data.write_word(0x0880, 1);
 		data.write_word(0x0881, 0x0200);
@@ -14076,14 +14078,14 @@ private:
 		bool const second = BIT(m_block, 0);
 		unsigned const flag = second ? 0x0880 : 0x087f;
 		bool const polling = second ? (pc == 0x0f33 || pc == 0x0f35) : (pc == 0x0f17 || pc == 0x0f19);
-		if (m_block == 116 || !polling || data.read_word(flag) != 1)
+		if (m_block == block_count() || !polling || data.read_word(flag) != 1)
 			return;
 		u8 const *const flash = memregion("flash")->base();
 		unsigned const base = second ? 0x0b00 : 0x0900;
 		for (unsigned i = 0; i != 512; ++i)
 		{
 			unsigned const offset = 0x40 + (m_block * 512 + i) * 0x20;
-			u16 const value = (m_block == 115 && i >= 510) ? 0xffff :
+			u16 const value = (m_block == block_count() - 1 && i >= 510) ? 0xffff :
 				(u16(flash[offset]) << 8) | flash[offset + 1];
 			data.write_word(base + i, value);
 		}
@@ -14109,6 +14111,21 @@ ROM_START(nsm3verify)
 	ROM_REGION(0x1d0000, "flash", 0)
 	ROM_LOAD("8210_5.31ppm_c.fls", 0, 0x1d0000,
 		CRC(927022b1) SHA1(c1a0fe95cedb89a92b19654208cc4855e1a4988e))
+ROM_END
+
+// Same staged program, distinct MCU-supplied count and flash input. The PROM
+// and COBBA variants remain sensitivity fixtures, not measured NPE-3 hardware.
+ROM_START(npe3verify)
+	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
+	ROM_SYSTEM_BIOS(1, "cobba", "COBBA model comparison (not handset validation)")
+	ROM_SYSTEM_BIOS(2, "cobba_alt", "COBBA register-F sensitivity fixture")
+	ROM_SYSTEM_BIOS(3, "rom4", "PROM version sensitivity fixture")
+	ROM_REGION16_LE(446, "verifier", 0)
+	ROM_LOAD16_WORD_SWAP("nsm3_verifier.bin", 0, 446,
+		CRC(53e2de79) SHA1(6646da3c5be9c70deda7e0b5b9f257d5d2ace815))
+	ROM_REGION(0x3a0000, "flash", 0)
+	ROM_LOAD("6210_556c.fls", 0, 0x3a0000,
+		CRC(203fb962) SHA1(3d9ea319503e78ec69b60d72cda23e461e118ea9))
 ROM_END
 
 ROM_START(tms54test)
@@ -14143,6 +14160,9 @@ SYST(2026, tms54test, 0, 0, test, 0, tms320c54x_test_state, empty_init,
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, nsm3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NSM-3 stock staged DSP verifier fixture",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, npe3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
+		"MAME", "NPE-3 stock staged DSP verifier fixture",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, tms54rom4, 0, 0, rom4, 0, tms320c54x_test_state, empty_init,
 		"MAME", "TMS320C54x ROM4 private execution fixture",

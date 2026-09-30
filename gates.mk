@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 319 gates: 176 generated from typed steps, 143 copied verbatim (shell).
+# 321 gates: 178 generated from typed steps, 143 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,7 +44,8 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-6210-bootstrap verify-8210-verifier verify-8210-bootstrap \
+.PHONY: verify-6210-keypad-controller verify-6210-verifier \
+	verify-6210-bootstrap verify-8210-verifier verify-8210-bootstrap \
 	verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 \
 	verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
 	verify-radio-periodic-location-update \
@@ -211,6 +212,12 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure
+
+verify-6210-keypad-controller: build
+	$(PYTHON) tools/npe3_keypad_check.py $(MAME_DIR)/mame $(MAME_DIR)/roms $(RUN_DIR)
+
+verify-6210-verifier: build
+	$(PYTHON) tools/nsm3_verifier_check.py $(MAME_DIR)/mame roms/noki6210/6210_556c.fls $(RUN_DIR) --product 6210
 
 verify-6210-bootstrap: PHONE=noki6210
 verify-6210-bootstrap: BIOS=556
