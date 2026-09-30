@@ -26,3 +26,16 @@ address,kind,name
 0x002b63fc,function,int_to_double_2b63fc
 0x002b49b8,function,double_div_2b49b8
 0x002b6124,function,double_to_int_2b6124
+0x002b64d4,function,rand_2b64d4
+0x0011250c,label,rand_seed_11250c
+0x002430ce,function,widget_list_head_2430ce
+0x002430de,function,widget_find_by_class_2430de
+0x0024311e,function,widget_mark_dirty_24311e
+0x00110904,label,widget_lists_110904
+0x00110901,label,ui_dirty_flag_110901
+0x002e06a9,data,widget_class_map_2e06a9
+0x0026afe0,function,rtos_mem_alloc_26afe0
+0x0026abf8,function,rtos_mem_free_26abf8
+0x0010931c,label,rtos_mem_pools_10931c
+0x0025f3b6,function,lcd_blit_bitmap_25f3b6
+0x0025f32c,function,lcd_put_pixel_25f32c

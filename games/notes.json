@@ -1,1 +1,59 @@
-{"blocks": []}
+{
+ "blocks": [
+  {
+   "addr": "0x2b64d4",
+   "lines": [
+    "ANSI C rand(): seed = seed*0x41c64e6d + 0x3039; returns (seed & 0x7fffffff) >> 16.",
+    "Seed lives at 0x11250c. Used by snake_place_food_2416f6 and rotation_handler_241fd0."
+   ]
+  },
+  {
+   "addr": "0x2430ce",
+   "lines": [
+    "Returns the head pointer of widget list N: widget_lists_110904[class_map_2e06a9[N]*0xc].",
+    "Lists are 12-byte {head, flags,...}; widgets are 0x40+ byte nodes: +0 next, +0x1c index byte, +0x3c flags u16, +0x3e class byte, +0x40 list number."
+   ]
+  },
+  {
+   "addr": "0x2430de",
+   "lines": [
+    "Walk list from widget_list_head; return first node whose +0x3e class == arg0 (arg0 < 0x6b) and +0x1c index >= arg1, else the last matching node.",
+    "Callers are the games UI layer (0x2431xx..0x2438xx)."
+   ]
+  },
+  {
+   "addr": "0x24311e",
+   "lines": [
+    "Under interrupt lock: set list flags |=1 (if head non-null) and |=2 for the widget's list (+0x40), clear widget flag bit 4 (+0x3c &= 0xffef), set ui_dirty_flag_110901 = 1. Returns 1 (0 if arg null).",
+    "Hypothesis: schedules a repaint of that widget/list."
+   ]
+  },
+  {
+   "addr": "0x26afe0",
+   "lines": [
+    "RTOS block allocator: picks the first of 8 pools whose block size (table at [0x100020+0x14] + i*4 + 2) >= requested size, pops the pool free list; if every pool is empty it queues a delay entry and services the scheduler, then retries.",
+    "Emits diagnostic bytes to the trace port at 0x600000/0x600100."
+   ]
+  },
+  {
+   "addr": "0x26abf8",
+   "lines": [
+    "RTOS block free: block header at ptr-8 holds pool index ^0x80; pushes the block onto that pool's free list (rtos_mem_pools_10931c + pool*0x14), wakes a waiter if one is queued.",
+    "Ghidra marks it noreturn by mistake; it returns."
+   ]
+  },
+  {
+   "addr": "0x25f3b6",
+   "lines": [
+    "Draws a bitmap descriptor {+0 bitmap*, +4 x, +5 y, +6/+7 clip offset, +8/+9 clip w/h, +10 attr}; bitmap = {+0 data, +8 width, +9 height}, PCD8544 layout (bit (y&7) of byte [x + width*(y>>3)]).",
+    "Calls lcd_put_pixel_25f32c(x, y, attr) per pixel, attr^0x10 for clear pixels. Used by snake_draw_241198 and the Memory/game3 draw paths."
+   ]
+  },
+  {
+   "addr": "0x22c15c",
+   "lines": [
+    "Hypothesis (unnamed): binds widget +0x3b through 0x22bcc0/0x22c0f8/0x22bdb4 then sets widget flag bit 1; likely softkey/label attachment. Needs the 0x22bxxx side mapped first."
+   ]
+  }
+ ]
+}
