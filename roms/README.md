@@ -307,6 +307,35 @@ This pair is a labelled portability input rather than the canonical 3310 MAME
 set. Its PMM is BIOS-specific and must not be combined with the older declared
 3310 images.
 
+### Nokia 8210 NSM-3 v5.31
+
+The original [Nokia service package](https://archive.org/download/Nokia_DCT3_firmwares/nsm3_531.exe)
+contains MCU `nsm3_5.310` and twelve alternative PPM files. Its SHA-1
+`6503a59d4b06ccfa949cbadf08b924ab662d668a` matches the archive metadata.
+Extract it without executing the installer into
+`roms/8210-nsm3-v531/service-package/`. The package's `nsm-3.ini` explicitly
+assigns the same MCU file to both ROM5 and ROM6 hardware.
+
+`make normalize-8210` reconstructs PPM C; its SHA-1
+`c1a0fe95cedb89a92b19654208cc4855e1a4988e` exactly matches MAME's canonical
+`8210_5.31ppm_c.fls` declaration. MCU and PPM-C source SHA-256 values are
+`b6bb4a7f7650c89db4c6c9ae350c21567c105d6afd8eb6ccf048f99b289d4861` and
+`b913766141d44b98f5dbdcbdde7ed259f3e253cb882ca370c7289f03e6264c40`.
+
+The separately acquired [canonical MAME set](https://www.planetemu.net/rom/mame-roms/noki8210)
+contains that same flash and `8210 virgin eeprom 003d0000.fls`.
+The latter is a 196,608-byte flash-backed PMM tail, not a physical serial
+EEPROM dump: SHA-1 `1c01ad3948ff9919890498a84f31052369d93e1d`, SHA-256
+`31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59`.
+Place it under `roms/noki8210/`; do not substitute another product's PMM.
+The downloaded set archive has SHA-256
+`047076cea1c19e3103a2dfd560b028ebe8fc8eb5a5d0193ca33081c5a6424eda`.
+
+The alternative `nsm3_531.zip` service archive matches its published SHA-1
+`142c91a4edf4aee524f11fcee78536d114f8b179`, but its PPM-H member fails ZIP CRC
+validation. Use the clean self-extracting package above for normalization;
+do not treat the ZIP's damaged member as firmware evidence.
+
 ### Nokia 6110 NSE-3
 
 The primary service manual specifies a 1 MiB Intel TE28F800 program flash and

@@ -27,6 +27,15 @@
   },
   "gates": [
     {
+      "name": "verify-8210-bootstrap",
+      "prerequisites": ["normalize-8210", "build"],
+      "variables": {},
+      "steps": [
+        {"step": "run", "silent": false, "make_flags": ["--no-print-directory"], "run_target": "run-prebuilt", "tokens": ["PHONE=noki8210", "BIOS=531", "RUN_DIR=$(RUN_DIR)", "SECONDS=2", "RUN_VERBOSE=1"]},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/nsm3_bootstrap_trace_check.py", "arguments": ["$(RUN_DIR)/error.log", "$(RUN_DIR)/boot_summary.txt"]}
+      ]
+    },
+    {
       "name": "verify-gsm-fr-codec",
       "prerequisites": [
         "$(LIBGSM_ARCHIVE)"

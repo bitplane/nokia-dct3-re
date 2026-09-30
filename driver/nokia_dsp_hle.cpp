@@ -118,6 +118,9 @@ void nokia_dsp_hle_device::device_reset()
 
 void nokia_dsp_hle_device::mcu_shared_write(u16 byte_offset)
 {
+	// Product-specific silicon identity can occupy a different shared cell.
+	// Observe the physical write; DSPIF continues to own storage only.
+	handle_bootstrap_parked_write(byte_offset);
 	if (!m_tone_control.enabled() ||
 			(byte_offset != m_tone_control.oscillator1_offset &&
 			 byte_offset != m_tone_control.oscillator2_offset &&

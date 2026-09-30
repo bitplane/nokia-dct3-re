@@ -645,6 +645,18 @@ normalize-3410:
 		--expect-eeprom-sha1 c1cb3a37efc11ea57b96969d2b01ca0f3b0f6bbe
 	cp roms/noki3210/dsp_prom roms/noki3210/dsp_drom roms/noki3210/dsp_pdrom roms/noki3410/
 
+.PHONY: normalize-8210
+normalize-8210:
+	$(PYTHON) tools/extract_dct3_wintesla.py \
+		--mcu roms/8210-nsm3-v531/service-package/nsm3_5.310 \
+		--ppm roms/8210-nsm3-v531/service-package/nsm3_5.31c \
+		--flash-output roms/noki8210/8210_5.31ppm_c.fls \
+		--expect-flash-sha1 c1a0fe95cedb89a92b19654208cc4855e1a4988e
+	@test "$$(sha256sum 'roms/noki8210/8210 virgin eeprom 003d0000.fls' | cut -d' ' -f1)" = "31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59" || \
+		{ echo 'Missing or mismatched canonical NSM-3 PMM image' >&2; exit 1; }
+	cp roms/noki3210/dsp_prom roms/noki3210/dsp_drom \
+		roms/noki3210/dsp_pdrom roms/noki8210/
+
 normalize-5210:
 	$(PYTHON) tools/extract_dct3_wintesla.py \
 		--mcu roms/5210-nsm5-v540/nsm5_5.400 \

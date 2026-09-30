@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 316 gates: 173 generated from typed steps, 143 copied verbatim (shell).
+# 317 gates: 174 generated from typed steps, 143 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,9 +44,9 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 \
-	verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
-	verify-radio-periodic-location-update \
+.PHONY: verify-8210-bootstrap verify-gsm-fr-codec verify-gsm-tch-f-l1 \
+	verify-gsm-a3a8 verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility \
+	verify-gsm-sms-transport verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
 	verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture \
@@ -210,6 +210,10 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure
+
+verify-8210-bootstrap: normalize-8210 build
+	$(MAKE) --no-print-directory run-prebuilt PHONE=noki8210 BIOS=531 RUN_DIR=$(RUN_DIR) SECONDS=2 RUN_VERBOSE=1
+	$(PYTHON) tools/nsm3_bootstrap_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR)/boot_summary.txt
 
 verify-gsm-fr-codec: $(LIBGSM_ARCHIVE)
 	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Ilib -Ithird_party lib/util/gsmfr.cpp tools/test_gsm_fr_codec.cpp $(LIBGSM_ARCHIVE) -o scratchpad/test_gsm_fr_codec
