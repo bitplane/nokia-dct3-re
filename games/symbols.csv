@@ -71,3 +71,11 @@ address,kind,name
 0x00262306,function,menu_entry_index_262306
 0x00243180,function,ui_refresh_timer_243180
 0x002629d0,function,menu_render_2629d0
+0x002623f6,function,menu_last_enabled_item_2623f6
+0x0026263a,function,menu_enabled_count_from_26263a
+0x00262338,function,menu_enabled_ordinal_262338
+0x002438e8,function,widget_link_by_class_2438e8
+0x0022f7fc,function,widget_text_height_22f7fc
+0x002453ec,function,widget_get_style_2453ec
+0x00296f4e,function,menu_layout_by_language_296f4e
+0x0011fcb1,label,ui_language_11fcb1
