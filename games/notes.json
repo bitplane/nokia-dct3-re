@@ -54,6 +54,51 @@
    "lines": [
     "Hypothesis (unnamed): binds widget +0x3b through 0x22bcc0/0x22c0f8/0x22bdb4 then sets widget flag bit 1; likely softkey/label attachment. Needs the 0x22bxxx side mapped first."
    ]
+  },
+  {
+   "addr": "0x240a4c",
+   "lines": [
+    "Memory: draws the whole board. Loops rows x cols (dims in arg2[0..1]); a card byte with bit 7 set is face-up and draws its value & 0x7f, otherwise 0xff (back). Tile origin = (origin + 2*i - dim) * 4. Cursor (arg3) is drawn last with attr 0x21.",
+    "Calls memory_draw_card_240668(value, x*4, y*4, attr)."
+   ]
+  },
+  {
+   "addr": "0x240bd8",
+   "lines": [
+    "Memory: deals a board. Builds 1..0x49 on the stack, Fisher-Yates shuffles it with rand_2b64d4 % n, writes each value twice (pairs) into the board, then shuffles the board in place."
+   ]
+  },
+  {
+   "addr": "0x240c88",
+   "lines": [
+    "Memory: moves the cursor. arg3/arg4 select row or column deltas with wraparound via divmod_2b5388; when both are equal it steps diagonally until it lands on a face-down card. Ends with games_ui_refresh_243170(2,0)."
+   ]
+  },
+  {
+   "addr": "0x2695f4",
+   "lines": [
+    "Scheduler: cancels the delay entry of task N (12-byte task table at 0x100140). Unlinks it from the delay lists at 0x100020+0x10/+0x28, folding its remaining ticks into the successor, marks the entry state 1, returns the remaining tick count. Same structures as sched_delay_queue_insert_2699be/service_269acc.",
+    "Medium confidence on the verb; the queue mechanics are clear."
+   ]
+  },
+  {
+   "addr": "0x2a5dec",
+   "lines": [
+    "Switches the UI context byte at 0x11fd1a (next to game_index_11fd1b). If the class (table 0x2e15ac) changes and the old context is not 7, releases the old class via 0x243646(class, 0), stores the new context, then 0x2a59fc() rebuilds.",
+    "Called by the games framework at 0x263468/0x263154 when entering/leaving a game screen."
+   ]
+  },
+  {
+   "addr": "0x2a5e1c",
+   "lines": [
+    "Hypothesis (unnamed): 26-slot table at 0x10f268 (12 bytes each, id at +4, 0x1a = empty). Removes the slot with the given id by copying the last used slot over it and marking that one empty, then 0x2a59fc(). Looks like a UI stack/registry remove."
+   ]
+  },
+  {
+   "addr": "0x2ac6fc",
+   "lines": [
+    "Hypothesis (unnamed): 0x2ac6fc -> 0x2b4fd6(table_2db724[ *0x11fcce * 8 ]); 0x2b4fd6 sets state at 0x1124f4 and posts 0x243646(0x67, table_2d3948[id*0x20]) or queues the id if busy. Possibly a tone/animation request keyed by the current profile; needs 0x243646 mapped first."
+   ]
   }
  ]
 }

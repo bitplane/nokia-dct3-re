@@ -39,3 +39,10 @@ address,kind,name
 0x0010931c,label,rtos_mem_pools_10931c
 0x0025f3b6,function,lcd_blit_bitmap_25f3b6
 0x0025f32c,function,lcd_put_pixel_25f32c
+0x00240a4c,function,memory_draw_board_240a4c
+0x00240668,function,memory_draw_card_240668
+0x00240bd8,function,memory_deal_board_240bd8
+0x00240c88,function,memory_move_cursor_240c88
+0x002695f4,function,sched_delay_cancel_2695f4
+0x002a5dec,function,ui_context_switch_2a5dec
+0x0011fd1a,label,ui_context_11fd1a
