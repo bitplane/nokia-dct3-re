@@ -29,6 +29,9 @@ def check_cobba(output, trace, returncode, expected, version=6):
         rf"publication: blocks=116 word0=([0-9a-f]{{4}}) word1={version:04x} word2={version:04x} word3=0006 pc=0f64", output)
     if returncode != 3 or not publication or int(publication[1], 16) != expected:
         raise ValueError("staged verifier did not publish the supplied COBBA register-F value")
+    # Pinned stock-input calculation in this core fixture, not a silicon verdict.
+    if "fingerprint=c2e06006 pmst=ffa8" not in output:
+        raise ValueError("unexpected staged fingerprint or final PMST")
     blocks = [int(value) for value in re.findall(r"nsm3_verifier: block=(\d+) flag=", trace)]
     if blocks != list(range(116)):
         raise ValueError("COBBA comparison did not consume all ordered blocks")

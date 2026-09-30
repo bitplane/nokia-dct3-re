@@ -75,7 +75,12 @@ attempted write of 6. Publications at data `0801` and `0802` follow that input;
 data `0803` retains the program's constant 6. Treating all program space as RAM
 would incorrectly turn the attempted write into a version source. No ROM6
 mask image has been recovered. The fingerprint is stored at data `04f7:04f8`
-under the current core; its production semantics remain unresolved.
+under the current core; its production semantics remain unresolved. With the
+pinned stock flash it is `c2e0:6006`, unchanged across both COBBA inputs and
+the version-4/6 comparisons, with final `PMST=ffa8`. Neither half equals the
+collaborator-reported `1eff`. This separates the fixture's flash calculation
+from its version-dependent shared completion; it does not establish where
+ROM6 hardware maps either result.
 
 These tests establish the publication semantics under the current clean-room
 core and explicit peripheral inputs, not silicon equivalence, a measured ROM6
@@ -84,12 +89,15 @@ version-cell layout, or a valid handset completion. The collaborator bridge's
 requiring its raw trace, ROM revision and memory mapping, not an input to copy.
 The operand-order audit is closed; the unresolved evidence is ROM6's mapping
 at `ff87` under these PMST settings and the matching physical trace/program.
-The core currently stores PMST at data register `001d`, but does not switch
+The generic CPU core stores PMST at data register `001d`, but does not switch
 ROM/RAM mappings for `MP/MC`, `OVLY` or `DROM`: instruction fetch uses the
 configured program cache, MVDP/MVPD use the configured program space, and
 ordinary data accesses use the configured data space. Thus the fixture's
 read-only `ff87` handler is an explicit test input, not an implementation of
-the PMST-controlled ROM6 memory map. Before a core-backed handset promotion,
+the PMST-controlled ROM6 memory map. The existing ROM4 board backend separately
+implements its evidenced OVLY alias (`0080..27ff`) and HPI DARAM mapping;
+that backend is not selected by this isolated fixture and is not a ROM6 map.
+Before a core-backed handset promotion,
 establish which physical memories cover program `ff87`, data `04f7:04f8`
 and shared data `0800:0803` in this mode, including aliases and write protection.
 Do not implement a generic C54x overlay from the ROM4 image alone: the MAD2

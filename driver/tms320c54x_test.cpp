@@ -14067,8 +14067,9 @@ private:
 		if (pc < 0x0f00 || pc >= 0x0fdf)
 			throw emu_fatalerror(1, "NSM3 verifier escaped staged image: pc=%04x block=%u", pc, m_block);
 		if (data.read_word(0x0801) != 0xffff)
-			throw emu_fatalerror(0, "NSM3 verifier publication: blocks=%u word0=%04x word1=%04x word2=%04x word3=%04x pc=%04x",
-				m_block, data.read_word(0x0800), data.read_word(0x0801), data.read_word(0x0802), data.read_word(0x0803), pc);
+			throw emu_fatalerror(0, "NSM3 verifier publication: blocks=%u word0=%04x word1=%04x word2=%04x word3=%04x pc=%04x fingerprint=%04x%04x pmst=%04x",
+				m_block, data.read_word(0x0800), data.read_word(0x0801), data.read_word(0x0802), data.read_word(0x0803), pc,
+				data.read_word(0x04f7), data.read_word(0x04f8), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
 		if (++m_ticks == 2000000)
 			throw emu_fatalerror(1, "NSM3 verifier timeout: pc=%04x blocks=%u flags=%04x/%04x",
 				pc, m_block, data.read_word(0x087f), data.read_word(0x0880));
