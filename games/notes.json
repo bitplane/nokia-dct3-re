@@ -99,6 +99,61 @@
    "lines": [
     "Hypothesis (unnamed): 0x2ac6fc -> 0x2b4fd6(table_2db724[ *0x11fcce * 8 ]); 0x2b4fd6 sets state at 0x1124f4 and posts 0x243646(0x67, table_2d3948[id*0x20]) or queues the id if busy. Possibly a tone/animation request keyed by the current profile; needs 0x243646 mapped first."
    ]
+  },
+  {
+   "addr": "0x243336",
+   "lines": [
+    "Allocates a 0x4c-byte widget (rtos_mem_alloc), inserts it into widget list (arg2 or class_map[class]) sorted by (class, index), sets +0x3e class, +0x1c index, clears +0x34/+0x3c, initialises via 0x2432e0, sets flag 0x20, marks dirty."
+   ]
+  },
+  {
+   "addr": "0x243550",
+   "lines": [
+    "widget_set(class, index, arg, data, flags): data == 0 clears/destroys the widget (special-cases the focused class at 0x10eb48+0x11 and +0x10, frees its buffer, then 0x2431e8(class,index,0)); otherwise finds the widget by class/index or creates it, marks it dirty, stores data at +0x34 and applies flag bits (bit 2 -> +0x18 |= 0x80). Returns flags>>3.",
+    "0x243646(class, data) is the (class, 0, 0, data, 0) wrapper used by the framework and by ui_context_switch_2a5dec."
+   ]
+  },
+  {
+   "addr": "0x2431e8",
+   "lines": [
+    "Hypothesis (unnamed): widget remove/detach; called as (0,0,ptr) to drop the focused widget and (class,index,0) from widget_set_243550."
+   ]
+  },
+  {
+   "addr": "0x2406b6",
+   "lines": [
+    "Draws an unsigned decimal number (abs of arg0) right-aligned at (arg1, arg2): divides by 10000..1 with divmod_2b5388, blits each digit from the 3-byte glyph table games_digit_glyphs_2d96ec at x = arg1 - 4*pos - 2 via lcd_blit_bitmap_25f3b6. Leading zeros suppressed. Rotation uses it for cell values."
+   ]
+  },
+  {
+   "addr": "0x242494",
+   "lines": [
+    "Rotation: draws the board (cells 6 apart in the state array, tile pitch 7x4 px) with games_draw_number_2406b6, frames the selected block with lcd_fill_rect_25eec0, and applies the rotation animation phase (arg2 1..6) as per-cell pixel offsets around the block edges. Block size comes from the level record (+4 of game_records: bits 0-1 and >>2)."
+   ]
+  },
+  {
+   "addr": "0x242c74",
+   "lines": [
+    "game3: scores an event for lane arg0. Object type (0x1102cc[lane-1]) 1-2 costs a life (arg1--, score -25 or to 0, status 0x11 = game over at 0 lives), 3/7/8 +10, 4 +5, 5 +15 and shortens arg3, 6 +20 and sets arg2 = 6. A miss (0x1102e0[lane] != 1) just subtracts 10 if score >= 10. Score is game_records[game].score."
+   ]
+  },
+  {
+   "addr": "0x242dd0",
+   "lines": [
+    "game3: for each of 6 lanes with no object, with probability 1-7/8 spawns one: type = rand%8 (nonzero), sub-type = rand%3+1, speed = 8 - level, x from {0x1c,0x2e,0x40}, y 8 (lanes 0-2) or 0x1b (3-5)."
+   ]
+  },
+  {
+   "addr": "0x242e8c",
+   "lines": [
+    "game3: draws the scene from bitmap descriptors at 0x2d9a24..0x2d9a78 and sprites 0x2d995c..0x2d9a20 via lcd_blit_bitmap_25f3b6. Not offered in the 3210 Games menu; behaviour matches a falling-object reaction game."
+   ]
+  },
+  {
+   "addr": "0x2623b0",
+   "lines": [
+    "Returns 1 if key arg0 (1..16) is allowed in the current UI context: mask = context descriptor (0x10bbec[0x10b2dd[*0x111931]*0xc]) bit (key-1), unless the descriptor is inactive (+9 != 0) which allows everything; keys >= 0x11 always allowed."
+   ]
   }
  ]
 }

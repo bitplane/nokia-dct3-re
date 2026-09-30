@@ -46,3 +46,13 @@ address,kind,name
 0x002695f4,function,sched_delay_cancel_2695f4
 0x002a5dec,function,ui_context_switch_2a5dec
 0x0011fd1a,label,ui_context_11fd1a
+0x00243336,function,widget_create_243336
+0x00243550,function,widget_set_243550
+0x00243646,function,widget_set_simple_243646
+0x002406b6,function,games_draw_number_2406b6
+0x002d96ec,data,games_digit_glyphs_2d96ec
+0x00242494,function,rotation_draw_board_242494
+0x00242c74,function,game3_score_event_242c74
+0x00242dd0,function,game3_spawn_objects_242dd0
+0x00242e8c,function,game3_draw_242e8c
+0x002623b0,function,ui_key_allowed_2623b0
