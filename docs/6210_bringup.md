@@ -67,6 +67,23 @@ PDF is `roms/research/npe3/npe3-schematics-v1.pdf`, 2,656,135 bytes,
 SHA-256 `559e9718a9dad703694f17d349383f75af4237b1c26cf94ecdb4aafe641f1e43`.
 It does not specify the missing DSP PROM word or final HPI publication.
 
+## Display
+
+The same Nokia sheet identifies H400, LPH7690-1, as a GD45 **96x60** LCD
+(page 5). This is primary evidence; the 96x65 claim in the reference
+emulator and 95x60 secondary descriptions are not the selected geometry.
+Firmware `4e656c..4e659c` clears banks 0..7, writing 96 zero bytes per
+bank: command `24`, then `40|bank`, `80`, 96 data bytes, and finally `20`.
+The profile therefore uses 96x64 controller storage with a 96x60 visible
+area. The capture harness uses the same storage/visible dimensions.
+
+The bootstrap gate requires all eight ordered bank clears (768 bytes),
+and a 96x60 blank capture, not merely a blank final picture of any size.
+This validates the boot transfer extent,
+not ordinary rendering or the complete controller command vocabulary.
+The PCD8544-compatible backend remains provisional, as do orientation and
+the isolated unused commands observed outside this clear routine.
+
 ## DSP upload
 
 The pointer at RAM `0x170070`, read without modifying firmware state, selects
@@ -119,3 +136,26 @@ or its IRQ4 upload-completion flag supplies the earlier verifier result.
 receive-ready, all 232 ordered handoffs, no reset and the uncompleted final
 wait. It is a frontier gate, not usable-phone acceptance. Generic harness
 task/mode RAM addresses still describe the 3210 and are not NPE-3 semantics.
+
+## Missing Bootstrap Observation
+
+No matching raw NPE-3 final publication or ROM6 mask image was identified in
+the acquired collection or checked-out reference implementation. The latter
+answers the parked shared-offset-2 read with zero; its later self-test
+responder does not establish the earlier verifier's result. The separate
+bridge default `1eff` is described as an 8210 value without a matching raw
+NPE-3 capture, and must not be transplanted.
+
+The smallest input that can justify an HLE continuation is an unmodified
+NPE-3 v5.56 boot capture identifying the board/DSP revision and firmware
+hash, and recording shared halfwords at MCU `10000` and `10002` around
+the final (232nd) buffer acknowledgement. Include `10004/10006` and
+the ownership words `100fe/10100` to distinguish phase/order, with raw
+capture bytes and a hash. Read substitutions, boot patches and bridge-HLE
+values must be disabled and declared. A standby snapshot alone can contain
+later reused mailbox data, so it is not equivalent to this boundary capture.
+
+Alternatively, core execution needs ROM6 PROM content/mapping at program
+`ff87` under PMST `ffa8`, plus the COBBA register-F/status-D contract.
+The stock MCU flash and PMM do not provide validated copies of those hardware inputs.
+The same staged code on another product is a comparison, not a substitute.

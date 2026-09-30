@@ -291,6 +291,7 @@ class MachineProfileTest(unittest.TestCase):
         profile = self.driver.split("constexpr nokia_product_config make_6210_config()", 1)[1]
         profile = profile.split("return result;", 1)[0]
         self.assertIn("result.keypad_wiring = KEYPAD_NPE3;", profile)
+        self.assertIn("result.display = DISPLAY_6210;", profile)
         self.assertIn("KEYPAD_NPE3 = { 5, 0x10 }", self.driver)
         matrix = self.driver.split("static INPUT_PORTS_START( noki6210 )", 1)[1]
         self.assertIn("PORT_INCLUDE(noki5210)", matrix.split("INPUT_PORTS_END", 1)[0])

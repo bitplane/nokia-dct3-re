@@ -307,8 +307,14 @@ constexpr display_geometry_contract DISPLAY_3610 = {
 constexpr display_geometry_contract DISPLAY_5210 = {
 	84, 48, 84, 48, true
 };
+// NPE-3 clears eight 96-byte banks at 0x4e656c; Nokia's board sheet
+// labels the fitted GD45 module 96x60. Remaining controller identity is open.
+constexpr display_geometry_contract DISPLAY_6210 = {
+	96, 64, 96, 60
+};
 static_assert(display_geometry_contract{}.valid());
 static_assert(DISPLAY_3410.valid());
+static_assert(DISPLAY_6210.valid());
 
 constexpr nokia_mad2_device::dsp_reset_wiring_contract
 		DSP_RESET_WIRING_3410 = {
@@ -940,6 +946,7 @@ constexpr nokia_product_config make_6210_config()
 {
 	nokia_product_config result;
 	result.keypad_wiring = KEYPAD_NPE3;
+	result.display = DISPLAY_6210;
 	// NPE-3 v5.56 0x4dc0e4 sets release bit 2 at CTSI+2, then
 	// 0x4dc0fa tests bit 4 via LSRS #5/carry. No bootstrap reply is assumed.
 	result.dsp_reset_wiring = { 0x10, 0x04 };
