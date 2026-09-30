@@ -192,6 +192,7 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x243a2c` | function | `widget_layout_pass_243a2c` | The games UI layout and paint pass (about 0xf80 bytes, under interrupt lock): resolves each widget list's style variant, clears and repaints overlapped list regions through the per-class handlers (event 3 then 6), then positions widgets along their neighbour links with the style paddings. The entry  |
 | `0x243a50` | label | `widget_layout_pass_part_243a50` |  |
 | `0x243a5e` | label | `widget_layout_pass_part_243a5e` |  |
+| `0x243b88` | label | `widget_layout_pass_part_243b88` | Not a function: interior of widget_layout_pass_243a2c (clears widget flag bit 4 for a list; false BL decode). |
 | `0x243ba6` | label | `widget_layout_pass_part_243ba6` |  |
 | `0x243ba8` | label | `widget_layout_pass_part_243ba8` |  |
 | `0x244d7c` | label | `widget_layout_pass_part_244d7c` | Not a function: interior of widget_layout_pass_243a2c (false BL decode in its literal pool); the neighbour-walk and stacking part of the pass. |
@@ -295,6 +296,25 @@ the phone-OS contract the games rely on (scheduler delays, the RTOS block
 allocator, the widget and menu layers, LCD drawing, string and float helpers,
 `rand`). `make games-worklist WORKLIST_ARGS=--boundary` lists the ones still
 unnamed.
+
+## Unnamed residue
+
+After the mapping pass the closure has 99 inner and 45 boundary functions;
+the following stay unnamed on purpose. Each has a hypothesis block in
+`docs/data/games_function_notes.json`.
+
+| Address | Why it is not named |
+|---|---|
+| `0x262544`, `0x2624b8`, `0x262590` | Menu descriptor resolvers whose id remapping table (`0x11fc80`) and widget `0x1b`'s role are unproved. |
+| `0x26344c` | Posts task-5 status `0x5de` after resetting cached UI tables; telephony-side failure path. |
+| `0x24386a` | Leaf writing `0x110900`, whose reader is outside the closure. |
+| `0x243964` | Vertical-extent helper inside the layout pass; needs a runtime probe of the neighbour fields. |
+| `0x2ac6fc`, `0x2b4fd6`, `0x2ac70e` | Status-line indicator posting through widget class `0x67` and an 8-byte handler table; value semantics belong to the phone, not the games. |
+| `0x2ae8ba`, `0x2ae7c4` | Phone status text builder and its cache reset. |
+| `0x2b44f6` | Software double add/subtract; only the scrollbar uses it. |
+
+None of these is reached by the three shipped games' handlers during play;
+they are menu-framework and phone-side surfaces the games inherit.
 
 ## Naming cautions
 

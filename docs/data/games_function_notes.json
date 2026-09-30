@@ -710,6 +710,18 @@
    "lines": [
     "Hypothesis (unnamed): 0x2ac6fc -> 0x2b4fd6(0x2db724[*0x11fcce * 8]); 0x2b4fd6 stores the id at 0x1124f4 and posts widget class 0x67 with the 32-byte record 0x2d3948[id] (records hold text id 0xdc and a pointer 0x2b5064), or queues the id when busy. editor_close_24af00's teardown also calls it. Role still open."
    ]
+  },
+  {
+   "addr": "0x243b88",
+   "lines": [
+    "Not a function: interior of widget_layout_pass_243a2c (clears widget flag bit 4 for a list; false BL decode)."
+   ]
+  },
+  {
+   "addr": "0x2b4fd6",
+   "lines": [
+    "Hypothesis (unnamed): class 0x67 is a generic text/icon widget (class handler 1 -> 0x22f8fc, list 17, style class 1). 0x2b4ff8 (outside the closure) re-posts it when the value 0x2a7734() returns changes, unless mode byte 0x11fcc2 == 3; 0x2b4fd6(id) posts record 0x2d3948[id] into it or queues the id at 0x1124f4+1 while +2 is busy. A status-line indicator refreshed from a polled value; the value's meaning is not established here."
+   ]
   }
  ]
 }
