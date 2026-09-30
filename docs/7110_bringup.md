@@ -53,6 +53,15 @@ sequences also match local routines at P:`0x0fb7` and `0x0fbf` in this upload.
 This corroborates a ROM4-compatible verifier ABI, not complete interchangeability
 of the 5110 and 7110 DSP images.
 
+TI's [C54x CPU reference, SPRU131G, table 4-3](https://www.ti.com/lit/pdf/spru131)
+places `MP/MC` at PMST bit 6, not bit 7. For `0xffa8`, bit 6 is clear
+(on-chip program ROM enabled), bit 5 is set (data RAM overlaid into program
+space), and bit 3 is set (`DROM`). Consequently the generic CPU contract does
+not require the write to P:`0xff87` to replace an enabled mask-ROM word.
+The fixture's read-only upper program mapping is consistent with that CPU
+contract. The remaining product-specific uncertainty is the fitted mask-ROM
+contents/extent, not the meaning of these PMST bits.
+
 The computed checksum is stored at D:`0x1f0e/0x1f0f`, separately from the
 MCU-visible final result. P:`0x0f65` stores a COBBA-derived result to D:`0x0800`;
 P:`0x0f67` reads P:`0xff87` into D:`0x0801`, then idles. A checksum alone is
@@ -107,7 +116,10 @@ bits 8..11 plus `0x37`, bits 4..7 plus `0x30`, and bits 0..3 plus `0x30`,
 then a zero terminator. This is a concrete formatting use of the returned
 COBBA word, not a pass/fail comparison. The containing command selector and
 the register-F hardware meaning have not yet been established; the formatting
-alone does not justify assuming a zero reset value.
+alone does not justify assuming a zero reset value. The subtract-cascade
+at `0x45bf50..0x45bf62` selects this reader for request `0x0d` to the
+information handler starting at `0x45bf02`. No externally documented name
+for that request has been established.
 
 This is a bounded disassembly result from the pinned flash: the linear Thumb
 scan found one direct `BL 0x432eae`. It is not an exhaustive indirect-call or
@@ -116,7 +128,9 @@ order without an additional halfword swap; swapping it again produces
 plausible-looking but incorrect instructions.
 
 Does primary hardware material or the firmware's consumers establish the
-7110's COBBA register-F reset/read result and the PMST-dependent `0xff87`
-mapping used above? Answer that before enabling the later service responder.
+7110's COBBA register-F reset/read result and fitted mask-ROM contents used
+above? The generic PMST ROM-enable semantics are established by TI, but a
+matching verifier ABI alone does not identify the complete mask ROM. Answer
+the product-specific questions before enabling the later service responder.
 Display geometry, Navi Roller and slide wiring remain separate product
 contracts, not inherited 3310 inputs.
