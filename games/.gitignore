@@ -1,0 +1,7 @@
+# Decompiled or disassembled firmware text is a derivative of Nokia's code and
+# never enters the repository; regenerate it with tools/decomp_refresh.sh.
+data/decomp/
+data/*.c
+data/*.log
+# Emulator run output
+run_*/
