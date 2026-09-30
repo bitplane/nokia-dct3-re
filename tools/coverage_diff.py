@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Per-phase function coverage diff from a coverage.lua error.log.
 
-Usage: cov_diff.py RUN_DIR/error.log --new PHASE[,PHASE...] [--against PHASE,...] [--symbols CSV]
+Usage: coverage_diff.py RUN_DIR/error.log --new PHASE[,PHASE...] [--against PHASE,...] [--symbols CSV]
 
 Prints functions first entered in the --new phases that never appeared in the
 --against phases (default: every phase that precedes the first --new phase),
@@ -24,7 +24,7 @@ def parse(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("log"); ap.add_argument("--new", required=True); ap.add_argument("--against")
-    ap.add_argument("--symbols", default=str(Path(__file__).resolve().parents[2] / "ghidra/symbols/3210.csv"))
+    ap.add_argument("--symbols", default=str(Path(__file__).resolve().parents[1] / "ghidra/symbols/3210.csv"))
     ap.add_argument("--gap", type=lambda s: int(s, 0), default=0x800, help="cluster break distance")
     a = ap.parse_args()
     seen, order = parse(a.log)

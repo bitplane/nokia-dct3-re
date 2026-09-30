@@ -7,19 +7,20 @@
 -- phase, the set of functions entered at least once.
 --
 -- Requires: -debug -debugger none -log
--- Env: SNAKE_ROOT       repository root (absolute)
---      SNAKE_COV_ENTRIES file with one "hexaddr tag" per line (default games/data/entry_candidates.txt)
---      SNAKE_COV_PHASES  "name:seconds,name:seconds,..." absolute emulation seconds at which
+-- Env: NOKIA_DCT3_COVERAGE_ENTRIES file with one "hexaddr tag" per line
+--                        (default run_games/entry_candidates.txt, see make games-entries)
+--      NOKIA_DCT3_COVERAGE_PHASES "name:seconds,..." absolute emulation seconds at which
 --                        a new phase starts (phase "boot" starts at 0)
-local root = os.getenv("SNAKE_ROOT") or "../.."
-dofile(root .. "/mame_nokia_dct3_input_exerciser.lua")
+--      NOKIA_DCT3_TRACE_WINDOW "start:stop:file" optional raw PC trace window
+local script_dir = (debug.getinfo(1, "S").source:match("^@(.*)/[^/]*$")) or "."
+dofile(script_dir .. "/mame_nokia_dct3_input_exerciser.lua")
 
 local machine = manager.machine
 local cpu = machine.devices[":maincpu"]
 local dbg = cpu.debug
 assert(dbg, "coverage.lua needs -debug (device_debug unavailable)")
 
-local entries_path = os.getenv("SNAKE_COV_ENTRIES") or (root .. "/games/data/entry_candidates.txt")
+local entries_path = os.getenv("NOKIA_DCT3_COVERAGE_ENTRIES") or (script_dir .. "/run_games/entry_candidates.txt")
 local count, mismatch = 0, 0
 -- learn the next breakpoint index
 local probe = dbg:bpset(0x200040, "1", "")
@@ -39,7 +40,7 @@ end
 machine:logerror(string.format("COVSETUP breakpoints=%d index_mismatch=%d\n", count, mismatch))
 
 local phases = {}
-for name, secs in string.gmatch(os.getenv("SNAKE_COV_PHASES") or "", "([%w_]+):([%d%.]+)") do
+for name, secs in string.gmatch(os.getenv("NOKIA_DCT3_COVERAGE_PHASES") or "", "([%w_]+):([%d%.]+)") do
 	phases[#phases + 1] = { name = name, at = tonumber(secs) }
 end
 table.sort(phases, function(a, b) return a.at < b.at end)
@@ -59,8 +60,8 @@ emu.register_periodic(function()
 	end
 end)
 
--- Optional raw PC trace window: SNAKE_TRACE="start_seconds:stop_seconds:file"
-local trace_spec = os.getenv("SNAKE_TRACE")
+-- Optional raw PC trace window: NOKIA_DCT3_TRACE_WINDOW="start_seconds:stop_seconds:file"
+local trace_spec = os.getenv("NOKIA_DCT3_TRACE_WINDOW")
 if trace_spec then
 	local t0, t1, file = trace_spec:match("([%d%.]+):([%d%.]+):(.+)")
 	t0, t1 = tonumber(t0), tonumber(t1)

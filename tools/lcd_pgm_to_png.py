@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Convert the harness's binary PGM LCD mirrors to PNG (no PIL), optionally scaled.
 
-Usage: pgm2png.py [--scale N] file.pgm [more.pgm ...]   -> writes file.png next to each
-       pgm2png.py --sheet out.png [--scale N] a.pgm b.pgm ...  -> one contact sheet, left to right
+Usage: lcd_pgm_to_png.py [--scale N] file.pgm [more.pgm ...]   -> writes file.png next to each
+       lcd_pgm_to_png.py --sheet out.png [--scale N] a.pgm b.pgm ...  -> one contact sheet, left to right
 """
 import argparse, struct, zlib
 from pathlib import Path

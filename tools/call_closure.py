@@ -8,14 +8,14 @@ on) and not descended into. Function extents are approximated as
 [entry, next entry) using the candidate entry list.
 
 Usage:
-  callgraph.py [--roots 0x... ...] [--inner 0x240600-0x244000,...] [--json out]
+  call_closure.py [--roots 0x... ...] [--inner 0x240600-0x244000,...] [--json out]
 Defaults: roots = every candidate entry inside the inner ranges.
 Output: JSON {functions: {addr: {callees:[], callers:[], boundary:bool, region:str}}, boundary:[...]}
 """
 import argparse, bisect, json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 FLASH = 0x200000
 DEFAULT_INNER = "0x240600-0x244000,0x2621c0-0x263500"
 
@@ -75,10 +75,10 @@ def build(image, entries_path, roots, inner):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", default=str(ROOT / "roms/3210f600a_swap16.bin"))
-    ap.add_argument("--entries", default=str(ROOT / "games/data/entry_candidates.txt"))
+    ap.add_argument("--entries", default=str(ROOT / "run_games/entry_candidates.txt"))
     ap.add_argument("--roots", nargs="*")
     ap.add_argument("--inner", default=DEFAULT_INNER)
-    ap.add_argument("--json", default=str(ROOT / "games/data/callgraph.json"))
+    ap.add_argument("--json", default=str(ROOT / "run_games/callgraph.json"))
     a = ap.parse_args()
     inner = parse_ranges(a.inner)
     entries = load_entries(a.entries)

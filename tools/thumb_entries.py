@@ -13,14 +13,14 @@ Output: one address per line (hex, even), sorted, with a source tag column.
 import argparse, csv, sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 FLASH = 0x200000
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", default=str(ROOT / "roms/3210f600a_swap16.bin"))
     ap.add_argument("--symbols", default=str(ROOT / "ghidra/symbols/3210.csv"))
-    ap.add_argument("--out", default=str(ROOT / "games/data/entry_candidates.txt"))
+    ap.add_argument("--out", default=str(ROOT / "run_games/entry_candidates.txt"))
     ap.add_argument("--no-push", action="store_true", help="omit the noisy push-prologue source")
     args = ap.parse_args()
 

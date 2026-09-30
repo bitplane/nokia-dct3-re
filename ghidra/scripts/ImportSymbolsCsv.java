@@ -1,5 +1,6 @@
 // Import the portable symbol map (address,kind,name CSV) into the current program.
 // Functions are created (Thumb) where absent; labels become primary symbols.
+// Rows whose name already exists at the address are skipped.
 // @category Nokia3210
 import java.io.BufferedReader;
 import java.io.File;
@@ -40,9 +41,15 @@ public class ImportSymbolsCsv extends GhidraScript {
 						}
 						fn = createFunction(addr, name);
 					}
-					if (fn != null) { fn.setName(name, SourceType.USER_DEFINED); functions++; }
-					else { createLabel(addr, name, true, SourceType.USER_DEFINED); labels++; }
-				} else {
+					if (fn != null) {
+						if (!fn.getName().equals(name) && getSymbolAt(addr, name) == null)
+							fn.setName(name, SourceType.USER_DEFINED);
+						functions++;
+					}
+					else if (getSymbolAt(addr, name) == null) { createLabel(addr, name, true, SourceType.USER_DEFINED); labels++; }
+				} else if (getSymbolAt(addr, name) == null) {
+					// The map may list the same name as both label and function at one
+					// address; a second symbol of the same name is a duplicate, not an error.
 					createLabel(addr, name, true, SourceType.USER_DEFINED);
 					labels++;
 				}

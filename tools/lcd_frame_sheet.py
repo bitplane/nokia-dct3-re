@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Contact sheet of the distinct informative LCD frames in a run dir (capture order).
 
-Usage: frame_sheet.py RUN_DIR [OUT.png] [SCALE] [FROM:TO]   (FROM:TO slices the distinct list)
+Usage: lcd_frame_sheet.py RUN_DIR [OUT.png] [SCALE] [FROM:TO]   (FROM:TO slices the distinct list)
 """
 import hashlib, subprocess, sys
 from pathlib import Path
@@ -19,5 +19,5 @@ sel = keep
 if rng:
     a, b = rng.split(":"); sel = keep[int(a or 0):int(b) if b else None]
 if sel:
-    subprocess.check_call([sys.executable, str(Path(__file__).parent / "pgm2png.py"), "--scale", scale, "--sheet", out, *map(str, sel)])
+    subprocess.check_call([sys.executable, str(Path(__file__).parent / "lcd_pgm_to_png.py"), "--scale", scale, "--sheet", out, *map(str, sel)])
     for i, p in enumerate(keep): print(i, p.name)
