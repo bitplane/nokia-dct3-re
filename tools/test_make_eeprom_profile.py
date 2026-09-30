@@ -14,7 +14,9 @@ class ChecksumTests(unittest.TestCase):
         flash = bytearray(0x0D9000)
         descriptor = 0x100
         location_length = (0x18A8 << 16) | 12
-        for offset, value in ((descriptor, 0x0749), (descriptor + 4, location_length)):
+        games_location_length = (0x0D9C << 16) | 4
+        for offset, value in ((descriptor, 0x0749), (descriptor + 4, location_length),
+                              (descriptor + 8, 0x074C), (descriptor + 12, games_location_length)):
             flash[offset:offset + 4] = value.to_bytes(4, "big")
         return bytes(flash)
 
@@ -64,6 +66,11 @@ class ChecksumTests(unittest.TestCase):
             "000901340104010100ffffff"
             "010801340104ff0100ffffff"
             "000901340104010100ffffff"))
+
+    def test_games_records_provision_top_score_and_level(self):
+        image = self.build()
+        location = 0x0D9C
+        self.assertEqual(image[location:location + 20], bytes.fromhex("000000ff") * 5)
 
     def test_display_profile_location_can_move_between_roms(self):
         flash = bytearray(self.firmware_fixture())

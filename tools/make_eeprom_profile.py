@@ -22,6 +22,16 @@ DISPLAY_PROFILE_LENGTH = 12
 # three reset profiles before committing descriptor 0x0749 variants 0..2.
 # None marks bytes the constructor does not write; retain their erased state
 # rather than presenting zero-filled scratch RAM as authored NV data.
+# Descriptor 0x074c holds one four-byte record per built-in game (five
+# variants): big-endian top score, level index 0..8 into the ROM speed table
+# at 0x2d9738, and one byte the loader (0x29a0e2) does not consume. Loader and
+# saver (0x299e5e) copy bytes 0..2 into the RAM records at 0x11040c. An erased
+# level byte indexes past the nine-entry table to speed 0, which makes Snake
+# advance every scheduler pass and leaves the level selector unable to move.
+GAMES_RECORD_KEY = 0x074C
+GAMES_RECORD_LENGTH = 4
+GAMES_RECORD_VARIANTS = 5
+GAMES_RECORD_DEFAULT = (0x00, 0x00, 0x00, None)
 DISPLAY_PROFILE_DEFAULTS = (
     (0x00, 0x09, 0x01, 0x34, 0x01, 0x04, 0x01, 0x01, 0x00, None, None, None),
     (0x01, 0x08, 0x01, 0x34, 0x01, 0x04, None, 0x01, 0x00, None, None, None),
@@ -171,6 +181,16 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None,
     for variant, record in enumerate(DISPLAY_PROFILE_DEFAULTS):
         record_offset = display_profile + variant * DISPLAY_PROFILE_LENGTH
         for field, value in enumerate(record):
+            if value is not None:
+                image[record_offset + field] = value
+
+    # Descriptor 0x074c: per-game top score and level. The ROM carries no reset
+    # constructor for these records, so provision a zero top score and level
+    # index 0 (the slowest speed) and leave the unconsumed byte erased.
+    games_record = find_nv_descriptor(flash, GAMES_RECORD_KEY, GAMES_RECORD_LENGTH)
+    for variant in range(GAMES_RECORD_VARIANTS):
+        record_offset = games_record + variant * GAMES_RECORD_LENGTH
+        for field, value in enumerate(GAMES_RECORD_DEFAULT):
             if value is not None:
                 image[record_offset + field] = value
 

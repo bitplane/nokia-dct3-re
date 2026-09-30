@@ -1700,6 +1700,14 @@ void nokia_dct3_state::machine_reset()
 		m_eeprom->write_scl(1);
 	m_ccont_irq_state = false;
 	m_timer_watchdog->adjust(attotime::from_hz(1), 0, attotime::from_hz(1));
+
+	// Child devices reset in declaration order, so the LCD controller resets
+	// before GENSIO drives SCLK to its idle-high level. The PCD8544 shift
+	// register counts that rising edge as a data bit and every later command
+	// and pixel byte arrives one bit misaligned. Reset the LCD after GENSIO
+	// has settled so the serial link starts aligned, as reset_digital_baseband
+	// already does for firmware-initiated resets.
+	m_lcd->reset();
 }
 
 void nokia_dct3_state::mad2_fiq_w(int state)
