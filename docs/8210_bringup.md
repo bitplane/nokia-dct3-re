@@ -84,6 +84,16 @@ version-cell layout, or a valid handset completion. The collaborator bridge's
 requiring its raw trace, ROM revision and memory mapping, not an input to copy.
 The operand-order audit is closed; the unresolved evidence is ROM6's mapping
 at `ff87` under these PMST settings and the matching physical trace/program.
+The core currently stores PMST at data register `001d`, but does not switch
+ROM/RAM mappings for `MP/MC`, `OVLY` or `DROM`: instruction fetch uses the
+configured program cache, MVDP/MVPD use the configured program space, and
+ordinary data accesses use the configured data space. Thus the fixture's
+read-only `ff87` handler is an explicit test input, not an implementation of
+the PMST-controlled ROM6 memory map. Before a core-backed handset promotion,
+establish which physical memories cover program `ff87`, data `04f7:04f8`
+and shared data `0800:0803` in this mode, including aliases and write protection.
+Do not implement a generic C54x overlay from the ROM4 image alone: the MAD2
+revision's memory layout is part of the missing contract.
 No matching raw verdict capture or ROM6 mask image was found in the checked-out
 collaborator repository. Its hardware-bridge source reports the value but
 does not include the capture. A code comment is not a substitute for those inputs.
