@@ -5,3 +5,6 @@ data/*.c
 data/*.log
 # Emulator run output
 run_*/
+
+# The root rule ignores the MAME checkout; our Lua harness scripts live here.
+!mame/

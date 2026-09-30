@@ -152,7 +152,44 @@
   {
    "addr": "0x2623b0",
    "lines": [
-    "Returns 1 if key arg0 (1..16) is allowed in the current UI context: mask = context descriptor (0x10bbec[0x10b2dd[*0x111931]*0xc]) bit (key-1), unless the descriptor is inactive (+9 != 0) which allows everything; keys >= 0x11 always allowed."
+    "Correction: this is a menu-item enable check, not a key check. Returns 1 if item arg0 (1..16) is enabled in the current menu context: mask = descriptor (0x10bbec[0x10b2dd[*0x111931]*0xc]) bit (item-1), everything enabled when the descriptor is inactive (+9 != 0); items >= 0x11 always enabled.",
+    "Renamed ui_key_allowed -> menu_item_enabled once the callers (first/next enabled item, select item) made the role clear."
+   ]
+  },
+  {
+   "addr": "0x2431e8",
+   "lines": [
+    "Destroys a widget: with a null pointer it looks the widget up by class/index and first calls its class handler widget_class_handlers_2e0660[+0x38](widget, 3). Unlinks the four neighbour pointers (+8,+0xc,+0x10,+0x14), removes it from its list (head or prev->next), flags later lists (+4 bit 1) for repaint, marks dirty, frees the block."
+   ]
+  },
+  {
+   "addr": "0x2432e0",
+   "lines": [
+    "Initialises a widget from the 4-byte class map entry (widget_class_map_2e06a9 - 1 + class*4): +0x38 handler index, +0x40 list (arg1 or entry byte 1), +0x3f entry byte 2, +0x41 entry byte 3; clears neighbours and +0x18/+0x42; clears flag bit 4."
+   ]
+  },
+  {
+   "addr": "0x243428",
+   "lines": [
+    "Links widget b next to widget a: relation 1 = b below a (a+0x14/b+0xc), 2 = above, 3 = right (a+0x10/b+8), 4 = left; inserts b into any existing chain and, when flags != 0, sets the corresponding bits in +0x18 (1/2/4/8, 0x10 for the flags bit 1 case). Relation 2 also runs a bounds check via 0x22c15c before linking."
+   ]
+  },
+  {
+   "addr": "0x2625ac",
+   "lines": [
+    "First enabled item (1..count) in the current menu context; count = descriptor[+4] or [+2] depending on +9."
+   ]
+  },
+  {
+   "addr": "0x2625f2",
+   "lines": [
+    "Next enabled item after arg0, wrapping from count back to 1; returns arg0 if nothing else is enabled."
+   ]
+  },
+  {
+   "addr": "0x2626f4",
+   "lines": [
+    "Selects menu item arg0: if the list fits in menu_visible_rows_11fd18 it just stores the first enabled item; otherwise stores the selection (+8), adjusts the top-of-window item (+7) with next/previous enabled items so the selection is visible."
    ]
   }
  ]
