@@ -16,7 +16,9 @@ class ChecksumTests(unittest.TestCase):
         location_length = (0x18A8 << 16) | 12
         games_location_length = (0x0D9C << 16) | 4
         for offset, value in ((descriptor, 0x0749), (descriptor + 4, location_length),
-                              (descriptor + 8, 0x074C), (descriptor + 12, games_location_length)):
+                              (descriptor + 8, 0x074C), (descriptor + 12, games_location_length),
+                              (descriptor + 16, 0x0757),
+                              (descriptor + 20, (0x0DB0 << 16) | 400)):
             flash[offset:offset + 4] = value.to_bytes(4, "big")
         return bytes(flash)
 
@@ -71,6 +73,54 @@ class ChecksumTests(unittest.TestCase):
         image = self.build()
         location = 0x0D9C
         self.assertEqual(image[location:location + 20], bytes.fromhex("000000ff") * 5)
+
+    def test_games_records_follow_relocated_descriptor(self):
+        flash = bytearray(self.firmware_fixture())
+        location = 0x1900
+        flash[0x10C:0x110] = ((location << 16) | 4).to_bytes(4, "big")
+        flash[0x114:0x118] = (((location + 20) << 16) | 400).to_bytes(4, "big")
+        image = make_eeprom_profile.build_profile(bytes(flash))
+        self.assertEqual(image[location:location + 20], bytes.fromhex("000000ff") * 5)
+        self.assertEqual(image[0x0D9C:0x0DB0], bytes([0xff]) * 20)
+        make_eeprom_profile.validate_checksums(image)
+
+    def test_v501_three_games_do_not_overwrite_adjacent_record(self):
+        flash = bytearray(self.firmware_fixture())
+        flash[0x114:0x118] = ((0x0DA8 << 16) | 400).to_bytes(4, "big")
+        image = make_eeprom_profile.build_profile(bytes(flash))
+        self.assertEqual(image[0x0D9C:0x0DA8], bytes.fromhex("000000ff") * 3)
+        self.assertEqual(image[0x0DA8:0x0DB0], bytes([0xff]) * 8)
+        make_eeprom_profile.validate_checksums(image)
+
+    def test_invalid_games_extent_is_rejected(self):
+        flash = bytearray(self.firmware_fixture())
+        flash[0x114:0x118] = ((0x0DAD << 16) | 400).to_bytes(4, "big")
+        with self.assertRaisesRegex(ValueError, "unsupported games NV record extent"):
+            make_eeprom_profile.build_profile(bytes(flash))
+
+    def test_acquired_3210_roms_agree_with_game_record_extent(self):
+        root = Path(__file__).resolve().parents[1] / "roms" / "noki3210"
+        cases = (
+            ("3210f600a.fls", 5, 0x29A110, 0x2D9738),
+            ("3210f501.fls", 3, 0x2977EC, 0x2D2D4C),
+        )
+        if not all((root / name).is_file() for name, *_ in cases):
+            self.skipTest("optional acquired 3210 ROMs are not installed")
+        for name, count, compare, speeds in cases:
+            with self.subTest(rom=name):
+                flash = (root / name).read_bytes()
+                # Thumb big-endian CMP r4,#count at the loader loop tail.
+                offset = compare - make_eeprom_profile.FLASH_BASE
+                self.assertEqual(flash[offset:offset + 2], bytes((0x2C, count)))
+                offset = speeds - make_eeprom_profile.FLASH_BASE
+                self.assertEqual(flash[offset:offset + 9],
+                                 bytes.fromhex("4230261e17120e0b09"))
+                start = make_eeprom_profile.find_nv_descriptor(flash, 0x074C, 4)
+                end = make_eeprom_profile.find_nv_descriptor(flash, 0x0757, 400)
+                self.assertEqual(end - start, count * 4)
+                image = make_eeprom_profile.build_profile(flash)
+                self.assertEqual(image[start:end], bytes.fromhex("000000ff") * count)
+                make_eeprom_profile.validate_checksums(image)
 
     def test_display_profile_location_can_move_between_roms(self):
         flash = bytearray(self.firmware_fixture())

@@ -23,7 +23,7 @@ DISPLAY_PROFILE_LENGTH = 12
 # None marks bytes the constructor does not write; retain their erased state
 # rather than presenting zero-filled scratch RAM as authored NV data.
 # Descriptor 0x074c holds one four-byte record per built-in game (five
-# variants): big-endian top score, level index 0..8 into the ROM speed table
+# variants in v6.00, three in v5.01): big-endian top score, level index 0..8 into the ROM speed table
 # at 0x2d9738, and one byte the loader (0x29a0e2) does not consume. Loader and
 # saver (0x299e5e) copy bytes 0..2 into the RAM records at 0x11040c. An erased
 # level byte indexes past the nine-entry table to speed 0, which makes Snake
@@ -188,7 +188,15 @@ def build_profile(flash: bytes, provisioned_identity: str | None = None,
     # constructor for these records, so provision a zero top score and level
     # index 0 (the slowest speed) and leave the unconsumed byte erased.
     games_record = find_nv_descriptor(flash, GAMES_RECORD_KEY, GAMES_RECORD_LENGTH)
-    for variant in range(GAMES_RECORD_VARIANTS):
+    # The adjacent 0x0757/400 record starts at 0x0db0 in v6.00, but
+    # 0x0da8 in v5.01. Their loaders independently confirm five and three
+    # iterations respectively; never write game defaults into that record.
+    games_end = find_nv_descriptor(flash, 0x0757, 400)
+    games_bytes = games_end - games_record
+    if (games_bytes <= 0 or games_bytes % GAMES_RECORD_LENGTH or
+            games_bytes > GAMES_RECORD_VARIANTS * GAMES_RECORD_LENGTH):
+        raise ValueError("unsupported games NV record extent")
+    for variant in range(games_bytes // GAMES_RECORD_LENGTH):
         record_offset = games_record + variant * GAMES_RECORD_LENGTH
         for field, value in enumerate(GAMES_RECORD_DEFAULT):
             if value is not None:

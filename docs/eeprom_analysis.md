@@ -36,6 +36,26 @@ The transport is substantially stronger than the data profile. A valid checksum
 proves only that firmware accepts the supplied bytes; it does not make those
 bytes authentic calibration, identity, or product configuration.
 
+### Game settings fixture
+
+The synthetic 3210 profile initializes descriptor `0x074c` with a zero
+big-endian top score, level index zero, and an unchanged fourth byte. This is
+usable game provisioning, not a recovered factory-default image. Its extent
+differs between the supported ROMs:
+
+| ROM | Loader / saver | Game records | Following `0x0757/400` record | Speed table |
+| --- | --- | --- | --- | --- |
+| v6.00 | `0x29a0e2` / `0x299e5e` | Five at `0x0d9c..0x0daf` | `0x0db0` | `0x2d9738` |
+| v5.01 | `0x2977be` / `0x29753a` | Three at `0x0d9c..0x0da7` | `0x0da8` | `0x2d2d4c` |
+
+The loader loops independently establish the five/three counts and copy only
+the score halfword and level byte. Both speed tables contain the same nine
+entries. The generator bounds game writes by the adjacent descriptor and
+rejects unsupported extents; writing five records on v5.01 would overwrite
+the start of another NV record. This contract does not validate the separate
+v5.01 fallback-copy source addresses listed above, nor apply to flash-backed
+permanent memory on other products.
+
 The GenIO input path must distinguish the output latch from the physical SDA
 level. When direction bit 0 is clear, the MCU has released SDA and must read the
 EEPROM's line directly rather than combine it with the output latch. With that
