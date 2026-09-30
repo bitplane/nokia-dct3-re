@@ -13976,16 +13976,27 @@ public:
 		m_cpu->set_addrmap(AS_DATA, &nsm3_verifier_state::data_map);
 		m_cpu->set_addrmap(AS_IO, &nsm3_verifier_state::io_map);
 	}
+	void nse5_verifier(machine_config &config)
+	{
+		verifier(config);
+		m_cpu->set_addrmap(AS_PROGRAM, &nsm3_verifier_state::nse5_program_map);
+	}
 
 private:
 	bool npe3() const { return !strcmp(machine().system().name, "npe3verify"); }
-	unsigned block_count() const { return npe3() ? 232 : 116; }
+	bool nse5() const { return !strcmp(machine().system().name, "nse5verify"); }
+	unsigned block_count() const { return nse5() ? 228 : npe3() ? 232 : 116; }
 	void program_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
 		// ROM4's acquired PROM has the immutable version word here. This
 		// fixture supplies an explicit version input, not missing ROM code.
 		map(0xff87, 0xff87).rw(FUNC(nsm3_verifier_state::version_r), FUNC(nsm3_verifier_state::version_w));
+	}
+	void nse5_program_map(address_map &map)
+	{
+		map(0, 0x7fff).ram();
+		map(0x8000, 0xffff).rom().region("mask", 0x10000);
 	}
 	u16 version_r() { return !strcmp(machine().options().bios(), "rom4") ? 4 : 6; }
 	void version_w(u16 value)
@@ -14033,11 +14044,11 @@ private:
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
-		for (unsigned i = 0; i != 0x10000; ++i)
+		for (unsigned i = 0; i != (nse5() ? 0x8000 : 0x10000); ++i)
 			if (i != 0xff87)
 				program.write_word(i, 0xffff);
 		u16 const *const staged = &memregion("verifier")->as_u16();
-		for (unsigned i = 0; i != 223; ++i)
+		for (unsigned i = 0; i != (nse5() ? 210 : 223); ++i)
 			program.write_word(0x0f00 + i, staged[i]);
 		// Values written by the MCU at 0x2cac80..0x2cacee, not a mask-ROM snapshot.
 		data.write_word(0x0800, 0);
@@ -14046,8 +14057,8 @@ private:
 		data.write_word(0x0803, 0xffff);
 		data.write_word(0x087b, 0x0100);
 		data.write_word(0x087c, 0x0300);
-		data.write_word(0x087d, npe3() ? 1 : 0);
-		data.write_word(0x087e, npe3() ? 0xd000 : 0xe800);
+		data.write_word(0x087d, (npe3() || nse5()) ? 1 : 0);
+		data.write_word(0x087e, nse5() ? 0xc800 : npe3() ? 0xd000 : 0xe800);
 		data.write_word(0x087f, 1);
 		data.write_word(0x0880, 1);
 		data.write_word(0x0881, 0x0200);
@@ -14066,12 +14077,13 @@ private:
 	{
 		auto &data = m_cpu->space(AS_DATA);
 		unsigned const pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
-		if (pc < 0x0f00 || pc >= 0x0fdf)
+		if ((pc < 0x0f00 || pc >= (nse5() ? 0x0fd2 : 0x0fdf)) &&
+				!(nse5() && pc >= 0x8000))
 			throw emu_fatalerror(1, "NSM3 verifier escaped staged image: pc=%04x block=%u", pc, m_block);
 		if (data.read_word(0x0801) != 0xffff)
 			throw emu_fatalerror(0, "NSM3 verifier publication: blocks=%u word0=%04x word1=%04x word2=%04x word3=%04x pc=%04x fingerprint=%04x%04x pmst=%04x",
 				m_block, data.read_word(0x0800), data.read_word(0x0801), data.read_word(0x0802), data.read_word(0x0803), pc,
-				data.read_word(0x04f7), data.read_word(0x04f8), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+				data.read_word(nse5() ? 0x1f0e : 0x04f7), data.read_word(nse5() ? 0x1f0f : 0x04f8), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
 		if (++m_ticks == 2000000)
 			throw emu_fatalerror(1, "NSM3 verifier timeout: pc=%04x blocks=%u flags=%04x/%04x",
 				pc, m_block, data.read_word(0x087f), data.read_word(0x0880));
@@ -14128,6 +14140,23 @@ ROM_START(npe3verify)
 		CRC(203fb962) SHA1(3d9ea319503e78ec69b60d72cda23e461e118ea9))
 ROM_END
 
+// Stock NSE-5 upload plus independently recovered ROM4 CRC routines. COBBA
+// variants are explicit peripheral fixtures, not a measured 7110 publication.
+ROM_START(nse5verify)
+	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
+	ROM_SYSTEM_BIOS(1, "cobba", "COBBA model comparison (not handset validation)")
+	ROM_SYSTEM_BIOS(2, "cobba_alt", "COBBA register-F sensitivity fixture")
+	ROM_REGION16_LE(420, "verifier", 0)
+	ROM_LOAD16_WORD_SWAP("nse5_verifier.bin", 0, 420,
+		CRC(e6c77fdc) SHA1(caca7599d9ca1a7dddf2df37f32be4aacd420deb))
+	ROM_REGION(0x390000, "flash", 0)
+	ROM_LOAD("7110f501_ppmc.fls", 0, 0x390000,
+		CRC(919ac753) SHA1(53af8324919f455ba8199d2c05f7a921cfb811d5))
+	ROM_REGION16_LE(0x20000, "mask", ROMREGION_ERASEFF)
+	ROM_LOAD16_WORD_SWAP("dsp_full.bin", 0, 0x1fffe,
+		CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
+ROM_END
+
 ROM_START(tms54test)
 ROM_END
 
@@ -14163,6 +14192,9 @@ SYST(2026, nsm3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, npe3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NPE-3 stock staged DSP verifier fixture",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, nse5verify, 0, 0, nse5_verifier, 0, nsm3_verifier_state, empty_init,
+		"MAME", "NSE-5 stock staged DSP verifier with ROM4 CRC routines",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, tms54rom4, 0, 0, rom4, 0, tms320c54x_test_state, empty_init,
 		"MAME", "TMS320C54x ROM4 private execution fixture",

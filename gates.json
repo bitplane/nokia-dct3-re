@@ -27,6 +27,14 @@
   },
   "gates": [
     {
+      "name": "verify-7110-verifier",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/nse5_verifier_check.py", "arguments": ["$(MAME_DIR)/mame", "roms/noki7110/7110f501_ppmc.fls", "roms/research/nse1-rom4/working/dsp_full.bin", "$(RUN_DIR)"]}
+      ]
+    },
+    {
       "name": "verify-7110-bootstrap",
       "prerequisites": ["build"],
       "variables": {"PHONE": "noki7110", "BIOS": "501"},

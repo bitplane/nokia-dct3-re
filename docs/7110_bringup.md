@@ -59,10 +59,31 @@ therefore not a legitimate mailbox completion value. PMST-dependent mapping,
 the P:`0xff87` write/read behavior and COBBA port-`0x2d` replies must be
 established before any result is promoted into the handset model.
 
+## Executed verifier fixture
+
+`make verify-7110-verifier` executes the stock 210-word program with the
+product-local 228-block flash stream. P:`0x8000..0xffff` is read-only recovered
+NSE-1 ROM4 code, including both CRC routines and the version word at `0xff87`.
+The fixture checks the source hash; no ROM4 code is transcribed into sources.
+This is an explicit memory-map assumption, not proof of the fitted 7110 die.
+
+All 228 blocks execute in order. With peripheral reads left unsupported the
+program stops at COBBA port `0x2d`, after the checksum calculation. With the
+existing COBBA model it reaches IDLE at P:`0x0f6b` and publishes:
+
+- D:`0x0800`: `0x0000`, or `0x0016` under the register-F sensitivity fixture;
+- D:`0x0801..0x0803`: `0x0004` in both cases;
+- D:`0x1f0e/0x1f0f`: checksum `0xa98692ad`, unchanged by the peripheral input.
+
+These are reproducible executable fixture results, not a measured handset
+publication. The full handset remains fail-closed: the COBBA register-F
+reset/read contract and product-specific PMST mapping are not promoted merely
+because the sensitivity fixture finishes.
+
 ## Next question
 
-Can the stock verifier execute against the recovered ROM4 routines and an
-evidenced memory map without output assists, and which final-publication
-fields still depend on an unknown COBBA contract? Answer that before enabling
-the later service responder. Display geometry, Navi Roller and slide wiring
-remain separate product contracts, not inherited 3310 inputs.
+Does primary hardware material or the firmware's consumers establish the
+7110's COBBA register-F reset/read result and the PMST-dependent `0xff87`
+mapping used above? Answer that before enabling the later service responder.
+Display geometry, Navi Roller and slide wiring remain separate product
+contracts, not inherited 3310 inputs.

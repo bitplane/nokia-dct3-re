@@ -68,7 +68,7 @@ absent product is a coverage question, not a drifted gate.
 | `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — |
 | `save-state` | — | — | — | — | — | — | yes | yes | — | — | — | — |
 | `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — |
-| `verifier` | — | — | — | — | — | — | — | — | — | yes | — | yes |
+| `verifier` | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 
 ## Different checker scripts
 
@@ -296,6 +296,12 @@ absent product is a coverage question, not a drifted gate.
 - **5110**: `tools/make_5110_eeprom_profile.py`
 - **5210**: `tools/check_lcd_frame.py`
 
+### `verifier`
+
+- **6210**: `tools/nsm3_verifier_check.py`
+- **7110**: `tools/nse5_verifier_check.py`
+- **8210**: `tools/nsm3_verifier_check.py`
+
 ## Same checker, different options
 
 ### `charger-wake` — `tools/charger_wake_check.py`
@@ -344,11 +350,6 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `--radio-profile`
 - **5210**: `--neighbour-arfcn`, `--radio-profile`, `--serving-arfcn`
 - shared: `--profile`
-
-### `verifier` — `tools/nsm3_verifier_check.py`
-
-- **6210**: `--product`
-- **8210**: _(none)_
 
 ## Different prerequisites
 
