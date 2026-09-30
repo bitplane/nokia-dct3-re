@@ -570,7 +570,7 @@ verify-3610-frontier: normalize-3610 build
 	@$(MAKE) --no-print-directory run-prebuilt PHONE=noki3610 BIOS=511e \
 		RUN_DIR=$(RUN_DIR) SECONDS=3
 	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)/boot_summary.txt
-	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' | sort | tail -1); \
 		test -n "$$f" || { echo "3610 frontier: no LCD frame"; exit 1; }; \
 		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_3610_CONTACT_SERVICE_SHA)
 	@echo 'NAM-1 GENSIO/CCONT and 96x65 display frontier: PASS'
@@ -872,7 +872,7 @@ smoke-2100: normalize-2100
 verify-2100-frontier: normalize-2100
 	@$(MAKE) --no-print-directory run PHONE=noki2100 BIOS=584e RUN_DIR=$(RUN_DIR) SECONDS=10
 	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)/boot_summary.txt --reject-fiq0
-	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' | sort | tail -1); \
 		test -n "$$f" || { echo "2100 frontier: no LCD frame"; exit 1; }; \
 		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_2100_POST_SERVICE_SHA)
 
@@ -902,7 +902,7 @@ verify-2100-interactive: normalize-2100 build
 		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,select NOKIA_DCT3_POST_READY_KEY_DELAY_MS=10000 NOKIA_DCT3_POST_READY_KEY_DURATION_MS=50 NOKIA_DCT3_POST_READY_KEY_GAP_MS=100'
 	test -f $(RUN_DIR)/error.log
 	@for key in 1 2 3 4 5 select; do grep -q "input-press: .* name=$$key" $(RUN_DIR)/error.log; done
-	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' | sort | tail -1); \
 		test -n "$$f" || { echo "2100 interactive: no LCD frame"; exit 1; }; \
 		$(PYTHON) tools/check_lcd_frame.py "$$f" --sha256 $(ORACLE_2100_SECURITY_REJECT_SHA)
 	@echo 'NAM-2 v5.84 plus v5.21 PMM security rejection boundary: PASS'
@@ -1176,10 +1176,10 @@ check-c54x-cross-rom:
 frame:
 	@f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' \
 		! -name '*_z504_*' ! -name '*_ff504_*' ! -name '*_z918_*' ! -name '*_ff918_*' \
-		-printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+		| sort | tail -1); \
 	fallback=0; \
 	if [ -z "$$f" ]; then \
-		f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' -printf '%T@ %p\n' | sort -n | tail -1 | cut -d' ' -f2-); \
+		f=$$(find $(RUN_DIR) -maxdepth 1 -name 'nokia_dct3_lcdmirror_*.pgm' | sort | tail -1); \
 		fallback=1; \
 	fi; \
 	if [ -z "$$f" ]; then echo "frame: no LCD frame in $(RUN_DIR) yet"; else \
