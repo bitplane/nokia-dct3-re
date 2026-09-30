@@ -6,6 +6,47 @@ supplied by you. Everything in this repo is original tooling, analysis, and
 annotations that operate *on* such an image — it is useless to anyone who does not
 already have a legitimately-obtained dump.
 
+## Classic handset collection
+
+The local, ignored collection now includes 131 product-coded service-package
+archives (120 distinct SHA-1 payloads, 573,867,126 bytes) from
+[Internet Archive's Nokia firmware collection](https://archive.org/details/Nokia_DCT3_firmwares).
+They are stored under `roms/archive-dct3-packages/`. Each member's size and
+SHA-1 match the source metadata; `manifest.json` records its source URL,
+size, SHA-1 and independently computed SHA-256. `source_metadata.json`
+preserves the source listing. Duplicate package aliases remain identifiable
+by hash rather than being counted as distinct firmware revisions.
+
+The selection covers NAM-2, NHM-2/3/5/6/9, NPE-3, NPM-5, NSE-1/2/3/5/6/8,
+NSK-1/3, NSM-1/2/3/3D/4/5 and classic NSB/NSC regional package prefixes.
+This includes multiple releases for comparison, not just the newest release.
+Product-code selection is acquisition triage, not a verified hardware-family
+assignment for every package. The source also contains CDMA and later-platform
+software; it was not downloaded indiscriminately as DCT3. Installers have not
+been executed. Some legacy self-extracting formats are not fully understood
+by 7-Zip, so matching an archive hash does not establish successful extraction.
+
+Six additional complete MAME firmware/PMM pairs are extracted in their
+`roms/noki*/` directories. All twelve members' sizes and SHA-1s match the
+current MAME ROM declarations, and all six ZIPs pass their internal CRC tests.
+Source archives and per-member hashes are retained in
+`roms/mame-dct3-archives/manifest.json`.
+
+| Product | Firmware | Source archive SHA-256 |
+| --- | --- | --- |
+| [6210](https://www.planetemu.net/rom/mame-roms/noki6210) | v5.56 PPM C | `2768e54ceee1a2d39ddd51e8f0407af497fe084bd8c0c8665f4575c42910e3d7` |
+| [6250](https://www.planetemu.net/rom/mame-roms/noki6250) | v5.03 PPM C | `50f88e6b9d31ea0f23dc338c7be0da29b3b9251bdd35de879ef5822870f87da2` |
+| [7110](https://www.planetemu.net/rom/mame-roms/noki7110) | v5.01 PPM C | `41c27d8c46c60c71fd4d5007f89cf37fb99447bdc458b8b04382c8e0e5253363` |
+| [8250](https://www.planetemu.net/rom/mame-roms/noki8250) | v5.02 PPM K | `85efd026a7f5c9f4e73a68d6c15952ecde9fcd228c6ac5ab777edae5680a7d0c` |
+| [8850](https://www.planetemu.net/rom/mame-roms/noki8850) | v5.31 PPM C | `c05269b942ad821de82c6ddc5ce1f7e791d80b887ce8d7a42ecc3cfee49bdd47` |
+| [8890](https://www.planetemu.net/rom/mame-roms/noki8890) | v12.20 PPM C | `ad2b5600a1193466a496942c15859a3d473438e7c5c69e9f01c90a0cc79d600b` |
+
+The files labelled "virgin eeprom" in those sets are flash-backed PMM tails,
+not external serial EEPROM or internal DSP ROM images. Their archival names
+and matching MAME hashes do not independently establish factory authenticity.
+No ROM5/ROM6 DSP mask dump was acquired, no missing MAD2 ROM is fabricated,
+and acquisition alone does not promote any handset's runtime coverage.
+
 ## Reference 3210 image
 
 The **NSE-8/9 v06.00 3210** flash file. It is distributed (by third parties) inside
