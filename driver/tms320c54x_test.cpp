@@ -13960,6 +13960,112 @@ void tms320c54x_test_state::rom4(machine_config &config)
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::rom4_data_map);
 }
 
+// Execute the stock flash-staged verifier without supplying a DSP mask ROM.
+// This is a protocol investigation fixture, not an NSM-3 compatibility backend.
+class nsm3_verifier_state : public driver_device
+{
+public:
+	nsm3_verifier_state(const machine_config &config, device_type type, const char *tag) :
+		driver_device(config, type, tag), m_cpu(*this, "maincpu") { }
+	void verifier(machine_config &config)
+	{
+		TMS320C54X(config, m_cpu, 13'000'000);
+		m_cpu->set_addrmap(AS_PROGRAM, &nsm3_verifier_state::program_map);
+		m_cpu->set_addrmap(AS_DATA, &nsm3_verifier_state::data_map);
+		m_cpu->set_addrmap(AS_IO, &nsm3_verifier_state::io_map);
+	}
+
+private:
+	void program_map(address_map &map) { map(0, 0xffff).ram(); }
+	void data_map(address_map &map) { map(0, 0xffff).ram(); }
+	void io_map(address_map &map)
+	{
+		map(0, 0xffff).rw(FUNC(nsm3_verifier_state::io_r), FUNC(nsm3_verifier_state::io_w));
+	}
+	u16 io_r(offs_t offset)
+	{
+		throw emu_fatalerror(1, "NSM3 verifier requires peripheral read: port=%04x pc=%04x blocks=%u",
+			u16(offset), u16(m_cpu->state_int(tms320c54x_device::STATE_PC)), m_block);
+	}
+	void io_w(offs_t offset, u16 data)
+	{
+		logerror("nsm3_verifier: port_write=%04x data=%04x blocks=%u\n", u16(offset), data, m_block);
+	}
+	void machine_start() override
+	{
+		m_timer = timer_alloc(FUNC(nsm3_verifier_state::step), this);
+	}
+	void machine_reset() override
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i != 0x10000; ++i)
+			program.write_word(i, 0xffff);
+		u16 const *const staged = &memregion("verifier")->as_u16();
+		for (unsigned i = 0; i != 223; ++i)
+			program.write_word(0x0f00 + i, staged[i]);
+		// Values written by the MCU at 0x2cac80..0x2cacee, not a mask-ROM snapshot.
+		data.write_word(0x0800, 0);
+		data.write_word(0x0801, 0xffff);
+		data.write_word(0x0802, 0xffff);
+		data.write_word(0x0803, 0xffff);
+		data.write_word(0x087b, 0x0100);
+		data.write_word(0x087c, 0x0300);
+		data.write_word(0x087d, 0);
+		data.write_word(0x087e, 0xe800);
+		data.write_word(0x087f, 1);
+		data.write_word(0x0880, 1);
+		data.write_word(0x0881, 0x0200);
+		m_block = 0;
+		m_ticks = 0;
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0f00);
+		m_timer->adjust(attotime::from_usec(1), 0, attotime::from_usec(1));
+	}
+	TIMER_CALLBACK_MEMBER(step)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		unsigned const pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
+		if (pc < 0x0f00 || pc >= 0x0fdf)
+			throw emu_fatalerror(1, "NSM3 verifier escaped staged image: pc=%04x block=%u", pc, m_block);
+		if (data.read_word(0x0801) != 0xffff)
+			throw emu_fatalerror(0, "NSM3 verifier publication: blocks=%u word0=%04x word1=%04x word2=%04x word3=%04x pc=%04x",
+				m_block, data.read_word(0x0800), data.read_word(0x0801), data.read_word(0x0802), data.read_word(0x0803), pc);
+		if (++m_ticks == 2000000)
+			throw emu_fatalerror(1, "NSM3 verifier timeout: pc=%04x blocks=%u flags=%04x/%04x",
+				pc, m_block, data.read_word(0x087f), data.read_word(0x0880));
+		bool const second = BIT(m_block, 0);
+		unsigned const flag = second ? 0x0880 : 0x087f;
+		bool const polling = second ? (pc == 0x0f33 || pc == 0x0f35) : (pc == 0x0f17 || pc == 0x0f19);
+		if (m_block == 116 || !polling || data.read_word(flag) != 1)
+			return;
+		u8 const *const flash = memregion("flash")->base();
+		unsigned const base = second ? 0x0b00 : 0x0900;
+		for (unsigned i = 0; i != 512; ++i)
+		{
+			unsigned const offset = 0x40 + (m_block * 512 + i) * 0x20;
+			u16 const value = (m_block == 115 && i >= 510) ? 0xffff :
+				(u16(flash[offset]) << 8) | flash[offset + 1];
+			data.write_word(base + i, value);
+		}
+		data.write_word(flag, 0);
+		logerror("nsm3_verifier: block=%u flag=%04x pc=%04x\n", m_block, flag, pc);
+		++m_block;
+	}
+	required_device<tms320c54x_device> m_cpu;
+	emu_timer *m_timer = nullptr;
+	unsigned m_block = 0;
+	unsigned m_ticks = 0;
+};
+
+ROM_START(nsm3verify)
+	ROM_REGION16_LE(446, "verifier", 0)
+	ROM_LOAD16_WORD_SWAP("nsm3_verifier.bin", 0, 446,
+		CRC(53e2de79) SHA1(6646da3c5be9c70deda7e0b5b9f257d5d2ace815))
+	ROM_REGION(0x1d0000, "flash", 0)
+	ROM_LOAD("8210_5.31ppm_c.fls", 0, 0x1d0000,
+		CRC(927022b1) SHA1(c1a0fe95cedb89a92b19654208cc4855e1a4988e))
+ROM_END
+
 ROM_START(tms54test)
 ROM_END
 
@@ -13989,6 +14095,9 @@ ROM_END
 
 SYST(2026, tms54test, 0, 0, test, 0, tms320c54x_test_state, empty_init,
 		"MAME", "TMS320C54x core conformance tests",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, nsm3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
+		"MAME", "NSM-3 stock staged DSP verifier fixture",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, tms54rom4, 0, 0, rom4, 0, tms320c54x_test_state, empty_init,
 		"MAME", "TMS320C54x ROM4 private execution fixture",

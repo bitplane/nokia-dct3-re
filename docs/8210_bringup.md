@@ -4,9 +4,10 @@
 
 NSM-3 v5.31 PPM C reaches the DSP-owned final sparse-flash verification
 publication at `0x2cadce`. No working-phone promotion is claimed. The next
-question is whether the externally staged C54x verifier can derive the
-publications in shared cells `0x10000` and `0x10002` without the mask ROM or
-a read override.
+question is the peripheral transaction at the externally staged verifier's
+tail: DSP port `0x2d` is first read at `0x0f9c`, after all 116 flash blocks
+have been processed. Its relation to the existing COBBA serial-control model
+must be established before deriving the final shared-cell publications.
 
 ## Inputs and hardware
 
@@ -39,11 +40,22 @@ executable DSP evidence.
   does not yet publish these unvalidated final results.
 
 The boot descriptor pointer at `0x135808` resolves to flash `0x31bcf0`.
-Its first program words are independently observed at shared offset `0xe00`
-before the sparse transfer. This is executable C54x material, unlike the
-subsequent ARM-flash samples, and is the next software-accessible evidence
-source. Execution outside that staged image must not be filled with guessed
-mask-ROM instructions.
+Its six-word descriptor is `0f00 0000 00df 0f00 00dc 0000`; the 223-word
+program at flash `0x31bcfc` is independently observed byte-for-byte at shared
+offset `0xe00` before the sparse transfer. Its SHA-1 is
+`6646da3c5be9c70deda7e0b5b9f257d5d2ace815`. The `00dc` descriptor field's
+meaning remains unassigned. Execution outside that staged image must not be
+filled with guessed mask-ROM instructions.
+
+The isolated `nsm3verify` core fixture loads this program at `0x0f00`, supplies
+the observed MCU buffer descriptors (`087b=0100`, `087c=0300`,
+`087d:087e=0000:e800`, `0881=0200`), and sends blocks only at the program's
+alternating ownership polls. It consumes all 116 blocks without leaving the
+staged program. It then writes ports `000e=1387`, `0000=000d`, `000c=0010`
+and stops fail-closed on the first port `002d` read (reported PC `0f9f`, after
+the PORTR operands). The production handset remains unchanged. This proves
+execution to that boundary under the current clean-room core, not silicon
+equivalence, final verification success, or absence of subsequent ROM needs.
 
 The existing independent emulator clears the final sentinel at read time.
 That is a compatibility behavior, not a captured NSM-3 verification result,
@@ -56,3 +68,7 @@ unpromoted behind this boundary.
 `make verify-8210-bootstrap` validates the ROM6 publication, exact upload
 handoff order and fail-closed final wait. It is a frontier gate, not boot/UI
 acceptance. Existing product profiles are unchanged.
+
+`make verify-8210-verifier` extracts the pinned staged image, executes it in
+an isolated run directory and requires the exact peripheral frontier above.
+Unsupported peripheral reads are fatal rather than synthetic responses.

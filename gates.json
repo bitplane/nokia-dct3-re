@@ -27,6 +27,21 @@
   },
   "gates": [
     {
+      "name": "verify-8210-verifier",
+      "prerequisites": ["normalize-8210", "build"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(PYTHON)",
+          "before_script": [],
+          "script": "tools/nsm3_verifier_check.py",
+          "arguments": ["$(MAME_DIR)/mame", "roms/noki8210/8210_5.31ppm_c.fls", "$(RUN_DIR)"]
+        }
+      ]
+    },
+    {
       "name": "verify-8210-bootstrap",
       "prerequisites": ["normalize-8210", "build"],
       "variables": {},

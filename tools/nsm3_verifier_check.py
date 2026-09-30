@@ -1,0 +1,55 @@
+"""Execute the stock NSM-3 staged verifier and check its peripheral frontier."""
+
+import argparse
+from pathlib import Path
+import re
+import shutil
+import subprocess
+
+try:
+    from tools.extract_nsm3_verifier import extract
+except ModuleNotFoundError:
+    from extract_nsm3_verifier import extract
+
+
+def check(output, trace, returncode):
+    if returncode != 1 or "port=002d pc=0f9f blocks=116" not in output:
+        raise ValueError("missing fail-closed NSM-3 peripheral-read frontier")
+    blocks = [int(value) for value in re.findall(r"nsm3_verifier: block=(\d+) flag=", trace)]
+    if blocks != list(range(116)):
+        raise ValueError("staged verifier did not consume all 116 ordered blocks")
+    writes = re.findall(r"port_write=([0-9a-f]+) data=([0-9a-f]+) blocks=(\d+)", trace)
+    if writes != [("000e", "1387", "116"), ("0000", "000d", "116"),
+                  ("000c", "0010", "116")]:
+        raise ValueError("unexpected verifier peripheral-write sequence")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("binary", type=Path)
+    parser.add_argument("flash", type=Path)
+    parser.add_argument("run_dir", type=Path)
+    args = parser.parse_args()
+    try:
+        binary, flash, run = args.binary.resolve(), args.flash.resolve(), args.run_dir.resolve()
+        rom_dir = run / "nsm3verify"
+        rom_dir.mkdir(parents=True, exist_ok=True)
+        (rom_dir / "nsm3_verifier.bin").write_bytes(extract(flash.read_bytes()))
+        shutil.copyfile(flash, rom_dir / "8210_5.31ppm_c.fls")
+        log = run / "error.log"
+        log.unlink(missing_ok=True)
+        result = subprocess.run([
+            str(binary), "nsm3verify", "-rompath", str(run), "-noreadconfig",
+            "-video", "none", "-sound", "none", "-nothrottle", "-seconds_to_run", "3",
+            "-skip_gameinfo", "-window", "-log"], cwd=run, capture_output=True,
+            text=True, timeout=30)
+        output = result.stdout + result.stderr
+        (run / "verifier_output.log").write_text(output)
+        check(output, log.read_text(), result.returncode)
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        parser.exit(1, f"NSM-3 verifier gate failed: {error}\n")
+    print("NSM-3 verifier frontier PASS: 116 blocks consumed; peripheral 0x2d remains unsupported")
+
+
+if __name__ == "__main__":
+    main()
