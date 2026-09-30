@@ -91,7 +91,7 @@
   {
    "addr": "0x2a5e1c",
    "lines": [
-    "Hypothesis (unnamed): 26-slot table at 0x10f268 (12 bytes each, id at +4, 0x1a = empty). Removes the slot with the given id by copying the last used slot over it and marking that one empty, then 0x2a59fc(). Looks like a UI stack/registry remove."
+    "ui_slot_remove(kind): 26-slot table ui_slots_10f268 (12 bytes: +0 text id, +4 kind, +6 value/0x114, +8 flag; kind 0x1a = empty). Removes the slot with this kind by moving the last used slot over it, then 0x2a59fc() rebuilds. Counterpart of ui_slot_set_2a5e8c."
    ]
   },
   {
@@ -353,6 +353,42 @@
    "addr": "0x2ac70e",
    "lines": [
     "Hypothesis (unnamed): dispatches through an 8-byte handler table at 0x2db720 with constant 0x5ec; menu_render_2629d0 calls it once."
+   ]
+  },
+  {
+   "addr": "0x262438",
+   "lines": [
+    "Index (0..5) of menu level id arg0 in the six 8-byte level records at menu_levels_10b2fc; the path string has at most six components for the same reason. Returns the loop index in r0 (Ghidra shows void)."
+   ]
+  },
+  {
+   "addr": "0x262452",
+   "lines": [
+    "Ordinal of the item whose id equals arg1 within menu context descriptor arg0 (+4 flags, +5 index, +2 count, +1 first entry): flags bit 0 = direct/indirect id (bit 2 returns arg1, bit 1 maps through 0x11fc80), otherwise walks the entry chain (next byte at entry+0xe of the 0x1c-byte records) comparing entry ids; 0 if not found."
+   ]
+  },
+  {
+   "addr": "0x2a5e8c",
+   "lines": [
+    "ui_slot_set(kind, value): finds the slot of this kind (or the first empty one) in ui_slots_10f268; slot type from 0x2e1479[0x2e1590[kind]*8]: 1 = text id (kept only if the string resolves via 0x296adc/0x296b74), 2 = raw byte in +6, anything else removes the slot; then 0x2a59fc(). Kind 6 carries the menu path indicator."
+   ]
+  },
+  {
+   "addr": "0x2b316e",
+   "lines": [
+    "Stops periodic slot n: three 12-byte slots at periodic_slots_1121ac, handler table periodic_slot_handlers_2dcbdc (12 bytes: fn, u16 param, ...). Cancels delayed event 0x2c, calls handler(3, n) unless the slot is free (0x19), frees it, and reposts event 0x2c with delay 5 if any slot is still active."
+   ]
+  },
+  {
+   "addr": "0x2b31d8",
+   "lines": [
+    "Starts a periodic slot of kind arg0 with args (arg1 word, arg2 byte): takes the first free slot, copies the handler's u16 param, calls handler(1, slot) and posts delayed event 0x2c (5 ticks). Returns 0xff when all three slots are busy. menu_render_2629d0 uses the pair around the scrollbar/marquee state at 0x10b2b4+3."
+   ]
+  },
+  {
+   "addr": "0x2ae8ba",
+   "lines": [
+    "Hypothesis (unnamed): phone status text builder keyed by codes 500+n (uses service_record_build_contact_pair_282afc, 0x287216/0x287730 lookups); reached from menu_render_2629d0 for one menu type. Outside the games' own needs."
    ]
   }
  ]

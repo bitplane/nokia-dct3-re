@@ -90,3 +90,13 @@ address,kind,name
 0x002b6018,function,atoi_2b6018
 0x002a3dc2,function,utoa_2a3dc2
 0x002e1929,data,ctype_table_2e1929
+0x00262438,function,menu_level_index_262438
+0x0010b2fc,label,menu_levels_10b2fc
+0x00262452,function,menu_item_ordinal_by_id_262452
+0x002a5e8c,function,ui_slot_set_2a5e8c
+0x002a5e1c,function,ui_slot_remove_2a5e1c
+0x0010f268,label,ui_slots_10f268
+0x002b316e,function,periodic_slot_stop_2b316e
+0x002b31d8,function,periodic_slot_start_2b31d8
+0x001121ac,label,periodic_slots_1121ac
+0x002dcbdc,data,periodic_slot_handlers_2dcbdc
