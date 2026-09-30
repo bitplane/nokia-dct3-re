@@ -509,12 +509,12 @@ overlay: download-mame
 		if git -C $(MAME_DIR) apply --reverse --check "../$$patch" >/dev/null 2>&1; then :; \
 		else git -C $(MAME_DIR) apply "../$$patch"; fi; \
 	done
-	install -C -D $(DRIVER) $(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp
-	@set -e; for src in $(DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
-	@set -e; for src in $(TEST_DRIVER_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; done
-	@set -e; for src in $(CPU_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/devices/$$src"; done
-	@set -e; for src in $(LIB_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/src/$$src"; done
-	@set -e; for src in $(LIBGSM_COMPONENTS); do install -C -D "$$src" "$(MAME_DIR)/3rdparty/$${src#third_party/}"; done
+	@dst="$(MAME_DIR)/src/mame/nokia/nokia_dct3.cpp"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$(DRIVER)" "$$dst" 2>/dev/null || cp -f "$(DRIVER)" "$$dst"
+	@set -e; for src in $(DRIVER_COMPONENTS); do dst="$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
+	@set -e; for src in $(TEST_DRIVER_COMPONENTS); do dst="$(MAME_DIR)/src/mame/nokia/$$(basename "$$src")"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
+	@set -e; for src in $(CPU_COMPONENTS); do dst="$(MAME_DIR)/src/devices/$$src"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
+	@set -e; for src in $(LIB_COMPONENTS); do dst="$(MAME_DIR)/src/$$src"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
+	@set -e; for src in $(LIBGSM_COMPONENTS); do dst="$(MAME_DIR)/3rdparty/$${src#third_party/}"; mkdir -p "$$(dirname "$$dst")"; cmp -s "$$src" "$$dst" 2>/dev/null || cp -f "$$src" "$$dst"; done
 	# makedep discovers a .cpp beside an included header; remove the retired overlay source.
 	rm -f $(MAME_DIR)/src/mame/nokia/nokia_gsm_fr_codec.cpp
 
