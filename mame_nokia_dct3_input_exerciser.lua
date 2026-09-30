@@ -194,7 +194,7 @@ if machine.system.name == "noki5110" then
 		star = field_by_name("COL.2", "Keypad *"),
 		power = field_by_name("PWR", "Power"),
 	}
-elseif is_5210 then
+elseif is_5210 or machine.system.name == "noki6210" then
 	key_fields = {
 		enter = field_by_mask("COL.1", 0x02), up = field_by_mask("COL.1", 0x04),
 		down = field_by_mask("COL.1", 0x08), ["0"] = field_by_mask("COL.3", 0x10),

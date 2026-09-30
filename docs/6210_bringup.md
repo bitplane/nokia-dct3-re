@@ -28,6 +28,45 @@ at region offset `0x3fa000`. Sources and archive hashes are in
 - The unvalidated 6250 retains its previous generic composition; it does not
   silently inherit the new 6210 contract through a shared machine config.
 
+## Keypad
+
+The NPE-3 v5.56 scanner `4f84c8` masks `6b`, drives `a8/28` and samples
+`2a`. Its ordinary scan forms `drive * 5 + sense` at `4f8550..4f8556`.
+Decoder `4facfa` uses the normal table at `2869b8` and the special table
+at `2869d4`. The normal table is:
+
+```text
+5a 5a 5a 5a 5a
+11 19 01 02 03
+0e 17 04 05 06
+0f 18 07 08 09
+10 1a 0c 0a 0b
+```
+
+Special input bit 4 maps to Power (`0d`); the other four special entries
+are `5a`. These tables independently select the same logical input layout
+as the 5210, so the 6210 reuses its port declarations with a product-local
+five-line controller contract and Power mask `10`, not its hardware profile.
+The previous inherited 3310 input declarations and four-line default were
+not NPE-3 evidence.
+
+`make verify-6210-keypad-controller` checks both pinned ROM tables, all 20
+matrix keys across all five driven lines (100 reads), and held-Power
+press/release through the actual MAME controller. It is an MMIO conformance
+fixture: Lua drives controller registers and host inputs, never firmware RAM
+or messages. It restores the row/direction/mask registers. This proves the
+configured matrix, not firmware decoding, debounce or usable menus; those
+remain gated by the unresolved DSP bootstrap. The ordinary input exerciser
+now selects this product's logical key layout too.
+
+Nokia's [NPE-3 board schematics](https://altehandys.de/downloads/ser-no-6210-schematics.pdf)
+(Version 1.0, 09.02.2001) show the fitted matrix switches on page 5 and
+identify the MAD2WD1 ROM6 V16 part on page 4. The physical sheet's ROW/COL
+names are not the input fixture's abstract drive/sense names. The archived
+PDF is `roms/research/npe3/npe3-schematics-v1.pdf`, 2,656,135 bytes,
+SHA-256 `559e9718a9dad703694f17d349383f75af4237b1c26cf94ecdb4aafe641f1e43`.
+It does not specify the missing DSP PROM word or final HPI publication.
+
 ## DSP upload
 
 The pointer at RAM `0x170070`, read without modifying firmware state, selects

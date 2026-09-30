@@ -27,6 +27,14 @@
   },
   "gates": [
     {
+      "name": "verify-6210-keypad-controller",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/npe3_keypad_check.py", "arguments": ["$(MAME_DIR)/mame", "$(MAME_DIR)/roms", "$(RUN_DIR)"]}
+      ]
+    },
+    {
       "name": "verify-6210-verifier",
       "prerequisites": ["build"],
       "variables": {},
