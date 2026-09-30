@@ -1022,3 +1022,8 @@ address,kind,name
 0x00243664,function,widget_move_to_list_243664
 0x0024369a,function,widget_set_in_list1_24369a
 0x00243934,function,widget_style_variant_243934
+0x00262fa4,function,menu_leave_262fa4
+0x00262ff0,function,menu_depth_push_262ff0
+0x00263006,function,menu_enabled_mask_build_263006
+0x002632fc,function,menu_level_insert_entry_2632fc
+0x002633d0,function,menu_level_create_2633d0

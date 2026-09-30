@@ -529,6 +529,36 @@
    "lines": [
     "Hypothesis (unnamed): computes a vertical extent for a widget from fields +0x46/+0x49/+0x4a and padding +0x2c, relative to a parent, when +0x28 bits 17..18 are set; part of the layout pass at 0x243ba8."
    ]
+  },
+  {
+   "addr": "0x262fa4",
+   "lines": [
+    "Leaves the current menu level if it is open (+0x2a of the level slot): stops the 0x24af00 effect (state 1 -> 2), cancels delayed event 0x31, tears the menu down with menu_render_2629d0(0xff, 1) unless suppressed (+1), calls 0x2ac6fc, clears the open flag. menu_enter_263154 calls it first."
+   ]
+  },
+  {
+   "addr": "0x262ff0",
+   "lines": [
+    "Increments the current context's menu nesting depth byte (0x10b2dc[ctx*4+1]), capped at 6, matching the six level slots."
+   ]
+  },
+  {
+   "addr": "0x263006",
+   "lines": [
+    "Builds the 16-bit item enable mask for the current level: for each entry (direct 0x14-byte table or the 0x1c-byte chain) reads bit (+0x1e / -10) of the byte pointed to by (+0x18 / -0x10) and packs it at the item's position. menu_enter_263154 stores it at level +4/+6 when descriptor flag bit 0 is set; menu_item_enabled_2623b0 tests it."
+   ]
+  },
+  {
+   "addr": "0x2632fc",
+   "lines": [
+    "Allocates a free entry among the 0x50 records of menu_entries_10b32c (used flag +0x19), copies the template (arg2), and links it into level arg0's chain: as first entry when the level is empty, at position arg1 (1-based) when given, else at the end; increments the level count. Returns 1, or 0 when no entry is free."
+   ]
+  },
+  {
+   "addr": "0x2633d0",
+   "lines": [
+    "Creates menu level arg0 in the first free slot of menu_levels_10b2fc (params arg1..arg3 at +3..+5) and inserts its first entry from a default template (payload arg4, text 0x114, 0xdc, 0xc, 0x11) via menu_level_insert_entry_2632fc; rolls the slot back when the insert fails."
+   ]
   }
  ]
 }
