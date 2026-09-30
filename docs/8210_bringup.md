@@ -136,3 +136,24 @@ acceptance. Existing product profiles are unchanged.
 an isolated run directory and checks the unsupported-peripheral case plus
 COBBA and immutable-version sensitivity cases. Unsupported peripheral reads
 are fatal rather than synthetic responses.
+
+## Evidence needed to resume
+
+The software-accessible stock upload, operand decoding, existing COBBA model
+and explicit memory-input comparisons do not establish the final silicon
+publication. A useful physical or independently captured reference must include:
+
+- NSM-3 board/DSP ROM revision, MCU/PPM hashes and the staged-program hash;
+  the current reference is v5.31 PPM C and the 223-word program above.
+- Ordered reset/release, upload and ownership exchanges, followed by actual
+  DSP writes to shared offsets `000`, `002`, `004` and `006`. Distinguish raw
+  hardware reads from bridge-HLE substitutions and retransmission repairs.
+- Program `ff87` read/write behavior under `PMST=ffa8`, the memory backing
+  data `04f7:04f8` and `0800:0803`, and COBBA register-F/status-D readings.
+- The final result pair and its ordering relative to the last buffer
+  acknowledgement and any reset, with the raw trace retained and hashed.
+
+A matching raw capture can justify a narrowly declared HLE bootstrap contract;
+a ROM6 memory image/map can support core execution. Neither is currently
+available in the acquired collection. UI, SIM, network, call/audio and
+handset save/load acceptance remain unvalidated behind this boundary.
