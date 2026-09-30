@@ -52,7 +52,8 @@
   {
    "addr": "0x22c15c",
    "lines": [
-    "Hypothesis (unnamed): binds widget +0x3b through 0x22bcc0/0x22c0f8/0x22bdb4 then sets widget flag bit 1; likely softkey/label attachment. Needs the 0x22bxxx side mapped first."
+    "widget_measure(metrics, widget): fills the widget's metrics block at +0x20 from the style tables. 0x22bcc0 picks the first 16-byte entry of 0x2d6e4c whose flags match the UI flags at 0x11fd16 and copies its geometry; 0x22c0f8 selects an 8-byte entry of 0x2d6748 starting at 0x2d6d90[widget +0x3f] (the style class) and matching widget +0x41 >> 5 (the style variant); 0x22bdb4 derives the remaining extents. Sets flag bit 1 = metrics valid, which widget_text_height_22f7fc, widget_link_243428 and widget_set_highlight_24387a test before reading +0x20/+0x24/+0x28/+0x2c/+0x2d.",
+    "This fixed the meaning of the two fields named provisionally last week: +0x3f is the style class, +0x41's top three bits the style variant; the setters were renamed accordingly."
    ]
   },
   {
@@ -292,13 +293,13 @@
   {
    "addr": "0x2437c4",
    "lines": [
-    "Sets widget field +0x3f for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. +0x3f is initialised from class-map byte 2 by widget_init_2432e0; its meaning (font/style) is not yet proven, hence the field name."
+    "Sets the widget's style class (+0x3f) for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. widget_measure_22c15c indexes 0x2d6d90 with it."
    ]
   },
   {
    "addr": "0x24383c",
    "lines": [
-    "Sets the top 3 bits of widget field +0x41 (value * 0x20, low 5 bits kept), marks dirty, clears flag bit 4. menu_render_2629d0 passes 0 or 5. Field meaning not yet proven."
+    "Sets the style variant (top 3 bits of +0x41, value * 0x20), marks dirty, clears flag bit 4. widget_measure_22c15c matches it against the 0x2d6748 style entries; menu_render_2629d0 passes 0 or 5."
    ]
   },
   {
@@ -479,7 +480,7 @@
   {
    "addr": "0x24af00",
    "lines": [
-    "Hypothesis (unnamed): stops a screen effect started by 0x24b174 (0x24b174 calls 0x24af70(buf, table, 0x578)); the pair is driven by menu descriptor flag bits 4/5 in menu_enter_263154 and by menu_return_263468."
+    "editor_close: if an editor is open (state block 0x110590 +8), runs its teardown (0x24adc8: cancels delayed event 0x31, destroys the focused widget, clears widget 0x29, removes UI slot 2, restores the previous UI context) and flushes pending text (0x24aedc), then sets 0x11fcd4 = 1. Menu descriptor flag 0x20 and menu_leave/menu_return call it."
    ]
   },
   {
@@ -521,7 +522,7 @@
   {
    "addr": "0x243934",
    "lines": [
-    "Picks the style variant for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte style entry's flag byte (0x2d656c[variant*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's variant limit; falls back to the first. widget_get_style_2453ec consumes the result."
+    "Picks the per-list style entry for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte entry's flag byte (0x2d656c[n*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's limit; falls back to the first. widget_get_style_2453ec and the layout pass consume the result. (Distinct from the per-widget style class/variant used by widget_measure_22c15c.)"
    ]
   },
   {
@@ -593,7 +594,7 @@
   {
    "addr": "0x24371a",
    "lines": [
-    "Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_attr_41_24383c writes in its top 3 bits)."
+    "Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_style_variant_24383c writes in its top 3 bits)."
    ]
   },
   {
@@ -666,6 +667,48 @@
    "addr": "0x262590",
    "lines": [
     "Hypothesis (unnamed): resolves a menu descriptor through 0x262544 and sets widget 0x1b's text from the matching 0x14-byte entry; widget 0x1b's role (header or softkey label) is not yet established."
+   ]
+  },
+  {
+   "addr": "0x24af70",
+   "lines": [
+    "editor_open(text, descriptor, param): closes any open editor, binds the text buffer (+0x34), descriptor (+0x1c) and param (+0x16) into the editor state block at 0x110590, marks it open (+8 = 1); for numeric descriptors (flags 0x600) scans the text for ',' or '.' to set the decimal-point bit; sets 0x110900 = 1 via 0x24386a; then 0x2454c0(descriptor[2], text) builds the editor widgets. This is the text/number input editor the MMI documentation calls the 'editor'."
+   ]
+  },
+  {
+   "addr": "0x24b174",
+   "lines": [
+    "editor_open_default(buf, table): editor_open_24af70(buf, table, 0x578). menu_enter_263154 calls it when the level descriptor has flag 0x10 (input-field menu items)."
+   ]
+  },
+  {
+   "addr": "0x244d7c",
+   "lines": [
+    "Not a function: interior of widget_layout_pass_243a2c (false BL decode in its literal pool); the neighbour-walk and stacking part of the pass."
+   ]
+  },
+  {
+   "addr": "0x245126",
+   "lines": [
+    "Not a function: interior of widget_layout_pass_243a2c; clears a list region with lcd_fill_rect_25eec0 and flags overlapping lists for repaint."
+   ]
+  },
+  {
+   "addr": "0x2451d8",
+   "lines": [
+    "Not a function: tail of widget_layout_pass_243a2c; releases the interrupt lock and calls service_session_draw_end_2abd7c (LCD flush)."
+   ]
+  },
+  {
+   "addr": "0x2451fe",
+   "lines": [
+    "Not a function: alternate tail of widget_layout_pass_243a2c (store state, unlock, flush when a full pass ran)."
+   ]
+  },
+  {
+   "addr": "0x2ac6fc",
+   "lines": [
+    "Hypothesis (unnamed): 0x2ac6fc -> 0x2b4fd6(0x2db724[*0x11fcce * 8]); 0x2b4fd6 stores the id at 0x1124f4 and posts widget class 0x67 with the 32-byte record 0x2d3948[id] (records hold text id 0xdc and a pointer 0x2b5064), or queues the id when busy. editor_close_24af00's teardown also calls it. Role still open."
    ]
   }
  ]

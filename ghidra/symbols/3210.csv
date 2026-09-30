@@ -972,8 +972,8 @@ address,kind,name
 0x002453ec,function,widget_get_style_2453ec
 0x00296f4e,function,menu_layout_by_language_296f4e
 0x0011fcb1,label,ui_language_11fcb1
-0x002437c4,function,widget_set_attr_3f_2437c4
-0x0024383c,function,widget_set_attr_41_24383c
+0x002437c4,function,widget_set_style_class_2437c4
+0x0024383c,function,widget_set_style_variant_24383c
 0x0024387a,function,widget_set_highlight_24387a
 0x0026281e,function,menu_build_path_string_26281e
 0x002b65c8,function,strcat_2b65c8
@@ -1021,7 +1021,7 @@ address,kind,name
 0x0010b32c,label,menu_entries_10b32c
 0x00243664,function,widget_move_to_list_243664
 0x0024369a,function,widget_set_in_list1_24369a
-0x00243934,function,widget_style_variant_243934
+0x00243934,function,widget_list_style_243934
 0x00262fa4,function,menu_leave_262fa4
 0x00262ff0,function,menu_depth_push_262ff0
 0x00263006,function,menu_enabled_mask_build_263006
@@ -1034,7 +1034,7 @@ address,kind,name
 0x0010eb48,label,widget_focus_10eb48
 0x002436c4,function,widget_set_handler_2436c4
 0x002436dc,function,widget_set_state_bit_2436dc
-0x0024371a,function,widget_set_attr_41_bits_24371a
+0x0024371a,function,widget_set_style_bits_24371a
 0x0024377c,function,widget_reset_with_handler_24377c
 0x00243804,function,widget_set_hidden_243804
 0x002439ac,function,widget_is_unobscured_2439ac
@@ -1048,3 +1048,11 @@ address,kind,name
 0x0026343a,function,menu_hide_26343a
 0x002634b6,function,menu_teardown_if_open_2634b6
 0x002634d4,function,menu_depth_pop_2634d4
+0x0022c15c,function,widget_measure_22c15c
+0x0024af70,function,editor_open_24af70
+0x0024af00,function,editor_close_24af00
+0x0024b174,function,editor_open_default_24b174
+0x002451d8,label,widget_layout_pass_part_2451d8
+0x002451fe,label,widget_layout_pass_part_2451fe
+0x00245126,label,widget_layout_pass_part_245126
+0x00244d7c,label,widget_layout_pass_part_244d7c

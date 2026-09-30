@@ -161,6 +161,7 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x110904` | label | `widget_lists_110904` |  |
 | `0x11fcb1` | label | `ui_language_11fcb1` |  |
 | `0x11fd1a` | label | `ui_context_11fd1a` |  |
+| `0x22c15c` | function | `widget_measure_22c15c` | widget_measure(metrics, widget): fills the widget's metrics block at +0x20 from the style tables. 0x22bcc0 picks the first 16-byte entry of 0x2d6e4c whose flags match the UI flags at 0x11fd16 and copies its geometry; 0x22c0f8 selects an 8-byte entry of 0x2d6748 starting at 0x2d6d90[widget +0x3f] (th |
 | `0x22f7fc` | function | `widget_text_height_22f7fc` | Height in pixels of text widget (class, index): measures each glyph of the widget's string (+0x34 text id resolved through 0x296adc with ui_language_11fcb1, font row 0x2d223c[+0x24]) via 0x25e4fe, takes the max against +0x20>>3, adds paddings +0x2c and +0x2d. Ids 0x901..0x970 are remapped to 0xe201. |
 | `0x2430c0` | function | `ui_repaint_state_ack_2430c0` | Leaf: if ui_repaint_state_10eb3c == 3 set it to 2 (same transition ui_refresh_timer_243180 makes before repainting). BL target from outside the games region; callers are not in the closure. |
 | `0x2430ce` | function | `widget_list_head_2430ce` | Returns the head pointer of widget list N: widget_lists_110904[class_map_2e06a9[N]*0xc]. Lists are 12-byte {head, flags,...}; widgets are 0x40+ byte nodes: +0 next, +0x1c index byte, +0x3c flags u16, +0x3e class byte, +0x40 list number. |
@@ -179,20 +180,24 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x24369a` | function | `widget_set_in_list1_24369a` | widget_set_243550(class, 0, 0, data, 0) followed by widget_move_to_list_243664(class, 0, 1): post content and pin the widget to list 1. |
 | `0x2436c4` | function | `widget_set_handler_2436c4` | Sets widget +0x38, the widget_class_handlers_2e0660 index, for (class, index 0). Returns 1 if the widget exists. |
 | `0x2436dc` | function | `widget_set_state_bit_2436dc` | Sets or clears bit arg1 of widget +0x42 and marks the widget dirty when the bit changes. |
-| `0x24371a` | function | `widget_set_attr_41_bits_24371a` | Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_attr_41_24383c writes in its top 3 bits). |
+| `0x24371a` | function | `widget_set_style_bits_24371a` | Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_style_variant_24383c writes in its top 3 bits). |
 | `0x24377c` | function | `widget_reset_with_handler_24377c` | Find-or-create (class, index); an existing widget is marked dirty and, if flag bit 0 is set, re-initialised through widget_init_2432e0; then +0x38 (class handler index) is set to arg2. |
-| `0x2437c4` | function | `widget_set_attr_3f_2437c4` | Sets widget field +0x3f for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. +0x3f is initialised from class-map byte 2 by widget_init_2432e0; its meaning (font/style) is not yet proven, hence the field name. |
+| `0x2437c4` | function | `widget_set_style_class_2437c4` | Sets the widget's style class (+0x3f) for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. widget_measure_22c15c indexes 0x2d6d90 with it. |
 | `0x243804` | function | `widget_set_hidden_243804` | Sets or clears widget flag 0x80 (hidden) for (class, index), sets flag 0x20 and marks dirty when it changes. widget_is_unobscured_2439ac ignores widgets with bit 7 set, which fixes the bit's meaning. |
-| `0x24383c` | function | `widget_set_attr_41_24383c` | Sets the top 3 bits of widget field +0x41 (value * 0x20, low 5 bits kept), marks dirty, clears flag bit 4. menu_render_2629d0 passes 0 or 5. Field meaning not yet proven. |
+| `0x24383c` | function | `widget_set_style_variant_24383c` | Sets the style variant (top 3 bits of +0x41, value * 0x20), marks dirty, clears flag bit 4. widget_measure_22c15c matches it against the 0x2d6748 style entries; menu_render_2629d0 passes 0 or 5. |
 | `0x24387a` | function | `widget_set_highlight_24387a` | Sets or clears highlight bit arg2 (0..2) in widget +0x28 bits 25..27 for (class, index), marking dirty on change; menu_render_2629d0 calls it as (0x21, selected_row, 2, 1) to highlight the selection. |
 | `0x2438e8` | function | `widget_link_by_class_2438e8` | widget_link_by_class(classA, idxA, classB, idxB, relation\|flags<<8): looks both widgets up and calls widget_link_243428(B, A, relation, flags) when both exist with the right index. |
-| `0x243934` | function | `widget_style_variant_243934` | Picks the style variant for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte style entry's flag byte (0x2d656c[variant*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's variant limit; falls back to the first. widget_get_style_2453ec consumes the resu |
+| `0x243934` | function | `widget_list_style_243934` | Picks the per-list style entry for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte entry's flag byte (0x2d656c[n*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's limit; falls back to the first. widget_get_style_2453ec and the layout pass consume th |
 | `0x2439ac` | function | `widget_is_unobscured_2439ac` | Returns 0 if any later widget in the same list that is not hidden overlaps this widget's rectangle (+0x47 x, +0x45 w, +0x49 y with heights +0x2c/+0x2d/+0x46), else 1. |
 | `0x243a2c` | function | `widget_layout_pass_243a2c` | The games UI layout and paint pass (about 0xf80 bytes, under interrupt lock): resolves each widget list's style variant, clears and repaints overlapped list regions through the per-class handlers (event 3 then 6), then positions widgets along their neighbour links with the style paddings. The entry  |
 | `0x243a50` | label | `widget_layout_pass_part_243a50` |  |
 | `0x243a5e` | label | `widget_layout_pass_part_243a5e` |  |
 | `0x243ba6` | label | `widget_layout_pass_part_243ba6` |  |
 | `0x243ba8` | label | `widget_layout_pass_part_243ba8` |  |
+| `0x244d7c` | label | `widget_layout_pass_part_244d7c` | Not a function: interior of widget_layout_pass_243a2c (false BL decode in its literal pool); the neighbour-walk and stacking part of the pass. |
+| `0x245126` | label | `widget_layout_pass_part_245126` | Not a function: interior of widget_layout_pass_243a2c; clears a list region with lcd_fill_rect_25eec0 and flags overlapping lists for repaint. |
+| `0x2451d8` | label | `widget_layout_pass_part_2451d8` | Not a function: tail of widget_layout_pass_243a2c; releases the interrupt lock and calls service_session_draw_end_2abd7c (LCD flush). |
+| `0x2451fe` | label | `widget_layout_pass_part_2451fe` | Not a function: alternate tail of widget_layout_pass_243a2c (store state, unlock, flush when a full pass ran). |
 | `0x2453ec` | function | `widget_get_style_2453ec` | Fills a 15-byte style struct (arg2) for widget (class, index), creating the widget if missing: +0xc class, +5..+8 from the 12-byte style table 0x2d6568 keyed by the widget's list (via 0x243934), +0xd/+0xe from widget +0x3f/+0x41. Returns 1. |
 | `0x2974f8` | function | `ui_event1b_short_delay_2974f8` |  |
 | `0x2a0aec` | label | `ui_state_handler_entry_2a0aec` |  |
@@ -298,7 +303,8 @@ unnamed.
   candidate but no code references it yet.
 - `logic_*` is inferred from mechanics plus the `Logic` string; treat it as a
   strong hypothesis.
-- `widget_set_attr_3f`/`_41` name the field they set; the fields' meaning is
-  open.
+- Widget `+0x3f` is the style class and the top bits of `+0x41` the style
+  variant, established through `widget_measure_22c15c`; the setters were
+  renamed once that was proved.
 - Addresses in `0x2431xx..0x2438xx` are the games' widget layer, not the
   general MMI window manager (task 6); do not conflate the two.
