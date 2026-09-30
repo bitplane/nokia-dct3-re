@@ -559,6 +559,114 @@
    "lines": [
     "Creates menu level arg0 in the first free slot of menu_levels_10b2fc (params arg1..arg3 at +3..+5) and inserts its first entry from a default template (payload arg4, text 0x114, 0xdc, 0xc, 0x11) via menu_level_insert_entry_2632fc; rolls the slot back when the insert fails."
    ]
+  },
+  {
+   "addr": "0x2430c0",
+   "lines": [
+    "Leaf: if ui_repaint_state_10eb3c == 3 set it to 2 (same transition ui_refresh_timer_243180 makes before repainting). BL target from outside the games region; callers are not in the closure."
+   ]
+  },
+  {
+   "addr": "0x2431d2",
+   "lines": [
+    "If ui_repaint_state_10eb3c is non-zero, clears it and calls ui_refresh_timer_243180(0), cancelling the pending repaint."
+   ]
+  },
+  {
+   "addr": "0x2432cc",
+   "lines": [
+    "Destroys the focused widget (pointer at widget_focus_10eb48, the same block widget_set_243550 consults at +0x11/+0x10) and clears the pointer."
+   ]
+  },
+  {
+   "addr": "0x2436c4",
+   "lines": [
+    "Sets widget +0x38, the widget_class_handlers_2e0660 index, for (class, index 0). Returns 1 if the widget exists."
+   ]
+  },
+  {
+   "addr": "0x2436dc",
+   "lines": [
+    "Sets or clears bit arg1 of widget +0x42 and marks the widget dirty when the bit changes."
+   ]
+  },
+  {
+   "addr": "0x24371a",
+   "lines": [
+    "Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_attr_41_24383c writes in its top 3 bits)."
+   ]
+  },
+  {
+   "addr": "0x24377c",
+   "lines": [
+    "Find-or-create (class, index); an existing widget is marked dirty and, if flag bit 0 is set, re-initialised through widget_init_2432e0; then +0x38 (class handler index) is set to arg2."
+   ]
+  },
+  {
+   "addr": "0x243804",
+   "lines": [
+    "Sets or clears widget flag 0x80 (hidden) for (class, index), sets flag 0x20 and marks dirty when it changes. widget_is_unobscured_2439ac ignores widgets with bit 7 set, which fixes the bit's meaning."
+   ]
+  },
+  {
+   "addr": "0x2439ac",
+   "lines": [
+    "Returns 0 if any later widget in the same list that is not hidden overlaps this widget's rectangle (+0x47 x, +0x45 w, +0x49 y with heights +0x2c/+0x2d/+0x46), else 1."
+   ]
+  },
+  {
+   "addr": "0x243a2c",
+   "lines": [
+    "The games UI layout and paint pass (about 0xf80 bytes, under interrupt lock): resolves each widget list's style variant, clears and repaints overlapped list regions through the per-class handlers (event 3 then 6), then positions widgets along their neighbour links with the style paddings. The entry scan split it at 0x243a50/0x243a5e/0x243ba6/0x243ba8 (false BL decodes in its literal pools); those are labelled as parts, not functions."
+   ]
+  },
+  {
+   "addr": "0x240610",
+   "lines": [
+    "Not a function: interior of level_widget_callback_240604 (no prologue; the pointer scan matched a literal). Labelled so the worklist stops offering it."
+   ]
+  },
+  {
+   "addr": "0x26250a",
+   "lines": [
+    "Not a function: interior of the unnamed 0x2624b8 (sets widget 0x1b text for a submenu entry); labelled as a part."
+   ]
+  },
+  {
+   "addr": "0x26343a",
+   "lines": [
+    "Clears 0x10b2b5 and tears the menu down with menu_render_2629d0(0xff, 1)."
+   ]
+  },
+  {
+   "addr": "0x2634b6",
+   "lines": [
+    "Tears the menu down (menu_render_2629d0(0xff, 1)) when the context's open flag (0x10b2de[ctx*4]) is set."
+   ]
+  },
+  {
+   "addr": "0x2634d4",
+   "lines": [
+    "Pops one menu nesting level: clears the current level slot, marks it state 7, restores the previous level's slot and adjusts the depth counter (max 6)."
+   ]
+  },
+  {
+   "addr": "0x24386a",
+   "lines": [
+    "Hypothesis (unnamed): leaf that writes (arg0 == 1) to 0x110900, the byte before ui_dirty_flag_110901; a second UI flag whose reader is outside the closure."
+   ]
+  },
+  {
+   "addr": "0x26344c",
+   "lines": [
+    "Hypothesis (unnamed): resets cached UI tables via 0x2ae7c4 then posts task-5 status 0x5de (the same failure status menu_enter_263154 uses when a level has no enabled item)."
+   ]
+  },
+  {
+   "addr": "0x262590",
+   "lines": [
+    "Hypothesis (unnamed): resolves a menu descriptor through 0x262544 and sets widget 0x1b's text from the matching 0x14-byte entry; widget 0x1b's role (header or softkey label) is not yet established."
+   ]
   }
  ]
 }

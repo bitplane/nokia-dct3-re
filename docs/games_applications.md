@@ -154,17 +154,22 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 
 | Address | Kind | Name | Evidence |
 |---|---|---|---|
+| `0x10eb3c` | label | `ui_repaint_state_10eb3c` |  |
+| `0x10eb48` | label | `widget_focus_10eb48` |  |
 | `0x10f268` | label | `ui_slots_10f268` |  |
 | `0x110901` | label | `ui_dirty_flag_110901` |  |
 | `0x110904` | label | `widget_lists_110904` |  |
 | `0x11fcb1` | label | `ui_language_11fcb1` |  |
 | `0x11fd1a` | label | `ui_context_11fd1a` |  |
 | `0x22f7fc` | function | `widget_text_height_22f7fc` | Height in pixels of text widget (class, index): measures each glyph of the widget's string (+0x34 text id resolved through 0x296adc with ui_language_11fcb1, font row 0x2d223c[+0x24]) via 0x25e4fe, takes the max against +0x20>>3, adds paddings +0x2c and +0x2d. Ids 0x901..0x970 are remapped to 0xe201. |
+| `0x2430c0` | function | `ui_repaint_state_ack_2430c0` | Leaf: if ui_repaint_state_10eb3c == 3 set it to 2 (same transition ui_refresh_timer_243180 makes before repainting). BL target from outside the games region; callers are not in the closure. |
 | `0x2430ce` | function | `widget_list_head_2430ce` | Returns the head pointer of widget list N: widget_lists_110904[class_map_2e06a9[N]*0xc]. Lists are 12-byte {head, flags,...}; widgets are 0x40+ byte nodes: +0 next, +0x1c index byte, +0x3c flags u16, +0x3e class byte, +0x40 list number. |
 | `0x2430de` | function | `widget_find_by_class_2430de` | Walk list from widget_list_head; return first node whose +0x3e class == arg0 (arg0 < 0x6b) and +0x1c index >= arg1, else the last matching node. Callers are the games UI layer (0x2431xx..0x2438xx). |
 | `0x24311e` | function | `widget_mark_dirty_24311e` | Under interrupt lock: set list flags \|=1 (if head non-null) and \|=2 for the widget's list (+0x40), clear widget flag bit 4 (+0x3c &= 0xffef), set ui_dirty_flag_110901 = 1. Returns 1 (0 if arg null). Hypothesis: schedules a repaint of that widget/list. |
 | `0x243180` | function | `ui_refresh_timer_243180` | Refresh timer control for the games UI: arg0 == 2 -> if state (0x110902) is 2, repaint via games_ui_refresh_243170 and, when state is 1, post delayed scheduler event 0x50 (delay 0x3c3d); otherwise cancel event 0x50 if pending and store arg0 as the state. Medium confidence on the exact state meanings |
+| `0x2431d2` | function | `ui_refresh_cancel_2431d2` | If ui_repaint_state_10eb3c is non-zero, clears it and calls ui_refresh_timer_243180(0), cancelling the pending repaint. |
 | `0x2431e8` | function | `widget_destroy_2431e8` | Destroys a widget: with a null pointer it looks the widget up by class/index and first calls its class handler widget_class_handlers_2e0660[+0x38](widget, 3). Unlinks the four neighbour pointers (+8,+0xc,+0x10,+0x14), removes it from its list (head or prev->next), flags later lists (+4 bit 1) for re |
+| `0x2432cc` | function | `widget_destroy_focused_2432cc` | Destroys the focused widget (pointer at widget_focus_10eb48, the same block widget_set_243550 consults at +0x11/+0x10) and clears the pointer. |
 | `0x2432e0` | function | `widget_init_2432e0` | Initialises a widget from the 4-byte class map entry (widget_class_map_2e06a9 - 1 + class*4): +0x38 handler index, +0x40 list (arg1 or entry byte 1), +0x3f entry byte 2, +0x41 entry byte 3; clears neighbours and +0x18/+0x42; clears flag bit 4. |
 | `0x243336` | function | `widget_create_243336` | Allocates a 0x4c-byte widget (rtos_mem_alloc), inserts it into widget list (arg2 or class_map[class]) sorted by (class, index), sets +0x3e class, +0x1c index, clears +0x34/+0x3c, initialises via 0x2432e0, sets flag 0x20, marks dirty. |
 | `0x243428` | function | `widget_link_243428` | Links widget b next to widget a: relation 1 = b below a (a+0x14/b+0xc), 2 = above, 3 = right (a+0x10/b+8), 4 = left; inserts b into any existing chain and, when flags != 0, sets the corresponding bits in +0x18 (1/2/4/8, 0x10 for the flags bit 1 case). Relation 2 also runs a bounds check via 0x22c15c |
@@ -172,11 +177,22 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x243646` | function | `widget_set_simple_243646` |  |
 | `0x243664` | function | `widget_move_to_list_243664` | Ensures widget (class, index) lives in widget list arg2: if it exists in another list it is destroyed and re-created there (sorted insert); created fresh if absent. |
 | `0x24369a` | function | `widget_set_in_list1_24369a` | widget_set_243550(class, 0, 0, data, 0) followed by widget_move_to_list_243664(class, 0, 1): post content and pin the widget to list 1. |
+| `0x2436c4` | function | `widget_set_handler_2436c4` | Sets widget +0x38, the widget_class_handlers_2e0660 index, for (class, index 0). Returns 1 if the widget exists. |
+| `0x2436dc` | function | `widget_set_state_bit_2436dc` | Sets or clears bit arg1 of widget +0x42 and marks the widget dirty when the bit changes. |
+| `0x24371a` | function | `widget_set_attr_41_bits_24371a` | Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_attr_41_24383c writes in its top 3 bits). |
+| `0x24377c` | function | `widget_reset_with_handler_24377c` | Find-or-create (class, index); an existing widget is marked dirty and, if flag bit 0 is set, re-initialised through widget_init_2432e0; then +0x38 (class handler index) is set to arg2. |
 | `0x2437c4` | function | `widget_set_attr_3f_2437c4` | Sets widget field +0x3f for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. +0x3f is initialised from class-map byte 2 by widget_init_2432e0; its meaning (font/style) is not yet proven, hence the field name. |
+| `0x243804` | function | `widget_set_hidden_243804` | Sets or clears widget flag 0x80 (hidden) for (class, index), sets flag 0x20 and marks dirty when it changes. widget_is_unobscured_2439ac ignores widgets with bit 7 set, which fixes the bit's meaning. |
 | `0x24383c` | function | `widget_set_attr_41_24383c` | Sets the top 3 bits of widget field +0x41 (value * 0x20, low 5 bits kept), marks dirty, clears flag bit 4. menu_render_2629d0 passes 0 or 5. Field meaning not yet proven. |
 | `0x24387a` | function | `widget_set_highlight_24387a` | Sets or clears highlight bit arg2 (0..2) in widget +0x28 bits 25..27 for (class, index), marking dirty on change; menu_render_2629d0 calls it as (0x21, selected_row, 2, 1) to highlight the selection. |
 | `0x2438e8` | function | `widget_link_by_class_2438e8` | widget_link_by_class(classA, idxA, classB, idxB, relation\|flags<<8): looks both widgets up and calls widget_link_243428(B, A, relation, flags) when both exist with the right index. |
 | `0x243934` | function | `widget_style_variant_243934` | Picks the style variant for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte style entry's flag byte (0x2d656c[variant*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's variant limit; falls back to the first. widget_get_style_2453ec consumes the resu |
+| `0x2439ac` | function | `widget_is_unobscured_2439ac` | Returns 0 if any later widget in the same list that is not hidden overlaps this widget's rectangle (+0x47 x, +0x45 w, +0x49 y with heights +0x2c/+0x2d/+0x46), else 1. |
+| `0x243a2c` | function | `widget_layout_pass_243a2c` | The games UI layout and paint pass (about 0xf80 bytes, under interrupt lock): resolves each widget list's style variant, clears and repaints overlapped list regions through the per-class handlers (event 3 then 6), then positions widgets along their neighbour links with the style paddings. The entry  |
+| `0x243a50` | label | `widget_layout_pass_part_243a50` |  |
+| `0x243a5e` | label | `widget_layout_pass_part_243a5e` |  |
+| `0x243ba6` | label | `widget_layout_pass_part_243ba6` |  |
+| `0x243ba8` | label | `widget_layout_pass_part_243ba8` |  |
 | `0x2453ec` | function | `widget_get_style_2453ec` | Fills a 15-byte style struct (arg2) for widget (class, index), creating the widget if missing: +0xc class, +5..+8 from the 12-byte style table 0x2d6568 keyed by the widget's list (via 0x243934), +0xd/+0xe from widget +0x3f/+0x41. Returns 1. |
 | `0x2974f8` | function | `ui_event1b_short_delay_2974f8` |  |
 | `0x2a0aec` | label | `ui_state_handler_entry_2a0aec` |  |
@@ -220,7 +236,10 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x263154` | function | `menu_enter_263154` | Enters menu level arg0 at item id arg1: after 0x262fa4() it binds the level's context descriptor (0x10bbec[...]) to the level record (0x10b2b4 + idx*8 + 0x48), resolves the item ordinal by id, applies the descriptor flags (bit 0 -> 0x263006 sets a 16-bit pair at +4/+6; bits 4/5 start/stop something  |
 | `0x2632fc` | function | `menu_level_insert_entry_2632fc` | Allocates a free entry among the 0x50 records of menu_entries_10b32c (used flag +0x19), copies the template (arg2), and links it into level arg0's chain: as first entry when the level is empty, at position arg1 (1-based) when given, else at the end; increments the level count. Returns 1, or 0 when n |
 | `0x2633d0` | function | `menu_level_create_2633d0` | Creates menu level arg0 in the first free slot of menu_levels_10b2fc (params arg1..arg3 at +3..+5) and inserts its first entry from a default template (payload arg4, text 0x114, 0xdc, 0xc, 0x11) via menu_level_insert_entry_2632fc; rolls the slot back when the insert fails. |
+| `0x26343a` | function | `menu_hide_26343a` | Clears 0x10b2b5 and tears the menu down with menu_render_2629d0(0xff, 1). |
 | `0x263468` | function | `menu_return_263468` | Returns to the current level's remembered selection (+6 of its descriptor) and re-activates it, stopping the 0x24af00 side effect if active; this is the 'Last view' style return after a game ends. |
+| `0x2634b6` | function | `menu_teardown_if_open_2634b6` | Tears the menu down (menu_render_2629d0(0xff, 1)) when the context's open flag (0x10b2de[ctx*4]) is set. |
+| `0x2634d4` | function | `menu_depth_pop_2634d4` | Pops one menu nesting level: clears the current level slot, marks it state 7, restores the previous level's slot and adjusts the depth counter (max 6). |
 | `0x296f4e` | function | `menu_layout_by_language_296f4e` | Looks the current language byte (ui_language_11fcb1) up in the 4-byte table 0x2d6548 (terminated by '*'), stores entry[2] into menu_visible_rows_11fd18 and entry[3] into 0x11fd17, returns entry[1]; default rows = 3. Explains why the menu window size is language-dependent. |
 
 ### Runtime services used by the games
