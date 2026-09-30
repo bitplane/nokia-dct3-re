@@ -170,10 +170,13 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x243428` | function | `widget_link_243428` | Links widget b next to widget a: relation 1 = b below a (a+0x14/b+0xc), 2 = above, 3 = right (a+0x10/b+8), 4 = left; inserts b into any existing chain and, when flags != 0, sets the corresponding bits in +0x18 (1/2/4/8, 0x10 for the flags bit 1 case). Relation 2 also runs a bounds check via 0x22c15c |
 | `0x243550` | function | `widget_set_243550` | widget_set(class, index, arg, data, flags): data == 0 clears/destroys the widget (special-cases the focused class at 0x10eb48+0x11 and +0x10, frees its buffer, then 0x2431e8(class,index,0)); otherwise finds the widget by class/index or creates it, marks it dirty, stores data at +0x34 and applies fla |
 | `0x243646` | function | `widget_set_simple_243646` |  |
+| `0x243664` | function | `widget_move_to_list_243664` | Ensures widget (class, index) lives in widget list arg2: if it exists in another list it is destroyed and re-created there (sorted insert); created fresh if absent. |
+| `0x24369a` | function | `widget_set_in_list1_24369a` | widget_set_243550(class, 0, 0, data, 0) followed by widget_move_to_list_243664(class, 0, 1): post content and pin the widget to list 1. |
 | `0x2437c4` | function | `widget_set_attr_3f_2437c4` | Sets widget field +0x3f for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. +0x3f is initialised from class-map byte 2 by widget_init_2432e0; its meaning (font/style) is not yet proven, hence the field name. |
 | `0x24383c` | function | `widget_set_attr_41_24383c` | Sets the top 3 bits of widget field +0x41 (value * 0x20, low 5 bits kept), marks dirty, clears flag bit 4. menu_render_2629d0 passes 0 or 5. Field meaning not yet proven. |
 | `0x24387a` | function | `widget_set_highlight_24387a` | Sets or clears highlight bit arg2 (0..2) in widget +0x28 bits 25..27 for (class, index), marking dirty on change; menu_render_2629d0 calls it as (0x21, selected_row, 2, 1) to highlight the selection. |
 | `0x2438e8` | function | `widget_link_by_class_2438e8` | widget_link_by_class(classA, idxA, classB, idxB, relation\|flags<<8): looks both widgets up and calls widget_link_243428(B, A, relation, flags) when both exist with the right index. |
+| `0x243934` | function | `widget_style_variant_243934` | Picks the style variant for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte style entry's flag byte (0x2d656c[variant*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's variant limit; falls back to the first. widget_get_style_2453ec consumes the resu |
 | `0x2453ec` | function | `widget_get_style_2453ec` | Fills a 15-byte style struct (arg2) for widget (class, index), creating the widget if missing: +0xc class, +5..+8 from the 12-byte style table 0x2d6568 keyed by the widget's list (via 0x243934), +0xd/+0xe from widget +0x3f/+0x41. Returns 1. |
 | `0x2974f8` | function | `ui_event1b_short_delay_2974f8` |  |
 | `0x2a0aec` | label | `ui_state_handler_entry_2a0aec` |  |
@@ -189,7 +192,12 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | Address | Kind | Name | Evidence |
 |---|---|---|---|
 | `0x10b2fc` | label | `menu_levels_10b2fc` |  |
+| `0x10b32c` | label | `menu_entries_10b32c` |  |
 | `0x11fd18` | label | `menu_visible_rows_11fd18` |  |
+| `0x2621cc` | function | `menu_level_entry_2621cc` | Returns the n-th (arg1, 0-based) entry of menu level arg0: level record in menu_levels_10b2fc (8 bytes: +0 id, +1 first entry, +2 count), entries are 0x1c-byte records in menu_entries_10b32c chained by the next byte at entry-2; result points at entry-0x1c (record base). 0 when the level or entry is  |
+| `0x262218` | function | `menu_level_clear_262218` | Clears menu level arg0: walks count+1 entries of its chain clearing the used flag at entry-3, then zeroes the level id. |
+| `0x26225e` | function | `menu_level_remove_entry_26225e` | Removes the n-th entry (arg1, 1-based, <= count) from level arg0's chain: relinks the previous entry's next byte, clears the entry's used flag, decrements the level count. |
+| `0x2622c2` | function | `menu_level_free_2622c2` | Frees level arg0: for each first entry, frees the payload pointers at +0/+4/+8 as selected by arg1 bits 0..2 with rtos_mem_free_26abf8, removes the entry, then clears the level via menu_level_clear_262218. games_menu_handler_29a144 calls it with flags 2 when leaving a game menu. |
 | `0x262306` | function | `menu_entry_index_262306` | Maps item ordinal arg0 to its entry index in the 0x1c-byte menu entry table at 0x10b32c: starts at the context's first entry (descriptor +1) and follows the next-entry byte at entry-2, n times; returns index-1. |
 | `0x262338` | function | `menu_enabled_ordinal_262338` | Position of item arg0 among enabled items (1-based): counts enabled items below it using the context's 16-bit enable mask; returns arg0 unchanged when the context is inactive. |
 | `0x2623b0` | function | `menu_item_enabled_2623b0` | Correction: this is a menu-item enable check, not a key check. Returns 1 if item arg0 (1..16) is enabled in the current menu context: mask = descriptor (0x10bbec[0x10b2dd[*0x111931]*0xc]) bit (item-1), everything enabled when the descriptor is inactive (+9 != 0); items >= 0x11 always enabled. Rename |

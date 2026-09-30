@@ -481,6 +481,54 @@
    "lines": [
     "Hypothesis (unnamed): stops a screen effect started by 0x24b174 (0x24b174 calls 0x24af70(buf, table, 0x578)); the pair is driven by menu descriptor flag bits 4/5 in menu_enter_263154 and by menu_return_263468."
    ]
+  },
+  {
+   "addr": "0x2621cc",
+   "lines": [
+    "Returns the n-th (arg1, 0-based) entry of menu level arg0: level record in menu_levels_10b2fc (8 bytes: +0 id, +1 first entry, +2 count), entries are 0x1c-byte records in menu_entries_10b32c chained by the next byte at entry-2; result points at entry-0x1c (record base). 0 when the level or entry is missing."
+   ]
+  },
+  {
+   "addr": "0x262218",
+   "lines": [
+    "Clears menu level arg0: walks count+1 entries of its chain clearing the used flag at entry-3, then zeroes the level id."
+   ]
+  },
+  {
+   "addr": "0x26225e",
+   "lines": [
+    "Removes the n-th entry (arg1, 1-based, <= count) from level arg0's chain: relinks the previous entry's next byte, clears the entry's used flag, decrements the level count."
+   ]
+  },
+  {
+   "addr": "0x2622c2",
+   "lines": [
+    "Frees level arg0: for each first entry, frees the payload pointers at +0/+4/+8 as selected by arg1 bits 0..2 with rtos_mem_free_26abf8, removes the entry, then clears the level via menu_level_clear_262218. games_menu_handler_29a144 calls it with flags 2 when leaving a game menu."
+   ]
+  },
+  {
+   "addr": "0x243664",
+   "lines": [
+    "Ensures widget (class, index) lives in widget list arg2: if it exists in another list it is destroyed and re-created there (sorted insert); created fresh if absent."
+   ]
+  },
+  {
+   "addr": "0x24369a",
+   "lines": [
+    "widget_set_243550(class, 0, 0, data, 0) followed by widget_move_to_list_243664(class, 0, 1): post content and pin the widget to list 1."
+   ]
+  },
+  {
+   "addr": "0x243934",
+   "lines": [
+    "Picks the style variant for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte style entry's flag byte (0x2d656c[variant*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's variant limit; falls back to the first. widget_get_style_2453ec consumes the result."
+   ]
+  },
+  {
+   "addr": "0x243964",
+   "lines": [
+    "Hypothesis (unnamed): computes a vertical extent for a widget from fields +0x46/+0x49/+0x4a and padding +0x2c, relative to a parent, when +0x28 bits 17..18 are set; part of the layout pass at 0x243ba8."
+   ]
   }
  ]
 }
