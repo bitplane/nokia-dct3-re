@@ -134,3 +134,23 @@ matching verifier ABI alone does not identify the complete mask ROM. Answer
 the product-specific questions before enabling the later service responder.
 Display geometry, Navi Roller and slide wiring remain separate product
 contracts, not inherited 3310 inputs.
+
+## Primary hardware anchor
+
+Nokia's NSE-5 System Module manual, Issue 1 (07/99), is available as a
+[readable mirror preview](https://www.eserviceinfo.com/preview_html.php?fileid=5461&previewid=3023).
+The locally acquired HTML is `roms/research/nse5/manuals/ch2sys-preview.html`;
+it is a partial text rendition, not the complete PDF or legible schematics.
+
+Page 2-7 identifies three roller interrupt inputs and an independent
+slide-position interrupt. Its key inventory includes roller push, two soft
+keys, Send/End, digits, star/hash and power. This supports a distinct physical
+input profile; it does not establish matrix positions, roller phase ordering,
+interrupt numbers or slide polarity. Those must be recovered before wiring
+host input to the controller.
+
+The block diagram identifies 512 KiB SRAM and 32-Mbit flash, consistent with
+the current mapped capacities. The ASIC pin table identifies `GenDet` as a
+slide input; the roller uses separate flex-pool pins. The register mux and
+interrupt decode are still unknown. No 3310 Up/Down event or firmware-level
+navigation message is an acceptable replacement for these physical inputs.
