@@ -107,6 +107,10 @@ list, 4 bytes of per-game parameters}`, indexed by `game_index_11fd1b`:
 | 2 | `memory_handler_24075c` | Memory |
 | 3 | `game3_handler_242890` | not offered in the 3210 Games menu |
 
+A fifth handler, `logic_handler_241780`, is not in the table at all: a complete
+Mastermind-style game (Nokia's "Logic") that nothing dispatches to on this
+product. The settings block's fifth record slot presumably belongs to it.
+
 Every handler receives the same event codes: `0x49` init, `0x53` resume,
 `0x54` tick, `0x57` draw, and key events as ASCII (`0x32/0x34/0x36/0x38` =
 2/4/6/8, `0x35` = 5, `0x23` = `#`, `0x2a` = `*`). Settings records exist for

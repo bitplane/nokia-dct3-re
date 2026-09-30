@@ -390,6 +390,43 @@
    "lines": [
     "Hypothesis (unnamed): phone status text builder keyed by codes 500+n (uses service_record_build_contact_pair_282afc, 0x287216/0x287730 lookups); reached from menu_render_2629d0 for one menu type. Outside the games' own needs."
    ]
+  },
+  {
+   "addr": "0x241780",
+   "lines": [
+    "Second dormant game. Event handler with the standard codes (0x49 init, 0x57 draw) and keys '*' submit, '2'/'8' cycle the symbol under the cursor, '4' copy/back, '5' pick. Mechanics are Mastermind: a secret of length logic_params_2d9760[1] (minus one below level 4) over (level&3)*2+5 symbols; guesses live in rows of 5 at logic_board_110364 (10 rows); each submitted row is scored by logic_score_guess_241cf6 into logic_row_scores_110398; 0xff (all exact) posts status 0x13 (win). Not referenced by game_table_2d9484 and never entered in any coverage run.",
+    "Name inferred from the mechanics plus the 'Logic' string in the English text block (Nokia's Logic on the 5110/6110 is this game); treat the prefix as a strong hypothesis."
+   ]
+  },
+  {
+   "addr": "0x241b10",
+   "lines": [
+    "Logic: draws the symbol palette row (top, when cursor row is 0), every guess row with its score pegs, a divider line at y=7, the cursor cell with attr 0x21, and the held symbol; symbols drawn with memory_draw_card_240668 (shared tile drawer)."
+   ]
+  },
+  {
+   "addr": "0x241dd6",
+   "lines": [
+    "Logic: arg0 < 0 regenerates the palette of 10 distinct random symbols (1..0x49) at logic_palette_1103b0 (duplicates are rejected by rescanning); arg0 > 0 returns palette[arg0-1]; 0 -> 0."
+   ]
+  },
+  {
+   "addr": "0x241cf6",
+   "lines": [
+    "Logic: arg0 == 0 generates the secret (len arg1, symbols 1..arg2) at logic_secret_1103a8; otherwise scores guess arg0 against it: exact matches counted and masked, then misplaced matches among the rest; returns 0xff on a full match else exact*16 + misplaced."
+   ]
+  },
+  {
+   "addr": "0x241e34",
+   "lines": [
+    "Logic: scrolls the board and score arrays up one row when the last row is used (memmove by 5 and by 1, clears the freed row)."
+   ]
+  },
+  {
+   "addr": "0x241e9c",
+   "lines": [
+    "Logic: draws a row's score pegs at column arg0*8 from the packed score byte (high nibble exact = 3x2 marks, low nibble misplaced = 3x1 marks), two layouts depending on how many fit."
+   ]
   }
  ]
 }
