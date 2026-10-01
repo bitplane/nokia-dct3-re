@@ -11,10 +11,12 @@ VENV   := .venv
 DRIVER := driver/nokia_dct3.cpp
 MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-intelfsh-dct3.patch patches/mame-pcd8544-geometry.patch \
+	patches/mame-sed1565.patch \
 	patches/mame-i2cmem-write-cycle.patch \
 	patches/mame-pulseaudio-input.patch \
 	patches/mame-tms320c54x-build.patch \
 	patches/mame-tms320c54x-test.patch \
+	patches/mame-sed1565-test.patch \
 	patches/mame-libgsm-build.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \
@@ -56,7 +58,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_sim_card.cpp driver/nokia_sim_card.h \
 	driver/nokia_uif.cpp driver/nokia_uif.h \
 	driver/nokia_dct3_trace.inc
-TEST_DRIVER_COMPONENTS := driver/tms320c54x_test.cpp
+TEST_DRIVER_COMPONENTS := driver/tms320c54x_test.cpp driver/sed1565_test.cpp
 PHONE ?= noki3210
 BIOS ?=
 
@@ -711,7 +713,7 @@ rom4-dsp-inputs:
 		roms/noki5110/nse1_rom4_dsp_data.bin
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/tms320c54x_test.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 -j$(JOBS)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/tms320c54x_test.cpp,src/mame/nokia/sed1565_test.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 -j$(JOBS)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

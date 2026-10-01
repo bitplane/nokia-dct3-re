@@ -1,0 +1,244 @@
+diff --git a/src/devices/video/sed1520.cpp b/src/devices/video/sed1520.cpp
+index 62cb1a67003..abbc44f6a9d 100644
+--- a/src/devices/video/sed1520.cpp
++++ b/src/devices/video/sed1520.cpp
+@@ -1,5 +1,5 @@
+ // license:BSD-3-Clause
+-// copyright-holders:Sandro Ronco
++// copyright-holders:Sandro Ronco, Gaz
+ /***************************************************************************
+ 
+     SED1520 LCD controller
+@@ -30,8 +30,173 @@ DEFINE_DEVICE_TYPE(SED1520, sed1520_device, "sed1520", "Epson SED1520 LCD Driver
+ DEFINE_DEVICE_TYPE(SED1560, sed1560_device, "sed1560", "Epson SED1560 LCD Driver")
+ DEFINE_DEVICE_TYPE(EPL43102, epl43102_device, "epl43102", "Elan EPL43102 LCD Driver")
+ DEFINE_DEVICE_TYPE(NT7502, nt7502_device, "nt7502", "Novatek NT7502 LCD Driver")
++DEFINE_DEVICE_TYPE(SED1565, sed1565_device, "sed1565", "Epson SED1565 LCD Driver")
+ 
+ 
++// SED1565 series datasheet, rev. 1.2: serial interface and commands, pp. 8-24, 8-48..8-56.
++// Analog contrast, supply ramp/busy timing and the separate static indicator output are not rendered.
++sed1565_device::sed1565_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock)
++	: sed15xx_device_base(mconfig, SED1565, tag, owner, clock, 132 * 9, 132)
++{
++}
++
++void sed1565_device::set_panel_window(uint8_t segment, uint8_t width, uint8_t height)
++{
++	if (!width || !height || unsigned(segment) + width > 132 || height > 65)
++		fatalerror("SED1565: invalid panel window");
++	m_panel_segment = segment;
++	m_panel_width = width;
++	m_panel_height = height;
++}
++
++void sed1565_device::device_start()
++{
++	sed15xx_device_base::device_start();
++	save_item(NAME(m_sdin)); save_item(NAME(m_sclk)); save_item(NAME(m_dc));
++	save_item(NAME(m_cs)); save_item(NAME(m_reset));
++	save_item(NAME(m_shift)); save_item(NAME(m_bits));
++	save_item(NAME(m_reverse)); save_item(NAME(m_fill)); save_item(NAME(m_com_reverse));
++	save_item(NAME(m_pending)); save_item(NAME(m_volume)); save_item(NAME(m_bias));
++	save_item(NAME(m_power)); save_item(NAME(m_resistor));
++	save_item(NAME(m_static_mode)); save_item(NAME(m_static_on));
++}
++
++void sed1565_device::reset_registers()
++{
++	m_start_line = m_column = m_page = m_old_column = 0;
++	m_pending = m_resistor = m_static_mode = 0;
++	m_modify_write = m_com_reverse = m_static_on = false;
++	m_volume = 0x20;
++}
++
++void sed1565_device::device_reset()
++{
++	sed15xx_device_base::device_reset();
++	reset_registers();
++	m_lcd_on = m_adc = 0;
++	m_shift = m_bits = m_bias = m_power = 0;
++	m_reverse = m_fill = false;
++	m_sdin = m_sclk = m_dc = m_cs = false;
++	m_reset = true;
++}
++
++void sed1565_device::reset_w(int state)
++{
++	if (!state && m_reset)
++	{
++		reset_registers();
++		m_lcd_on = m_adc = 0;
++		m_reverse = m_fill = false;
++		m_bias = m_power = m_shift = m_bits = 0;
++	}
++	m_reset = bool(state);
++}
++
++void sed1565_device::cs_w(int state)
++{
++	m_cs = bool(state);
++	if (m_cs)
++		m_bits = m_shift = 0;
++}
++
++void sed1565_device::sclk_w(int state)
++{
++	if (state && !m_sclk && !m_cs && m_reset)
++	{
++		m_shift = (m_shift << 1) | m_sdin;
++		if (++m_bits == 8)
++		{
++			if (m_dc) data_write(m_shift);
++			else control_write(m_shift);
++			m_bits = m_shift = 0;
++		}
++	}
++	m_sclk = bool(state);
++}
++
++void sed1565_device::increment_column()
++{
++	// The counter saturates at 83h; it never carries into the page address.
++	if (m_column < 131)
++		++m_column;
++}
++
++void sed1565_device::data_write(uint8_t data)
++{
++	if (m_column >= 132 || m_page > 8)
++		return;
++	m_ddr[m_page * 132 + m_column] = m_page == 8 ? data & 1 : data;
++	increment_column();
++}
++
++uint8_t sed1565_device::data_read()
++{
++	uint8_t const result = m_data;
++	if (!machine().side_effects_disabled() && m_column < 132 && m_page <= 8)
++	{
++		m_data = m_ddr[m_page * 132 + m_column];
++		if (!m_modify_write) increment_column();
++	}
++	return result;
++}
++
++uint8_t sed1565_device::status_read()
++{
++	return (m_busy << 7) | ((!m_adc) << 6) | ((!m_lcd_on) << 5) | ((!m_reset) << 4);
++}
++
++void sed1565_device::control_write(uint8_t data)
++{
++	if (m_pending)
++	{
++		if (m_pending == 0x81) m_volume = data & 0x3f;
++		else m_static_mode = data & 3;
++		m_pending = 0;
++	}
++	else if ((data & 0xfe) == 0xae) m_lcd_on = BIT(data, 0);
++	else if ((data & 0xc0) == 0x40) m_start_line = data & 0x3f;
++	else if ((data & 0xf0) == 0xb0) m_page = data & 0x0f;
++	else if ((data & 0xf0) == 0x00) m_column = (m_column & 0xf0) | (data & 0x0f);
++	else if ((data & 0xf0) == 0x10) m_column = (m_column & 0x0f) | ((data & 0x0f) << 4);
++	else if ((data & 0xfe) == 0xa0) m_adc = BIT(data, 0);
++	else if ((data & 0xfe) == 0xa6) m_reverse = BIT(data, 0);
++	else if ((data & 0xfe) == 0xa4) m_fill = BIT(data, 0);
++	else if ((data & 0xfe) == 0xa2) m_bias = BIT(data, 0);
++	else if ((data & 0xf0) == 0xc0) m_com_reverse = BIT(data, 3);
++	else if ((data & 0xf8) == 0x28) m_power = data & 7;
++	else if ((data & 0xf8) == 0x20) m_resistor = data & 7;
++	else if (data == 0x81) m_pending = data;
++	else if ((data & 0xfe) == 0xac)
++	{
++		m_static_on = BIT(data, 0);
++		if (m_static_on) m_pending = data;
++	}
++	else if (data == 0xe0) { m_modify_write = true; m_old_column = m_column; }
++	else if (data == 0xee) { m_modify_write = false; m_column = m_old_column; }
++	else if (data == 0xe2) reset_registers(); // Software reset preserves display RAM.
++	else if (data != 0xe3 && data != 0xf0)
++		logerror("%s: unsupported SED1565 command %02x\n", machine().describe_context(), data);
++}
++
++uint32_t sed1565_device::screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect)
++{
++	bitmap.fill(0, cliprect);
++	if (!m_lcd_on) return 0;
++	for (int y = std::max(0, cliprect.top()); y <= std::min(int(m_panel_height) - 1, cliprect.bottom()); ++y)
++	{
++		// COMS is the separate 65th row, not part of the 64-line start-line rotation.
++		unsigned const row = y == 64 ? 64 : (m_start_line + (m_com_reverse ? 63 - y : y)) & 63;
++		for (int x = std::max(0, cliprect.left()); x <= std::min(int(m_panel_width) - 1, cliprect.right()); ++x)
++		{
++			unsigned const segment = m_panel_segment + x;
++			unsigned const column = m_adc ? 131 - segment : segment;
++			bool const pixel = BIT(m_ddr[(row / 8) * 132 + column], row & 7);
++			bitmap.pix(y, x) = m_fill || (pixel != m_reverse);
++		}
++	}
++	return 0;
++}
++
+ //**************************************************************************
+ //  live device
+ //**************************************************************************
+diff --git a/src/devices/video/sed1520.h b/src/devices/video/sed1520.h
+index 8d9e47bc218..08cac3dc41e 100644
+--- a/src/devices/video/sed1520.h
++++ b/src/devices/video/sed1520.h
+@@ -1,5 +1,5 @@
+ // license:BSD-3-Clause
+-// copyright-holders:Sandro Ronco
++// copyright-holders:Sandro Ronco, Gaz
+ /***************************************************************************
+ 
+     SED1520 LCD controller
+@@ -174,10 +174,47 @@ protected:
+ };
+ 
+ 
++// ======================> sed1565_device
++
++class sed1565_device : public sed15xx_device_base
++{
++public:
++	sed1565_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
++	void set_panel_window(uint8_t segment, uint8_t width, uint8_t height);
++	void sdin_w(int state) { m_sdin = bool(state); }
++	void dc_w(int state) { m_dc = bool(state); }
++	void sclk_w(int state);
++	void cs_w(int state);
++	void reset_w(int state);
++	virtual void control_write(uint8_t data) override;
++	virtual void data_write(uint8_t data) override;
++	virtual uint8_t data_read() override;
++	virtual uint8_t status_read() override;
++	uint32_t screen_update(screen_device &screen, bitmap_ind16 &bitmap, const rectangle &cliprect);
++
++protected:
++	virtual void device_start() override ATTR_COLD;
++	virtual void device_reset() override ATTR_COLD;
++
++private:
++	void reset_registers();
++	void increment_column();
++	uint8_t m_panel_segment = 0;
++	uint8_t m_panel_width = 132;
++	uint8_t m_panel_height = 65;
++	bool m_sdin = false, m_sclk = false, m_dc = false, m_cs = false, m_reset = true;
++	uint8_t m_shift = 0, m_bits = 0;
++	bool m_reverse = false, m_fill = false, m_com_reverse = false;
++	uint8_t m_pending = 0, m_volume = 0x20, m_bias = 0, m_power = 0, m_resistor = 0;
++	uint8_t m_static_mode = 0;
++	bool m_static_on = false;
++};
++
+ // device type definition
+ DECLARE_DEVICE_TYPE(SED1520, sed1520_device)
+ DECLARE_DEVICE_TYPE(SED1560, sed1560_device)
+ DECLARE_DEVICE_TYPE(EPL43102, epl43102_device)
+ DECLARE_DEVICE_TYPE(NT7502, nt7502_device)
++DECLARE_DEVICE_TYPE(SED1565, sed1565_device)
+ 
+ #endif // MAME_VIDEO_SED1520_H

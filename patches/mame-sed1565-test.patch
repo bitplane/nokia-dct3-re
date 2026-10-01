@@ -1,0 +1,13 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -36195,6 +36195,9 @@
+ nshrz2mhz
+ vector1
+ 
++@source:nokia/sed1565_test.cpp
++sed1565t
++
+ @source:novadesitec/novadesitec_fr002.cpp
+ clrmatch
+ sportmem

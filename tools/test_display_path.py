@@ -13,7 +13,7 @@ class DisplayPathTest(unittest.TestCase):
         cls.lcd_patch = (ROOT / "patches/mame-pcd8544-geometry.patch").read_text()
 
     def test_native_pcd8544_receives_msb_first_serial_bytes(self):
-        self.assertIn('required_device<pcd8544_device> m_lcd', self.phone)
+        self.assertIn('optional_device<pcd8544_device> m_lcd', self.phone)
         self.assertIn('PCD8544(config, m_lcd)', self.phone)
         self.assertIn('for (int bit = 7; bit >= 0; bit--)', self.gensio)
         self.assertIn('m_lcd_sdin_cb(BIT(data, bit))', self.gensio)
@@ -26,6 +26,16 @@ class DisplayPathTest(unittest.TestCase):
         self.assertIn('write_lcd(data, true)', self.gensio)
         self.assertIn('write_lcd(data, false)', self.gensio)
         self.assertIn('m_gensio->lcd_dc_cb().set(m_lcd', self.phone)
+
+    def test_7110_selects_sed1565_without_changing_sibling_controllers(self):
+        body = self.phone.split(
+            'void nokia_dct3_state::noki7110(machine_config &config)', 1
+        )[1].split('void nokia_dct3_state::noki6210', 1)[0]
+        self.assertIn('config.device_remove("lcd")', body)
+        self.assertIn('SED1565(config, m_sed_lcd).set_panel_window(18, 96, 65)', body)
+        for pin in ('dc_w', 'sdin_w', 'sclk_w'):
+            self.assertIn(f'FUNC(sed1565_device::{pin})', body)
+        self.assertIn('FUNC(sed1565_device::screen_update)', body)
 
     def test_controller_and_visible_geometry_are_separate(self):
         self.assertIn('static constexpr unsigned MAX_WIDTH = 102', self.lcd_patch)

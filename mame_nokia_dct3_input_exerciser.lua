@@ -23,6 +23,7 @@ local is_2100 = machine.system.name == "noki2100"
 local is_3610 = machine.system.name == "noki3610"
 local is_5210 = machine.system.name == "noki5210"
 local is_6210 = machine.system.name == "noki6210"
+local is_7110 = machine.system.name == "noki7110"
 local is_early_serial = machine.system.name == "noki5110" or
 		machine.system.name == "noki6110"
 local dsp_cpu = machine.devices[":dsp_c54x:cpu"]
@@ -31,6 +32,10 @@ local lcd_controller_banks = is_6210 and 8 or ((is_3410 or is_2100 or is_3610) a
 local lcd_visible_width = (is_3410 or is_2100 or is_3610 or is_6210) and 96 or 84
 local lcd_visible_height = is_6210 and 60 or ((is_3410 or is_2100 or is_3610) and 65 or 48)
 local lcd_x_mirror = is_2100 or is_3610 or is_5210
+if is_7110 then
+	lcd_controller_width, lcd_controller_banks = 132, 9
+	lcd_visible_width, lcd_visible_height = 96, 65
+end
 local lcd_data_port = is_early_serial and 0x2b or 0x2e
 local lcd_command_port = is_early_serial and 0x2c or 0x6e
 
@@ -48,6 +53,8 @@ local lcd_mode = 0x04
 local lcd_control = 0
 local lcd_x = 0
 local lcd_y = 0
+local sed_pending, sed_start_line = 0, 0
+local sed_adc, sed_com_reverse, sed_reverse, sed_fill, sed_on = false, false, false, false, false
 local pending_lcd = {}
 local lcd_dirty = false
 local active_fields = {}
@@ -363,6 +370,9 @@ local function queue_lcd_dump()
 	pending_lcd[#pending_lcd + 1] = {
 		seq = lcd_full_dumps, zero = zero, ff = ff, other = other,
 		vram = snapshot, control = lcd_control,
+		sed_start_line = sed_start_line, sed_adc = sed_adc,
+		sed_com_reverse = sed_com_reverse, sed_reverse = sed_reverse,
+		sed_fill = sed_fill, sed_on = sed_on,
 	}
 end
 
@@ -375,6 +385,13 @@ taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "nokia_dct3_oracle_m
 		lcd_data_writes = lcd_data_writes + 1
 		if value ~= 0 then nonzero_lcd_data_writes = nonzero_lcd_data_writes + 1 end
 		local old_x, old_y = lcd_x, lcd_y
+		if is_7110 then
+			-- SED1565 columns saturate; page 8 contains only the COMS bit.
+			if lcd_y <= 8 and lcd_x < 132 then
+				lcd_vram[lcd_y * 132 + lcd_x] = lcd_y == 8 and (value & 1) or value
+				lcd_x = math.min(lcd_x + 1, 131)
+			end
+		else
 		lcd_vram[(lcd_y * lcd_controller_width) + lcd_x] = value
 		if (lcd_mode & 0x02) ~= 0 then
 			lcd_y = lcd_y + 1
@@ -384,10 +401,27 @@ taps[#taps + 1] = space:install_write_tap(0x20000, 0x200ff, "nokia_dct3_oracle_m
 			if lcd_x >= lcd_controller_width then lcd_x = 0; lcd_y = (lcd_y + 1) % lcd_controller_banks end
 		end
 		if old_x == lcd_controller_width - 1 and old_y == lcd_controller_banks - 1 and lcd_x == 0 and lcd_y == 0 then queue_lcd_dump() end
+		end
 	elseif reg == lcd_command_port then
 		lcd_dirty = true
 		lcd_cmd_writes = lcd_cmd_writes + 1
-		if (lcd_mode & 0x01) ~= 0 then
+		if is_7110 then
+			if sed_pending ~= 0 then sed_pending = 0
+			elseif value == 0x81 or value == 0xad then sed_pending = value
+			elseif (value & 0xf0) == 0xb0 then lcd_y = value & 15
+			elseif (value & 0xf0) == 0x10 then lcd_x = (lcd_x & 15) | ((value & 15) << 4)
+			elseif (value & 0xf0) == 0 then lcd_x = (lcd_x & 0xf0) | (value & 15)
+			elseif (value & 0xc0) == 0x40 then sed_start_line = value & 63
+			elseif (value & 0xfe) == 0xa0 then sed_adc = (value & 1) ~= 0
+			elseif (value & 0xf0) == 0xc0 then sed_com_reverse = (value & 8) ~= 0
+			elseif (value & 0xfe) == 0xa6 then sed_reverse = (value & 1) ~= 0
+			elseif (value & 0xfe) == 0xa4 then sed_fill = (value & 1) ~= 0
+			elseif (value & 0xfe) == 0xae then sed_on = (value & 1) ~= 0
+			elseif value == 0xe2 then
+				lcd_x, lcd_y, sed_start_line = 0, 0, 0
+				sed_com_reverse = false
+			end
+		elseif (lcd_mode & 0x01) ~= 0 then
 			if (value & 0xf8) == 0x20 then lcd_mode = value & 0x07 end
 		elseif (value & 0x80) ~= 0 then lcd_x = (value & 0x7f) % lcd_controller_width
 		elseif (value & 0xf0) == 0x40 then lcd_y = (value & 0x0f) % lcd_controller_banks
@@ -418,6 +452,11 @@ end)
 local function write_lcd_dump()
 	while #pending_lcd > 0 do
 	local pending = table.remove(pending_lcd, 1)
+	if is_7110 then
+		-- Native device output is an independent check on the passive byte mirror.
+		machine.screens[":screen"]:snapshot(string.format(
+				"%s/nokia_dct3_native_%04d.png", output_dir, pending.seq))
+	end
 	local filename = string.format("%s/nokia_dct3_lcdmirror_%04d_f%03d_z%03d_ff%03d_o%03d.pgm",
 		output_dir, pending.seq, frames, pending.zero, pending.ff, pending.other)
 	local f = io.open(filename, "wb")
@@ -427,8 +466,20 @@ local function write_lcd_dump()
 		local row, bit = y >> 3, y & 7
 		for x = 0, lcd_visible_width - 1 do
 			local source_x = lcd_x_mirror and (lcd_visible_width - 1 - x) or x
-			local on = (pending.vram[(row * lcd_controller_width) + source_x] >> bit) & 1
-			if (pending.control & 1) ~= 0 then on = 1 - on end
+			local source_row, source_bit = row, bit
+			if is_7110 then
+				local line = y == 64 and 64 or
+						((pending.sed_start_line + (pending.sed_com_reverse and (63 - y) or y)) & 63)
+				source_row, source_bit = line >> 3, line & 7
+				local segment = 18 + x
+				source_x = pending.sed_adc and (131 - segment) or segment
+			end
+			local on = (pending.vram[(source_row * lcd_controller_width) + source_x] >> source_bit) & 1
+			if is_7110 then
+				if pending.sed_reverse then on = 1 - on end
+				if pending.sed_fill then on = 1 end
+				if not pending.sed_on then on = 0 end
+			elseif (pending.control & 1) ~= 0 then on = 1 - on end
 			f:write(string.char(on ~= 0 and 0 or 255))
 		end
 	end

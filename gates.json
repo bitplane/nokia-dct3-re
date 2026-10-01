@@ -27,6 +27,14 @@
   },
   "gates": [
     {
+      "name": "verify-sed1565",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/sed1565_check.py", "arguments": ["$(MAME_DIR)/mame", "$(RUN_DIR)"]}
+      ]
+    },
+    {
       "name": "verify-7110-verifier",
       "prerequisites": ["build"],
       "variables": {},

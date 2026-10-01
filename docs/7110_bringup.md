@@ -13,7 +13,9 @@ and data images advances beyond this wait and issues LCD traffic using the
 stock 7110 flash and product-local PMM. It does not establish the fitted 7110
 mask-ROM identity or complete boot. The normal profile remains fail-closed.
 The immediate graphical prerequisite is a SED1565-family controller, not the
-inherited PCD8544 profile.
+previously inherited PCD8544 profile. The normal product now selects SED1565
+with a 96-by-65 panel window at segment 18; the DSP completion boundary remains
+unchanged.
 
 ## Display contract
 
@@ -27,14 +29,25 @@ with the C54x frame timer still running, but does not validate UI settlement.
 Independent [physical 7110 display measurements](https://serdisplib.sourceforge.net/ser/sed1565.html)
 identify an on-glass SED1565 controller and a 96-by-65 panel. Its 132-column
 controller RAM exposes the panel from column 18, with nine pages and only one
-visible bit in the final page. Implement the controller from its datasheet;
-do not extend PCD8544 geometry to reinterpret a different command protocol.
-The column offset and orientation must also be checked against firmware
-addressing before accepting a rendered frame. The primary
+visible bit in the final page. The firmware transfers start with `b0 11 02`,
+selecting page zero and column `0x12`, independently corroborating the offset.
+The primary
 [Epson SED1565 datasheet, revision 1.2](https://serdisplib.sourceforge.net/ser/doc/sed1565.pdf)
-defines the 132-by-65 RAM and serial interface. MAME's existing SED15xx family
-is the starting point for implementation reuse, not an assertion that its
-SED1560 command decoder is interchangeable.
+defines the 132-by-65 RAM and serial interface. `patches/mame-sed1565.patch`
+extends MAME's existing SED15xx family with a distinct command decoder and
+serial interface. Existing SED1560 and PCD8544 behavior is unchanged.
+
+`make verify-sed1565` runs 17 executable controller checks without phone
+firmware: serial input, command arguments, segment/common directions, start
+line, ninth page, invalid pages, column saturation, read-modify-write, display
+modes, chip select and reset. Software reset preserves display RAM, display
+enable and segment direction; the reset pin additionally restores those
+control defaults. Analog contrast, supply/busy timing and the separate static
+indicator output remain unmodeled. Controller conformance is not evidence of
+a complete 7110 boot.
+
+The passive Lua mirror uses the SED1565 grammar for this product and emits a
+native screen snapshot alongside it for independent pixel comparison.
 
 The initial generic configuration published three calibrated values after
 64 exchanges. Those values preceded completion of this product's upload and

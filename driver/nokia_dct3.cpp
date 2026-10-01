@@ -27,6 +27,7 @@
 #include "sound/beep.h"
 #include "speaker.h"
 #include "video/pcd8544.h"
+#include "video/sed1520.h"
 
 #include "nokia_ccont.h"
 #include "nokia_b3_flash.h"
@@ -967,6 +968,7 @@ constexpr nokia_product_config make_7110_config()
 	// NSE-5's scanner at 0x474056..0x4740ac iterates five rows, with
 	// column bits 1..4. Host key positions and the power input remain provisional.
 	result.keypad_wiring.rows = 5;
+	result.display = { 132, 65, 96, 65, false };
 	// NSE-5 v5.01 0x432eae uploads 227 full sparse-flash blocks and
 	// one terminal block before 0x432f96 waits for a DSP-owned verdict.
 	// Ownership acknowledgements do not establish the final publication.
@@ -1072,6 +1074,7 @@ public:
 		m_simi(*this, "simi"),
 		m_sim_card(*this, "sim_card"),
 		m_lcd(*this, "lcd"),
+		m_sed_lcd(*this, "sed_lcd"),
 		m_buzzer(*this, "buzzer"),
 		m_dsp_tone1(*this, "dsp_tone1"),
 		m_dsp_tone2(*this, "dsp_tone2"),
@@ -1224,7 +1227,8 @@ private:
 	required_device<nokia_radio_peer_device> m_radio_peer;
 	required_device<nokia_simi_device> m_simi;
 	required_device<nokia_sim_card_device> m_sim_card;
-	required_device<pcd8544_device> m_lcd;
+	optional_device<pcd8544_device> m_lcd;
+	optional_device<sed1565_device> m_sed_lcd;
 	required_device<beep_device> m_buzzer;
 	required_device<beep_device> m_dsp_tone1;
 	required_device<beep_device> m_dsp_tone2;
@@ -1724,7 +1728,8 @@ void nokia_dct3_state::machine_reset()
 	// and pixel byte arrives one bit misaligned. Reset the LCD after GENSIO
 	// has settled so the serial link starts aligned, as reset_digital_baseband
 	// already does for firmware-initiated resets.
-	m_lcd->reset();
+	if (m_lcd) m_lcd->reset();
+	if (m_sed_lcd) m_sed_lcd->reset();
 }
 
 void nokia_dct3_state::mad2_fiq_w(int state)
@@ -1867,7 +1872,8 @@ void nokia_dct3_state::reset_digital_baseband()
 	m_radio_peer->reset();
 	m_simi->reset();
 	m_sim_card->reset();
-	m_lcd->reset();
+	if (m_lcd) m_lcd->reset();
+	if (m_sed_lcd) m_sed_lcd->reset();
 	// nokia_gsm_network_device contains immutable cell data; the session, link
 	// and radio peers above own the reset-sensitive protocol phases.
 	machine_reset();
@@ -3302,6 +3308,12 @@ void nokia_dct3_state::noki7110(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
 	apply_product_config(PRODUCT_7110);
+	config.device_remove("lcd");
+	SED1565(config, m_sed_lcd).set_panel_window(18, 96, 65);
+	subdevice<screen_device>("screen")->set_screen_update("sed_lcd", FUNC(sed1565_device::screen_update));
+	m_gensio->lcd_dc_cb().set(m_sed_lcd, FUNC(sed1565_device::dc_w));
+	m_gensio->lcd_sdin_cb().set(m_sed_lcd, FUNC(sed1565_device::sdin_w));
+	m_gensio->lcd_sclk_cb().set(m_sed_lcd, FUNC(sed1565_device::sclk_w));
 }
 
 void nokia_dct3_state::noki6210(machine_config &config)
