@@ -48,6 +48,29 @@ the LCD initialization test. Keep its results separate from normal-product
 acceptance; do not promote the mask or COBBA assumptions merely because it
 advances farther.
 
+The observer now retains its tap subscriptions for the whole run and validates
+entry details at the executed verifier and service initializer as positive
+controls. Read taps are observation-only; an unretained subscription can be
+collected before the observation window ends, so truncated entry counts are
+not valid absence evidence. The executed startup calls `0x3bb818` for nineteen
+indexed contexts, with 424 context-wrapper entries at `0x4bc214` through eight
+seconds. The call at `0x49fd64` to `0x3a2612` completes: all four callees
+(`0x46bdd8`, `0x46bc16`, `0x3209e8`, `0x311eb0`) execute and subsequent context
+releases occur. It is not a stalled initialization call.
+
+Add `--menu` to the instrument command to press/release the physical row-0,
+column-2 Menu switch at approximately 4.2/4.4 seconds. This does not change
+firmware RAM or interrupt masks. The current composition initializes the
+keypad at `0x474112` once and executes nine scans at `0x474004`, the last around
+1.776 seconds. By one second, global IRQ mask `0x8e` leaves IRQ0 unmasked, but
+column mask `0x3f` masks every matrix column and remains so through eight
+seconds. The later Menu input produces no IRQ0 handler entry at `0x4740f0`,
+no key-decoder entry at `0x4cfc5c`, and no repaint. This identifies a firmware-
+owned input-disable lifecycle to trace, not evidence that the verified physical
+matrix needs another mapping or an injected navigation event. Determine who
+writes/restores the column mask and what completion enables ordinary input;
+do not clear it from the harness to manufacture an interactive boot.
+
 ## Display contract
 
 The full-core trial emits 141 LCD commands and 2,592 data bytes (three

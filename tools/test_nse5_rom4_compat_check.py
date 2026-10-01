@@ -7,7 +7,9 @@ def complete_trace():
     return "\n".join(
         f"nse5_compat_sample: t={t:.6f} pc=0049fff8 result0=0016 result1=0004"
         for t in (0.1, 0.5, 1, 2, 4, 8)) + (
-        "\nrom4_interface_summary: completion_strobes=94 mailbox_writes=235")
+        "\nrom4_interface_summary: completion_strobes=94 mailbox_writes=235") + "\n" + "\n".join(
+        f"nse5_compat_entry: name={name} pc=00432eae r0=00000000 r1=00000000 lr=0049ff17 t=0.1\n"
+        f"nse5_compat_entries: name={name} count=1" for name in ("verifier", "service_init"))
 
 
 class CompatibilityCheckTest(unittest.TestCase):
@@ -33,3 +35,7 @@ class CompatibilityCheckTest(unittest.TestCase):
     def test_wrong_executed_version_rejected(self):
         with self.assertRaises(ValueError):
             checker.check_trace(complete_trace().replace("result1=0004", "result1=ffff"), 0)
+
+    def test_counter_without_successful_tap_detail_rejected(self):
+        with self.assertRaisesRegex(ValueError, "positive-control"):
+            checker.check_trace(complete_trace().replace("name=verifier pc=", "name=other pc="), 0)

@@ -153,6 +153,9 @@ or was expensive to discover. Current examples include:
 
 - swap16 byte-lane handling for byte tables;
 - PC hooks firing only at actual branch targets;
+- Lua tap subscriptions needing a live owner for the entire observation
+  window; retain them in a callback/upvalue and validate positive-control
+  detail records, not just counters, before interpreting absent events;
 - constructors that acknowledge an incoming command rather than initiate it;
 - report code 7 belonging to shutdown/power lifecycle rather than ordinary
   boot readiness; and

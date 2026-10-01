@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import os
 from pathlib import Path
 import re
 import shutil
@@ -20,7 +21,7 @@ INPUTS = {
 
 def check_trace(trace, returncode):
     if returncode or "[LUA ERROR]" in trace:
-        raise ValueError("compatibility execution failed")
+        raise ValueError(f"compatibility execution failed (returncode={returncode})")
     samples = re.findall(r"nse5_compat_sample: t=([\d.]+) pc=([0-9a-f]+) result0=([0-9a-f]+) result1=([0-9a-f]+)", trace)
     if len(samples) != 6 or float(samples[-1][0]) < 8:
         raise ValueError("missing complete observation window")
@@ -29,6 +30,13 @@ def check_trace(trace, returncode):
         raise ValueError("DSP execution did not complete the upload boundary")
     if int(samples[-1][3], 16) != 4:
         raise ValueError("executed mask did not publish its ROM4 version")
+    # A silent Lua tap callback failure must not masquerade as absence.
+    for name in ("verifier", "service_init"):
+        count = re.search(rf"nse5_compat_entries: name={name} count=(\d+)", trace)
+        details = re.findall(rf"nse5_compat_entry: name={name} pc=[0-9a-f]{{8}} "
+                             r"r0=[0-9a-f]{8} r1=[0-9a-f]{8} lr=[0-9a-f]{8} t=[\d.]+", trace)
+        if not count or int(count[1]) < 1 or len(details) != min(int(count[1]), 12):
+            raise ValueError(f"missing validated positive-control entry trace: {name}")
     return samples
 
 
@@ -37,6 +45,7 @@ def main():
     parser.add_argument("binary", type=Path)
     parser.add_argument("roms", type=Path)
     parser.add_argument("run_dir", type=Path)
+    parser.add_argument("--menu", action="store_true", help="press/release the physical Menu switch after startup")
     args = parser.parse_args()
     try:
         run = args.run_dir.resolve()
@@ -56,6 +65,8 @@ def main():
             shutil.rmtree(nvram)
         for frame in run.rglob("native_*.png"):
             frame.unlink()
+        env = os.environ.copy()
+        env["NSE5_COMPAT_MENU"] = "1" if args.menu else "0"
         result = subprocess.run([
             str(args.binary.resolve()), "nse5r4t", "-rompath", str(romdir.parent),
             "-nvram_directory", str(run / "nvram"), "-cfg_directory", str(run / "cfg"),
@@ -63,10 +74,14 @@ def main():
             "-sound", "none", "-nothrottle", "-seconds_to_run", "9", "-skip_gameinfo",
             "-log", "-autoboot_delay", "0", "-autoboot_script",
             str(Path(__file__).with_name("nse5_rom4_compat.lua").resolve())],
-            cwd=run, capture_output=True, text=True, timeout=120)
+            cwd=run, env=env, capture_output=True, text=True, timeout=120)
         output = result.stdout + result.stderr
         (run / "compat_output.log").write_text(output)
         samples = check_trace(log.read_text() + output, result.returncode)
+        if args.menu:
+            trace = log.read_text()
+            if "nse5_compat_menu: pressed=1" not in trace or "nse5_compat_menu: pressed=0" not in trace:
+                raise ValueError("physical Menu press/release did not execute")
         frames = list(run.rglob("native_*.png"))
         if len(frames) != 6:
             raise ValueError("missing six native LCD captures")
