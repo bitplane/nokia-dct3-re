@@ -110,6 +110,11 @@ These are distinct objects. Four halfword-aligned literal occurrences of
 those occurrences yields 15 candidate loads. Code/data classification and
 indirect or derived pointers remain outside that count.
 
+Reproduce the candidate list with
+`tools/find_literal_loads.py 0x16702c --rom roms/noki7110/7110f501_ppmc.fls --encoding big`.
+The tool defaults to the older swap16 image format; omitting `--encoding big`
+is not a valid absence test on this acquired FLS.
+
 An additional literal at `0x45c33c` points directly to `0x167036`, the
 word-0 result field. Its reader at `0x45bf8a..0x45bfb0` emits three bytes:
 bits 8..11 plus `0x37`, bits 4..7 plus `0x30`, and bits 0..3 plus `0x30`,
