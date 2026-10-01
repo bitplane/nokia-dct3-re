@@ -964,6 +964,9 @@ constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
 constexpr nokia_product_config make_7110_config()
 {
 	nokia_product_config result;
+	// NSE-5's scanner at 0x474056..0x4740ac iterates five rows, with
+	// column bits 1..4. Host key positions and the power input remain provisional.
+	result.keypad_wiring.rows = 5;
 	// NSE-5 v5.01 0x432eae uploads 227 full sparse-flash blocks and
 	// one terminal block before 0x432f96 waits for a DSP-owned verdict.
 	// Ownership acknowledgements do not establish the final publication.

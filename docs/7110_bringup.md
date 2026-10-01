@@ -194,3 +194,11 @@ an aggregate input interrupt model, not two independently clearing sources.
 These are static firmware contracts. No post-bootstrap input acceptance run
 is possible at the current fail-closed frontier, and no physical inputs have
 yet been wired from these findings.
+
+The conventional keypad scanner at `0x474004` iterates five rows
+(`0x4740aa` compares against 5), using row signal `0x28`, direction `0xa8`
+and column input `0x2a`. It scans column bits 1..4 and returns `row * 5 +
+column`; bit 0 is not an ordinary scanned key. The product now configures
+five rows, replacing the inherited four-row controller default. Host key
+positions and power-input wiring remain provisional, and this change is
+not a claim of successful physical-key handling past bootstrap.
