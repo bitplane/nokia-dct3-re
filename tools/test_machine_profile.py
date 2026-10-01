@@ -299,7 +299,8 @@ class MachineProfileTest(unittest.TestCase):
     def test_7110_configures_recovered_row_count_without_bootstrap_verdict(self):
         profile = self.driver.split("constexpr nokia_product_config make_7110_config()", 1)[1]
         profile = profile.split("return result;", 1)[0]
-        self.assertIn("result.keypad_wiring.rows = 5;", profile)
+        self.assertIn("result.keypad_wiring = KEYPAD_NSE5;", profile)
+        self.assertIn("KEYPAD_NSE5 = { 5, 0x02 }", self.driver)
         self.assertIn("0, {}, 0, std::nullopt, std::nullopt, 0", profile)
 
     def test_3330_owns_observed_peer_adc_keypad_and_bootstrap_defaults(self):

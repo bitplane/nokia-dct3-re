@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 324 gates: 181 generated from typed steps, 143 copied verbatim (shell).
+# 325 gates: 182 generated from typed steps, 143 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,11 +44,11 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-sed1565 verify-7110-verifier verify-7110-bootstrap \
-	verify-6210-keypad-controller verify-6210-verifier verify-6210-bootstrap \
-	verify-8210-verifier verify-8210-bootstrap verify-gsm-fr-codec \
-	verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 verify-gsm-xcch-l1 \
-	verify-gsm-mobility verify-gsm-sms-transport \
+.PHONY: verify-7110-keypad-controller verify-sed1565 verify-7110-verifier \
+	verify-7110-bootstrap verify-6210-keypad-controller verify-6210-verifier \
+	verify-6210-bootstrap verify-8210-verifier verify-8210-bootstrap \
+	verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 \
+	verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
@@ -213,6 +213,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure
+
+verify-7110-keypad-controller: build
+	$(PYTHON) tools/nse5_keypad_check.py $(MAME_DIR)/mame $(MAME_DIR)/roms $(RUN_DIR)
 
 verify-sed1565: build
 	$(PYTHON) tools/sed1565_check.py $(MAME_DIR)/mame $(RUN_DIR)

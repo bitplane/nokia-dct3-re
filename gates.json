@@ -27,6 +27,14 @@
   },
   "gates": [
     {
+      "name": "verify-7110-keypad-controller",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/nse5_keypad_check.py", "arguments": ["$(MAME_DIR)/mame", "$(MAME_DIR)/roms", "$(RUN_DIR)"]}
+      ]
+    },
+    {
       "name": "verify-sed1565",
       "prerequisites": ["build"],
       "variables": {},

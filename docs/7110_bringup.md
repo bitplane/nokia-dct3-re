@@ -253,10 +253,33 @@ These are static firmware contracts. No post-bootstrap input acceptance run
 is possible at the current fail-closed frontier, and no physical inputs have
 yet been wired from these findings.
 
+### Keypad matrix
+
 The conventional keypad scanner at `0x474004` iterates five rows
 (`0x4740aa` compares against 5), using row signal `0x28`, direction `0xa8`
 and column input `0x2a`. It scans column bits 1..4 and returns `row * 5 +
-column`; bit 0 is not an ordinary scanned key. The product now configures
-five rows, replacing the inherited four-row controller default. Host key
-positions and power-input wiring remain provisional, and this change is
-not a claim of successful physical-key handling past bootstrap.
+column`; bit 0 is not an ordinary scanned key. Decoder `0x4cfc5c` selects a
+25-byte normal map at `0x28dcd8` or a five-byte special map at `0x28dcf4`,
+indexed by byte `0x168995`. The established map is index zero; additional
+product map indices have not been validated.
+
+| Row | Column 1 | Column 2 | Column 3 | Column 4 |
+| --- | --- | --- | --- | --- |
+| 0 | Send (`0x0e`) | left softkey (`0x19`) | right softkey (`0x1a`) | star (`0x0c`) |
+| 1 | End (`0x0f`) | 0 (`0x0a`) | hash (`0x0b`) | 6 |
+| 2 | 1 | roller push (`0x12`) | 4 | 7 |
+| 3 | 2 | 5 | 8 | 9 |
+| 4 | 3 | unused | unused | unused |
+
+The separate special map is `5a 0d 5a 5a 5a`: column bit 1 is Power,
+requiring mask `0x02`, not the inherited `0x04`. The key-code names shared
+with independently mapped products identify digits, star/hash, call keys and
+softkeys. The remaining fitted matrix input `0x12` is labeled roller push by
+Nokia's physical key inventory; its application action remains unvalidated.
+Rotation still requires the separate three-phase UIF+ contract above.
+
+`make verify-7110-keypad-controller` pins the flash hash and both tables,
+then tests all 17 fitted matrix inputs across all five row drives (85 scans)
+and Power press/release. This is MMIO controller conformance, not a firmware
+message injection or proof of post-bootstrap UI key acceptance. The normal
+bootstrap gate separately protects the unchanged fail-closed DSP boundary.
