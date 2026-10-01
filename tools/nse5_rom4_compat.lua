@@ -17,6 +17,13 @@ local entries = {
     {0x4cfc5c, "key_decoder"},
     {0x474112, "key_init"}, {0x4740f0, "key_irq0"},
     {0x474004, "key_scan"},
+    {0x4cfcf6, "key_state_init"}, {0x4cfc18, "key_flags_set"},
+    {0x4cfbc4, "key_unmask_or_post"},
+    {0x39378c, "application_start"}, {0x393518, "startup_event_read"},
+    {0x393528, "startup_event_dispatch"}, {0x393942, "startup_ready_loop"},
+    {0x3939d0, "startup_ready_test"}, {0x3939e6, "startup_ready_done"},
+    {0x393b04, "startup_alternate"},
+    {0x4c8b94, "startup_report14"}, {0x4c8bd0, "startup_report15"},
 }
 for _, entry in ipairs(entries) do
     local address, name = entry[1], entry[2]
@@ -26,19 +33,49 @@ for _, entry in ipairs(entries) do
             local pc = cpu.state["PC"].value
             if pc ~= address then return end
             entry_counts[name] = entry_counts[name] + 1
-            if entry_counts[name] <= (name == "startup_index" and 64 or 12) or
+            if entry_counts[name] <= ((name == "startup_index" or
+                    name == "startup_event_dispatch") and 64 or 12) or
                     (name == "key_decoder" and cpu.state["R0"].value ~= 0xff) then
                 machine:logerror(string.format(
-                    "nse5_compat_entry: name=%s pc=%08x r0=%08x r1=%08x lr=%08x t=%.6f\n",
+                    "nse5_compat_entry: name=%s pc=%08x r0=%08x r1=%08x lr=%08x t=%.6f r4=%08x\n",
                     name, pc, cpu.state["R0"].value, cpu.state["R1"].value,
-                    cpu.state["R14"].value, machine.time:as_double()))
+                    cpu.state["R14"].value, machine.time:as_double(),
+                    cpu.state["R4"].value))
             end
         end)
 end
+local column_writes = 0
+taps[#taps + 1] = space:install_write_tap(0x20068, 0x2006b,
+    "nse5_compat_column_mask", function(offset, data, mask)
+        if (mask & 0xff) == 0 then return end
+        column_writes = column_writes + 1
+        machine:logerror(string.format(
+            "nse5_compat_column_mask: value=%02x pc=%08x lr=%08x t=%.6f\n",
+            data & 0xff, cpu.state["PC"].value, cpu.state["R14"].value,
+            machine.time:as_double()))
+    end)
+local key_state_writes = 0
+taps[#taps + 1] = space:install_write_tap(0x168990, 0x168997,
+    "nse5_compat_key_state", function(offset, data, mask)
+        for lane = 0, 3 do
+            local address = offset + lane
+            local shift = (3 - lane) * 8
+            if (address == 0x168990 or address == 0x168994) and
+                    ((mask >> shift) & 0xff) ~= 0 then
+                key_state_writes = key_state_writes + 1
+                if key_state_writes <= 64 then
+                    machine:logerror(string.format(
+                        "nse5_compat_key_state: address=%08x value=%02x pc=%08x lr=%08x t=%.6f\n",
+                        address, (data >> shift) & 0xff, cpu.state["PC"].value,
+                        cpu.state["R14"].value, machine.time:as_double()))
+                end
+            end
+        end
+    end)
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries, "entry trace subscriptions lost")
+    assert(#taps == #entries + 2, "entry trace subscriptions lost")
     if menu_fixture then
         local now = machine.time:as_double()
         if (menu_step == 0 and now >= 4.2) or (menu_step == 1 and now >= 4.4) then
@@ -56,12 +93,19 @@ emu.register_frame_done(function()
     if next_sample > #times or machine.time:as_double() < times[next_sample] then return end
     machine.screens[":screen"]:snapshot(string.format("native_%02d.png", next_sample))
     machine:logerror(string.format(
-        "nse5_compat_sample: t=%.6f pc=%08x result0=%04x result1=%04x idle=%02x irq=%02x irq_mask=%02x col_mask=%02x\n",
+        "nse5_compat_sample: t=%.6f pc=%08x result0=%04x result1=%04x idle=%02x irq=%02x irq_mask=%02x col_mask=%02x ready=%02x mode=%04x\n",
         machine.time:as_double(), cpu.state["PC"].value,
         space:read_u16(0x167036), space:read_u16(0x167038), space:read_u8(0x168f04),
-        space:read_u8(0x20009), space:read_u8(0x2000b), space:read_u8(0x2006b)))
+        space:read_u8(0x20009), space:read_u8(0x2000b), space:read_u8(0x2006b),
+        space:read_u8(0x16ab85), space:read_u16(0x1689e4)))
     next_sample = next_sample + 1
     if next_sample > #times then
+        machine:logerror(string.format("nse5_compat_column_writes: count=%d\n", column_writes))
+        local checklist = {}
+        for index = 0, 10 do
+            checklist[#checklist + 1] = string.format("%02x", space:read_u8(0x16a2b4 + index))
+        end
+        machine:logerror("nse5_compat_subsystem_checklist: bytes=" .. table.concat(checklist) .. "\n")
         for _, entry in ipairs(entries) do
             machine:logerror(string.format("nse5_compat_entries: name=%s count=%d\n",
                 entry[2], entry_counts[entry[2]]))

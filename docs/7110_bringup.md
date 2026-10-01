@@ -66,10 +66,52 @@ keypad at `0x474112` once and executes nine scans at `0x474004`, the last around
 column mask `0x3f` masks every matrix column and remains so through eight
 seconds. The later Menu input produces no IRQ0 handler entry at `0x4740f0`,
 no key-decoder entry at `0x4cfc5c`, and no repaint. This identifies a firmware-
-owned input-disable lifecycle to trace, not evidence that the verified physical
-matrix needs another mapping or an injected navigation event. Determine who
-writes/restores the column mask and what completion enables ordinary input;
-do not clear it from the harness to manufacture an interactive boot.
+owned input-disable lifecycle, not evidence that the verified physical matrix
+needs another mapping or an injected navigation event.
+
+### Application readiness and input enable
+
+The persistent column-mask write is owned by the keypad software constructor
+`0x4cfcf6`, called at `0x39391c` inside application entry `0x39378c`.
+At approximately 0.683 seconds it sets byte `0x168990` to 1 and
+`0x168994` to 0; its write at `0x4cfd40` masks column bits `0x1e`.
+Those two state bytes retain their values through eight seconds. The flag
+setter `0x4cfc18` and unmask/post helper `0x4cfbc4` do not execute during
+that window. The mask therefore follows a firmware-owned startup branch,
+not an unexplained device interrupt.
+
+The application consumes events through `0x393518`/`0x3bbeb8`.
+Reports `0x14`, `0x16`, `0x15`, `0x17` respectively set bits 0, 1, 2, 3
+of readiness byte `0x16ab85`. The test at `0x3939d0` requires both the
+low nibble of `0x17fed8` to equal 6 and readiness to equal `0x0f` before
+entering `0x3939e6`. Subsequent branches explicitly clear column mask bits
+`0x1e`, restore roller/slide enables, unmask IRQ7 and call the keypad flag
+setter. These paths must remain firmware-owned.
+
+The retained-tap compatibility run receives reports `0x17` and `0x16` at
+approximately 0.688 seconds, but observes neither `0x14` nor `0x15`.
+Readiness remains `0x0a` and application continuation halfword `0x1689e4`
+is `0x0012` at the one-, two-, four- and eight-second samples.
+There are three readiness-test entries and no completed-readiness entry.
+This is an observed missing startup-report boundary, not proof that all
+other startup conditions are satisfied or that mode `0x12` itself blocks
+message processing.
+
+Report `0x15` has a concrete subsystem checklist: `0x311eb0` accepts
+inputs `0x0e..0x18`, sets one of eleven bytes at `0x16a2b4`, and calls
+report stub `0x4c8bd0` only when every byte is nonzero. Input `0x64`
+instead clears all eleven bytes. The run observes only that reset input,
+from `0x3a2624`, and all eleven bytes remain zero at eight seconds.
+Report stubs `0x4c8b94` (`0x14`) and `0x4c8bd0` (`0x15`) have zero
+observed entries. Their queue-send primitive is `0x3bbe04`, not the
+separate queue-send primitive `0x3bc3e8` used by keypad helper events.
+
+The next question is which legitimate startup sources produce report
+`0x14` and the eleven `0x311eb0` completion inputs in this product.
+Static halfword BL matches are candidates only: the apparent `0x2dfb1c`
+call to the `0x14` stub lies in an undecoded data region and is not an
+established producer. Do not substitute a guessed report, clear a mask,
+or promote the candidate DSP mask to make these branches execute.
 
 ## Display contract
 
