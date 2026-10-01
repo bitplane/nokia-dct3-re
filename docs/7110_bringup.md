@@ -241,6 +241,40 @@ patterns in the fast sampler retain the previous current-phase byte rather
 than defining a fourth phase. Physical rotation direction, contact topology,
 pulls and transition timing remain unvalidated.
 
+The slow classifier's initialization record at `0x4ffbd0` copies 62 bytes
+to `0x168a3c`, supplying eight records with eight-byte stride and six
+significant observations per record. `tools/nse5_roller_contract.py` extracts
+these from the hash-pinned flash. Observation order is B,C while driving A
+low; A,C while driving B low; then A,B while driving C low. Here A/B/C are
+respectively `0xf1` bit 1, `0xf2` bit 0 and `0xf3` bit 5.
+
+| Record | Six sampled levels | Classifier effect |
+| --- | --- | --- |
+| 0 | 111010 | phase 1 |
+| 1 | 111111 | retain previous phase |
+| 2 | 101101 | phase 2 |
+| 3 | 111111 | retain previous phase |
+| 4 | 010111 | phase 3 |
+| 5 | 111111 | retain previous phase |
+| 6 | 000000 | retain previous phase 1/2/3; initial 0 -> 3 |
+| 7 | 111111 | shadowed by record 1 |
+
+The classifier selects the first exact match; no match also retains the
+previous phase. Rows 0/2/4 override that history. This is a decoded sampling
+contract, not a proven passive-contact schematic. In particular, the table
+does not justify replacing all GPIO reads with a fixed phase pattern.
+
+A passive closed-pair model reproduces all three distinct slow patterns:
+phase 1 closes B-C, phase 2 closes A-C, and phase 3 closes A-B, with released
+inputs high. Restoration drives the previous phase's isolated pin low. With
+no rotation the fast sample is invalid and retains that phase; either new
+closed pair produces the correct one-hot sample for the next phase. All
+nine previous/current combinations are checked by
+`tools/test_nse5_roller_contract.py`. This supports a contact-network model
+without substituting firmware events. Pull strength, the two direction-bank
+roles and interrupt edge/mux behavior are still unvalidated; this desk model
+has not yet been wired into UIF or claimed as physical-input acceptance.
+
 Separate readers at `0x4741b2` and `0x4741ec` invert GPIO `0xf1` bit 7.
 The latter stores the resulting logical state and selects two software
 continuations. Nokia identifies a separate slide input, but the physical
