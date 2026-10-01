@@ -159,3 +159,38 @@ the current mapped capacities. The ASIC pin table identifies `GenDet` as a
 slide input; the roller uses separate flex-pool pins. The register mux and
 interrupt decode are still unknown. No 3310 Up/Down event or firmware-level
 navigation message is an acceptable replacement for these physical inputs.
+
+## UIF+ firmware contract
+
+The stock image provides a three-phase input decoder, not a quadrature
+Up/Down key substitute:
+
+| Surface | Recovered contract |
+| --- | --- |
+| Phase sampler `0x473d14` | reads GPIO `0xf1` bit 1, `0xf2` bit 0 and `0xf3` bit 5 |
+| Valid phases | `(1,0,0)` = 1; `(0,1,0)` = 2; `(0,0,1)` = 3 |
+| Phase transition | `1 -> 3 -> 2 -> 1` produces `0x17`; reverse produces `0x18`; unchanged phase produces `0x5a` |
+| State | previous phase at `0x168a30`; sampled bits at offsets 6..8; current phase at offset 9 |
+| Dispatch `0x473f7a..0x473fa8` | `0x17` reaches `0x4cfb28`; `0x18` reaches `0x4cfb62` |
+| Key-facing paths | handlers conditionally publish matching `0x17`/`0x18` values through `0x45c724` and `0x45c704` |
+| Interrupt handling | caller masks IRQ7, samples GPIO, restores the mask and acknowledges status `0x80` at MAD2 `0x09` |
+
+The slow sampler at `0x473a9c` actively drives/probes each GPIO pair and
+collects six observations. Its classifier at `0x473de8` and restoration
+routine at `0x473c80` must also be respected: returning a fixed one-hot
+pattern at every GPIO read is not a complete electrical model. Invalid
+patterns in the fast sampler retain the previous current-phase byte rather
+than defining a fourth phase. Physical rotation direction, contact topology,
+pulls and transition timing remain unvalidated.
+
+Separate readers at `0x4741b2` and `0x4741ec` invert GPIO `0xf1` bit 7.
+The latter stores the resulting logical state and selects two software
+continuations. Nokia identifies a separate slide input, but the physical
+open/closed polarity and pin-mux association must still be confirmed; do not
+infer them from the inversion alone. The nearby control path at `0x4741c2`
+also masks/acknowledges IRQ7. Its coexistence with roller handling requires
+an aggregate input interrupt model, not two independently clearing sources.
+
+These are static firmware contracts. No post-bootstrap input acceptance run
+is possible at the current fail-closed frontier, and no physical inputs have
+yet been wired from these findings.
