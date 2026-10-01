@@ -293,6 +293,28 @@ the compiled device through MMIO and physical input fields. Pull strength,
 interrupt edge/mux behavior and firmware navigation remain unvalidated.
 No IRQ7 source is synthesized by the position input yet.
 
+The common IRQ7 dispatcher is `0x4caa04`. It takes one F1/F2/F3 snapshot,
+compares F1 bit 7 against saved F1 at `0x168a32`, and calls the slide handler
+at `0x4741c2` if changed. It then compares F1 bit 1, F2 bit 0 and F3 bit 5
+against the saved roller samples at `0x168a32..34`, calling `0x473f4c` if
+any differs. Both checks can run during one interrupt: slide is checked
+first, not exclusively. The tail acknowledges MAD2 `0x09` bit `0x80`.
+No separate source-ID register is read by this dispatcher.
+
+The hash-pinned extractor scans all 1,867,775 halfword positions for classic
+Thumb BL encodings and finds exactly one direct-call candidate for each
+handler: slide at `0x4caa2c`, roller at `0x4caa60`. Both are independently
+decoded in the common dispatcher. This scan does not close indirect calls,
+ARM-mode calls or hardware enable-bit semantics. Its four dispatcher pool
+literals are checked along with the seven sampling/restoration literals.
+
+Register `0xef` is also load-bearing: initialization enables `0x04` and
+`0x89`; the slide handler clears `0x04`, while roller handling clears
+`0x89` during service and sets it again afterward. The association of those
+three individual roller-enable bits with A/B/C, edge/level polarity and
+masked-change retention remains unresolved. Do not infer it from bit order
+or fabricate IRQ7 merely because a host position changed.
+
 Separate readers at `0x4741b2` and `0x4741ec` invert GPIO `0xf1` bit 7.
 The latter stores the resulting logical state and selects two software
 continuations. Nokia identifies a separate slide input, but the physical
