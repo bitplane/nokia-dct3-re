@@ -12,10 +12,41 @@ A bounded full-core compatibility trial with the recovered NSE-1 ROM4 program
 and data images advances beyond this wait and issues LCD traffic using the
 stock 7110 flash and product-local PMM. It does not establish the fitted 7110
 mask-ROM identity or complete boot. The normal profile remains fail-closed.
-The immediate graphical prerequisite is a SED1565-family controller, not the
-previously inherited PCD8544 profile. The normal product now selects SED1565
+The former display-controller prerequisite is now covered by SED1565 rather
+than the inherited PCD8544 profile. The normal product selects SED1565
 with a 96-by-65 panel window at segment 18; the DSP completion boundary remains
 unchanged.
+
+### Reproducible compatibility instrument
+
+`nse5r4t` is an explicitly labeled research composition, not another supported
+handset or an assertion about the fitted 7110 mask. It runs the acquired
+NSE-1 program/data mask through the C54x backend against the unchanged NSE-5
+flash and product-local PMM. It inherits the 7110 board/display/input wiring;
+the normal `noki7110` configuration remains fail-closed.
+
+After `make build`, reproduce the bounded observation with:
+
+```sh
+.venv/bin/python tools/nse5_rom4_compat_check.py mame/mame roms run_7110_rom4_repro
+```
+
+The runner hashes all four inputs, prepares a private ROM directory, removes
+only this fixture's retained NVRAM, and captures six native panel images
+through eight seconds. Its Lua observer reads MCU state and snapshots the
+screen; it does not write firmware state or synthesize DSP results. The
+compiled run reproduced 235 mailbox writes and 94 DSP completion strobes.
+Version 4 is copied to `0x167038` by 0.5 seconds; the current peripheral model
+produces word 0 equal to zero, not a hardcoded acceptance value. The final MCU
+PC is `0x49fffc`, and the final native image is blank. This protects the
+compatibility observation window, not UI startup, SIM or fitted-mask identity.
+The backend retains its independently documented peripheral/timing models;
+executing authentic mask bytes does not validate those models for NSE-5.
+
+Use this instrument to find the first unmet application-start boundary after
+the LCD initialization test. Keep its results separate from normal-product
+acceptance; do not promote the mask or COBBA assumptions merely because it
+advances farther.
 
 ## Display contract
 

@@ -1110,6 +1110,7 @@ public:
 	void noki5110(machine_config &config);
 	void noki6110(machine_config &config);
 	void noki7110(machine_config &config);
+	void nse5r4t(machine_config &config);
 	void noki6210(machine_config &config);
 	void noki6250(machine_config &config);
 	void dct3_base(machine_config &config);
@@ -3376,6 +3377,16 @@ void nokia_dct3_state::noki7110(machine_config &config)
 	m_gensio->lcd_sclk_cb().set(m_sed_lcd, FUNC(sed1565_device::sclk_w));
 }
 
+void nokia_dct3_state::nse5r4t(machine_config &config)
+{
+	// Compatibility instrument, not the fitted NSE-5 mask identity. Execute
+	// the acquired NSE-1 ROM4 against stock NSE-5 flash and local PMM.
+	noki7110(config);
+	config.device_remove("dsp_hle");
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 void nokia_dct3_state::noki6210(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
@@ -3575,6 +3586,24 @@ ROM_START( noki7110 )
 	ROM_LOAD("7110 virgin eeprom 005fa000.fls", 0x3fa000, 0x006000, CRC(78e7d8c1) SHA1(8b4dd782fc9d1306268ba63124ee463ac646912b))
 ROM_END
 
+// Explicit research composition: no donor EEPROM/PMM and no fabricated
+// bootstrap reply. The ROM4 mask remains an unproved NSE-5 compatibility input.
+ROM_START( nse5r4t )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nse5_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_program.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("7110f501_ppmc.fls", 0, 0x390000,
+			CRC(919ac753) SHA1(53af8324919f455ba8199d2c05f7a921cfb811d5))
+	ROM_LOAD("7110 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
+			CRC(78e7d8c1) SHA1(8b4dd782fc9d1306268ba63124ee463ac646912b))
+ROM_END
+
 ROM_START( noki8210 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -3619,6 +3648,7 @@ SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empt
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
