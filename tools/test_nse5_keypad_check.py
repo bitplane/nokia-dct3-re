@@ -7,7 +7,12 @@ from tools import nse5_keypad_check as checker
 
 class Nse5KeypadCheckTest(unittest.TestCase):
     def test_complete_trace(self):
-        checker.check_trace("nse5_keypad: PASS matrix_keys=17 scans=85 power_mask=02", 0)
+        checker.check_trace("nse5_keypad: PASS matrix_keys=17 scans=85 power_mask=02\n"
+                            "nse5_roller: PASS positions=3 probes=18 restored_pairs=9 irq_delivery=unvalidated", 0)
+
+    def test_missing_roller_probe_rejected(self):
+        with self.assertRaisesRegex(ValueError, "roller"):
+            checker.check_trace("nse5_keypad: PASS matrix_keys=17 scans=85 power_mask=02", 0)
 
     def test_failed_process_cannot_pass(self):
         with self.assertRaises(ValueError):

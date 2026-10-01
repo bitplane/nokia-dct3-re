@@ -281,8 +281,17 @@ seven restoration/sampler GPIO literals, preventing confusion between a
 direction-bank write and an output-latch write. This does not establish
 direction polarity for every UIF pin or the separate `0x70` bank.
 
-Pull strength and interrupt edge/mux behavior remain unvalidated; this desk model
-has not yet been wired into UIF or claimed as physical-input acceptance.
+The 7110 board now connects that network through UIF's generic input-sample
+callback. A three-position wrapping `Navi Roller` host input selects the
+mechanical closed pair, not a firmware key/event. Only the identified roller
+bits are driven by this callback; other products retain the register-only
+input behavior. Down/Up decrement/increment the contact position; these host
+bindings do not establish physical clockwise/counterclockwise naming.
+`make verify-7110-keypad-controller` now also exercises 18 low-drive probe
+observations and all nine restored-drive previous/current combinations on
+the compiled device through MMIO and physical input fields. Pull strength,
+interrupt edge/mux behavior and firmware navigation remain unvalidated.
+No IRQ7 source is synthesized by the position input yet.
 
 Separate readers at `0x4741b2` and `0x4741ec` invert GPIO `0xf1` bit 7.
 The latter stores the resulting logical state and selects two software
@@ -292,9 +301,9 @@ infer them from the inversion alone. The nearby control path at `0x4741c2`
 also masks/acknowledges IRQ7. Its coexistence with roller handling requires
 an aggregate input interrupt model, not two independently clearing sources.
 
-These are static firmware contracts. No post-bootstrap input acceptance run
-is possible at the current fail-closed frontier, and no physical inputs have
-yet been wired from these findings.
+No post-bootstrap application-input acceptance run is possible at the current
+fail-closed frontier. Roller pin sampling has controller conformance coverage;
+the slide has no physical input wiring yet, and neither has IRQ7 acceptance.
 
 ### Keypad matrix
 

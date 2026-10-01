@@ -1133,6 +1133,7 @@ private:
 	void post_load();
 	void apply_product_config(nokia_product_config const &product);
 	void apply_sms_config();
+	u8 nse5_roller_gpio_r(offs_t bank);
 
 
 	uint8_t mad2_io_r(offs_t offset);
@@ -2823,6 +2824,9 @@ INPUT_PORTS_END
 
 static INPUT_PORTS_START( noki7110 )
 	PORT_INCLUDE(dct3_network_config)
+	PORT_START("ROLLER")
+	// Mechanical contact position only. IRQ7 delivery remains unvalidated.
+	PORT_BIT( 0x03, 0x00, IPT_POSITIONAL ) PORT_NAME("Navi Roller") PORT_POSITIONS(3) PORT_WRAPS PORT_SENSITIVITY(100) PORT_KEYDELTA(1) PORT_CODE_DEC(KEYCODE_DOWN) PORT_CODE_INC(KEYCODE_UP)
 	// NSE-5 raw index = row * 5 + column. Column zero is not scanned.
 	// Roller rotation is a separate UIF+ contact input, not Up/Down keys.
 	PORT_START("COL.0")
@@ -3343,10 +3347,27 @@ void nokia_dct3_state::noki6110(machine_config &config)
 	apply_product_config(PRODUCT_6110);
 }
 
+u8 nokia_dct3_state::nse5_roller_gpio_r(offs_t bank)
+{
+	// One closed pair, with released pins pulled high. A driven-low contact
+	// pulls its connected mate low; do not synthesize a firmware phase byte.
+	static constexpr u8 masks[3] = { 0x02, 0x01, 0x20 };
+	bool low[3];
+	for (unsigned pin = 0; pin < 3; ++pin)
+		low[pin] = !(m_uif->read(0xb1 + pin) & masks[pin]) &&
+				!(m_uif->read(0x31 + pin) & masks[pin]);
+	const unsigned isolated = ioport("ROLLER")->read() % 3;
+	const unsigned first = (isolated + 1) % 3;
+	const unsigned second = (isolated + 2) % 3;
+	low[first] = low[second] = low[first] || low[second];
+	return bank >= 1 && bank <= 3 && !low[bank - 1] ? masks[bank - 1] : 0;
+}
+
 void nokia_dct3_state::noki7110(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
 	apply_product_config(PRODUCT_7110);
+	m_uif->input_cb().set(FUNC(nokia_dct3_state::nse5_roller_gpio_r));
 	config.device_remove("lcd");
 	SED1565(config, m_sed_lcd).set_panel_window(18, 96, 65);
 	subdevice<screen_device>("screen")->set_screen_update("sed_lcd", FUNC(sed1565_device::screen_update));

@@ -10,7 +10,8 @@ public:
 	nokia_uif_device(const machine_config &mconfig, const char *tag, device_t *owner, u32 clock = 0);
 
 	static bool owns(offs_t offset);
-	u8 read(offs_t offset) const;
+	auto input_cb() { return m_input_cb.bind(); }
+	u8 read(offs_t offset);
 	void write(offs_t offset, u8 data);
 
 protected:
@@ -19,6 +20,7 @@ protected:
 
 private:
 	u8 m_regs[0x100] = { 0 };
+	devcb_read8 m_input_cb;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_UIF, nokia_uif_device)

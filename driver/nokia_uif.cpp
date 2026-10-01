@@ -8,7 +8,8 @@ DEFINE_DEVICE_TYPE(NOKIA_UIF, nokia_uif_device, "nokia_uif", "Nokia MAD2 UIF GPI
 
 nokia_uif_device::nokia_uif_device(
 		const machine_config &mconfig, const char *tag, device_t *owner, u32 clock) :
-	device_t(mconfig, NOKIA_UIF, tag, owner, clock)
+	device_t(mconfig, NOKIA_UIF, tag, owner, clock),
+	m_input_cb(*this, 0)
 {
 }
 
@@ -29,8 +30,10 @@ void nokia_uif_device::device_reset()
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
 }
 
-u8 nokia_uif_device::read(offs_t offset) const
+u8 nokia_uif_device::read(offs_t offset)
 {
+	if (owns(offset) && (offset & 0xc0) == 0xc0 && !m_input_cb.isunset())
+		return m_input_cb(offset & 3);
 	return owns(offset) ? m_regs[offset] : 0;
 }
 

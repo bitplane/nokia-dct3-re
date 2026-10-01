@@ -25,6 +25,8 @@ def check_trace(trace, returncode):
         raise ValueError("missing complete NSE-5 keypad controller conformance")
     if "[LUA ERROR]" in trace or "assertion failed" in trace:
         raise ValueError("Lua conformance error")
+    if "nse5_roller: PASS positions=3 probes=18 restored_pairs=9 irq_delivery=unvalidated" not in trace:
+        raise ValueError("missing NSE-5 physical roller contact probes")
 
 
 def main():
@@ -51,7 +53,7 @@ def main():
         check_trace(log.read_text() + output, result.returncode)
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
         parser.exit(1, f"NSE-5 keypad gate failed: {error}\n")
-    print("NSE-5 keypad PASS: pinned tables, 17 matrix keys/85 scans, Power press/release; UI handling not validated")
+    print("NSE-5 inputs PASS: pinned tables, 17 matrix keys/85 scans, Power press/release, 18 roller probes; UI/roller IRQ handling not validated")
 
 
 if __name__ == "__main__":
