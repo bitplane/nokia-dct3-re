@@ -30,8 +30,18 @@ class RollerContractTest(unittest.TestCase):
         image = bytearray(contract.TABLE_OFFSET + 62)
         image[contract.TABLE_OFFSET - 8:contract.TABLE_OFFSET] = bytes.fromhex(
             "0000003e00168a3c")
+        for address, value in ((0x473FE8, 0x200B3), (0x473FEC, 0x20033),
+                               (0x473FF0, 0x200B1), (0x473FF4, 0x200B2),
+                               (0x473FF8, 0x20032), (0x473FFC, 0x20031),
+                               (0x474000, 0x200F1)):
+            offset = address - 0x200000
+            image[offset:offset + 4] = value.to_bytes(4, "big")
         for i in range(8):
             image[contract.TABLE_OFFSET + i * 8:contract.TABLE_OFFSET + i * 8 + 6] = bytes([i]) * 6
         with patch.object(contract, "FLASH_SHA1", hashlib.sha1(image).hexdigest()):
             result = contract.extract(image)
         self.assertEqual(result["patterns"], [[i] * 6 for i in range(8)])
+        image[0x473FF0 - 0x200000:0x473FF4 - 0x200000] = bytes.fromhex("00020031")
+        with patch.object(contract, "FLASH_SHA1", hashlib.sha1(image).hexdigest()):
+            with self.assertRaisesRegex(ValueError, "GPIO literal"):
+                contract.extract(image)

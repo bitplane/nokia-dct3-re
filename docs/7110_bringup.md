@@ -271,8 +271,17 @@ no rotation the fast sample is invalid and retains that phase; either new
 closed pair produces the correct one-hot sample for the next phase. All
 nine previous/current combinations are checked by
 `tools/test_nse5_roller_contract.py`. This supports a contact-network model
-without substituting firmware events. Pull strength, the two direction-bank
-roles and interrupt edge/mux behavior are still unvalidated; this desk model
+without substituting firmware events. The restoration literals establish
+`0xb1..0xb3` as the relevant release/drive controls: a set roller bit releases
+that pin for sensing, a cleared bit drives its `0x31..0x33` latch. Phase 1
+clears B1 bit 1 and latch 31 bit 1, then sets B2 bit 0 and B3 bit 5; phases
+2/3 perform the corresponding permutation. The slow sampler follows the
+same direction rule for each low-drive probe. The extractor checks all
+seven restoration/sampler GPIO literals, preventing confusion between a
+direction-bank write and an output-latch write. This does not establish
+direction polarity for every UIF pin or the separate `0x70` bank.
+
+Pull strength and interrupt edge/mux behavior remain unvalidated; this desk model
 has not yet been wired into UIF or claimed as physical-input acceptance.
 
 Separate readers at `0x4741b2` and `0x4741ec` invert GPIO `0xf1` bit 7.
