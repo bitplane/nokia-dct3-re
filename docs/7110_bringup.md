@@ -8,6 +8,34 @@ change from `0xffff`. Graphical boot, firmware-owned button handling, SIM,
 phonebook and registration are not validated. `make verify-7110-bootstrap`
 protects this boundary without supplying a final result.
 
+A bounded full-core compatibility trial with the recovered NSE-1 ROM4 program
+and data images advances beyond this wait and issues LCD traffic using the
+stock 7110 flash and product-local PMM. It does not establish the fitted 7110
+mask-ROM identity or complete boot. The normal profile remains fail-closed.
+The immediate graphical prerequisite is a SED1565-family controller, not the
+inherited PCD8544 profile.
+
+## Display contract
+
+The full-core trial emits 141 LCD commands and 2,592 data bytes (three
+96-column, nine-page transfers). Initialization includes
+`a6 a4 a3 a1 c0 22 81 35 2f e3 40 b0 10 00 af`. This command stream is
+incompatible with the inherited PCD8544 decoder; its captured pixels are not
+evidence of graphical boot. A 20-second trial ends without a soft reset and
+with the C54x frame timer still running, but does not validate UI settlement.
+
+Independent [physical 7110 display measurements](https://serdisplib.sourceforge.net/ser/sed1565.html)
+identify an on-glass SED1565 controller and a 96-by-65 panel. Its 132-column
+controller RAM exposes the panel from column 18, with nine pages and only one
+visible bit in the final page. Implement the controller from its datasheet;
+do not extend PCD8544 geometry to reinterpret a different command protocol.
+The column offset and orientation must also be checked against firmware
+addressing before accepting a rendered frame. The primary
+[Epson SED1565 datasheet, revision 1.2](https://serdisplib.sourceforge.net/ser/doc/sed1565.pdf)
+defines the 132-by-65 RAM and serial interface. MAME's existing SED15xx family
+is the starting point for implementation reuse, not an assertion that its
+SED1560 command decoder is interchangeable.
+
 The initial generic configuration published three calibrated values after
 64 exchanges. Those values preceded completion of this product's upload and
 are not evidence of successful 7110 verification. The product-local profile
