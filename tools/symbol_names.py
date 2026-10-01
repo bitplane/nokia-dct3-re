@@ -8,7 +8,9 @@ def load(extra=None):
         if not p.exists(): continue
         for row in csv.reader(open(p)):
             if len(row) >= 3 and row[0] != "address":
-                names[int(row[0], 16) & ~1] = row[2]
+                addr = int(row[0], 16)
+                # Only code addresses carry a Thumb bit; RAM/data labels may be odd.
+                names[addr & ~1 if row[1] == "function" else addr] = row[2]
     return names
 def is_auto(name):
     return name is None or name.startswith(("FUN_", "thunk_FUN_", "callback_", "func_"))

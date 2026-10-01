@@ -904,9 +904,9 @@ address,kind,name
 0x00242890,function,game3_handler_242890
 0x00240604,function,level_widget_callback_240604
 0x00241198,function,snake_draw_241198
-0x002413dc,function,snake_step_2413dc
-0x002414dc,function,snake_food_2414dc
-0x00241620,function,snake_advance_head_241620
+0x002413dc,function,snake_check_move_2413dc
+0x002414dc,function,snake_move_head_2414dc
+0x00241620,function,snake_advance_tail_241620
 0x002416f6,function,snake_place_food_2416f6
 0x00243170,function,games_ui_refresh_243170
 0x00299e5e,function,game_record_save_299e5e
@@ -1057,3 +1057,12 @@ address,kind,name
 0x00245126,label,widget_layout_pass_part_245126
 0x00244d7c,label,widget_layout_pass_part_244d7c
 0x00243b88,label,widget_layout_pass_part_243b88
+0x00110340,label,snake_food_pos_110340
+0x00110348,label,snake_board_110348
+0x00110354,label,snake_grow_flag_110354
+0x002d9744,data,snake_food_bitmap_2d9744
+0x002d94bc,data,game_tile_bitmaps_2d94bc
+0x002d96c4,data,game_tile_back_2d96c4
+0x002d96cc,data,game_tile_cursor_2d96cc
+0x002d995c,data,game3_sprites_2d995c
+0x002d9764,data,game3_backgrounds_2d9764

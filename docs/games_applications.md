@@ -37,8 +37,42 @@ flips with 5; the fourth game maps keys 1..6 to its six cells.
 
 The tick is self-scheduled: the handler re-posts delayed scheduler event
 `0x30` through `sched_post_event_delay_2697aa`. Snake's delay is
-`10 * game_speed_table_2d9738[level] / 7.78125` ticks with the table
+`floor(10 * game_speed_table_2d9738[level] / 7.78125)` ticks with the table
 `66 48 38 30 23 18 14 11 9` for levels 1..9.
+
+## Timing
+
+The speed table is in units of 10 ms and `7.78125` is the firmware's tick
+length in milliseconds (255/32768 s): level 1 is meant to step every 660 ms
+(84 ticks, 653.6 ms) and level 9 every 90 ms (11 ticks, 85.6 ms).
+
+Measured in MAME with `mame_nokia_dct3_ram_probe.lua` tapping the snake
+indices at `snake_state_110310`: 635 ms per step at level index 0 and 83 ms
+at level index 8, i.e. 7.56 ms per tick (248/32768 s). The emulated
+scheduler tick is therefore about 2.9 % shorter than the firmware's own
+constant implies. This is recorded as an observation about the timer model,
+not corrected here.
+
+## Assets
+
+All game graphics live in `0x2d9484..0x2d9a80` and are drawn through
+`lcd_blit_bitmap_25f3b6` (column-major, bit `y & 7` per row) or plain
+`lcd_fill_rect_25eec0` calls:
+
+| Address | Content | Format |
+|---|---|---|
+| `0x2d9484` | `game_table_2d9484` | four 12-byte plugin records |
+| `0x2d94bc` | `game_tile_bitmaps_2d94bc` | 7x7 tiles, 7 bytes each; blank + 0x49 symbols (Memory, Logic) |
+| `0x2d96c4`, `0x2d96cc` | card back, cursor frame | 8 bytes each |
+| `0x2d96ec` | `games_digit_glyphs_2d96ec` | 3x5 digits, 3 bytes each |
+| `0x2d9738` | `game_speed_table_2d9738` | nine speed bytes |
+| `0x2d9744` | `snake_food_bitmap_2d9744` | 4x4, 4 bytes |
+| `0x2d9760` | `logic_params_2d9760` | rows (10), code length (5) |
+| `0x2d9764` | `game3_backgrounds_2d9764` | 84x48 scenes, 504 bytes each |
+| `0x2d995c` | `game3_sprites_2d995c` | 10x10 sprites, 20 bytes, outline/filled pairs |
+
+Snake itself has no sprite for the body: segments are 3x3, 4x3 or 3x4 filled
+rectangles on a 4-pixel cell pitch.
 
 ## Settings records
 
@@ -77,13 +111,17 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | Address | Kind | Name | Evidence |
 |---|---|---|---|
 | `0x110310` | label | `snake_state_110310` |  |
+| `0x110340` | label | `snake_food_pos_110340` |  |
 | `0x110344` | label | `snake_speed_110344` |  |
-| `0x240d82` | function | `snake_handler_240d82` |  |
-| `0x241198` | function | `snake_draw_241198` |  |
-| `0x2413dc` | function | `snake_step_2413dc` |  |
-| `0x2414dc` | function | `snake_food_2414dc` |  |
-| `0x241620` | function | `snake_advance_head_241620` |  |
-| `0x2416f6` | function | `snake_place_food_2416f6` |  |
+| `0x110348` | label | `snake_board_110348` |  |
+| `0x110354` | label | `snake_grow_flag_110354` |  |
+| `0x240d82` | function | `snake_handler_240d82` | Snake event handler. 0x49 init: clears the snake record(s), sets direction/state, frees and rebuilds the board. 0x54 tick: snake_check_move_2413dc; on a free cell it advances the tail unless snake_grow_flag_110354 is set, moves the head, then compares the head with snake_food_pos_110340: on a match  |
+| `0x241198` | function | `snake_draw_241198` | Draws the field: border from four lcd_fill_rect_25eec0 calls sized cols*4+2 by rows*4+2; food as the 4x4 bitmap snake_food_bitmap_2d9744 at (x*4+2, y*4+2); each snake by walking the direction ring from tail to head, drawing a 3x3 block for the tail and 4x3 or 3x4 blocks per segment so adjacent cells |
+| `0x2413dc` | function | `snake_check_move_2413dc` | Collision test for the next head cell of snake arg1: head + direction delta; returns 1 for a wall or an occupied cell, 0 for a free cell, and arg3[snake] when the cell is the current tail cell (legal only if the tail is about to move). |
+| `0x2414dc` | function | `snake_move_head_2414dc` | Moves the head: in 1-player mode a full ring (head+1 == tail after wrap+1) awards 100 points and posts status 0x13 (board filled); if the ring would overflow it first advances the tail; writes the direction into the ring at the head index, increments the head index modulo the ring size, applies the  |
+| `0x241620` | function | `snake_advance_tail_241620` | Advances the tail: clears the tail cell's occupancy bit, reads the 2-bit direction stored at the tail index to move tail x/y one cell, increments the tail index modulo the ring size. (First named 'advance head'; the cell it clears and the index it increments are the tail's.) |
+| `0x2416f6` | function | `snake_place_food_2416f6` | Places food: up to 255 tries of x = rand() % cols, y = rand() % rows until the occupancy bit is clear; writes the 4-byte position to arg0 (snake_food_pos_110340). |
+| `0x2d9744` | data | `snake_food_bitmap_2d9744` | Assets, all column-major with bit (y & 7) per row as lcd_blit_bitmap_25f3b6 expects: snake food 4x4 (4 bytes); game_tile_bitmaps_2d94bc 7x7 tiles, 7 bytes each, index 0 blank then 0x49 symbols shared by Memory and Logic; game_tile_back_2d96c4 (card back) and game_tile_cursor_2d96cc (frame), 8 bytes  |
 
 ### Memory
 
@@ -113,6 +151,8 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x242c74` | function | `game3_score_event_242c74` | game3: scores an event for lane arg0. Object type (0x1102cc[lane-1]) 1-2 costs a life (arg1--, score -25 or to 0, status 0x11 = game over at 0 lives), 3/7/8 +10, 4 +5, 5 +15 and shortens arg3, 6 +20 and sets arg2 = 6. A miss (0x1102e0[lane] != 1) just subtracts 10 if score >= 10. Score is game_recor |
 | `0x242dd0` | function | `game3_spawn_objects_242dd0` | game3: for each of 6 lanes with no object, with probability 1-7/8 spawns one: type = rand%8 (nonzero), sub-type = rand%3+1, speed = 8 - level, x from {0x1c,0x2e,0x40}, y 8 (lanes 0-2) or 0x1b (3-5). |
 | `0x242e8c` | function | `game3_draw_242e8c` | game3: draws the scene from bitmap descriptors at 0x2d9a24..0x2d9a78 and sprites 0x2d995c..0x2d9a20 via lcd_blit_bitmap_25f3b6. Not offered in the 3210 Games menu; behaviour matches a falling-object reaction game. |
+| `0x2d9764` | data | `game3_backgrounds_2d9764` |  |
+| `0x2d995c` | data | `game3_sprites_2d995c` |  |
 
 ### Logic (undispatched)
 
@@ -147,6 +187,9 @@ hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
 | `0x29a2a0` | function | `game_over_score_screen_29a2a0` |  |
 | `0x29a3a4` | function | `games_app_callback_29a3a4` |  |
 | `0x2d9484` | data | `game_table_2d9484` |  |
+| `0x2d94bc` | data | `game_tile_bitmaps_2d94bc` |  |
+| `0x2d96c4` | data | `game_tile_back_2d96c4` |  |
+| `0x2d96cc` | data | `game_tile_cursor_2d96cc` |  |
 | `0x2d96ec` | data | `games_digit_glyphs_2d96ec` |  |
 | `0x2d9738` | data | `game_speed_table_2d9738` |  |
 

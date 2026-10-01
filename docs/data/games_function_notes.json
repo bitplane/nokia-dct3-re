@@ -722,6 +722,49 @@
    "lines": [
     "Hypothesis (unnamed): class 0x67 is a generic text/icon widget (class handler 1 -> 0x22f8fc, list 17, style class 1). 0x2b4ff8 (outside the closure) re-posts it when the value 0x2a7734() returns changes, unless mode byte 0x11fcc2 == 3; 0x2b4fd6(id) posts record 0x2d3948[id] into it or queues the id at 0x1124f4+1 while +2 is busy. A status-line indicator refreshed from a polled value; the value's meaning is not established here."
    ]
+  },
+  {
+   "addr": "0x240d82",
+   "lines": [
+    "Snake event handler. 0x49 init: clears the snake record(s), sets direction/state, frees and rebuilds the board. 0x54 tick: snake_check_move_2413dc; on a free cell it advances the tail unless snake_grow_flag_110354 is set, moves the head, then compares the head with snake_food_pos_110340: on a match it beeps (display_type2_post 0xf1), adds level+1 to the score (game_records +0), places new food and sets the grow flag so the next tick keeps the tail. It re-posts delayed event 0x30 with floor(10 * snake_speed_110344 / 7.78125) ticks. A collision posts task-5 status 0x11 (game over). 0x57 draws via snake_draw_241198. Key events 2/4/6/8 set the direction.",
+    "State: snake_state_110310, 0x18 bytes per snake (two in 2-player mode): +0 u16 tail index, +2 u16 head index, +4 u16 ring size-1, +8/+9 head x/y, +0xc/+0xd tail x/y, +0x10 direction (0 up, 1 right, 2 down, 3 left), +0x14 pointer to the direction ring (2 bits per segment). Board: snake_board_110348 = {cols, rows, pad, pad, pointer to a 1-bit-per-cell occupancy map (byte index x + cols*(y>>3), bit y&7)}."
+   ]
+  },
+  {
+   "addr": "0x2413dc",
+   "lines": [
+    "Collision test for the next head cell of snake arg1: head + direction delta; returns 1 for a wall or an occupied cell, 0 for a free cell, and arg3[snake] when the cell is the current tail cell (legal only if the tail is about to move)."
+   ]
+  },
+  {
+   "addr": "0x2414dc",
+   "lines": [
+    "Moves the head: in 1-player mode a full ring (head+1 == tail after wrap+1) awards 100 points and posts status 0x13 (board filled); if the ring would overflow it first advances the tail; writes the direction into the ring at the head index, increments the head index modulo the ring size, applies the direction delta to head x/y and sets the occupancy bit."
+   ]
+  },
+  {
+   "addr": "0x241620",
+   "lines": [
+    "Advances the tail: clears the tail cell's occupancy bit, reads the 2-bit direction stored at the tail index to move tail x/y one cell, increments the tail index modulo the ring size. (First named 'advance head'; the cell it clears and the index it increments are the tail's.)"
+   ]
+  },
+  {
+   "addr": "0x2416f6",
+   "lines": [
+    "Places food: up to 255 tries of x = rand() % cols, y = rand() % rows until the occupancy bit is clear; writes the 4-byte position to arg0 (snake_food_pos_110340)."
+   ]
+  },
+  {
+   "addr": "0x241198",
+   "lines": [
+    "Draws the field: border from four lcd_fill_rect_25eec0 calls sized cols*4+2 by rows*4+2; food as the 4x4 bitmap snake_food_bitmap_2d9744 at (x*4+2, y*4+2); each snake by walking the direction ring from tail to head, drawing a 3x3 block for the tail and 4x3 or 3x4 blocks per segment so adjacent cells join. Cells are 4 px pitch with a 2 px origin."
+   ]
+  },
+  {
+   "addr": "0x2d9744",
+   "lines": [
+    "Assets, all column-major with bit (y & 7) per row as lcd_blit_bitmap_25f3b6 expects: snake food 4x4 (4 bytes); game_tile_bitmaps_2d94bc 7x7 tiles, 7 bytes each, index 0 blank then 0x49 symbols shared by Memory and Logic; game_tile_back_2d96c4 (card back) and game_tile_cursor_2d96cc (frame), 8 bytes each; games_digit_glyphs_2d96ec 3x5 digits, 3 bytes each; game3_sprites_2d995c 20-byte 10x10 sprites in outline/filled pairs; game3_backgrounds_2d9764 84x48 scenes (504 bytes). Bitmap headers are 12 bytes {data*, 4 unused, width, height}; the game_table_2d9484 parameter bytes are 01 09 07d0 (Rotation), 01 05 004b (Snake), 01 05 2710 (Memory), 01 08 0000 (game3)."
+   ]
   }
  ]
 }

@@ -38,7 +38,9 @@ def main():
     asm = subprocess.run([str(ROOT / ".venv/bin/python"), str(ROOT / "tools/disrom.py"), f"{addr:#x}:{end-addr:#x}"], capture_output=True, text=True, env=env).stdout
     lits = {}
     for m in re.finditer(r"\[([0-9a-f]{8})\] = ([0-9a-f]{8})", asm):
-        v = int(m.group(2), 16); lits[m.group(1)] = (v, describe(v & ~1 if v & 1 else v, names))
+        v = int(m.group(2), 16)
+        code = FLASH <= v < FLASH + 0x200000 and v & 1 and (v & ~1) in names
+        lits[m.group(1)] = (v, describe(v & ~1 if code else v, names))
     if lits:
         print("literal pool:")
         for k, (v, d) in sorted(lits.items()): print(f"   [{k}] = {v:08x}  {d}")

@@ -189,6 +189,10 @@ functions and export analysis. The naming list is also exported as a
   (`NOKIA_DCT3_SNAPSHOT_AT`), and the games research hook that pins
   `game_index_11fd1b` (`NOKIA_DCT3_FORCE_GAME`, `NOKIA_DCT3_FORCE_GAME_AT`).
   `make run-keys KEYS=enter,x,x,6` drives a scripted key sequence headlessly.
+- `mame_nokia_dct3_ram_probe.lua` wraps the exerciser with a RAM write tap
+  (`NOKIA_DCT3_RAM_TAP=start:end`, logged as `RAMTAP t=... addr=...`) and an
+  optional held byte (`NOKIA_DCT3_RAM_POKE=addr:value:at`). It measured the
+  Snake step interval recorded in `games_applications.md`.
 - `mame_nokia_dct3_input_exerciser.lua` — MAME Lua harness used by the run targets
   to capture structural/LCD evidence and drive keypad input. Delayed input uses
   a scheduler-backed `emu.wait()` coroutine because LCD frame callbacks stop
