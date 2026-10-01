@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -17,6 +18,27 @@ INPUTS = {
     "noki5110/nse1_rom4_dsp_program.bin": "a05a1e96a8c36ec5a47e1ea059d15afa54ca5739",
     "noki5110/nse1_rom4_dsp_data.bin": "024c7f970f4ef754d3e90471de48a167515f930d",
 }
+
+
+def task2_queue_observation(trace):
+    """Describe captured queue state, without making a stalled boot a gate."""
+    posts = []
+    for match in re.finditer(
+            r"nse5_compat_task2_queue: primitive=([0-9a-f]{2}) detail=([0-9a-f]{2}) "
+            r"producer=([0-9a-f]{2}) consumer=([0-9a-f]{2}) capacity=([0-9a-f]{2}) t=([\d.]+)", trace):
+        primitive, detail, producer, consumer, capacity = (
+            int(value, 16) for value in match.groups()[:5])
+        if capacity < 2 or producer >= capacity or consumer >= capacity:
+            raise ValueError("invalid captured task-2 queue geometry")
+        posts.append({"primitive": primitive, "detail": detail,
+                      "producer": producer, "consumer": consumer,
+                      "capacity": capacity, "time": float(match[6]),
+                      "full": (producer + 1) % capacity == consumer})
+    failures = [{"primitive": int(match[1], 16), "detail": int(match[2], 16),
+                 "time": float(match[3])} for match in re.finditer(
+        r"nse5_compat_task2_queue_failure: primitive=([0-9a-f]{2}) "
+        r"detail=([0-9a-f]{2}) t=([\d.]+)", trace)]
+    return {"capture_limit_per_tap": 64, "posts": posts, "failures": failures}
 
 
 def check_trace(trace, returncode):
@@ -46,6 +68,7 @@ def main():
     parser.add_argument("roms", type=Path)
     parser.add_argument("run_dir", type=Path)
     parser.add_argument("--menu", action="store_true", help="press/release the physical Menu switch after startup")
+    parser.add_argument("--verbose", action="store_true", help="include device-boundary transport traces")
     args = parser.parse_args()
     try:
         run = args.run_dir.resolve()
@@ -73,11 +96,15 @@ def main():
             "-snapshot_directory", str(run), "-noreadconfig", "-video", "none",
             "-sound", "none", "-nothrottle", "-seconds_to_run", "9", "-skip_gameinfo",
             "-log", "-autoboot_delay", "0", "-autoboot_script",
-            str(Path(__file__).with_name("nse5_rom4_compat.lua").resolve())],
+            str(Path(__file__).with_name("nse5_rom4_compat.lua").resolve()),
+            *(["-verbose"] if args.verbose else [])],
             cwd=run, env=env, capture_output=True, text=True, timeout=120)
         output = result.stdout + result.stderr
         (run / "compat_output.log").write_text(output)
-        samples = check_trace(log.read_text() + output, result.returncode)
+        trace = log.read_text()
+        samples = check_trace(trace + output, result.returncode)
+        (run / "startup_queue.json").write_text(
+            json.dumps(task2_queue_observation(trace), indent=2) + "\n")
         if args.menu:
             trace = log.read_text()
             if "nse5_compat_menu: pressed=1" not in trace or "nse5_compat_menu: pressed=0" not in trace:

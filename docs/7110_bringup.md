@@ -98,7 +98,7 @@ other startup conditions are satisfied or that mode `0x12` itself blocks
 message processing.
 
 Report `0x15` has a concrete subsystem checklist: `0x311eb0` accepts
-inputs `0x0e..0x18`, sets one of eleven bytes at `0x16a2b4`, and calls
+inputs `0x0e..0x19` except `0x17`, sets one of eleven bytes at `0x16a2b4`, and calls
 report stub `0x4c8bd0` only when every byte is nonzero. Input `0x64`
 instead clears all eleven bytes. The run observes only that reset input,
 from `0x3a2624`, and all eleven bytes remain zero at eight seconds.
@@ -106,12 +106,79 @@ Report stubs `0x4c8b94` (`0x14`) and `0x4c8bd0` (`0x15`) have zero
 observed entries. Their queue-send primitive is `0x3bbe04`, not the
 separate queue-send primitive `0x3bc3e8` used by keypad helper events.
 
-The next question is which legitimate startup sources produce report
-`0x14` and the eleven `0x311eb0` completion inputs in this product.
-Static halfword BL matches are candidates only: the apparent `0x2dfb1c`
-call to the `0x14` stub lies in an undecoded data region and is not an
-established producer. Do not substitute a guessed report, clear a mask,
-or promote the candidate DSP mask to make these branches execute.
+The report-`0x14` call at `0x2dfb1c` is executable Thumb code interleaved
+with strings and literal data. Disassembly must start at a known instruction
+boundary (`0x2dfb10`), not decode the preceding embedded `VBAT Checks`
+string as instructions. This call remains a live producer candidate.
+
+### Second-phase task release
+
+The twelve-byte task records begin at `0x25d3fc`. They identify entries
+`0x0e..0x16`, `0x18`, `0x19` as the eleven subsystem tasks whose startup
+completion calls feed `0x311eb0`. Task `0x17` is separate and has entry
+`0x2df5b4`, containing the report-`0x14` producer. The first release phase
+includes task `0x17`, but the eleven checklist tasks belong to the second
+release phase at `0x49fddc..0x49fe1a`; that phase is not entered in the
+compatibility run. Their absence is therefore not eleven independent
+missing hardware responses.
+
+The deciding predicate `0x469cc2` waits for bit 2 of byte `0x17fe15` to
+clear, then returns 1 only if bit 6 is set. The runtime write-watch sees
+initialization `00 -> 08 -> 48 -> c8` at approximately 0.695 seconds,
+then `cc` at 0.701 seconds. Event `0xd8` reaches `0x311416` at
+approximately 2.253 seconds while bit 2 remains set. Its busy-expiry branch
+`0x311430` clears bit 6 (`0xcc -> 0x8c`) and then bit 2 (`-> 0x88`).
+The predicate consequently returns zero and startup enters `0x49fe36`,
+skipping the second-phase task release. At that decision bootstrap byte
+`0x16702c` is 1, mode byte `0x16ab88` is 2, and startup state bytes
+`0x16bc78..79` are `02 00`.
+
+The preceding constructor at `0x3aef0c` runs once. It constructs task-3
+messages with class/type `0x70`, command `0x13` and four data bytes,
+followed by commands `0x14`, `0x15`, `0x16` with twelve, twenty and
+twenty-four data bytes. These are allocated packet lengths, not timer IDs.
+This ties the release failure to an observed startup transaction expiry;
+the message construction alone does not prove DSP-ring delivery or identify
+the correct response payload. `--verbose` enables existing device-boundary
+traces in the compatibility runner to check that transport next.
+
+### Self-test reply lost at a full firmware queue
+
+The verbose run establishes transport delivery: the DSP consumes all four
+stock `0x70` startup packets and publishes replies through the RX ring.
+It publishes type `0x74`, payload `0d 00`, at approximately 0.701377 seconds.
+The MCU consumes that ring entry and `0x469dbc` wraps it for task 2.
+The self-test consumer `0x30e7a6` would cancel the outstanding timer,
+clear busy bit 2, and interpret status bits 0/1 of the second payload byte;
+zero preserves the release-result bit 6. That handler has no observed entry.
+
+The queue-send failure is measured, not inferred from a silent handler:
+
+- Task 2's numeric/pointer queue has capacity 12, with indices at
+  `0x101acc`/`0x101acd`. One slot distinguishes full from empty.
+- Eleven preceding type-`0x74` payloads `32 00 01 11` fill the queue
+  before task 2 begins receiving at approximately 0.703905 seconds.
+- The `0d 00` post at 0.701839 seconds sees producer 11, consumer 0.
+  Its next producer would wrap to the consumer, so the queue is full.
+- The return at `0x3bbe98`, qualified by the saved caller `0x469e0d`,
+  has return-state register `r4 == 0` at 0.701853 seconds. The unqueued
+  message still contains primitive `0x0d`, detail `0x00`.
+
+Thus the executing DSP is not silent and a success-shaped reply is not
+missing: it is rejected before the firmware consumer can see it. This does
+not prove the candidate mask is fully compatible or that accepting this
+reply would complete graphical boot. The repeated `0x32` publications may
+reflect a peripheral-model defect or mask/product incompatibility; their
+meaning and legitimate triggering conditions still need decoding.
+
+The compatibility runner writes `startup_queue.json` with the captured
+post geometry, modulo-full calculation and observed failures. Each queue
+tap is capped at 64 details; lack of a later detail is not absence evidence.
+The next question is which DSP instruction/peripheral condition produces
+the repeated `32 00 01 11` reports before task 2 can drain them. Do not
+filter these reports, enlarge the firmware queue, change task scheduling,
+inject the self-test reply, cancel the expiry, or promote the candidate
+DSP mask to manufacture successful startup.
 
 ## Display contract
 

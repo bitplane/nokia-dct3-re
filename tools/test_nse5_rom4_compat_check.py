@@ -13,6 +13,30 @@ def complete_trace():
 
 
 class CompatibilityCheckTest(unittest.TestCase):
+    def test_queue_full_at_selftest_reply(self):
+        trace = ("nse5_compat_task2_queue: primitive=0d detail=00 producer=0b "
+                 "consumer=00 capacity=0c t=0.701839\n"
+                 "nse5_compat_task2_queue_failure: primitive=0d detail=00 t=0.701846")
+        result = checker.task2_queue_observation(trace)
+        self.assertTrue(result["posts"][0]["full"])
+        self.assertEqual(result["failures"][0]["primitive"], 13)
+
+    def test_queue_full_wraps_at_capacity(self):
+        trace = ("nse5_compat_task2_queue: primitive=32 detail=00 producer=02 "
+                 "consumer=03 capacity=0c t=1.0")
+        self.assertTrue(checker.task2_queue_observation(trace)["posts"][0]["full"])
+
+    def test_empty_queue_is_not_full(self):
+        trace = ("nse5_compat_task2_queue: primitive=32 detail=00 producer=00 "
+                 "consumer=00 capacity=0c t=1.0")
+        self.assertFalse(checker.task2_queue_observation(trace)["posts"][0]["full"])
+
+    def test_invalid_queue_index_rejected(self):
+        trace = ("nse5_compat_task2_queue: primitive=0d detail=00 producer=0c "
+                 "consumer=00 capacity=0c t=1.0")
+        with self.assertRaisesRegex(ValueError, "geometry"):
+            checker.task2_queue_observation(trace)
+
     def test_executed_observation_window(self):
         self.assertEqual(len(checker.check_trace(complete_trace(), 0)), 6)
 

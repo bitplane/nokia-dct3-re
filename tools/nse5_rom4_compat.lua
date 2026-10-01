@@ -24,6 +24,16 @@ local entries = {
     {0x3939d0, "startup_ready_test"}, {0x3939e6, "startup_ready_done"},
     {0x393b04, "startup_alternate"},
     {0x4c8b94, "startup_report14"}, {0x4c8bd0, "startup_report15"},
+    {0x49fddc, "subsystem_group_release"}, {0x49fe36, "subsystem_group_skip"},
+    {0x469cc2, "startup_release_predicate"}, {0x469ce0, "startup_release_retry"},
+    {0x3aef0c, "startup_selftest_request"},
+    {0x311416, "startup_selftest_expiry"}, {0x311430, "startup_selftest_busy_expiry"},
+    {0x469dbc, "dsp_control_forward"}, {0x30e728, "dsp_control_receive"},
+    {0x30e7a6, "startup_selftest_reply"},
+    {0x311506, "task2_receive_loop"},
+    {0x4dea50, "task2_message_received"},
+    {0x3bbe04, "task2_dsp_queue_post"},
+    {0x3bbe98, "task2_dsp_queue_result"},
 }
 for _, entry in ipairs(entries) do
     local address, name = entry[1], entry[2]
@@ -32,8 +42,13 @@ for _, entry in ipairs(entries) do
         "nse5_compat_" .. name, function(offset, data, mask)
             local pc = cpu.state["PC"].value
             if pc ~= address then return end
+            if name == "task2_message_received" and cpu.state["R14"].value ~= 0x311511 then return end
+            if name == "task2_dsp_queue_post" and cpu.state["R14"].value ~= 0x469e0d then return end
+            if name == "task2_dsp_queue_result" and
+                    space:read_u32(cpu.state["R13"].value + 8) ~= 0x469e0d then return end
             entry_counts[name] = entry_counts[name] + 1
-            if entry_counts[name] <= ((name == "startup_index" or
+            if entry_counts[name] <= ((name == "startup_index" or name == "task2_dsp_queue_post" or
+                    name == "task2_dsp_queue_result" or
                     name == "startup_event_dispatch") and 64 or 12) or
                     (name == "key_decoder" and cpu.state["R0"].value ~= 0xff) then
                 machine:logerror(string.format(
@@ -41,6 +56,43 @@ for _, entry in ipairs(entries) do
                     name, pc, cpu.state["R0"].value, cpu.state["R1"].value,
                     cpu.state["R14"].value, machine.time:as_double(),
                     cpu.state["R4"].value))
+                if name == "subsystem_group_skip" or name == "subsystem_group_release" then
+                    local r5 = cpu.state["R5"].value
+                    machine:logerror(string.format(
+                        "nse5_compat_release: path=%s bootstrap=%02x mode=%02x r5=%08x r5_byte0=%02x r5_byte1=%02x predicate=%02x t=%.6f\n",
+                        name, space:read_u8(0x16702c), space:read_u8(0x16ab88),
+                        r5, space:read_u8(r5), space:read_u8(r5 + 1),
+                        space:read_u8(0x17fe15), machine.time:as_double()))
+                end
+                if name == "dsp_control_receive" or name == "startup_selftest_reply" or
+                        name == "task2_message_received" then
+                    local message = name ~= "startup_selftest_reply" and
+                        cpu.state["R0"].value or cpu.state["R4"].value
+                    local bytes = {}
+                    for index = 0, 11 do
+                        bytes[#bytes + 1] = string.format("%02x", space:read_u8(message + index))
+                    end
+                    machine:logerror(string.format(
+                        "nse5_compat_dsp_control: name=%s message=%08x bytes=%s flags=%02x t=%.6f\n",
+                        name, message, table.concat(bytes), space:read_u8(0x17fe15),
+                        machine.time:as_double()))
+                end
+                if name == "task2_dsp_queue_post" then
+                    local message = cpu.state["R1"].value
+                    local catalogue = space:read_u32(0x10003c)
+                    machine:logerror(string.format(
+                        "nse5_compat_task2_queue: primitive=%02x detail=%02x producer=%02x consumer=%02x capacity=%02x t=%.6f\n",
+                        space:read_u8(message + 8), space:read_u8(message + 9),
+                        space:read_u8(0x101acc), space:read_u8(0x101acd),
+                        space:read_u8(catalogue + 2 * 12 + 7), machine.time:as_double()))
+                end
+                if name == "task2_dsp_queue_result" and cpu.state["R4"].value == 0 then
+                    local message = cpu.state["R5"].value
+                    machine:logerror(string.format(
+                        "nse5_compat_task2_queue_failure: primitive=%02x detail=%02x t=%.6f\n",
+                        space:read_u8(message + 8), space:read_u8(message + 9),
+                        machine.time:as_double()))
+                end
             end
         end)
 end
@@ -72,10 +124,22 @@ taps[#taps + 1] = space:install_write_tap(0x168990, 0x168997,
             end
         end
     end)
+local release_state_writes = 0
+taps[#taps + 1] = space:install_write_tap(0x17fe14, 0x17fe17,
+    "nse5_compat_release_state", function(offset, data, mask)
+        if (mask & 0x00ff0000) == 0 then return end
+        release_state_writes = release_state_writes + 1
+        if release_state_writes <= 64 then
+            machine:logerror(string.format(
+                "nse5_compat_release_state: value=%02x pc=%08x lr=%08x t=%.6f\n",
+                (data >> 16) & 0xff, cpu.state["PC"].value,
+                cpu.state["R14"].value, machine.time:as_double()))
+        end
+    end)
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 2, "entry trace subscriptions lost")
+    assert(#taps == #entries + 3, "entry trace subscriptions lost")
     if menu_fixture then
         local now = machine.time:as_double()
         if (menu_step == 0 and now >= 4.2) or (menu_step == 1 and now >= 4.4) then
