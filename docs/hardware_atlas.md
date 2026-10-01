@@ -56,7 +56,8 @@ rings. It is deliberately transport-only so either the current compatibility
 HLE or a future TMS320C54x core can attach without changing the MCU-visible
 device. Separate DSP-HLE and external-service devices currently attach the
 semantic peers without executing DSP instructions. Companion devices are **CCONT** (power/ADC/RTC/charger), the
-**PCD8544 LCD**, **24C128 EEPROM** (I2C), and the SIM card behind MAD2 SIMI.
+**PCD8544 LCD** (SED1565 with a 96-by-65 panel on the 7110),
+**24C128 EEPROM** (I2C on the 3210), and the SIM card behind MAD2 SIMI.
 
 ## CPU memory map (the emulated regions)
 

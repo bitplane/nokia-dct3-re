@@ -49,6 +49,23 @@ a complete 7110 boot.
 The passive Lua mirror uses the SED1565 grammar for this product and emits a
 native screen snapshot alongside it for independent pixel comparison.
 
+With the candidate ROM4 composition, all four captures in an eight-second
+run matched native output pixel-for-pixel at 96 by 65. The frames contain
+initialization patterns and then cleared RAM, not a graphical boot UI. The
+run issued 141 commands and 2,592 data bytes, with zero soft resets and no
+unsupported-controller commands. This establishes the display transport and
+decoder for the observed stream, not application startup or mask-ROM identity.
+
+The final sampled PC `0x49fff8` belongs to an interrupt-driven idle loop,
+not the verifier wait. `0x49ffec` stores 1 to byte `0x168f04`; IRQ/FIQ
+dispatcher entries `0x4cab50` and `0x4cac14` clear it at `0x4cab56` and
+`0x4cac1a`. A read-only runtime write-watch observed all three writers.
+`0x49fff6..0x49fffc` polls the flag, then returns to idle predicates when it
+clears. A sampled PC in this range cannot alone establish a boot deadlock.
+The next runtime question is which application-start/input lifecycle follows
+the cleared LCD test, while keeping the mask-ROM compatibility assumption
+explicit and separate from physical input claims.
+
 The initial generic configuration published three calibrated values after
 64 exchanges. Those values preceded completion of this product's upload and
 are not evidence of successful 7110 verification. The product-local profile
