@@ -2324,6 +2324,14 @@ void tms320c54x_device::execute_one(u16 op)
 		m_delayed_words = 2;
 		m_icount -= 2;
 		return;
+	case 0xfe44: // RCD ANEQ (SPRU172C, RC[D])
+		if ((m_a & ACC_MASK) != 0)
+		{
+			m_delayed_target = pop();
+			m_delayed_words = 2;
+		}
+		m_icount -= 2;
+		return;
 	case 0xf495: // NOP
 		return;
 	case 0xf1c0: // XOR A, B

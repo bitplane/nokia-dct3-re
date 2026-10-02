@@ -13737,7 +13737,52 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"MPYU doubles unsigned operands under FRCT and saturates with OVA");
+					"MPYU doubles unsigned operands under FRCT and saturates with OVA");
+			program.write_word(0x05e0, 0x75d6);
+			program.write_word(0x05e1, 0x0124);
+			program.write_word(0x05e2, 0xfe44); // RCD ANEQ
+			program.write_word(0x05e3, 0xe800); // Delay word changes tested A.
+			program.write_word(0x05e4, 0xe802);
+			program.write_word(0x05e5, 0xe803); // Only the false path reaches this.
+			program.write_word(0x05e6, 0x75d6);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			program.write_word(0x05ec, 0x75d6);
+			program.write_word(0x05ed, 0x0124);
+			program.write_word(0x05ee, 0xf5e1);
+			data.write_word(0x0300, 0x05ec);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 750;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 750)
+		{
+			expect_opcode(0xfe44,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+				"RCD ANEQ captures the true condition before its two delay words");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 751;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 751)
+		{
+			expect_opcode(0xfe44,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+				"RCD ANEQ false path preserves the stack and falls through");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

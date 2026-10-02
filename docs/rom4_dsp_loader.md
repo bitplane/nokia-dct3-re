@@ -1819,3 +1819,19 @@ external unassisted run's 74 acknowledgements and stable UI remain the complete
 ROM4 reference; MAME has now independently crossed the same loader boundary.
 This is an instruction-semantics correction, not a reconstructed image or
 timing adjustment.
+
+## Delayed conditional return
+
+The core implements `0xfe44` as `RCD ANEQ`: test the full accumulator A
+before the two following delay words, pop the return address only when A
+is nonzero, and charge three cycles on either path. This follows
+[TI SPRU172C, RC[D], pages 4-133/4-134](https://www.ti.com/lit/ug/spru172c/spru172c.pdf).
+The executable core fixture tests both paths, including a delay-word write
+that changes A after the decision, stack preservation on a false condition,
+and port-to-port cycle counts. Other conditional delayed-return encodings
+are not implied to be implemented by this one opcode.
+
+ROM4 uses this instruction at `0x90eb` when additional demand-load
+continuations are delivered through BSCR.HINT. The bounded NSE-5 investigation
+documents that signal and its unpromoted follow-on execution/timer boundaries
+in [7110 bring-up](7110_bringup.md#diagnostic-publication-and-partial-code-block-transfer).
