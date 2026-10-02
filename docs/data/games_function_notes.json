@@ -1,0 +1,770 @@
+{
+ "blocks": [
+  {
+   "addr": "0x2b64d4",
+   "lines": [
+    "ANSI C rand(): seed = seed*0x41c64e6d + 0x3039; returns (seed & 0x7fffffff) >> 16.",
+    "Seed lives at 0x11250c. Used by snake_place_food_2416f6 and rotation_handler_241fd0."
+   ]
+  },
+  {
+   "addr": "0x2430ce",
+   "lines": [
+    "Returns the head pointer of widget list N: widget_lists_110904[class_map_2e06a9[N]*0xc].",
+    "Lists are 12-byte {head, flags,...}; widgets are 0x40+ byte nodes: +0 next, +0x1c index byte, +0x3c flags u16, +0x3e class byte, +0x40 list number."
+   ]
+  },
+  {
+   "addr": "0x2430de",
+   "lines": [
+    "Walk list from widget_list_head; return first node whose +0x3e class == arg0 (arg0 < 0x6b) and +0x1c index >= arg1, else the last matching node.",
+    "Callers are the games UI layer (0x2431xx..0x2438xx)."
+   ]
+  },
+  {
+   "addr": "0x24311e",
+   "lines": [
+    "Under interrupt lock: set list flags |=1 (if head non-null) and |=2 for the widget's list (+0x40), clear widget flag bit 4 (+0x3c &= 0xffef), set ui_dirty_flag_110901 = 1. Returns 1 (0 if arg null).",
+    "Hypothesis: schedules a repaint of that widget/list."
+   ]
+  },
+  {
+   "addr": "0x26afe0",
+   "lines": [
+    "RTOS block allocator: picks the first of 8 pools whose block size (table at [0x100020+0x14] + i*4 + 2) >= requested size, pops the pool free list; if every pool is empty it queues a delay entry and services the scheduler, then retries.",
+    "Emits diagnostic bytes to the trace port at 0x600000/0x600100."
+   ]
+  },
+  {
+   "addr": "0x26abf8",
+   "lines": [
+    "RTOS block free: block header at ptr-8 holds pool index ^0x80; pushes the block onto that pool's free list (rtos_mem_pools_10931c + pool*0x14), wakes a waiter if one is queued.",
+    "Ghidra marks it noreturn by mistake; it returns."
+   ]
+  },
+  {
+   "addr": "0x25f3b6",
+   "lines": [
+    "Draws a bitmap descriptor {+0 bitmap*, +4 x, +5 y, +6/+7 clip offset, +8/+9 clip w/h, +10 attr}; bitmap = {+0 data, +8 width, +9 height}, PCD8544 layout (bit (y&7) of byte [x + width*(y>>3)]).",
+    "Calls lcd_put_pixel_25f32c(x, y, attr) per pixel, attr^0x10 for clear pixels. Used by snake_draw_241198 and the Memory/game3 draw paths."
+   ]
+  },
+  {
+   "addr": "0x22c15c",
+   "lines": [
+    "widget_measure(metrics, widget): fills the widget's metrics block at +0x20 from the style tables. 0x22bcc0 picks the first 16-byte entry of 0x2d6e4c whose flags match the UI flags at 0x11fd16 and copies its geometry; 0x22c0f8 selects an 8-byte entry of 0x2d6748 starting at 0x2d6d90[widget +0x3f] (the style class) and matching widget +0x41 >> 5 (the style variant); 0x22bdb4 derives the remaining extents. Sets flag bit 1 = metrics valid, which widget_text_height_22f7fc, widget_link_243428 and widget_set_highlight_24387a test before reading +0x20/+0x24/+0x28/+0x2c/+0x2d.",
+    "This fixed the meaning of the two fields named provisionally last week: +0x3f is the style class, +0x41's top three bits the style variant; the setters were renamed accordingly."
+   ]
+  },
+  {
+   "addr": "0x240a4c",
+   "lines": [
+    "Memory: draws the whole board. Loops rows x cols (dims in arg2[0..1]); a card byte with bit 7 set is face-up and draws its value & 0x7f, otherwise 0xff (back). Tile origin = (origin + 2*i - dim) * 4. Cursor (arg3) is drawn last with attr 0x21.",
+    "Calls memory_draw_card_240668(value, x*4, y*4, attr)."
+   ]
+  },
+  {
+   "addr": "0x240bd8",
+   "lines": [
+    "Memory: deals a board. Builds 1..0x49 on the stack, Fisher-Yates shuffles it with rand_2b64d4 % n, writes each value twice (pairs) into the board, then shuffles the board in place."
+   ]
+  },
+  {
+   "addr": "0x240c88",
+   "lines": [
+    "Memory: moves the cursor. arg3/arg4 select row or column deltas with wraparound via divmod_2b5388; when both are equal it steps diagonally until it lands on a face-down card. Ends with games_ui_refresh_243170(2,0)."
+   ]
+  },
+  {
+   "addr": "0x2695f4",
+   "lines": [
+    "Scheduler: cancels the delay entry of task N (12-byte task table at 0x100140). Unlinks it from the delay lists at 0x100020+0x10/+0x28, folding its remaining ticks into the successor, marks the entry state 1, returns the remaining tick count. Same structures as sched_delay_queue_insert_2699be/service_269acc.",
+    "Medium confidence on the verb; the queue mechanics are clear."
+   ]
+  },
+  {
+   "addr": "0x2a5dec",
+   "lines": [
+    "Switches the UI context byte at 0x11fd1a (next to game_index_11fd1b). If the class (table 0x2e15ac) changes and the old context is not 7, releases the old class via 0x243646(class, 0), stores the new context, then 0x2a59fc() rebuilds.",
+    "Called by the games framework at 0x263468/0x263154 when entering/leaving a game screen."
+   ]
+  },
+  {
+   "addr": "0x2a5e1c",
+   "lines": [
+    "ui_slot_remove(kind): 26-slot table ui_slots_10f268 (12 bytes: +0 text id, +4 kind, +6 value/0x114, +8 flag; kind 0x1a = empty). Removes the slot with this kind by moving the last used slot over it, then 0x2a59fc() rebuilds. Counterpart of ui_slot_set_2a5e8c."
+   ]
+  },
+  {
+   "addr": "0x2ac6fc",
+   "lines": [
+    "Hypothesis (unnamed): 0x2ac6fc -> 0x2b4fd6(table_2db724[ *0x11fcce * 8 ]); 0x2b4fd6 sets state at 0x1124f4 and posts 0x243646(0x67, table_2d3948[id*0x20]) or queues the id if busy. Possibly a tone/animation request keyed by the current profile; needs 0x243646 mapped first."
+   ]
+  },
+  {
+   "addr": "0x243336",
+   "lines": [
+    "Allocates a 0x4c-byte widget (rtos_mem_alloc), inserts it into widget list (arg2 or class_map[class]) sorted by (class, index), sets +0x3e class, +0x1c index, clears +0x34/+0x3c, initialises via 0x2432e0, sets flag 0x20, marks dirty."
+   ]
+  },
+  {
+   "addr": "0x243550",
+   "lines": [
+    "widget_set(class, index, arg, data, flags): data == 0 clears/destroys the widget (special-cases the focused class at 0x10eb48+0x11 and +0x10, frees its buffer, then 0x2431e8(class,index,0)); otherwise finds the widget by class/index or creates it, marks it dirty, stores data at +0x34 and applies flag bits (bit 2 -> +0x18 |= 0x80). Returns flags>>3.",
+    "0x243646(class, data) is the (class, 0, 0, data, 0) wrapper used by the framework and by ui_context_switch_2a5dec."
+   ]
+  },
+  {
+   "addr": "0x2431e8",
+   "lines": [
+    "Hypothesis (unnamed): widget remove/detach; called as (0,0,ptr) to drop the focused widget and (class,index,0) from widget_set_243550."
+   ]
+  },
+  {
+   "addr": "0x2406b6",
+   "lines": [
+    "Draws an unsigned decimal number (abs of arg0) right-aligned at (arg1, arg2): divides by 10000..1 with divmod_2b5388, blits each digit from the 3-byte glyph table games_digit_glyphs_2d96ec at x = arg1 - 4*pos - 2 via lcd_blit_bitmap_25f3b6. Leading zeros suppressed. Rotation uses it for cell values."
+   ]
+  },
+  {
+   "addr": "0x242494",
+   "lines": [
+    "Rotation: draws the board (cells 6 apart in the state array, tile pitch 7x4 px) with games_draw_number_2406b6, frames the selected block with lcd_fill_rect_25eec0, and applies the rotation animation phase (arg2 1..6) as per-cell pixel offsets around the block edges. Block size comes from the level record (+4 of game_records: bits 0-1 and >>2)."
+   ]
+  },
+  {
+   "addr": "0x242c74",
+   "lines": [
+    "game3: scores an event for lane arg0. Object type (0x1102cc[lane-1]) 1-2 costs a life (arg1--, score -25 or to 0, status 0x11 = game over at 0 lives), 3/7/8 +10, 4 +5, 5 +15 and shortens arg3, 6 +20 and sets arg2 = 6. A miss (0x1102e0[lane] != 1) just subtracts 10 if score >= 10. Score is game_records[game].score."
+   ]
+  },
+  {
+   "addr": "0x242dd0",
+   "lines": [
+    "game3: for each of 6 lanes with no object, with probability 1-7/8 spawns one: type = rand%8 (nonzero), sub-type = rand%3+1, speed = 8 - level, x from {0x1c,0x2e,0x40}, y 8 (lanes 0-2) or 0x1b (3-5)."
+   ]
+  },
+  {
+   "addr": "0x242e8c",
+   "lines": [
+    "game3: draws the scene from bitmap descriptors at 0x2d9a24..0x2d9a78 and sprites 0x2d995c..0x2d9a20 via lcd_blit_bitmap_25f3b6. Not offered in the 3210 Games menu; behaviour matches a falling-object reaction game."
+   ]
+  },
+  {
+   "addr": "0x2623b0",
+   "lines": [
+    "Correction: this is a menu-item enable check, not a key check. Returns 1 if item arg0 (1..16) is enabled in the current menu context: mask = descriptor (0x10bbec[0x10b2dd[*0x111931]*0xc]) bit (item-1), everything enabled when the descriptor is inactive (+9 != 0); items >= 0x11 always enabled.",
+    "Renamed ui_key_allowed -> menu_item_enabled once the callers (first/next enabled item, select item) made the role clear."
+   ]
+  },
+  {
+   "addr": "0x2431e8",
+   "lines": [
+    "Destroys a widget: with a null pointer it looks the widget up by class/index and first calls its class handler widget_class_handlers_2e0660[+0x38](widget, 3). Unlinks the four neighbour pointers (+8,+0xc,+0x10,+0x14), removes it from its list (head or prev->next), flags later lists (+4 bit 1) for repaint, marks dirty, frees the block."
+   ]
+  },
+  {
+   "addr": "0x2432e0",
+   "lines": [
+    "Initialises a widget from the 4-byte class map entry (widget_class_map_2e06a9 - 1 + class*4): +0x38 handler index, +0x40 list (arg1 or entry byte 1), +0x3f entry byte 2, +0x41 entry byte 3; clears neighbours and +0x18/+0x42; clears flag bit 4."
+   ]
+  },
+  {
+   "addr": "0x243428",
+   "lines": [
+    "Links widget b next to widget a: relation 1 = b below a (a+0x14/b+0xc), 2 = above, 3 = right (a+0x10/b+8), 4 = left; inserts b into any existing chain and, when flags != 0, sets the corresponding bits in +0x18 (1/2/4/8, 0x10 for the flags bit 1 case). Relation 2 also runs a bounds check via 0x22c15c before linking."
+   ]
+  },
+  {
+   "addr": "0x2625ac",
+   "lines": [
+    "First enabled item (1..count) in the current menu context; count = descriptor[+4] or [+2] depending on +9."
+   ]
+  },
+  {
+   "addr": "0x2625f2",
+   "lines": [
+    "Next enabled item after arg0, wrapping from count back to 1; returns arg0 if nothing else is enabled."
+   ]
+  },
+  {
+   "addr": "0x2626f4",
+   "lines": [
+    "Selects menu item arg0: if the list fits in menu_visible_rows_11fd18 it just stores the first enabled item; otherwise stores the selection (+8), adjusts the top-of-window item (+7) with next/previous enabled items so the selection is visible."
+   ]
+  },
+  {
+   "addr": "0x2b64e8",
+   "lines": [
+    "srand: stores arg0 into rand_seed_11250c (same literal as rand_2b64d4). game3_spawn_objects_242dd0 reseeds before spawning."
+   ]
+  },
+  {
+   "addr": "0x2626a8",
+   "lines": [
+    "Previous enabled menu item before arg0, wrapping from 1 to the item count; mirror of menu_next_enabled_item_2625f2."
+   ]
+  },
+  {
+   "addr": "0x262670",
+   "lines": [
+    "Row of item arg0 within the visible window: counts next-enabled steps from the window's top item (context +7, table 0x10bbf3)."
+   ]
+  },
+  {
+   "addr": "0x26265c",
+   "lines": [
+    "Number of enabled items in the current menu (0 when none): first enabled item then 0x26263a() to count onward. Consumed by menu_render_2629d0 as the rows-remaining counter and by menu_select_item_2626f4 against menu_visible_rows_11fd18."
+   ]
+  },
+  {
+   "addr": "0x262306",
+   "lines": [
+    "Maps item ordinal arg0 to its entry index in the 0x1c-byte menu entry table at 0x10b32c: starts at the context's first entry (descriptor +1) and follows the next-entry byte at entry-2, n times; returns index-1."
+   ]
+  },
+  {
+   "addr": "0x243180",
+   "lines": [
+    "Refresh timer control for the games UI: arg0 == 2 -> if state (0x110902) is 2, repaint via games_ui_refresh_243170 and, when state is 1, post delayed scheduler event 0x50 (delay 0x3c3d); otherwise cancel event 0x50 if pending and store arg0 as the state.",
+    "Medium confidence on the exact state meanings."
+   ]
+  },
+  {
+   "addr": "0x2629d0",
+   "lines": [
+    "Renders the current menu page: clears widgets 0x19-0x21, computes the scrollbar position with the software-float helpers (title widget 0x19, bar 0x1a), then for each visible row from the window top builds text widget 0x21 (and 0x1d icon / 0x1e mark 0x28/0x29 for checkable menus), links them with widget_link_243428/0x2438e8, re-paginating when rows overflow; finally highlights the selected row via 0x24387a and 0x296f4e. arg0 == 0xff tears the menu down (0x2a5e1c(6))."
+   ]
+  },
+  {
+   "addr": "0x2623f6",
+   "lines": [
+    "Last enabled item: walks down from the item count until menu_item_enabled_2623b0 says yes; 0 if none."
+   ]
+  },
+  {
+   "addr": "0x26263a",
+   "lines": [
+    "Counts enabled items from arg0 up to the last enabled one (inclusive) via menu_next_enabled_item_2625f2; menu_enabled_count_26265c feeds it the first enabled item."
+   ]
+  },
+  {
+   "addr": "0x262338",
+   "lines": [
+    "Position of item arg0 among enabled items (1-based): counts enabled items below it using the context's 16-bit enable mask; returns arg0 unchanged when the context is inactive."
+   ]
+  },
+  {
+   "addr": "0x2438e8",
+   "lines": [
+    "widget_link_by_class(classA, idxA, classB, idxB, relation|flags<<8): looks both widgets up and calls widget_link_243428(B, A, relation, flags) when both exist with the right index."
+   ]
+  },
+  {
+   "addr": "0x22f7fc",
+   "lines": [
+    "Height in pixels of text widget (class, index): measures each glyph of the widget's string (+0x34 text id resolved through 0x296adc with ui_language_11fcb1, font row 0x2d223c[+0x24]) via 0x25e4fe, takes the max against +0x20>>3, adds paddings +0x2c and +0x2d. Ids 0x901..0x970 are remapped to 0xe201. menu_render_2629d0 uses it to paginate."
+   ]
+  },
+  {
+   "addr": "0x2453ec",
+   "lines": [
+    "Fills a 15-byte style struct (arg2) for widget (class, index), creating the widget if missing: +0xc class, +5..+8 from the 12-byte style table 0x2d6568 keyed by the widget's list (via 0x243934), +0xd/+0xe from widget +0x3f/+0x41. Returns 1."
+   ]
+  },
+  {
+   "addr": "0x296f4e",
+   "lines": [
+    "Looks the current language byte (ui_language_11fcb1) up in the 4-byte table 0x2d6548 (terminated by '*'), stores entry[2] into menu_visible_rows_11fd18 and entry[3] into 0x11fd17, returns entry[1]; default rows = 3. Explains why the menu window size is language-dependent."
+   ]
+  },
+  {
+   "addr": "0x262544",
+   "lines": [
+    "Hypothesis (unnamed): resolves a menu descriptor (+6 flags, +7 index) to an item id, optionally through the remap table 0x11fc80 or by searching the entry table for a matching id."
+   ]
+  },
+  {
+   "addr": "0x2624b8",
+   "lines": [
+    "Hypothesis (unnamed): temporarily points the context's entry table at a sub-table (0x10b2dc+0x20 + 8*n) to set widget 0x1b's text from the resolved entry, then restores it; looks like the title/softkey text for a submenu."
+   ]
+  },
+  {
+   "addr": "0x2437c4",
+   "lines": [
+    "Sets the widget's style class (+0x3f) for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. widget_measure_22c15c indexes 0x2d6d90 with it."
+   ]
+  },
+  {
+   "addr": "0x24383c",
+   "lines": [
+    "Sets the style variant (top 3 bits of +0x41, value * 0x20), marks dirty, clears flag bit 4. widget_measure_22c15c matches it against the 0x2d6748 style entries; menu_render_2629d0 passes 0 or 5."
+   ]
+  },
+  {
+   "addr": "0x24387a",
+   "lines": [
+    "Sets or clears highlight bit arg2 (0..2) in widget +0x28 bits 25..27 for (class, index), marking dirty on change; menu_render_2629d0 calls it as (0x21, selected_row, 2, 1) to highlight the selection."
+   ]
+  },
+  {
+   "addr": "0x26281e",
+   "lines": [
+    "Builds the menu path indicator shown top-right (e.g. \"6-2-...\"): for each menu level, utoa_2a3dc2 of the level's item number joined with \"-\" (0x2629ac); the current item number is appended, or \"...\" (0x2629b0) when it would not fit; for right-to-left languages (flag at 0x11fd16 bit 3, language != 0x19) the numeric groups are reversed. Result set through 0x2a5e8c(6, str). Returns early via 0x2a5e1c(6) when the context flags bit 3 disable the indicator."
+   ]
+  },
+  {
+   "addr": "0x2b65c8",
+   "lines": [
+    "strcat: appends src to dst, returns dst."
+   ]
+  },
+  {
+   "addr": "0x2b6680",
+   "lines": [
+    "strlen."
+   ]
+  },
+  {
+   "addr": "0x2b6638",
+   "lines": [
+    "strcpy: returns dst."
+   ]
+  },
+  {
+   "addr": "0x2b6660",
+   "lines": [
+    "isdigit: ctype_table_2e1929[c] & 4. atoi_2b6018 tests the same table: bit 3 = space (skipped), bit 2 = digit."
+   ]
+  },
+  {
+   "addr": "0x2b6018",
+   "lines": [
+    "atoi: skips leading space class, handles '+'/'-', accumulates decimal digits."
+   ]
+  },
+  {
+   "addr": "0x2a3dc2",
+   "lines": [
+    "utoa: writes the decimal digits of arg0 (no leading zeros, '0' for zero) into arg1 and returns the digit count; divides by 10000 downward via divmod_2b5388."
+   ]
+  },
+  {
+   "addr": "0x2ac70e",
+   "lines": [
+    "Hypothesis (unnamed): dispatches through an 8-byte handler table at 0x2db720 with constant 0x5ec; menu_render_2629d0 calls it once."
+   ]
+  },
+  {
+   "addr": "0x262438",
+   "lines": [
+    "Index (0..5) of menu level id arg0 in the six 8-byte level records at menu_levels_10b2fc; the path string has at most six components for the same reason. Returns the loop index in r0 (Ghidra shows void)."
+   ]
+  },
+  {
+   "addr": "0x262452",
+   "lines": [
+    "Ordinal of the item whose id equals arg1 within menu context descriptor arg0 (+4 flags, +5 index, +2 count, +1 first entry): flags bit 0 = direct/indirect id (bit 2 returns arg1, bit 1 maps through 0x11fc80), otherwise walks the entry chain (next byte at entry+0xe of the 0x1c-byte records) comparing entry ids; 0 if not found."
+   ]
+  },
+  {
+   "addr": "0x2a5e8c",
+   "lines": [
+    "ui_slot_set(kind, value): finds the slot of this kind (or the first empty one) in ui_slots_10f268; slot type from 0x2e1479[0x2e1590[kind]*8]: 1 = text id (kept only if the string resolves via 0x296adc/0x296b74), 2 = raw byte in +6, anything else removes the slot; then 0x2a59fc(). Kind 6 carries the menu path indicator."
+   ]
+  },
+  {
+   "addr": "0x2b316e",
+   "lines": [
+    "Stops periodic slot n: three 12-byte slots at periodic_slots_1121ac, handler table periodic_slot_handlers_2dcbdc (12 bytes: fn, u16 param, ...). Cancels delayed event 0x2c, calls handler(3, n) unless the slot is free (0x19), frees it, and reposts event 0x2c with delay 5 if any slot is still active."
+   ]
+  },
+  {
+   "addr": "0x2b31d8",
+   "lines": [
+    "Starts a periodic slot of kind arg0 with args (arg1 word, arg2 byte): takes the first free slot, copies the handler's u16 param, calls handler(1, slot) and posts delayed event 0x2c (5 ticks). Returns 0xff when all three slots are busy. menu_render_2629d0 uses the pair around the scrollbar/marquee state at 0x10b2b4+3."
+   ]
+  },
+  {
+   "addr": "0x2ae8ba",
+   "lines": [
+    "Hypothesis (unnamed): phone status text builder keyed by codes 500+n (uses service_record_build_contact_pair_282afc, 0x287216/0x287730 lookups); reached from menu_render_2629d0 for one menu type. Outside the games' own needs."
+   ]
+  },
+  {
+   "addr": "0x241780",
+   "lines": [
+    "Second dormant game. Event handler with the standard codes (0x49 init, 0x57 draw) and keys '*' submit, '2'/'8' cycle the symbol under the cursor, '4' copy/back, '5' pick. Mechanics are Mastermind: a secret of length logic_params_2d9760[1] (minus one below level 4) over (level&3)*2+5 symbols; guesses live in rows of 5 at logic_board_110364 (10 rows); each submitted row is scored by logic_score_guess_241cf6 into logic_row_scores_110398; 0xff (all exact) posts status 0x13 (win). Not referenced by game_table_2d9484 and never entered in any coverage run.",
+    "Name inferred from the mechanics plus the 'Logic' string in the English text block (Nokia's Logic on the 5110/6110 is this game); treat the prefix as a strong hypothesis."
+   ]
+  },
+  {
+   "addr": "0x241b10",
+   "lines": [
+    "Logic: draws the symbol palette row (top, when cursor row is 0), every guess row with its score pegs, a divider line at y=7, the cursor cell with attr 0x21, and the held symbol; symbols drawn with memory_draw_card_240668 (shared tile drawer)."
+   ]
+  },
+  {
+   "addr": "0x241dd6",
+   "lines": [
+    "Logic: arg0 < 0 regenerates the palette of 10 distinct random symbols (1..0x49) at logic_palette_1103b0 (duplicates are rejected by rescanning); arg0 > 0 returns palette[arg0-1]; 0 -> 0."
+   ]
+  },
+  {
+   "addr": "0x241cf6",
+   "lines": [
+    "Logic: arg0 == 0 generates the secret (len arg1, symbols 1..arg2) at logic_secret_1103a8; otherwise scores guess arg0 against it: exact matches counted and masked, then misplaced matches among the rest; returns 0xff on a full match else exact*16 + misplaced."
+   ]
+  },
+  {
+   "addr": "0x241e34",
+   "lines": [
+    "Logic: scrolls the board and score arrays up one row when the last row is used (memmove by 5 and by 1, clears the freed row)."
+   ]
+  },
+  {
+   "addr": "0x241e9c",
+   "lines": [
+    "Logic: draws a row's score pegs at column arg0*8 from the packed score byte (high nibble exact = 3x2 marks, low nibble misplaced = 3x1 marks), two layouts depending on how many fit."
+   ]
+  },
+  {
+   "addr": "0x242754",
+   "lines": [
+    "Rotation: rotates the selected block's contents counter-clockwise (values move top-right -> top-left -> bottom-left -> bottom-right). Block origin from the 4-byte cursor arg1 (row, col; cells are 6 apart per row); 2x2 below level 4, 3x3 ring of 8 cells otherwise."
+   ]
+  },
+  {
+   "addr": "0x2427f4",
+   "lines": [
+    "Rotation: the clockwise counterpart of rotation_rotate_block_ccw_242754 (same block geometry, inverse cycle)."
+   ]
+  },
+  {
+   "addr": "0x242220",
+   "lines": [
+    "Not a function: interior of rotation_handler_241fd0 (no prologue; 0x24221e falls into it). Wraps the cursor after a move using divmod by the board size and posts tick event 0x30 with delay 3 for the rotation animation. Listed as a label so the worklist stops offering it."
+   ]
+  },
+  {
+   "addr": "0x2b5068",
+   "lines": [
+    "Software double multiply (sign = a.sign ^ b.sign, exponent add). menu_render_2629d0 computes the scrollbar thumb as (pos-1) * ((rows-7) op c) / (count-1) with this, double_div_2b49b8 and 0x2b44f6; Snake's tick delay uses the same family."
+   ]
+  },
+  {
+   "addr": "0x2b44f6",
+   "lines": [
+    "Hypothesis (unnamed): software double add or subtract (aligns exponents, no sign combination); used once by menu_render_2629d0 on the scrollbar height."
+   ]
+  },
+  {
+   "addr": "0x26309c",
+   "lines": [
+    "Activates menu item arg0 in the current level: rejects items beyond the count or disabled; stores it as the level's selection (+6); if the level flags bit 6 it posts task-5 status 0x38c (or 0x38e for item 0) with the item's payload word and does not return; otherwise renders the menu (or clears the pending 0x2b4fd6(1) state). Returns 1 on success, 0 if rejected."
+   ]
+  },
+  {
+   "addr": "0x263154",
+   "lines": [
+    "Enters menu level arg0 at item id arg1: after 0x262fa4() it binds the level's context descriptor (0x10bbec[...]) to the level record (0x10b2b4 + idx*8 + 0x48), resolves the item ordinal by id, applies the descriptor flags (bit 0 -> 0x263006 sets a 16-bit pair at +4/+6; bits 4/5 start/stop something through 0x24b174/0x24af00), then activates the item (falling back to the first enabled) and ui_context_switch_2a5dec(1). Posts task-5 status 0x5de/0x5eb when the level has no enabled item."
+   ]
+  },
+  {
+   "addr": "0x263468",
+   "lines": [
+    "Returns to the current level's remembered selection (+6 of its descriptor) and re-activates it, stopping the 0x24af00 side effect if active; this is the 'Last view' style return after a game ends."
+   ]
+  },
+  {
+   "addr": "0x24af00",
+   "lines": [
+    "editor_close: if an editor is open (state block 0x110590 +8), runs its teardown (0x24adc8: cancels delayed event 0x31, destroys the focused widget, clears widget 0x29, removes UI slot 2, restores the previous UI context) and flushes pending text (0x24aedc), then sets 0x11fcd4 = 1. Menu descriptor flag 0x20 and menu_leave/menu_return call it."
+   ]
+  },
+  {
+   "addr": "0x2621cc",
+   "lines": [
+    "Returns the n-th (arg1, 0-based) entry of menu level arg0: level record in menu_levels_10b2fc (8 bytes: +0 id, +1 first entry, +2 count), entries are 0x1c-byte records in menu_entries_10b32c chained by the next byte at entry-2; result points at entry-0x1c (record base). 0 when the level or entry is missing."
+   ]
+  },
+  {
+   "addr": "0x262218",
+   "lines": [
+    "Clears menu level arg0: walks count+1 entries of its chain clearing the used flag at entry-3, then zeroes the level id."
+   ]
+  },
+  {
+   "addr": "0x26225e",
+   "lines": [
+    "Removes the n-th entry (arg1, 1-based, <= count) from level arg0's chain: relinks the previous entry's next byte, clears the entry's used flag, decrements the level count."
+   ]
+  },
+  {
+   "addr": "0x2622c2",
+   "lines": [
+    "Frees level arg0: for each first entry, frees the payload pointers at +0/+4/+8 as selected by arg1 bits 0..2 with rtos_mem_free_26abf8, removes the entry, then clears the level via menu_level_clear_262218. games_menu_handler_29a144 calls it with flags 2 when leaving a game menu."
+   ]
+  },
+  {
+   "addr": "0x243664",
+   "lines": [
+    "Ensures widget (class, index) lives in widget list arg2: if it exists in another list it is destroyed and re-created there (sorted insert); created fresh if absent."
+   ]
+  },
+  {
+   "addr": "0x24369a",
+   "lines": [
+    "widget_set_243550(class, 0, 0, data, 0) followed by widget_move_to_list_243664(class, 0, 1): post content and pin the widget to list 1."
+   ]
+  },
+  {
+   "addr": "0x243934",
+   "lines": [
+    "Picks the per-list style entry for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte entry's flag byte (0x2d656c[n*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's limit; falls back to the first. widget_get_style_2453ec and the layout pass consume the result. (Distinct from the per-widget style class/variant used by widget_measure_22c15c.)"
+   ]
+  },
+  {
+   "addr": "0x243964",
+   "lines": [
+    "Hypothesis (unnamed): computes a vertical extent for a widget from fields +0x46/+0x49/+0x4a and padding +0x2c, relative to a parent, when +0x28 bits 17..18 are set; part of the layout pass at 0x243ba8."
+   ]
+  },
+  {
+   "addr": "0x262fa4",
+   "lines": [
+    "Leaves the current menu level if it is open (+0x2a of the level slot): stops the 0x24af00 effect (state 1 -> 2), cancels delayed event 0x31, tears the menu down with menu_render_2629d0(0xff, 1) unless suppressed (+1), calls 0x2ac6fc, clears the open flag. menu_enter_263154 calls it first."
+   ]
+  },
+  {
+   "addr": "0x262ff0",
+   "lines": [
+    "Increments the current context's menu nesting depth byte (0x10b2dc[ctx*4+1]), capped at 6, matching the six level slots."
+   ]
+  },
+  {
+   "addr": "0x263006",
+   "lines": [
+    "Builds the 16-bit item enable mask for the current level: for each entry (direct 0x14-byte table or the 0x1c-byte chain) reads bit (+0x1e / -10) of the byte pointed to by (+0x18 / -0x10) and packs it at the item's position. menu_enter_263154 stores it at level +4/+6 when descriptor flag bit 0 is set; menu_item_enabled_2623b0 tests it."
+   ]
+  },
+  {
+   "addr": "0x2632fc",
+   "lines": [
+    "Allocates a free entry among the 0x50 records of menu_entries_10b32c (used flag +0x19), copies the template (arg2), and links it into level arg0's chain: as first entry when the level is empty, at position arg1 (1-based) when given, else at the end; increments the level count. Returns 1, or 0 when no entry is free."
+   ]
+  },
+  {
+   "addr": "0x2633d0",
+   "lines": [
+    "Creates menu level arg0 in the first free slot of menu_levels_10b2fc (params arg1..arg3 at +3..+5) and inserts its first entry from a default template (payload arg4, text 0x114, 0xdc, 0xc, 0x11) via menu_level_insert_entry_2632fc; rolls the slot back when the insert fails."
+   ]
+  },
+  {
+   "addr": "0x2430c0",
+   "lines": [
+    "Leaf: if ui_repaint_state_10eb3c == 3 set it to 2 (same transition ui_refresh_timer_243180 makes before repainting). BL target from outside the games region; callers are not in the closure."
+   ]
+  },
+  {
+   "addr": "0x2431d2",
+   "lines": [
+    "If ui_repaint_state_10eb3c is non-zero, clears it and calls ui_refresh_timer_243180(0), cancelling the pending repaint."
+   ]
+  },
+  {
+   "addr": "0x2432cc",
+   "lines": [
+    "Destroys the focused widget (pointer at widget_focus_10eb48, the same block widget_set_243550 consults at +0x11/+0x10) and clears the pointer."
+   ]
+  },
+  {
+   "addr": "0x2436c4",
+   "lines": [
+    "Sets widget +0x38, the widget_class_handlers_2e0660 index, for (class, index 0). Returns 1 if the widget exists."
+   ]
+  },
+  {
+   "addr": "0x2436dc",
+   "lines": [
+    "Sets or clears bit arg1 of widget +0x42 and marks the widget dirty when the bit changes."
+   ]
+  },
+  {
+   "addr": "0x24371a",
+   "lines": [
+    "Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_style_variant_24383c writes in its top 3 bits)."
+   ]
+  },
+  {
+   "addr": "0x24377c",
+   "lines": [
+    "Find-or-create (class, index); an existing widget is marked dirty and, if flag bit 0 is set, re-initialised through widget_init_2432e0; then +0x38 (class handler index) is set to arg2."
+   ]
+  },
+  {
+   "addr": "0x243804",
+   "lines": [
+    "Sets or clears widget flag 0x80 (hidden) for (class, index), sets flag 0x20 and marks dirty when it changes. widget_is_unobscured_2439ac ignores widgets with bit 7 set, which fixes the bit's meaning."
+   ]
+  },
+  {
+   "addr": "0x2439ac",
+   "lines": [
+    "Returns 0 if any later widget in the same list that is not hidden overlaps this widget's rectangle (+0x47 x, +0x45 w, +0x49 y with heights +0x2c/+0x2d/+0x46), else 1."
+   ]
+  },
+  {
+   "addr": "0x243a2c",
+   "lines": [
+    "The games UI layout and paint pass (about 0xf80 bytes, under interrupt lock): resolves each widget list's style variant, clears and repaints overlapped list regions through the per-class handlers (event 3 then 6), then positions widgets along their neighbour links with the style paddings. The entry scan split it at 0x243a50/0x243a5e/0x243ba6/0x243ba8 (false BL decodes in its literal pools); those are labelled as parts, not functions."
+   ]
+  },
+  {
+   "addr": "0x240610",
+   "lines": [
+    "Not a function: interior of level_widget_callback_240604 (no prologue; the pointer scan matched a literal). Labelled so the worklist stops offering it."
+   ]
+  },
+  {
+   "addr": "0x26250a",
+   "lines": [
+    "Not a function: interior of the unnamed 0x2624b8 (sets widget 0x1b text for a submenu entry); labelled as a part."
+   ]
+  },
+  {
+   "addr": "0x26343a",
+   "lines": [
+    "Clears 0x10b2b5 and tears the menu down with menu_render_2629d0(0xff, 1)."
+   ]
+  },
+  {
+   "addr": "0x2634b6",
+   "lines": [
+    "Tears the menu down (menu_render_2629d0(0xff, 1)) when the context's open flag (0x10b2de[ctx*4]) is set."
+   ]
+  },
+  {
+   "addr": "0x2634d4",
+   "lines": [
+    "Pops one menu nesting level: clears the current level slot, marks it state 7, restores the previous level's slot and adjusts the depth counter (max 6)."
+   ]
+  },
+  {
+   "addr": "0x24386a",
+   "lines": [
+    "Hypothesis (unnamed): leaf that writes (arg0 == 1) to 0x110900, the byte before ui_dirty_flag_110901; a second UI flag whose reader is outside the closure."
+   ]
+  },
+  {
+   "addr": "0x26344c",
+   "lines": [
+    "Hypothesis (unnamed): resets cached UI tables via 0x2ae7c4 then posts task-5 status 0x5de (the same failure status menu_enter_263154 uses when a level has no enabled item)."
+   ]
+  },
+  {
+   "addr": "0x262590",
+   "lines": [
+    "Hypothesis (unnamed): resolves a menu descriptor through 0x262544 and sets widget 0x1b's text from the matching 0x14-byte entry; widget 0x1b's role (header or softkey label) is not yet established."
+   ]
+  },
+  {
+   "addr": "0x24af70",
+   "lines": [
+    "editor_open(text, descriptor, param): closes any open editor, binds the text buffer (+0x34), descriptor (+0x1c) and param (+0x16) into the editor state block at 0x110590, marks it open (+8 = 1); for numeric descriptors (flags 0x600) scans the text for ',' or '.' to set the decimal-point bit; sets 0x110900 = 1 via 0x24386a; then 0x2454c0(descriptor[2], text) builds the editor widgets. This is the text/number input editor the MMI documentation calls the 'editor'."
+   ]
+  },
+  {
+   "addr": "0x24b174",
+   "lines": [
+    "editor_open_default(buf, table): editor_open_24af70(buf, table, 0x578). menu_enter_263154 calls it when the level descriptor has flag 0x10 (input-field menu items)."
+   ]
+  },
+  {
+   "addr": "0x244d7c",
+   "lines": [
+    "Not a function: interior of widget_layout_pass_243a2c (false BL decode in its literal pool); the neighbour-walk and stacking part of the pass."
+   ]
+  },
+  {
+   "addr": "0x245126",
+   "lines": [
+    "Not a function: interior of widget_layout_pass_243a2c; clears a list region with lcd_fill_rect_25eec0 and flags overlapping lists for repaint."
+   ]
+  },
+  {
+   "addr": "0x2451d8",
+   "lines": [
+    "Not a function: tail of widget_layout_pass_243a2c; releases the interrupt lock and calls service_session_draw_end_2abd7c (LCD flush)."
+   ]
+  },
+  {
+   "addr": "0x2451fe",
+   "lines": [
+    "Not a function: alternate tail of widget_layout_pass_243a2c (store state, unlock, flush when a full pass ran)."
+   ]
+  },
+  {
+   "addr": "0x2ac6fc",
+   "lines": [
+    "Hypothesis (unnamed): 0x2ac6fc -> 0x2b4fd6(0x2db724[*0x11fcce * 8]); 0x2b4fd6 stores the id at 0x1124f4 and posts widget class 0x67 with the 32-byte record 0x2d3948[id] (records hold text id 0xdc and a pointer 0x2b5064), or queues the id when busy. editor_close_24af00's teardown also calls it. Role still open."
+   ]
+  },
+  {
+   "addr": "0x243b88",
+   "lines": [
+    "Not a function: interior of widget_layout_pass_243a2c (clears widget flag bit 4 for a list; false BL decode)."
+   ]
+  },
+  {
+   "addr": "0x2b4fd6",
+   "lines": [
+    "Hypothesis (unnamed): class 0x67 is a generic text/icon widget (class handler 1 -> 0x22f8fc, list 17, style class 1). 0x2b4ff8 (outside the closure) re-posts it when the value 0x2a7734() returns changes, unless mode byte 0x11fcc2 == 3; 0x2b4fd6(id) posts record 0x2d3948[id] into it or queues the id at 0x1124f4+1 while +2 is busy. A status-line indicator refreshed from a polled value; the value's meaning is not established here."
+   ]
+  },
+  {
+   "addr": "0x240d82",
+   "lines": [
+    "Snake event handler. 0x49 init: clears the snake record(s), sets direction/state, frees and rebuilds the board. 0x54 tick: snake_check_move_2413dc; on a free cell it advances the tail unless snake_grow_flag_110354 is set, moves the head, then compares the head with snake_food_pos_110340: on a match it beeps (display_type2_post 0xf1), adds level+1 to the score (game_records +0), places new food and sets the grow flag so the next tick keeps the tail. It re-posts delayed event 0x30 with floor(10 * snake_speed_110344 / 7.78125) ticks. A collision posts task-5 status 0x11 (game over). 0x57 draws via snake_draw_241198. Key events 2/4/6/8 set the direction.",
+    "State: snake_state_110310, 0x18 bytes per snake (two in 2-player mode): +0 u16 tail index, +2 u16 head index, +4 u16 ring size-1, +8/+9 head x/y, +0xc/+0xd tail x/y, +0x10 direction (0 up, 1 right, 2 down, 3 left), +0x14 pointer to the direction ring (2 bits per segment). Board: snake_board_110348 = {cols, rows, pad, pad, pointer to a 1-bit-per-cell occupancy map (byte index x + cols*(y>>3), bit y&7)}."
+   ]
+  },
+  {
+   "addr": "0x2413dc",
+   "lines": [
+    "Collision test for the next head cell of snake arg1: head + direction delta; returns 1 for a wall or an occupied cell, 0 for a free cell, and arg3[snake] when the cell is the current tail cell (legal only if the tail is about to move)."
+   ]
+  },
+  {
+   "addr": "0x2414dc",
+   "lines": [
+    "Moves the head: in 1-player mode a full ring (head+1 == tail after wrap+1) awards 100 points and posts status 0x13 (board filled); if the ring would overflow it first advances the tail; writes the direction into the ring at the head index, increments the head index modulo the ring size, applies the direction delta to head x/y and sets the occupancy bit."
+   ]
+  },
+  {
+   "addr": "0x241620",
+   "lines": [
+    "Advances the tail: clears the tail cell's occupancy bit, reads the 2-bit direction stored at the tail index to move tail x/y one cell, increments the tail index modulo the ring size. (First named 'advance head'; the cell it clears and the index it increments are the tail's.)"
+   ]
+  },
+  {
+   "addr": "0x2416f6",
+   "lines": [
+    "Places food: up to 255 tries of x = rand() % cols, y = rand() % rows until the occupancy bit is clear; writes the 4-byte position to arg0 (snake_food_pos_110340)."
+   ]
+  },
+  {
+   "addr": "0x241198",
+   "lines": [
+    "Draws the field: border from four lcd_fill_rect_25eec0 calls sized cols*4+2 by rows*4+2; food as the 4x4 bitmap snake_food_bitmap_2d9744 at (x*4+2, y*4+2); each snake by walking the direction ring from tail to head, drawing a 3x3 block for the tail and 4x3 or 3x4 blocks per segment so adjacent cells join. Cells are 4 px pitch with a 2 px origin."
+   ]
+  },
+  {
+   "addr": "0x2d9744",
+   "lines": [
+    "Assets, all column-major with bit (y & 7) per row as lcd_blit_bitmap_25f3b6 expects: snake food 4x4 (4 bytes); game_tile_bitmaps_2d94bc 7x7 tiles, 7 bytes each, index 0 blank then 0x49 symbols shared by Memory and Logic; game_tile_back_2d96c4 (card back) and game_tile_cursor_2d96cc (frame), 8 bytes each; games_digit_glyphs_2d96ec 3x5 digits, 3 bytes each; game3_sprites_2d995c 20-byte 10x10 sprites in outline/filled pairs; game3_backgrounds_2d9764 84x48 scenes (504 bytes). Bitmap headers are 12 bytes {data*, 4 unused, width, height}; the game_table_2d9484 parameter bytes are 01 09 07d0 (Rotation), 01 05 004b (Snake), 01 05 2710 (Memory), 01 08 0000 (game3)."
+   ]
+  }
+ ]
+}

@@ -99,6 +99,7 @@ corresponding subsystem:
 - `sim_registration.md`
 - `sim_emulator_scope.md`
 - `firmware_code_maps.md`
+- `games_applications.md` (built-in games, their framework and boundary services)
 - `message_topology_census.md`
 - `battery_classifier_analysis.md` (mapped battery ADC/classifier contract)
 
