@@ -180,6 +180,58 @@ filter these reports, enlarge the firmware queue, change task scheduling,
 inject the self-test reply, cancel the expiry, or promote the candidate
 DSP mask to manufacture successful startup.
 
+### Diagnostic publication and partial code-block transfer
+
+The passive DSP data-space watch at native word `0x08e4` captures the
+publication PC and stack. The early `32 00 01 11` publications use packet
+sender `0x37ce` (producer write at `0x3805`); the captured stack includes
+`0x385f`, the return from the diagnostic builder called at `0x385d`.
+That builder at `0x4aa5` writes packet prefix `0x3200`, length 4 and type
+`0x74`. Its caller checks DSP word `0x0871`, the code-block request cell.
+This ties the repeated reports to loader activity, not an idle heartbeat.
+The meaning of the diagnostic reason remains unvalidated.
+
+The MCU receives IRQ4 for both request `0x12` and request `1`. Handler
+`0x433574` reads the latter at `0x4335da`; this is not a lost interrupt
+edge. The former completes, clears request offset `0x0e2` and writes
+status 4 at offset `0x0e4`. The latter performs a partial transfer:
+at branch target `0x4336a6`, approximately 0.523229 seconds, the loader
+has `0x028f` words remaining, chunk field `0x044c`, source `0x229224`
+and destination `0x10260`. It writes status 2, which the DSP clears at
+approximately 0.523258 seconds, while leaving request 1 outstanding.
+Thus an uncleared request does not mean the MCU ignored its selector.
+
+Reproduce with `tools/nse5_rom4_compat_check.py --verbose`; the observer
+emits `nse5_compat_code_block` and `nse5_compat_dsp_publication` records.
+The continuation signal is now identified: DSP routine `0x31f9` clears
+status `0x0872`, then pulses data address `0x0029` bit 3 at PCs
+`0x3200`/`0x3203`. The same bit is pulsed for the initial selector `0x12`
+and selector 1. The passive observer records all three with the outstanding
+request and status. TI's [SPRU038A, sections 3.5.3 and 3.5.4](https://www.ti.com/jp/lit/ug/spru038a/spru038a.pdf)
+documents this address/bit as BSCR.HINT, a DSP-to-ARM interrupt output.
+This is corroboration from related TI silicon, not proof of fitted MAD2
+identity or every BSCR bit's semantics.
+
+Replacing the request-word notification with this output completes selectors
+1 and 2 and advances to 8 and 3 in the NSE-5 trial. It does **not** establish
+boot: execution later reaches opcode `0x0363` in data-like words at `0x06f5`
+and produces invalid RX-ring indices. The same change exposes the legitimate
+`RCD ANEQ` opcode `0xfe44` at `0x90eb` on NSE-1. That instruction is now
+implemented with executable true/false tests against TI SPRU172C's delayed
+conditional-return contract. Even with it implemented, the HINT trial fails
+NSE-1 coherent/menu acceptance and produces a rapid slot-timer loop involving
+port `0x0f` writes of 0 and `0x3a98`. Those are observations, not evidence
+that zero should be suppressed or that the timer clock should be tuned.
+
+Consequently HINT wiring is not promoted: the working backend retains its
+explicitly documented request-write approximation. The next investigation
+must establish the additional loader execution and slot-timer/control
+contracts exposed by the complete transfer, preserving NSE-1 acceptance
+before replacing that approximation. Do not clear requests, synthesize
+completions, suppress diagnostics or alter timer values to obtain boot.
+Entry hooks are branch-target observations; an unobserved fallthrough-only
+hook is not absence evidence.
+
 ## Display contract
 
 The full-core trial emits 141 LCD commands and 2,592 data bytes (three

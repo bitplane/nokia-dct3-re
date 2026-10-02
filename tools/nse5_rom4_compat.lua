@@ -34,6 +34,7 @@ local entries = {
     {0x4dea50, "task2_message_received"},
     {0x3bbe04, "task2_dsp_queue_post"},
     {0x3bbe98, "task2_dsp_queue_result"},
+    {0x433626, "code_block_chunk"}, {0x4336a6, "code_block_partial"},
 }
 for _, entry in ipairs(entries) do
     local address, name = entry[1], entry[2]
@@ -63,6 +64,15 @@ for _, entry in ipairs(entries) do
                         name, space:read_u8(0x16702c), space:read_u8(0x16ab88),
                         r5, space:read_u8(r5), space:read_u8(r5 + 1),
                         space:read_u8(0x17fe15), machine.time:as_double()))
+                end
+                if name == "code_block_chunk" or name == "code_block_partial" then
+                    local state = cpu.state["R4"].value
+                    machine:logerror(string.format(
+                        "nse5_compat_code_block: name=%s request=%04x status=%04x remaining=%04x chunk=%04x source=%08x destination=%08x t=%.6f\n",
+                        name, space:read_u16(0x100e2), space:read_u16(0x100e4),
+                        space:read_u16(state + 6), space:read_u16(state + 8),
+                        space:read_u32(state + 0x10), space:read_u32(state + 0x14),
+                        machine.time:as_double()))
                 end
                 if name == "dsp_control_receive" or name == "startup_selftest_reply" or
                         name == "task2_message_received" then
@@ -136,10 +146,39 @@ taps[#taps + 1] = space:install_write_tap(0x17fe14, 0x17fe17,
                 cpu.state["R14"].value, machine.time:as_double()))
         end
     end)
+local dsp = machine.devices[":dsp_c54x:cpu"]
+local dsp_space = dsp.spaces["data"]
+local dsp_publications = 0
+local dsp_service_pulses = 0
+taps[#taps + 1] = dsp_space:install_write_tap(0x0029, 0x0029,
+    "nse5_compat_dsp_service_register", function(offset, data, mask)
+        dsp_service_pulses = dsp_service_pulses + 1
+        if dsp_service_pulses <= 64 then
+            machine:logerror(string.format(
+                "nse5_compat_dsp_service_register: value=%04x pc=%04x request=%04x status=%04x t=%.6f\n",
+                data, dsp.state["PC"].value, dsp_space:read_u16(0x0871),
+                dsp_space:read_u16(0x0872), machine.time:as_double()))
+        end
+    end)
+taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
+    "nse5_compat_dsp_publication", function(offset, data, mask)
+        dsp_publications = dsp_publications + 1
+        if dsp_publications <= 128 then
+            local stack = {}
+            for index = 0, 15 do
+                stack[#stack + 1] = string.format("%04x", dsp_space:read_u16(
+                    (dsp.state["SP"].value + index) & 0xffff))
+            end
+            machine:logerror(string.format(
+                "nse5_compat_dsp_publication: producer=%04x pc=%04x sp=%04x t=%.6f stack=%s\n",
+                data, dsp.state["PC"].value, dsp.state["SP"].value,
+                machine.time:as_double(), table.concat(stack, ":")))
+        end
+    end)
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 3, "entry trace subscriptions lost")
+    assert(#taps == #entries + 5, "entry trace subscriptions lost")
     if menu_fixture then
         local now = machine.time:as_double()
         if (menu_step == 0 and now >= 4.2) or (menu_step == 1 and now >= 4.4) then
