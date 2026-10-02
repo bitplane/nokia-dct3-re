@@ -401,6 +401,26 @@ The filename "virgin eeprom" is not evidence of compatibility with the
 model's nominal serial. A paired COBBA observation, a provenance-backed
 stored identity format, or an independently documented factory profile is
 needed before changing that input.
+
+### Loader trial regression boundary
+
+The full-transfer changes remain experimental: BSCR.HINT-driven service IRQ,
+absolute port-`0x0f` compare against the free-running port-`0x0d` counter,
+and NSE-5's larger overlay geometry. The protected 3210 frontier and COBBA
+conformance pass, and `verify-5110-menu` reproduces the exact menu oracle.
+The old RF-negative gates do not pass and are not silently re-banked.
+
+A fresh, isolated 30-second NSE-1 run starts receiver reads on frame 30,
+finishes with 6499 frame expiries and 207040 reads, exactly
+`32 * (6499 - 30 + 1)`. It emits these three port-`0x31/0x32` pairs:
+`2a04/0006` at DSP `0xa240` twice, then `2813/0030` at `0x4028`.
+It remains idle at `0x408d`, IFR zero, IMR `0x035f`, with no port-`0x38/0x39`
+burst reads. A shorter instrumented run additionally emits `0041/0040`
+at `0x3712`; exact command counts are not established as invariant.
+The existing gate instead requires zero port-`0x32` writes and first read
+on frame 29. Classify these newly reached firmware paths and add focused
+counter/compare acceptance before promoting the trial; matching the menu
+frame alone does not settle this behavior change.
 Do not substitute donor provisioning, alter validation or invent a COBBA
 identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
 is blank; DSP progress is not graphical boot or fitted-mask compatibility.
