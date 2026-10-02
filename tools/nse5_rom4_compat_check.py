@@ -62,6 +62,23 @@ def check_trace(trace, returncode):
     return samples
 
 
+def program_upload_observation(trace):
+    """Compare captured upload writes with later reads, without inferring silicon."""
+    writes, comparisons = {}, []
+    for line in trace.splitlines():
+        write = re.search(r"nse5_compat_dsp_upper_program_upload: address=([0-9a-f]{4}) value=([0-9a-f]{4})", line)
+        read = re.search(r"nse5_compat_dsp_live_word: address=([0-9a-f]{4}) word=([0-9a-f]{4})", line)
+        if write:
+            writes[int(write[1], 16)] = int(write[2], 16)
+        elif read and int(read[1], 16) in writes:
+            address, value = int(read[1], 16), int(read[2], 16)
+            comparisons.append({"address": address, "written": writes[address],
+                                "read": value, "matches": writes[address] == value})
+    return {"captured_write_addresses": len(writes),
+            "compared_reads": comparisons,
+            "mismatches": [row for row in comparisons if not row["matches"]]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
@@ -69,7 +86,7 @@ def main():
     parser.add_argument("run_dir", type=Path)
     parser.add_argument("--menu", action="store_true", help="press/release the physical Menu switch after startup")
     parser.add_argument("--verbose", action="store_true", help="include device-boundary transport traces")
-    parser.add_argument("--dsp-tail", action="store_true", help="capture the last 64 DSP program reads before an illegal instruction")
+    parser.add_argument("--dsp-tail", action="store_true", help="capture DSP helper/low-program entry tails and return-stack writes")
     args = parser.parse_args()
     try:
         run = args.run_dir.resolve()
@@ -107,6 +124,9 @@ def main():
         samples = check_trace(trace + output, result.returncode)
         (run / "startup_queue.json").write_text(
             json.dumps(task2_queue_observation(trace), indent=2) + "\n")
+        if args.dsp_tail:
+            (run / "program_upload.json").write_text(
+                json.dumps(program_upload_observation(trace), indent=2) + "\n")
         if args.menu:
             trace = log.read_text()
             if "nse5_compat_menu: pressed=1" not in trace or "nse5_compat_menu: pressed=0" not in trace:

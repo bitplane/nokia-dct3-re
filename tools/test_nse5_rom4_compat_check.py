@@ -13,6 +13,26 @@ def complete_trace():
 
 
 class CompatibilityCheckTest(unittest.TestCase):
+    def test_upload_read_mismatch(self):
+        trace = ("nse5_compat_dsp_upper_program_upload: address=282d value=4a08\n"
+                 "nse5_compat_dsp_live_word: address=282d word=2833")
+        result = checker.program_upload_observation(trace)
+        self.assertEqual(result["mismatches"][0]["address"], 0x282d)
+
+    def test_upload_read_matches_latest_write(self):
+        trace = ("nse5_compat_dsp_upper_program_upload: address=282d value=4a08\n"
+                 "nse5_compat_dsp_upper_program_upload: address=282d value=fc00\n"
+                 "nse5_compat_dsp_live_word: address=282d word=fc00")
+        result = checker.program_upload_observation(trace)
+        self.assertEqual(result["captured_write_addresses"], 1)
+        self.assertEqual(len(result["compared_reads"]), 1)
+        self.assertFalse(result["mismatches"])
+
+    def test_uncaptured_write_does_not_prove_match(self):
+        result = checker.program_upload_observation(
+            "nse5_compat_dsp_live_word: address=282d word=fc00")
+        self.assertEqual(result["compared_reads"], [])
+
     def test_queue_full_at_selftest_reply(self):
         trace = ("nse5_compat_task2_queue: primitive=0d detail=00 producer=0b "
                  "consumer=00 capacity=0c t=0.701839\n"

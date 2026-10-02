@@ -17,6 +17,15 @@ than the inherited PCD8544 profile. The normal product selects SED1565
 with a 96-by-65 panel window at segment 18; the DSP completion boundary remains
 unchanged.
 
+The full-transfer research frontier is the DSP program-memory extent:
+NSE-5 writes executable code above the backend's `0x2800` overlay limit.
+A larger-bank trial removes execution of stale mask words but then waits
+on COBBA register D status bits `0x0c`; it still has no graphical boot.
+Neither the fitted geometry nor that status response is established. See
+[the upload/read evidence](#diagnostic-publication-and-partial-code-block-transfer)
+before revisiting queue loss or interpreting the resulting bad return as
+a CPU opcode gap.
+
 ### Reproducible compatibility instrument
 
 `nse5r4t` is an explicitly labeled research composition, not another supported
@@ -218,10 +227,9 @@ boot: execution later reaches opcode `0x0363` in data-like words at `0x06f5`
 and produces invalid RX-ring indices. The same change exposes the legitimate
 `RCD ANEQ` opcode `0xfe44` at `0x90eb` on NSE-1. That instruction is now
 implemented with executable true/false tests against TI SPRU172C's delayed
-conditional-return contract. Even with it implemented, the HINT trial fails
-NSE-1 coherent/menu acceptance and produces a rapid slot-timer loop involving
-port `0x0f` writes of 0 and `0x3a98`. Those are observations, not evidence
-that zero should be suppressed or that the timer clock should be tuned.
+conditional-return contract. With the legacy relative slot timer, the HINT
+trial produces a rapid loop involving port `0x0f` writes of 0 and `0x3a98`.
+That does not justify suppressing zero or tuning the clock.
 
 Consequently HINT wiring is not promoted: the working backend retains its
 explicitly documented request-write approximation. The next investigation
@@ -237,8 +245,12 @@ round trips, balanced SP, true/false branches and cycle counts.
 
 ROM readers `0x44dc` and scheduler writers `0x25f7`/`0x366c` support a
 free-running port-`0x0d` counter and absolute port-`0x0f` compare hypothesis.
-An experiment removes the rapid zero-compare loop but still fails NSE-1
-acceptance, reaching unsupported `BCD BLEQ` (`0xfa4f`) at `0x0ad6`.
+An experiment removes the rapid zero-compare loop. `BCD BLEQ` (`0xfa4f`)
+at `0x0ad6` is implemented with negative/zero/positive signed-B fixtures,
+delay-slot condition capture and cycle counts. With these instructions,
+NSE-1 passes runtime coherence and its exact physical Menu frame. The complete
+coherent Make gate still rejects the newly active RF port-32 writes: its old
+zero-write boundary assertion has not been re-banked.
 Counter equality ordering, clock/control behavior and physical CTSI
 correspondence remain unvalidated; the experiment is not promoted.
 
@@ -246,9 +258,35 @@ On NSE-5, `--dsp-tail` captures the first entry below program `0x0800`:
 `RETE` at `0x3620` returns to `0x2470`, branches to `0x2754`, then `RET`
 at `0x2763` with SP `0x0854` pops zero and enters `0x0000`. The later
 `0x0363` failure is execution of data, not evidence for a new opcode.
-Trace creation/writes of this return-stack entry before concluding CPU
-error or mask incompatibility. The tail includes extension-word reads;
-it is not an instruction-boundary disassembly.
+The return-stack trace and upload/read comparison identify an earlier cause:
+the uploaded trampoline at `0x2470` branches to `0x2754`, which redirects
+caller `0x45c4` to uploaded code at `0x282d`. The backend discards program
+writes at or above `0x2800`, so this entry instead executes mask-ROM words.
+It repeatedly calls `0x45c2`, shrinking SP from `0x1ec6` into shared HPI
+storage. The final zero return is a consequence, not the original defect.
+
+The DSP's `MVDP` at `0x31d6` writes `0x4a08` to `0x282d`; subsequent reads
+return `0x2833` under the old geometry. An explicitly experimental `0x3000`
+overlay extent makes all ten captured comparisons at `0x282d..0x2836`
+match, removes this recursion and completes a nine-second observation run
+without an unsupported opcode. The exact fitted RAM extent remains unproven.
+TI [SPRU131G, chapter 3](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+documents model-dependent C54x memory maps; the `0x27ff` limit is not a
+CPU-family-wide architectural limit.
+
+The next observed boundary is the mask routine `0x4641..0x464a`, repeatedly
+reading COBBA control register D through `0x465c` and waiting for
+`(value & 0x000c) == 0x000c`. The current storage-only COBBA model reads zero.
+This is a consumer predicate, not evidence that a real COBBA should return
+`0x000c`. Recover the preceding transaction and register semantics before
+adding a response. Readiness remains `0x0a`, keypad columns remain masked,
+and the LCD is blank; no graphical boot or fitted-mask compatibility is proven.
+
+`--dsp-tail` emits bounded upload/helper/stack observations and
+`program_upload.json`; comparisons are limited to captured writes and later
+reads. The broad fetch tap is removed after the upload window to avoid
+dominating runtime. Its records include extension words, not solely decoded
+instruction boundaries.
 Entry hooks are branch-target observations; an unobserved fallthrough-only
 hook is not absence evidence.
 

@@ -151,8 +151,35 @@ local dsp_space = dsp.spaces["data"]
 local capture_tail = os.getenv("NSE5_COMPAT_DSP_TAIL") == "1"
 local program_tail, tail_index, tail_dumped = {}, 0, false
 local previous_program_read
-local function dump_program_tail(reason)
-    tail_dumped = true
+local helper_seen = false
+local program_tap
+local stack_writes = 0
+if capture_tail then
+    local ignored_uploads = 0
+    taps[#taps + 1] = dsp.spaces["program"]:install_write_tap(0x2800, 0x2fff,
+        "nse5_compat_dsp_upper_program_upload", function(offset, data, mask)
+            ignored_uploads = ignored_uploads + 1
+            if ignored_uploads <= 16 or (offset >= 0x2828 and offset <= 0x2836) then
+                machine:logerror(string.format(
+                    "nse5_compat_dsp_upper_program_upload: address=%04x value=%04x pc=%04x pmst=%04x t=%.9f\n",
+                    offset, data, dsp.state["PC"].value,
+                    dsp.state["PMST"].value, machine.time:as_double()))
+            end
+        end)
+    taps[#taps + 1] = dsp_space:install_write_tap(0x0830, 0x0860,
+        "nse5_compat_dsp_return_stack", function(offset, data, mask)
+            stack_writes = stack_writes + 1
+            if stack_writes <= 2048 then
+                machine:logerror(string.format(
+                    "nse5_compat_dsp_return_stack: address=%04x old=%04x value=%04x pc=%04x sp=%04x t=%.9f\n",
+                    offset, dsp_space:read_u16(offset), data,
+                    dsp.state["PC"].value, dsp.state["SP"].value,
+                    machine.time:as_double()))
+            end
+        end)
+end
+local function dump_program_tail(reason, keep_capturing)
+    tail_dumped = not keep_capturing
     machine:logerror("nse5_compat_dsp_program_tail_reason: " .. reason .. "\n")
     -- Extension words can appear: these are program reads, not decoded instructions.
     for index = math.max(1, tail_index - 63), tail_index do
@@ -163,7 +190,7 @@ local function dump_program_tail(reason)
     end
 end
 if capture_tail then
-    taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0, 0xffff,
+    program_tap = dsp.spaces["program"]:install_read_tap(0, 0xffff,
         "nse5_compat_dsp_program_tail", function(offset, data, mask)
             if tail_dumped or offset ~= ((dsp.state["PC"].value - 1) & 0xffff) then return end
             tail_index = tail_index + 1
@@ -173,11 +200,24 @@ if capture_tail then
                 dsp.state["AR3"].value, dsp.state["AR4"].value,
                 dsp.state["ST0"].value, dsp.state["ST1"].value,
             }
+            if not helper_seen and offset == 0x2754 then
+                helper_seen = true
+                dump_program_tail("first-uploaded-helper", true)
+                for _, bounds in ipairs({{0x246a, 0x2475}, {0x2754, 0x2780},
+                        {0x282d, 0x2875}, {0x45c2, 0x45f8}}) do
+                    for address = bounds[1], bounds[2] do
+                        machine:logerror(string.format(
+                            "nse5_compat_dsp_live_word: address=%04x word=%04x\n",
+                            address, dsp.spaces["program"]:read_u16(address)))
+                    end
+                end
+            end
             if previous_program_read and previous_program_read >= 0x0800 and offset < 0x0800 then
                 dump_program_tail("low-program-entry")
             end
             previous_program_read = offset
         end)
+    taps[#taps + 1] = program_tap
 end
 local dsp_publications = 0
 local dsp_service_pulses = 0
@@ -209,9 +249,16 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 5 + (capture_tail and 1 or 0), "entry trace subscriptions lost")
+    assert(#taps == #entries + 5 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
     if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
         dump_program_tail("illegal-opcode")
+    end
+    if capture_tail and not tail_dumped and machine.time:as_double() >= 0.55 then
+        dump_program_tail("bounded-upload-window")
+    end
+    if program_tap and tail_dumped then
+        program_tap:remove()
+        program_tap = nil
     end
     if menu_fixture then
         local now = machine.time:as_double()
