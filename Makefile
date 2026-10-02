@@ -1004,6 +1004,7 @@ check-c54x-rom4-compare: build
 		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
 			-skip_gameinfo -nothrottle -seconds_to_run 1 \
+			-state_directory "$$tmp/state" \
 			-autoboot_script $(abspath tools/c54x_rom4_compare_fixture.lua) >output.log 2>&1; \
 		cat output.log; \
 		grep -q '^ROM4 compare model conformance: PASS ' output.log

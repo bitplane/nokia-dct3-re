@@ -6,6 +6,7 @@ local backend = machine.devices[":dsp_c54x"]
 local io = dsp.spaces["io"]
 local slots = emu.item(assert(backend.items["0/m_slot_timer_expiries"]))
 local completed = false
+local save_snapshot, reference_snapshot
 local active, writing, unexpected_writes = false, false, 0
 local port_tap = io:install_write_tap(0x0d, 0x0f, "ctsi_fixture_isolation",
     function()
@@ -28,6 +29,28 @@ local function configure(counter, compare, reload)
     write(0x0d, counter)
     write(0x0f, compare)
 end
+local save_subscription = emu.add_machine_pre_save_notifier(function()
+    save_snapshot = {counter = io:read_u16(0x0d), slots = count(), time = machine.time:as_double()}
+end)
+local load_subscription = emu.add_machine_post_load_notifier(function()
+    assert(save_snapshot and reference_snapshot, "missing save/reference snapshot")
+    assert(io:read_u16(0x0d) == save_snapshot.counter, "counter position not restored exactly")
+    expect(save_snapshot.slots, "expiry count restored")
+    assert(machine.time:as_double() == save_snapshot.time, "saved emulated time not restored")
+    local replay = coroutine.create(function()
+        wait_ticks(100); expect(save_snapshot.slots, "restored before pending compare")
+        wait_ticks(3500); expect(reference_snapshot.slots, "restored pending compare")
+        local delta = (io:read_u16(0x0d) - reference_snapshot.counter + 2500) % 5000 - 2500
+        assert(math.abs(delta) <= 1, "counter replay phase differs")
+        assert(unexpected_writes == 0, "firmware rewrote a tested CTSI port")
+        completed = true
+        print(string.format("ROM4 compare save replay: saved_counter=%04x saved_slots=%d replay_slots=%d phase_delta=%d",
+            save_snapshot.counter, save_snapshot.slots, count(), delta))
+        print("ROM4 compare model conformance: PASS ahead behind equality repeat sentinel reload reset save")
+        machine:exit()
+    end)
+    assert(coroutine.resume(replay))
+end)
 local runner = coroutine.create(function()
     assert(emu.wait(0.25))
     -- ILLEGAL is the core's debugger execution-stop state, not a firmware
@@ -79,12 +102,18 @@ local runner = coroutine.create(function()
     assert(dsp.state["ILLEGAL"].value == 1 and dsp.state["IMR"].value == 0,
         "fixture lost execution isolation")
     assert(unexpected_writes == 0, "firmware rewrote a tested CTSI port")
-    completed = true
-    print("ROM4 compare model conformance: PASS ahead behind equality repeat sentinel reload reset")
-    machine:exit()
+    configure(1000, 4000)
+    machine:save("ctsi_compare_fixture")
+    wait_ticks(100)
+    assert(save_snapshot, "save did not complete within observation window")
+    expect(save_snapshot.slots, "reference before pending compare")
+    wait_ticks(3500)
+    expect(save_snapshot.slots + 1, "reference pending compare")
+    reference_snapshot = {counter = io:read_u16(0x0d), slots = count()}
+    machine:load("ctsi_compare_fixture")
 end)
 assert(coroutine.resume(runner))
 local stop_subscription = emu.add_machine_stop_notifier(function()
     if not completed then print("ROM4 compare model conformance: FAIL incomplete") end
 end)
-assert(stop_subscription and port_tap)
+assert(stop_subscription and port_tap and save_subscription and load_subscription)

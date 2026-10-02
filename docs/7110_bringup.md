@@ -438,9 +438,14 @@ outside-period sentinel cancellation, reload-induced cancellation, and
 counter/compare suspension and retention across the MAD2 DSP reset line.
 An isolation tap rejects unexpected firmware writes to the tested ports.
 The fixture exits without restoring or retaining its modified state.
+It also saves a pending nonzero compare, runs a reference interval, loads
+the state, and replays that interval. Counter position, expiry count and
+emulated timestamp restore exactly; the replay produces the same expiry
+count and counter phase within one tick. Pre-save and post-load notifiers
+anchor the snapshots to completed state operations, not request time.
 These cases pass the trial implementation, but do not establish physical
-equality ordering or real-chip reset retention. Save-state acceptance and
-classification of the newly reached RF paths remain outstanding.
+equality ordering or real-chip reset retention. Classification of the newly
+reached RF paths remains outstanding.
 
 The full-transfer changes remain experimental: BSCR.HINT-driven service IRQ,
 absolute port-`0x0f` compare against the free-running port-`0x0d` counter,
