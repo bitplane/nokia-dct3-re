@@ -366,7 +366,24 @@ stores agrees on every observed call. Shift and XOR semantics are grounded
 in TI [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), not in
 the phone's expected identity values. Round sequencing, final reversal and
 compatibility of the acquired provisioning with nominal COBBA inputs remain
-to be established; these stage checks do not validate the entire transform.
+distinct from these stage checks.
+
+The completed arithmetic audit checks 128 rotations, 128 mixing calls,
+110 nonlinear calls, 18 bit reversals and ten complete eleven-round loops.
+For each complete transform, it records six original data words, the six
+prepared table words, all twelve schedule words and six returned words.
+An independent word-level model reproduces all ten transforms, including
+both blocks of the rejected primitive `0x35`. Its prepared table is
+`6521 4cda 4d33 3bc6 3342 2c9e`; using the raw table before its linear-mix
+and reversal preparation is not an equivalent calculation.
+
+This closes the observed transform arithmetic as a source of the rejection;
+it does not prove fitted mask identity, valid provisioning or every CPU path.
+The remaining input contract is whether the acquired PMM was prepared for
+the nominal COBBA serial inputs used here. Establish the stored identity
+record's format/reader and its provenance before deriving or configuring
+any handset-specific serial value. No value inferred merely by making the
+validator accept is admissible.
 Do not substitute donor provisioning, alter validation or invent a COBBA
 identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
 is blank; DSP progress is not graphical boot or fitted-mask compatibility.

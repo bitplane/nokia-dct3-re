@@ -281,6 +281,91 @@ local dsp_service_pulses = 0
 local payload_writes = 0
 local source_tail = {}
 local transform_entries = 0
+local nonlinear_input, nonlinear_base, nonlinear_count
+nonlinear_count = 0
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7fe8, 0x7fe8,
+    "nse5_compat_nonlinear_input", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7fe9 then return end
+        nonlinear_base = dsp.state["AR4"].value
+        nonlinear_input = {}
+        for index = 0, 5 do
+            nonlinear_input[#nonlinear_input + 1] = string.format("%04x", dsp_space:read_u16(nonlinear_base + index))
+        end
+    end)
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7ff9, 0x7ff9,
+    "nse5_compat_nonlinear_output", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7ffa or not nonlinear_input then return end
+        nonlinear_count = nonlinear_count + 1
+        if nonlinear_count <= 128 then
+            local output = {}
+            for index = 0, 5 do
+                output[#output + 1] = string.format("%04x", dsp_space:read_u16(nonlinear_base + index))
+            end
+            machine:logerror(string.format(
+                "nse5_compat_nonlinear: input=%s output=%s t=%.9f\n",
+                table.concat(nonlinear_input, ":"), table.concat(output, ":"), machine.time:as_double()))
+        end
+        nonlinear_input = nil
+    end)
+local reverse_input, reverse_base, reverse_count, round_count, codec_input, codec_base
+reverse_count, round_count = 0, 0
+for _, address in ipairs({0x7f3f, 0x7f45, 0x7f54}) do
+    taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(address, address,
+        "nse5_compat_round_" .. string.format("%04x", address), function(offset, data, mask)
+            if dsp.state["PC"].value ~= address + 1 then return end
+            if address == 0x7f3f then
+                round_count = 0
+                codec_base = dsp.state["AR4"].value
+                local words, key, schedule = {}, {}, {}
+                for index = 0, 5 do
+                    words[#words + 1] = string.format("%04x", dsp_space:read_u16(codec_base + index))
+                    key[#key + 1] = string.format("%04x", dsp_space:read_u16(dsp.state["AR5"].value + index))
+                end
+                for index = 0, 11 do
+                    schedule[#schedule + 1] = string.format("%04x", dsp_space:read_u16(dsp.state["AR6"].value + index))
+                end
+                codec_input = {table.concat(words, ":"), table.concat(key, ":"), table.concat(schedule, ":")}
+            elseif address == 0x7f45 then round_count = round_count + 1
+            else
+                machine:logerror(string.format(
+                    "nse5_compat_rounds: count=%d schedule=%04x base=%04x t=%.9f\n",
+                    round_count, dsp.state["AR6"].value, dsp.state["AR4"].value,
+                    machine.time:as_double()))
+            end
+        end)
+end
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x8001, 0x8001,
+    "nse5_compat_reverse_input", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x8002 then return end
+        reverse_base = dsp.state["AR4"].value
+        reverse_input = {}
+        for index = 0, 5 do
+            reverse_input[#reverse_input + 1] = string.format("%04x", dsp_space:read_u16(reverse_base + index))
+        end
+    end)
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x8014, 0x8014,
+    "nse5_compat_reverse_output", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x8015 or not reverse_input then return end
+        reverse_count = reverse_count + 1
+        if reverse_count <= 32 then
+            local output = {}
+            for index = 0, 5 do
+                output[#output + 1] = string.format("%04x", dsp_space:read_u16(reverse_base + index))
+            end
+            machine:logerror(string.format(
+                "nse5_compat_reverse: base=%04x input=%s output=%s t=%.9f\n",
+                reverse_base, table.concat(reverse_input, ":"), table.concat(output, ":"),
+                machine.time:as_double()))
+            if codec_input and reverse_base == codec_base then
+                machine:logerror(string.format(
+                    "nse5_compat_codec: input=%s table=%s schedule=%s output=%s t=%.9f\n",
+                    codec_input[1], codec_input[2], codec_input[3], table.concat(output, ":"),
+                    machine.time:as_double()))
+                codec_input = nil
+            end
+        end
+        reverse_input = nil
+    end)
 local mix_input, mix_destination, mix_count
 mix_count = 0
 taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7fb1, 0x7fb1,
@@ -440,7 +525,7 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 15 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
+    assert(#taps == #entries + 22 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
     if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
         dump_program_tail("illegal-opcode")
     end
