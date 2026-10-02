@@ -354,6 +354,17 @@ produces `d1b4 5ffb 4ff0 2d7b 0f4c e1c3` at D:`0x13dc`; these are the
 resident `0xb6df` words with the first two words XORed by those inputs.
 This proves what the model used, not what the acquired handset used.
 
+A bounded data-space write watch confirms the acquisition chain in both
+initializations. The loader clears D:`0x1f0c..0x1f0d`; the builder briefly
+writes `0053/414e`, then writes `0016/0000` and finally `0010` to the second
+word at instruction tails `0x4af1`, `0x4af4` and `0x4afd`. The transform
+therefore consumes the later COBBA-derived values, not the temporary pair.
+Here “serial registers” means registers accessed over the serial-control
+interface. Their use in the MSID/retained-data calculations does not alone
+prove a unique physical chip serial number, and their earlier designation
+as analog measurements does not establish electrical units. Register
+semantics and the original paired input values remain separate unknowns.
+
 A fresh CPU conformance run passes. The nine-second compatibility trace
 contains 419 exact opcodes: 403 have focused assertions, one (`ec02`) is
 executed-only, and 15 are absent from the fixture. Their first observed PCs
