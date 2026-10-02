@@ -404,6 +404,20 @@ needed before changing that input.
 
 ### Loader trial regression boundary
 
+`tools/c54x_rom4_timer_trace_check.py LOG` protects the observed NSE-1
+idle cadence under the trial: 16 consecutive slot expiries coincide with
+frame wraps and remain one 5000-quarter-symbol period apart. Both the
+four-second instrumented trace and fresh 30-second trace pass; six unit
+tests reject missing observations, sequence gaps, changed reload, phase
+errors and the old one-tick storm. This is a read-only trace check, not
+physical clock validation or complete counter conformance. It does not
+exercise nonzero compares, equality ordering, reload changes, reset
+retention or save-state restoration; those remain promotion prerequisites.
+The full tool suite also retains an intentional source-contract mismatch:
+`test_dsp_device_split` requires the baseline `0x2800` overlay limit, while
+the unpromoted trial uses a configurable extent. Do not report the full
+suite as green or change this test independently of the geometry decision.
+
 The full-transfer changes remain experimental: BSCR.HINT-driven service IRQ,
 absolute port-`0x0f` compare against the free-running port-`0x0d` counter,
 and NSE-5's larger overlay geometry. The protected 3210 frontier and COBBA

@@ -285,7 +285,8 @@ class SpeechMediaBoundaryTests(unittest.TestCase):
         )[1].split("u16 nokia_cobba_device::control_data_r", 1)[0]
         self.assertNotIn("m_hle_microphone", control_write)
         self.assertNotIn("m_hle_output", control_write)
-        self.assertNotIn("gain", control_write)
+        control_code = "\n".join(line.split("//", 1)[0] for line in control_write.splitlines())
+        self.assertNotIn("gain", control_code)
         conformance = cobba.split(
             "u8 nokia_cobba_device::run_control_conformance_checks", 1
         )[1].split("bool nokia_cobba_device::write_earpiece_pcm", 1)[0]
