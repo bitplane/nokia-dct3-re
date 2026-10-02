@@ -151,6 +151,23 @@
   - `radio_camp_trace_check.py` — validates the ordered firmware-owned path from
     a usable RSSI candidate through channel change and SI1--SI4 acceptance.
     `make verify-radio-camp` runs the deterministic radio peer and this checker.
+  - `thumb_entries.py`, `call_closure.py`, `naming_worklist.py`,
+    `function_packet.py`, `symbol_names.py`, `coverage_diff.py` — the games
+    mapping loop (`make games-callgraph`, `make games-next`,
+    `make games-packet ADDR=`): candidate Thumb entries, a BL closure that
+    separates inner functions from boundary services, a frontier-ranked
+    naming worklist, and a per-function packet (callers, callees, resolved
+    literal pool, cached decompile from `make games-decomp`, disassembly,
+    reviewed notes from `docs/data/games_function_notes.json`).
+    `coverage_diff.py` diffs the per-phase `COV` records written by
+    `mame_nokia_dct3_coverage.lua`.
+  - `lcd_frame_sheet.py` / `lcd_pgm_to_png.py` — contact sheets of the LCD
+    mirror frames a run captured.
+  - `games_doc_tables.py` — regenerates the address-map tables in
+    `docs/games_applications.md` from the symbol map and the notes JSON
+    (`make games-doc`; `--check` for CI-style staleness).
+  - `split_decompile_export.py` — splits an `ExportFunctionsByAddress` file
+    into one file per function under an ignored run directory.
 - `ghidra/scripts/*.java` — headless Ghidra scripts (run via `analyzeHeadless`).
   `ExportGensioAccesses.java` separates resolved direct/literal MAD2 accesses
   from scalar-only candidates and reports coverage totals for another ROM.
@@ -163,6 +180,19 @@ byte-paired incorrectly and must not be used as evidence. The Ghidra scripts nam
 functions and export analysis. The naming list is also exported as a
   portable symbol map at `ghidra/symbols/3210.csv` (address, kind, name) so you
   get the names without running Ghidra.
+- `mame_nokia_dct3_coverage.lua`, `mame_nokia_dct3_snapshot.lua` and
+  `mame_nokia_dct3_force_game.lua` wrap the exerciser (`RUN_EXTRA_ARGS=
+  '-autoboot_script ../mame_nokia_dct3_coverage.lua -debug -debugger none'`):
+  per-phase function coverage with an optional raw trace window
+  (`NOKIA_DCT3_COVERAGE_ENTRIES`, `NOKIA_DCT3_COVERAGE_PHASES`,
+  `NOKIA_DCT3_TRACE_WINDOW`), MAME's own screen snapshot
+  (`NOKIA_DCT3_SNAPSHOT_AT`), and the games research hook that pins
+  `game_index_11fd1b` (`NOKIA_DCT3_FORCE_GAME`, `NOKIA_DCT3_FORCE_GAME_AT`).
+  `make run-keys KEYS=enter,x,x,6` drives a scripted key sequence headlessly.
+- `mame_nokia_dct3_ram_probe.lua` wraps the exerciser with a RAM write tap
+  (`NOKIA_DCT3_RAM_TAP=start:end`, logged as `RAMTAP t=... addr=...`) and an
+  optional held byte (`NOKIA_DCT3_RAM_POKE=addr:value:at`). It measured the
+  Snake step interval recorded in `games_applications.md`.
 - `mame_nokia_dct3_input_exerciser.lua` — MAME Lua harness used by the run targets
   to capture structural/LCD evidence and drive keypad input. Delayed input uses
   a scheduler-backed `emu.wait()` coroutine because LCD frame callbacks stop

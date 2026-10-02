@@ -1,0 +1,373 @@
+# Built-in games: application map
+
+The Nokia 3210 v6.00 Games menu offers Rotation, Snake and Memory. This
+document maps the game applications, the framework they share, and the
+phone-OS services they depend on. It is an address-level reverse-engineering
+reference in the sense of `README.md`: absolute addresses apply to NSE-8/9
+v6.00 only, names are project terminology, and reviewed conclusions that
+affect the driver (the games NV records) live in the provisioning contract in
+`eeprom_analysis.md` and `tools/make_eeprom_profile.py`.
+
+The games are ordinary firmware. Nothing here proposes emulating them; the
+map exists so that game behaviour can be traced, regression-tested and, for
+external projects, re-hosted without guessing at the firmware's contracts.
+
+## Plugin table and event interface
+
+`game_table_2d9484` holds 12-byte records `{Thumb handler, pointer to a
+3-byte record list, four bytes of per-game parameters}` indexed by
+`game_index_11fd1b`:
+
+| Index | Handler | Menu name |
+|---:|---|---|
+| 0 | `rotation_handler_241fd0` | Rotation |
+| 1 | `snake_handler_240d82` | Snake |
+| 2 | `memory_handler_24075c` | Memory |
+| 3 | `game3_handler_242890` | not offered in the Games menu |
+
+A fifth handler, `logic_handler_241780`, is not in the table at all. It is a
+complete Mastermind-style game matching Nokia's "Logic" on the 5110/6110 and
+the `Logic` string in the English text block; nothing on this product
+dispatches to it. The settings block reserves five records, one per handler.
+
+Every handler receives one event code: `0x49` init, `0x53` resume, `0x54`
+tick, `0x57` draw, and key events as ASCII (`0x31`..`0x39` digits, `0x23`
+`#`, `0x2a` `*`). Snake steers with 2/4/6/8; Memory moves with 2/4/6/8 and
+flips with 5; the fourth game maps keys 1..6 to its six cells.
+
+The tick is self-scheduled: the handler re-posts delayed scheduler event
+`0x30` through `sched_post_event_delay_2697aa`. Snake's delay is
+`floor(10 * game_speed_table_2d9738[level] / 7.78125)` ticks with the table
+`66 48 38 30 23 18 14 11 9` for levels 1..9.
+
+## Timing
+
+The speed table is in units of 10 ms and `7.78125` is the firmware's tick
+length in milliseconds (255/32768 s): level 1 is meant to step every 660 ms
+(84 ticks, 653.6 ms) and level 9 every 90 ms (11 ticks, 85.6 ms).
+
+Measured in MAME with `mame_nokia_dct3_ram_probe.lua` tapping the snake
+indices at `snake_state_110310`: 635 ms per step at level index 0 and 83 ms
+at level index 8, i.e. 7.56 ms per tick (248/32768 s). The emulated
+scheduler tick is therefore about 2.9 % shorter than the firmware's own
+constant implies. This is recorded as an observation about the timer model,
+not corrected here.
+
+## Assets
+
+All game graphics live in `0x2d9484..0x2d9a80` and are drawn through
+`lcd_blit_bitmap_25f3b6` (column-major, bit `y & 7` per row) or plain
+`lcd_fill_rect_25eec0` calls:
+
+| Address | Content | Format |
+|---|---|---|
+| `0x2d9484` | `game_table_2d9484` | four 12-byte plugin records |
+| `0x2d94bc` | `game_tile_bitmaps_2d94bc` | 7x7 tiles, 7 bytes each; blank + 0x49 symbols (Memory, Logic) |
+| `0x2d96c4`, `0x2d96cc` | card back, cursor frame | 8 bytes each |
+| `0x2d96ec` | `games_digit_glyphs_2d96ec` | 3x5 digits, 3 bytes each |
+| `0x2d9738` | `game_speed_table_2d9738` | nine speed bytes |
+| `0x2d9744` | `snake_food_bitmap_2d9744` | 4x4, 4 bytes |
+| `0x2d9760` | `logic_params_2d9760` | rows (10), code length (5) |
+| `0x2d9764` | `game3_backgrounds_2d9764` | 84x48 scenes, 504 bytes each |
+| `0x2d995c` | `game3_sprites_2d995c` | 10x10 sprites, 20 bytes, outline/filled pairs |
+
+Snake itself has no sprite for the body: segments are 3x3, 4x3 or 3x4 filled
+rectangles on a 4-pixel cell pitch.
+
+## Settings records
+
+NV descriptor `0x074c` maps EEPROM `0x0d9c` to five 4-byte records: big-endian
+top score, level index 0..8, one byte the loader ignores.
+`game_records_load_29a0e2` copies them into `game_records_11040c` (8 bytes per
+game: `+0` current score, `+2` top score, `+4` level); `game_record_save_299e5e`
+writes the current record back. An erased record indexes past the speed table
+to speed 0, which made Snake advance every scheduler pass and left the Level
+selector unable to move; the generated EEPROM profile now provisions level
+index 0. See `eeprom_analysis.md`.
+
+## Runtime evidence
+
+- Per-phase function coverage (`mame_nokia_dct3_coverage.lua`, breakpoints on
+  every candidate Thumb entry, re-enabled at phase boundaries) with a
+  Memory-game control run on the identical key timeline isolates the Snake
+  core at `0x240604..0x241620` and the game-over group at `0x262218`,
+  `0x26225e`, `0x263468`.
+- A raw PC trace window during play confirmed the tick path once the level
+  record was provisioned; MAME plays all three menu games organically.
+- `mame_nokia_dct3_force_game.lua` (external research hook) pins
+  `game_index_11fd1b` to 3 before New game; the fourth handler runs to
+  completion with its own scene bitmaps and a game-over screen.
+
+## Address map
+
+Names follow the repository convention (`role_address`). Rows marked as
+hypotheses in `docs/data/games_function_notes.json` keep neutral prefixes
+(`game3_`, field names) until the behaviour is proved.
+
+<!-- address map: generated by tools/games_doc_tables.py -->
+
+### Snake
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x110310` | label | `snake_state_110310` |  |
+| `0x110340` | label | `snake_food_pos_110340` |  |
+| `0x110344` | label | `snake_speed_110344` |  |
+| `0x110348` | label | `snake_board_110348` |  |
+| `0x110354` | label | `snake_grow_flag_110354` |  |
+| `0x240d82` | function | `snake_handler_240d82` | Snake event handler. 0x49 init: clears the snake record(s), sets direction/state, frees and rebuilds the board. 0x54 tick: snake_check_move_2413dc; on a free cell it advances the tail unless snake_grow_flag_110354 is set, moves the head, then compares the head with snake_food_pos_110340: on a match  |
+| `0x241198` | function | `snake_draw_241198` | Draws the field: border from four lcd_fill_rect_25eec0 calls sized cols*4+2 by rows*4+2; food as the 4x4 bitmap snake_food_bitmap_2d9744 at (x*4+2, y*4+2); each snake by walking the direction ring from tail to head, drawing a 3x3 block for the tail and 4x3 or 3x4 blocks per segment so adjacent cells |
+| `0x2413dc` | function | `snake_check_move_2413dc` | Collision test for the next head cell of snake arg1: head + direction delta; returns 1 for a wall or an occupied cell, 0 for a free cell, and arg3[snake] when the cell is the current tail cell (legal only if the tail is about to move). |
+| `0x2414dc` | function | `snake_move_head_2414dc` | Moves the head: in 1-player mode a full ring (head+1 == tail after wrap+1) awards 100 points and posts status 0x13 (board filled); if the ring would overflow it first advances the tail; writes the direction into the ring at the head index, increments the head index modulo the ring size, applies the  |
+| `0x241620` | function | `snake_advance_tail_241620` | Advances the tail: clears the tail cell's occupancy bit, reads the 2-bit direction stored at the tail index to move tail x/y one cell, increments the tail index modulo the ring size. (First named 'advance head'; the cell it clears and the index it increments are the tail's.) |
+| `0x2416f6` | function | `snake_place_food_2416f6` | Places food: up to 255 tries of x = rand() % cols, y = rand() % rows until the occupancy bit is clear; writes the 4-byte position to arg0 (snake_food_pos_110340). |
+| `0x2d9744` | data | `snake_food_bitmap_2d9744` | Assets, all column-major with bit (y & 7) per row as lcd_blit_bitmap_25f3b6 expects: snake food 4x4 (4 bytes); game_tile_bitmaps_2d94bc 7x7 tiles, 7 bytes each, index 0 blank then 0x49 symbols shared by Memory and Logic; game_tile_back_2d96c4 (card back) and game_tile_cursor_2d96cc (frame), 8 bytes  |
+
+### Memory
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x240668` | function | `memory_draw_card_240668` |  |
+| `0x24075c` | function | `memory_handler_24075c` |  |
+| `0x240a4c` | function | `memory_draw_board_240a4c` | Memory: draws the whole board. Loops rows x cols (dims in arg2[0..1]); a card byte with bit 7 set is face-up and draws its value & 0x7f, otherwise 0xff (back). Tile origin = (origin + 2*i - dim) * 4. Cursor (arg3) is drawn last with attr 0x21. Calls memory_draw_card_240668(value, x*4, y*4, attr). |
+| `0x240bd8` | function | `memory_deal_board_240bd8` | Memory: deals a board. Builds 1..0x49 on the stack, Fisher-Yates shuffles it with rand_2b64d4 % n, writes each value twice (pairs) into the board, then shuffles the board in place. |
+| `0x240c88` | function | `memory_move_cursor_240c88` | Memory: moves the cursor. arg3/arg4 select row or column deltas with wraparound via divmod_2b5388; when both are equal it steps diagonally until it lands on a face-down card. Ends with games_ui_refresh_243170(2,0). |
+
+### Rotation
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x241fd0` | function | `rotation_handler_241fd0` |  |
+| `0x242220` | label | `rotation_handler_cursor_wrap_242220` | Not a function: interior of rotation_handler_241fd0 (no prologue; 0x24221e falls into it). Wraps the cursor after a move using divmod by the board size and posts tick event 0x30 with delay 3 for the rotation animation. Listed as a label so the worklist stops offering it. |
+| `0x242494` | function | `rotation_draw_board_242494` | Rotation: draws the board (cells 6 apart in the state array, tile pitch 7x4 px) with games_draw_number_2406b6, frames the selected block with lcd_fill_rect_25eec0, and applies the rotation animation phase (arg2 1..6) as per-cell pixel offsets around the block edges. Block size comes from the level r |
+| `0x242754` | function | `rotation_rotate_block_ccw_242754` | Rotation: rotates the selected block's contents counter-clockwise (values move top-right -> top-left -> bottom-left -> bottom-right). Block origin from the 4-byte cursor arg1 (row, col; cells are 6 apart per row); 2x2 below level 4, 3x3 ring of 8 cells otherwise. |
+| `0x2427f4` | function | `rotation_rotate_block_cw_2427f4` | Rotation: the clockwise counterpart of rotation_rotate_block_ccw_242754 (same block geometry, inverse cycle). |
+
+### Fourth table entry (game3)
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x242890` | function | `game3_handler_242890` |  |
+| `0x242c74` | function | `game3_score_event_242c74` | game3: scores an event for lane arg0. Object type (0x1102cc[lane-1]) 1-2 costs a life (arg1--, score -25 or to 0, status 0x11 = game over at 0 lives), 3/7/8 +10, 4 +5, 5 +15 and shortens arg3, 6 +20 and sets arg2 = 6. A miss (0x1102e0[lane] != 1) just subtracts 10 if score >= 10. Score is game_recor |
+| `0x242dd0` | function | `game3_spawn_objects_242dd0` | game3: for each of 6 lanes with no object, with probability 1-7/8 spawns one: type = rand%8 (nonzero), sub-type = rand%3+1, speed = 8 - level, x from {0x1c,0x2e,0x40}, y 8 (lanes 0-2) or 0x1b (3-5). |
+| `0x242e8c` | function | `game3_draw_242e8c` | game3: draws the scene from bitmap descriptors at 0x2d9a24..0x2d9a78 and sprites 0x2d995c..0x2d9a20 via lcd_blit_bitmap_25f3b6. Not offered in the 3210 Games menu; behaviour matches a falling-object reaction game. |
+| `0x2d9764` | data | `game3_backgrounds_2d9764` |  |
+| `0x2d995c` | data | `game3_sprites_2d995c` |  |
+
+### Logic (undispatched)
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x11035c` | label | `logic_cursor_11035c` |  |
+| `0x110360` | label | `logic_last_cursor_110360` |  |
+| `0x110364` | label | `logic_board_110364` |  |
+| `0x110398` | label | `logic_row_scores_110398` |  |
+| `0x1103a4` | label | `logic_held_symbol_1103a4` |  |
+| `0x1103a8` | label | `logic_secret_1103a8` |  |
+| `0x1103b0` | label | `logic_palette_1103b0` |  |
+| `0x241780` | function | `logic_handler_241780` | Second dormant game. Event handler with the standard codes (0x49 init, 0x57 draw) and keys '*' submit, '2'/'8' cycle the symbol under the cursor, '4' copy/back, '5' pick. Mechanics are Mastermind: a secret of length logic_params_2d9760[1] (minus one below level 4) over (level&3)*2+5 symbols; guesses |
+| `0x241b10` | function | `logic_draw_board_241b10` | Logic: draws the symbol palette row (top, when cursor row is 0), every guess row with its score pegs, a divider line at y=7, the cursor cell with attr 0x21, and the held symbol; symbols drawn with memory_draw_card_240668 (shared tile drawer). |
+| `0x241cf6` | function | `logic_score_guess_241cf6` | Logic: arg0 == 0 generates the secret (len arg1, symbols 1..arg2) at logic_secret_1103a8; otherwise scores guess arg0 against it: exact matches counted and masked, then misplaced matches among the rest; returns 0xff on a full match else exact*16 + misplaced. |
+| `0x241dd6` | function | `logic_symbol_palette_241dd6` | Logic: arg0 < 0 regenerates the palette of 10 distinct random symbols (1..0x49) at logic_palette_1103b0 (duplicates are rejected by rescanning); arg0 > 0 returns palette[arg0-1]; 0 -> 0. |
+| `0x241e34` | function | `logic_scroll_board_241e34` | Logic: scrolls the board and score arrays up one row when the last row is used (memmove by 5 and by 1, clears the freed row). |
+| `0x241e9c` | function | `logic_draw_score_pegs_241e9c` | Logic: draws a row's score pegs at column arg0*8 from the packed score byte (high nibble exact = 3x2 marks, low nibble misplaced = 3x1 marks), two layouts depending on how many fit. |
+| `0x2d9760` | data | `logic_params_2d9760` |  |
+
+### Games framework and plugin table
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x11040c` | label | `game_records_11040c` |  |
+| `0x11fd1b` | label | `game_index_11fd1b` |  |
+| `0x2406b6` | function | `games_draw_number_2406b6` | Draws an unsigned decimal number (abs of arg0) right-aligned at (arg1, arg2): divides by 10000..1 with divmod_2b5388, blits each digit from the 3-byte glyph table games_digit_glyphs_2d96ec at x = arg1 - 4*pos - 2 via lcd_blit_bitmap_25f3b6. Leading zeros suppressed. Rotation uses it for cell values. |
+| `0x243170` | function | `games_ui_refresh_243170` |  |
+| `0x299e5e` | function | `game_record_save_299e5e` |  |
+| `0x29a0e2` | function | `game_records_load_29a0e2` |  |
+| `0x29a144` | function | `games_menu_handler_29a144` |  |
+| `0x29a2a0` | function | `game_over_score_screen_29a2a0` |  |
+| `0x29a3a4` | function | `games_app_callback_29a3a4` |  |
+| `0x2d9484` | data | `game_table_2d9484` |  |
+| `0x2d94bc` | data | `game_tile_bitmaps_2d94bc` |  |
+| `0x2d96c4` | data | `game_tile_back_2d96c4` |  |
+| `0x2d96cc` | data | `game_tile_cursor_2d96cc` |  |
+| `0x2d96ec` | data | `games_digit_glyphs_2d96ec` |  |
+| `0x2d9738` | data | `game_speed_table_2d9738` |  |
+
+### Widget layer
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x10eb3c` | label | `ui_repaint_state_10eb3c` |  |
+| `0x10eb48` | label | `widget_focus_10eb48` |  |
+| `0x10f268` | label | `ui_slots_10f268` |  |
+| `0x110901` | label | `ui_dirty_flag_110901` |  |
+| `0x110904` | label | `widget_lists_110904` |  |
+| `0x11fcb1` | label | `ui_language_11fcb1` |  |
+| `0x11fd1a` | label | `ui_context_11fd1a` |  |
+| `0x22c15c` | function | `widget_measure_22c15c` | widget_measure(metrics, widget): fills the widget's metrics block at +0x20 from the style tables. 0x22bcc0 picks the first 16-byte entry of 0x2d6e4c whose flags match the UI flags at 0x11fd16 and copies its geometry; 0x22c0f8 selects an 8-byte entry of 0x2d6748 starting at 0x2d6d90[widget +0x3f] (th |
+| `0x22f7fc` | function | `widget_text_height_22f7fc` | Height in pixels of text widget (class, index): measures each glyph of the widget's string (+0x34 text id resolved through 0x296adc with ui_language_11fcb1, font row 0x2d223c[+0x24]) via 0x25e4fe, takes the max against +0x20>>3, adds paddings +0x2c and +0x2d. Ids 0x901..0x970 are remapped to 0xe201. |
+| `0x2430c0` | function | `ui_repaint_state_ack_2430c0` | Leaf: if ui_repaint_state_10eb3c == 3 set it to 2 (same transition ui_refresh_timer_243180 makes before repainting). BL target from outside the games region; callers are not in the closure. |
+| `0x2430ce` | function | `widget_list_head_2430ce` | Returns the head pointer of widget list N: widget_lists_110904[class_map_2e06a9[N]*0xc]. Lists are 12-byte {head, flags,...}; widgets are 0x40+ byte nodes: +0 next, +0x1c index byte, +0x3c flags u16, +0x3e class byte, +0x40 list number. |
+| `0x2430de` | function | `widget_find_by_class_2430de` | Walk list from widget_list_head; return first node whose +0x3e class == arg0 (arg0 < 0x6b) and +0x1c index >= arg1, else the last matching node. Callers are the games UI layer (0x2431xx..0x2438xx). |
+| `0x24311e` | function | `widget_mark_dirty_24311e` | Under interrupt lock: set list flags \|=1 (if head non-null) and \|=2 for the widget's list (+0x40), clear widget flag bit 4 (+0x3c &= 0xffef), set ui_dirty_flag_110901 = 1. Returns 1 (0 if arg null). Hypothesis: schedules a repaint of that widget/list. |
+| `0x243180` | function | `ui_refresh_timer_243180` | Refresh timer control for the games UI: arg0 == 2 -> if state (0x110902) is 2, repaint via games_ui_refresh_243170 and, when state is 1, post delayed scheduler event 0x50 (delay 0x3c3d); otherwise cancel event 0x50 if pending and store arg0 as the state. Medium confidence on the exact state meanings |
+| `0x2431d2` | function | `ui_refresh_cancel_2431d2` | If ui_repaint_state_10eb3c is non-zero, clears it and calls ui_refresh_timer_243180(0), cancelling the pending repaint. |
+| `0x2431e8` | function | `widget_destroy_2431e8` | Destroys a widget: with a null pointer it looks the widget up by class/index and first calls its class handler widget_class_handlers_2e0660[+0x38](widget, 3). Unlinks the four neighbour pointers (+8,+0xc,+0x10,+0x14), removes it from its list (head or prev->next), flags later lists (+4 bit 1) for re |
+| `0x2432cc` | function | `widget_destroy_focused_2432cc` | Destroys the focused widget (pointer at widget_focus_10eb48, the same block widget_set_243550 consults at +0x11/+0x10) and clears the pointer. |
+| `0x2432e0` | function | `widget_init_2432e0` | Initialises a widget from the 4-byte class map entry (widget_class_map_2e06a9 - 1 + class*4): +0x38 handler index, +0x40 list (arg1 or entry byte 1), +0x3f entry byte 2, +0x41 entry byte 3; clears neighbours and +0x18/+0x42; clears flag bit 4. |
+| `0x243336` | function | `widget_create_243336` | Allocates a 0x4c-byte widget (rtos_mem_alloc), inserts it into widget list (arg2 or class_map[class]) sorted by (class, index), sets +0x3e class, +0x1c index, clears +0x34/+0x3c, initialises via 0x2432e0, sets flag 0x20, marks dirty. |
+| `0x243428` | function | `widget_link_243428` | Links widget b next to widget a: relation 1 = b below a (a+0x14/b+0xc), 2 = above, 3 = right (a+0x10/b+8), 4 = left; inserts b into any existing chain and, when flags != 0, sets the corresponding bits in +0x18 (1/2/4/8, 0x10 for the flags bit 1 case). Relation 2 also runs a bounds check via 0x22c15c |
+| `0x243550` | function | `widget_set_243550` | widget_set(class, index, arg, data, flags): data == 0 clears/destroys the widget (special-cases the focused class at 0x10eb48+0x11 and +0x10, frees its buffer, then 0x2431e8(class,index,0)); otherwise finds the widget by class/index or creates it, marks it dirty, stores data at +0x34 and applies fla |
+| `0x243646` | function | `widget_set_simple_243646` |  |
+| `0x243664` | function | `widget_move_to_list_243664` | Ensures widget (class, index) lives in widget list arg2: if it exists in another list it is destroyed and re-created there (sorted insert); created fresh if absent. |
+| `0x24369a` | function | `widget_set_in_list1_24369a` | widget_set_243550(class, 0, 0, data, 0) followed by widget_move_to_list_243664(class, 0, 1): post content and pin the widget to list 1. |
+| `0x2436c4` | function | `widget_set_handler_2436c4` | Sets widget +0x38, the widget_class_handlers_2e0660 index, for (class, index 0). Returns 1 if the widget exists. |
+| `0x2436dc` | function | `widget_set_state_bit_2436dc` | Sets or clears bit arg1 of widget +0x42 and marks the widget dirty when the bit changes. |
+| `0x24371a` | function | `widget_set_style_bits_24371a` | Find-or-create (class, index), set flag bit 0, then set or clear the arg2 bits of +0x41 (the field widget_set_style_variant_24383c writes in its top 3 bits). |
+| `0x24377c` | function | `widget_reset_with_handler_24377c` | Find-or-create (class, index); an existing widget is marked dirty and, if flag bit 0 is set, re-initialised through widget_init_2432e0; then +0x38 (class handler index) is set to arg2. |
+| `0x2437c4` | function | `widget_set_style_class_2437c4` | Sets the widget's style class (+0x3f) for (class, index), creating the widget if missing and setting flag bit 0 when the value changes. widget_measure_22c15c indexes 0x2d6d90 with it. |
+| `0x243804` | function | `widget_set_hidden_243804` | Sets or clears widget flag 0x80 (hidden) for (class, index), sets flag 0x20 and marks dirty when it changes. widget_is_unobscured_2439ac ignores widgets with bit 7 set, which fixes the bit's meaning. |
+| `0x24383c` | function | `widget_set_style_variant_24383c` | Sets the style variant (top 3 bits of +0x41, value * 0x20), marks dirty, clears flag bit 4. widget_measure_22c15c matches it against the 0x2d6748 style entries; menu_render_2629d0 passes 0 or 5. |
+| `0x24387a` | function | `widget_set_highlight_24387a` | Sets or clears highlight bit arg2 (0..2) in widget +0x28 bits 25..27 for (class, index), marking dirty on change; menu_render_2629d0 calls it as (0x21, selected_row, 2, 1) to highlight the selection. |
+| `0x2438e8` | function | `widget_link_by_class_2438e8` | widget_link_by_class(classA, idxA, classB, idxB, relation\|flags<<8): looks both widgets up and calls widget_link_243428(B, A, relation, flags) when both exist with the right index. |
+| `0x243934` | function | `widget_list_style_243934` | Picks the per-list style entry for widget list arg0: starts at 0x2d6730[list] and advances while the 12-byte entry's flag byte (0x2d656c[n*0xc]) has no bit in common with the UI flags at 0x11fd16, up to the list's limit; falls back to the first. widget_get_style_2453ec and the layout pass consume th |
+| `0x2439ac` | function | `widget_is_unobscured_2439ac` | Returns 0 if any later widget in the same list that is not hidden overlaps this widget's rectangle (+0x47 x, +0x45 w, +0x49 y with heights +0x2c/+0x2d/+0x46), else 1. |
+| `0x243a2c` | function | `widget_layout_pass_243a2c` | The games UI layout and paint pass (about 0xf80 bytes, under interrupt lock): resolves each widget list's style variant, clears and repaints overlapped list regions through the per-class handlers (event 3 then 6), then positions widgets along their neighbour links with the style paddings. The entry  |
+| `0x243a50` | label | `widget_layout_pass_part_243a50` |  |
+| `0x243a5e` | label | `widget_layout_pass_part_243a5e` |  |
+| `0x243b88` | label | `widget_layout_pass_part_243b88` | Not a function: interior of widget_layout_pass_243a2c (clears widget flag bit 4 for a list; false BL decode). |
+| `0x243ba6` | label | `widget_layout_pass_part_243ba6` |  |
+| `0x243ba8` | label | `widget_layout_pass_part_243ba8` |  |
+| `0x244d7c` | label | `widget_layout_pass_part_244d7c` | Not a function: interior of widget_layout_pass_243a2c (false BL decode in its literal pool); the neighbour-walk and stacking part of the pass. |
+| `0x245126` | label | `widget_layout_pass_part_245126` | Not a function: interior of widget_layout_pass_243a2c; clears a list region with lcd_fill_rect_25eec0 and flags overlapping lists for repaint. |
+| `0x2451d8` | label | `widget_layout_pass_part_2451d8` | Not a function: tail of widget_layout_pass_243a2c; releases the interrupt lock and calls service_session_draw_end_2abd7c (LCD flush). |
+| `0x2451fe` | label | `widget_layout_pass_part_2451fe` | Not a function: alternate tail of widget_layout_pass_243a2c (store state, unlock, flush when a full pass ran). |
+| `0x2453ec` | function | `widget_get_style_2453ec` | Fills a 15-byte style struct (arg2) for widget (class, index), creating the widget if missing: +0xc class, +5..+8 from the 12-byte style table 0x2d6568 keyed by the widget's list (via 0x243934), +0xd/+0xe from widget +0x3f/+0x41. Returns 1. |
+| `0x2974f8` | function | `ui_event1b_short_delay_2974f8` |  |
+| `0x2a0aec` | label | `ui_state_handler_entry_2a0aec` |  |
+| `0x2a0c40` | label | `ui_controller_phonestate_dispatch_2a0c40` |  |
+| `0x2a5dec` | function | `ui_context_switch_2a5dec` | Switches the UI context byte at 0x11fd1a (next to game_index_11fd1b). If the class (table 0x2e15ac) changes and the old context is not 7, releases the old class via 0x243646(class, 0), stores the new context, then 0x2a59fc() rebuilds. Called by the games framework at 0x263468/0x263154 when entering/ |
+| `0x2a5e1c` | function | `ui_slot_remove_2a5e1c` | ui_slot_remove(kind): 26-slot table ui_slots_10f268 (12 bytes: +0 text id, +4 kind, +6 value/0x114, +8 flag; kind 0x1a = empty). Removes the slot with this kind by moving the last used slot over it, then 0x2a59fc() rebuilds. Counterpart of ui_slot_set_2a5e8c. |
+| `0x2a5e8c` | function | `ui_slot_set_2a5e8c` | ui_slot_set(kind, value): finds the slot of this kind (or the first empty one) in ui_slots_10f268; slot type from 0x2e1479[0x2e1590[kind]*8]: 1 = text id (kept only if the string resolves via 0x296adc/0x296b74), 2 = raw byte in +6, anything else removes the slot; then 0x2a59fc(). Kind 6 carries the  |
+| `0x2e0660` | data | `widget_class_handlers_2e0660` |  |
+| `0x2e06a9` | data | `widget_class_map_2e06a9` |  |
+
+### Menu framework
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x10b2fc` | label | `menu_levels_10b2fc` |  |
+| `0x10b32c` | label | `menu_entries_10b32c` |  |
+| `0x11fd18` | label | `menu_visible_rows_11fd18` |  |
+| `0x2621cc` | function | `menu_level_entry_2621cc` | Returns the n-th (arg1, 0-based) entry of menu level arg0: level record in menu_levels_10b2fc (8 bytes: +0 id, +1 first entry, +2 count), entries are 0x1c-byte records in menu_entries_10b32c chained by the next byte at entry-2; result points at entry-0x1c (record base). 0 when the level or entry is  |
+| `0x262218` | function | `menu_level_clear_262218` | Clears menu level arg0: walks count+1 entries of its chain clearing the used flag at entry-3, then zeroes the level id. |
+| `0x26225e` | function | `menu_level_remove_entry_26225e` | Removes the n-th entry (arg1, 1-based, <= count) from level arg0's chain: relinks the previous entry's next byte, clears the entry's used flag, decrements the level count. |
+| `0x2622c2` | function | `menu_level_free_2622c2` | Frees level arg0: for each first entry, frees the payload pointers at +0/+4/+8 as selected by arg1 bits 0..2 with rtos_mem_free_26abf8, removes the entry, then clears the level via menu_level_clear_262218. games_menu_handler_29a144 calls it with flags 2 when leaving a game menu. |
+| `0x262306` | function | `menu_entry_index_262306` | Maps item ordinal arg0 to its entry index in the 0x1c-byte menu entry table at 0x10b32c: starts at the context's first entry (descriptor +1) and follows the next-entry byte at entry-2, n times; returns index-1. |
+| `0x262338` | function | `menu_enabled_ordinal_262338` | Position of item arg0 among enabled items (1-based): counts enabled items below it using the context's 16-bit enable mask; returns arg0 unchanged when the context is inactive. |
+| `0x2623b0` | function | `menu_item_enabled_2623b0` | Correction: this is a menu-item enable check, not a key check. Returns 1 if item arg0 (1..16) is enabled in the current menu context: mask = descriptor (0x10bbec[0x10b2dd[*0x111931]*0xc]) bit (item-1), everything enabled when the descriptor is inactive (+9 != 0); items >= 0x11 always enabled. Rename |
+| `0x2623f6` | function | `menu_last_enabled_item_2623f6` | Last enabled item: walks down from the item count until menu_item_enabled_2623b0 says yes; 0 if none. |
+| `0x262438` | function | `menu_level_index_262438` | Index (0..5) of menu level id arg0 in the six 8-byte level records at menu_levels_10b2fc; the path string has at most six components for the same reason. Returns the loop index in r0 (Ghidra shows void). |
+| `0x262452` | function | `menu_item_ordinal_by_id_262452` | Ordinal of the item whose id equals arg1 within menu context descriptor arg0 (+4 flags, +5 index, +2 count, +1 first entry): flags bit 0 = direct/indirect id (bit 2 returns arg1, bit 1 maps through 0x11fc80), otherwise walks the entry chain (next byte at entry+0xe of the 0x1c-byte records) comparing |
+| `0x2625ac` | function | `menu_first_enabled_item_2625ac` | First enabled item (1..count) in the current menu context; count = descriptor[+4] or [+2] depending on +9. |
+| `0x2625f2` | function | `menu_next_enabled_item_2625f2` | Next enabled item after arg0, wrapping from count back to 1; returns arg0 if nothing else is enabled. |
+| `0x26263a` | function | `menu_enabled_count_from_26263a` | Counts enabled items from arg0 up to the last enabled one (inclusive) via menu_next_enabled_item_2625f2; menu_enabled_count_26265c feeds it the first enabled item. |
+| `0x26265c` | function | `menu_enabled_count_26265c` | Number of enabled items in the current menu (0 when none): first enabled item then 0x26263a() to count onward. Consumed by menu_render_2629d0 as the rows-remaining counter and by menu_select_item_2626f4 against menu_visible_rows_11fd18. |
+| `0x262670` | function | `menu_item_row_262670` | Row of item arg0 within the visible window: counts next-enabled steps from the window's top item (context +7, table 0x10bbf3). |
+| `0x2626a8` | function | `menu_prev_enabled_item_2626a8` | Previous enabled menu item before arg0, wrapping from 1 to the item count; mirror of menu_next_enabled_item_2625f2. |
+| `0x2626f4` | function | `menu_select_item_2626f4` | Selects menu item arg0: if the list fits in menu_visible_rows_11fd18 it just stores the first enabled item; otherwise stores the selection (+8), adjusts the top-of-window item (+7) with next/previous enabled items so the selection is visible. |
+| `0x26281e` | function | `menu_build_path_string_26281e` | Builds the menu path indicator shown top-right (e.g. "6-2-..."): for each menu level, utoa_2a3dc2 of the level's item number joined with "-" (0x2629ac); the current item number is appended, or "..." (0x2629b0) when it would not fit; for right-to-left languages (flag at 0x11fd16 bit 3, language != 0x |
+| `0x2629d0` | function | `menu_render_2629d0` | Renders the current menu page: clears widgets 0x19-0x21, computes the scrollbar position with the software-float helpers (title widget 0x19, bar 0x1a), then for each visible row from the window top builds text widget 0x21 (and 0x1d icon / 0x1e mark 0x28/0x29 for checkable menus), links them with wid |
+| `0x262fa4` | function | `menu_leave_262fa4` | Leaves the current menu level if it is open (+0x2a of the level slot): stops the 0x24af00 effect (state 1 -> 2), cancels delayed event 0x31, tears the menu down with menu_render_2629d0(0xff, 1) unless suppressed (+1), calls 0x2ac6fc, clears the open flag. menu_enter_263154 calls it first. |
+| `0x262ff0` | function | `menu_depth_push_262ff0` | Increments the current context's menu nesting depth byte (0x10b2dc[ctx*4+1]), capped at 6, matching the six level slots. |
+| `0x263006` | function | `menu_enabled_mask_build_263006` | Builds the 16-bit item enable mask for the current level: for each entry (direct 0x14-byte table or the 0x1c-byte chain) reads bit (+0x1e / -10) of the byte pointed to by (+0x18 / -0x10) and packs it at the item's position. menu_enter_263154 stores it at level +4/+6 when descriptor flag bit 0 is set |
+| `0x26309c` | function | `menu_activate_item_26309c` | Activates menu item arg0 in the current level: rejects items beyond the count or disabled; stores it as the level's selection (+6); if the level flags bit 6 it posts task-5 status 0x38c (or 0x38e for item 0) with the item's payload word and does not return; otherwise renders the menu (or clears the  |
+| `0x263154` | function | `menu_enter_263154` | Enters menu level arg0 at item id arg1: after 0x262fa4() it binds the level's context descriptor (0x10bbec[...]) to the level record (0x10b2b4 + idx*8 + 0x48), resolves the item ordinal by id, applies the descriptor flags (bit 0 -> 0x263006 sets a 16-bit pair at +4/+6; bits 4/5 start/stop something  |
+| `0x2632fc` | function | `menu_level_insert_entry_2632fc` | Allocates a free entry among the 0x50 records of menu_entries_10b32c (used flag +0x19), copies the template (arg2), and links it into level arg0's chain: as first entry when the level is empty, at position arg1 (1-based) when given, else at the end; increments the level count. Returns 1, or 0 when n |
+| `0x2633d0` | function | `menu_level_create_2633d0` | Creates menu level arg0 in the first free slot of menu_levels_10b2fc (params arg1..arg3 at +3..+5) and inserts its first entry from a default template (payload arg4, text 0x114, 0xdc, 0xc, 0x11) via menu_level_insert_entry_2632fc; rolls the slot back when the insert fails. |
+| `0x26343a` | function | `menu_hide_26343a` | Clears 0x10b2b5 and tears the menu down with menu_render_2629d0(0xff, 1). |
+| `0x263468` | function | `menu_return_263468` | Returns to the current level's remembered selection (+6 of its descriptor) and re-activates it, stopping the 0x24af00 side effect if active; this is the 'Last view' style return after a game ends. |
+| `0x2634b6` | function | `menu_teardown_if_open_2634b6` | Tears the menu down (menu_render_2629d0(0xff, 1)) when the context's open flag (0x10b2de[ctx*4]) is set. |
+| `0x2634d4` | function | `menu_depth_pop_2634d4` | Pops one menu nesting level: clears the current level slot, marks it state 7, restores the previous level's slot and adjusts the depth counter (max 6). |
+| `0x296f4e` | function | `menu_layout_by_language_296f4e` | Looks the current language byte (ui_language_11fcb1) up in the 4-byte table 0x2d6548 (terminated by '*'), stores entry[2] into menu_visible_rows_11fd18 and entry[3] into 0x11fd17, returns entry[1]; default rows = 3. Explains why the menu window size is language-dependent. |
+
+### Runtime services used by the games
+
+| Address | Kind | Name | Evidence |
+|---|---|---|---|
+| `0x10931c` | label | `rtos_mem_pools_10931c` |  |
+| `0x1121ac` | label | `periodic_slots_1121ac` |  |
+| `0x11250c` | label | `rand_seed_11250c` |  |
+| `0x25eec0` | function | `lcd_fill_rect_25eec0` |  |
+| `0x25f32c` | function | `lcd_put_pixel_25f32c` |  |
+| `0x25f3b6` | function | `lcd_blit_bitmap_25f3b6` | Draws a bitmap descriptor {+0 bitmap*, +4 x, +5 y, +6/+7 clip offset, +8/+9 clip w/h, +10 attr}; bitmap = {+0 data, +8 width, +9 height}, PCD8544 layout (bit (y&7) of byte [x + width*(y>>3)]). Calls lcd_put_pixel_25f32c(x, y, attr) per pixel, attr^0x10 for clear pixels. Used by snake_draw_241198 and |
+| `0x2695f4` | function | `sched_delay_cancel_2695f4` | Scheduler: cancels the delay entry of task N (12-byte task table at 0x100140). Unlinks it from the delay lists at 0x100020+0x10/+0x28, folding its remaining ticks into the successor, marks the entry state 1, returns the remaining tick count. Same structures as sched_delay_queue_insert_2699be/service |
+| `0x269bf4` | function | `rtos_task_resume_269bf4` |  |
+| `0x269d00` | function | `rtos_scheduler_taskswitch_269d00` |  |
+| `0x26a354` | function | `rtos_mailbox_post_26a354` |  |
+| `0x26abf8` | function | `rtos_mem_free_26abf8` | RTOS block free: block header at ptr-8 holds pool index ^0x80; pushes the block onto that pool's free list (rtos_mem_pools_10931c + pool*0x14), wakes a waiter if one is queued. Ghidra marks it noreturn by mistake; it returns. |
+| `0x26afe0` | function | `rtos_mem_alloc_26afe0` | RTOS block allocator: picks the first of 8 pools whose block size (table at [0x100020+0x14] + i*4 + 2) >= requested size, pops the pool free list; if every pool is empty it queues a delay entry and services the scheduler, then retries. Emits diagnostic bytes to the trace port at 0x600000/0x600100. |
+| `0x2a3dc2` | function | `utoa_2a3dc2` | utoa: writes the decimal digits of arg0 (no leading zeros, '0' for zero) into arg1 and returns the digit count; divides by 10000 downward via divmod_2b5388. |
+| `0x2b1c96` | function | `lcd_write_2b1c96` |  |
+| `0x2b1d14` | function | `lcd_init_2b1d14` |  |
+| `0x2b316e` | function | `periodic_slot_stop_2b316e` | Stops periodic slot n: three 12-byte slots at periodic_slots_1121ac, handler table periodic_slot_handlers_2dcbdc (12 bytes: fn, u16 param, ...). Cancels delayed event 0x2c, calls handler(3, n) unless the slot is free (0x19), frees it, and reposts event 0x2c with delay 5 if any slot is still active. |
+| `0x2b31d8` | function | `periodic_slot_start_2b31d8` | Starts a periodic slot of kind arg0 with args (arg1 word, arg2 byte): takes the first free slot, copies the handler's u16 param, calls handler(1, slot) and posts delayed event 0x2c (5 ticks). Returns 0xff when all three slots are busy. menu_render_2629d0 uses the pair around the scrollbar/marquee st |
+| `0x2b49b8` | function | `double_div_2b49b8` |  |
+| `0x2b5068` | function | `double_mul_2b5068` | Software double multiply (sign = a.sign ^ b.sign, exponent add). menu_render_2629d0 computes the scrollbar thumb as (pos-1) * ((rows-7) op c) / (count-1) with this, double_div_2b49b8 and 0x2b44f6; Snake's tick delay uses the same family. |
+| `0x2b5388` | function | `divmod_2b5388` |  |
+| `0x2b5c7c` | function | `memcpy_2b5c7c` |  |
+| `0x2b6018` | function | `atoi_2b6018` | atoi: skips leading space class, handles '+'/'-', accumulates decimal digits. |
+| `0x2b6124` | function | `double_to_int_2b6124` |  |
+| `0x2b63fc` | function | `int_to_double_2b63fc` |  |
+| `0x2b64d4` | function | `rand_2b64d4` | ANSI C rand(): seed = seed*0x41c64e6d + 0x3039; returns (seed & 0x7fffffff) >> 16. Seed lives at 0x11250c. Used by snake_place_food_2416f6 and rotation_handler_241fd0. |
+| `0x2b64e8` | function | `srand_2b64e8` | srand: stores arg0 into rand_seed_11250c (same literal as rand_2b64d4). game3_spawn_objects_242dd0 reseeds before spawning. |
+| `0x2b65c8` | function | `strcat_2b65c8` | strcat: appends src to dst, returns dst. |
+| `0x2b6638` | function | `strcpy_2b6638` | strcpy: returns dst. |
+| `0x2b6660` | function | `isdigit_2b6660` | isdigit: ctype_table_2e1929[c] & 4. atoi_2b6018 tests the same table: bit 3 = space (skipped), bit 2 = digit. |
+| `0x2b6680` | function | `strlen_2b6680` | strlen. |
+| `0x2dcbdc` | data | `periodic_slot_handlers_2dcbdc` |  |
+| `0x2e1929` | data | `ctype_table_2e1929` |  |
+
+<!-- end address map -->
+
+## Boundary services
+
+`make games-callgraph` walks the BL closure from every candidate entry in the
+games region (`0x240600..0x244000`) and the games framework
+(`0x2621c0..0x263500`). Functions outside those ranges are boundary services:
+the phone-OS contract the games rely on (scheduler delays, the RTOS block
+allocator, the widget and menu layers, LCD drawing, string and float helpers,
+`rand`). `make games-worklist WORKLIST_ARGS=--boundary` lists the ones still
+unnamed.
+
+## Unnamed residue
+
+After the mapping pass the closure has 99 inner and 45 boundary functions;
+the following stay unnamed on purpose. Each has a hypothesis block in
+`docs/data/games_function_notes.json`.
+
+| Address | Why it is not named |
+|---|---|
+| `0x262544`, `0x2624b8`, `0x262590` | Menu descriptor resolvers whose id remapping table (`0x11fc80`) and widget `0x1b`'s role are unproved. |
+| `0x26344c` | Posts task-5 status `0x5de` after resetting cached UI tables; telephony-side failure path. |
+| `0x24386a` | Leaf writing `0x110900`, whose reader is outside the closure. |
+| `0x243964` | Vertical-extent helper inside the layout pass; needs a runtime probe of the neighbour fields. |
+| `0x2ac6fc`, `0x2b4fd6`, `0x2ac70e` | Status-line indicator posting through widget class `0x67` and an 8-byte handler table; value semantics belong to the phone, not the games. |
+| `0x2ae8ba`, `0x2ae7c4` | Phone status text builder and its cache reset. |
+| `0x2b44f6` | Software double add/subtract; only the scrollbar uses it. |
+
+None of these is reached by the three shipped games' handlers during play;
+they are menu-framework and phone-side surfaces the games inherit.
+
+## Naming cautions
+
+- `game3_*` describes behaviour (six lanes, typed targets, lives); the
+  product name is not established. `React` in the text block is the obvious
+  candidate but no code references it yet.
+- `logic_*` is inferred from mechanics plus the `Logic` string; treat it as a
+  strong hypothesis.
+- Widget `+0x3f` is the style class and the top bits of `+0x41` the style
+  variant, established through `widget_measure_22c15c`; the setters were
+  renamed once that was proved.
+- Addresses in `0x2431xx..0x2438xx` are the games' widget layer, not the
+  general MMI window manager (task 6); do not conflate the two.

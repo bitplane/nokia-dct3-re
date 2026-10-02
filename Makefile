@@ -720,6 +720,66 @@ swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }
 	@$(PYTHON) -c "d=open('$(ROM)','rb').read(); b=bytearray(d); b[0::2],b[1::2]=d[1::2],d[0::2]; open('$(SWAP)','wb').write(bytes(b)); print('wrote $(SWAP) (%d bytes)'%len(b))"
 
+# Built-in games (Rotation, Snake, Memory) static and runtime mapping helpers.
+# Generated artifacts live under the ignored $(GAMES_RUN_DIR); names live in
+# ghidra/symbols/3210.csv and reviewed notes in docs/data/games_function_notes.json.
+GAMES_RUN_DIR ?= run_games
+GAMES_INNER ?= 0x240600-0x244000,0x2621c0-0x263500
+GHIDRA_PROJECTS ?= $(HOME)/ghidra/projects
+GHIDRA_PROJECT ?= nokia3210
+GHIDRA_PROGRAM ?= 3210f600a_swap16.bin
+KEYS ?= enter
+KEY_DELAY_MS ?= 12000
+KEY_DURATION_MS ?= 70
+KEY_GAP_MS ?= 430
+KEY_CAPTURE_MS ?= 2000
+
+.PHONY: games-entries games-callgraph games-decomp games-doc games-worklist games-packet games-next run-keys
+
+games-entries:
+	@mkdir -p $(GAMES_RUN_DIR)
+	$(PYTHON) tools/thumb_entries.py --image $(SWAP) --out $(GAMES_RUN_DIR)/entry_candidates.txt
+
+games-callgraph: games-entries
+	$(PYTHON) tools/call_closure.py --image $(SWAP) --entries $(GAMES_RUN_DIR)/entry_candidates.txt \
+		--inner $(GAMES_INNER) --json $(GAMES_RUN_DIR)/callgraph.json
+
+# Push the symbol map into the Ghidra project and re-export decompiled C for
+# every function in the games closure (derived text, kept out of the tree).
+games-decomp:
+	@set -e; test -f $(GAMES_RUN_DIR)/callgraph.json || $(MAKE) --no-print-directory games-callgraph; \
+	mkdir -p $(GAMES_RUN_DIR)/decomp; \
+	addrs=$$($(PYTHON) -c "import json; g=json.load(open('$(GAMES_RUN_DIR)/callgraph.json')); print(' '.join('0x'+a for a in g['functions']))"); \
+	analyzeHeadless $(GHIDRA_PROJECTS) $(GHIDRA_PROJECT) -process $(GHIDRA_PROGRAM) -noanalysis -scriptPath ghidra/scripts \
+		-postScript ImportSymbolsCsv.java $(abspath ghidra/symbols/3210.csv) \
+		-postScript ExportFunctionsByAddress.java $(abspath $(GAMES_RUN_DIR))/decomp/_all.c $$addrs 2>&1 | grep -E "ImportSymbolsCsv|ERROR" || true; \
+	$(PYTHON) tools/split_decompile_export.py $(GAMES_RUN_DIR)/decomp/_all.c $(GAMES_RUN_DIR)/decomp
+
+games-doc:
+	$(PYTHON) tools/games_doc_tables.py
+
+games-worklist:
+	$(PYTHON) tools/naming_worklist.py $(WORKLIST_ARGS)
+
+games-packet:
+	@test -n "$(ADDR)" || { echo "usage: make games-packet ADDR=0x240d82"; exit 1; }
+	$(PYTHON) tools/function_packet.py $(ADDR)
+
+# One mapping tick: progress and worklist, then the packet for the top target.
+games-next:
+	@out=$$($(PYTHON) tools/naming_worklist.py $(WORKLIST_ARGS)); echo "$$out"; \
+	target=$$(echo "$$out" | awk '/^NEXT/{print "0x"$$2}'); \
+	test -z "$$target" || { echo; $(PYTHON) tools/function_packet.py $$target; }
+
+# Headless 3210 run with a scripted key sequence; unmapped names such as "x"
+# are harmless no-op slots (pauses). The UI accepts keys about 12 s after boot.
+run-keys:
+	@set -e; $(DCT3_EEPROM_GUARD) \
+	$(MAKE) --no-print-directory run PHONE=noki3210 RUN_DIR=$(RUN_DIR) SECONDS=$(SECONDS) \
+		PROVISIONED_IMEI_PREFIX=49015420323751 \
+		RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=$(KEYS) NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$(KEY_DELAY_MS) NOKIA_DCT3_POST_READY_KEY_DURATION_MS=$(KEY_DURATION_MS) NOKIA_DCT3_POST_READY_KEY_GAP_MS=$(KEY_GAP_MS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=$(KEY_CAPTURE_MS) $(RUN_ENV)' \
+		RUN_EXTRA_ARGS='-window $(RUN_EXTRA_ARGS)'
+
 census:
 	@mkdir -p run_census
 	$(PYTHON) tools/validate_evidence.py
