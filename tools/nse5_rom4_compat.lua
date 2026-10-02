@@ -107,7 +107,11 @@ for _, entry in ipairs(entries) do
                     local message = name ~= "startup_selftest_reply" and
                         cpu.state["R0"].value or cpu.state["R4"].value
                     local bytes = {}
-                    for index = 0, (name == "dsp_control_forward" and 63 or 11) do
+                    local last = name == "dsp_control_forward" and 63 or 11
+                    if name == "task2_message_received" and space:read_u8(message + 8) == 0x34 then
+                        last = 23 -- 14-byte payload, including algorithm-0x82 MSID.
+                    end
+                    for index = 0, last do
                         bytes[#bytes + 1] = string.format("%02x", space:read_u8(message + index))
                     end
                     machine:logerror(string.format(

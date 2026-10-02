@@ -294,10 +294,10 @@ the required `0x78..0x7f`, so `0x3af64e` marks it invalid. This reaches
 system-stop code 4 at `0x4e94d6`, called from `0x3af6b0`, and loops at
 `0x4e9510`. Both observed initializations return the same payload.
 
-The concrete unresolved question is the provenance and transformation of
-that primitive's data: product-local PMM, COBBA-derived inputs, recovered
-mask data or CPU arithmetic may participate. Identity-like field checks do
-not yet establish its semantic identity or justify repairing its bytes.
+The concrete unresolved question is the compatibility of the stored data
+with the modeled COBBA inputs and recovered mask. The staging and transform
+audits below establish the observed arithmetic, not correct provisioning.
+Identity-like field checks do not justify repairing the reply bytes.
 Transport observation confirms the DSP publishes the bytes without a later
 MCU mutation: the `0x74` packet has 52 payload bytes and returns through
 mask caller `0x4bac`. At the first shared payload write, DSP PC `0x37fc`
@@ -305,8 +305,8 @@ has source AR1 `0x120c`, destination AR2 `0x088c` and base AR3 `0x1202`.
 A bounded source-write tail records the transformation in
 `0x7f7a..0x8012`; `0x8012` writes `0x2ad0` to D:`0x120c` before publication.
 Consequently the invalid field predates transport and consumer decoding.
-Audit the transform's original inputs and CPU semantics before assigning
-the fault to PMM contents or incompatible mask data.
+The original-input and CPU arithmetic audits below separate these layers
+before assigning fault to PMM contents or incompatible mask data.
 The input is a MCU-originated type-`0x70` packet containing
 `16 18` followed by the 24-byte block beginning `81 84 b1 91`.
 At 0.670170 s, MCU `0x432cd8` writes its first word to HPI `0x1004a`
@@ -331,8 +331,8 @@ the calculation. This is a read-only staging model, not an identity decoder
 or provisioning generator. It rules out MCU preparation and transport
 corruption for this block, but does not prove the stored block is valid for
 the recovered DSP mask or that the DSP transform is correctly executed.
-The next boundary is the DSP transform's input/operation contract, not
-repairing these bytes or bypassing the consumer validation.
+The DSP transform audit below closes the observed operation contract;
+repairing these bytes or bypassing consumer validation remains inadmissible.
 At transform entry the serial words at D:`0x1f0c..0x1f0d` are
 `0x0016,0x0010`, the existing nominal COBBA inputs. Table preparation
 produces `d1b4 5ffb 4ff0 2d7b 0f4c e1c3` at D:`0x13dc`; these are the
@@ -400,6 +400,27 @@ The filename "virgin eeprom" is not evidence of compatibility with the
 model's nominal serial. A paired COBBA observation, a provenance-backed
 stored identity format, or an independently documented factory profile is
 needed before changing that input.
+
+### Generated MSID Versus Stored Data
+
+The complete primitive-`0x34` reply is distinct from rejected `0x35`:
+`0000007400120100340e0082f4af7937041f6f93224c65ab`.
+Its algorithm-`0x82` MSID is `82f4af7937041f6f93224c65ab`. The existing
+decoder recovers three word groups `be4cf224 / 00160010 / a8a9aa46`,
+exactly matching the independently captured DSP encoder input at
+0.671833 seconds. The middle group therefore corroborates the nominal
+serial representation used by this composition; it does not recover the
+original handset's serial or validate the PMM. Both initializations agree.
+`nse5_msid_reply_check.py TRACE` checks complete reply framing, prior matching
+encoder observation and inverse agreement; six negative/positive unit
+fixtures protect missing, malformed, late and disagreeing evidence.
+
+[Gammu's documented 7110 service protocol](https://docs.gammu.org/protocol/n7110.html)
+lists an external MSID response under `0xb5` separately from DSP-version and
+COBBA information requests under `0xc8`. This supports keeping generated
+service identity, stored PMM records and hardware observations distinct.
+It supplies no paired MSID/PMM dump for the acquired handset. A generated
+MSID from this model cannot be used as evidence for new hardware inputs.
 
 ### Loader trial regression boundary
 
