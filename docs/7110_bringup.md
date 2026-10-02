@@ -427,6 +427,29 @@ model's nominal serial. A paired COBBA observation, a provenance-backed
 stored identity format, or an independently documented factory profile is
 needed before changing that input.
 
+### Manufacturer Release And Storage Layout
+
+The acquired [Nokia NSE-5 v5.01 installer](https://archive.org/download/Nokia_DCT3_firmwares/nse5_mcu_5.01.exe)
+contains independently decompressible gzip members; no installer execution is
+required to inspect them. Its release-note member begins at archive offset
+`0x70b9a9` and expands to 29931 bytes. The notes identify DSP software
+`P30.4.107`, HP2.5-or-newer hardware, 4 MB flash, 512 KB SRAM and PMM release
+14. These describe the release target, not a fitted mask-ROM dump.
+
+Sections 7.2–7.4 distinguish MCU-only `nse5nx05.010` from
+`nse5nx05.01_`, which includes Flash Data Initialization. They warn that the
+EEPROM mover was removed and that older layouts require an intermediate
+release. A successful archive hash therefore does not establish that an
+independently acquired PMM tail has the correct lifecycle/layout for v5.01.
+
+The installer contains record-stream members at `0x834a7` (3214792 expanded
+bytes) and `0x55da10` (3280400 expanded bytes), plus PPM C at `0x2c9814`
+(524864 expanded bytes). These are candidates for a read-only comparison of
+manufacturer initialization data against the acquired flash/PMM. Their exact
+record extents and correspondence are not yet verified. Do not replace the
+product-local PMM merely because another member advances boot, and do not
+interpret initialized defaults as a paired hardware identity.
+
 ### Generated MSID Versus Stored Data
 
 The complete primitive-`0x34` reply is distinct from rejected `0x35`:
