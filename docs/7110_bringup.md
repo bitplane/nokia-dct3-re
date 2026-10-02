@@ -426,8 +426,26 @@ destination `0x157424`, length `0x898`, caller return `0x3faf87`, at
 0.088319 and 0.755891 seconds. The first twelve cached bytes reproduce
 the acquired file, with no intervening content substitution before the
 requests. This excludes a cache-copy/address error, not an incorrect
-upstream record-selection policy or incompatible stored content. The loader
-around `0x3faf87` remains the bounded target for the selection-policy audit.
+upstream record-selection policy or incompatible stored content.
+
+The loader at `0x3faec4` replays a sector-local write journal rather than
+choosing one identity record. `tools/nse5_pmm_journal.py` independently decodes
+the observed write-only path: 96 records terminate at file offset `0x1340`.
+Later writes do not touch the first `0x38` logical bytes used by the three
+requests. At the executed completion branch `0x3fafd8`, both full 2200-byte
+cache snapshots exactly match independent replay (SHA-256
+`7738e93a7cf8fd84e26709f42c05470da5859cc6b3be5f3a38e2af8733af4734`).
+The decoder rejects deletion records rather than guessing their semantics;
+none occurs in this sector. A later wall-clock snapshot is not equivalent:
+live firmware settings writes already change the cache by 0.1 seconds.
+This closes journal replay as a cause of the rejected command inputs, not
+physical chip identity or validity of the stored provisioning.
+
+```sh
+.venv/bin/python tools/nse5_pmm_journal.py \
+  'roms/noki7110/7110 virgin eeprom 005fa000.fls' \
+  --trace run_7110_journal_complete/error.log
+```
 
 Nokia's [NSE-5 repair hints, page 13](https://www.manualslib.com/manual/2806569/Nokia-7110.html?page=13)
 require re-establishing IMEI/SIMLOCK data after replacing COBBA or D301.

@@ -20,6 +20,7 @@ local menu_fixture = os.getenv("NSE5_COMPAT_MENU") == "1"
 local menu_step = 0
 local entries = {
     {0x46cb84, "storage_cache_copy"},
+    {0x3fafd8, "storage_journal_done"},
     {0x432eae, "verifier"}, {0x3bc2a8, "service_init"},
     {0x45c61c, "optional_boot_call"}, {0x3bb818, "startup_index"},
     {0x4bc214, "arm_wrapper"}, {0x4caa04, "uif_irq7"},
@@ -59,6 +60,8 @@ for _, entry in ipairs(entries) do
             local pc = cpu.state["PC"].value
             if pc ~= address then return end
             if name == "storage_cache_copy" and cpu.state["R0"].value ~= 0x157424 then return end
+            if name == "storage_journal_done" and
+                    space:read_u32(cpu.state["R6"].value) ~= 0x5fa000 then return end
             if name == "task2_message_received" and cpu.state["R14"].value ~= 0x311511 then return end
             if name == "task2_dsp_queue_post" and cpu.state["R14"].value ~= 0x469e0d then return end
             if name == "task2_dsp_queue_result" and
@@ -79,6 +82,13 @@ for _, entry in ipairs(entries) do
                         cpu.state["R0"].value, cpu.state["R1"].value,
                         cpu.state["R2"].value, cpu.state["R14"].value,
                         machine.time:as_double()))
+                end
+                if name == "storage_journal_done" then
+                    local cache = {}
+                    for index = 0, 0x897 do
+                        cache[#cache + 1] = string.format("%02x", space:read_u8(0x157424 + index))
+                    end
+                    machine:logerror("nse5_compat_storage_cache_snapshot: bytes=" .. table.concat(cache) .. "\n")
                 end
                 if name == "subsystem_group_skip" or name == "subsystem_group_release" then
                     local r5 = cpu.state["R5"].value
