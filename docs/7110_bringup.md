@@ -444,11 +444,26 @@ independently acquired PMM tail has the correct lifecycle/layout for v5.01.
 
 The installer contains record-stream members at `0x834a7` (3214792 expanded
 bytes) and `0x55da10` (3280400 expanded bytes), plus PPM C at `0x2c9814`
-(524864 expanded bytes). These are candidates for a read-only comparison of
-manufacturer initialization data against the acquired flash/PMM. Their exact
-record extents and correspondence are not yet verified. Do not replace the
-product-local PMM merely because another member advances boot, and do not
-interpret initialized defaults as a paired hardware identity.
+(524864 expanded bytes). `tools/nse5_installer_audit.py` pins the installer
+hash, bounds decompression, validates ordered non-overlapping records and
+compares only supplied ranges; it does not fill gaps or emit replacement ROMs.
+All 392 MCU records and 64 PPM C records exactly match the acquired flash.
+The basic image repeats those MCU bytes and adds eight sparse 8192-byte
+storage records. Its `0x5fa000` and `0x5fc000` records differ from the acquired
+PMM in 4170 and 3 bytes respectively; other initialization ranges fall outside
+the two acquired images. The three command-source slices at PMM `0x26..0x5d`
+are erased in the basic image. It therefore supplies no paired identity for
+the acquired provisioned records. Flash mismatch is excluded for these
+members, but PMM validity/migration is not proved. Do not replace the
+product-local PMM merely because another member advances boot or interpret
+initialized defaults as a paired hardware identity.
+
+```sh
+.venv/bin/python tools/nse5_installer_audit.py \
+  roms/archive-dct3-packages/nse5_mcu_5.01.exe \
+  roms/noki7110/7110f501_ppmc.fls \
+  'roms/noki7110/7110 virgin eeprom 005fa000.fls'
+```
 
 ### Generated MSID Versus Stored Data
 
