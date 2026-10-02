@@ -21,8 +21,9 @@ The full-transfer trial first exposes the DSP program-memory extent:
 NSE-5 writes executable code above the backend's `0x2800` overlay limit.
 A larger-bank trial removes execution of stale mask words. Preserving
 COBBA's existing nominal ready input across writes then reaches DSP idle,
-but the MCU rejects primitive `0x35` and stops with code 4. Its payload
-provenance is the current unresolved boundary; graphical boot is unproved.
+but the MCU rejects primitive `0x35` and stops with code 4. The transform and
+stored-input provenance are reproduced independently; compatibility of those
+inputs with the modeled chip identity remains unresolved. Graphical boot is unproved.
 Neither fitted geometry nor physical COBBA status semantics is established. See
 [the upload/read evidence](#diagnostic-publication-and-partial-code-block-transfer)
 before revisiting queue loss or interpreting the resulting bad return as
@@ -46,10 +47,10 @@ The runner hashes all four inputs, prepares a private ROM directory, removes
 only this fixture's retained NVRAM, and captures six native panel images
 through eight seconds. Its Lua observer reads MCU state and snapshots the
 screen; it does not write firmware state or synthesize DSP results. The
-compiled run reproduced 235 mailbox writes and 94 DSP completion strobes.
+banked model reproduces 238 mailbox writes and 1710 DSP completion strobes.
 Version 4 is copied to `0x167038` by 0.5 seconds; the current peripheral model
 produces word 0 equal to zero, not a hardcoded acceptance value. The final MCU
-PC is `0x49fffc`, and the final native image is blank. This protects the
+PC is `0x4e9510`, and the final native image is blank. This protects the
 compatibility observation window, not UI startup, SIM or fitted-mask identity.
 The backend retains its independently documented peripheral/timing models;
 executing authentic mask bytes does not validate those models for NSE-5.
@@ -298,6 +299,20 @@ The concrete unresolved question is the compatibility of the stored data
 with the modeled COBBA inputs and recovered mask. The staging and transform
 audits below establish the observed arithmetic, not correct provisioning.
 Identity-like field checks do not justify repairing the reply bytes.
+
+The complete consumer spans `0x3af4d0..0x3af88c`; its first rejection is
+not its whole contract. After structural validation it selects a result
+from the reply selector and context, compares two short fields through
+byte-comparison routine `0x4ee9b4`, and can compare the retained 24-byte
+record read from logical storage address `0x20`. Later branches copy the
+decoded blocks into context storage or write a transformed retained record
+through `0x3af44c`, then publish a result through `0x3ae594`. None of these
+later acceptance/storage branches is reached by the captured invalid reply.
+This establishes a stored-data lifecycle, not a generic DSP-ready message;
+the precise identity/lock semantics still require independent evidence.
+The first structural check also accepts some nondecimal nibbles, so it
+must not be labeled a strict decimal IMEI validator on that check alone.
+
 Transport observation confirms the DSP publishes the bytes without a later
 MCU mutation: the `0x74` packet has 52 payload bytes and returns through
 mask caller `0x4bac`. At the first shared payload write, DSP PC `0x37fc`
