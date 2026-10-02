@@ -46,10 +46,19 @@ register fields.
 
 ## Remaining boundary
 
-No supported MCU image exposes DSP-local COBBA register traffic. Closing the
-mux/gain contract therefore requires a real DSP core, DSP firmware visibility,
-or physical bus capture. Until then, the opaque register file and declared HLE
-profile are the honest stopping point.
+MCU images do not directly expose DSP-local COBBA register traffic. The native
+NSE-1 C54x backend now exposes boot/self-test transactions, but this does not
+close the mux/gain contract. Operational DSP execution or physical bus capture
+is still needed for those fields. The opaque register file and declared HLE
+voice profile remain the current boundary.
+
+Nokia's [NSB-6 technical documentation, page 37](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html?page=37)
+describes a 24-bit hardware-random serial read from COBBA and used with
+software/identity data to establish stored flash authority. This is evidence
+that hardware/provisioning pairing exists in the family, not a register map
+for NSE-5. In particular, neither that description nor serial-control bus
+traffic establishes registers 5/6 as analog measurements or unique identity
+fields. Their current values are calibrated inputs, not measured defaults.
 
 The public 5110 ROM4 analysis provides a software-only route when its
 bring-your-own mask image is available. It identifies serial I/O ports

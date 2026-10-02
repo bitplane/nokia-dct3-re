@@ -71,10 +71,9 @@ void nokia_cobba_device::device_reset()
 	m_microphone_overruns = 0;
 	m_microphone_underruns = 0;
 	std::fill(m_control_registers.begin(), m_control_registers.end(), 0);
-	// ROM4's self-test reads COBBA analog measurement registers 5 and 6.
-	// These are input measurements supplied by the codec, not synthesized test
-	// results; the nominal no-signal values keep both readings in their accepted
-	// hardware ranges.
+	// ROM4's self-test reads serial-control registers 5 and 6. These calibrated
+	// inputs are not synthesized test results; their physical meaning and reset
+	// values are unverified. "Serial-control" names the bus, not a chip identity.
 	m_control_registers[0x05] = 0x0160;
 	m_control_registers[0x06] = 0x0010;
 	// Recovered ROM4 multi-register transactions wait for status register D
