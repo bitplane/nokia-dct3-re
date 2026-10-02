@@ -957,12 +957,17 @@ COBBA's DSP control plane is represented separately from those samples.
 matching the reviewed ROM4 port protocol: data is latched first, then a
 low-nibble register select commits a write; select bit 4 requests a read, whose
 data port reports the addressed 12-bit value with the busy flag clear after
-the immediate modelled transaction. Control register `0xD` resets to the
-recovered idle handshake value `0x00c` (accept bits clear, completion bits
-set). `make verify-cobba-control` exercises that device boundary directly. It
+the immediate modelled transaction. Control register `0xD` has calibrated
+nominal ready inputs `0x00c`; their reset value and physical timing are not
+measured. Configuration writes preserve those two input bits. NSE-5 reads
+them set, writes zero, then waits for them again; treating the entire register
+as a flat writable latch erased readiness indefinitely.
+`make verify-cobba-control` exercises that device boundary directly. It
 checks reset state, 12-bit data masking and write-select commit, non-destructive
 read-select with a retained data latch, and masking of the select word to its
-read bit and low address nibble. The conformance operation snapshots and
+read bit and low address nibble, plus ready-input retention and storage of
+other opaque D bits. This tests declared model behavior, not physical latency.
+The conformance operation snapshots and
 restores the complete opaque control state. Other register meanings are
 deliberately not attached to routes or gains yet. In particular, command
 `0x08` does not synthetically write a COBBA register.

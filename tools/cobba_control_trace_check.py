@@ -11,10 +11,10 @@ def check(text: str) -> int:
     matches = re.findall(
         r"cobba_fixture: control_conformance=([0-9a-fA-F]{2})", text
     )
-    if matches != ["1f"]:
+    if matches != ["3f"]:
         raise ValueError(
             "COBBA control conformance result is "
-            f"{matches or 'missing'}, expected exactly 1f"
+            f"{matches or 'missing'}, expected exactly 3f"
         )
 
     transactions = re.findall(
@@ -30,6 +30,12 @@ def check(text: str) -> int:
         ("5", "read", "5", "fed"),
         ("6", "write", "8", "610"),
         ("7", "write", "8", "000"),
+        ("8", "write", "d", "000"),
+        ("9", "read", "d", "00c"),
+        ("10", "write", "d", "5a3"),
+        ("11", "read", "d", "5af"),
+        ("12", "write", "d", "000"),
+        ("13", "read", "d", "00c"),
     ]
     normalized = [tuple(field.lower() for field in item) for item in transactions]
     if normalized != expected:
@@ -46,7 +52,7 @@ def check(text: str) -> int:
             "COBBA codec serial loopback transactions are "
             f"{loopbacks or 'missing'}, expected exactly [('0aaa', '1')]"
         )
-    return 0x1F
+    return 0x3F
 
 
 def main() -> int:
