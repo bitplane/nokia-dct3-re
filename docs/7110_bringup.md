@@ -17,11 +17,13 @@ than the inherited PCD8544 profile. The normal product selects SED1565
 with a 96-by-65 panel window at segment 18; the DSP completion boundary remains
 unchanged.
 
-The full-transfer research frontier is the DSP program-memory extent:
+The full-transfer trial first exposes the DSP program-memory extent:
 NSE-5 writes executable code above the backend's `0x2800` overlay limit.
-A larger-bank trial removes execution of stale mask words but then waits
-on COBBA register D status bits `0x0c`; it still has no graphical boot.
-Neither the fitted geometry nor that status response is established. See
+A larger-bank trial removes execution of stale mask words. Preserving
+COBBA's existing nominal ready input across writes then reaches DSP idle,
+but the MCU rejects primitive `0x35` and stops with code 4. Its payload
+provenance is the current unresolved boundary; graphical boot is unproved.
+Neither fitted geometry nor physical COBBA status semantics is established. See
 [the upload/read evidence](#diagnostic-publication-and-partial-code-block-transfer)
 before revisiting queue loss or interpreting the resulting bad return as
 a CPU opcode gap.
@@ -274,13 +276,67 @@ TI [SPRU131G, chapter 3](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
 documents model-dependent C54x memory maps; the `0x27ff` limit is not a
 CPU-family-wide architectural limit.
 
-The next observed boundary is the mask routine `0x4641..0x464a`, repeatedly
-reading COBBA control register D through `0x465c` and waiting for
-`(value & 0x000c) == 0x000c`. The current storage-only COBBA model reads zero.
-This is a consumer predicate, not evidence that a real COBBA should return
-`0x000c`. Recover the preceding transaction and register semantics before
-adding a response. Readiness remains `0x0a`, keypad columns remain masked,
-and the LCD is blank; no graphical boot or fitted-mask compatibility is proven.
+The mask routine `0x4641..0x464a` waits for COBBA register D bits `0x000c`.
+The device already supplies these as calibrated nominal inputs at reset;
+NSE-5 reads `0x000c`, writes zero at 0.523968 s, then polls zero forever.
+Thus the observed failure is erasure of an existing input by a configuration
+write, not absence of a new DSP completion. A provisional input-retention
+trial preserves those two bits while leaving other D bits as opaque storage.
+This does not establish their physical ownership or ready latency. The
+COBBA conformance fixture checks zero writes and preservation of other bits.
+
+With retention plus the experimental loader/overlay changes, the DSP reaches
+idle `0x408d`, emits regular completion strobes and encounters no unsupported
+opcode during nine seconds. The MCU instead rejects primitive `0x35`:
+`0x3af4d0` receives length `0x32`, which skips the length-`0x34` checksum path.
+At `0x3af540`, flags byte `0x17fe15` is `0xcc` (bit 6 set). Payload byte
+`+0x15` is `0x76`, selecting `0x3af5a2`; byte `+0x21` is `0xd0`, outside
+the required `0x78..0x7f`, so `0x3af64e` marks it invalid. This reaches
+system-stop code 4 at `0x4e94d6`, called from `0x3af6b0`, and loops at
+`0x4e9510`. Both observed initializations return the same payload.
+
+The concrete unresolved question is the provenance and transformation of
+that primitive's data: product-local PMM, COBBA-derived inputs, recovered
+mask data or CPU arithmetic may participate. Identity-like field checks do
+not yet establish its semantic identity or justify repairing its bytes.
+Transport observation confirms the DSP publishes the bytes without a later
+MCU mutation: the `0x74` packet has 52 payload bytes and returns through
+mask caller `0x4bac`. At the first shared payload write, DSP PC `0x37fc`
+has source AR1 `0x120c`, destination AR2 `0x088c` and base AR3 `0x1202`.
+A bounded source-write tail records the transformation in
+`0x7f7a..0x8012`; `0x8012` writes `0x2ad0` to D:`0x120c` before publication.
+Consequently the invalid field predates transport and consumer decoding.
+Audit the transform's original inputs and CPU semantics before assigning
+the fault to PMM contents or incompatible mask data.
+The input is a MCU-originated type-`0x70` packet containing
+`16 18` followed by the 24-byte block beginning `81 84 b1 91`.
+At 0.670170 s, MCU `0x432cd8` writes its first word to HPI `0x1004a`
+from the packet buffer around `0x104384`; DSP `0x4b85` stages it into
+D:`0x120e` at 0.672109 s. Transform entry `0x7f2d` then sees duplicate
+blocks at `0x1202` and `0x120e`, and a second entry operates on `0x1208`.
+AR1 `0xb0bc` at staging names a mask dispatch table, not an established
+cryptographic key. The existing 5110 transform fixture validates one input
+and loop path, not this 7110 input. Neither acquired file contains this
+24-byte block verbatim because it is MCU-prepared, not a raw PMM slice.
+The constructor `0x3aefcc` sets type `0x70`, primitive `0x16` and length
+`0x18`. Copy routine `0x4ef178` first reads 24 bytes from RAM `0x157444`,
+matching acquired PMM `0x46..0x5d`. Routine `0x3ae364` reads 12 bytes from
+storage base `0x157424` through `0x4ebfbc`/`0x3fb854`, matching PMM
+`0x26..0x31`. It duplicates them, multiplies adjacent byte pairs into
+little-endian 16-bit products, reverses byte order, complements bit-reversed
+bytes and XORs that mask into the block at `0x3ae400`.
+
+`tools/nse5_pmm_stage.py` independently reproduces all 24 transmitted bytes
+from those two acquired slices; its observed-packet unit fixture protects
+the calculation. This is a read-only staging model, not an identity decoder
+or provisioning generator. It rules out MCU preparation and transport
+corruption for this block, but does not prove the stored block is valid for
+the recovered DSP mask or that the DSP transform is correctly executed.
+The next boundary is the DSP transform's input/operation contract, not
+repairing these bytes or bypassing the consumer validation.
+Do not substitute donor provisioning, alter validation or invent a COBBA
+identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
+is blank; DSP progress is not graphical boot or fitted-mask compatibility.
 
 `--dsp-tail` emits bounded upload/helper/stack observations and
 `program_upload.json`; comparisons are limited to captured writes and later

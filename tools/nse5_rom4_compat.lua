@@ -35,6 +35,9 @@ local entries = {
     {0x3bbe04, "task2_dsp_queue_post"},
     {0x3bbe98, "task2_dsp_queue_result"},
     {0x433626, "code_block_chunk"}, {0x4336a6, "code_block_partial"},
+    {0x4e94d6, "system_stop"},
+    {0x3af4d0, "identity_reply"}, {0x3af540, "identity_payload_check"},
+    {0x3af64e, "identity_invalid"},
 }
 for _, entry in ipairs(entries) do
     local address, name = entry[1], entry[2]
@@ -74,12 +77,37 @@ for _, entry in ipairs(entries) do
                         space:read_u32(state + 0x10), space:read_u32(state + 0x14),
                         machine.time:as_double()))
                 end
+                if name == "system_stop" then
+                    local stack = {}
+                    for index = 0, 7 do
+                        stack[#stack + 1] = string.format("%08x", space:read_u32(
+                            cpu.state["R13"].value + index * 4))
+                    end
+                    machine:logerror(string.format(
+                        "nse5_compat_system_stop: code=%08x lr=%08x sp=%08x r1=%08x r2=%08x r3=%08x stack=%s t=%.9f\n",
+                        cpu.state["R0"].value, cpu.state["R14"].value,
+                        cpu.state["R13"].value, cpu.state["R1"].value,
+                        cpu.state["R2"].value, cpu.state["R3"].value,
+                        table.concat(stack, ":"), machine.time:as_double()))
+                end
+                if name == "identity_reply" or name == "identity_payload_check" or name == "identity_invalid" then
+                    local message = name == "identity_reply" and cpu.state["R0"].value or cpu.state["R6"].value
+                    local bytes = {}
+                    for index = 0, 61 do
+                        bytes[#bytes + 1] = string.format("%02x", space:read_u8(message + index))
+                    end
+                    machine:logerror(string.format(
+                        "nse5_compat_identity_reply: name=%s message=%08x bytes=%s state=%08x flags=%02x t=%.9f\n",
+                        name, message, table.concat(bytes), cpu.state["R12"].value,
+                        space:read_u8(0x17fe15),
+                        machine.time:as_double()))
+                end
                 if name == "dsp_control_receive" or name == "startup_selftest_reply" or
-                        name == "task2_message_received" then
+                        name == "task2_message_received" or name == "dsp_control_forward" then
                     local message = name ~= "startup_selftest_reply" and
                         cpu.state["R0"].value or cpu.state["R4"].value
                     local bytes = {}
-                    for index = 0, 11 do
+                    for index = 0, (name == "dsp_control_forward" and 63 or 11) do
                         bytes[#bytes + 1] = string.format("%02x", space:read_u8(message + index))
                     end
                     machine:logerror(string.format(
@@ -107,6 +135,35 @@ for _, entry in ipairs(entries) do
         end)
 end
 local column_writes = 0
+local request_buffer_writes = 0
+taps[#taps + 1] = space:install_write_tap(0x104384, 0x1043a7,
+    "nse5_compat_request_buffer", function(offset, data, mask)
+        local when = machine.time:as_double()
+        if when < 0.6 or when > 0.671 then return end
+        request_buffer_writes = request_buffer_writes + 1
+        if request_buffer_writes > 96 then return end
+        machine:logerror(string.format(
+            "nse5_compat_request_buffer: address=%08x data=%08x mask=%08x pc=%08x lr=%08x r0=%08x r1=%08x r2=%08x t=%.9f\n",
+            offset, data, mask, cpu.state["PC"].value, cpu.state["R14"].value,
+            cpu.state["R0"].value, cpu.state["R1"].value, cpu.state["R2"].value, when))
+    end)
+taps[#taps + 1] = space:install_write_tap(0x10048, 0x1004b,
+    "nse5_compat_request_source", function(offset, data, mask)
+        if machine.time:as_double() < 0.66 then return end
+        machine:logerror(string.format(
+            "nse5_compat_request_source: data=%08x mask=%08x pc=%08x lr=%08x r0=%08x r1=%08x r2=%08x r3=%08x r4=%08x r5=%08x t=%.9f\n",
+            data, mask, cpu.state["PC"].value, cpu.state["R14"].value,
+            cpu.state["R0"].value, cpu.state["R1"].value, cpu.state["R2"].value,
+            cpu.state["R3"].value, cpu.state["R4"].value, cpu.state["R5"].value,
+            machine.time:as_double()))
+        if cpu.state["PC"].value == 0x432cd8 and (data & 0xffff) == 0x8184 then
+            local bytes = {}
+            for index = 0, 11 do
+                bytes[#bytes + 1] = string.format("%02x", space:read_u8(0x157424 + index))
+            end
+            machine:logerror("nse5_compat_mask_input: bytes=" .. table.concat(bytes) .. "\n")
+        end
+    end)
 taps[#taps + 1] = space:install_write_tap(0x20068, 0x2006b,
     "nse5_compat_column_mask", function(offset, data, mask)
         if (mask & 0xff) == 0 then return end
@@ -221,6 +278,65 @@ if capture_tail then
 end
 local dsp_publications = 0
 local dsp_service_pulses = 0
+local payload_writes = 0
+local source_tail = {}
+local transform_entries = 0
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7f2d, 0x7f2d,
+    "nse5_compat_transform_input", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7f2e then return end
+        transform_entries = transform_entries + 1
+        if transform_entries > 8 then return end
+        local registers, words = {}, {}
+        for index = 0, 7 do
+            registers[#registers + 1] = string.format("%04x", dsp.state["AR" .. index].value)
+        end
+        for address = 0x1200, 0x121f do
+            words[#words + 1] = string.format("%04x", dsp_space:read_u16(address))
+        end
+        machine:logerror(string.format(
+            "nse5_compat_transform_input: entry=%d ar=%s buffer=%s st0=%04x st1=%04x t=%.9f\n",
+            transform_entries, table.concat(registers, ":"), table.concat(words, ":"),
+            dsp.state["ST0"].value, dsp.state["ST1"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = dsp_space:install_write_tap(0x1200, 0x121f,
+    "nse5_compat_response_buffer", function(offset, data, mask)
+        if machine.time:as_double() > 0.674 then return end
+        if offset == 0x120e then
+            local input, table_words = {}, {}
+            for address = 0x0820, 0x0838 do
+                input[#input + 1] = string.format("%04x", dsp_space:read_u16(address))
+            end
+            for address = 0xb0bc, 0xb0cb do
+                table_words[#table_words + 1] = string.format("%04x", dsp_space:read_u16(address))
+            end
+            machine:logerror(string.format(
+                "nse5_compat_transform_source: value=%04x pc=%04x ar1=%04x ar2=%04x ar3=%04x hpi=%s table=%s t=%.9f\n",
+                data, dsp.state["PC"].value, dsp.state["AR1"].value,
+                dsp.state["AR2"].value, dsp.state["AR3"].value,
+                table.concat(input, ":"), table.concat(table_words, ":"),
+                machine.time:as_double()))
+        end
+        source_tail[#source_tail + 1] = string.format(
+            "nse5_compat_response_buffer: address=%04x value=%04x pc=%04x sp=%04x t=%.9f\n",
+            offset, data, dsp.state["PC"].value, dsp.state["SP"].value,
+            machine.time:as_double())
+        if #source_tail > 64 then table.remove(source_tail, 1) end
+    end)
+taps[#taps + 1] = dsp_space:install_write_tap(0x088c, 0x088c,
+    "nse5_compat_payload_source", function(offset, data, mask)
+        payload_writes = payload_writes + 1
+        if payload_writes > 16 then return end
+        for _, line in ipairs(source_tail) do machine:logerror(line) end
+        local registers = {}
+        for index = 0, 7 do
+            registers[#registers + 1] = string.format("%04x", dsp.state["AR" .. index].value)
+        end
+        machine:logerror(string.format(
+            "nse5_compat_payload_source: value=%04x pc=%04x sp=%04x ar=%s a=%010x b=%010x t=%.9f\n",
+            data, dsp.state["PC"].value, dsp.state["SP"].value,
+            table.concat(registers, ":"), dsp.state["A"].value,
+            dsp.state["B"].value, machine.time:as_double()))
+    end)
 taps[#taps + 1] = dsp_space:install_write_tap(0x0029, 0x0029,
     "nse5_compat_dsp_service_register", function(offset, data, mask)
         dsp_service_pulses = dsp_service_pulses + 1
@@ -249,7 +365,7 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 5 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
+    assert(#taps == #entries + 10 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
     if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
         dump_program_tail("illegal-opcode")
     end
