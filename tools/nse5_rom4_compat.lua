@@ -5,9 +5,21 @@ local space = cpu.spaces.program
 local next_sample = 1
 local times = {0.1, 0.5, 1, 2, 4, 8}
 local taps, entry_counts = {}, {}
+local storage_cache_writes = 0
+taps[#taps + 1] = space:install_write_tap(0x157424, 0x15742f,
+    "nse5_compat_storage_cache_writer", function(offset, data, mask)
+        storage_cache_writes = storage_cache_writes + 1
+        if storage_cache_writes <= 16 then
+            machine:logerror(string.format(
+                "nse5_compat_storage_cache_write: address=%08x data=%08x mask=%08x pc=%08x lr=%08x t=%.9f\n",
+                offset, data, mask, cpu.state["PC"].value,
+                cpu.state["R14"].value, machine.time:as_double()))
+        end
+    end)
 local menu_fixture = os.getenv("NSE5_COMPAT_MENU") == "1"
 local menu_step = 0
 local entries = {
+    {0x46cb84, "storage_cache_copy"},
     {0x432eae, "verifier"}, {0x3bc2a8, "service_init"},
     {0x45c61c, "optional_boot_call"}, {0x3bb818, "startup_index"},
     {0x4bc214, "arm_wrapper"}, {0x4caa04, "uif_irq7"},
@@ -46,6 +58,7 @@ for _, entry in ipairs(entries) do
         "nse5_compat_" .. name, function(offset, data, mask)
             local pc = cpu.state["PC"].value
             if pc ~= address then return end
+            if name == "storage_cache_copy" and cpu.state["R0"].value ~= 0x157424 then return end
             if name == "task2_message_received" and cpu.state["R14"].value ~= 0x311511 then return end
             if name == "task2_dsp_queue_post" and cpu.state["R14"].value ~= 0x469e0d then return end
             if name == "task2_dsp_queue_result" and
@@ -60,6 +73,13 @@ for _, entry in ipairs(entries) do
                     name, pc, cpu.state["R0"].value, cpu.state["R1"].value,
                     cpu.state["R14"].value, machine.time:as_double(),
                     cpu.state["R4"].value))
+                if name == "storage_cache_copy" then
+                    machine:logerror(string.format(
+                        "nse5_compat_storage_cache_copy: destination=%08x source=%08x length=%08x lr=%08x t=%.9f\n",
+                        cpu.state["R0"].value, cpu.state["R1"].value,
+                        cpu.state["R2"].value, cpu.state["R14"].value,
+                        machine.time:as_double()))
+                end
                 if name == "subsystem_group_skip" or name == "subsystem_group_release" then
                     local r5 = cpu.state["R5"].value
                     machine:logerror(string.format(
@@ -539,7 +559,7 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 23 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
+    assert(#taps == #entries + 24 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
     if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
         dump_program_tail("illegal-opcode")
     end

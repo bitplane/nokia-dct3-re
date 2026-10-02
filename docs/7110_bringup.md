@@ -418,6 +418,17 @@ and each matches the observed DSP TX packet. Twelve-byte length alone does
 not identify the first record as an MSID: the live `0x15` path prepares the
 different table `1962 ea23 537c 121a 2247 c2ea`, not the MSID helper's table.
 
+The logical reader `0x3fb854..0x3fb898` bounds the request against `0x898`
+and copies from fixed cache base `0x157424`; it does not search the flash
+journal per request. A bounded write watch and entry observation at
+`0x46cb84` capture the startup cache copy twice: source `0x5fa026`,
+destination `0x157424`, length `0x898`, caller return `0x3faf87`, at
+0.088319 and 0.755891 seconds. The first twelve cached bytes reproduce
+the acquired file, with no intervening content substitution before the
+requests. This excludes a cache-copy/address error, not an incorrect
+upstream record-selection policy or incompatible stored content. The loader
+around `0x3faf87` remains the bounded target for the selection-policy audit.
+
 Nokia's [NSE-5 repair hints, page 13](https://www.manualslib.com/manual/2806569/Nokia-7110.html?page=13)
 require re-establishing IMEI/SIMLOCK data after replacing COBBA or D301.
 This independently supports a hardware/provisioning pairing requirement;
