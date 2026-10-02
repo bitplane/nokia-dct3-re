@@ -148,6 +148,37 @@ taps[#taps + 1] = space:install_write_tap(0x17fe14, 0x17fe17,
     end)
 local dsp = machine.devices[":dsp_c54x:cpu"]
 local dsp_space = dsp.spaces["data"]
+local capture_tail = os.getenv("NSE5_COMPAT_DSP_TAIL") == "1"
+local program_tail, tail_index, tail_dumped = {}, 0, false
+local previous_program_read
+local function dump_program_tail(reason)
+    tail_dumped = true
+    machine:logerror("nse5_compat_dsp_program_tail_reason: " .. reason .. "\n")
+    -- Extension words can appear: these are program reads, not decoded instructions.
+    for index = math.max(1, tail_index - 63), tail_index do
+        local row = program_tail[(index - 1) % 64 + 1]
+        machine:logerror(string.format(
+            "nse5_compat_dsp_program_tail: address=%04x word=%04x sp=%04x a=%010x b=%010x ar2=%04x ar3=%04x ar4=%04x st0=%04x st1=%04x\n",
+            table.unpack(row)))
+    end
+end
+if capture_tail then
+    taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0, 0xffff,
+        "nse5_compat_dsp_program_tail", function(offset, data, mask)
+            if tail_dumped or offset ~= ((dsp.state["PC"].value - 1) & 0xffff) then return end
+            tail_index = tail_index + 1
+            program_tail[(tail_index - 1) % 64 + 1] = {
+                offset, data, dsp.state["SP"].value, dsp.state["A"].value,
+                dsp.state["B"].value, dsp.state["AR2"].value,
+                dsp.state["AR3"].value, dsp.state["AR4"].value,
+                dsp.state["ST0"].value, dsp.state["ST1"].value,
+            }
+            if previous_program_read and previous_program_read >= 0x0800 and offset < 0x0800 then
+                dump_program_tail("low-program-entry")
+            end
+            previous_program_read = offset
+        end)
+end
 local dsp_publications = 0
 local dsp_service_pulses = 0
 taps[#taps + 1] = dsp_space:install_write_tap(0x0029, 0x0029,
@@ -178,7 +209,10 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 5, "entry trace subscriptions lost")
+    assert(#taps == #entries + 5 + (capture_tail and 1 or 0), "entry trace subscriptions lost")
+    if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
+        dump_program_tail("illegal-opcode")
+    end
     if menu_fixture then
         local now = machine.time:as_double()
         if (menu_step == 0 and now >= 4.2) or (menu_step == 1 and now >= 4.4) then

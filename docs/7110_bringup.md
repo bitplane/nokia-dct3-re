@@ -229,6 +229,26 @@ must establish the additional loader execution and slot-timer/control
 contracts exposed by the complete transfer, preserving NSE-1 acceptance
 before replacing that approximation. Do not clear requests, synthesize
 completions, suppress diagnostics or alter timer values to obtain boot.
+
+The expanded loader trial exposes two independently testable CPU omissions:
+PSHM/POPM use seven-bit MMR addresses, and `BCD ALT` (`0xfa43`) tests signed
+40-bit A before its delay slots. Executable fixtures cover high-MMR stack
+round trips, balanced SP, true/false branches and cycle counts.
+
+ROM readers `0x44dc` and scheduler writers `0x25f7`/`0x366c` support a
+free-running port-`0x0d` counter and absolute port-`0x0f` compare hypothesis.
+An experiment removes the rapid zero-compare loop but still fails NSE-1
+acceptance, reaching unsupported `BCD BLEQ` (`0xfa4f`) at `0x0ad6`.
+Counter equality ordering, clock/control behavior and physical CTSI
+correspondence remain unvalidated; the experiment is not promoted.
+
+On NSE-5, `--dsp-tail` captures the first entry below program `0x0800`:
+`RETE` at `0x3620` returns to `0x2470`, branches to `0x2754`, then `RET`
+at `0x2763` with SP `0x0854` pops zero and enters `0x0000`. The later
+`0x0363` failure is execution of data, not evidence for a new opcode.
+Trace creation/writes of this return-stack entry before concluding CPU
+error or mask incompatibility. The tail includes extension-word reads;
+it is not an instruction-boundary disassembly.
 Entry hooks are branch-target observations; an unobserved fallthrough-only
 hook is not absence evidence.
 

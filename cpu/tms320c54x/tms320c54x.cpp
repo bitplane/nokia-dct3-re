@@ -2302,6 +2302,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xfa45: // BCD pmad, AEQ
 	case 0xfa44: // BCD pmad, ANEQ
+	case 0xfa43: // BCD pmad, ALT
 	case 0xfa20: // BCD pmad, NTC
 	case 0xfa30: // BCD pmad, TC
 	case 0xfa4d: // BCD pmad, BEQ
@@ -2309,6 +2310,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 destination = fetch();
 		const bool condition = op == 0xfa45 ? (m_a & ACC_MASK) == 0 :
 				op == 0xfa44 ? (m_a & ACC_MASK) != 0 :
+				op == 0xfa43 ? (s64(m_a << 24) >> 24) < 0 :
 				op == 0xfa4d ? (m_b & ACC_MASK) == 0 :
 				op == 0xfa30 ? bool(m_st0 & 0x1000) : !(m_st0 & 0x1000);
 		m_icount -= 2;
@@ -2438,12 +2440,12 @@ void tms320c54x_device::execute_one(u16 op)
 			m_st1 = (m_st1 & ~u16(0x001f)) | (op & 0x001f);
 			return;
 		}
-		if ((op & 0xffe0) == 0x4a00) // PSHM MMR
+		if ((op & 0xff80) == 0x4a00) // PSHM MMR (seven-bit address)
 		{
 			push(data_read(low & 0x7f));
 			return;
 		}
-		if ((op & 0xffe0) == 0x8a00) // POPM MMR
+		if ((op & 0xff80) == 0x8a00) // POPM MMR (seven-bit address)
 		{
 			data_write(low & 0x7f, pop());
 			return;

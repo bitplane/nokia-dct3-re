@@ -69,6 +69,7 @@ def main():
     parser.add_argument("run_dir", type=Path)
     parser.add_argument("--menu", action="store_true", help="press/release the physical Menu switch after startup")
     parser.add_argument("--verbose", action="store_true", help="include device-boundary transport traces")
+    parser.add_argument("--dsp-tail", action="store_true", help="capture the last 64 DSP program reads before an illegal instruction")
     args = parser.parse_args()
     try:
         run = args.run_dir.resolve()
@@ -90,6 +91,7 @@ def main():
             frame.unlink()
         env = os.environ.copy()
         env["NSE5_COMPAT_MENU"] = "1" if args.menu else "0"
+        env["NSE5_COMPAT_DSP_TAIL"] = "1" if args.dsp_tail else "0"
         result = subprocess.run([
             str(args.binary.resolve()), "nse5r4t", "-rompath", str(romdir.parent),
             "-nvram_directory", str(run / "nvram"), "-cfg_directory", str(run / "cfg"),

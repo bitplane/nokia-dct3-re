@@ -13782,7 +13782,71 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-				"RCD ANEQ false path preserves the stack and falls through");
+					"RCD ANEQ false path preserves the stack and falls through");
+			// 0x60/0x61 belong to this fixture's interrupting read peripheral.
+			program.write_word(0x05e2, 0x4a62); // PSHM MMR 0x62
+			program.write_word(0x05e3, 0x4a63); // PSHM MMR 0x63
+			program.write_word(0x05e4, 0x8a62); // POPM MMR 0x62
+			program.write_word(0x05e5, 0x8a63); // POPM MMR 0x63
+			program.write_word(0x05e6, 0x75d6);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			data.write_word(0x0062, 0x1234);
+			data.write_word(0x0063, 0x5678);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 752;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 752)
+		{
+			expect_opcode(0x4a62,
+				data.read_word(0x02ff) == 0x1234 && data.read_word(0x02fe) == 0x5678 &&
+				data.read_word(0x0062) == 0x5678 && data.read_word(0x0063) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+				"PSHM/POPM decode all seven MMR address bits with balanced stack and one-cycle costs");
+			expect_opcode(0x8a63, data.read_word(0x0063) == 0x1234,
+				"POPM preserves the high MMR address bits");
+			program.write_word(0x05e2, 0xfa43); // BCD ALT
+			program.write_word(0x05e3, 0x05ec);
+			program.write_word(0x05e4, 0xe801); // Changes A after the decision.
+			program.write_word(0x05e5, 0xe802);
+			program.write_word(0x05e6, 0xe803);
+			program.write_word(0x05e7, 0x75d6);
+			program.write_word(0x05e8, 0x0124);
+			program.write_word(0x05e9, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 753;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 753)
+		{
+			expect_opcode(0xfa43,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+				"BCD ALT captures the signed condition before both delay words");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 754;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 754)
+		{
+			expect_opcode(0xfa43,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+				"BCD ALT false path falls through with its three-cycle cost");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
