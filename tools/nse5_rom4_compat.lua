@@ -281,6 +281,38 @@ local dsp_service_pulses = 0
 local payload_writes = 0
 local source_tail = {}
 local transform_entries = 0
+local rotation_input, rotation_base, rotation_count, rotation_other, rotation_other_input
+rotation_count = 0
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7f7b, 0x7f7b,
+    "nse5_compat_rotation_input", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7f7c then return end
+        rotation_base = dsp.state["AR2"].value
+        rotation_other = dsp.state["AR3"].value
+        rotation_input = {}
+        rotation_other_input = {}
+        for index = 0, 1 do
+            rotation_input[#rotation_input + 1] = string.format("%04x", dsp_space:read_u16(rotation_base + index))
+            rotation_other_input[#rotation_other_input + 1] = string.format("%04x", dsp_space:read_u16(rotation_other + index))
+        end
+    end)
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7f8b, 0x7f8b,
+    "nse5_compat_rotation_output", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7f8c or not rotation_input then return end
+        rotation_count = rotation_count + 1
+        if rotation_count <= 128 then
+            local output, other_output = {}, {}
+            for index = 0, 1 do
+                output[#output + 1] = string.format("%04x", dsp_space:read_u16(rotation_base + index))
+                other_output[#other_output + 1] = string.format("%04x", dsp_space:read_u16(rotation_other + index))
+            end
+            machine:logerror(string.format(
+                "nse5_compat_rotation: base=%04x input=%s output=%s other=%04x other_input=%s other_output=%s t=%.9f\n",
+                rotation_base, table.concat(rotation_input, ":"), table.concat(output, ":"),
+                rotation_other, table.concat(rotation_other_input, ":"), table.concat(other_output, ":"),
+                machine.time:as_double()))
+        end
+        rotation_input = nil
+    end)
 taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7f59, 0x7f59,
     "nse5_compat_transform_table", function(offset, data, mask)
         if dsp.state["PC"].value ~= 0x7f5a then return end
@@ -381,7 +413,7 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 11 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
+    assert(#taps == #entries + 13 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
     if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
         dump_program_tail("illegal-opcode")
     end

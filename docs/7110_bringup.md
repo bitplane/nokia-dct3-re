@@ -349,6 +349,15 @@ serial words and prepared table for a subsequent intermediate-state audit.
 The NSE-1 Python profile helper is an encoder; using it with the reverse
 schedule is not an independently verified decoder and must not be used to
 diagnose a CPU error from a differing result.
+
+The resident helper `0x7f7b..0x7f8b` is checked separately against word
+arithmetic: it rotates the 32-bit pair addressed by AR2 right by 10 and
+the pair addressed by AR3 right by 31. The pointers sometimes swap; they
+are not assumed to address consecutive regions. A bounded trace of 128
+calls, including the rejected `0x35` transaction, matches these operations.
+`tools/nse5_transform_trace_check.py TRACE` rejects missing observations,
+malformed operands or a mismatched result. This establishes that stage on
+the observed operands, not the full codec or PMM/COBBA pairing.
 Do not substitute donor provisioning, alter validation or invent a COBBA
 identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
 is blank; DSP progress is not graphical boot or fitted-mask compatibility.
