@@ -464,6 +464,29 @@ The existing gate instead requires zero port-`0x32` writes and first read
 on frame 29. Classify these newly reached firmware paths and add focused
 counter/compare acceptance before promoting the trial; matching the menu
 frame alone does not settle this behavior change.
+
+The bounded, read-only `tools/c54x_rom4_rf_operand_observe.lua` now maps
+these writes to resident firmware operands. Both calls enter `0xa22f`
+with stacked return `0xa1d5` (the call at `0xa1d3`). The `PORTW` instruction
+at `0xa23e` reads through AR5=`0x1921`, whose word is `0x0006`; its port-31
+partner comes from the same table stream. Instruction `0x4025` instead
+uses absolute Smem `0x0009`, the CPU's accumulator-high MMR: accumulator
+`0x00302813` supplies the observed `0x2813/0x0030` pair through MMRs 8/9.
+Reading backend data-array words 8/9 would not recover those CPU MMRs.
+These are executed firmware table/accumulator outputs, not peer-injected
+RF payloads. Their electrical meaning remains unvalidated.
+
+Regenerating the EEPROM profile while retaining the same flash/SIM NVRAM
+reproduces the fresh three-write sequence at 2.095882, 2.114346 and
+2.129435 seconds. Reusing the persisted EEPROM instead reaches four
+writes around 1.515--1.548 seconds, including `0x0041/0x0040` at
+`0x3710` through AR3=`0x1923` (word `0x0040`). Regenerating the EEPROM
+again removes that fourth write. Thus the fresh-versus-persisted profile
+distinction explains this observed variation; it is not evidence that
+adding observation taps changes DSP timing. Do not apply the fresh-profile
+operand count to preserved-NVRAM runs. Cached instruction fetch increments
+PC before its read callback, so these taps match PC=`address+1`, not
+PC=`address`.
 Do not substitute donor provisioning, alter validation or invent a COBBA
 identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
 is blank; DSP progress is not graphical boot or fitted-mask compatibility.
