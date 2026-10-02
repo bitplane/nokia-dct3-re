@@ -358,6 +358,15 @@ calls, including the rejected `0x35` transaction, matches these operations.
 `tools/nse5_transform_trace_check.py TRACE` rejects missing observations,
 malformed operands or a mismatched result. This establishes that stage on
 the observed operands, not the full codec or PMM/COBBA pairing.
+The same check covers 128 calls to mixing helper `0x7fb1..0x7fe7`.
+The trace resolves its three address-table-selected input pairs before
+execution and reads its selected output pair afterward. A straight-line
+integer model of the unextended XORs, 32-bit logical shifts and low-word
+stores agrees on every observed call. Shift and XOR semantics are grounded
+in TI [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), not in
+the phone's expected identity values. Round sequencing, final reversal and
+compatibility of the acquired provisioning with nominal COBBA inputs remain
+to be established; these stage checks do not validate the entire transform.
 Do not substitute donor provisioning, alter validation or invent a COBBA
 identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
 is blank; DSP progress is not graphical boot or fitted-mask compatibility.

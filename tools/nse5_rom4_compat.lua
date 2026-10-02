@@ -281,6 +281,33 @@ local dsp_service_pulses = 0
 local payload_writes = 0
 local source_tail = {}
 local transform_entries = 0
+local mix_input, mix_destination, mix_count
+mix_count = 0
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7fb1, 0x7fb1,
+    "nse5_compat_mix_input", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7fb2 then return end
+        local table_address = dsp.state["AR2"].value
+        mix_input = {}
+        for index = 0, 2 do
+            local address = dsp_space:read_u16(table_address + index)
+            for word = 0, 1 do
+                mix_input[#mix_input + 1] = string.format("%04x", dsp_space:read_u16((address + word) & 0xffff))
+            end
+        end
+        mix_destination = dsp_space:read_u16(table_address + 3)
+    end)
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7fe7, 0x7fe7,
+    "nse5_compat_mix_output", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7fe8 or not mix_input then return end
+        mix_count = mix_count + 1
+        if mix_count <= 128 then
+            machine:logerror(string.format(
+                "nse5_compat_mix: input=%s output=%04x:%04x t=%.9f\n",
+                table.concat(mix_input, ":"), dsp_space:read_u16(mix_destination),
+                dsp_space:read_u16((mix_destination + 1) & 0xffff), machine.time:as_double()))
+        end
+        mix_input = nil
+    end)
 local rotation_input, rotation_base, rotation_count, rotation_other, rotation_other_input
 rotation_count = 0
 taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7f7b, 0x7f7b,
@@ -413,7 +440,7 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 13 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
+    assert(#taps == #entries + 15 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
     if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
         dump_program_tail("illegal-opcode")
     end
