@@ -180,15 +180,6 @@ void nokia_dspif_device::dsp_data_w(u16 address, u16 data)
 				header & 0xff, header >> 8, data, machine().time().as_double());
 	}
 	peer_shared_w(offset, data);
-	// Compatibility approximation: notify IRQ4 on a new ROM4 loader selector.
-	// Actual ROM4 code pulses BSCR.HINT, including after partial transfers with
-	// no selector write. Migration awaits the follow-on DSP execution/timer
-	// contracts; see docs/7110_bringup.md. This is not the full signal model.
-	if (address == hpi_daram_base + (0x0e2 / 2) && data != 0)
-	{
-		m_service_irq_cb(1);
-		m_service_irq_cb(0);
-	}
 }
 
 u8 nokia_dspif_device::dspif_r(offs_t offset) const

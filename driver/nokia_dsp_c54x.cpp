@@ -48,6 +48,9 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_host_command_vector));
 	save_item(NAME(m_slot_frame_length));
 	save_item(NAME(m_slot_delay));
+	save_item(NAME(m_frame_counter_base));
+	save_item(NAME(m_frame_counter_epoch));
+	save_item(NAME(m_slot_compare_written));
 	save_item(NAME(m_slot_timer_expiries));
 	save_item(NAME(m_frame_timer_expiries));
 	save_item(NAME(m_io_trace_count));
@@ -69,6 +72,9 @@ void nokia_dsp_c54x_device::device_reset()
 	m_host_command_vector = 0;
 	m_slot_frame_length = 0;
 	m_slot_delay = 0;
+	m_frame_counter_base = 0;
+	m_frame_counter_epoch = machine().time();
+	m_slot_compare_written = false;
 	m_slot_timer_expiries = 0;
 	m_frame_timer_expiries = 0;
 	m_io_trace_count = 0;
@@ -102,12 +108,24 @@ void nokia_dsp_c54x_device::device_stop()
 			m_data[0x00aa], m_data[0x00ac]);
 }
 
+u32 nokia_dsp_c54x_device::frame_period() const
+{
+	return u32(m_slot_frame_length ? m_slot_frame_length : 4999) + 1;
+}
+
+u16 nokia_dsp_c54x_device::frame_counter() const
+{
+	const u64 ticks = m_reset_released
+			? (machine().time() - m_frame_counter_epoch).as_ticks(13'000'000) / 12 : 0;
+	return (m_frame_counter_base + ticks) % frame_period();
+}
+
 void nokia_dsp_c54x_device::arm_frame_timer()
 {
 	// ROM4 CTSI counts quarter-symbols from the 13 MHz reference divided by
 	// 12. Hardware starts with a 5000-quarter-symbol GSM frame; a later port
 	// 0x0e write replaces the default reload value.
-	const u32 quarter_symbols = u32(m_slot_frame_length ? m_slot_frame_length : 4999) + 1;
+	const u32 quarter_symbols = frame_period() - frame_counter();
 	m_frame_timer->adjust(attotime::from_ticks(u64(quarter_symbols) * 12, 13'000'000));
 }
 
@@ -115,6 +133,10 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 {
 	if (!m_reset_released)
 		return;
+	// The scheduled edge is the counter wrap; pin it exactly despite
+	// attotime's integer rounding of the fractional 13 MHz/12 period.
+	m_frame_counter_base = 0;
+	m_frame_counter_epoch = machine().time();
 
 	++m_frame_timer_expiries;
 	const bool enabled = m_ccont->dsp_frame_clock_enabled();
@@ -135,9 +157,19 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::frame_timer_expired)
 
 void nokia_dsp_c54x_device::arm_slot_timer(u16 quarter_symbols)
 {
-	// CTSI derives this ROM4 one-shot from the 13 MHz reference divided by 12.
-	// A zero reload means expiry on the next quarter-symbol tick.
-	m_slot_delay = quarter_symbols ? quarter_symbols : 1;
+	// ROM4 writes absolute event positions, not relative delays. Its 15000
+	// sentinel cannot match a counter with the ordinary 4999 reload.
+	m_slot_compare_written = true;
+	if (!m_reset_released || quarter_symbols >= frame_period())
+	{
+		m_slot_timer->adjust(attotime::never);
+		return;
+	}
+	const u32 period = frame_period();
+	const u32 delta = (quarter_symbols + period - frame_counter()) % period;
+	// Equality on a newly written compare is scheduled at the next wrap;
+	// sub-quarter-symbol write/match ordering remains unvalidated.
+	m_slot_delay = delta ? delta : period;
 	m_slot_timer->adjust(attotime::from_ticks(u64(m_slot_delay) * 12, 13'000'000));
 }
 
@@ -145,6 +177,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_c54x_device::slot_timer_expired)
 {
 	if (!m_reset_released)
 		return;
+	m_slot_timer->adjust(attotime::from_ticks(u64(frame_period()) * 12, 13'000'000));
 	++m_slot_timer_expiries;
 	if (m_slot_timer_expiries <= 16)
 		machine().logerror("rom4_slot_timer: expiry=%llu delay=%u pc=%04x ifr=%04x imr=%04x t=%.6f\n",
@@ -162,6 +195,8 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 {
 	// MAD2 holds the DSP core in reset while leaving its shared/on-chip DARAM
 	// intact. Releasing the line restarts at the mask-ROM reset vector.
+	m_frame_counter_base = frame_counter();
+	m_frame_counter_epoch = machine().time();
 	m_reset_released = released;
 	m_host_command_line = false;
 	m_host_command_vector = 0;
@@ -170,17 +205,22 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 	if (released)
 	{
 		arm_frame_timer();
+		if (m_slot_compare_written)
+			arm_slot_timer(m_io[0x0f]);
 		update_host_command_line();
 	}
 	else
+	{
 		m_frame_timer->adjust(attotime::never);
+		m_slot_timer->adjust(attotime::never);
+	}
 }
 
 bool nokia_dsp_c54x_device::overlay_address(u16 address) const
 {
-	// PMST.OVLY maps the on-chip DARAM at 0x0080..0x27ff into program space.
+	// The overlay extent belongs to the configured DSP memory geometry.
 	return BIT(m_cpu->state_int(tms320c54x_device::STATE_PMST), 5) &&
-			address >= 0x0080 && address < 0x2800;
+			address >= 0x0080 && address < m_overlay_end;
 }
 
 u16 nokia_dsp_c54x_device::program_r(offs_t offset)
@@ -241,6 +281,8 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 		m_transport->dsp_data_w(address, data);
 	else
 		m_data[address] = data;
+	if (address == 0x0029 && BIT(old_data ^ data, 3))
+		m_transport->service_irq_w(BIT(data, 3));
 	// The DSP publishes MCU-bound packets by writing the receive-ring producer
 	// last. This edge is the physical FIQ0 notification; the shared words alone
 	// are not polled by the MCU.
@@ -324,6 +366,8 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 		return host_request();
 	case 0x02:
 		return m_transport->shared_word(0x0aa / 2);
+	case 0x0d:
+		return frame_counter();
 	case 0x21:
 	{
 		const u16 value = m_cobba->codec_serial_receive();
@@ -394,7 +438,23 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	}
 	else if (port == 0x0e)
 	{
+		m_frame_counter_base = frame_counter();
+		m_frame_counter_epoch = machine().time();
 		m_slot_frame_length = data;
+		m_frame_counter_base %= frame_period();
+		if (m_reset_released)
+			arm_frame_timer();
+		if (m_slot_compare_written)
+			arm_slot_timer(m_io[0x0f]);
+	}
+	else if (port == 0x0d)
+	{
+		m_frame_counter_base = (data & 0x3fff) % frame_period();
+		m_frame_counter_epoch = machine().time();
+		if (m_reset_released)
+			arm_frame_timer();
+		if (m_slot_compare_written)
+			arm_slot_timer(m_io[0x0f]);
 	}
 	else if (port == 0x0f)
 	{

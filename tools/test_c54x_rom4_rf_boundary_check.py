@@ -3,10 +3,13 @@ import unittest
 from tools.c54x_rom4_rf_boundary_check import check
 
 
-def summary(*, frames=6497, reads=207008, first_frame=29, pairs=0,
+def summary(*, frames=6499, reads=207040, first_frame=30, pairs=3,
             port38=0, port39=0, ifr="0000", imr="035f"):
     return (
         f"rom4_rf_read: sample=1 pc=324b frame={first_frame} t=0.160944\n"
+        "rom4_rf_port32: sequence=1 port31=2a04 port32=0006 pc=a240\n"
+        "rom4_rf_port32: sequence=2 port31=2a04 port32=0006 pc=a240\n"
+        "rom4_rf_port32: sequence=3 port31=2813 port32=0030 pc=4028\n"
         "rom4_interface_summary: completion_strobes=2 mailbox_writes=3 "
         f"slot_expiries=0 frame_expiries={frames} rf_reads={reads} "
         f"rf_port32_writes={pairs} rf_port38_reads={port38} "
@@ -17,13 +20,13 @@ def summary(*, frames=6497, reads=207008, first_frame=29, pairs=0,
 
 class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
     def test_accepts_quantified_int0_receiver_activation(self):
-        self.assertEqual(check(summary())["frame_expiries"], 6497)
+        self.assertEqual(check(summary())["frame_expiries"], 6499)
 
     def test_accepts_one_in_flight_frame_at_time_cutoff(self):
-        self.assertEqual(check(summary(frames=6498))["rf_reads"], 207008)
+        self.assertEqual(check(summary(frames=6500))["rf_reads"], 207040)
 
     def test_accepts_two_in_flight_frames_at_time_cutoff(self):
-        self.assertEqual(check(summary(frames=6498, reads=206976))["rf_reads"], 206976)
+        self.assertEqual(check(summary(frames=6500, reads=207008))["rf_reads"], 207008)
 
     def test_rejects_wrong_first_rf_frame(self):
         with self.assertRaisesRegex(ValueError, "started on frame 23"):
@@ -43,15 +46,22 @@ class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
             check(summary(reads=207007))
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
-            check(summary(frames=6500))
+            check(summary(frames=6502))
         with self.assertRaisesRegex(ValueError, "RF read cadence changed"):
-            check(summary(frames=6498, reads=206944))
+            check(summary(frames=6500, reads=206944))
 
     def test_rejects_unexpected_burst_port_activity(self):
         with self.assertRaisesRegex(ValueError, "parallel burst path"):
             check(summary(port38=1))
         with self.assertRaisesRegex(ValueError, "parallel burst path"):
             check(summary(port39=1))
+
+    def test_rejects_changed_rf_sequence(self):
+        for text in (summary(pairs=0), summary().replace("port32=0006", "port32=0007"),
+                     summary().replace("pc=4028", "pc=3712"),
+                     summary().replace("sequence=2", "sequence=1")):
+            with self.assertRaisesRegex(ValueError, "RF port sequence changed"):
+                check(text)
 
     def test_rejects_unexpected_interrupt_state(self):
         with self.assertRaisesRegex(ValueError, "unexpected terminal IMR"):

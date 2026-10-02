@@ -214,7 +214,9 @@ class DspDeviceSplitTest(unittest.TestCase):
         self.assertIn("required_device<nokia_dspif_device> m_transport", self.c54x_backend)
         self.assertIn("m_transport->dsp_data_r(address)", self.c54x_backend)
         self.assertIn("m_transport->dsp_data_w(address, data)", self.c54x_backend)
-        self.assertIn("address >= 0x0080 && address < 0x2800", self.c54x_backend)
+        self.assertIn("address >= 0x0080 && address < m_overlay_end", self.c54x_backend)
+        self.assertIn("u16 m_overlay_end = 0x2800", self.c54x_backend)
+        self.assertIn("set_overlay_end(0x3000)", self.phone)
         self.assertIn("set_input_line(9, HOLD_LINE)", self.c54x_backend)
         self.assertIn("set_input_line(INPUT_LINE_RESET", self.c54x_backend)
         for semantic in (

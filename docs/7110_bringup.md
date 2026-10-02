@@ -233,12 +233,11 @@ conditional-return contract. With the legacy relative slot timer, the HINT
 trial produces a rapid loop involving port `0x0f` writes of 0 and `0x3a98`.
 That does not justify suppressing zero or tuning the clock.
 
-Consequently HINT wiring is not promoted: the working backend retains its
-explicitly documented request-write approximation. The next investigation
-must establish the additional loader execution and slot-timer/control
-contracts exposed by the complete transfer, preserving NSE-1 acceptance
-before replacing that approximation. Do not clear requests, synthesize
-completions, suppress diagnostics or alter timer values to obtain boot.
+The backend now delivers service IRQ through BSCR.HINT transitions instead
+of the request-write approximation. The complete-transfer execution and
+counter/compare contracts below have focused acceptance and preserve NSE-1
+boot/menu behavior. Do not clear requests, synthesize completions, suppress
+diagnostics or alter timer values to obtain boot.
 
 The expanded loader trial exposes two independently testable CPU omissions:
 PSHM/POPM use seven-bit MMR addresses, and `BCD ALT` (`0xfa43`) tests signed
@@ -250,11 +249,11 @@ free-running port-`0x0d` counter and absolute port-`0x0f` compare hypothesis.
 An experiment removes the rapid zero-compare loop. `BCD BLEQ` (`0xfa4f`)
 at `0x0ad6` is implemented with negative/zero/positive signed-B fixtures,
 delay-slot condition capture and cycle counts. With these instructions,
-NSE-1 passes runtime coherence and its exact physical Menu frame. The complete
-coherent Make gate still rejects the newly active RF port-32 writes: its old
-zero-write boundary assertion has not been re-banked.
-Counter equality ordering, clock/control behavior and physical CTSI
-correspondence remain unvalidated; the experiment is not promoted.
+NSE-1 passes runtime coherence and its exact physical Menu frame. The RF
+acceptance now pins the measured fresh-profile output sequence, rather than
+the superseded zero-write boundary (see below). Counter equality ordering,
+clock/control behavior and physical CTSI correspondence remain unvalidated
+on silicon; the implemented model has controller conformance coverage.
 
 On NSE-5, `--dsp-tail` captures the first entry below program `0x0800`:
 `RETE` at `0x3620` returns to `0x2470`, branches to `0x2754`, then `RET`
@@ -412,11 +411,10 @@ tests reject missing observations, sequence gaps, changed reload, phase
 errors and the old one-tick storm. This is a read-only trace check, not
 physical clock validation or complete counter conformance. It does not
 exercise nonzero compares, equality ordering, reload changes, reset
-retention or save-state restoration; those remain promotion prerequisites.
-The full tool suite also retains an intentional source-contract mismatch:
-`test_dsp_device_split` requires the baseline `0x2800` overlay limit, while
-the unpromoted trial uses a configurable extent. Do not report the full
-suite as green or change this test independently of the geometry decision.
+retention or save-state restoration; the separate fixture below covers
+those implemented-model cases. The default overlay remains `0x2800`;
+only `nse5r4t` selects the research `0x3000` extent. The source boundary
+test now protects both facts instead of requiring a hardcoded comparator.
 
 `make check-c54x-rom4-counter-observe` runs a fresh isolated NSE-1 boot and
 the cadence check above. Its read-only Lua observer joins short-interval
@@ -444,14 +442,14 @@ emulated timestamp restore exactly; the replay produces the same expiry
 count and counter phase within one tick. Pre-save and post-load notifiers
 anchor the snapshots to completed state operations, not request time.
 These cases pass the trial implementation, but do not establish physical
-equality ordering or real-chip reset retention. Classification of the newly
-reached RF paths remains outstanding.
+equality ordering or real-chip reset retention.
 
-The full-transfer changes remain experimental: BSCR.HINT-driven service IRQ,
-absolute port-`0x0f` compare against the free-running port-`0x0d` counter,
-and NSE-5's larger overlay geometry. The protected 3210 frontier and COBBA
-conformance pass, and `verify-5110-menu` reproduces the exact menu oracle.
-The old RF-negative gates do not pass and are not silently re-banked.
+The banked backend uses BSCR.HINT-driven service IRQ and absolute
+port-`0x0f` compare against the free-running port-`0x0d` counter. NSE-5's
+larger overlay geometry remains a research configuration, not identification
+of fitted silicon. Fresh acceptance passes DSP coherence, long RF cadence,
+the exact 5110 menu, normal 7110 fail-closed bootstrap, 3210 baseline and
+frontier, and the 3310/3330/3410 frontiers. All 1211 tool tests pass.
 
 A fresh, isolated 30-second NSE-1 run starts receiver reads on frame 30,
 finishes with 6499 frame expiries and 207040 reads, exactly
@@ -460,10 +458,12 @@ finishes with 6499 frame expiries and 207040 reads, exactly
 It remains idle at `0x408d`, IFR zero, IMR `0x035f`, with no port-`0x38/0x39`
 burst reads. A shorter instrumented run additionally emits `0041/0040`
 at `0x3712`; exact command counts are not established as invariant.
-The existing gate instead requires zero port-`0x32` writes and first read
-on frame 29. Classify these newly reached firmware paths and add focused
-counter/compare acceptance before promoting the trial; matching the menu
-frame alone does not settle this behavior change.
+The old assertion (zero port-`0x32` writes, first read on frame 29) is
+superseded deliberately: the fresh-profile RF gate now requires frame 30
+and exactly these three ordered pairs at their observed instruction tails.
+It still rejects parallel burst activity, pending INT0, changed interrupt
+mask and receiver cadence. This is an emulated-boundary oracle, not RF
+electrical validation or network registration evidence.
 
 The bounded, read-only `tools/c54x_rom4_rf_operand_observe.lua` now maps
 these writes to resident firmware operands. Both calls enter `0xa22f`

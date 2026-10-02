@@ -3384,6 +3384,9 @@ void nokia_dct3_state::nse5r4t(machine_config &config)
 	noki7110(config);
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// Research geometry: NSE-5 uploads executable code above 0x2800.
+	// This tests the missing overlay bank, not the fitted mask identity.
+	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 

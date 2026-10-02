@@ -48,6 +48,7 @@ public:
 	void consume_tx_packet(const packet &value);
 	bool enqueue_rx_packet(u8 type, const u8 *payload, unsigned payload_length);
 	void notify_rx();
+	void service_irq_w(int state) { m_service_irq_cb(state); }
 	u16 service_pending() const;
 	void complete_service();
 	u8 run_conformance_checks();
