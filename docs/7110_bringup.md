@@ -418,6 +418,17 @@ The full tool suite also retains an intentional source-contract mismatch:
 the unpromoted trial uses a configurable extent. Do not report the full
 suite as green or change this test independently of the geometry decision.
 
+`make check-c54x-rom4-counter-observe` runs a fresh isolated NSE-1 boot and
+the cadence check above. Its read-only Lua observer joins short-interval
+port-`0x0d` reads, tolerating one tick of quantization against elapsed
+emulated time at the declared 13 MHz/12 rate. It also samples the
+non-destructive register 128 times at 100-microsecond intervals after
+0.25 seconds: firmware alone provides only five reads in this short boot.
+The observed result is 133 reads, 130 checked pairs, 128 advancing pairs
+and zero errors. Samples cross counter wraps but do not establish compare
+or reset semantics. Long gaps and explicit counter/reload writes break
+the comparison chain; no firmware or controller writes are synthesized.
+
 The full-transfer changes remain experimental: BSCR.HINT-driven service IRQ,
 absolute port-`0x0f` compare against the free-running port-`0x0d` counter,
 and NSE-5's larger overlay geometry. The protected 3210 frontier and COBBA
