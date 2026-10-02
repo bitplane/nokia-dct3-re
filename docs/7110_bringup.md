@@ -384,6 +384,23 @@ the nominal COBBA serial inputs used here. Establish the stored identity
 record's format/reader and its provenance before deriving or configuring
 any handset-specific serial value. No value inferred merely by making the
 validator accept is admissible.
+The MCU constructor `0x3aef0c` makes the storage mapping explicit:
+command `0x14` reads twelve bytes at logical offset `0x14`; `0x15` reads
+twelve at `0x00` followed by eight at `0x0c`; `0x16` reads twenty-four at
+`0x20`, then applies the staging transform. The acquired record's payload
+base is file offset `0x26`. `nse5_pmm_stage.py` reports all three requests,
+and each matches the observed DSP TX packet. Twelve-byte length alone does
+not identify the first record as an MSID: the live `0x15` path prepares the
+different table `1962 ea23 537c 121a 2247 c2ea`, not the MSID helper's table.
+
+Nokia's [NSE-5 repair hints, page 13](https://www.manualslib.com/manual/2806569/Nokia-7110.html?page=13)
+require re-establishing IMEI/SIMLOCK data after replacing COBBA or D301.
+This independently supports a hardware/provisioning pairing requirement;
+it supplies neither this dump's original serial words nor a register map.
+The filename "virgin eeprom" is not evidence of compatibility with the
+model's nominal serial. A paired COBBA observation, a provenance-backed
+stored identity format, or an independently documented factory profile is
+needed before changing that input.
 Do not substitute donor provisioning, alter validation or invent a COBBA
 identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
 is blank; DSP progress is not graphical boot or fitted-mask compatibility.

@@ -18,12 +18,17 @@ def stage_block(storage: bytes, block: bytes) -> bytes:
     return bytes(byte ^ key for byte, key in zip(block, mask))
 
 
-def inspect_pmm(image: bytes) -> dict[str, str]:
+def inspect_pmm(image: bytes) -> dict[str, object]:
     if len(image) < 0x5e or image[6:12] != b"EEPROM":
         raise ValueError("expected acquired NSE-5 EEPROM flash record header")
     storage, block = image[0x26:0x32], image[0x46:0x5e]
     return {"storage": storage.hex(), "block": block.hex(),
-            "staged": stage_block(storage, block).hex()}
+            "staged": stage_block(storage, block).hex(),
+            "startup_requests": {
+                "14": image[0x3a:0x46].hex(),
+                "15": (image[0x26:0x32] + image[0x32:0x3a]).hex(),
+                "16": stage_block(storage, block).hex(),
+            }}
 
 
 def main() -> None:

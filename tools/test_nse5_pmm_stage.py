@@ -22,6 +22,14 @@ class PacketPreparationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             inspect_pmm(bytes(0x5e))
 
+    def test_startup_request_offsets(self):
+        image = bytearray(range(0x5e))
+        image[6:12] = b"EEPROM"
+        result = inspect_pmm(bytes(image))
+        self.assertEqual(result["startup_requests"]["14"], bytes(range(0x3a, 0x46)).hex())
+        self.assertEqual(result["startup_requests"]["15"], bytes(range(0x26, 0x3a)).hex())
+        self.assertEqual(result["startup_requests"]["16"], result["staged"])
+
 
 if __name__ == "__main__":
     unittest.main()
