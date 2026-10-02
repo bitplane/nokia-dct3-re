@@ -991,6 +991,23 @@ check-c54x-rom4-counter-observe: build
 		grep -q '^ROM4 observed counter clock: PASS ' output.log; \
 		$(PYTHON) $(abspath tools/c54x_rom4_timer_trace_check.py) error.log
 
+.PHONY: check-c54x-rom4-compare
+check-c54x-rom4-compare: build
+	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-compare.XXXXXX)"; \
+		trap 'rm -rf "$$tmp"' EXIT; \
+		mkdir -p "$$tmp/nvram/noki5110"; \
+		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
+			--eeprom $(abspath roms/noki5110/nse-1.bin) \
+			--flash $(abspath roms/noki5110/5110f530.fls) \
+			--output "$$tmp/nvram/noki5110/eeprom"; \
+		cd "$$tmp"; \
+		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
+			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
+			-skip_gameinfo -nothrottle -seconds_to_run 1 \
+			-autoboot_script $(abspath tools/c54x_rom4_compare_fixture.lua) >output.log 2>&1; \
+		cat output.log; \
+		grep -q '^ROM4 compare model conformance: PASS ' output.log
+
 check-c54x-rom4-coherent: build
 	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-c54x-coherent.XXXXXX)"; \
 		trap 'rm -rf "$$tmp"' EXIT; \

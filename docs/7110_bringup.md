@@ -429,6 +429,19 @@ and zero errors. Samples cross counter wraps but do not establish compare
 or reset semantics. Long gaps and explicit counter/reload writes break
 the comparison chain; no firmware or controller writes are synthesized.
 
+`make check-c54x-rom4-compare` is separately classified as destructive
+controller model conformance, never a boot fixture. It stops DSP instruction
+execution with debugger state in a disposable process, directly writes
+CTSI ports, and reads the saved expiry count. It verifies ahead/behind
+absolute compares, equality scheduled next cycle, periodic repetition,
+outside-period sentinel cancellation, reload-induced cancellation, and
+counter/compare suspension and retention across the MAD2 DSP reset line.
+An isolation tap rejects unexpected firmware writes to the tested ports.
+The fixture exits without restoring or retaining its modified state.
+These cases pass the trial implementation, but do not establish physical
+equality ordering or real-chip reset retention. Save-state acceptance and
+classification of the newly reached RF paths remain outstanding.
+
 The full-transfer changes remain experimental: BSCR.HINT-driven service IRQ,
 absolute port-`0x0f` compare against the free-running port-`0x0d` counter,
 and NSE-5's larger overlay geometry. The protected 3210 frontier and COBBA
