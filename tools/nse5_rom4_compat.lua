@@ -281,21 +281,37 @@ local dsp_service_pulses = 0
 local payload_writes = 0
 local source_tail = {}
 local transform_entries = 0
+taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7f59, 0x7f59,
+    "nse5_compat_transform_table", function(offset, data, mask)
+        if dsp.state["PC"].value ~= 0x7f5a then return end
+        local words = {}
+        for address = 0x13dc, 0x13e1 do
+            words[#words + 1] = string.format("%04x", dsp_space:read_u16(address))
+        end
+        machine:logerror(string.format(
+            "nse5_compat_transform_table: words=%s ar2=%04x ar3=%04x ar4=%04x ar5=%04x t=%.9f\n",
+            table.concat(words, ":"), dsp.state["AR2"].value, dsp.state["AR3"].value,
+            dsp.state["AR4"].value, dsp.state["AR5"].value, machine.time:as_double()))
+    end)
 taps[#taps + 1] = dsp.spaces["program"]:install_read_tap(0x7f2d, 0x7f2d,
     "nse5_compat_transform_input", function(offset, data, mask)
         if dsp.state["PC"].value ~= 0x7f2e then return end
         transform_entries = transform_entries + 1
         if transform_entries > 8 then return end
-        local registers, words = {}, {}
+        local registers, words, serial_words = {}, {}, {}
         for index = 0, 7 do
             registers[#registers + 1] = string.format("%04x", dsp.state["AR" .. index].value)
         end
         for address = 0x1200, 0x121f do
             words[#words + 1] = string.format("%04x", dsp_space:read_u16(address))
         end
+        for address = 0x1f0c, 0x1f0f do
+            serial_words[#serial_words + 1] = string.format("%04x", dsp_space:read_u16(address))
+        end
         machine:logerror(string.format(
-            "nse5_compat_transform_input: entry=%d ar=%s buffer=%s st0=%04x st1=%04x t=%.9f\n",
+            "nse5_compat_transform_input: entry=%d ar=%s buffer=%s serial_words=%s st0=%04x st1=%04x t=%.9f\n",
             transform_entries, table.concat(registers, ":"), table.concat(words, ":"),
+            table.concat(serial_words, ":"),
             dsp.state["ST0"].value, dsp.state["ST1"].value, machine.time:as_double()))
     end)
 taps[#taps + 1] = dsp_space:install_write_tap(0x1200, 0x121f,
@@ -365,7 +381,7 @@ taps[#taps + 1] = dsp_space:install_write_tap(0x08e4, 0x08e4,
 emu.register_frame_done(function()
     -- Retain subscriptions for the whole run. A local table not captured by
     -- a live callback can be collected while the CPU is executing a tap.
-    assert(#taps == #entries + 10 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
+    assert(#taps == #entries + 11 + (capture_tail and 3 or 0), "entry trace subscriptions lost")
     if capture_tail and not tail_dumped and dsp.state["ILLEGAL"].value ~= 0 then
         dump_program_tail("illegal-opcode")
     end

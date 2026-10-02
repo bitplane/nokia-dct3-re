@@ -334,6 +334,21 @@ corruption for this block, but does not prove the stored block is valid for
 the recovered DSP mask or that the DSP transform is correctly executed.
 The next boundary is the DSP transform's input/operation contract, not
 repairing these bytes or bypassing the consumer validation.
+At transform entry the serial words at D:`0x1f0c..0x1f0d` are
+`0x0016,0x0010`, the existing nominal COBBA inputs. Table preparation
+produces `d1b4 5ffb 4ff0 2d7b 0f4c e1c3` at D:`0x13dc`; these are the
+resident `0xb6df` words with the first two words XORed by those inputs.
+This proves what the model used, not what the acquired handset used.
+
+A fresh CPU conformance run passes. The nine-second compatibility trace
+contains 419 exact opcodes: 403 have focused assertions, one (`ec02`) is
+executed-only, and 15 are absent from the fixture. Their first observed PCs
+are outside the resident transform; this is not proof that all transform
+operand/status combinations are correct. The read-only traces retain the
+serial words and prepared table for a subsequent intermediate-state audit.
+The NSE-1 Python profile helper is an encoder; using it with the reverse
+schedule is not an independently verified decoder and must not be used to
+diagnose a CPU error from a differing result.
 Do not substitute donor provisioning, alter validation or invent a COBBA
 identity. Readiness remains `0x0a`, keypad columns remain masked and the LCD
 is blank; DSP progress is not graphical boot or fitted-mask compatibility.
