@@ -2306,12 +2306,14 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xfa20: // BCD pmad, NTC
 	case 0xfa30: // BCD pmad, TC
 	case 0xfa4d: // BCD pmad, BEQ
+	case 0xfa4f: // BCD pmad, BLEQ
 	{
 		const u16 destination = fetch();
 		const bool condition = op == 0xfa45 ? (m_a & ACC_MASK) == 0 :
 				op == 0xfa44 ? (m_a & ACC_MASK) != 0 :
 				op == 0xfa43 ? (s64(m_a << 24) >> 24) < 0 :
 				op == 0xfa4d ? (m_b & ACC_MASK) == 0 :
+				op == 0xfa4f ? (s64(m_b << 24) >> 24) <= 0 :
 				op == 0xfa30 ? bool(m_st0 & 0x1000) : !(m_st0 & 0x1000);
 		m_icount -= 2;
 		if (condition)

@@ -13846,7 +13846,36 @@ private:
 			expect_opcode(0xfa43,
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-				"BCD ALT false path falls through with its three-cycle cost");
+					"BCD ALT false path falls through with its three-cycle cost");
+			program.write_word(0x05e2, 0xfa4f); // BCD BLEQ (SPRU172C condition 01001111)
+			program.write_word(0x05e4, 0xe901); // Changes B after the decision.
+			program.write_word(0x05e5, 0xe902);
+			program.write_word(0x05e6, 0xe903);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 755;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 755 || m_phase == 756 || m_phase == 757)
+		{
+			const bool taken = m_phase != 757;
+			expect_opcode(0xfa4f,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 2 : 3) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 8),
+				"BCD BLEQ tests signed 40-bit B including zero before delay slots");
+			if (m_phase != 757)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, m_phase == 755 ? 0 : 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
