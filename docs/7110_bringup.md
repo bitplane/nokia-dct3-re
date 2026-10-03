@@ -2,6 +2,17 @@
 
 ## Current boundary
 
+The native-core compatibility boundary is parked pending independent evidence,
+not further identity guessing. Public searches for paired NSE-5 PMM/MSID
+captures and COBBA serial-control register specifications have not supplied
+the missing contract. This is a bounded search result, not proof that the data
+does not exist. Gammu's [7110 protocol documentation](https://docs.gammu.org/protocol/n7110.html)
+lists identification reads, but no paired PMM or register-5/6 interpretation;
+service packages and basic-initialization records do not establish a handset's
+original paired identity. Software work may resume on new independent evidence;
+no hardware acquisition or collaborator response is a prerequisite for work
+on other products.
+
 NSE-5 v5.01 PPM C completes 228 alternating sparse-flash buffer handoffs and
 waits at `0x432f96..0x432f9c` for the DSP-owned halfword at MCU `0x10002` to
 change from `0xffff`. Graphical boot, firmware-owned button handling, SIM,

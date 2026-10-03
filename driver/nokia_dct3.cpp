@@ -926,8 +926,16 @@ constexpr nokia_product_config PRODUCT_5210 = make_5210_config();
 constexpr nokia_product_config PRODUCT_2100 = make_2100_config();
 constexpr nokia_product_config PRODUCT_3610 = make_3610_config();
 constexpr nokia_product_config PRODUCT_DEFAULT = make_conservative_config();
-constexpr nokia_product_config PRODUCT_8XXX =
-		make_conservative_config({ 4, 0x10 });
+constexpr nokia_product_config make_8xxx_config()
+{
+	nokia_product_config result = make_conservative_config({ 4, 0x10 });
+	// Independently recovered command/read loops: NSM-3D v5.02 0x2feb1c,
+	// NSM-2 v5.31 0x3030ac and NSB-6 v12.20 0x2fd0d8 select 0x22,
+	// write 0x2c and poll status bit 2 at 0x6d before reading 0x6c.
+	result.gensio_wiring = { 0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true };
+	return result;
+}
+constexpr nokia_product_config PRODUCT_8XXX = make_8xxx_config();
 
 constexpr nokia_product_config make_8210_config()
 {
