@@ -35,16 +35,32 @@ def check_silent_runtime(text):
         raise ValueError("runtime peer answered during the silent comparison")
 
 
+def check_service_control(text):
+    if "runtime_hle_handoff pc=2c75 native_suspended=1" not in text:
+        raise ValueError("missing exclusive native-to-HLE boundary")
+    consumers = re.findall(r"6250_service_control_consumer: class=(\w+) command=(\w+) status=(\w+) armed=(\w+)", text)
+    if consumers != [("74", "0d", "00", "84")]:
+        raise ValueError("missing unique armed compact service-control consumption")
+    if "6250_service_control_endpoint: flags=00 fault0=00 fault1=00" not in text:
+        raise ValueError("service-control faults or armed wait remain")
+    if "[LUA ERROR]" in text:
+        raise ValueError("observer failed")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("--silent-runtime", action="store_true")
+    parser.add_argument("--service-control", action="store_true")
     args = parser.parse_args()
     try:
-        (check_silent_runtime if args.silent_runtime else check)(args.log.read_text())
+        if args.silent_runtime and args.service_control:
+            raise ValueError("silent and responding comparisons are mutually exclusive")
+        checker = check_service_control if args.service_control else check_silent_runtime if args.silent_runtime else check
+        checker(args.log.read_text())
     except (OSError, ValueError) as error:
         parser.exit(1, f"6250 staged boundary failed: {error}\n")
-    print("6250 native uploads PASS; missing mask code at 2c75 remains unexecuted")
+    print("6250 research boundary PASS; graphical idle and physical DSP identity remain unproved")
 
 
 if __name__ == "__main__":

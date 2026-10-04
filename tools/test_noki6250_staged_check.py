@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki6250_staged_check import check, check_silent_runtime
+from tools.noki6250_staged_check import check, check_silent_runtime, check_service_control
 
 
 class StagedBoundaryTest(unittest.TestCase):
@@ -40,6 +40,22 @@ class StagedBoundaryTest(unittest.TestCase):
     def test_silent_runtime_rejects_peer_response(self):
         with self.assertRaises(ValueError):
             check_silent_runtime(self.runtime() + "RX enqueue\n")
+
+    def service(self):
+        return ("runtime_hle_handoff pc=2c75 native_suspended=1\n"
+                "6250_service_control_consumer: class=74 command=0d status=00 armed=84\n"
+                "6250_service_control_endpoint: flags=00 fault0=00 fault1=00\n")
+
+    def test_service_control(self):
+        check_service_control(self.service())
+
+    def test_unarmed_completion_rejected(self):
+        with self.assertRaises(ValueError):
+            check_service_control(self.service().replace("armed=84", "armed=00"))
+
+    def test_fault_not_cleared(self):
+        with self.assertRaises(ValueError):
+            check_service_control(self.service().replace("fault0=00", "fault0=10"))
 
 
 if __name__ == "__main__":

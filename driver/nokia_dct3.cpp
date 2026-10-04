@@ -3369,6 +3369,9 @@ void nokia_dct3_state::nhm3hle(machine_config &config)
 	// request-derived transport peer owns runtime afterward, not mask code.
 	nokia_product_config runtime = PRODUCT_6250;
 	runtime.external_service_transport = true;
+	// 6250 consumer 304494 dispatches 0d, clears its armed timer and reads
+	// two fault bits from the following octet. This is a declared peer model.
+	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }

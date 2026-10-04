@@ -116,18 +116,41 @@ Validate using `noki6250_staged_check.py error.log --silent-runtime`.
 Separate research machine `nhm3hle` transfers ownership to the existing
 request-derived runtime HLE at that boundary. It uses the same acquired
 ROM/PMM, with transport discovery enabled but no fitted record codec,
-registration/channel-map profile or self-test completion override. D0
+registration/channel-map profile or record-verdict override. D0
 discovery traverses TX type `05` and RX `8e`; firmware subsequently sends
-`70:0d00`, which remains unanswered. Its current frame is a visible
+`70:0d00`, which is answered by the declared compact service-control peer.
+Its current frame is a visible
 service-failure screen, not interactive idle. Display geometry is not
 product-validated, and the stream includes commands `0a` and `11` unused
 by the current PCD8544 model. The repeated D0 frame is
 `1e0200d0000305014100`; its semantics need product-specific classification.
 
+## Compact service-control contract
+
+Receive worker `504642..50467e` forwards the `7x` family through `47f2f8`,
+which constructs an envelope with class at `+3`, body at `+8` and posts
+mailbox 2. Passive task-context observation (`100022`, recovered from
+receive helper `3c363c`) identifies its receive caller as `307627`.
+Dispatcher `30763a..3076ba` routes class `74` to `304494` except command
+`32`, which has a separate path.
+
+The subtract cascade at `3044b6..3044c2` selects command `0d` at `304512`.
+Flag bit 2 of `17fd15` arms the wait; the handler cancels timer `17`, clears
+that flag and interprets body byte `+9` bits 0/1 as faults. Clear bits clear
+fault bytes `17fbf0`/`17fbf1`; set bits write `10`/`11`. Runtime research HLE
+therefore uses the existing compact request-correlated `74:0d00` response.
+This is declared peer behavior, not execution of the missing DSP self-test.
+
+A fresh run observes exactly one consumer with class `74`, command `0d`,
+status `00`, armed flags `84`, then endpoint flags/faults `00/00/00`.
+Validate using `noki6250_staged_check.py error.log --service-control`.
+The service-failure frame persists: this completion does not establish a
+provisioning verdict, ordinary startup settlement or interactive idle.
+
 ## Next question
 
-Recover this product's consumer of the `70:0d00` service-control request and
-the source of its failure decision. Also establish the physical LCD contract
+Recover the remaining startup failure decision after compact service-control
+completion. Also establish the physical LCD contract
 before treating the research frame as a product-level display oracle.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
