@@ -179,6 +179,26 @@ through eight seconds; the native PC stays `2c75`. The first request's
 semantic effect and legitimate completion are the next peer contract.
 Do not advance it with a guessed acknowledgement.
 
+The encoder's 53-entry command table maps `32` (and alias `2a`) to
+MCU shared address `0x100b8`, DSP data word `085c`. It stores the complete
+16-bit argument, then sets pending `0x100e0` and rings the doorbell when
+commit is requested. The observer's `900f` is the independent word at
+`0x100a8`, not command 32's payload. A scan of all 28 acquired catalogue
+payloads finds no literal `085c` and five `085d` occurrences; this does not
+exclude indirect accesses or establish the absent resident handler.
+The acquired ROM4 mask uses `085c` as a multiplication coefficient in two
+80-iteration routines, making gain a useful comparison hypothesis, not a
+ROM6 semantic identification. The next contract is the resident consumer
+of this parameter and its completion, rather than an inferred IRQ mask.
+The fresh silent-peer run confirms `0x100b8=3fff` and saved caller
+`0x2b6175`. This is the retry/deferred-parameter wrapper at `0x2b6114`:
+commands `31..34` have four retained halfwords and a dirty-bit mask, and
+an unavailable encoder is retried before its parameter is queued. Thus
+the first request belongs to an MCU parameter-update lifecycle, not the
+loader's IRQ4 upload acknowledgement. Its command-32 setter at
+`0x2b61e6` clamps its argument before calling the wrapper; physical units
+and the resident DSP consumer remain unresolved.
+
 HLE callbacks and queued service/packet/response/keepalive/speech work must
 not mutate the transport while native ownership is active. In particular,
 the generic HLE doorbell clear of `0x100e0` is suppressed: otherwise the

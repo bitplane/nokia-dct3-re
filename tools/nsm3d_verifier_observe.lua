@@ -15,6 +15,11 @@ local doorbell_tap = memory:install_write_tap(0x30000, 0x30003,
                 cpu.state["R4"].value & 0xffff, cpu.state["R6"].value & 0xffff,
                 cpu.state["R5"].value & 0xffff, memory:read_u16(0x100a8),
                 memory:read_u16(0x100e0), machine.time:as_double()))
+            -- Encoder saves r8 and r4-r7 before LR: caller is SP + 20.
+            machine:logerror(string.format(
+                "nsm3d_control_parameter: caller=%08x address=000100b8 value=%04x t=%.6f\n",
+                memory:read_u32(cpu.state["R13"].value + 20),
+                memory:read_u16(0x100b8), machine.time:as_double()))
         end
     end)
 local release_tap = memory:install_write_tap(0x20000, 0x20003,
