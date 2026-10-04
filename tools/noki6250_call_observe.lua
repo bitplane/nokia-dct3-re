@@ -1,4 +1,4 @@
--- External network call fixture plus physical Send/End; no firmware writes.
+-- Physical call input; outgoing mode is harness policy, not driver config.
 local source = debug.getinfo(1, "S").source:sub(2)
 local directory = assert(source:match("^(.*[/])"))
 dofile(directory .. "noki6250_runtime_observe.lua")
@@ -13,6 +13,15 @@ local actions = {
     {20, cell(0, 2), 1}, {20.2, cell(0, 2), 0},
     {24, cell(0, 3), 1}, {24.2, cell(0, 3), 0}
 }
+if os.getenv("NOKIA_DCT3_6250_OUTGOING") == "1" then
+    actions = {
+        {16, cell(2, 1), 1}, {16.15, cell(2, 1), 0},
+        {16.4, cell(3, 1), 1}, {16.55, cell(3, 1), 0},
+        {16.8, cell(4, 1), 1}, {16.95, cell(4, 1), 0},
+        {20, cell(0, 2), 1}, {20.2, cell(0, 2), 0},
+        {28, cell(0, 3), 1}, {28.2, cell(0, 3), 0}
+    }
+end
 local captures = {17, 21, 26, 32}
 local next_action, next_capture = 1, 1
 emu.register_periodic(function()

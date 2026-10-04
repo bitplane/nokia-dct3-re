@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.noki6250_call_check import verify
+from tools.noki6250_call_check import verify, verify_outgoing
 
 
 # Compact protocol transcript from the reviewed NHM-3 run; timing is omitted.
@@ -29,6 +29,10 @@ RX enqueue type=80 payload=34 data=600000000a4d000100001506210001f0
 
 
 class CallCheckTests(unittest.TestCase):
+    def test_incoming_trace_is_not_outgoing_proof(self):
+        with self.assertRaises(ValueError):
+            verify_outgoing(TRACE)
+
     def test_complete_signaling(self):
         verify(TRACE)
 

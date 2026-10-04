@@ -485,3 +485,11 @@ initial-record ROM fixture, `tools/noki6250_call_observe.lua`, 35 seconds and
 `-verbose`. `tools/noki6250_call_check.py LOG` checks the ordered signaling
 through confirmed release and resumed PCH, and rejects continued speech
 traffic after confirmation. It does not validate audio.
+
+For an outgoing call, omit the incoming-call configuration and set the
+harness-only `NOKIA_DCT3_6250_OUTGOING=1` when running the same physical
+input script. It presses 1/2/3, Send at 20 seconds and End at 28 seconds.
+The firmware publishes CM Service Request and SETUP containing number
+`123`, acknowledges network Connect, then completes release back to PCH.
+Validate with `noki6250_call_check.py LOG --outgoing --number 123`.
+This uses the same evidenced channel contracts, not a new speech backend.
