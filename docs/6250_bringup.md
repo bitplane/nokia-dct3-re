@@ -9,8 +9,9 @@ explicit initial-record PMM comparison and nominal channel-2 battery input,
 the same composition reaches graphical boot, startup readiness `0f`, and scans
 a physical row-1/column-1 press as raw key `06`. The research composition now
 enables the existing SIMI/card boundary: ATR, PPS and file reads run through
-the firmware, and a settled physical press opens the Messages menu. Network
-registration, calls and SMS remain unvalidated. An organic phonebook save
+the firmware, and a settled physical press opens the Messages menu. Ordinary
+fresh and preserved-location network registration and `DCT3 LAB` presentation
+are verified in the declared radio HLE. Calls and SMS remain unvalidated. An organic phonebook save
 and cold-start retrieval from SIM NVRAM are verified below. Normal `noki6250`
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
@@ -430,22 +431,28 @@ Seven type `51` configuration blocks follow; their semantic contents are
 not established by the packet inventory. Research `nhm3hle` selects only
 the existing candidate-window acquisition strategy. No assignment, handover,
 traffic-release or neighbor encoding constants are imported from another
-product; the later unset/default confirmation values remain unvalidated.
+product. The assigned confirmation below is independently 6250-derived;
+the remaining later contract fields stay unvalidated.
 
 With this declared HLE comparison, firmware organically sends type `02`
 channel changes for ARFCN 19, type `4a` acquisition control, a type `0f`
 68-byte neighbor list, type `0c` random-access requests, and an assigned
-channel configuration at 10.697 seconds. At 10.713 seconds it sends type
-`1b`, 28 bytes, beginning `00 80 01 03 01 2b`; it releases the channel
-at 29.903 seconds. Registration is not proved: no Location Updating exchange
-or registered operator presentation is observed in this 40-second run.
+channel configuration at 10.697 seconds. Own confirmation consumer `464738`
+compares RX body `+4` bit 0 at `464756` with pending-context byte 2
+(pointer at `1728e0`). The observed assigned context is `0402/01/01`:
+confirmation zero mismatches, producing only an empty establishment request.
+Confirmation one matches; the firmware emits a Location Updating Request,
+acknowledges the network's Accept and Channel Release, writes EF_LOCI offsets
+4/10, releases SDCCH and maintains serving BCCH/PCH. The frame displays
+`DCT3 LAB` and signal bars. Release context `0409` has its own completion
+branch and the peer supplies zero; it is not a global success=one contract.
 
-The peer currently answers assigned `CHANNEL_CHANGED_CNF` (RX type `89`)
-with its unset confirmation value zero, then emits type `86` establishment
-notification. Recover the 6250's consumer-side interpretation of those two
-responses before choosing a confirmation value or advancing the call/SMS
-contract. A request-format match validates acquisition reuse, not every
-subsequent DSP primitive. Reproduce with `nhm3hle`, the initial-record fixture,
+Research `nhm3hle` therefore sets assigned confirmation one. A cold restart
+with retained NVRAM emits the persisted-location request and completes the
+same protocol exchange without redundant EF_LOCI writes. Both runs pass
+`tools/radio_registration_trace_check.py LOG --profile nhm3`; add `--preserved`
+for the second process. This validates registration reuse, not every later
+call/SMS/DSP primitive. Reproduce with `nhm3hle`, the initial-record fixture,
 fresh storage, `noki6250_runtime_observe.lua`, 40 seconds and `-verbose`;
 inspect the `dsp_hle: TX packet` and `dspif_transport: RX enqueue` streams.
 

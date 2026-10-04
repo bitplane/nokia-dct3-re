@@ -3397,8 +3397,11 @@ void nokia_dct3_state::nhm3hle(machine_config &config)
 	runtime.external_service_transport = true;
 	// Own TX 0x56/160 publishes eighty big-endian candidate channels,
 	// beginning with 19 and padding with 0xffff. Only acquisition is
-	// selected here; assignment/handover/call parameters remain unproved.
+	// selected here; handover/call parameters remain unproved.
 	runtime.radio.acquisition = nokia_radio_peer_device::acquisition_strategy::candidate_window;
+	// Own consumer 0x464756 compares RX body bit 0 with pending context
+	// 0x0402 byte 2, observed as 1 for assigned SDCCH.
+	runtime.radio.assigned_channel_confirmation = 1;
 	// 6250 consumer 304494 dispatches 0d, clears its armed timer and reads
 	// two fault bits from the following octet. This is a declared peer model.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;

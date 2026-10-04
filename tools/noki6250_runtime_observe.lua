@@ -8,6 +8,26 @@ local nv_writers = {}
 local nv_copy_count = 0
 local keypad_readers = {}
 local scalar_posts = {}
+local channel_confirmations = {}
+taps[#taps + 1] = memory:install_read_tap(0x464738, 0x46473b,
+    "6250_channel_confirmation", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x464738 then return end
+        local object = cpu.state["R0"].value
+        -- The pending-context address is supplied by the own-ROM literal.
+        local pointer_address = memory:read_u32(0x4649e8)
+        local context = memory:read_u32(pointer_address)
+        local body = memory:read_u8(object + 4)
+        local input, expected, pending = 0xffff, 0xff, 0xff
+        if context >= 0x100000 and context < 0x180000 then
+            input = memory:read_u16(context)
+            expected, pending = memory:read_u8(context + 2), memory:read_u8(context + 3)
+        end
+        local key = string.format("%x:%x:%x:%x", body, input, expected, pending)
+        if channel_confirmations[key] then return end
+        channel_confirmations[key] = true
+        machine:logerror(string.format("6250_channel_confirmation: body=%02x input=%04x expected=%02x pending=%02x t=%.6f\n",
+            body, input, expected, pending, machine.time:as_double()))
+    end)
 local sim_accesses = {}
 for _, direction in ipairs({"read", "write"}) do
     local install = direction == "read" and memory.install_read_tap or memory.install_write_tap
