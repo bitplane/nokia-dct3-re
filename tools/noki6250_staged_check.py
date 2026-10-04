@@ -47,17 +47,33 @@ def check_service_control(text):
         raise ValueError("observer failed")
 
 
+def check_lcd_stream(text):
+    capture = re.search(r"6250_lcd_runs: data_total=(\d+) commands=([^\n]+)", text)
+    if not capture:
+        raise ValueError("missing LCD stream observation")
+    runs = capture[2].split(",")
+    expected = ["24:0", "40:0", "80:0"]
+    for bank in range(1, 8):
+        expected += [f"{0x40 + bank:02x}:96", "80:0"]
+    expected += ["20:96"]
+    if runs[:len(expected)] != expected or int(capture[1]) % (96 * 8):
+        raise ValueError("LCD stream does not match eight 96-byte banks")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("--silent-runtime", action="store_true")
     parser.add_argument("--service-control", action="store_true")
+    parser.add_argument("--lcd-stream", action="store_true")
     args = parser.parse_args()
     try:
         if args.silent_runtime and args.service_control:
             raise ValueError("silent and responding comparisons are mutually exclusive")
         checker = check_service_control if args.service_control else check_silent_runtime if args.silent_runtime else check
         checker(args.log.read_text())
+        if args.lcd_stream:
+            check_lcd_stream(args.log.read_text())
     except (OSError, ValueError) as error:
         parser.exit(1, f"6250 staged boundary failed: {error}\n")
     print("6250 research boundary PASS; graphical idle and physical DSP identity remain unproved")

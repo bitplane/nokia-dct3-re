@@ -313,9 +313,15 @@ constexpr display_geometry_contract DISPLAY_5210 = {
 constexpr display_geometry_contract DISPLAY_6210 = {
 	96, 64, 96, 60
 };
+// NHM-3 independently writes eight 96-byte banks; Nokia's user manual
+// specifies a 96x60 visible display. Controller identification remains open.
+constexpr display_geometry_contract DISPLAY_6250 = {
+	96, 64, 96, 60
+};
 static_assert(display_geometry_contract{}.valid());
 static_assert(DISPLAY_3410.valid());
 static_assert(DISPLAY_6210.valid());
+static_assert(DISPLAY_6250.valid());
 
 constexpr nokia_mad2_device::dsp_reset_wiring_contract
 		DSP_RESET_WIRING_3410 = {
@@ -976,6 +982,7 @@ constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
 constexpr nokia_product_config make_6250_config()
 {
 	nokia_product_config result = make_conservative_config();
+	result.display = DISPLAY_6250;
 	// 6250 v5.03 sets CTSI+2 bit 2 at 0x4e7dc4 and polls bit 4
 	// at 0x4e7dca. Its reset path clears bit 2 and waits for bit 4 low.
 	result.dsp_reset_wiring = { 0x10, 0x04, 0x01 };

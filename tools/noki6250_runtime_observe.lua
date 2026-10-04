@@ -4,6 +4,30 @@ local cpu = assert(machine.devices[":maincpu"])
 local memory = cpu.spaces["program"]
 local taps = {}
 local receivers = {}
+local lcd_commands, lcd_runs = {}, {}
+local lcd_data_count, lcd_since_command = 0, 0
+taps[#taps + 1] = memory:install_write_tap(0x2006c, 0x2006f,
+    "6250_lcd_commands", function(offset, value, mask)
+        if (mask & 0xff00) == 0 then return end
+        local command = (value >> 8) & 0xff
+        lcd_commands[command] = (lcd_commands[command] or 0) + 1
+        if #lcd_runs < 80 then
+            lcd_runs[#lcd_runs + 1] = string.format("%02x:%d", command, lcd_since_command)
+        end
+        lcd_since_command = 0
+    end)
+taps[#taps + 1] = memory:install_write_tap(0x2002c, 0x2002f,
+    "6250_lcd_data", function(offset, value, mask)
+        if (mask & 0xff00) == 0 then return end
+        lcd_data_count = lcd_data_count + 1
+        lcd_since_command = lcd_since_command + 1
+    end)
+taps[#taps + 1] = memory:install_write_tap(0x17fe24, 0x17fe27,
+    "6250_lifecycle_status", function(offset, value, mask)
+        if (mask & 0xff000000) == 0 then return end
+        machine:logerror(string.format("6250_lifecycle_status: data=%02x pc=%08x t=%.6f\n",
+            (value >> 24) & 0xff, cpu.state["PC"].value, machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x304494, 0x304497,
     "6250_service_control_consumer", function(offset, value, mask)
         if cpu.state["PC"].value ~= 0x304494 then return end
@@ -42,6 +66,15 @@ emu.register_periodic(function()
         memory:read_u16(0x10000), memory:read_u16(0x10002), machine.time:as_double()))
     machine:logerror(string.format("6250_service_control_endpoint: flags=%02x fault0=%02x fault1=%02x\n",
         memory:read_u8(0x17fd15), memory:read_u8(0x17fbf0), memory:read_u8(0x17fbf1)))
+    machine:logerror(string.format("6250_lcd_runs: data_total=%d commands=%s\n",
+        lcd_data_count, table.concat(lcd_runs, ",")))
+    local counts = {}
+    for command = 0, 255 do
+        if lcd_commands[command] then
+            counts[#counts + 1] = string.format("%02x:%d", command, lcd_commands[command])
+        end
+    end
+    machine:logerror("6250_lcd_commands: counts=" .. table.concat(counts, ",") .. "\n")
     machine.screens[":screen"]:snapshot("6250_runtime.png")
 end)
 _G.noki6250_runtime_taps = taps

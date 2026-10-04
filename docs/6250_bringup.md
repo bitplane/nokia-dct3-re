@@ -2,11 +2,12 @@
 
 ## Current boundary
 
-The acquired v5.03 PPM C and product-local PMM execute through independently
-recovered MAD2 release and GENSIO/CCONT contracts. A fresh eight-second run
-observes 116 zero-valued ownership writes to each DSP buffer, then parks at
-`429842` waiting for the final DSP-owned publication. No final verdict is
-supplied. LCD, physical input and phone features are not yet validated.
+The acquired v5.03 PPM C and product-local PMM reach a correctly dimensioned
+96x60 `CONTACT SERVICE` frame in research composition `nhm3hle`, after native
+verifier/loaders and request-correlated service-control completion. Interactive
+idle, physical input and phone features remain unvalidated. Normal `noki6250`
+retains the fail-closed final publication wait at `429842`; the research
+composition is not promoted to supported default boot.
 
 ## Inputs
 
@@ -119,9 +120,9 @@ ROM/PMM, with transport discovery enabled but no fitted record codec,
 registration/channel-map profile or record-verdict override. D0
 discovery traverses TX type `05` and RX `8e`; firmware subsequently sends
 `70:0d00`, which is answered by the declared compact service-control peer.
-Its current frame is a visible
-service-failure screen, not interactive idle. Display geometry is not
-product-validated, and the stream includes commands `0a` and `11` unused
+Its current frame is a visible service-failure screen, not interactive idle.
+Display storage/visible geometry is validated below, but the stream includes
+commands `0a` and `11` unused
 by the current PCD8544 model. The repeated D0 frame is
 `1e0200d0000305014100`; its semantics need product-specific classification.
 
@@ -147,11 +148,28 @@ Validate using `noki6250_staged_check.py error.log --service-control`.
 The service-failure frame persists: this completion does not establish a
 provisioning verdict, ordinary startup settlement or interactive idle.
 
+## LCD geometry
+
+Passive GENSIO captures show eight bank addresses `40..47`, each followed
+by an X-address `80` and exactly 96 data bytes, repeated for whole frames.
+The inferred storage is 96x64. Nokia's original
+[6250 user manual, technical specifications](https://www.mobilgyujtemeny.hu/letolt/User%20manual/Nokia/nokia_6250_usermanual_en.pdf)
+specifies a 96x60 visible display. `DISPLAY_6250` declares those dimensions;
+the previous 84-column default wrapped data into the wrong columns and
+corrupted the first text line. The corrected research snapshot is nonblank
+96x60 and renders `CONTACT SERVICE` legibly.
+
+Check the independent stream evidence using
+`noki6250_staged_check.py error.log --service-control --lcd-stream`. Geometry
+does not identify the controller silicon or validate all commands. Commands
+`0a` in extended mode and `11` in basic mode remain unmodeled; no guessed
+side effect was added. The observed lifecycle byte `17fe24=01`, written at
+`4c11d8` during initialization, is not established as the screen's fault cause.
+
 ## Next question
 
 Recover the remaining startup failure decision after compact service-control
-completion. Also establish the physical LCD contract
-before treating the research frame as a product-level display oracle.
+completion, and identify the LCD controller/remaining command semantics.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.

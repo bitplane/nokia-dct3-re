@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki6250_staged_check import check, check_silent_runtime, check_service_control
+from tools.noki6250_staged_check import check, check_silent_runtime, check_service_control, check_lcd_stream
 
 
 class StagedBoundaryTest(unittest.TestCase):
@@ -56,6 +56,24 @@ class StagedBoundaryTest(unittest.TestCase):
     def test_fault_not_cleared(self):
         with self.assertRaises(ValueError):
             check_service_control(self.service().replace("fault0=00", "fault0=10"))
+
+    def lcd(self):
+        commands = ["24:0", "40:0", "80:0"]
+        for bank in range(1, 8):
+            commands += [f"{0x40 + bank:02x}:96", "80:0"]
+        commands += ["20:96"]
+        return "6250_lcd_runs: data_total=768 commands=" + ",".join(commands)
+
+    def test_eight_96_byte_banks(self):
+        check_lcd_stream(self.lcd())
+
+    def test_84_column_assumption_rejected(self):
+        with self.assertRaises(ValueError):
+            check_lcd_stream(self.lcd().replace(":96", ":84"))
+
+    def test_partial_bank_rejected(self):
+        with self.assertRaises(ValueError):
+            check_lcd_stream(self.lcd().replace("total=768", "total=767"))
 
 
 if __name__ == "__main__":
