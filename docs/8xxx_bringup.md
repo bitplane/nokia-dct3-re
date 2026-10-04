@@ -277,6 +277,19 @@ acquired ROM6 loader's transaction structurally, without establishing
 identical transforms or silicon inputs. ROM4 primitive `0d` at `4a16`
 reports resident word `06f9`, rather than echoing the request's zero.
 
+A fresh native NSE-1 reference run with the existing product-local EEPROM
+profile observes three writes to `D06f9`, all zero, at PCs `0f10`, `0e34`
+and `0e6c` between 0.133283 and 0.133907 seconds. At three seconds the
+word is still zero, identity flags `D1f11` are `0007`, and upload completion
+`D0880` is `1074`. Thus an identity bitfield is not the primitive-`0d`
+self-test payload. The literal mask scan finds its reader at `4a1c`, but
+the observed writes occur in uploaded startup code; that scan alone is
+not a writer census. `tools/nse1_selftest_status_observe.lua` reproduces
+the passive observation with `noki5110`, a fresh `make_5110_eeprom_profile.py`
+fixture, `-autoboot_delay 0` and a four-second run. No device or firmware
+state is changed by the observer. These ROM4 startup results do not prove
+the missing ROM6 routines pass on 8250; its final `0d` remains unanswered.
+
 The existing native-observed word codec now has a mathematically derived
 inverse in `tools/nse5_transform_trace_check.py`. It inverts the recovered
 96-bit linear helper by GF(2) elimination and the nonlinear three-bit
