@@ -87,21 +87,48 @@ control word is at `0880` rather than the earlier product's `087f`.
 The loader issues selector `0014` then 124 selector-`0001` requests. Its
 second upload is independently compared against 613 words from this flash
 at `21d4bc` (SHA1 `b1df4b301d67c6c4421ae346478c465a7fd20ff0`). Native
-execution stops at absent program word `2c75`, around 1.8971 s. No mask
+execution suspends before absent program word `2c75`, around 1.8971 s. No mask
 instruction is fabricated. This proves upload progression, not acceptance
 of provisioning, graphical boot or physical peripheral identity.
 
 Reproduce a fresh `nhm3stage` run with the same private ROM path and isolated
 NVRAM/config directories as above, without the early observer. Expected
-process status is 1 for the explicit unavailable-program boundary. Validate
+process status is 0 for the explicit silent observation. Validate
 the resulting log with `tools/noki6250_staged_check.py error.log`; exit status
 alone is insufficient. `make verify`, `make verify-frontier` and the tool
 suite remain the regression guards for existing products.
 
+The loader guard runs once per configured CPU clock during this research
+stage instead of the coarse microsecond observer. It verifies the second
+upload before its first fetch, then suspends at `2c75`; this is an isolation
+mechanism, not a recovered physical DSP clock claim. Other staged profiles
+retain their existing guard cadence.
+
+## Runtime comparison
+
+With `tools/noki6250_runtime_observe.lua`, silent `nhm3stage` emits ten
+post-loader parameter commits at MCU `429e48`: three zero wire values,
+then `8102/900f/8426/920c/920c/920f/920f`, with coefficient `3fff`.
+At eight seconds the native PC remains `2c75`. The MCU eventually clears
+pending itself; no DSP reply or inferred parameter success is supplied.
+Validate using `noki6250_staged_check.py error.log --silent-runtime`.
+
+Separate research machine `nhm3hle` transfers ownership to the existing
+request-derived runtime HLE at that boundary. It uses the same acquired
+ROM/PMM, with transport discovery enabled but no fitted record codec,
+registration/channel-map profile or self-test completion override. D0
+discovery traverses TX type `05` and RX `8e`; firmware subsequently sends
+`70:0d00`, which remains unanswered. Its current frame is a visible
+service-failure screen, not interactive idle. Display geometry is not
+product-validated, and the stream includes commands `0a` and `11` unused
+by the current PCD8544 model. The repeated D0 frame is
+`1e0200d0000305014100`; its semantics need product-specific classification.
+
 ## Next question
 
-Recover what the MCU requests after this loader boundary and whether the
-existing declared runtime DSP peer can answer it from this product's own
-records. Missing native mask code and immutable peripheral identity remain
-explicitly unvalidated; runtime HLE must not manufacture record/self-test
-verdicts merely to reach a frame.
+Recover this product's consumer of the `70:0d00` service-control request and
+the source of its failure decision. Also establish the physical LCD contract
+before treating the research frame as a product-level display oracle.
+Missing native mask code and immutable peripheral identity remain explicitly
+unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
+to reach idle.

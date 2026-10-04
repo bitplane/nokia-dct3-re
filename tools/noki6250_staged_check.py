@@ -15,19 +15,33 @@ def check(text):
     if re.findall(r"request selector=([0-9a-f]+)", text) != ["0014"] + ["0001"] * 124:
         raise ValueError("unexpected native loader request sequence")
     verified = text.find("loader2_verified words=613 entry=0a00")
-    boundary = text.find("unavailable_program address=2c75 pc=2c76 stage=loader")
+    boundary = text.find("outside_uploaded_code pc=2c75")
     if verified < 0 or boundary <= verified:
         raise ValueError("missing product-local loader verification or fail-closed mask boundary")
+    if "observation_halt pc=2c75 ownership_retained=1" not in text:
+        raise ValueError("missing silent native isolation at the mask boundary")
     if "unimplemented C54x opcode" in text or "[LUA ERROR]" in text:
         raise ValueError("execution or observer failed before the reviewed boundary")
+
+
+def check_silent_runtime(text):
+    check(text)
+    commands = re.findall(r"6250_runtime_doorbell:.*pc=00429e48 command=([0-9a-f]+) argument=3fff pending=0001", text)
+    if commands != ["0000"] * 3 + ["8102", "900f", "8426", "920c", "920c", "920f", "920f"]:
+        raise ValueError("unexpected MCU parameter sequence with the DSP held silent")
+    if not re.search(r"6250_runtime_boundary: arm_pc=[0-9a-f]+ dsp_pc=2c75 pending=0000", text):
+        raise ValueError("missing retained native boundary at the observation endpoint")
+    if "runtime_hle_handoff" in text or "RX enqueue" in text:
+        raise ValueError("runtime peer answered during the silent comparison")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
+    parser.add_argument("--silent-runtime", action="store_true")
     args = parser.parse_args()
     try:
-        check(args.log.read_text())
+        (check_silent_runtime if args.silent_runtime else check)(args.log.read_text())
     except (OSError, ValueError) as error:
         parser.exit(1, f"6250 staged boundary failed: {error}\n")
     print("6250 native uploads PASS; missing mask code at 2c75 remains unexecuted")

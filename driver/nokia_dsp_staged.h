@@ -20,6 +20,7 @@ public:
 	void set_loader2_source(u32 flash_offset) { m_loader2_offset = flash_offset; }
 	void set_verifier_source_end(u16 end) { m_verifier_source_end = end; }
 	void set_loader_control_address(u16 address) { m_loader_control_address = address; }
+	void set_cycle_guard_for_loader(bool enable) { m_cycle_guard_for_loader = enable; }
 	void set_observe_after_missing_code(bool enable) { m_observe_after_missing_code = enable; }
 	void set_runtime_hle_after_loader(bool enable) { m_runtime_hle = enable; }
 
@@ -33,6 +34,7 @@ private:
 	void data_map(address_map &map);
 	void io_map(address_map &map);
 	u16 program_r(offs_t offset);
+	void verify_loader2();
 	void program_w(offs_t offset, u16 data);
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 data);
@@ -49,6 +51,7 @@ private:
 	u32 m_loader2_offset = 0;
 	u16 m_verifier_source_end = 0xe800;
 	u16 m_loader_control_address = 0x087f;
+	bool m_cycle_guard_for_loader = false;
 	bool m_loader2_verified = false;
 	bool m_observe_after_missing_code = false;
 	bool m_runtime_hle = false;

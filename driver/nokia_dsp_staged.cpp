@@ -106,12 +106,16 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::begin_execution)
 	if (!m_active)
 		return;
 	m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0f00);
-	m_guard->adjust(attotime::from_usec(1), 0, attotime::from_usec(1));
+	// A coarse observation tick can miss CALL into absent mask code before
+	// program_r fails closed. Cycle-scale isolation never supplies that opcode.
+	attotime const cadence = (!m_verifier && m_cycle_guard_for_loader) ?
+			attotime::from_hz(clock()) : attotime::from_usec(1);
+	m_guard->adjust(cadence, 0, cadence);
 }
 
-u16 nokia_dsp_staged_device::program_r(offs_t offset)
+void nokia_dsp_staged_device::verify_loader2()
 {
-	if (!m_verifier && offset == 0x0a00 && !m_loader2_verified)
+	if (!m_loader2_verified)
 	{
 		if (!m_loader2_offset || m_loader2_offset + 613 * 2 > m_flash.bytes())
 			fatalerror("Staged DSP requires a configured loader2 source");
@@ -121,6 +125,12 @@ u16 nokia_dsp_staged_device::program_r(offs_t offset)
 		m_loader2_verified = true;
 		logerror("staged_dsp: loader2_verified words=613 entry=0a00 t=%.6f\n", machine().time().as_double());
 	}
+}
+
+u16 nokia_dsp_staged_device::program_r(offs_t offset)
+{
+	if (!m_verifier && offset == 0x0a00)
+		verify_loader2();
 	// Firmware-contained bootstrap fragment, not a fitted-mask dump. The
 	// product profile chooses its source; no missing words are fabricated.
 	if (offset >= 0xff80 && offset < 0xff80 + m_fragment.size())
@@ -217,6 +227,9 @@ void nokia_dsp_staged_device::io_w(offs_t offset, u16 data)
 TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::check_execution)
 {
 	const u16 pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
+	// A cycle guard can observe the loader entry before its first fetch.
+	if (!m_verifier && pc == 0x0a00)
+		verify_loader2();
 	if ((pc < 0x0f00 || pc >= m_program_end) &&
 			!(m_loader2_verified && pc >= 0x0a00 && pc < 0x0c65))
 	{

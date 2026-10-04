@@ -1141,6 +1141,7 @@ public:
 	void noki6210(machine_config &config);
 	void noki6250(machine_config &config);
 	void nhm3stage(machine_config &config);
+	void nhm3hle(machine_config &config);
 	void dct3_base(machine_config &config);
 	void dct3_32mbit_flash_base(machine_config &config);
 	void noki3310(machine_config &config);
@@ -3357,6 +3358,19 @@ void nokia_dct3_state::nhm3stage(machine_config &config)
 	staged.set_loader2_source(0x1d4bc);
 	staged.set_verifier_source_end(0xd000);
 	staged.set_loader_control_address(0x0880);
+	staged.set_cycle_guard_for_loader(true);
+	staged.set_observe_after_missing_code(true);
+}
+
+void nokia_dct3_state::nhm3hle(machine_config &config)
+{
+	nhm3stage(config);
+	// Native uploads stop before the absent mask routine; the existing
+	// request-derived transport peer owns runtime afterward, not mask code.
+	nokia_product_config runtime = PRODUCT_6250;
+	runtime.external_service_transport = true;
+	apply_product_config(runtime);
+	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }
 
 void nokia_dct3_state::nsm3dhle(machine_config &config)
@@ -3670,6 +3684,15 @@ ROM_START( nhm3stage )
 		CRC(6087ce70) SHA1(57c29c8387caf864603d94a22bfb63ace427b7f9))
 ROM_END
 
+ROM_START( nhm3hle )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("6250-503mcuppmc.fls", 0, 0x3a0000,
+		CRC(8dffb91b) SHA1(95607ce39c383bda75f1e6aeae67a214b787b0a1))
+	ROM_LOAD("6250 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
+		CRC(6087ce70) SHA1(57c29c8387caf864603d94a22bfb63ace427b7f9))
+ROM_END
+
 ROM_START( noki7110 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -3763,6 +3786,7 @@ SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empt
 SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6250, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nhm3stage, noki6250, 0, nhm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "6250 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nhm3hle, noki6250, 0, nhm3hle, noki3310, nokia_dct3_state, empty_init, "Nokia", "6250 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsm3dr6, noki8250, 0,    nsm3dr6, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D staged DSP with declared ROM6 input (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsm3dhle, noki8250, 0,   nsm3dhle, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
