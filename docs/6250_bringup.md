@@ -309,12 +309,16 @@ stopped analog task or missing timer.
 
 State 3 (`30cea0`) accepts event `41`, or on event `49` tests predicate
 `4f918a(00009004)` while its retry count is nonzero. The predicate's register
-map `289af0` resolves index `10` to CCONT register 1, mask `04`; it normalizes
-that bit to a Boolean. The current CCONT model assigns this bit to the
-charger-reset cause. At 8/20 seconds, context fields `+0e/+11` are `01/00`
+map `2893a8` (literal at `4f92a8`) resolves index `10` to serial command `70`,
+mask `04`; it normalizes that bit to a Boolean. The serial address is
+`(command >> 3) & 0f`, selecting CCONT register `0e` and its charger-reset
+cause. Table `289af0` is not this reader's descriptor map. At 8/20 seconds,
+context fields `+0e/+11` are `01/00`
 and the retry count decreases from `04` to `00`, with readiness still `0e`.
-These observations do not establish that an ordinary power-on should set
-the charger-reset bit. Recover the preceding branch selection and event
+The predicate is observed at 9.324/12.724 seconds with argument `00009004`,
+cached status `13/00` and count `04/03`; neither status has bit 2 set.
+These observations do not establish that ordinary power-on should set the
+charger-reset cause. Recover the preceding branch selection and event
 `41` producer before modifying the board inputs; do not inject the bit or
 report 14 to bypass this lifecycle.
 

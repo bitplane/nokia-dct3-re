@@ -9,6 +9,18 @@ local nv_copy_count = 0
 local keypad_readers = {}
 local scalar_posts = {}
 local analog_writes, analog_receiver_seen = {}, false
+local analog_predicates = {}
+taps[#taps + 1] = memory:install_read_tap(0x4f9188, 0x4f918b,
+    "6250_analog_predicate", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x4f918a then return end
+        local argument, caller = cpu.state["R0"].value, cpu.state["R14"].value
+        if caller ~= 0x30cedd then return end
+        local cached = memory:read_u8(0x172cc8)
+        if analog_predicates[cached] then return end
+        analog_predicates[cached] = true
+        machine:logerror(string.format("6250_analog_predicate: argument=%08x cached=%02x count=%02x t=%.6f\n",
+            argument, cached, memory:read_u8(0x1704ad), machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x3c3588, 0x3c358b,
     "6250_scalar_posts", function(offset, value, mask)
         if cpu.state["PC"].value ~= 0x3c3588 then return end
