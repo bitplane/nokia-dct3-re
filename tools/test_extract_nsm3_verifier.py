@@ -48,6 +48,16 @@ class VerifierExtractionTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported"):
             verifier.extract(self.image(), "6250")
 
+    def test_nsm3d_uses_its_own_flash_and_descriptor(self):
+        image = bytearray(verifier.NSM3D_DESCRIPTOR_OFFSET + 12)
+        struct.pack_into(">6H", image, verifier.NSM3D_DESCRIPTOR_OFFSET,
+                         0x0f00, 0, 223, 0x0f00, 0xdc, 0)
+        image += b"\x12\x34" * 223
+        with patch.object(verifier.hashlib, "sha1", side_effect=[
+                self.digest(verifier.NSM3D_FLASH_SHA1),
+                self.digest(verifier.PROGRAM_SHA1)]):
+            self.assertEqual(verifier.extract(image, "8250"), b"\x12\x34" * 223)
+
     def test_nse5_has_its_own_shorter_program_and_descriptor(self):
         image = bytearray(verifier.NSE5_DESCRIPTOR_OFFSET + 12)
         struct.pack_into(">6H", image, verifier.NSE5_DESCRIPTOR_OFFSET,

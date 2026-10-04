@@ -14263,8 +14263,22 @@ ROM_START(nsm3verify)
 		CRC(927022b1) SHA1(c1a0fe95cedb89a92b19654208cc4855e1a4988e))
 ROM_END
 
-// Same staged program, distinct MCU-supplied count and flash input. The PROM
-// and COBBA variants remain sensitivity fixtures, not measured NPE-3 hardware.
+// Same staged program and observed geometry, distinct stock 8250 flash input.
+// Peripheral variants remain sensitivity fixtures, not fitted NSM-3D identity.
+ROM_START(nsm3dverify)
+	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
+	ROM_SYSTEM_BIOS(1, "cobba", "COBBA model comparison (not handset validation)")
+	ROM_SYSTEM_BIOS(2, "cobba_alt", "COBBA register-F sensitivity fixture")
+	ROM_SYSTEM_BIOS(3, "rom4", "PROM version sensitivity fixture")
+	ROM_REGION16_LE(446, "verifier", 0)
+	ROM_LOAD16_WORD_SWAP("nsm3_verifier.bin", 0, 446,
+		CRC(53e2de79) SHA1(6646da3c5be9c70deda7e0b5b9f257d5d2ace815))
+	ROM_REGION(0x1d0000, "flash", 0)
+	ROM_LOAD("8250-502mcuppmk.fls", 0, 0x1d0000,
+		CRC(2c58e48b) SHA1(f26c98ffcfffbbd5714889e10cfa41c5f6dd2529))
+ROM_END
+
+// NPE-3 additionally supplies a different block count and source extent.
 ROM_START(npe3verify)
 	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
 	ROM_SYSTEM_BIOS(1, "cobba", "COBBA model comparison (not handset validation)")
@@ -14327,6 +14341,9 @@ SYST(2026, tms54test, 0, 0, test, 0, tms320c54x_test_state, empty_init,
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, nsm3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NSM-3 stock staged DSP verifier fixture",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, nsm3dverify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
+		"MAME", "NSM-3D stock staged DSP verifier fixture",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, npe3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NPE-3 stock staged DSP verifier fixture",
