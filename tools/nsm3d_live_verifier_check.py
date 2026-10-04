@@ -83,6 +83,14 @@ def check_silent_observation(text):
         raise ValueError("native PC or pending ownership changed during observation")
 
 
+def check_parameter_origin(text):
+    parameters = re.findall(
+        r"nsm3d_control_parameter: caller=([0-9a-f]+) "
+        r"wrapper_caller=([0-9a-f]+) address=([0-9a-f]+) value=([0-9a-f]+)", text)
+    if parameters != [("002b6175", "002b61f1", "000100b8", "3fff")]:
+        raise ValueError("initial DSP parameter did not originate in the recovered setter")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -94,6 +102,7 @@ def main():
         check(text, extract(image, "8250"), extract_loader(image), extract_program_fragment(image))
         check_boundary(text)
         check_silent_observation(text)
+        check_parameter_origin(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 live verifier failed: {error}\n")
     print("8250 native verifier and loaders verified; silent-DSP command-32 boundary preserved; phone boot remains unproved")

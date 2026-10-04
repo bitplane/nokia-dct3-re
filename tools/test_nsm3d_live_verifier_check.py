@@ -1,12 +1,23 @@
 import unittest
 
 try:
-    from tools.nsm3d_live_verifier_check import check, check_boundary, check_silent_observation
+    from tools.nsm3d_live_verifier_check import check, check_boundary, check_silent_observation, check_parameter_origin
 except ModuleNotFoundError:
-    from nsm3d_live_verifier_check import check, check_boundary, check_silent_observation
+    from nsm3d_live_verifier_check import check, check_boundary, check_silent_observation, check_parameter_origin
 
 
 class LiveVerifierTests(unittest.TestCase):
+    def test_parameter_origin(self):
+        text = ("nsm3d_control_parameter: caller=002b6175 wrapper_caller=002b61f1 "
+                "address=000100b8 value=3fff t=1.026648\n")
+        check_parameter_origin(text)
+        for old, new in (("002b61f1", "002b61f3"), ("000100b8", "000100a8"),
+                         ("3fff", "ffff")):
+            with self.subTest(change=new), self.assertRaises(ValueError):
+                check_parameter_origin(text.replace(old, new))
+        with self.assertRaises(ValueError):
+            check_parameter_origin(text + text)
+
     def fixture(self):
         return (
             "nsm3d_verifier_program: words=1234\n"

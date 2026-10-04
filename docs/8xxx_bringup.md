@@ -198,6 +198,12 @@ the first request belongs to an MCU parameter-update lifecycle, not the
 loader's IRQ4 upload acknowledgement. Its command-32 setter at
 `0x2b61e6` clamps its argument before calling the wrapper; physical units
 and the resident DSP consumer remain unresolved.
+The setter at `0x2b61d0` uses a signed comparison against `0x8000` and
+substitutes `0x7fff` for larger inputs. Its initialization call at
+`0x2b627e` loads `0x3fff` from the product-local literal at `0x2b65f8`.
+Runtime saved return addresses confirm encoder caller `0x2b6175` and
+wrapper caller `0x2b61f1`. This establishes a bounded coefficient-like
+parameter lifecycle, not its physical units or an evidenced ROM6 consumer.
 
 HLE callbacks and queued service/packet/response/keepalive/speech work must
 not mutate the transport while native ownership is active. In particular,
