@@ -1129,6 +1129,7 @@ public:
 	void noki5210(machine_config &config);
 	void noki8xxx(machine_config &config);
 	void nsm3dr6(machine_config &config);
+	void nsm3dhle(machine_config &config);
 	void noki8210(machine_config &config);
 
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
@@ -3327,6 +3328,13 @@ void nokia_dct3_state::nsm3dr6(machine_config &config)
 	staged.set_observe_after_missing_code(true);
 }
 
+void nokia_dct3_state::nsm3dhle(machine_config &config)
+{
+	nsm3dr6(config);
+	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
+	m_dsp_hle->set_opaque_parameter_acceptance(true);
+}
+
 void nokia_dct3_state::noki8210(machine_config &config)
 {
 	dct3_base(config);
@@ -3666,6 +3674,13 @@ ROM_START( nsm3dr6 )
 	ROM_LOAD("8250 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(7ca585e0) SHA1(a974fb5fddcd0438ac4aaf32b431f1453e8d923c))
 ROM_END
 
+ROM_START( nsm3dhle )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("8250-502mcuppmk.fls", 0, 0x1d0000, CRC(2c58e48b) SHA1(f26c98ffcfffbbd5714889e10cfa41c5f6dd2529))
+	ROM_LOAD("8250 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(7ca585e0) SHA1(a974fb5fddcd0438ac4aaf32b431f1453e8d923c))
+ROM_END
+
 ROM_START( noki8850 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -3701,6 +3716,7 @@ SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empt
 SYST( 2000, noki6250, 0,      0,      noki6250, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsm3dr6, noki8250, 0,    nsm3dr6, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D staged DSP with declared ROM6 input (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsm3dhle, noki8250, 0,   nsm3dhle, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

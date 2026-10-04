@@ -215,14 +215,37 @@ busy ownership and IRQ4 notification. None of the 28 acquired ROM6 upload
 payloads contains literal `0870`, so these ROM4 instruction addresses and
 handler implementation are not a recovered ROM6 resident routine.
 
-A runtime HLE alternative must be a separate, explicitly selected backend:
-retain the silent native fixture, stop native execution before unavailable
-instructions, and make transport ownership exclusive. Parameter acceptance
-must retain/apply the submitted configuration before completing busy; it
-must not fabricate a native helper return, the loader's `abba` cookie, or
-firmware state. Its configuration-consumption behavior would be declared
-HLE, not proof of complete ROM6 execution. This is the software path to
-evaluate next; continued native execution still needs the fitted mask.
+`nsm3dhle` is a separate, explicitly selected hybrid research composition.
+It executes the same native verifier and loaders, suspends before resident
+call `2c75`, then transfers transport ownership to runtime HLE. The native
+CPU remains suspended; no helper return, loader `abba` cookie or firmware
+state is fabricated. `nsm3dr6` retains its silent ownership policy, and the
+normal `noki8250` configuration remains fail-closed.
+
+The hybrid accepts the MCU's 14-word parameter bank at shared offsets
+`a8..c2` into saved HLE state before clearing busy. This is declared opaque
+configuration consumption, not recovered ROM6 instruction behavior, analogue
+gain emulation, or a measured completion latency. Its fresh eight-second
+run observes commands `32/31/33/08/09/2f/2f`, retains parameter `3fff`,
+clears pending, and leaves the native PC at `2c75`. The MCU reaches
+`0x2f349a`; graphical boot and phone features remain unproved. The next
+boundary is the MCU's post-control packet/service initialization, which
+must be decoded from this firmware rather than importing another product's
+ring layout or replies. Continued native execution still needs the fitted
+mask.
+
+Use the same private-directory invocation below with machine `nsm3dhle`
+and validate its log separately:
+
+```sh
+.venv/bin/python tools/nsm3d_runtime_hle_check.py RUN/error.log \
+  roms/noki8250/8250-502mcuppmk.fls
+```
+
+The hybrid checker verifies acquired native uploads, exclusive ownership,
+ordered control acceptance and the retained native stop. It is not a boot
+or UI acceptance gate. Both 3210 gates, the silent native fixture, the
+tool suite and the patch-stack check pass with this composition present.
 
 HLE callbacks and queued service/packet/response/keepalive/speech work must
 not mutate the transport while native ownership is active. In particular,

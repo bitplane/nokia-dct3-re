@@ -111,6 +111,7 @@ public:
 	};
 
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
+	void set_opaque_parameter_acceptance(bool enabled) { m_opaque_parameter_acceptance = enabled; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_control_contract(service_control_contract contract)
 	{
@@ -133,6 +134,7 @@ public:
 	auto mcu_control_word_cb() { return m_mcu_control_word_cb.bind(); }
 	u16 mcu_control_word() const { return m_mcu_control_word; }
 	u16 mcu_control_wire() const { return m_mcu_control_wire; }
+	u16 applied_parameter(unsigned index) const { return m_applied_parameters.at(index); }
 	u16 data_word(u16 address) const { return m_data_memory[address]; }
 	bool data_word_loaded(u16 address) const { return m_data_memory_loaded[address] != 0; }
 	u64 speech_uplink_frames() const { return m_speech_uplink_frames; }
@@ -199,6 +201,8 @@ private:
 	bootstrap_contract m_bootstrap;
 	u16 m_mcu_control_word = 0;
 	u16 m_mcu_control_wire = 0;
+	bool m_opaque_parameter_acceptance = false;
+	std::array<u16, 14> m_applied_parameters{};
 	speech_control_contract m_speech_control;
 	tone_control_contract m_tone_control;
 	u32 m_tone_frequency1 = 0;

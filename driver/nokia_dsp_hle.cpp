@@ -40,6 +40,7 @@ void nokia_dsp_hle_device::device_start()
 	save_item(NAME(m_bootstrap_exchange_count));
 	save_item(NAME(m_mcu_control_word));
 	save_item(NAME(m_mcu_control_wire));
+	save_item(NAME(m_applied_parameters));
 	save_item(NAME(m_tone_frequency1));
 	save_item(NAME(m_tone_frequency2));
 	save_item(NAME(m_tone_amplitude));
@@ -98,6 +99,7 @@ void nokia_dsp_hle_device::device_reset()
 	m_bootstrap_exchange_count = 0;
 	m_mcu_control_word = 0;
 	m_mcu_control_wire = 0;
+	m_applied_parameters.fill(0);
 	m_tone_frequency1 = 0;
 	m_tone_frequency2 = 0;
 	m_tone_amplitude = 0;
@@ -180,7 +182,7 @@ bool nokia_dsp_hle_device::bootstrap_ping_pong() const
 
 bool nokia_dsp_hle_device::native_owns_transport() const
 {
-	return m_staged && m_staged->active();
+	return m_staged && m_staged->owns_transport();
 }
 
 void nokia_dsp_hle_device::publish_bootstrap_completion()
@@ -229,6 +231,16 @@ void nokia_dsp_hle_device::doorbell_w(int state)
 		return;
 	if (state && m_transport->dspif_r(0) == 0 && m_transport->dspif_r(1) == 4)
 	{
+		if (m_opaque_parameter_acceptance)
+		{
+			// Declared runtime HLE: consume the MCU's parameter bank as opaque
+			// configuration. Units/routing remain unknown, not invented here.
+			for (unsigned index = 0; index < m_applied_parameters.size(); ++index)
+				m_applied_parameters[index] = m_transport->shared_word(0x0a8 / 2 + index);
+			logerror("dsp_hle: parameter_accept coefficient=%04x pending=%04x t=%.6f\n",
+					m_applied_parameters[8], m_transport->shared_word(0x0e0 / 2),
+					machine().time().as_double());
+		}
 		m_mcu_control_wire = m_transport->shared_word(0x0a8 / 2);
 		// The wire is multiplexed: bits 15..12 select one of the command
 		// table's first sixteen entries and bits 11..0 carry its value.

@@ -233,6 +233,17 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::check_execution)
 		logerror("staged_dsp: installed_program words=%u first=%04x last=%04x target_data=%04x pmst=%04x\n",
 				installed, first, last, data_r(pc), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
 		logerror("staged_dsp: outside_uploaded_code pc=%04x t=%.6f\n", pc, machine().time().as_double());
+		if (m_runtime_hle && !m_verifier && m_loader2_verified && pc == 0x2c75)
+		{
+			// Selected hybrid backend: no missing instruction is executed and
+			// no native return/cookie is fabricated. HLE owns later transport.
+			m_observation_halted = true;
+			m_guard->adjust(attotime::never);
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			machine().scheduler().abort_timeslice();
+			logerror("staged_dsp: runtime_hle_handoff pc=%04x native_suspended=1\n", pc);
+			return;
+		}
 		if (m_observe_after_missing_code)
 		{
 			// Diagnostic isolation, not a substitute helper or hardware claim.
