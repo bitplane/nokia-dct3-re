@@ -168,8 +168,33 @@ side effect was added. The observed lifecycle byte `17fe24=01`, written at
 
 ## Next question
 
-Recover the remaining startup failure decision after compact service-control
-completion, and identify the LCD controller/remaining command semantics.
+Resolve the product-local NV checksum mismatch before adding another peer
+response. Task 2 stores fault `0c` at `304330`: its sum from `3040a0` is
+`6d57`, whereas logical NV `0254` contains `7095`; companion word `0170`
+is `1b0b`. The sum covers bytes `0120..0253`, excluding the two bytes at
+`0154..0155`. Reader `510e1c` delegates to `4030e8`, which copies from the
+RAM shadow at `15c034`. A passive capture of that shadow independently
+recomputes `6d57` and confirms both stored words. Its first 32 checksum-range
+bytes match the acquired PMM at file offset `0146`, but a 64-byte contiguous
+match does not exist: logical NV is not a proven flat PMM-file mapping.
+
+The population trace resolves that distinction further. Copy primitive
+`514648`, called by `48078c`, first loads `0a28` bytes from flash `5fa026`
+to shadow `15c034`. It then applies a four-byte record from `5faae6` to
+logical `0150` and a two-byte record from `5faaee` to logical `0254`.
+The base image's checksum is valid (`6d61` computed and stored), but those
+acquired record overlays change byte `0153` from `98` to `8e` and the
+stored checksum from `6d61` to `7095`. The resulting `6d57` mismatch is
+therefore already represented in the acquired PMM record stream, not a
+spontaneous RAM corruption. Whether those records are intended to be active
+under this firmware's catalogue rules remains the next question.
+
+Decode record selection/validity before repairing any source data.
+Changing `0254` to the observed sum without
+establishing that contract would merely suppress a verdict and is not an
+accepted correction. `noki6250_runtime_observe.lua` captures the fault and
+checksum-range shadow without modifying either. LCD controller identity and
+remaining command semantics also remain open.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.

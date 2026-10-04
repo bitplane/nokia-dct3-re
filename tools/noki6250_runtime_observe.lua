@@ -4,8 +4,55 @@ local cpu = assert(machine.devices[":maincpu"])
 local memory = cpu.spaces["program"]
 local taps = {}
 local receivers = {}
+local nv_writers = {}
+local nv_copy_count = 0
 local lcd_commands, lcd_runs = {}, {}
 local lcd_data_count, lcd_since_command = 0, 0
+taps[#taps + 1] = memory:install_read_tap(0x514648, 0x51464b,
+    "6250_nv_copy_calls", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x514648 then return end
+        local destination = cpu.state["R0"].value
+        local length = cpu.state["R2"].value
+        if destination >= 0x15c28a or destination + length <= 0x15c154 then return end
+        if nv_copy_count >= 32 then return end
+        nv_copy_count = nv_copy_count + 1
+        machine:logerror(string.format("6250_nv_copy: destination=%08x source=%08x length=%x caller=%08x t=%.6f\n",
+            destination, cpu.state["R1"].value, length, cpu.state["R14"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = memory:install_write_tap(0x15c154, 0x15c28b,
+    "6250_nv_shadow_writers", function(offset, value, mask)
+        local pc = cpu.state["PC"].value
+        if nv_writers[pc] then return end
+        nv_writers[pc] = true
+        machine:logerror(string.format("6250_nv_shadow_writer: pc=%08x caller=%08x address=%08x data=%08x mask=%08x r0=%08x r1=%08x r2=%08x t=%.6f\n",
+            pc, cpu.state["R14"].value, offset, value, mask,
+            cpu.state["R0"].value, cpu.state["R1"].value, cpu.state["R2"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = memory:install_write_tap(0x17fbe0, 0x17fbf7,
+    "6250_startup_faults", function(offset, value, mask)
+        for lane = 0, 3 do
+            local shift = (3 - lane) * 8
+            if ((mask >> shift) & 0xff) ~= 0 then
+                local byte = (value >> shift) & 0xff
+                if byte ~= 0 then
+                    machine:logerror(string.format("6250_startup_fault: offset=%02x data=%02x pc=%08x t=%.6f\n",
+                        offset + lane - 0x17fbe0, byte, cpu.state["PC"].value, machine.time:as_double()))
+                    if offset + lane == 0x17fbec and cpu.state["PC"].value == 0x304330 then
+                        local stack = cpu.state["R13"].value
+                        machine:logerror(string.format(
+                            "6250_nv_sum_failure: computed=%04x stored0254=%04x companion0170=%04x t=%.6f\n",
+                            cpu.state["R6"].value & 0xffff, memory:read_u16(stack + 4),
+                            memory:read_u16(stack + 6), machine.time:as_double()))
+                        local bytes = {}
+                        for index = 0x120, 0x255 do
+                            bytes[#bytes + 1] = string.format("%02x", memory:read_u8(0x15c034 + index))
+                        end
+                        machine:logerror("6250_nv_sum_shadow: bytes=" .. table.concat(bytes) .. "\n")
+                    end
+                end
+            end
+        end
+    end)
 taps[#taps + 1] = memory:install_write_tap(0x2006c, 0x2006f,
     "6250_lcd_commands", function(offset, value, mask)
         if (mask & 0xff00) == 0 then return end
@@ -66,6 +113,9 @@ emu.register_periodic(function()
         memory:read_u16(0x10000), memory:read_u16(0x10002), machine.time:as_double()))
     machine:logerror(string.format("6250_service_control_endpoint: flags=%02x fault0=%02x fault1=%02x\n",
         memory:read_u8(0x17fd15), memory:read_u8(0x17fbf0), memory:read_u8(0x17fbf1)))
+    local faults = {}
+    for index = 0, 23 do faults[#faults + 1] = string.format("%02x", memory:read_u8(0x17fbe0 + index)) end
+    machine:logerror("6250_startup_fault_endpoint: bytes=" .. table.concat(faults) .. "\n")
     machine:logerror(string.format("6250_lcd_runs: data_total=%d commands=%s\n",
         lcd_data_count, table.concat(lcd_runs, ",")))
     local counts = {}
