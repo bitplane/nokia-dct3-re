@@ -287,6 +287,17 @@ checksum/signature/hash as the existing independent byte codec. This is
 codec machinery, not evidence that ROM6 uses those tables or that the
 8250 PMM belongs to the ROM4 modeled signature.
 
+`tools/dct3_msid_codec.py` now supports explicitly selected `82` and `83`
+MSID families using that independently derived word transform/inverse.
+The numeric `83` decoder table is published in the original
+[DCT3 MBUS discussion](https://nokiafree.org/forums/archive/index.php/t-38381.html?s=905ef8616030d0920e8836236655ced0).
+A separate [RAE-3 service-tool capture](https://forum.gsmhosting.com/vbb/f550/9110-contact-service-951428/)
+provides an external `83` vector: the codec reproduces all twelve reported
+plaintext bytes, including its checksum, chip ID and signature. This is
+independent codec-family validation, not a donor identity for this machine
+or proof that the 8250 selects `83`. The encoder requires all plaintext
+bytes and the family explicitly; it never chooses a passing identity.
+
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
 The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
