@@ -14135,8 +14135,9 @@ public:
 
 private:
 	bool npe3() const { return !strcmp(machine().system().name, "npe3verify"); }
+	bool nhm3() const { return !strcmp(machine().system().name, "nhm3verify"); }
 	bool nse5() const { return !strcmp(machine().system().name, "nse5verify"); }
-	unsigned block_count() const { return nse5() ? 228 : npe3() ? 232 : 116; }
+	unsigned block_count() const { return nse5() ? 228 : (npe3() || nhm3()) ? 232 : 116; }
 	void program_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
@@ -14208,8 +14209,8 @@ private:
 		data.write_word(0x0803, 0xffff);
 		data.write_word(0x087b, 0x0100);
 		data.write_word(0x087c, 0x0300);
-		data.write_word(0x087d, (npe3() || nse5()) ? 1 : 0);
-		data.write_word(0x087e, nse5() ? 0xc800 : npe3() ? 0xd000 : 0xe800);
+		data.write_word(0x087d, (npe3() || nhm3() || nse5()) ? 1 : 0);
+		data.write_word(0x087e, nse5() ? 0xc800 : (npe3() || nhm3()) ? 0xd000 : 0xe800);
 		data.write_word(0x087f, 1);
 		data.write_word(0x0880, 1);
 		data.write_word(0x0881, 0x0200);
@@ -14305,6 +14306,20 @@ ROM_START(npe3verify)
 		CRC(203fb962) SHA1(3d9ea319503e78ec69b60d72cda23e461e118ea9))
 ROM_END
 
+// 6250's own staged bytes and sparse flash stream; no handset verdict supplied.
+ROM_START(nhm3verify)
+	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
+	ROM_SYSTEM_BIOS(1, "cobba", "COBBA model comparison (not handset validation)")
+	ROM_SYSTEM_BIOS(2, "cobba_alt", "COBBA register-F sensitivity fixture")
+	ROM_SYSTEM_BIOS(3, "rom4", "PROM version sensitivity fixture")
+	ROM_REGION16_LE(446, "verifier", 0)
+	ROM_LOAD16_WORD_SWAP("nsm3_verifier.bin", 0, 446,
+		CRC(53e2de79) SHA1(6646da3c5be9c70deda7e0b5b9f257d5d2ace815))
+	ROM_REGION(0x3a0000, "flash", 0)
+	ROM_LOAD("6250-503mcuppmc.fls", 0, 0x3a0000,
+		CRC(8dffb91b) SHA1(95607ce39c383bda75f1e6aeae67a214b787b0a1))
+ROM_END
+
 // Stock NSE-5 upload plus independently recovered ROM4 CRC routines. COBBA
 // variants are explicit peripheral fixtures, not a measured 7110 publication.
 ROM_START(nse5verify)
@@ -14360,6 +14375,9 @@ SYST(2026, nsm3dverify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, npe3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NPE-3 stock staged DSP verifier fixture",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, nhm3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
+		"MAME", "6250 stock staged DSP verifier fixture",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, nse5verify, 0, 0, nse5_verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NSE-5 stock staged DSP verifier with ROM4 CRC routines",

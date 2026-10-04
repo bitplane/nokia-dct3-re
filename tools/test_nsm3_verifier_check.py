@@ -73,6 +73,15 @@ class VerifierFrontierTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_cobba(output, trace, 3, 0)
 
+    def test_6250_count_and_fingerprint(self):
+        output, trace = self.comparison(0)
+        output = output.replace("116", "232").replace("c2e06006", "c62d430c")
+        trace = trace.replace("blocks=116", "blocks=232")
+        trace += "".join(f"nsm3_verifier: block={i} flag=087f\n" for i in range(116, 232))
+        check_cobba(output, trace, 3, 0, count=232, fingerprint="c62d430c")
+        with self.assertRaises(ValueError):
+            check_cobba(output, trace, 3, 0, count=232, fingerprint="f65a0d46")
+
 
 if __name__ == "__main__":
     unittest.main()

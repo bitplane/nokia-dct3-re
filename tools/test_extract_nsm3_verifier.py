@@ -80,7 +80,15 @@ class VerifierExtractionTest(unittest.TestCase):
 
     def test_rejects_unknown_product(self):
         with self.assertRaisesRegex(ValueError, "unsupported"):
-            verifier.extract(self.image(), "6250")
+            verifier.extract(self.image(), "unknown")
+
+    def test_6250_uses_its_own_descriptor(self):
+        image = bytearray(0x1e544 + 12)
+        struct.pack_into(">6H", image, 0x1e544, 0x0f00, 0, 223, 0x0f00, 0xdc, 0)
+        image += b"\x12\x34" * 223
+        with patch.object(verifier.hashlib, "sha1", side_effect=[
+                self.digest(verifier.NHM3_FLASH_SHA1), self.digest(verifier.PROGRAM_SHA1)]):
+            self.assertEqual(verifier.extract(image, "6250"), b"\x12\x34" * 223)
 
     def test_nsm3d_uses_its_own_flash_and_descriptor(self):
         image = bytearray(verifier.NSM3D_DESCRIPTOR_OFFSET + 12)

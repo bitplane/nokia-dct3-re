@@ -29,7 +29,20 @@ taps[#taps + 1] = memory:install_write_tap(0x100fc, 0x10103,
         end
     end)
 local checked = false
+local captured = false
 emu.register_periodic(function()
+    if not captured and machine.time:as_double() >= 0.5 then
+        captured = true
+        local program, fields = {}, {}
+        for index = 0, 222 do
+            program[#program + 1] = string.format("%04x", memory:read_u16(0x11e00 + index * 2))
+        end
+        for index = 0, 6 do
+            fields[#fields + 1] = string.format("%04x", memory:read_u16(0x100f6 + index * 2))
+        end
+        machine:logerror(string.format("6250_verifier_capture: fields=%s program=%s\n",
+            table.concat(fields, "/"), table.concat(program)))
+    end
     if checked or machine.time:as_double() < 8 then return end
     checked = true
     machine:logerror(string.format(

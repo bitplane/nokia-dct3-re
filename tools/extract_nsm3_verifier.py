@@ -19,6 +19,7 @@ NSM3D_FLASH_SHA1 = "f26c98ffcfffbbd5714889e10cfa41c5f6dd2529"
 NSM3D_DESCRIPTOR_OFFSET = 0x1188C0
 NSM3D_LOADER_OFFSET = 0x111D14
 NSM3D_LOADER_SHA1 = "1250a9e17ce44ec8cc373f222a817f99f505bcdf"
+NHM3_FLASH_SHA1 = "95607ce39c383bda75f1e6aeae67a214b787b0a1"
 
 
 def extract_program_fragment(image):
@@ -56,6 +57,8 @@ def extract(image, product="8210"):
                  (0x0f00, 0, 210, 0x0700, 0x00b4, 0), NSE5_PROGRAM_SHA1),
         "8250": (NSM3D_FLASH_SHA1, NSM3D_DESCRIPTOR_OFFSET, PROGRAM_WORDS,
                  (0x0f00, 0, PROGRAM_WORDS, 0x0f00, 0x00dc, 0), PROGRAM_SHA1),
+        "6250": (NHM3_FLASH_SHA1, 0x1e544, PROGRAM_WORDS,
+                 (0x0f00, 0, PROGRAM_WORDS, 0x0f00, 0x00dc, 0), PROGRAM_SHA1),
     }
     if product not in profiles:
         raise ValueError("unsupported verifier product")
@@ -76,7 +79,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("flash", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--product", choices=("8210", "6210", "7110", "8250"), default="8210")
+    parser.add_argument("--product", choices=("8210", "6210", "7110", "8250", "6250"), default="8210")
     parser.add_argument("--loader", action="store_true", help="extract the 8250 second-stage upload")
     args = parser.parse_args()
     try:
