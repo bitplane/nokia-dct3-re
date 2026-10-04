@@ -154,7 +154,8 @@ void nokia_mad2_device::write(offs_t offset, u8 data)
 	{
 	case 0x02:
 		m_dsp_reset_cb(m_dsp_reset_wiring.enabled() ?
-				bool(data & m_dsp_reset_wiring.release_mask) : BIT(data, 0));
+				bool(data & (m_dsp_reset_wiring.execution_mask ?
+						m_dsp_reset_wiring.execution_mask : m_dsp_reset_wiring.release_mask)) : BIT(data, 0));
 		break;
 	case 0x01:
 		// Both 3210 ROMs set bit 2 and then spin without a software exit.

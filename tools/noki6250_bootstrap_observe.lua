@@ -6,6 +6,16 @@ local dsp_ready, ccont_ready = false, false
 local ownership = { [0x100fc] = 0, [0x10100] = 0 }
 local last_owner, order_errors = nil, 0
 local taps = {}
+taps[#taps + 1] = memory:install_write_tap(0x20000, 0x20003,
+    "6250_dsp_control", function(offset, value, mask)
+        if (mask & 0xff00) ~= 0 then
+            machine:logerror(string.format(
+                "6250_dsp_control: data=%02x pc=%08x program0=%04x fields=%04x/%04x/%04x/%04x\n",
+                (value >> 8) & 0xff, cpu.state["PC"].value,
+                memory:read_u16(0x11e00), memory:read_u16(0x100f6),
+                memory:read_u16(0x100f8), memory:read_u16(0x100fa), memory:read_u16(0x100fc)))
+        end
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x20000, 0x20003,
     "6250_reset_ready", function(offset, value, mask)
         if (mask & 0xff00) ~= 0 and ((value >> 8) & 0x10) ~= 0 then

@@ -1,8 +1,9 @@
 diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 --- a/src/mame/mame.lst
 +++ b/src/mame/mame.lst
-@@ -36178,3 +36178,5 @@
+@@ -36178,3 +36178,6 @@
  noki6250
++nhm3stage
  noki7110
 +nse5r4t
 +nsm3dr6

@@ -70,13 +70,13 @@ void nokia_dsp_staged_device::reset_line_w(int released)
 		return;
 	const bool verifier = m_transport->dsp_data_r(0x087b) == 0x0100 &&
 			m_transport->dsp_data_r(0x087c) == 0x0300 &&
-			m_transport->dsp_data_r(0x087e) == 0xe800 &&
+			m_transport->dsp_data_r(0x087e) == m_verifier_source_end &&
 			m_transport->dsp_data_r(0x0881) == 0x0200;
 	const bool loader = m_transport->dsp_data_r(0x087b) == 0xfd00 &&
 			m_transport->dsp_data_r(0x087c) == 0xff80 &&
 			m_transport->dsp_data_r(0x087d) == 0x027e &&
 			m_transport->dsp_data_r(0x087e) == 0x0500 &&
-			m_transport->dsp_data_r(0x087f) == 0x0078;
+			m_transport->dsp_data_r(m_loader_control_address) == 0x0078;
 	// Only uploaded programs recovered independently from this flash are
 	// supported. Missing mask instructions/data are never filled with stubs.
 	if (!verifier && !loader)

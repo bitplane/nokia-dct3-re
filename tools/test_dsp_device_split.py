@@ -239,7 +239,8 @@ class DspDeviceSplitTest(unittest.TestCase):
     def test_mad2_drives_product_reset_level_into_backend(self):
         self.assertIn("auto dsp_reset_cb()", self.mad2)
         self.assertIn("case 0x02:", self.mad2)
-        self.assertIn("data & m_dsp_reset_wiring.release_mask", self.mad2)
+        self.assertIn("m_dsp_reset_wiring.execution_mask", self.mad2)
+        self.assertIn("m_dsp_reset_wiring.release_mask", self.mad2)
         self.assertIn("m_mad2->dsp_reset_cb().set", self.phone)
         self.assertIn("m_dsp_backend->reset_line_w(state)", self.phone)
 
