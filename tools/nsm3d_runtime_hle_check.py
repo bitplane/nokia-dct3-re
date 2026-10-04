@@ -34,16 +34,42 @@ def check_handoff(text):
         raise ValueError("native resumed or parameter busy remained set")
 
 
+def check_discovery(text):
+    events = [
+        "TX pending type=05 payload=10 data=1eff00d000030101e000",
+        "RX enqueue type=8e payload=10 producer=086 data=1e0002d000030101e000",
+        "RX enqueue type=8e payload=10 producer=08c data=1e0002d000030401c100",
+        "TX pending type=05 payload=10 data=1e0200d0000305014100",
+    ]
+    cursor = 0
+    for event in events:
+        found = text.find(event, cursor)
+        if found < 0:
+            raise ValueError("missing ordered request-derived discovery exchange")
+        cursor = found + len(event)
+    words = dict(re.findall(
+        r"nsm3d_shared_boundary: address=([0-9a-f]+) value=([0-9a-f]+)", text))
+    if any(address not in words for address in ("000100a4", "000100a6", "000101c8", "000101ca")):
+        raise ValueError("missing ring boundary observations")
+    if words["000100a4"] != words["000100a6"] or words["000101c8"] != words["000101ca"]:
+        raise ValueError("firmware did not drain the discovery rings")
+    if "external_service: response command=" in text:
+        raise ValueError("unsolicited application profile was enabled")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("flash", type=Path)
+    parser.add_argument("--discovery", action="store_true", help="require verbose discovery and ring observations")
     args = parser.parse_args()
     try:
         text, image = args.log.read_text(), args.flash.read_bytes()
         check(text, extract(image, "8250"), extract_loader(image), extract_program_fragment(image))
         check_boundary(text)
         check_handoff(text)
+        if args.discovery:
+            check_discovery(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 runtime HLE failed: {error}\n")
     print("8250 native uploads and exclusive runtime HLE parameter acceptance verified; phone boot unproved")

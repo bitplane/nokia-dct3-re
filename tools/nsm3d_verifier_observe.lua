@@ -94,6 +94,13 @@ local sample = coroutine.create(function()
         "nsm3d_verifier_boundary: pc=%08x result0=%04x result1=%04x pairs0=%d pairs1=%d order_errors=%d\n",
         cpu.state["PC"].value, memory:read_u16(0x10000), memory:read_u16(0x10002),
         transfers[0x100fe], transfers[0x10100], order_errors))
+    for _, address in ipairs({0x100a4, 0x100a6, 0x101c8, 0x101ca, 0x100dc, 0x100e4}) do
+        machine:logerror(string.format("nsm3d_shared_boundary: address=%08x value=%04x\n",
+            address, memory:read_u16(address)))
+    end
+    local screen = machine.screens[":screen"]
+    local snapshot = os.getenv("NOKIA_DCT3_SNAPSHOT_DIR")
+    if screen and snapshot then screen:snapshot(snapshot .. "/nsm3d-frontier.png") end
 end)
 assert(coroutine.resume(sample))
 assert(tap)

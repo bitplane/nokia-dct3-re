@@ -3331,6 +3331,11 @@ void nokia_dct3_state::nsm3dr6(machine_config &config)
 void nokia_dct3_state::nsm3dhle(machine_config &config)
 {
 	nsm3dr6(config);
+	nokia_product_config runtime = PRODUCT_8XXX;
+	runtime.dsp_reset_wiring = { 0x10, 0x01 };
+	// Request-derived D0 discovery only; no donor application/channel map.
+	runtime.external_service_transport = true;
+	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 	m_dsp_hle->set_opaque_parameter_acceptance(true);
 }

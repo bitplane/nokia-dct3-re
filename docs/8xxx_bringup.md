@@ -234,16 +234,32 @@ must be decoded from this firmware rather than importing another product's
 ring layout or replies. Continued native execution still needs the fitted
 mask.
 
+The hybrid now enables request-derived D0 discovery transport only, with
+no unsolicited application/channel-map profile or radio protocol selected.
+The MCU emits type `05`, payload `1eff00d000030101e000`. The peer derives
+type-`8e` responses `1e0002d000030101e000` and
+`1e0002d000030401c100`; the firmware consumes both and emits its own
+follow-up `1e0200d0000305014100`. TX and RX rings are drained at eight
+seconds (`a4/a6=0002/0002`, `1c8/1ca=008c/008c`). This validates the
+shared discovery grammar against this MCU, not a donor application setup.
+The independently captured LCD is still blank. Subsequent organic type-70
+requests start with primitives `13/14/15/16` and `0d00`; their resident
+service completion is the next boundary. No response to those requests is
+yet synthesized in this composition.
+
 Use the same private-directory invocation below with machine `nsm3dhle`
 and validate its log separately:
 
 ```sh
 .venv/bin/python tools/nsm3d_runtime_hle_check.py RUN/error.log \
-  roms/noki8250/8250-502mcuppmk.fls
+  roms/noki8250/8250-502mcuppmk.fls --discovery
 ```
 
-The hybrid checker verifies acquired native uploads, exclusive ownership,
-ordered control acceptance and the retained native stop. It is not a boot
+Use `-verbose` for discovery transport observations. Setting fixture variable
+`NOKIA_DCT3_SNAPSHOT_DIR` captures the native LCD at eight seconds without
+modifying guest state. The hybrid checker verifies acquired native uploads,
+exclusive ownership, ordered control acceptance, firmware discovery follow-up,
+drained rings and the retained native stop. It is not a boot
 or UI acceptance gate. Both 3210 gates, the silent native fixture, the
 tool suite and the patch-stack check pass with this composition present.
 
