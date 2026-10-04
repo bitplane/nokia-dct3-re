@@ -111,10 +111,11 @@ taps[#taps + 1] = memory:install_write_tap(0x30000, 0x30003,
             value, mask, cpu.state["PC"].value, memory:read_u16(0x100a8),
             memory:read_u16(0x100b8), memory:read_u16(0x100e0), machine.time:as_double()))
     end)
-local captured = false
+local captured = 0
 emu.register_periodic(function()
-    if captured or machine.time:as_double() < 8 then return end
-    captured = true
+    local deadline = captured == 0 and 8 or 20
+    if captured >= 2 or machine.time:as_double() < deadline then return end
+    captured = captured + 1
     local dsp = assert(machine.devices[":dsp_staged:cpu"])
     machine:logerror(string.format(
         "6250_runtime_boundary: arm_pc=%08x dsp_pc=%04x pending=%04x result=%04x/%04x t=%.6f\n",
@@ -134,6 +135,6 @@ emu.register_periodic(function()
         end
     end
     machine:logerror("6250_lcd_commands: counts=" .. table.concat(counts, ",") .. "\n")
-    machine.screens[":screen"]:snapshot("6250_runtime.png")
+    machine.screens[":screen"]:snapshot(captured == 1 and "6250_runtime.png" or "6250_runtime20.png")
 end)
 _G.noki6250_runtime_taps = taps

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Read-only NHM-3 checksum and acquired-journal comparison."""
+"""NHM-3 checksum comparison and explicit initial-record provisioning fixture."""
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -54,13 +55,40 @@ def assess(image, trace=None):
     }
 
 
+def initial_record_fixture(image):
+    assess(image)
+    _, records, _ = replay(image, 0xa28)
+    first = records[0]
+    end = first["source"] + first["length"]
+    base = image[first["source"]:end]
+    if checksum(base) != int.from_bytes(base[0x254:0x256], "big"):
+        raise ValueError("initial record has no valid application checksum to preserve")
+    result = bytearray(image)
+    result[first["record"] + 1] = record_checksum(0, base)
+    # Retain the initial payload exactly; discard this sector's later history.
+    result[end:0x2000] = b"\xff" * (0x2000 - end)
+    return bytes(result)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pmm", type=Path)
     parser.add_argument("--trace", type=Path)
+    parser.add_argument("--initial-record-fixture", type=Path,
+                        help="write a separate derived fixture, never overwrite the acquired PMM")
     args = parser.parse_args()
     try:
-        result = assess(args.pmm.read_bytes(), args.trace.read_text() if args.trace else None)
+        image = args.pmm.read_bytes()
+        result = assess(image, args.trace.read_text() if args.trace else None)
+        if args.initial_record_fixture:
+            if args.initial_record_fixture.resolve() == args.pmm.resolve():
+                raise ValueError("fixture output must not overwrite its source")
+            fixture = initial_record_fixture(image)
+            with args.initial_record_fixture.open("xb") as output:
+                output.write(fixture)
+            result["fixture"] = {"source_sha256": hashlib.sha256(image).hexdigest(),
+                                 "fixture_sha256": hashlib.sha256(fixture).hexdigest(),
+                                 "policy": "initial acquired payload only; record checksum recomputed"}
     except (OSError, ValueError) as exc:
         print(f"6250 PMM comparison failed: {exc}", file=sys.stderr)
         return 1

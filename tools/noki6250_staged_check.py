@@ -60,17 +60,34 @@ def check_lcd_stream(text):
         raise ValueError("LCD stream does not match eight 96-byte banks")
 
 
+def check_initial_fixture(text):
+    if "runtime_hle_handoff pc=2c75 native_suspended=1" not in text:
+        raise ValueError("missing exclusive native-to-HLE boundary")
+    if "6250_service_control_consumer: class=74 command=0d status=00 armed=c4" not in text:
+        raise ValueError("initial-record service-control comparison differs")
+    if "6250_nv_sum_failure:" in text or "[LUA ERROR]" in text:
+        raise ValueError("NV checksum fault or observer failure remains")
+    captures = re.findall(r"6250_startup_fault_endpoint: bytes=([0-9a-f]+)", text)
+    if len(captures) != 2 or any(len(x) != 48 or bytes.fromhex(x)[12] != 0 for x in captures):
+        raise ValueError("NV checksum fault did not remain clear at both endpoints")
+    if not re.search(r"6250_runtime_boundary:.*t=20\.000000", text):
+        raise ValueError("missing long-run endpoint")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("--silent-runtime", action="store_true")
     parser.add_argument("--service-control", action="store_true")
     parser.add_argument("--lcd-stream", action="store_true")
+    parser.add_argument("--initial-record-fixture", action="store_true")
     args = parser.parse_args()
     try:
-        if args.silent_runtime and args.service_control:
+        if sum((args.silent_runtime, args.service_control, args.initial_record_fixture)) > 1:
             raise ValueError("silent and responding comparisons are mutually exclusive")
-        checker = check_service_control if args.service_control else check_silent_runtime if args.silent_runtime else check
+        checker = (check_initial_fixture if args.initial_record_fixture else
+                   check_service_control if args.service_control else
+                   check_silent_runtime if args.silent_runtime else check)
         checker(args.log.read_text())
         if args.lcd_stream:
             check_lcd_stream(args.log.read_text())

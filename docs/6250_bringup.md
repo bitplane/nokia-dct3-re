@@ -204,12 +204,32 @@ Thus the two checksum-region overlays are accepted, individually intact
 records whose combined NV content is inconsistent. The input's "virgin"
 filename is not evidence of factory-valid provisioning.
 
-Decode record selection/validity before repairing any source data.
+The decoded contract supports the separate initial-record comparison below,
+not an unlabelled repair of the acquired input.
 Changing `0254` to the observed sum without
 establishing that contract would merely suppress a verdict and is not an
 accepted correction. `noki6250_runtime_observe.lua` captures the fault and
 checksum-range shadow without modifying either. LCD controller identity and
 remaining command semantics also remain open.
+
+### Initial-record provisioning comparison
+
+`noki6250_pmm_check.py PMM --initial-record-fixture OUTPUT` creates a
+separate, explicitly derived fixture: retain the acquired initial `0a28`
+payload exactly, recompute its envelope checksum, erase later records in
+the first sector, and preserve all remaining sectors. It refuses a base
+payload whose application checksum is invalid and refuses source overwrite.
+This is not a recovered factory dump and does not replace the acquired ROM.
+Fixture SHA1 is `053627c9d1a8ba40e6b37653f4d77ee7cf0900d8`.
+
+With fresh storage and the same `nhm3hle` composition, this fixture clears
+fault `0c` organically at both 8 and 20 seconds. The compact response arrives
+with armed flags `c4`, leaving flags `40`; the LCD is blank at both endpoints,
+not an idle screen. The native CPU remains suspended at `2c75`. Validate the
+21-second run with `noki6250_staged_check.py LOG --initial-record-fixture`.
+The expected MAME ROM checksum warning records that this is a derived input,
+not the acquired image. Next identify the remaining startup flag and the
+blank-display lifecycle before promoting any normal-machine configuration.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.
