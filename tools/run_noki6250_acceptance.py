@@ -23,7 +23,8 @@ def main():
     parser.add_argument("run_directory", type=Path,
                         help="new directory; existing directories are refused")
     parser.add_argument("--mame", type=Path)
-    parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call"),
+    parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
+                                              "sms-read", "sms-delete", "sms-reply"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -43,25 +44,35 @@ def main():
         (local_roms / source.name).write_bytes(fixture)
         (run / "cfg").mkdir()
         (run / "nvram").mkdir()
-        call = args.scenario != "calculator"
+        call = args.scenario in ("incoming-call", "outgoing-call")
+        sms = args.scenario.startswith("sms-")
         if args.scenario == "incoming-call":
             shutil.copyfile(root / "fixtures/radio_incoming_call_answered/nhm3hle.cfg",
                             run / "cfg/nhm3hle.cfg")
+        if sms:
+            shutil.copyfile(root / "fixtures/radio_incoming_sms/nhm3hle.cfg",
+                            run / "cfg/nhm3hle.cfg")
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
+        if sms:
+            script = "noki6250_sms_observe.lua"
+        seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
                    "-nvram_directory", "nvram", "-cfg_directory", "cfg",
                    "-noreadconfig", "-autoboot_script",
                    str(root / "tools" / script),
-                   "-autoboot_delay", "0", "-seconds_to_run", "35" if call else "45",
+                   "-autoboot_delay", "0", "-seconds_to_run", seconds,
                    "-video", "none", "-sound", "none", "-nothrottle",
                    "-log", "-verbose"]
         env = os.environ.copy()
-        for flag in ("NOKIA_DCT3_6250_CALCULATOR", "NOKIA_DCT3_6250_OUTGOING"):
+        flags = {"calculator": "NOKIA_DCT3_6250_CALCULATOR",
+                 "outgoing-call": "NOKIA_DCT3_6250_OUTGOING",
+                 "sms-delete": "NOKIA_DCT3_6250_SMS_DELETE",
+                 "sms-reply": "NOKIA_DCT3_6250_SMS_REPLY"}
+        for flag in flags.values():
             env.pop(flag, None)
-        flag = "NOKIA_DCT3_6250_OUTGOING" if call else "NOKIA_DCT3_6250_CALCULATOR"
-        if args.scenario != "incoming-call":
-            env[flag] = "1"
+        if args.scenario in flags:
+            env[flags[args.scenario]] = "1"
         (run / "acceptance.json").write_text(json.dumps({
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
@@ -75,6 +86,16 @@ def main():
                        str(run / "error.log")]
             if args.scenario == "outgoing-call":
                 checker.extend(["--outgoing", "--number", "123"])
+        elif sms:
+            frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8}[args.scenario]
+            frames = list((run / "snap").rglob(f"6250_sms_{frame_index}.png"))
+            if len(frames) != 1:
+                raise ValueError(f"expected one SMS frame, found {len(frames)}")
+            checker = [sys.executable, str(root / "tools/noki6250_sms_check.py"),
+                       str(run / "error.log"), str(run / "nvram/nhm3hle/sim_card"),
+                       str(frames[0])]
+            if args.scenario != "sms-read":
+                checker.append("--deleted" if args.scenario == "sms-delete" else "--sent")
         else:
             frames = list((run / "snap").rglob("6250_app_14.png"))
             if len(frames) != 1:

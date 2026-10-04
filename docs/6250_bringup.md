@@ -556,6 +556,12 @@ The physical calculator workflow has a fresh-state acceptance runner:
     --scenario incoming-call --rompath run_model_scout_6250/roms
 .venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-outgoing-new \
     --scenario outgoing-call --rompath run_model_scout_6250/roms
+.venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-sms-read-new \
+    --scenario sms-read --rompath run_model_scout_6250/roms
+.venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-sms-delete-new \
+    --scenario sms-delete --rompath run_model_scout_6250/roms
+.venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-sms-reply-new \
+    --scenario sms-reply --rompath run_model_scout_6250/roms
 ```
 
 The ROM path must contain the prepared acquired NHM-3 ROM members. The
@@ -575,6 +581,14 @@ assigned-channel release confirmation, and return to idle PCH with no
 continued speech-radio traffic. These are signaling tests, not voice tests.
 The runner clears conflicting calculator/outgoing fixture environment
 selectors before selecting its scenario.
+
+SMS scenarios copy the incoming-message network configuration into the
+private run directory. Read/delete validate delivery and acknowledgement,
+the persisted SIM record and its read/erased status, and the reviewed UI
+frame. Reply physically composes `Hi` for `5551234`; acceptance requires
+the exact submission, network acknowledgements, release and sent frame.
+Each scenario starts with fresh SIM storage, and conflicting SMS fixture
+selectors are cleared before execution.
 
 The 6250 command-8 helper is `429a34`: its jump table at `429a88` selects
 `429de6`, which combines the low 12 parameter bits with `8000`, stores its
