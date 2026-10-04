@@ -10,7 +10,8 @@ the same composition reaches graphical boot, startup readiness `0f`, and scans
 a physical row-1/column-1 press as raw key `06`. The research composition now
 enables the existing SIMI/card boundary: ATR, PPS and file reads run through
 the firmware, and a settled physical press opens the Messages menu. Network
-registration, phonebook persistence, calls and SMS remain unvalidated. Normal `noki6250`
+registration, cold-start phonebook readback, calls and SMS remain unvalidated.
+An organic phonebook save to SIM NVRAM is verified below. Normal `noki6250`
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
@@ -387,6 +388,28 @@ probe at 16/16.15 seconds opens the Messages menu (Select/Exit), captured
 at 20 seconds by `noki6250_key_observe.lua`. The probe contains physical
 input only; it does not select callbacks, write RAM, or post UI messages.
 The first 6-second press occurs during SIM reads and is not the menu proof.
+
+### Input layout and phonebook save
+
+The separate power map at `288f98` is `5a 5a 5a 5a 0d`; only column 4
+translates to Power. `PRODUCT_6250` now uses five rows and power mask `10`.
+Its normal table at `288f7c` matches the existing five-row input definition,
+so the named `noki6250` input set includes that definition rather than the
+incorrect four-row 3310 layout. This establishes firmware translation;
+all side-key semantics and physical electrical wiring are not independently
+measured.
+
+`tools/noki6250_phonebook_observe.lua` uses only physical cells to open
+Names, select Add name, enter `A`, enter `123`, and confirm. Captures show
+the Name editor, Phone number editor and `Saved to SIM card`. After normal
+MAME exit, `nvram/nhm3hle/sim_card` contains a 3524-byte card image whose
+first 32-byte ADN record is `41`, 17 erased bytes, `03 81 21 f3`, then ten
+erased bytes; the remaining 49 ADN records are erased. Thus the save reaches
+durable card storage, not just a UI acknowledgment. Cold-start UI retrieval
+is the next acceptance step and must not be inferred from those bytes alone.
+Run this probe for 35 seconds with fresh per-run storage and the explicit
+initial-record fixture; the runtime observer captures its own two endpoints
+and the phonebook probe captures each editor/save stage separately.
 
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely

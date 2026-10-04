@@ -987,9 +987,9 @@ constexpr nokia_product_config make_6250_config()
 	// full scale exceeds the analog initialization's 1.8..5.5 V window.
 	// This is a nominal board input, not a measured ADC transfer curve.
 	result.ccont_board.channel_defaults[2] = 0x230;
-	// NHM-3 v5.03 scanner 0x505c70..0x505cce iterates all five rows.
-	// Keep the conservative power-column assumption pending its own decode.
-	result.keypad_wiring.rows = 5;
+	// Own five-row matrix at 0x288f7c; separate power table 0x288f98
+	// maps only column 4 to key 0x0d (the other columns are 0x5a).
+	result.keypad_wiring = { 5, 0x10 };
 	result.display = DISPLAY_6250;
 	// 6250 v5.03 sets CTSI+2 bit 2 at 0x4e7dc4 and polls bit 4
 	// at 0x4e7dca. Its reset path clears bit 2 and waits for bit 4 low.
@@ -2926,6 +2926,12 @@ static INPUT_PORTS_START( noki6210 )
 	PORT_INCLUDE(noki5210)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki6250 )
+	// Own NHM-3 table 0x288f7c matches this existing five-row layout.
+	// The separate power table 0x288f98 selects column 4.
+	PORT_INCLUDE(noki5210)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki3310 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3807,9 +3813,9 @@ SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empt
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, noki6250, 0,      0,      noki6250, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, nhm3stage, noki6250, 0, nhm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "6250 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, nhm3hle, noki6250, 0, nhm3hle, noki3310, nokia_dct3_state, empty_init, "Nokia", "6250 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, noki6250, 0,      0,      noki6250, noki6250, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nhm3stage, noki6250, 0, nhm3stage, noki6250, nokia_dct3_state, empty_init, "Nokia", "6250 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nhm3hle, noki6250, 0, nhm3hle, noki6250, nokia_dct3_state, empty_init, "Nokia", "6250 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsm3dr6, noki8250, 0,    nsm3dr6, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D staged DSP with declared ROM6 input (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsm3dhle, noki8250, 0,   nsm3dhle, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
