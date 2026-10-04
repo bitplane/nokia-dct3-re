@@ -4,8 +4,11 @@
 
 The acquired v5.03 PPM C and product-local PMM reach a correctly dimensioned
 96x60 `CONTACT SERVICE` frame in research composition `nhm3hle`, after native
-verifier/loaders and request-correlated service-control completion. Interactive
-idle, physical input and phone features remain unvalidated. Normal `noki6250`
+verifier/loaders and request-correlated service-control completion. With the
+explicit initial-record PMM comparison and nominal channel-2 battery input,
+the same composition reaches `Insert SIM`, startup readiness `0f`, and scans
+a physical row-1/column-1 press as raw key `06`. Menus, idle with SIM, and
+phone features remain unvalidated. Normal `noki6250`
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
@@ -298,7 +301,7 @@ Its surrounding lifecycle includes firmware strings "VBAT Checks" and
 analog/power readiness path and its inputs, not an invented DSP packet.
 This direct-call observation is not an exhaustive exclusion of indirect or
 data-driven producers. The default ADC tuple is still conservative for
-NHM-3: recover its mux/threshold contract before choosing product inputs.
+NHM-3. The full-scale comparison below identifies the corrected channel-2 input.
 
 The report owner is analog/power task 21 (receive caller `30af9d`, observed
 current-task byte `100022`), with context `1704a4`, event at `+20` and state
@@ -345,9 +348,20 @@ validity failure, not a reason to synthesize a ready report.
 Logical source 7 goes through `500d86` and the own-ROM mux at `288fa0` to
 physical ADC selector 2. Its conversion applies calibration then scales by
 1500/232 (`3da9d4`); the current raw selector-2 input is full scale `3ff`.
-Recover the actual calibration and physical voltage contract before choosing
-a product-local nominal input. The measurement gate establishes a bounded
-validity interval, not by itself a measured battery voltage or pack identity.
+The acquired calibration is gain `3f7ecb5a` (0.9952904), offset zero. The
+product-local nominal channel-2 input is now `230`: the firmware converts it
+to `0e11` (3601), and report 14 posts at 3.439 seconds. Readiness settles at
+`0f` and phase `03`; the physical probe is scanned after 6 seconds. The
+endpoint frame is `Insert SIM`. This is a declared nominal board input,
+not a measured transfer curve or a recovered factory PMM dump. No other
+ADC channel, firmware state, report, or NV payload was changed.
+
+Reproduce with the initial-record fixture and `noki6250_key_observe.lua`
+using the fresh-run command above, then run
+`python3 tools/noki6250_staged_check.py LOG --initial-record-fixture --physical-ready`.
+The checker proves report delivery, settled startup predicates and matrix
+scan; it does not prove menu semantics or pixel identity. Inspect the captured
+96x60 frame separately. Default and coherent 3210 regression gates reproduce.
 
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely

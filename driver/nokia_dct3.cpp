@@ -982,6 +982,11 @@ constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
 constexpr nokia_product_config make_6250_config()
 {
 	nokia_product_config result = make_conservative_config();
+	// NHM-3 source 7 maps to selector 2 (0x288fa0). Its acquired PMM
+	// calibration and 1500/232 scale convert raw 0x230 to about 3.60 V;
+	// full scale exceeds the analog initialization's 1.8..5.5 V window.
+	// This is a nominal board input, not a measured ADC transfer curve.
+	result.ccont_board.channel_defaults[2] = 0x230;
 	// NHM-3 v5.03 scanner 0x505c70..0x505cce iterates all five rows.
 	// Keep the conservative power-column assumption pending its own decode.
 	result.keypad_wiring.rows = 5;

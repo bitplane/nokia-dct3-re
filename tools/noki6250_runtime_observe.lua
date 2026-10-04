@@ -280,6 +280,9 @@ emu.register_periodic(function()
     machine:logerror(string.format("6250_analog_fields: count=%02x field0e=%02x field11=%02x ccont10=%02x t=%.6f\n",
         memory:read_u8(0x1704ad), memory:read_u8(0x1704b2),
         memory:read_u8(0x1704b5), memory:read_u8(0x172cc8), machine.time:as_double()))
+    machine:logerror(string.format("6250_analog_calibration: gain=%08x offset=%08x sample_count=%02x t=%.6f\n",
+        memory:read_u32(0x17fd4c), memory:read_u32(0x17fd50),
+        memory:read_u8(0x1691e2), machine.time:as_double()))
     machine:logerror(string.format("6250_startup_context_endpoint: counter=%02x input=%04x continuation=%04x t=%.6f\n",
         memory:read_u8(0x172ca4), memory:read_u16(0x172ca6), memory:read_u16(0x172ca8),
         machine.time:as_double()))

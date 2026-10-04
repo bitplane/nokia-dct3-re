@@ -1,9 +1,31 @@
 import unittest
 
-from tools.noki6250_staged_check import check, check_silent_runtime, check_service_control, check_lcd_stream
+from tools.noki6250_staged_check import check, check_silent_runtime, check_service_control, check_lcd_stream, check_physical_ready
 
 
 class StagedBoundaryTest(unittest.TestCase):
+    def ready_fixture(self):
+        return ("runtime_hle_handoff pc=2c75 native_suspended=1\n"
+                "6250_service_control_consumer: class=74 command=0d status=00 armed=c4\n" +
+                "6250_startup_fault_endpoint: bytes=" + "00" * 24 + "\n" +
+                "6250_startup_fault_endpoint: bytes=" + "00" * 24 + "\n" +
+                "6250_runtime_boundary: t=20.000000\n"
+                "6250_scalar_post: task=1 message=0014 caller=004e967f\n"
+                "6250_startup_gate: phase=03 readiness=0f t=8.000000\n"
+                "6250_startup_gate: phase=03 readiness=0f t=20.000000\n"
+                "6250_raw_matrix_key: value=06 pc=00505cf8 t=6.000190\n")
+
+    def test_physical_ready(self):
+        check_physical_ready(self.ready_fixture())
+
+    def test_ready_without_input_rejected(self):
+        with self.assertRaises(ValueError):
+            check_physical_ready(self.ready_fixture().replace("value=06", "value=ff"))
+
+    def test_incomplete_readiness_rejected(self):
+        with self.assertRaises(ValueError):
+            check_physical_ready(self.ready_fixture().replace("readiness=0f", "readiness=0e"))
+
     def fixture(self):
         return ("release entry=0f00 words=223 prom_input=0006 clock=13000000 stage=verifier\n"
                 "publication word0=0000 word1=0006 word2=0006 word3=0006 pc=0f65\n"

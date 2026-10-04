@@ -81,6 +81,7 @@ def main():
     parser.add_argument("--service-control", action="store_true")
     parser.add_argument("--lcd-stream", action="store_true")
     parser.add_argument("--initial-record-fixture", action="store_true")
+    parser.add_argument("--physical-ready", action="store_true")
     args = parser.parse_args()
     try:
         if sum((args.silent_runtime, args.service_control, args.initial_record_fixture)) > 1:
@@ -89,11 +90,24 @@ def main():
                    check_service_control if args.service_control else
                    check_silent_runtime if args.silent_runtime else check)
         checker(args.log.read_text())
+        if args.physical_ready:
+            check_physical_ready(args.log.read_text())
         if args.lcd_stream:
             check_lcd_stream(args.log.read_text())
     except (OSError, ValueError) as error:
         parser.exit(1, f"6250 staged boundary failed: {error}\n")
     print("6250 research boundary PASS; graphical idle and physical DSP identity remain unproved")
+
+
+def check_physical_ready(text):
+    check_initial_fixture(text)
+    if not re.search(r"6250_scalar_post: task=1 message=0014\b", text):
+        raise ValueError("analog readiness report is absent")
+    for deadline in (8, 20):
+        if f"6250_startup_gate: phase=03 readiness=0f t={deadline:.6f}" not in text:
+            raise ValueError("startup readiness did not settle at both endpoints")
+    if not re.search(r"6250_raw_matrix_key: value=06 pc=00505cf8 t=6\.", text):
+        raise ValueError("physical row-1/column-1 input was not scanned")
 
 
 if __name__ == "__main__":
