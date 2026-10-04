@@ -3402,6 +3402,9 @@ void nokia_dct3_state::nhm3hle(machine_config &config)
 	// Own consumer 0x464756 compares RX body bit 0 with pending context
 	// 0x0402 byte 2, observed as 1 for assigned SDCCH.
 	runtime.radio.assigned_channel_confirmation = 1;
+	// Own physical-End release publishes type 02 with channel 0x60 and
+	// parameter 0x14; acknowledge that transaction through the peer.
+	runtime.radio.traffic_release_parameter = 0x14;
 	// 6250 consumer 304494 dispatches 0d, clears its armed timer and reads
 	// two fault bits from the following octet. This is a declared peer model.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;

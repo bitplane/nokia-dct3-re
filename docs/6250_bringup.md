@@ -460,3 +460,28 @@ inspect the `dsp_hle: TX packet` and `dspif_transport: RX enqueue` streams.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.
+
+## Incoming-call signaling
+
+The incoming-call network fixture pages the registered handset. Firmware
+publishes Paging Response, Call Confirmed, Alerting and Assignment Complete.
+Physical Send at 20 seconds publishes Connect; the network acknowledges it.
+Physical End at 24 seconds publishes Disconnect, followed by Release Complete
+and the network's RR Channel Release. The LCD returns to `DCT3 LAB`.
+
+Firmware's type-02 traffic-release request is
+`040000001117001a600000130000001400000001`. The research profile selects
+its observed parameter `14`; the peer returns type-89 zero and the own
+consumer observes context `0409/00/00`. Firmware resumes serving-channel
+configuration and PCH; HLE speech frames cease at release. Without this
+profile field the peer did not recognize the release transaction, leaving
+speech traffic active despite the LCD returning to idle.
+Speech/audio ownership is also unvalidated; visible call UI and CC signaling
+do not establish audible voice.
+
+Reproduce with a private copy of
+`fixtures/radio_incoming_call_answered/nhm3hle.cfg`, fresh NVRAM, the
+initial-record ROM fixture, `tools/noki6250_call_observe.lua`, 35 seconds and
+`-verbose`. `tools/noki6250_call_check.py LOG` checks the ordered signaling
+through confirmed release and resumed PCH, and rejects continued speech
+traffic after confirmation. It does not validate audio.
