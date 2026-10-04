@@ -574,6 +574,8 @@ The physical calculator workflow has a fresh-state acceptance runner:
     --scenario sms-reply --rompath run_model_scout_6250/roms
 .venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-phonebook-new \
     --scenario phonebook --rompath run_model_scout_6250/roms
+.venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-registration-new \
+    --scenario registration --rompath run_model_scout_6250/roms
 ```
 
 The ROM path must contain the prepared acquired NHM-3 ROM members. The
@@ -608,6 +610,12 @@ process with the same persisted storage. Cold-start acceptance requires
 the reviewed contact-detail frame and byte-identical SIM storage after
 readback. The first process's log and SIM image are retained separately;
 the manifest records both commands. No emulator save state is used.
+
+Registration acceptance runs both fresh and preserved-location boots in
+separate MAME processes. Each must complete Location Updating, its expected
+SIM writes, assigned-channel release and steady camping. The fresh log and
+SIM image are retained before the second process; the second checker uses
+the NHM-3 preserved-location policy, not the fresh-write ordering.
 
 The 6250 command-8 helper is `429a34`: its jump table at `429a88` selects
 `429de6`, which combines the low 12 parameter bits with `8000`, stores its

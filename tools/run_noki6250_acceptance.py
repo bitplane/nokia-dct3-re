@@ -25,7 +25,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook"),
+                                              "phonebook", "registration"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -58,6 +58,8 @@ def main():
             script = "noki6250_sms_observe.lua"
         if args.scenario == "phonebook":
             script = "noki6250_phonebook_observe.lua"
+        if args.scenario == "registration":
+            script = "noki6250_runtime_observe.lua"
         seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
@@ -105,6 +107,9 @@ def main():
                 raise ValueError(f"expected one save frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
                        "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
+        elif args.scenario == "registration":
+            checker = [sys.executable, str(root / "tools/radio_registration_trace_check.py"),
+                       str(run / "error.log"), "--profile", "nhm3"]
         else:
             frames = list((run / "snap").rglob("6250_app_14.png"))
             if len(frames) != 1:
@@ -134,6 +139,16 @@ def main():
             checker[2] = "readback"
             checker[-1] = str(frames[0])
             subprocess.run(checker, check=True)
+        if args.scenario == "registration":
+            shutil.copyfile(run / "error.log", run / "registration-fresh.log")
+            shutil.copyfile(run / "nvram/nhm3hle/sim_card", run / "registration-fresh.sim")
+            with (run / "preserved-console.log").open("w") as console:
+                subprocess.run(command, cwd=run, env=env, stdout=console,
+                               stderr=subprocess.STDOUT, check=True)
+            subprocess.run(checker + ["--preserved"], check=True)
+            manifest = json.loads((run / "acceptance.json").read_text())
+            manifest["cold_restart_command"] = command
+            (run / "acceptance.json").write_text(json.dumps(manifest, indent=2) + "\n")
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print(f"Evidence: {run}")
