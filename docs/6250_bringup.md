@@ -189,6 +189,13 @@ therefore already represented in the acquired PMM record stream, not a
 spontaneous RAM corruption. Whether those records are intended to be active
 under this firmware's catalogue rules remains the next question.
 
+Read-only `tools/noki6250_pmm_check.py PMM --trace LOG` independently
+replays 15 records, stopping at file `0ba2`, and exactly matches the captured
+checksum-range shadow. Its report separates the valid initial image from
+the final overlaid image. This confirms record order and write destinations,
+but does not yet validate the record-header checksum bits. Do not interpret
+its successful comparison as proof that the acquired journal is healthy.
+
 Decode record selection/validity before repairing any source data.
 Changing `0254` to the observed sum without
 establishing that contract would merely suppress a verdict and is not an

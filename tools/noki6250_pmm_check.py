@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Read-only NHM-3 checksum and acquired-journal comparison."""
+
+import argparse
+import json
+from pathlib import Path
+import re
+import sys
+
+try:
+    from tools.nse5_pmm_journal import replay
+except ModuleNotFoundError:
+    from nse5_pmm_journal import replay
+
+
+def checksum(cache):
+    if len(cache) < 0x256:
+        raise ValueError("NV image does not cover the checksum contract")
+    return (sum(cache[0x120:0x254]) - sum(cache[0x154:0x156])) & 0xffff
+
+
+def assess(image, trace=None):
+    cache, records, stop = replay(image, 0xa28)
+    first = records[0] if records else None
+    if not first or first["destination"] != 0 or first["length"] != 0xa28:
+        raise ValueError("expected NHM-3 complete initial cache record")
+    base = image[first["source"]:first["source"] + first["length"]]
+    if trace is not None:
+        snapshots = re.findall(r"6250_nv_sum_shadow: bytes=([0-9a-f]+)", trace)
+        if not snapshots or any(bytes.fromhex(x) != cache[0x120:0x256] for x in snapshots):
+            raise ValueError("no matching runtime checksum-range shadow")
+    return {
+        "records": len(records), "stop_offset": f"{stop:04x}",
+        "base_computed": f"{checksum(base):04x}",
+        "base_stored": base[0x254:0x256].hex(),
+        "replayed_computed": f"{checksum(cache):04x}",
+        "replayed_stored": cache[0x254:0x256].hex(),
+        "checksum_region_updates": [row for row in records[1:]
+                                    if row["destination"] < 0x256 and
+                                    row["destination"] + row["length"] > 0x120],
+        "scope": "observed write-journal replay; record checksum bits are not validated",
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("pmm", type=Path)
+    parser.add_argument("--trace", type=Path)
+    args = parser.parse_args()
+    try:
+        result = assess(args.pmm.read_bytes(), args.trace.read_text() if args.trace else None)
+    except (OSError, ValueError) as exc:
+        print(f"6250 PMM comparison failed: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
