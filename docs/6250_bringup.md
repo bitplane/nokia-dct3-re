@@ -552,6 +552,10 @@ The physical calculator workflow has a fresh-state acceptance runner:
 ```sh
 .venv/bin/python tools/run_noki6250_calculator.py /tmp/6250-calculator-new \
     --rompath run_model_scout_6250/roms
+.venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-incoming-new \
+    --scenario incoming-call --rompath run_model_scout_6250/roms
+.venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-outgoing-new \
+    --scenario outgoing-call --rompath run_model_scout_6250/roms
 ```
 
 The ROM path must contain the prepared acquired NHM-3 ROM members. The
@@ -562,6 +566,15 @@ ordered physical calculator actions and reviewed `1+2=3` pixel result,
 not merely a successful emulator exit. This validates `nhm3hle` with
 explicit comparison provisioning; it does not validate ordinary
 `noki6250` boot or speech audio.
+
+The call scenarios use the same isolated comparison provisioning. Incoming
+copies the network-page configuration into the private run directory;
+outgoing physically enters `123` and presses Send. Their checkers require
+the ordered call-control exchange, physical Answer/End or dialing/End,
+assigned-channel release confirmation, and return to idle PCH with no
+continued speech-radio traffic. These are signaling tests, not voice tests.
+The runner clears conflicting calculator/outgoing fixture environment
+selectors before selecting its scenario.
 
 The 6250 command-8 helper is `429a34`: its jump table at `429a88` selects
 `429de6`, which combines the low 12 parameter bits with `8000`, stores its
