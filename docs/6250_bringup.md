@@ -228,8 +228,25 @@ with armed flags `c4`, leaving flags `40`; the LCD is blank at both endpoints,
 not an idle screen. The native CPU remains suspended at `2c75`. Validate the
 21-second run with `noki6250_staged_check.py LOG --initial-record-fixture`.
 The expected MAME ROM checksum warning records that this is a derived input,
-not the acquired image. Next identify the remaining startup flag and the
-blank-display lifecycle before promoting any normal-machine configuration.
+not the acquired image.
+
+### Startup success and display lifecycle
+
+Flag `40` is retained success, not an outstanding wait. Initialization
+`304262..304268` sets it; checksum failure `304332..304338` and the final
+fault-array scan `304382..3043a8` clear it on failures (ignoring sentinel
+`ff`/`fe` and zero). The compact response clears wait bit `04`. Routine
+`47f354` clears pending bit `80` at `47f370` at 3.734 s; the provisioned run
+retains `40` afterward. Do not target that bit for clearing.
+
+Passive LCD payload counts distinguish this frontier from invisible rendered
+content: five 768-byte transfers occur by 3.001 s. Transfers 1/2/4/5 are all
+zero; transfer 3 has 768 nonzero bytes (576 are `ff`) at 2.010 s. No further
+LCD data arrives through 20 s. Thus the endpoint blank frame agrees with
+the firmware's final zero payload, rather than proving that a menu is drawn
+but hidden by the LCD model. Controller identity/command fidelity remain
+separate unknowns. The next investigation is the post-self-test UI lifecycle
+and organic physical-input handling, not another self-test completion reply.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.

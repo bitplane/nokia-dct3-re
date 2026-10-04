@@ -8,6 +8,14 @@ local nv_writers = {}
 local nv_copy_count = 0
 local lcd_commands, lcd_runs = {}, {}
 local lcd_data_count, lcd_since_command = 0, 0
+local lcd_nonzero_count = 0
+local lcd_frame_nonzero, lcd_frame_ff = 0, 0
+taps[#taps + 1] = memory:install_write_tap(0x17fd14, 0x17fd17,
+    "6250_startup_flags", function(offset, value, mask)
+        if (mask & 0xff0000) == 0 then return end
+        machine:logerror(string.format("6250_startup_flags: data=%02x pc=%08x t=%.6f\n",
+            (value >> 16) & 0xff, cpu.state["PC"].value, machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x48078c, 0x48078f,
     "6250_nv_record_copy", function(offset, value, mask)
         if cpu.state["PC"].value ~= 0x48078c then return end
@@ -76,6 +84,18 @@ taps[#taps + 1] = memory:install_write_tap(0x2002c, 0x2002f,
     "6250_lcd_data", function(offset, value, mask)
         if (mask & 0xff00) == 0 then return end
         lcd_data_count = lcd_data_count + 1
+        local byte = (value >> 8) & 0xff
+        if byte ~= 0 then
+            lcd_nonzero_count = lcd_nonzero_count + 1
+            lcd_frame_nonzero = lcd_frame_nonzero + 1
+        end
+        if byte == 0xff then lcd_frame_ff = lcd_frame_ff + 1 end
+        if lcd_data_count % 768 == 0 then
+            machine:logerror(string.format("6250_lcd_transfer: index=%d nonzero=%d ff=%d pc=%08x t=%.6f\n",
+                lcd_data_count // 768, lcd_frame_nonzero, lcd_frame_ff,
+                cpu.state["PC"].value, machine.time:as_double()))
+            lcd_frame_nonzero, lcd_frame_ff = 0, 0
+        end
         lcd_since_command = lcd_since_command + 1
     end)
 taps[#taps + 1] = memory:install_write_tap(0x17fe24, 0x17fe27,
@@ -128,6 +148,8 @@ emu.register_periodic(function()
     machine:logerror("6250_startup_fault_endpoint: bytes=" .. table.concat(faults) .. "\n")
     machine:logerror(string.format("6250_lcd_runs: data_total=%d commands=%s\n",
         lcd_data_count, table.concat(lcd_runs, ",")))
+    machine:logerror(string.format("6250_lcd_payload: nonzero_bytes=%d t=%.6f\n",
+        lcd_nonzero_count, machine.time:as_double()))
     local counts = {}
     for command = 0, 255 do
         if lcd_commands[command] then
