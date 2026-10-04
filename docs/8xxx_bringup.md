@@ -268,6 +268,15 @@ reports resident word `06f9`, rather than echoing the request's zero.
 
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
+The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
+`32` directly, or size `34` after summing 25 big-endian halfwords from
+message `+0a`, truncating to 16 bits, XORing `ffff` (literal at
+`0x28d5e8`), and comparing the stored halfword at message `+3c`.
+This is an envelope check, not the complete context/identity acceptance
+contract. `tools/nsm3d_service_contract.py` checks that distinction offline;
+its tests cover byte order, overflow, malformed extents and corruption.
+The `36` handler stores whether message `+0a` is zero to `0x12da46`
+and invokes `0x288c84(2)`; it does not decode a transformed record.
 Recover these MCU-side producers/consumers and compare their transformation
 contract with the acquired mask before implementing a result-producing
 HLE. The generic compact-success profile remains disabled here.
