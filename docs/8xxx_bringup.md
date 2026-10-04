@@ -45,6 +45,15 @@ and 6 in word 3. Stock-input fingerprint `f3a3625c` differs from NSM-3's
 none identifies fitted NSM-3D silicon, and no fixture publication is injected
 into `noki8250`.
 
+Once shared offset 2 changes, `0x2cb316..0x2cb31e` copies shared word 1
+to RAM `0x12f028` and word 0 to `0x12f026`, then returns without validating
+them locally. A halfword-aligned literal Thumb-BL scan of the complete stock
+flash finds one candidate call to `0x2cb226`, at `0x2f33d0`; its decoded
+caller continues initialization after return. Indirect calls and consumers
+through aliased structure pointers are not closed by that scan. Validation
+of the retained fields, rather than the upload loop's mere return, remains
+the next MCU-side question.
+
 ## Recovered GENSIO contract
 
 All three independently select CCONT with control `0x22`, write the command
