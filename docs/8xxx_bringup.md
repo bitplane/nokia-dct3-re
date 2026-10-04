@@ -109,6 +109,24 @@ product-flash payload before execution; SHA-1
 That routine is outside the acquired code and remains fail-closed. No ROM4
 instructions or guessed helper return values were imported.
 
+The second loader's early direct calls also include `938c`, `4007` and
+`9ddd`. None lies in any of the 28 initialized descriptors' declared
+destination ranges. This is bounded upload coverage, not an absence proof
+for relocation or an identification of the fitted mask. Reproduce the
+catalogue, payload hashes and half-open range queries with:
+
+```sh
+.venv/bin/python -m tools.nsm3d_catalogue \
+  roms/noki8250/8250-502mcuppmk.fls \
+  --address 0x2c75 --address 0x938c --address 0x4007 --address 0x9ddd
+```
+
+The next software question is whether the loader relocates acquired code
+to those addresses or calls resident mask routines. A public sibling HLE
+boot claim for 8250 v6.02 is not an execution oracle for this v5.02 image;
+its advertised model/version and provisioning must be matched before
+using it to justify a peer response.
+
 The MCU handler at `0x2cb874` consumes the selector from shared byte offset
 `e2`, indexes the relocated catalogue, copies at most the declared input
 chunk length, and acknowledges through `e4`. The flash initialization record
