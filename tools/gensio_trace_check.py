@@ -8,7 +8,7 @@ import sys
 
 
 ACCESS_RE = re.compile(
-    r"gensio: ([RW]) off=([0-9a-fA-F]{2}) data=([0-9a-fA-F]{2})"
+    r"gensio(?:_select)?: ([RW]) off=([0-9a-fA-F]{2}) data=([0-9a-fA-F]{2})"
 )
 
 ADC_PROFILES = {

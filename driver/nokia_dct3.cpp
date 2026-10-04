@@ -2215,6 +2215,12 @@ uint8_t nokia_dct3_state::mad2_register_r(offs_t offset)
 
 void nokia_dct3_state::trace_mad2_read(offs_t offset, uint8_t data)
 {
+	// These retained board latches are not owned by the GENSIO endpoint.
+	const bool select_latch = offset == 0x6f ||
+			(offset >= 0xad && offset <= 0xaf) || (offset >= 0xed && offset <= 0xef);
+	if (m_trace_enabled && select_latch && m_gensio_trace_count++ < GENSIO_TRACE_LIMIT)
+		LOGMASKED(LOG_GENSIO, "gensio_select: R off=%02x data=%02x pc=%08x t=%.9f\n",
+				offset, data, m_maincpu->pc(), machine().time().as_double());
 	if (m_trace_enabled &&
 			m_gensio->owns(offset) &&
 			m_gensio_trace_count++ < GENSIO_TRACE_LIMIT)
@@ -2311,6 +2317,11 @@ void nokia_dct3_state::mad2_register_w(offs_t offset, uint8_t data)
 void nokia_dct3_state::trace_mad2_write(offs_t offset, uint8_t data, uint8_t old_data)
 {
 	const bool gensio_register = m_gensio->owns(offset);
+	const bool select_latch = offset == 0x6f ||
+			(offset >= 0xad && offset <= 0xaf) || (offset >= 0xed && offset <= 0xef);
+	if (m_trace_enabled && select_latch && m_gensio_trace_count++ < GENSIO_TRACE_LIMIT)
+		LOGMASKED(LOG_GENSIO, "gensio_select: W off=%02x data=%02x old=%02x pc=%08x t=%.9f\n",
+				offset, data, old_data, m_maincpu->pc(), machine().time().as_double());
 	if (m_trace_enabled &&
 			(offset >= 0x08 && offset <= 0x13) &&
 			m_mad2_timer_trace_count++ < 4096)

@@ -12,6 +12,13 @@ from tools.gensio_trace_check import (
 
 
 class GensioTraceCheckTest(unittest.TestCase):
+    def test_endpoint_and_board_latch_records_preserve_order(self):
+        text = ("gensio_select: W off=af data=00 old=ff pc=1 t=0\n"
+                "gensio: W off=2d data=25 old=00 pc=1 t=0\n"
+                "gensio_select: R off=af data=00 pc=1 t=0\n")
+        self.assertEqual(parse_accesses(text),
+                         [("W", 0xaf, 0), ("W", 0x2d, 0x25), ("R", 0xaf, 0)])
+
     def test_complete_read_and_write_transactions(self):
         text = """
 [:] gensio: W off=2d data=25 old=21 pc=1 t=0

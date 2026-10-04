@@ -3,8 +3,9 @@
 ## Ownership
 
 `nokia_gensio_device` owns the recovered MAD2 GENSIO register subset, endpoint
-selection and status, CCONT byte transport, LCD pin serialization, and the
-SELECT1/2/3 backing latches. The phone driver supplies board wiring only:
+selection and status, CCONT byte transport and LCD pin serialization.
+The unassigned SELECT1/2/3 backing latches remain in the driver's retained
+MAD2 register array, not in the GENSIO endpoint. The driver supplies wiring:
 CCONT byte/select callbacks and PCD8544 `DC`, `SDIN`, and `SCLK` pins.
 
 | MAD2 offset | Contract | Status |
@@ -47,6 +48,9 @@ claim. The full PCs and extraction coverage are in
 `ExportGensioAccesses.java` enumerates direct, literal-derived and scalar
 candidate uses for another ROM. `make verify-gensio` checks the two-ROM startup,
 read-back and bit-0 contract without committing raw traces.
+Passive `gensio_select` records observe those retained latches separately
+from device-owned `gensio` endpoint accesses; the checker merges both in
+execution order without assigning an attached peer.
 
 ## Remaining fidelity work
 
