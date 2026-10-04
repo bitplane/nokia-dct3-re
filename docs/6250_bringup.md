@@ -335,6 +335,20 @@ that latch is missing or because a charger cause was injected. State 12 also
 tests byte `17fd74`, observed zero at initialization and cleared at `30cce0`.
 Follow the analog completion/connection lifecycle before changing reset causes.
 
+The repeated event `26` invokes measurement accumulator `3daaa8`. It only
+decrements initialization counter `1691e2` if `3da9d4` accepts both converted
+samples in the inclusive range `0708..157c` (1800..5500). The observed pair is
+`19b5/19b5`, with counter `0a`: both exceed the upper bound, so the counter
+cannot drain and this path cannot reach report 14. This is a concrete input
+validity failure, not a reason to synthesize a ready report.
+
+Logical source 7 goes through `500d86` and the own-ROM mux at `288fa0` to
+physical ADC selector 2. Its conversion applies calibration then scales by
+1500/232 (`3da9d4`); the current raw selector-2 input is full scale `3ff`.
+Recover the actual calibration and physical voltage contract before choosing
+a product-local nominal input. The measurement gate establishes a bounded
+validity interval, not by itself a measured battery voltage or pack identity.
+
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.

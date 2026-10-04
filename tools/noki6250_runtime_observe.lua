@@ -10,6 +10,18 @@ local keypad_readers = {}
 local scalar_posts = {}
 local analog_writes, analog_receiver_seen = {}, false
 local analog_predicates = {}
+local analog_samples = {}
+taps[#taps + 1] = memory:install_read_tap(0x3daa80, 0x3daa83,
+    "6250_analog_samples", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x3daa82 then return end
+        local first = memory:read_u16(cpu.state["R5"].value)
+        local second = memory:read_u16(cpu.state["R4"].value)
+        local key = first * 0x10000 + second
+        if analog_samples[key] then return end
+        analog_samples[key] = true
+        machine:logerror(string.format("6250_analog_samples: first=%04x second=%04x count=%02x t=%.6f\n",
+            first, second, memory:read_u8(0x1691e2), machine.time:as_double()))
+    end)
 local analog_messages = {}
 local analog_selectors = {}
 taps[#taps + 1] = memory:install_read_tap(0x20000, 0x20003,
