@@ -547,6 +547,22 @@ input/result workflow, not every installed application or game.
 
 ## Speech-control boundary
 
+The physical calculator workflow has a fresh-state acceptance runner:
+
+```sh
+.venv/bin/python tools/run_noki6250_calculator.py /tmp/6250-calculator-new \
+    --rompath run_model_scout_6250/roms
+```
+
+The ROM path must contain the prepared acquired NHM-3 ROM members. The
+runner creates a separate initial-record PMM comparison from the acquired
+source, isolated configuration/NVRAM/log directories, and an execution
+manifest. It refuses an existing run directory. Success requires the
+ordered physical calculator actions and reviewed `1+2=3` pixel result,
+not merely a successful emulator exit. This validates `nhm3hle` with
+explicit comparison provisioning; it does not validate ordinary
+`noki6250` boot or speech audio.
+
 The 6250 command-8 helper is `429a34`: its jump table at `429a88` selects
 `429de6`, which combines the low 12 parameter bits with `8000`, stores its
 own shadow at `16e47e`, publishes shared `100a8`, and commits through DSPIF.
