@@ -506,4 +506,28 @@ no-cipher type-14 publication is `002effffffffffffffff0000`; this is a
 Reproduce with a private copy of `fixtures/radio_incoming_sms/nhm3hle.cfg`,
 fresh storage, the initial-record fixture and runtime observer, for 35 seconds
 with `-verbose`. Validate with `radio_incoming_sms_trace_check.py LOG SIM_NVRAM
---profile nhm3`. UI reading, deleting and outgoing SMS remain separate tests.
+--profile nhm3`. This transport gate is distinct from the UI tests below.
+
+Physical inbox reading and confirmed deletion are now independently exercised.
+`noki6250_sms_observe.lua` presses Show, Options, Erase and, with harness-only
+`NOKIA_DCT3_6250_SMS_DELETE=1`, OK at the confirmation prompt. The read frame
+shows sender `5551234` and text `hello`; EF_SMS status becomes `01`. Confirmed
+deletion changes status to `00`, preserves the message body, and returns to
+the Inbox menu. No firmware state is written by the script.
+
+Run the incoming-SMS fixture for 35 seconds with this script. Validate the
+read outcome using `noki6250_sms_check.py LOG SIM_NVRAM FRAME` (capture 2),
+or the deleted outcome with `--deleted` (capture 5). The checker requires
+transport closure, exact stored payload/status, storage-update counts and
+the reviewed 96x60 frame. These are separate fresh-process runs.
+
+The same harness with `NOKIA_DCT3_6250_SMS_REPLY=1` physically selects Reply,
+Empty screen, enters `Hi` through multi-tap keys, selects Send and confirms
+the sender's number `5551234`. Firmware sends the exact SMS-SUBMIT through
+SAPI 3 and displays `Message sent` after the laboratory network's CP/RP
+acknowledgements. Run for 50 seconds and check capture 8 with
+`noki6250_sms_check.py LOG SIM_NVRAM FRAME --sent`. The SIM argument is used
+only by inbox modes; sent-mode proof comes from the exact outgoing payload,
+recipient, acknowledgement/release sequence and reviewed frame.
+The level-enabled incoming fixture can page again after this later release;
+that second receipt is not counted as a second outgoing submission.
