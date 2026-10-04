@@ -348,6 +348,25 @@ the decoded content's chip/key/preprocessing contract, not envelope format.
 The read-only Lua observer retains the last 16 decoder PCs to reproduce
 the path; it does not modify the response or CPU state.
 
+An offline comparison uses only the two published `82`/`83` lock tables,
+the same original PMM bytes and the same nominal chip packing. Before
+marker stripping, family `82` gives byte-9 values `43/bc` and markers
+`c875/28f7`; family `83` gives `ee/06` and `5146/f343`. Both therefore
+fail the ordinary `+21 in 78..7f` structural branch. This is not a chip-ID
+search, and does not exclude either family with the original physical
+chip identity. Merely switching the current HLE's family is unsupported.
+The numeric tables are the author's published `Lock_Enc_82/83` values in
+[the DCT3 MBUS discussion](https://nokiafree.org/forums/archive/index.php/t-38381.html?s=905ef8616030d0920e8836236655ced0).
+
+The own-ROM helper at `28bf30..28c018` constructs a separate primitive
+`17`, length `30`, combining caller fields with original 24-byte PMM data
+(or reversed 12-byte halves when its stack argument is one), then posts
+it through `2890c4`. Its observed caller is downstream of successful
+primitive-35 validation at `28d55e`. That helper is a record-update
+transaction, not evidence of an IMEI-derived pad on the current `1618`
+read request. Neither a donor chip identity nor a default unlocked record
+has been substituted to make these checks pass.
+
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
 The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
