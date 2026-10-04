@@ -205,6 +205,25 @@ Runtime saved return addresses confirm encoder caller `0x2b6175` and
 wrapper caller `0x2b61f1`. This establishes a bounded coefficient-like
 parameter lifecycle, not its physical units or an evidenced ROM6 consumer.
 
+The acquired ROM4 mask supplies a bounded comparison for control completion:
+at `377b` and `38c3` it tests DSP word `0870` (MCU `0x100e0`), calls the
+parameter consumer at `a51b`, pulses MMR `29` bit 3, then clears `0870` at
+`379e` or `38d0`. The consumer reads neighboring parameter `085d` and
+updates configuration; `085c` is consumed directly by the multiply loops.
+This corroborates the MCU-side distinction between stored parameters,
+busy ownership and IRQ4 notification. None of the 28 acquired ROM6 upload
+payloads contains literal `0870`, so these ROM4 instruction addresses and
+handler implementation are not a recovered ROM6 resident routine.
+
+A runtime HLE alternative must be a separate, explicitly selected backend:
+retain the silent native fixture, stop native execution before unavailable
+instructions, and make transport ownership exclusive. Parameter acceptance
+must retain/apply the submitted configuration before completing busy; it
+must not fabricate a native helper return, the loader's `abba` cookie, or
+firmware state. Its configuration-consumption behavior would be declared
+HLE, not proof of complete ROM6 execution. This is the software path to
+evaluate next; continued native execution still needs the fitted mask.
+
 HLE callbacks and queued service/packet/response/keepalive/speech work must
 not mutate the transport while native ownership is active. In particular,
 the generic HLE doorbell clear of `0x100e0` is suppressed: otherwise the
