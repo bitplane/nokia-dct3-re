@@ -622,7 +622,7 @@ bool nokia_dsp_hle_device::consume_memory_upload(const nokia_dspif_device::packe
 
 bool nokia_dsp_hle_device::answer_identity_query(const nokia_dspif_device::packet &packet)
 {
-	if (!m_msid83_query || packet.type != 0x70 || packet.length != 6 ||
+	if (!m_record_codec83 || packet.type != 0x70 || packet.length != 6 ||
 			packet.payload[0] != 0x13 || packet.payload[1] != 4)
 		return false;
 	using namespace nokia_dct3_record_codec;
@@ -650,6 +650,42 @@ bool nokia_dsp_hle_device::answer_identity_query(const nokia_dspif_device::packe
 	return true;
 }
 
+bool nokia_dsp_hle_device::answer_record_query(const nokia_dspif_device::packet &packet)
+{
+	if (!m_record_codec83 || packet.type != 0x70 || packet.length != 26 ||
+			packet.payload[0] != 0x16 || packet.payload[1] != 24)
+		return false;
+	using namespace nokia_dct3_record_codec;
+	const u32 chip = ((m_cobba->control_register(5) & 0xfff) << 12) |
+			(m_cobba->control_register(6) & 0xfff);
+	record table = {0x7b, 0xb4, 0xd0, 0xef, 0x9e, 0xb2, 0x0a, 0xbe, 0x73, 0xda, 0xd3, 0x35};
+	for (unsigned i = 0; i < 4; ++i)
+		table[i] ^= chip >> (24 - 8 * i);
+	static constexpr record schedule = {0xb1, 0x73, 0xe6, 0x5a, 0xab, 0x47, 0x8e, 0x0d, 0x1a, 0x34, 0x68, 0x0b};
+	// Short record envelope and format 0, observed in ROM4 and accepted by
+	// this MCU parser. ROM6 format/key selection remains an HLE hypothesis.
+	// Return the actual inverse and original bytes, never an open-lock fixture.
+	std::array<u8, 52> response = {0x35, 0x32, 0x00, 0x00};
+	std::array<u16, 2> markers{};
+	for (unsigned block = 0; block < 2; ++block)
+	{
+		record encoded{};
+		std::copy_n(packet.payload.begin() + 2 + block * 12, 12, encoded.begin());
+		record decoded = inverse(encoded, table, schedule);
+		markers[block] = (decoded[10] << 8) | decoded[11];
+		// ROM4 4b9e/4ba1 removes the private marker from either result.
+		decoded[10] = decoded[11] = 0;
+		std::copy(decoded.begin(), decoded.end(), response.begin() + 4 + block * 12);
+	}
+	std::copy_n(packet.payload.begin() + 2, 24, response.begin() + 28);
+	if (!m_transport->enqueue_rx_packet(0x74, response.data(), response.size()))
+		return false;
+	m_transport->notify_rx();
+	LOGMASKED(LOG_DSP_HLE, "dsp_hle: record_decode family=83 chip=%08x format=00 markers=%04x/%04x verdict=not_evaluated t=%.6f\n",
+			chip, markers[0], markers[1], machine().time().as_double());
+	return true;
+}
+
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 {
 	if (native_owns_transport())
@@ -661,10 +697,14 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 		while (m_transport->peek_tx_packet(packet))
 		{
 			consume_memory_upload(packet);
-			if (m_msid83_query && packet.type == 0x70 && packet.length == 6 &&
+			if (m_record_codec83 && packet.type == 0x70 && packet.length == 6 &&
 					packet.payload[0] == 0x13 && packet.payload[1] == 4 &&
 					!answer_identity_query(packet))
 				break; // Preserve the request until RX has room.
+			if (m_record_codec83 && packet.type == 0x70 && packet.length == 26 &&
+					packet.payload[0] == 0x16 && packet.payload[1] == 24 &&
+					!answer_record_query(packet))
+				break;
 			if (m_external_service_enabled && packet.type == 0x05 &&
 					packet.length >= 9 && packet.length <= 75)
 				m_external_peer->receive_frame(packet.payload.data(), packet.length);

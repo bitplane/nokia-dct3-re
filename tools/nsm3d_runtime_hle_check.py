@@ -3,15 +3,18 @@
 import argparse
 from pathlib import Path
 import re
+import struct
 
 try:
     from tools.extract_nsm3_verifier import extract, extract_loader, extract_program_fragment
     from tools.nsm3d_live_verifier_check import check, check_boundary
     from tools.dct3_msid_codec import decode_msid
+    from tools.nse5_transform_trace_check import inverse_transform_words
 except ModuleNotFoundError:
     from extract_nsm3_verifier import extract, extract_loader, extract_program_fragment
     from nsm3d_live_verifier_check import check, check_boundary
     from dct3_msid_codec import decode_msid
+    from nse5_transform_trace_check import inverse_transform_words
 
 
 def check_handoff(text):
@@ -100,6 +103,36 @@ def check_identity_query(text, image):
         raise ValueError("unrecovered self-test success was synthesized")
 
 
+def check_record_query(text):
+    requests = re.findall(r"TX pending type=70 payload=26 data=(1618[0-9a-f]{48})", text)
+    replies = re.findall(r"RX enqueue type=74 payload=52 producer=[0-9a-f]+ "
+                         r"data=(35320000[0-9a-f]{96})", text)
+    computations = re.findall(r"record_decode family=83 chip=([0-9a-f]{8}) format=00 "
+                              r"markers=([0-9a-f]{4})/([0-9a-f]{4}) verdict=not_evaluated", text)
+    received = re.findall(r"nsm3d_record_received: message=[0-9a-f]+ bytes=([0-9a-f]{120})", text)
+    if any(len(records) != 1 for records in (requests, replies, computations, received)):
+        raise ValueError("missing unique record request, computation, reply or MCU receipt")
+    encoded = bytes.fromhex(requests[0])[2:]
+    chip, *markers = computations[0]
+    chip = bytes.fromhex(chip)
+    key = bytes(value ^ (chip[index] if index < 4 else 0) for index, value in
+                enumerate(bytes.fromhex("7bb4d0ef9eb20abe73dad335")))
+    schedule = tuple(value * 0x101 for value in bytes.fromhex("b173e65aab478e0d1a34680b"))
+    decoded = bytearray()
+    for block in range(2):
+        words = inverse_transform_words(struct.unpack(">6H", encoded[block * 12:block * 12 + 12]),
+                                        struct.unpack(">6H", key), schedule)
+        data = struct.pack(">6H", *words)
+        if data[-2:].hex() != markers[block]:
+            raise ValueError("record marker observation differs from computed inverse")
+        decoded.extend(data[:-2] + bytes(2))
+    reply = bytes.fromhex(replies[0])
+    if reply[4:28] != decoded or reply[28:] != encoded:
+        raise ValueError("record reply is not the computed inverse and original bytes")
+    if bytes.fromhex(received[0])[8:] != reply:
+        raise ValueError("MCU consumer did not receive the computed record reply")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -109,6 +142,8 @@ def main():
                         help="check verbose service requests against acquired product-local PMM")
     parser.add_argument("--identity", action="store_true",
                         help="require computed identity response and firmware retention, not final verdict")
+    parser.add_argument("--records", action="store_true",
+                        help="check candidate codec record inverse and MCU receipt, not record validity")
     args = parser.parse_args()
     try:
         text, image = args.log.read_text(), args.flash.read_bytes()
@@ -121,6 +156,8 @@ def main():
             check_service_inputs(text, image, args.pmm.read_bytes())
         if args.identity:
             check_identity_query(text, image)
+        if args.records:
+            check_record_query(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 runtime HLE failed: {error}\n")
     print("8250 native uploads and exclusive runtime HLE parameter acceptance verified; phone boot unproved")

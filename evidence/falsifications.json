@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "8250_pmm_matches_codec83_nominal_cobba",
+      "status": "disproven",
+      "hypothesis": "The acquired 8250 low records form an accepted primitive-35 reply when decoded directly with the published family-83 lock codec, nominal modeled COBBA packing 00160010 and format zero",
+      "conclusion": "The computed inverse is independently reproduced and all 52 reply bytes reach MCU handler 28d250, but the firmware takes invalid-field branch 28d56e. Original pre-strip markers are 5146/f343. This disproves that exact codec/key/format combination; it does not establish defective PMM, the correct ROM6 table or preprocessing, or a measured chip identity. No open-lock data, PMM rewrite or final self-test success is supplied.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/nsm3d_runtime_hle_check.py", "tools/nsm3d_verifier_observe.lua"]
+    },
+    {
       "id": "rom4_type1a_directly_activates_rf_acquisition",
       "status": "disproven",
       "hypothesis": "The organic NSE-1 type-0x1a search-list packet directly activates the ROM4 parallel RF receive path",

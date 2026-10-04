@@ -6,6 +6,31 @@ local transfers = { [0x100fe] = 0, [0x10100] = 0 }
 local order_errors, last = 0, nil
 local rx_read_sites = {}
 local observe_rx = true
+local record_calls = 0
+local record_rejection_seen = false
+local record_rejection_tap = memory:install_read_tap(0x28d56c, 0x28d573,
+    "nsm3d_record_rejection", function(offset, data, mask)
+        local pc = cpu.state["PC"].value
+        if pc == 0x28d56e and not record_rejection_seen then
+            record_rejection_seen = true
+            machine:logerror(string.format("nsm3d_record_rejected: pc=%08x t=%.6f\n",
+                pc, machine.time:as_double()))
+        end
+    end)
+local record_tap = memory:install_read_tap(0x28d250, 0x28d253,
+    "nsm3d_record_consumer", function(offset, data, mask)
+        if cpu.state["PC"].value ~= 0x28d250 then return end
+        record_calls = record_calls + 1
+        if record_calls > 4 then return end
+        local address = cpu.state["R0"].value
+        if address < 0x100000 or address + 60 > 0x180000 then return end
+        local bytes = {}
+        for index = 0, 59 do
+            bytes[#bytes + 1] = string.format("%02x", memory:read_u8(address + index))
+        end
+        machine:logerror(string.format("nsm3d_record_received: message=%08x bytes=%s t=%.6f\n",
+            address, table.concat(bytes), machine.time:as_double()))
+    end)
 local rx_tap = memory:install_read_tap(0x101c8, 0x101cb,
     "nsm3d_rx_indices", function(offset, data, mask)
         local pc = cpu.state["PC"].value
@@ -101,6 +126,11 @@ local sample = coroutine.create(function()
     end
     machine:logerror(string.format("nsm3d_identity_boundary: ready=%02x record=%s\n",
         memory:read_u8(0x12da3f), table.concat(identity)))
+    local context = {}
+    for index = 0, 19 do
+        context[#context + 1] = string.format("%02x", memory:read_u8(0x12da3c + index))
+    end
+    machine:logerror("nsm3d_record_context: bytes=" .. table.concat(context) .. "\n")
     if dsp then
         local fields = {}
         for address = 0x110f6, 0x11102, 2 do
@@ -127,4 +157,4 @@ assert(tap)
 assert(release_tap)
 -- Keep the tap userdata rooted for the entire run, including GC triggered
 -- by the larger loader capture. A local assertion is not a lifetime root.
-_G.nsm3d_observer_handles = {tap, release_tap, doorbell_tap, rx_tap}
+_G.nsm3d_observer_handles = {tap, release_tap, doorbell_tap, rx_tap, record_tap, record_rejection_tap}

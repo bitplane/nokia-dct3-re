@@ -245,8 +245,8 @@ shared discovery grammar against this MCU, not a donor application setup.
 The independently captured LCD is still blank. Subsequent organic type-70
 requests start with primitives `13/14/15/16` and `0d00`; their resident
 service completion is the next boundary. The research HLE answers the
-identity query only; record decoding and the final self-test reply remain
-unimplemented.
+identity query and returns a candidate decoded record; the final self-test
+reply remains unimplemented.
 
 The producer at `0x28cb68` supplies product-local inputs, not an arbitrary
 challenge: primitive `13` reads the firmware checksum at `0x3cfffc` through
@@ -313,13 +313,28 @@ On a fresh coherent run, the device queues type `74` payload
 request. Firmware handler `0x28d02c` retains all 13 MSID bytes at `0x12da5c`
 and sets its ready flag at `0x12da3f`. The decoded reply reproduces the
 request checksum and modeled chip inputs; the low-record requests still
-match the acquired PMM. RX drains at `0095/0095`, MCU remains at
-`0x2f3498`, and the captured LCD remains blank. This validates the computed
-query/receive contract, not the identity record verdict. No `0d00` success,
+match the acquired PMM. This validates the computed query/receive contract,
+not the identity record verdict. No `0d00` success,
 ABBA cookie, PMM rewrite or firmware-state change is synthesized.
 `--identity` checks the encoded inputs and firmware-owned retention and
 rejects a fabricated final success. The strict `nsm3dr6` control remains
 silent at command 32 with native transport ownership retained.
+
+The candidate codec also answers the organic `1618` request with a short
+`3532` envelope: format zero, two computed inverse blocks and the original
+24 input bytes. Its key is the published family-`83` lock table XORed with
+the modeled chip packing; it does not substitute default/open-lock data.
+The private final word of each decoded block is stripped, as in ROM4
+`4b9e/4ba1`, without claiming that either marker passed a validity test.
+The current original markers are `5146/f343`. Firmware receives all 52
+response bytes at `0x28d250`, then takes its invalid-field branch at
+`0x28d56e`; the acquired records are not accepted by this candidate
+codec/key/format combination. This does not prove defective PMM or the
+correct ROM6 table/padding selection. Original chip identity and any
+product-specific preprocessing still require evidence. RX drains at
+`00b0/00b0`, MCU remains at `0x2f3496`, and the LCD is still blank.
+`--records` independently recomputes both inverse blocks, checks marker
+stripping/original-byte retention and requires identical MCU receipt.
 
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
@@ -330,6 +345,11 @@ message `+0a`, truncating to 16 bits, XORing `ffff` (literal at
 This is an envelope check, not the complete context/identity acceptance
 contract. `tools/nsm3d_service_contract.py` checks that distinction offline;
 its tests cover byte order, overflow, malformed extents and corruption.
+The byte at message `+0a` is a format selector, not an unused success byte:
+`0x28d476..0x28d4a6` maps 1 to internal flags 3, 2 to flags `0b`, and
+0 to flags 5 (or 7 when context `+0d` is `81`); other values invalidate
+the record. The candidate HLE's zero is the observed ROM4 format choice,
+not proof of the fitted ROM6 response format.
 The `36` handler stores whether message `+0a` is zero to `0x12da46`
 and invokes `0x288c84(2)`; it does not decode a transformed record.
 Recover these MCU-side producers/consumers and compare their transformation
@@ -341,7 +361,7 @@ and validate its log separately:
 
 ```sh
 .venv/bin/python tools/nsm3d_runtime_hle_check.py RUN/error.log \
-  roms/noki8250/8250-502mcuppmk.fls --discovery --identity \
+  roms/noki8250/8250-502mcuppmk.fls --discovery --identity --records \
   --pmm 'roms/noki8250/8250 virgin eeprom 003d0000.fls'
 ```
 
