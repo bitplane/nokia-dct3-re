@@ -4,6 +4,18 @@ local cpu = assert(machine.devices[":maincpu"])
 local memory = cpu.spaces["program"]
 local transfers = { [0x100fe] = 0, [0x10100] = 0 }
 local order_errors, last = 0, nil
+local rx_read_sites = {}
+local observe_rx = true
+local rx_tap = memory:install_read_tap(0x101c8, 0x101cb,
+    "nsm3d_rx_indices", function(offset, data, mask)
+        local pc = cpu.state["PC"].value
+        if observe_rx and machine.time:as_double() >= 1.04 and not rx_read_sites[pc] then
+            rx_read_sites[pc] = true
+            machine:logerror(string.format(
+                "nsm3d_rx_index_read: pc=%08x address=%08x data=%08x mask=%08x\n",
+                pc, offset, data, mask))
+        end
+    end)
 local doorbell_tap = memory:install_write_tap(0x30000, 0x30003,
     "nsm3d_dspif_writes", function(offset, data, mask)
         machine:logerror(string.format(
@@ -81,6 +93,8 @@ local sample = coroutine.create(function()
             address, memory:read_u16(address)))
     end
     if not emu.wait(7.5) then return end
+    -- Do not attribute the observer's own boundary reads to the MCU's PC.
+    observe_rx = false
     if dsp then
         local fields = {}
         for address = 0x110f6, 0x11102, 2 do
@@ -107,4 +121,4 @@ assert(tap)
 assert(release_tap)
 -- Keep the tap userdata rooted for the entire run, including GC triggered
 -- by the larger loader capture. A local assertion is not a lifetime root.
-_G.nsm3d_observer_handles = {tap, release_tap, doorbell_tap}
+_G.nsm3d_observer_handles = {tap, release_tap, doorbell_tap, rx_tap}

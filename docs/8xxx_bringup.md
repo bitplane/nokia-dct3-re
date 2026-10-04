@@ -247,6 +247,31 @@ requests start with primitives `13/14/15/16` and `0d00`; their resident
 service completion is the next boundary. No response to those requests is
 yet synthesized in this composition.
 
+The receive path is recovered independently from ring observations:
+`0x2cb0c0` counts queued words, `0x2cb150` builds a class-18 message,
+and task-4 code `0x3029fe` dispatches its type byte. Types `70..7f` are
+reframed by `0x2e2a54` and posted to task 2, retaining the compact payload
+at message `+8`. The service decoder at `0x244a5c` selects primitive `0d`
+at `0x244acc`; result byte `+9` bits 0 and 1 record failures in two
+service-result slots. Therefore emitting `0d00` without recovering the
+checks would assert success, not merely acknowledge transport.
+
+The ROM4 comparison exposes more of this family, but is not a ROM6 spec.
+Its type-70 parser `4951` indexes a **data-ROM**, not program-ROM, table
+at `b0a6`: primitives `13/14/15/16` select `4ac7/4b1f/4b3e/4b73`.
+Primitive 13 reads COBBA values and calls transform `7f05` before emitting
+a type-74 frame starting `340e`; primitive 15 calls `7f17`, stores six
+words XORed with `a5a5`, and compares paired words. This resembles the
+acquired ROM6 loader's transaction structurally, without establishing
+identical transforms or silicon inputs. ROM4 primitive `0d` at `4a16`
+reports resident word `06f9`, rather than echoing the request's zero.
+
+The 8250 decoder independently routes primitive `34` to `0x28d02c`
+(13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
+Recover these MCU-side producers/consumers and compare their transformation
+contract with the acquired mask before implementing a result-producing
+HLE. The generic compact-success profile remains disabled here.
+
 Use the same private-directory invocation below with machine `nsm3dhle`
 and validate its log separately:
 
