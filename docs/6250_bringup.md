@@ -449,7 +449,8 @@ branch and the peer supplies zero; it is not a global success=one contract.
 
 Research `nhm3hle` therefore sets assigned confirmation one. A cold restart
 with retained NVRAM emits the persisted-location request and completes the
-same protocol exchange without redundant EF_LOCI writes. Both runs pass
+same protocol exchange. It refreshes EF_LOCI offset 4 between Accept and
+Channel Release, but does not rewrite status offset 10. Both runs pass
 `tools/radio_registration_trace_check.py LOG --profile nhm3`; add `--preserved`
 for the second process. This validates registration reuse, not every later
 call/SMS/DSP primitive. Reproduce with `nhm3hle`, the initial-record fixture,

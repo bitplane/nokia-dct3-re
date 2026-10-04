@@ -142,7 +142,15 @@ def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
             text):
         raise ValueError(
             "preserved cold boot did not use the persisted LAI/TMSI location update")
-    if preserved and profile in ("nhm2", "nhm3") and re.search(
+    if preserved and profile == "nhm3":
+        accept = text.find("LAPDm Location Updating Accept acknowledged nr=1")
+        release_end = text.find("radio_phase=release_channel_change", accept)
+        interval = text[accept:release_end]
+        if "sim_device: update-binary fid=6f7e offset=4 length=5" not in interval:
+            raise ValueError("NHM-3 did not refresh persisted EF_LOCI before deconfiguration")
+        if "sim_device: update-binary fid=6f7e offset=10" in text:
+            raise ValueError("NHM-3 redundantly rewrote persisted location status")
+    if preserved and profile == "nhm2" and re.search(
             r"sim_device: update-binary fid=6f7e", text):
         raise ValueError(f"{profile.upper()} redundantly mutated persisted EF_LOCI")
 
