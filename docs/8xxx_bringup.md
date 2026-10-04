@@ -247,6 +247,16 @@ requests start with primitives `13/14/15/16` and `0d00`; their resident
 service completion is the next boundary. No response to those requests is
 yet synthesized in this composition.
 
+The producer at `0x28cb68` supplies product-local inputs, not an arbitrary
+challenge: primitive `13` reads the firmware checksum at `0x3cfffc` through
+`0x2ffb22` (the alternate branch reads `0x200038`). Primitives `14`, `15`
+and `16` read logical PMM offsets `14` (12 bytes), `00` plus `0c` (20
+bytes total), and `20` (24 bytes). The acquired PMM's low-record body at
+file offset `0x10026` reproduces all three captured request bodies exactly.
+The runtime checker accepts `--pmm` to enforce this ordered provenance.
+This proves the forwarded inputs, not their compatibility with a modeled
+COBBA identity or the missing ROM6 transforms.
+
 The receive path is recovered independently from ring observations:
 `0x2cb0c0` counts queued words, `0x2cb150` builds a class-18 message,
 and task-4 code `0x3029fe` dispatches its type byte. Types `70..7f` are

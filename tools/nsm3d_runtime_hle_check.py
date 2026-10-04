@@ -57,11 +57,37 @@ def check_discovery(text):
         raise ValueError("unsolicited application profile was enabled")
 
 
+def check_service_inputs(text, image, pmm):
+    # 28cb68 constructs these requests with logical PMM reads at 14, 00,
+    # 0c and 20. The acquired PMM's low-record body starts at file 10026.
+    base = 0x10026
+    if len(image) != 0x1d0000 or len(pmm) != 0x30000:
+        raise ValueError("unexpected 8250 flash or PMM extent")
+    expected = [
+        bytes.fromhex("1304") + image[-4:],
+        bytes.fromhex("140c") + pmm[base + 0x14:base + 0x20],
+        bytes.fromhex("1514") + pmm[base:base + 0x14],
+        bytes.fromhex("1618") + pmm[base + 0x20:base + 0x38],
+    ]
+    packets = []
+    for match in re.finditer(
+            r"TX pending type=70 payload=(\d+) data=([0-9a-f]+)", text):
+        payload = bytes.fromhex(match[2])
+        if payload and payload[0] in (0x13, 0x14, 0x15, 0x16):
+            if len(payload) != int(match[1]):
+                raise ValueError("malformed service TX trace extent")
+            packets.append(payload)
+    if packets != expected:
+        raise ValueError("service requests do not match ordered product-local inputs")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("flash", type=Path)
     parser.add_argument("--discovery", action="store_true", help="require verbose discovery and ring observations")
+    parser.add_argument("--pmm", type=Path,
+                        help="check verbose service requests against acquired product-local PMM")
     args = parser.parse_args()
     try:
         text, image = args.log.read_text(), args.flash.read_bytes()
@@ -70,6 +96,8 @@ def main():
         check_handoff(text)
         if args.discovery:
             check_discovery(text)
+        if args.pmm:
+            check_service_inputs(text, image, args.pmm.read_bytes())
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 runtime HLE failed: {error}\n")
     print("8250 native uploads and exclusive runtime HLE parameter acceptance verified; phone boot unproved")
