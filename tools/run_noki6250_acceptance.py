@@ -24,7 +24,8 @@ def main():
                         help="new directory; existing directories are refused")
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
-                                              "sms-read", "sms-delete", "sms-reply"),
+                                              "sms-read", "sms-delete", "sms-reply",
+                                              "phonebook"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -55,6 +56,8 @@ def main():
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
             script = "noki6250_sms_observe.lua"
+        if args.scenario == "phonebook":
+            script = "noki6250_phonebook_observe.lua"
         seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
@@ -96,6 +99,12 @@ def main():
                        str(frames[0])]
             if args.scenario != "sms-read":
                 checker.append("--deleted" if args.scenario == "sms-delete" else "--sent")
+        elif args.scenario == "phonebook":
+            frames = list((run / "snap").rglob("6250_phonebook_7.png"))
+            if len(frames) != 1:
+                raise ValueError(f"expected one save frame, found {len(frames)}")
+            checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
+                       "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
         else:
             frames = list((run / "snap").rglob("6250_app_14.png"))
             if len(frames) != 1:
@@ -103,6 +112,28 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        if args.scenario == "phonebook":
+            shutil.copyfile(run / "error.log", run / "phonebook-save.log")
+            saved_sim = (run / "nvram/nhm3hle/sim_card").read_bytes()
+            (run / "phonebook-save.sim").write_bytes(saved_sim)
+            # A new MAME process reloads persisted flash/SIM, without a save state.
+            command[command.index("-autoboot_script") + 1] = str(
+                root / "tools/noki6250_phonebook_readback.lua")
+            command[command.index("-seconds_to_run") + 1] = "30"
+            manifest = json.loads((run / "acceptance.json").read_text())
+            manifest["cold_restart_command"] = command
+            (run / "acceptance.json").write_text(json.dumps(manifest, indent=2) + "\n")
+            with (run / "readback-console.log").open("w") as console:
+                subprocess.run(command, cwd=run, env=env, stdout=console,
+                               stderr=subprocess.STDOUT, check=True)
+            if (run / "nvram/nhm3hle/sim_card").read_bytes() != saved_sim:
+                raise ValueError("cold-start phonebook readback changed persistent SIM data")
+            frames = list((run / "snap").rglob("6250_phonebook_readback_5.png"))
+            if len(frames) != 1:
+                raise ValueError(f"expected one cold-start frame, found {len(frames)}")
+            checker[2] = "readback"
+            checker[-1] = str(frames[0])
+            subprocess.run(checker, check=True)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print(f"Evidence: {run}")

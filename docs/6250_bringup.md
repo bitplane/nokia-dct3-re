@@ -562,6 +562,8 @@ The physical calculator workflow has a fresh-state acceptance runner:
     --scenario sms-delete --rompath run_model_scout_6250/roms
 .venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-sms-reply-new \
     --scenario sms-reply --rompath run_model_scout_6250/roms
+.venv/bin/python tools/run_noki6250_acceptance.py /tmp/6250-phonebook-new \
+    --scenario phonebook --rompath run_model_scout_6250/roms
 ```
 
 The ROM path must contain the prepared acquired NHM-3 ROM members. The
@@ -589,6 +591,13 @@ frame. Reply physically composes `Hi` for `5551234`; acceptance requires
 the exact submission, network acknowledgements, release and sent frame.
 Each scenario starts with fresh SIM storage, and conflicting SMS fixture
 selectors are cleared before execution.
+
+Phonebook acceptance saves `A`/`123` through physical input, validates the
+reviewed save frame and ADN contents, exits MAME, then starts a separate
+process with the same persisted storage. Cold-start acceptance requires
+the reviewed contact-detail frame and byte-identical SIM storage after
+readback. The first process's log and SIM image are retained separately;
+the manifest records both commands. No emulator save state is used.
 
 The 6250 command-8 helper is `429a34`: its jump table at `429a88` selects
 `429de6`, which combines the low 12 parameter bits with `8000`, stores its
