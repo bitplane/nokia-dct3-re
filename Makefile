@@ -28,6 +28,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dsp_backend.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
+	driver/nokia_dsp_staged.cpp driver/nokia_dsp_staged.h \
 	driver/nokia_dspif.cpp driver/nokia_dspif.h \
 	driver/nokia_external_service.cpp driver/nokia_external_service.h \
 	driver/nokia_gsm_call_adapter.cpp driver/nokia_gsm_call_adapter.h \
@@ -714,7 +715,7 @@ rom4-dsp-inputs:
 		roms/noki5110/nse1_rom4_dsp_data.bin
 
 build: overlay roms
-	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/tms320c54x_test.cpp,src/mame/nokia/sed1565_test.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 -j$(JOBS)
+	$(MAKE) -C $(MAME_DIR) REGENIE=1 SOURCES=src/mame/nokia/nokia_dct3.cpp,src/mame/nokia/tms320c54x_test.cpp,src/mame/nokia/sed1565_test.cpp,src/mame/nokia/nokia_b3_flash.cpp,src/mame/nokia/nokia_ccont.cpp,src/mame/nokia/nokia_cobba.cpp,src/mame/nokia/nokia_dsp_c54x.cpp,src/mame/nokia/nokia_dsp_hle.cpp,src/mame/nokia/nokia_dsp_staged.cpp,src/mame/nokia/nokia_dspif.cpp,src/mame/nokia/nokia_external_service.cpp,src/mame/nokia/nokia_gensio.cpp,src/mame/nokia/gsm_a3a8.cpp,src/mame/nokia/gsm_a5.cpp,src/mame/nokia/gsm_cell_broadcast.cpp,src/mame/nokia/gsm_ems.cpp,src/mame/nokia/gsm_mm_authentication.cpp,src/mame/nokia/gsm_tch_f_l1.cpp,src/mame/nokia/gsm_xcch_l1.cpp,src/mame/nokia/nokia_gsm_network.cpp,src/mame/nokia/nokia_gsm_session.cpp,src/mame/nokia/nokia_gsm_voice_peer.cpp,src/mame/nokia/nokia_lapdm_link.cpp,src/mame/nokia/nokia_kbgpio.cpp,src/mame/nokia/nokia_mad2.cpp,src/mame/nokia/nokia_mad2_pcm.cpp,src/mame/nokia/nokia_mbus.cpp,src/mame/nokia/nokia_mbus_terminal.cpp,src/mame/nokia/nokia_pup.cpp,src/mame/nokia/nokia_radio_peer.cpp,src/mame/nokia/nokia_simi.cpp,src/mame/nokia/nokia_sim_card.cpp,src/mame/nokia/nokia_uif.cpp USE_QTDEBUG=0 -j$(JOBS)
 
 swap16:
 	@test -f $(ROM) || { echo "Missing $(ROM) — see roms/README.md"; exit 1; }

@@ -7,10 +7,10 @@ execute with their own acquired flash/PMM inputs. None is promoted to graphical
 boot, interactive UI, registration or calls. Input hashes and acquisition
 provenance remain in `roms/README.md`.
 
-The next bounded target is the MCU validation of the 8250 staged verifier's
-published fields. The program and supplied geometry match NSM-3, but a
-sensitivity fixture's chosen PROM/COBBA values are not fitted-chip evidence
-and are not supplied to the handset.
+The normal 8250 remains at its fail-closed verifier boundary. The separate
+`nsm3dr6` research composition executes the MCU-uploaded verifier and advances
+to the next DSP loader. Its declared PROM6 input is not an acquired mask ROM;
+graphical boot and phone functionality remain unproved.
 
 ## 8250 staged verifier
 
@@ -49,10 +49,45 @@ Once shared offset 2 changes, `0x2cb316..0x2cb31e` copies shared word 1
 to RAM `0x12f028` and word 0 to `0x12f026`, then returns without validating
 them locally. A halfword-aligned literal Thumb-BL scan of the complete stock
 flash finds one candidate call to `0x2cb226`, at `0x2f33d0`; its decoded
-caller continues initialization after return. Indirect calls and consumers
-through aliased structure pointers are not closed by that scan. Validation
-of the retained fields, rather than the upload loop's mere return, remains
-the next MCU-side question.
+caller continues initialization after return. The direct literal reader of
+`0x12f026`, at `0x2de1ca`, formats a three-character COBBA identifier; it is
+not a verdict check. Indirect consumers through aliased structure pointers
+are not closed by the scan. The next target is the descriptor-driven loader
+and its mask-entry/publication contract, not an assumed result-validation gate.
+
+### Live uploaded-code composition
+
+`nsm3dr6` combines the existing MCU/HLE devices with a bounded C54x staged
+executor. MCU-uploaded shared memory is its executable program; native code
+owns buffer acknowledgements and result publication while active. HLE
+bootstrap acknowledgements are suppressed during that ownership. No result
+words, transfer-count completion or MCU state are manufactured.
+
+The authentic service package `nsm3d_604.exe`, member `nsm-3d.ini`, names
+`Rom6ImageFile=nsm3dx_6.040`. This supports a ROM6-family experiment, not a
+fitted-mask identification for v5.02. The composition supplies immutable
+PROM version 6, existing nominal COBBA register-F/status inputs, and a
+declared 13 MHz execution clock. It retains the staged code's CTSI writes
+to ports 0/0c/0e without fabricating interrupts; other ports and execution
+outside the recovered program fail closed.
+
+On a product-local cold run, native execution publishes `0000/0006/0006/0006`
+at 0.996196 seconds. MCU `0x2cb328` has retained `0000/0006` after exactly
+58 ordered ownership pairs per buffer. The next initialization clears shared
+memory, loads descriptor `0x311d14` with fields
+`fd00/ff80/027e/0500/0078/0000`, and releases DSP reset at `0x2cb4c0`
+at 1.014471 seconds. This is a different loader contract: the research device
+deliberately exits with an unsupported-contract error instead of treating it
+as another verifier or pretending to execute the missing mask.
+
+Run `nsm3dr6` with the private-directory options below and
+`tools/nsm3d_verifier_observe.lua`. The expected bounded run exits nonzero at
+the second release. Validate the captured native publication and MCU retention:
+
+```sh
+.venv/bin/python tools/nsm3d_live_verifier_check.py RUN/error.log \
+  roms/noki8250/8250-502mcuppmk.fls
+```
 
 ## Recovered GENSIO contract
 
@@ -100,4 +135,7 @@ baseline and coherent frontier. The SELECT gate's missing records were an
 ownership-filtered logging omission: retained board latches are not GENSIO
 endpoint registers. Separate passive `gensio_select` records restore coverage
 without changing register ownership or behavior; `verify-gensio` now passes
-both 3210 firmware revisions. The expanded tool suite passes 1,238 tests.
+both 3210 firmware revisions. After adding the separate live staged-code
+composition, the normal 8250 boundary, 3210 baseline and coherent frontier
+still reproduce. The expanded tool suite passes 1,244 tests and all 11 MAME
+overlay patches apply to the pinned upstream commit.

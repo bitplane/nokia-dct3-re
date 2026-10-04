@@ -6,6 +6,7 @@
 
 #include "nokia_dsp_backend.h"
 #include "nokia_dspif.h"
+#include "nokia_dsp_staged.h"
 #include "nokia_external_service.h"
 #include "nokia_gsm_fr_codec.h"
 #include "nokia_mad2_pcm.h"
@@ -143,7 +144,7 @@ public:
 	virtual void tx_commit_w(int state) override;
 	virtual void service_pending_w(int state) override;
 	virtual void doorbell_w(int state) override;
-	virtual void reset_line_w(int released) override { }
+	virtual void reset_line_w(int released) override;
 	virtual void shared_002_write_w(int state) override;
 	virtual void shared_006_write_w(int state) override;
 	virtual void shared_0fe_read_w(int state) override;
@@ -175,6 +176,7 @@ private:
 	void restore_speech_codec_state();
 	bool consume_memory_upload(const nokia_dspif_device::packet &packet);
 	required_device<nokia_dspif_device> m_transport;
+	optional_device<nokia_dsp_staged_device> m_staged;
 	required_device<nokia_external_service_peer_device> m_external_peer;
 	required_device<nokia_radio_peer_device> m_radio_peer;
 	required_device<nokia_mad2_pcm_device> m_mad2_pcm;

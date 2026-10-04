@@ -15,6 +15,7 @@ nokia_dsp_hle_device::nokia_dsp_hle_device(
 	device_t(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
 	nokia_dsp_backend_interface(mconfig, *this),
 	m_transport(*this, "^dspif"),
+	m_staged(*this, "^dsp_staged"),
 	m_external_peer(*this, "^external_service_peer"),
 	m_radio_peer(*this, "^radio_peer"),
 	m_mad2_pcm(*this, "^mad2_pcm"),
@@ -308,6 +309,8 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 
 void nokia_dsp_hle_device::handle_bootstrap_exchange_read(u16 offset)
 {
+	if (m_staged && m_staged->active())
+		return;
 	if (!bootstrap_ping_pong() ||
 			m_transport->shared_word(offset / 2) == 0 ||
 			(offset == 0x100 &&
@@ -318,6 +321,12 @@ void nokia_dsp_hle_device::handle_bootstrap_exchange_read(u16 offset)
 
 void nokia_dsp_hle_device::handle_bootstrap_exchange_write(u16 offset)
 {
+	if (m_staged && m_staged->active())
+	{
+		machine().scheduler().perfect_quantum(attotime::from_usec(100));
+		machine().scheduler().abort_timeslice();
+		return;
+	}
 	const u16 token = m_transport->shared_word(offset / 2);
 	if (bootstrap_ping_pong())
 	{
@@ -343,6 +352,12 @@ void nokia_dsp_hle_device::handle_bootstrap_exchange_write(u16 offset)
 						m_bootstrap.exchange_limit)
 			publish_bootstrap_completion();
 	}
+}
+
+void nokia_dsp_hle_device::reset_line_w(int released)
+{
+	if (m_staged)
+		m_staged->reset_line_w(released);
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)

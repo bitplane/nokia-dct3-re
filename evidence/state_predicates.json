@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3d_uploaded_verifier_publication", "owner": "dsp_staged_research", "status": "modeled",
+      "predicate": "Native MCU-uploaded 8250 verifier publishes results and firmware retains them after 58 ordered buffer pairs",
+      "current": "The separate nsm3dr6 research composition executes the stock 223-word upload through C54x with declared PROM6 and nominal COBBA inputs. Native code publishes 0000/0006/0006/0006; MCU 0x2cb328 retains 0000/0006 after 58 pairs per buffer. The next reset release at 0x2cb4c0 uses descriptor 0x311d14, fd00/ff80/027e/0500/0078/0000, and deliberately stops as unsupported. This is not fitted-mask evidence or graphical boot; normal noki8250 remains fail-closed.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/nsm3d_verifier_observe.lua", "tools/nsm3d_live_verifier_check.py"]
+    },
+    {
       "id": "nsm5_5210_standby", "owner": "product_profile", "status": "satisfied",
       "predicate": "Nokia 5210 v5.40 completes board bring-up, GSM registration and interactive application entry through product-owned device contracts",
       "current": "The forcing-free NSM-5 profile completes organic DSP bootstrap and compact service control, external-service discovery and application registration, SIMI initialization, BLB-2 pack recognition, candidate-window acquisition and ordinary Location Updating. Firmware updates EF_LOCI, releases SDCCH, returns to camp and renders DCT3 LAB. A separate network fixture proves SIM-backed MM authentication before the same promotion. Exact-frame gates reproduce registered standby, open the firmware-owned Messages menu item, enter Write messages, return through two physical Back operations, and preserve registered state across save/load before further physical navigation. IMSI paging completes through random access and clean release. An ordinary MT SMS crosses SAPI 3 and segmented CP-DATA, persists unread in EF_SMS, produces the receipt UI, then physical softkeys display hello and update the SIM record to read. Incoming-call paging additionally reaches caller presentation, physical Send/Connect, traffic assignment, NSM-5 wire 0x860b speech selection, physical End and complete CC/RR release; wire 0x840a clears speech control before exact return to registered idle. PCM/media remains unproved.",
