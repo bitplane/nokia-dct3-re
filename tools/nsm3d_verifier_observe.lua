@@ -8,13 +8,21 @@ local rx_read_sites = {}
 local observe_rx = true
 local record_calls = 0
 local record_rejection_seen = false
-local record_rejection_tap = memory:install_read_tap(0x28d56c, 0x28d573,
+local record_path = {}
+local record_rejection_tap = memory:install_read_tap(0x28d350, 0x28d573,
     "nsm3d_record_rejection", function(offset, data, mask)
         local pc = cpu.state["PC"].value
+        if not record_rejection_seen and pc >= 0x28d350 and pc <= 0x28d573
+                and record_path[#record_path] ~= string.format("%08x", pc) then
+            record_path[#record_path + 1] = string.format("%08x", pc)
+            if #record_path > 16 then table.remove(record_path, 1) end
+        end
         if pc == 0x28d56e and not record_rejection_seen then
             record_rejection_seen = true
             machine:logerror(string.format("nsm3d_record_rejected: pc=%08x t=%.6f\n",
                 pc, machine.time:as_double()))
+            machine:logerror(string.format("nsm3d_record_rejection_path: pcs=%s\n",
+                table.concat(record_path, ",")))
         end
     end)
 local record_tap = memory:install_read_tap(0x28d250, 0x28d253,

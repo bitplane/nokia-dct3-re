@@ -336,6 +336,18 @@ product-specific preprocessing still require evidence. RX drains at
 `--records` independently recomputes both inverse blocks, checks marker
 stripping/original-byte retention and requires identical MCU receipt.
 
+A fresh passive decoder-path run localizes this rejection before format
+selection: `28d350 -> 28d356 -> 28d37e -> 28d3be -> 28d3c4 -> 28d56e`.
+Message byte `+15` is `ee`, bypassing the special `60..6f` and `78..7f`
+cases. The ordinary structural branch then requires message byte `+21`
+in `78..7f`; its computed value is `06`, so the `blt` rejects it.
+These are byte 9 of each decoded 12-byte block, not stripped marker words.
+Changing the format selector cannot repair this observed rejection: its
+code at `28d476` is never reached. This narrows the next investigation to
+the decoded content's chip/key/preprocessing contract, not envelope format.
+The read-only Lua observer retains the last 16 decoder PCs to reproduce
+the path; it does not modify the response or CPU state.
+
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
 The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
