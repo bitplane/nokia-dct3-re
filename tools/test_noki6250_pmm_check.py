@@ -1,10 +1,16 @@
 import unittest
 
-from tools.noki6250_pmm_check import assess, checksum
+from tools.noki6250_pmm_check import assess, checksum, record_checksum
 from tools.test_nse5_pmm_journal import sector, write
 
 
 class PmmTests(unittest.TestCase):
+    def test_record_checksum_uses_both_address_bytes_and_wraps(self):
+        self.assertEqual(record_checksum(0x150, bytes.fromhex("a761818e")), 0x68)
+        self.assertEqual(record_checksum(0x254, bytes.fromhex("7095")), 0x5b)
+        with self.assertRaises(ValueError):
+            record_checksum(0x10000, b"")
+
     def test_checksum_excludes_two_bytes_and_wraps(self):
         cache = bytearray([255] * 0xa28)
         self.assertEqual(checksum(cache), (306 * 255) & 0xffff)

@@ -19,6 +19,12 @@ def checksum(cache):
     return (sum(cache[0x120:0x254]) - sum(cache[0x154:0x156])) & 0xffff
 
 
+def record_checksum(destination, data):
+    if not 0 <= destination <= 0xffff:
+        raise ValueError("record destination must fit a word")
+    return ((destination >> 8) + (destination & 0xff) + sum(data)) & 0xff
+
+
 def assess(image, trace=None):
     cache, records, stop = replay(image, 0xa28)
     first = records[0] if records else None
@@ -38,7 +44,13 @@ def assess(image, trace=None):
         "checksum_region_updates": [row for row in records[1:]
                                     if row["destination"] < 0x256 and
                                     row["destination"] + row["length"] > 0x120],
-        "scope": "observed write-journal replay; record checksum bits are not validated",
+        "record_checksum_mismatches": [
+            {"record": row["record"], "stored": image[row["record"] + 1],
+             "computed": record_checksum(row["destination"],
+                                         image[row["source"]:row["source"] + row["length"]])}
+            for row in records if image[row["record"] + 1] != record_checksum(
+                row["destination"], image[row["source"]:row["source"] + row["length"]])],
+        "scope": "write-journal replay; NHM-3 reader does not enforce record checksum bytes",
     }
 
 

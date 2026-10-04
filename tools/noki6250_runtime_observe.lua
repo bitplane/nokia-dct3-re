@@ -8,6 +8,15 @@ local nv_writers = {}
 local nv_copy_count = 0
 local lcd_commands, lcd_runs = {}, {}
 local lcd_data_count, lcd_since_command = 0, 0
+taps[#taps + 1] = memory:install_read_tap(0x48078c, 0x48078f,
+    "6250_nv_record_copy", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x48078c then return end
+        local destination = cpu.state["R0"].value
+        local length = cpu.state["R2"].value
+        if destination >= 0x15c28a or destination + length <= 0x15c154 then return end
+        machine:logerror(string.format("6250_nv_record_copy: destination=%08x source=%08x length=%x caller=%08x t=%.6f\n",
+            destination, cpu.state["R1"].value, length, cpu.state["R14"].value, machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x514648, 0x51464b,
     "6250_nv_copy_calls", function(offset, value, mask)
         if cpu.state["PC"].value ~= 0x514648 then return end

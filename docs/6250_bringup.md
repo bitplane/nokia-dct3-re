@@ -193,8 +193,16 @@ Read-only `tools/noki6250_pmm_check.py PMM --trace LOG` independently
 replays 15 records, stopping at file `0ba2`, and exactly matches the captured
 checksum-range shadow. Its report separates the valid initial image from
 the final overlaid image. This confirms record order and write destinations,
-but does not yet validate the record-header checksum bits. Do not interpret
-its successful comparison as proof that the acquired journal is healthy.
+and now checks the record checksum byte independently. Reader `402758`
+requires sector state 1, decodes length/destination and applies records in
+order until header `ffff` or stop bit `0200`. It skips deletion records
+(`0100`) and does not validate the low checksum byte on this read path.
+Writer helper `402876` computes that byte as the sum of both destination
+bytes and payload, modulo 256. All 14 later records satisfy that contract;
+the initial record stores `70` where its acquired payload computes `35`.
+Thus the two checksum-region overlays are accepted, individually intact
+records whose combined NV content is inconsistent. The input's "virgin"
+filename is not evidence of factory-valid provisioning.
 
 Decode record selection/validity before repairing any source data.
 Changing `0254` to the observed sum without
