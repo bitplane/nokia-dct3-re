@@ -247,6 +247,33 @@ the firmware's final zero payload, rather than proving that a menu is drawn
 but hidden by the LCD model. Controller identity/command fidelity remain
 separate unknowns. The next investigation is the post-self-test UI lifecycle
 and organic physical-input handling, not another self-test completion reply.
+
+### Keypad boundary
+
+The own scanner `505c18` iterates five rows at `505c70..505cce`, with
+row drive `20028`, direction `200a8`, columns `2002a` and mask `2006b`.
+`PRODUCT_6250` now exposes five rows instead of the conservative four.
+The power-column mask is still a conservative assumption, not recovered
+NHM-3 wiring. Translator `50842a` indexes `288f7c` by `row*5+column`;
+the first 25 entries are:
+
+```text
+5a 5a 5a 5a 5a
+11 19 01 02 03
+0e 17 04 05 06
+0f 18 07 08 09
+10 1a 0c 0a 0b
+```
+
+Inherited NHM-5 input labels do not describe this matrix. The physical probe
+`noki6250_key_observe.lua` presses/releases column 1, row 1 (own logical
+key `19`) at 6/6.15 s without writing MMIO or RAM. It observes no subsequent
+scan or display transfer. At both edges the firmware keeps all columns
+masked (`3f`), row `e0`, direction `1f`, MAD2 IRQ mask `8e`.
+The mask is set by suppression routine `508462`, called from `3b197e`
+at 2.011 s, and retained by subsequent scans. Follow that caller's lifecycle
+and the corresponding re-enable contract; do not bypass the column mask to
+manufacture interactivity. Scanner output is observed at RAM `174050`.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.

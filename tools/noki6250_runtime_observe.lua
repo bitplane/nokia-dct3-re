@@ -6,10 +6,38 @@ local taps = {}
 local receivers = {}
 local nv_writers = {}
 local nv_copy_count = 0
+local keypad_readers = {}
 local lcd_commands, lcd_runs = {}, {}
 local lcd_data_count, lcd_since_command = 0, 0
 local lcd_nonzero_count = 0
 local lcd_frame_nonzero, lcd_frame_ff = 0, 0
+taps[#taps + 1] = memory:install_read_tap(0x508460, 0x508463,
+    "6250_keypad_suppression", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x508462 then return end
+        machine:logerror(string.format("6250_keypad_suppression: caller=%08x t=%.6f\n",
+            cpu.state["R14"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = memory:install_write_tap(0x20068, 0x2006b,
+    "6250_column_mask_writers", function(offset, value, mask)
+        if (mask & 0xff) == 0 then return end
+        machine:logerror(string.format("6250_column_mask: value=%02x pc=%08x caller=%08x t=%.6f\n",
+            value & 0xff, cpu.state["PC"].value, cpu.state["R14"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = memory:install_write_tap(0x174050, 0x174053,
+    "6250_raw_matrix_key", function(offset, value, mask)
+        if (mask & 0xff000000) == 0 then return end
+        machine:logerror(string.format("6250_raw_matrix_key: value=%02x pc=%08x t=%.6f\n",
+            (value >> 24) & 0xff, cpu.state["PC"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = memory:install_read_tap(0x20028, 0x2002b,
+    "6250_keypad_readers", function(offset, value, mask)
+        if (mask & 0xff00) == 0 then return end
+        local pc = cpu.state["PC"].value
+        if keypad_readers[pc] then return end
+        keypad_readers[pc] = true
+        machine:logerror(string.format("6250_keypad_reader: pc=%08x columns=%02x t=%.6f\n",
+            pc, (value >> 8) & 0xff, machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_write_tap(0x17fd14, 0x17fd17,
     "6250_startup_flags", function(offset, value, mask)
         if (mask & 0xff0000) == 0 then return end

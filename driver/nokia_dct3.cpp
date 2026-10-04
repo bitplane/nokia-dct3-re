@@ -982,6 +982,9 @@ constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
 constexpr nokia_product_config make_6250_config()
 {
 	nokia_product_config result = make_conservative_config();
+	// NHM-3 v5.03 scanner 0x505c70..0x505cce iterates all five rows.
+	// Keep the conservative power-column assumption pending its own decode.
+	result.keypad_wiring.rows = 5;
 	result.display = DISPLAY_6250;
 	// 6250 v5.03 sets CTSI+2 bit 2 at 0x4e7dc4 and polls bit 4
 	// at 0x4e7dca. Its reset path clears bit 2 and waits for bit 4 low.
