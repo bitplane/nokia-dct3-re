@@ -38,6 +38,12 @@ def assess(image, trace=None):
             raise ValueError("no matching runtime checksum-range shadow")
     return {
         "records": len(records), "stop_offset": f"{stop:04x}",
+        "sector_inventory": [
+            {"offset": f"{offset:04x}",
+             "erased": all(value == 0xff for value in image[offset:offset + 0x2000]),
+             "eeprom_signature": image[offset + 6:offset + 12] == b"EEPROM",
+             "reader_state_word": image[offset + 0x18:offset + 0x1a].hex()}
+            for offset in range(0, len(image) - 0x1fff, 0x2000)],
         "base_computed": f"{checksum(base):04x}",
         "base_stored": base[0x254:0x256].hex(),
         "replayed_computed": f"{checksum(cache):04x}",

@@ -6,6 +6,16 @@ from tools.noki6250_staged_check import check_initial_fixture
 
 
 class PmmTests(unittest.TestCase):
+    def test_sector_inventory_does_not_invent_a_backup_journal(self):
+        image = bytes(sector(write(0, bytes(0xa28)))) + b"\xff" * 0x2000
+        rows = assess(image)["sector_inventory"]
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(rows[0]["eeprom_signature"])
+        self.assertEqual(rows[0]["reader_state_word"], "0001")
+        self.assertTrue(rows[1]["erased"])
+        self.assertFalse(rows[1]["eeprom_signature"])
+        self.assertEqual(rows[1]["reader_state_word"], "ffff")
+
     def test_initial_runtime_requires_clear_fault_and_long_endpoint(self):
         text = ("runtime_hle_handoff pc=2c75 native_suspended=1\n"
                 "6250_service_control_consumer: class=74 command=0d status=00 armed=c4\n"

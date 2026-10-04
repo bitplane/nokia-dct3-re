@@ -175,10 +175,9 @@ does not identify the controller silicon or validate all commands. Commands
 side effect was added. The observed lifecycle byte `17fe24=01`, written at
 `4c11d8` during initialization, is not established as the screen's fault cause.
 
-## Next question
+## Acquired PMM validity
 
-Resolve the product-local NV checksum mismatch before adding another peer
-response. Task 2 stores fault `0c` at `304330`: its sum from `3040a0` is
+Task 2 stores fault `0c` at `304330`: its sum from `3040a0` is
 `6d57`, whereas logical NV `0254` contains `7095`; companion word `0170`
 is `1b0b`. The sum covers bytes `0120..0253`, excluding the two bytes at
 `0154..0155`. Reader `510e1c` delegates to `4030e8`, which copies from the
@@ -195,8 +194,8 @@ The base image's checksum is valid (`6d61` computed and stored), but those
 acquired record overlays change byte `0153` from `98` to `8e` and the
 stored checksum from `6d61` to `7095`. The resulting `6d57` mismatch is
 therefore already represented in the acquired PMM record stream, not a
-spontaneous RAM corruption. Whether those records are intended to be active
-under this firmware's catalogue rules remains the next question.
+spontaneous RAM corruption. The reader contract below establishes that
+these overlays are accepted.
 
 Read-only `tools/noki6250_pmm_check.py PMM --trace LOG` independently
 replays 15 records, stopping at file `0ba2`, and exactly matches the captured
@@ -212,6 +211,14 @@ the initial record stores `70` where its acquired payload computes `35`.
 Thus the two checksum-region overlays are accepted, individually intact
 records whose combined NV content is inconsistent. The input's "virgin"
 filename is not evidence of factory-valid provisioning.
+
+The complete acquired `6000`-byte file has one accepted EEPROM sector:
+offset `0000` has the signature and reader state `0001`. Offset `2000`
+has no EEPROM signature and state `ffff`; offset `4000` is fully erased.
+The PMM checker reports these raw sector properties independently. There
+is no second accepted journal in this acquired file from which to recover
+a valid replacement. This does not establish how an intact factory image
+would have been provisioned.
 
 The decoded contract supports the separate initial-record comparison below,
 not an unlabelled repair of the acquired input.
@@ -231,10 +238,13 @@ payload whose application checksum is invalid and refuses source overwrite.
 This is not a recovered factory dump and does not replace the acquired ROM.
 Fixture SHA1 is `053627c9d1a8ba40e6b37653f4d77ee7cf0900d8`.
 
-With fresh storage and the same `nhm3hle` composition, this fixture clears
+In the earlier full-scale channel-2 comparison, fresh storage and this
+`nhm3hle` composition clear
 fault `0c` organically at both 8 and 20 seconds. The compact response arrives
 with armed flags `c4`, leaving flags `40`; the LCD is blank at both endpoints,
-not an idle screen. The native CPU remains suspended at `2c75`. Validate the
+not an idle screen. This is not the current nominal-input boot result:
+the channel-2 startup contract below resolves that separate readiness gate.
+The native CPU remains suspended at `2c75`. Validate the
 21-second run with `noki6250_staged_check.py LOG --initial-record-fixture`.
 The expected MAME ROM checksum warning records that this is a derived input,
 not the acquired image.
