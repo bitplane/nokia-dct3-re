@@ -573,3 +573,23 @@ zero frame clock leaves the HLE speech cadence disabled. Recover those
 contracts from product documentation/firmware before supplying a donor
 profile or claiming audible voice. Native mask execution remains a separate
 unresolved boundary.
+
+### Product documentation boundary
+
+The Nokia NHM-3 service manual, `System ModuleOriginal.pdf`, is indexed in
+[the 6250 service archive](https://www.eserviceinfo.com/downloadsm/26151/Nokia_6250.html).
+Its [system-module text preview](https://www.eserviceinfo.com/preview_html.php?fileid=26151&previewid=12844)
+identifies COBBA_GJP as the speech AD/DA owner, connected serially to MAD2WD.
+The baseband description assigns input/output selection and gain control
+to COBBA under MAD2 control; the audio sections describe the speaker and
+microphone attachments. This supports the existing transport/codec boundary,
+not a particular PCM configuration.
+
+The preview has damaged font extraction: much prose is recoverable from
+the embedded character mapping, but numeric values are missing. It therefore
+does not establish PCM clock rates, sample framing, codec gains, or the
+internal microphone selector. The archive download-start endpoint returned
+an HTML landing page rather than its advertised RAR in the checked request.
+An intact PDF or product-owned register initialization remains necessary
+before enabling the 6250 speech cadence. Do not treat recoverable prose as
+evidence for absent numbers or substitute a sibling handset's configuration.
