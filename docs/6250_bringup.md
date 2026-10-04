@@ -10,8 +10,8 @@ the same composition reaches graphical boot, startup readiness `0f`, and scans
 a physical row-1/column-1 press as raw key `06`. The research composition now
 enables the existing SIMI/card boundary: ATR, PPS and file reads run through
 the firmware, and a settled physical press opens the Messages menu. Network
-registration, cold-start phonebook readback, calls and SMS remain unvalidated.
-An organic phonebook save to SIM NVRAM is verified below. Normal `noki6250`
+registration, calls and SMS remain unvalidated. An organic phonebook save
+and cold-start retrieval from SIM NVRAM are verified below. Normal `noki6250`
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
@@ -405,11 +405,22 @@ the Name editor, Phone number editor and `Saved to SIM card`. After normal
 MAME exit, `nvram/nhm3hle/sim_card` contains a 3524-byte card image whose
 first 32-byte ADN record is `41`, 17 erased bytes, `03 81 21 f3`, then ten
 erased bytes; the remaining 49 ADN records are erased. Thus the save reaches
-durable card storage, not just a UI acknowledgment. Cold-start UI retrieval
-is the next acceptance step and must not be inferred from those bytes alone.
+durable card storage, not just a UI acknowledgment.
 Run this probe for 35 seconds with fresh per-run storage and the explicit
 initial-record fixture; the runtime observer captures its own two endpoints
 and the phonebook probe captures each editor/save stage separately.
+
+For cold-start readback, exit the save run normally, preserve its NVRAM, and
+start a new MAME process in the same run directory with
+`tools/noki6250_phonebook_readback.lua` for 29 seconds. This physical-only
+sequence selects Names/Search/List/Details; captures show `A` and number
+`123` after reboot. It never issues an UPDATE RECORD. Both runs are checked
+by `tools/noki6250_phonebook_check.py STAGE NVRAM FRAME`, where STAGE is
+`save` or `readback`; use `6250_phonebook_7.png` and
+`6250_phonebook_readback_5.png` respectively. The check compares the reviewed
+96x60 luminance pixels and validates the exact persistent record plus all
+49 erased records. Keep save/readback as separate processes: an in-process
+UI reread is not this persistence test.
 
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely

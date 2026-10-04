@@ -22,16 +22,19 @@ SUPPORTED_NVRAM_LENGTHS = {
 
 
 def validate_phonebook(trace: str, data: bytes, expected_name: bytes = b"ADA") -> None:
+    if "ins=dc p1=01 p2=04 p3=20 selected=6f3a" not in trace:
+        raise ValueError("firmware did not issue absolute UPDATE RECORD for EF_ADN record 1")
+    if "update fid=6f3a record=1 length=32" not in trace:
+        raise ValueError("card did not commit the firmware's EF_ADN update")
+    validate_phonebook_storage(data, expected_name)
+
+
+def validate_phonebook_storage(data: bytes, expected_name: bytes = b"ADA") -> None:
     if len(data) not in SUPPORTED_NVRAM_LENGTHS:
         expected = ", ".join(str(length) for length in sorted(SUPPORTED_NVRAM_LENGTHS))
         raise ValueError(
             f"SIM NVRAM has {len(data)} bytes, expected one of {expected}"
         )
-    if "ins=dc p1=01 p2=04 p3=20 selected=6f3a" not in trace:
-        raise ValueError("firmware did not issue absolute UPDATE RECORD for EF_ADN record 1")
-    if "update fid=6f3a record=1 length=32" not in trace:
-        raise ValueError("card did not commit the firmware's EF_ADN update")
-
     expected = bytearray([0xff] * RECORD_LENGTH)
     if not expected_name or len(expected_name) > 18:
         raise ValueError("expected contact name must contain 1 to 18 bytes")
