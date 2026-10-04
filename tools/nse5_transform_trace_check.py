@@ -2,6 +2,7 @@
 """Check observed ROM4 rotation and mixing helpers against word arithmetic."""
 
 import argparse
+from functools import lru_cache
 from pathlib import Path
 import re
 
@@ -66,6 +67,81 @@ def transform_words(words: tuple[int, ...], table: tuple[int, ...],
             words = nonlinear_words(words)
             words = rotate32(*words[:2], 31) + words[2:4] + rotate32(*words[4:], 10)
     return reverse_words(words)
+
+
+def _pack_words(words):
+    return sum(word << (16 * index) for index, word in enumerate(words))
+
+
+def _unpack_words(value):
+    return tuple((value >> (16 * index)) & 0xffff for index in range(6))
+
+
+@lru_cache(maxsize=1)
+def _inverse_mix_rows():
+    # Recover the GF(2) inverse from the independently observed linear
+    # helper, rather than importing an undocumented inverse key table.
+    columns = [_pack_words(linear_mix(_unpack_words(1 << bit)))
+               for bit in range(96)]
+    rows = [sum(((column >> bit) & 1) << index
+                for index, column in enumerate(columns)) | (1 << (96 + bit))
+            for bit in range(96)]
+    for bit in range(96):
+        pivot = next((index for index in range(bit, 96)
+                      if rows[index] & (1 << bit)), None)
+        if pivot is None:
+            raise ValueError("observed linear transform is not invertible")
+        rows[bit], rows[pivot] = rows[pivot], rows[bit]
+        for index in range(96):
+            if index != bit and rows[index] & (1 << bit):
+                rows[index] ^= rows[bit]
+    return tuple(row >> 96 for row in rows)
+
+
+def inverse_linear_mix(words):
+    value = _pack_words(words)
+    return _unpack_words(sum(((row & value).bit_count() & 1) << bit
+                            for bit, row in enumerate(_inverse_mix_rows())))
+
+
+def inverse_nonlinear_words(words):
+    # Each bit is an independent permutation of the three word groups.
+    inverse = {}
+    for value in range(8):
+        bits = tuple((value >> index) & 1 for index in range(3))
+        output = sum((bits[index] ^ (bits[(index + 1) % 3] |
+                     (bits[(index + 2) % 3] ^ 1))) << index
+                     for index in range(3))
+        inverse[output] = value
+    if len(inverse) != 8:
+        raise ValueError("observed nonlinear transform is not invertible")
+    result = [0] * 6
+    for parity in range(2):
+        for bit in range(16):
+            value = sum(((words[parity + index * 2] >> bit) & 1) << index
+                        for index in range(3))
+            decoded = inverse[value]
+            for index in range(3):
+                result[parity + index * 2] |= ((decoded >> index) & 1) << bit
+    return tuple(result)
+
+
+def inverse_transform_words(words, table, schedule):
+    """Invert a supplied observed codec; does not select ROM6 keys/identity."""
+    if (len(words) != 6 or len(table) != 6 or len(schedule) != 12 or
+            any(not 0 <= word <= 0xffff for word in (*words, *table, *schedule))):
+        raise ValueError("inverse requires six data/table and twelve unsigned words")
+    words = reverse_words(words)
+    for index in reversed(range(12)):
+        if index < 11:
+            words = rotate32(*words[:2], 1) + words[2:4] + rotate32(*words[4:], 22)
+            words = inverse_nonlinear_words(words)
+            words = rotate32(*words[:2], 22) + words[2:4] + rotate32(*words[4:], 1)
+        mixed = list(inverse_linear_mix(words))
+        mixed[1] ^= schedule[index]
+        mixed[4] ^= schedule[index]
+        words = tuple(word ^ key for word, key in zip(mixed, table))
+    return words
 
 
 def check_nonlinear(text: str) -> int:

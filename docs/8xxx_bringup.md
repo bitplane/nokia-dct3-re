@@ -276,6 +276,17 @@ acquired ROM6 loader's transaction structurally, without establishing
 identical transforms or silicon inputs. ROM4 primitive `0d` at `4a16`
 reports resident word `06f9`, rather than echoing the request's zero.
 
+The existing native-observed word codec now has a mathematically derived
+inverse in `tools/nse5_transform_trace_check.py`. It inverts the recovered
+96-bit linear helper by GF(2) elimination and the nonlinear three-bit
+permutation explicitly, then reverses the round order and rotations. Tests
+cover every linear basis vector, both nonlinear word groups, 100 randomized
+full round trips and recorded native vectors. The acquired ROM4 MSID tables
+at data `b6e5/b6f7` reproduce the native reply and decode it to the same
+checksum/signature/hash as the existing independent byte codec. This is
+codec machinery, not evidence that ROM6 uses those tables or that the
+8250 PMM belongs to the ROM4 modeled signature.
+
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
 The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
