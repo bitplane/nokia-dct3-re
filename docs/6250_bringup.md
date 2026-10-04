@@ -493,3 +493,17 @@ The firmware publishes CM Service Request and SETUP containing number
 `123`, acknowledges network Connect, then completes release back to PCH.
 Validate with `noki6250_call_check.py LOG --outgoing --number 123`.
 This uses the same evidenced channel contracts, not a new speech backend.
+
+## Incoming SMS
+
+The network SMS fixture produces an organic `1 message received` screen.
+Firmware acknowledges segmented SAPI-3 CP-DATA, writes the ordinary `hello`
+SMS-DELIVER into EF_SMS record 1, sends RP-ACK and releases SDCCH. The SIM
+NVRAM contains the exact unread record after process exit. Its observed
+no-cipher type-14 publication is `002effffffffffffffff0000`; this is a
+6250-specific publication, not a borrowed NSM-5 control value.
+
+Reproduce with a private copy of `fixtures/radio_incoming_sms/nhm3hle.cfg`,
+fresh storage, the initial-record fixture and runtime observer, for 35 seconds
+with `-verbose`. Validate with `radio_incoming_sms_trace_check.py LOG SIM_NVRAM
+--profile nhm3`. UI reading, deleting and outgoing SMS remain separate tests.

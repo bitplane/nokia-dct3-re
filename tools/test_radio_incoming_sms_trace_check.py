@@ -63,6 +63,14 @@ class IncomingSmsTraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "DSP cipher-control"):
             verify(GOOD, nvram_with_message(), "nsm5")
 
+    def test_nhm3_cipher_control_contract(self):
+        verify(GOOD.replace("00f4ffffffff", "002effffffff"),
+               nvram_with_message(), "nhm3")
+
+    def test_nhm3_rejects_foreign_cipher_control(self):
+        with self.assertRaisesRegex(ValueError, "DSP cipher-control"):
+            verify(GOOD, nvram_with_message(), "nhm3")
+
     def test_accepts_physically_read_message(self):
         nvram = bytearray(nvram_with_message())
         nvram[SMS_NVRAM_OFFSET] = 0x01
