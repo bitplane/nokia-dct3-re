@@ -422,6 +422,33 @@ by `tools/noki6250_phonebook_check.py STAGE NVRAM FRAME`, where STAGE is
 49 erased records. Keep save/readback as separate processes: an in-process
 UI reread is not this persistence test.
 
+## Radio acquisition comparison
+
+After SIM enable, passive DSP TX inventory observes a type `56`, 160-byte
+candidate window: first big-endian channel `0013`, then 79 `ffff` entries.
+Seven type `51` configuration blocks follow; their semantic contents are
+not established by the packet inventory. Research `nhm3hle` selects only
+the existing candidate-window acquisition strategy. No assignment, handover,
+traffic-release or neighbor encoding constants are imported from another
+product; the later unset/default confirmation values remain unvalidated.
+
+With this declared HLE comparison, firmware organically sends type `02`
+channel changes for ARFCN 19, type `4a` acquisition control, a type `0f`
+68-byte neighbor list, type `0c` random-access requests, and an assigned
+channel configuration at 10.697 seconds. At 10.713 seconds it sends type
+`1b`, 28 bytes, beginning `00 80 01 03 01 2b`; it releases the channel
+at 29.903 seconds. Registration is not proved: no Location Updating exchange
+or registered operator presentation is observed in this 40-second run.
+
+The peer currently answers assigned `CHANNEL_CHANGED_CNF` (RX type `89`)
+with its unset confirmation value zero, then emits type `86` establishment
+notification. Recover the 6250's consumer-side interpretation of those two
+responses before choosing a confirmation value or advancing the call/SMS
+contract. A request-format match validates acquisition reuse, not every
+subsequent DSP primitive. Reproduce with `nhm3hle`, the initial-record fixture,
+fresh storage, `noki6250_runtime_observe.lua`, 40 seconds and `-verbose`;
+inspect the `dsp_hle: TX packet` and `dspif_transport: RX enqueue` streams.
+
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.
