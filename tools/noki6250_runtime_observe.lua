@@ -7,10 +7,31 @@ local receivers = {}
 local nv_writers = {}
 local nv_copy_count = 0
 local keypad_readers = {}
+local scalar_posts = {}
+local analog_writes, analog_receiver_seen = {}, false
+taps[#taps + 1] = memory:install_read_tap(0x3c3588, 0x3c358b,
+    "6250_scalar_posts", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x3c3588 then return end
+        local task, message = cpu.state["R0"].value, cpu.state["R1"].value
+        if task > 32 or message > 0xffff then return end
+        local key = task * 0x10000 + message
+        if scalar_posts[key] then return end
+        scalar_posts[key] = true
+        machine:logerror(string.format("6250_scalar_post: task=%d message=%04x caller=%08x t=%.6f\n",
+            task, message, cpu.state["R14"].value, machine.time:as_double()))
+    end)
 local lcd_commands, lcd_runs = {}, {}
 local lcd_data_count, lcd_since_command = 0, 0
 local lcd_nonzero_count = 0
 local lcd_frame_nonzero, lcd_frame_ff = 0, 0
+taps[#taps + 1] = memory:install_write_tap(0x1704c4, 0x1704c7,
+    "6250_analog_lifecycle", function(offset, value, mask)
+        local key = string.format("%08x:%08x:%08x", cpu.state["PC"].value, value, mask)
+        if analog_writes[key] then return end
+        analog_writes[key] = true
+        machine:logerror(string.format("6250_analog_lifecycle: data=%08x mask=%08x pc=%08x t=%.6f\n",
+            value, mask, cpu.state["PC"].value, machine.time:as_double()))
+    end)
 for _, watched in ipairs({{0x172c84, 0xff0000, 16, "readiness"},
                           {0x17fe38, 0xff000000, 24, "phase"}}) do
     local address, byte_mask, shift, name = table.unpack(watched)
@@ -159,8 +180,14 @@ taps[#taps + 1] = memory:install_read_tap(0x304494, 0x304497,
     end)
 taps[#taps + 1] = memory:install_read_tap(0x3c363c, 0x3c363f,
     "6250_service_receiver", function(offset, value, mask)
-        if cpu.state["PC"].value ~= 0x3c363c or memory:read_u8(0x100022) ~= 2 then return end
+        if cpu.state["PC"].value ~= 0x3c363c then return end
         local caller = cpu.state["R14"].value
+        if caller == 0x30af9d and not analog_receiver_seen then
+            analog_receiver_seen = true
+            machine:logerror(string.format("6250_analog_receiver: task=%d t=%.6f\n",
+                memory:read_u8(0x100022), machine.time:as_double()))
+        end
+        if memory:read_u8(0x100022) ~= 2 then return end
         if receivers[caller] then return end
         receivers[caller] = true
         machine:logerror(string.format("6250_service_receiver: task=2 caller=%08x t=%.6f\n",
@@ -180,6 +207,11 @@ emu.register_periodic(function()
     if captured >= 2 or machine.time:as_double() < deadline then return end
     captured = captured + 1
     local dsp = assert(machine.devices[":dsp_staged:cpu"])
+    machine:logerror(string.format("6250_analog_endpoint: event=%04x state=%04x t=%.6f\n",
+        memory:read_u16(0x1704c4), memory:read_u16(0x1704c6), machine.time:as_double()))
+    machine:logerror(string.format("6250_analog_fields: count=%02x field0e=%02x field11=%02x ccont10=%02x t=%.6f\n",
+        memory:read_u8(0x1704ad), memory:read_u8(0x1704b2),
+        memory:read_u8(0x1704b5), memory:read_u8(0x172cc8), machine.time:as_double()))
     machine:logerror(string.format("6250_startup_context_endpoint: counter=%02x input=%04x continuation=%04x t=%.6f\n",
         memory:read_u8(0x172ca4), memory:read_u16(0x172ca6), memory:read_u16(0x172ca8),
         machine.time:as_double()))

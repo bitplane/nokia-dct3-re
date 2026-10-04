@@ -299,6 +299,25 @@ analog/power readiness path and its inputs, not an invented DSP packet.
 This direct-call observation is not an exhaustive exclusion of indirect or
 data-driven producers. The default ADC tuple is still conservative for
 NHM-3: recover its mux/threshold contract before choosing product inputs.
+
+The report owner is analog/power task 21 (receive caller `30af9d`, observed
+current-task byte `100022`), with context `1704a4`, event at `+20` and state
+at `+22`. The initial-record comparison runs through states `11 -> 13 -> 4
+-> 3` at approximately 0.054, 2.015, 5.490 and 5.955 seconds. Timer event
+`49` and periodic events `4a`/`4b` are delivered: this is not evidence of a
+stopped analog task or missing timer.
+
+State 3 (`30cea0`) accepts event `41`, or on event `49` tests predicate
+`4f918a(00009004)` while its retry count is nonzero. The predicate's register
+map `289af0` resolves index `10` to CCONT register 1, mask `04`; it normalizes
+that bit to a Boolean. The current CCONT model assigns this bit to the
+charger-reset cause. At 8/20 seconds, context fields `+0e/+11` are `01/00`
+and the retry count decreases from `04` to `00`, with readiness still `0e`.
+These observations do not establish that an ordinary power-on should set
+the charger-reset bit. Recover the preceding branch selection and event
+`41` producer before modifying the board inputs; do not inject the bit or
+report 14 to bypass this lifecycle.
+
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.
