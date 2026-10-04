@@ -274,6 +274,31 @@ The mask is set by suppression routine `508462`, called from `3b197e`
 at 2.011 s, and retained by subsequent scans. Follow that caller's lifecycle
 and the corresponding re-enable contract; do not bypass the column mask to
 manufacture interactivity. Scanner output is observed at RAM `174050`.
+
+### Missing readiness report
+
+Suppression is part of startup engine `3b1848`, not an isolated input bug.
+The ordinary re-enable tails at `3b1a5a`/`3b1af6` clear the low five column
+mask bits and call `5083d2(1)`. Before these tails, `3b1a2e..3b1a42`
+requires phase byte `17fe38 & 0f == 6` and readiness byte
+`172c85 & 0f == 0f`. Physical observation at 8 and 20 seconds instead
+gives phase `06`, readiness `0e`.
+
+The readiness inputs map directly: `14` sets bit 0, `15` bit 2, `16` bit 1,
+and `17` bit 3 via `3b19c4..3b19ce`. Inputs `17`, `16`, `15` set the observed
+mask to `08`, `0a`, `0e`; report `14` is absent. This is a real measured
+readiness gate, distinct from the successful self-test flag `40`.
+Context `172ca4` contains a diagnostic counter, last input at `+2` and
+dispatch continuation at `+4`; its counter value `04` is not a boot mode.
+
+The literal report-14 publisher is `4e966c`, posting value `14` to task 1
+via `3c3588`. An aligned Thumb direct-call scan identifies caller `30bf3c`.
+Its surrounding lifecycle includes firmware strings "VBAT Checks" and
+"Start limited fast VBAT reads"; therefore the next investigation is this
+analog/power readiness path and its inputs, not an invented DSP packet.
+This direct-call observation is not an exhaustive exclusion of indirect or
+data-driven producers. The default ADC tuple is still conservative for
+NHM-3: recover its mux/threshold contract before choosing product inputs.
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.

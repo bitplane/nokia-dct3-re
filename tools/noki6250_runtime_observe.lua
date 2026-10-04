@@ -11,6 +11,21 @@ local lcd_commands, lcd_runs = {}, {}
 local lcd_data_count, lcd_since_command = 0, 0
 local lcd_nonzero_count = 0
 local lcd_frame_nonzero, lcd_frame_ff = 0, 0
+for _, watched in ipairs({{0x172c84, 0xff0000, 16, "readiness"},
+                          {0x17fe38, 0xff000000, 24, "phase"}}) do
+    local address, byte_mask, shift, name = table.unpack(watched)
+    taps[#taps + 1] = memory:install_write_tap(address, address + 3,
+        "6250_startup_" .. name, function(offset, value, mask)
+            if (mask & byte_mask) == 0 then return end
+            machine:logerror(string.format("6250_startup_%s: value=%02x pc=%08x t=%.6f\n",
+                name, (value >> shift) & 0xff, cpu.state["PC"].value, machine.time:as_double()))
+        end)
+end
+taps[#taps + 1] = memory:install_write_tap(0x172ca4, 0x172cab,
+    "6250_startup_context", function(offset, value, mask)
+        machine:logerror(string.format("6250_startup_context: address=%08x data=%08x mask=%08x pc=%08x t=%.6f\n",
+            offset, value, mask, cpu.state["PC"].value, machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x508460, 0x508463,
     "6250_keypad_suppression", function(offset, value, mask)
         if cpu.state["PC"].value ~= 0x508462 then return end
@@ -165,6 +180,11 @@ emu.register_periodic(function()
     if captured >= 2 or machine.time:as_double() < deadline then return end
     captured = captured + 1
     local dsp = assert(machine.devices[":dsp_staged:cpu"])
+    machine:logerror(string.format("6250_startup_context_endpoint: counter=%02x input=%04x continuation=%04x t=%.6f\n",
+        memory:read_u8(0x172ca4), memory:read_u16(0x172ca6), memory:read_u16(0x172ca8),
+        machine.time:as_double()))
+    machine:logerror(string.format("6250_startup_gate: phase=%02x readiness=%02x t=%.6f\n",
+        memory:read_u8(0x17fe38), memory:read_u8(0x172c85), machine.time:as_double()))
     machine:logerror(string.format(
         "6250_runtime_boundary: arm_pc=%08x dsp_pc=%04x pending=%04x result=%04x/%04x t=%.6f\n",
         cpu.state["PC"].value, dsp.state["PC"].value, memory:read_u16(0x100e0),
