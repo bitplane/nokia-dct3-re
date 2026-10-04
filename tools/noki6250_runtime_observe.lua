@@ -10,6 +10,50 @@ local keypad_readers = {}
 local scalar_posts = {}
 local analog_writes, analog_receiver_seen = {}, false
 local analog_predicates = {}
+local analog_messages = {}
+local analog_selectors = {}
+taps[#taps + 1] = memory:install_read_tap(0x20000, 0x20003,
+    "6250_reset_cause_read", function(offset, value, mask)
+        if (mask & 0xff0000) == 0 or machine.time:as_double() > 0.1 then return end
+        machine:logerror(string.format("6250_reset_cause_read: data=%08x mask=%08x pc=%08x t=%.6f\n",
+            value, mask, cpu.state["PC"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = memory:install_write_tap(0x20000, 0x20003,
+    "6250_reset_control", function(offset, value, mask)
+        if (mask & 0xff0000) == 0 then return end
+        machine:logerror(string.format("6250_reset_control: value=%02x pc=%08x t=%.6f\n",
+            (value >> 16) & 0xff, cpu.state["PC"].value, machine.time:as_double()))
+    end)
+for _, address in ipairs({0x17fd74, 0x17fe15}) do
+    local aligned, shift = address & ~3, (3 - (address & 3)) * 8
+    taps[#taps + 1] = memory:install_write_tap(aligned, aligned + 3,
+        string.format("6250_analog_selector_%x", address), function(offset, value, mask)
+            if ((mask >> shift) & 0xff) == 0 then return end
+            local byte = (value >> shift) & 0xff
+            local key = string.format("%x:%x:%x", address, byte, cpu.state["PC"].value)
+            if analog_selectors[key] then return end
+            analog_selectors[key] = true
+            machine:logerror(string.format("6250_analog_selector: address=%08x value=%02x pc=%08x t=%.6f\n",
+                address, byte, cpu.state["PC"].value, machine.time:as_double()))
+        end)
+end
+taps[#taps + 1] = memory:install_read_tap(0x508830, 0x508833,
+    "6250_analog_messages", function(offset, value, mask)
+        if cpu.state["PC"].value ~= 0x508832 then return end
+        local caller = cpu.state["R14"].value
+        if caller < 0x30af20 or caller >= 0x30d800 then return end
+        if analog_messages[caller] then return end
+        analog_messages[caller] = true
+        local address, bytes = cpu.state["R0"].value, {}
+        if address < 0x200000 or address >= 0x5a0000 then return end
+        for index = 0, 160 do
+            local byte = memory:read_u8(address + index)
+            if byte == 0 then break end
+            bytes[#bytes + 1] = byte >= 32 and byte <= 126 and string.char(byte) or " "
+        end
+        machine:logerror(string.format("6250_analog_message: caller=%08x text=%s t=%.6f\n",
+            caller, table.concat(bytes), machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x4f9188, 0x4f918b,
     "6250_analog_predicate", function(offset, value, mask)
         if cpu.state["PC"].value ~= 0x4f918a then return end

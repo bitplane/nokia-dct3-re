@@ -322,6 +322,19 @@ charger-reset cause. Recover the preceding branch selection and event
 `41` producer before modifying the board inputs; do not inject the bit or
 report 14 to bypass this lifecycle.
 
+The firmware's diagnostic strings name the observed path "CHECK TEST MODE",
+"CHECK POWER ON REASON", "INIT CHARGING", "BOOT UP CHARGE", then
+"WAIT CHARGER VOLTAGE SETTING" and "CHARGER DISCONNECTED". These names
+describe this analog routine, not proof that the board was charger-started.
+Power-on-reason byte `17fe15` is set to `0a` at 0.064 seconds by `4c11b8`.
+The selector `4c116e` reads MAD2 register `20001`; bit 0 set selects that
+value (`lsrs #1` followed by carry-set branch `4c1176`). The observed read is
+`01`, matching the model's reset default. Thus the charging-named analog
+initialization is reached with the existing ordinary-reset latch, not because
+that latch is missing or because a charger cause was injected. State 12 also
+tests byte `17fd74`, observed zero at initialization and cleared at `30cce0`.
+Follow the analog completion/connection lifecycle before changing reset causes.
+
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely
 to reach idle.
