@@ -20,6 +20,35 @@ composition is not promoted to supported default boot.
 
 ## Inputs
 
+### Remaining goal boundary
+
+The original-input graphical-boot requirement is not complete. The acquired
+PMM replays to an inconsistent application checksum, and its other sectors
+contain no accepted replacement journal. The initial-record comparison is
+an explicit external-input experiment, not an authenticated factory repair.
+Suppressing the resulting fault or rewriting the stored checksum merely to
+pass is outside the accepted method.
+
+Native DSP execution also stops before missing mask program word `2c75`.
+The product's uploaded verifier/loaders have been executed and compared;
+they do not contain that mask routine. Runtime HLE is explicitly exclusive
+after suspension, not proof that the missing instructions are emulated.
+
+Speech command ownership is recovered, but the product PCM clock/framing
+and codec route are not. The available original-manual text preview loses
+numeric fields; checked public download links return HTML instead of the
+archive, and the alternate PDF host was inaccessible. These results do not
+justify donor bus settings. An intact product source or independently
+evidenced firmware contract is required to resume that work.
+
+Reproducible research acceptance covers physical menus/calculator, SIM
+phonebook save and cold retrieval, fresh/preserved network registration,
+incoming/outgoing call signaling and release, and SMS read/delete/reply.
+These successes do not discharge the original-PMM, native-mask or audio
+boundaries above. Existing `verify` and `verify-frontier` gates also pass.
+
+### Acquired Members
+
 - MCU/PPM: `roms/noki6250/6250-503mcuppmc.fls`, SHA1
   `95607ce39c383bda75f1e6aeae67a214b787b0a1`.
 - PMM: `roms/noki6250/6250 virgin eeprom 005fa000.fls`, SHA1
@@ -125,14 +154,16 @@ Validate using `noki6250_staged_check.py error.log --silent-runtime`.
 
 Separate research machine `nhm3hle` transfers ownership to the existing
 request-derived runtime HLE at that boundary. It uses the same acquired
-ROM/PMM, with transport discovery enabled but no fitted record codec,
-registration/channel-map profile or record-verdict override. D0
+ROM/PMM, with transport discovery enabled and no record-verdict override. D0
 discovery traverses TX type `05` and RX `8e`; firmware subsequently sends
 `70:0d00`, which is answered by the declared compact service-control peer.
-Its current frame is a visible service-failure screen, not interactive idle.
+With the acquired inconsistent PMM it renders the service-failure screen.
+The separate initial-record comparison plus nominal channel-2 input reaches
+interactive idle; its configured acquisition/channel and release contracts
+are validated by the acceptance scenarios below.
 Display storage/visible geometry is validated below, but the stream includes
 commands `0a` and `11` unused
-by the current PCD8544 model. The repeated D0 frame is
+by the current PCD8544 model. The observed D0 discovery frame is
 `1e0200d0000305014100`; its semantics need product-specific classification.
 
 ## Compact service-control contract

@@ -3391,13 +3391,15 @@ void nokia_dct3_state::nhm3hle(machine_config &config)
 	nokia_product_config runtime = PRODUCT_6250;
 	// Own SIM initialization 0x491fd8..0x492034 and reset 0x491bb4
 	// use the existing 0x37/0x38/0x39 SIMI grammar. Keep this boundary
-	// comparison in the research composition until the card exchange is gated.
+	// comparison in the research composition; physical phonebook and SMS
+	// acceptance exercise the card exchange without promoting default boot.
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
 	runtime.external_service_transport = true;
 	// Own TX 0x56/160 publishes eighty big-endian candidate channels,
 	// beginning with 19 and padding with 0xffff. Only acquisition is
-	// selected here; handover/call parameters remain unproved.
+	// selected here. Assigned-channel and call-release contracts are
+	// configured below; handover remains unproved.
 	runtime.radio.acquisition = nokia_radio_peer_device::acquisition_strategy::candidate_window;
 	// Own consumer 0x464756 compares RX body bit 0 with pending context
 	// 0x0402 byte 2, observed as 1 for assigned SDCCH.
