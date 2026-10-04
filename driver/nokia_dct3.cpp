@@ -973,6 +973,25 @@ constexpr nokia_product_config make_6210_config()
 }
 constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
 
+constexpr nokia_product_config make_6250_config()
+{
+	nokia_product_config result = make_conservative_config();
+	// 6250 v5.03 sets CTSI+2 bit 2 at 0x4e7dc4 and polls bit 4
+	// at 0x4e7dca. Its reset path clears bit 2 and waits for bit 4 low.
+	result.dsp_reset_wiring = { 0x10, 0x04 };
+	// Its CCONT read at 0x4f91c6 selects 0x22, writes 0x2c and polls
+	// 0x6d bit 2. Selection bit 2 is clear: the byte starts receive-ready.
+	result.gensio_wiring = { 0x2c, 0x2d, 0x2e, 0x6c, 0x6d, 0x6e, 0x03, true };
+	// Keep transport ownership acknowledgements, not the inherited 64-pair
+	// compatibility verdict. The 6250's final DSP publication is unproved.
+	result.dsp_bootstrap = {
+		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+		0, {}, 0, std::nullopt, std::nullopt, 0
+	};
+	return result;
+}
+constexpr nokia_product_config PRODUCT_6250 = make_6250_config();
+
 constexpr nokia_product_config make_7110_config()
 {
 	nokia_product_config result;
@@ -3449,7 +3468,7 @@ void nokia_dct3_state::noki6210(machine_config &config)
 void nokia_dct3_state::noki6250(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
-	apply_product_config(PRODUCT_DEFAULT);
+	apply_product_config(PRODUCT_6250);
 }
 
 // Shared later-MAD2 image set currently associated with these profiles. Its

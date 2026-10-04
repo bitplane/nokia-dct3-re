@@ -516,9 +516,8 @@ needed to satisfy the current ROM declarations; they are not executed by this
 HLE composition and are not fitted mask evidence. No missing boot ROM was
 fabricated. A zero process exit and a PC sample are not phone acceptance.
 
-The associated 6250 v5.03 cold scout, still using `PRODUCT_DEFAULT`, parks
-at `0x4e7dca..0x4e7dce` polling CTSI reset-ready bit 4. Its release contract
-requires independent recovery before inheriting any NPE-3 configuration.
+The 6250's independently recovered reset/GENSIO contracts and current DSP
+publication boundary now live in [6250_bringup.md](6250_bringup.md).
 
 ## Verification
 
