@@ -43,7 +43,7 @@ distinction.
 | `8210_bringup.md` | NSM-3 stock inputs, staged-verifier execution and unresolved final DSP publication contract. |
 | `8xxx_bringup.md` | Acquired 8250/8850/8890 GENSIO contracts and bounded software-only frontiers. |
 | `6210_bringup.md` | NPE-3 reset/GENSIO contracts, staged verifier and final DSP upload frontier. |
-| `6250_bringup.md` | Product-local reset/GENSIO contracts and fail-closed staged DSP frontier. |
+| `6250_bringup.md` | Product-local staged DSP boundary and research boot, input, SIM, phonebook, registration, call-signaling and SMS acceptance. |
 | `7110_bringup.md` | NSE-5 upload, SED1565/keypad/roller contracts, fail-closed product boundary and explicit ROM4 compatibility instrument. |
 | `2100_bringup.md` | Bounded NAM-2 v5.84 portability frontier and display resumption contract. |
 | `3610_bringup.md` | NAM-1 v5.11 executable profile, GENSIO/CCONT evidence and current bring-up boundary. |

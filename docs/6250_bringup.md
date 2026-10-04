@@ -11,8 +11,10 @@ a physical row-1/column-1 press as raw key `06`. The research composition now
 enables the existing SIMI/card boundary: ATR, PPS and file reads run through
 the firmware, and a settled physical press opens the Messages menu. Ordinary
 fresh and preserved-location network registration and `DCT3 LAB` presentation
-are verified in the declared radio HLE. Calls and SMS remain unvalidated. An organic phonebook save
-and cold-start retrieval from SIM NVRAM are verified below. Normal `noki6250`
+are verified in the declared radio HLE. Physical incoming/outgoing call
+signaling and complete release are verified, but speech/audio is not.
+SMS delivery, reading, deletion and reply submission are verified. An organic
+phonebook save and cold-start retrieval from SIM NVRAM are verified below. Normal `noki6250`
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
@@ -531,3 +533,14 @@ only by inbox modes; sent-mode proof comes from the exact outgoing payload,
 recipient, acknowledgement/release sequence and reviewed frame.
 The level-enabled incoming fixture can page again after this later release;
 that second receipt is not counted as a second outgoing submission.
+
+## Application interaction
+
+Physical menu enumeration identifies Calculator as menu 7 in this ROM.
+`noki6250_app_observe.lua` with harness-only
+`NOKIA_DCT3_6250_CALCULATOR=1` opens it, enters 1, selects Add, enters 2
+and selects Equals. The firmware displays `1 + 2 = 3`; the application,
+arithmetic and menu layout are ROM-owned. Run the initial-record fixture
+with fresh storage for 45 seconds and validate capture 14 using
+`noki6250_app_check.py LOG FRAME`. This proves a complete application
+input/result workflow, not every installed application or game.
