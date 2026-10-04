@@ -392,6 +392,20 @@ The reviewed header, filename and record structure supply no authenticated
 original COBBA serial. The existing registers 5/6 are explicitly calibrated
 inputs, not measured chip identity; see [the COBBA boundary](cobba_control_boundary.md#remaining-boundary).
 
+`tools/dct3_record_identity_constraints.py` is an optional offline research
+instrument, not a provisioning tool or acceptance gate. It pins this PMM's
+SHA1 and models the explicit family-83/raw-input/24-bit-chip hypothesis,
+requiring both unstripped final words to equal ROM4's `54c2` marker. Its
+symbolic byte inverse is cross-checked against the independent native word
+model, including randomized keys and inputs. It requires a separately
+installed `z3-solver`; it does not add a runtime emulator dependency.
+Timeout means **unknown**, not absence of a compatible chip, and even a
+satisfying candidate would need independent record/identity validation.
+No solver output is connected to a device setter, PMM writer or HLE verdict.
+The acquired first record returns `unknown (timeout)` with both 10-second
+and 120-second limits. This avenue has not recovered a serial or falsified
+the unknown-chip hypothesis; neither a candidate nor an absence proof exists.
+
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
 The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
