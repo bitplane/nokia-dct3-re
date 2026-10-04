@@ -367,6 +367,18 @@ transaction, not evidence of an IMEI-derived pad on the current `1618`
 read request. Neither a donor chip identity nor a default unlocked record
 has been substituted to make these checks pass.
 
+The acquired PMM's provenance imposes another limit: its filename's
+"virgin EEPROM" wording is not a factory-state guarantee. The file has one
+`EEPROM` header at `10006`, and contains non-erased user data outside the
+low identity records (personal contents are not reproduced here). The ten
+24-byte slots at logical `20 + 18*n` contain only two distinct ciphertexts:
+slot 0 SHA1 `064d3eacf4fa384d2ecb2e2cdd83e99b88a37723`, slots 1–9 SHA1
+`1c9f0bd909e352d04013573cf9d16b4ae12b287d`. Repetition does not prove a
+default/unlocked plaintext or provide nine independent key observations.
+The reviewed header, filename and record structure supply no authenticated
+original COBBA serial. The existing registers 5/6 are explicitly calibrated
+inputs, not measured chip identity; see [the COBBA boundary](cobba_control_boundary.md#remaining-boundary).
+
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
 The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
