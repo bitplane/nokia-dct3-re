@@ -14,6 +14,8 @@ class LiveVerifierTests(unittest.TestCase):
             "nsm3d_release: pc=002cb328 control=10 result0=0000 result1=0006 "
             "retained0=0000 retained1=0006 pairs0=58 pairs1=58 order_errors=0 t=0.996202\n"
             "nsm3d_loader_descriptor: address=00311d14 fields=fd00/ff80/027e/0500/0078/0000\n"
+            "nsm3d_loader_upload: words=5678\n"
+            "staged_dsp: unavailable_program address=ff80 pc=0f20 stage=loader t=1.015569\n"
         )
 
     def test_native_result_retained(self):
@@ -39,6 +41,17 @@ class LiveVerifierTests(unittest.TestCase):
         text = self.fixture()
         with self.assertRaises(ValueError):
             check(text + text.splitlines()[1], bytes.fromhex("1234"))
+
+    def test_loader_bytes_and_mask_boundary(self):
+        check(self.fixture(), bytes.fromhex("1234"), bytes.fromhex("5678"))
+
+    def test_wrong_loader_upload(self):
+        with self.assertRaises(ValueError):
+            check(self.fixture(), bytes.fromhex("1234"), bytes.fromhex("8765"))
+
+    def test_wrong_missing_mask_address(self):
+        with self.assertRaises(ValueError):
+            check(self.fixture().replace("address=ff80", "address=ff81"), bytes.fromhex("1234"), bytes.fromhex("5678"))
 
 
 if __name__ == "__main__":

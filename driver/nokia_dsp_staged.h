@@ -41,6 +41,8 @@ private:
 	emu_timer *m_guard = nullptr;
 	bool m_active = false;
 	bool m_published = false;
+	u16 m_program_end = 0x0fdf;
+	bool m_verifier = true;
 };
 
 DECLARE_DEVICE_TYPE(NOKIA_DSP_STAGED, nokia_dsp_staged_device)

@@ -23,6 +23,11 @@ local release_tap = memory:install_write_tap(0x20000, 0x20003,
             end
             machine:logerror(string.format("nsm3d_loader_descriptor: address=%08x fields=%s\n",
                 descriptor, table.concat(fields, "/")))
+            local upload = {}
+            for index = 0, 637 do
+                upload[#upload + 1] = string.format("%04x", memory:read_u16(0x10a00 + index * 2))
+            end
+            machine:logerror("nsm3d_loader_upload: words=" .. table.concat(upload) .. "\n")
         end
     end)
 -- The ARM program space is 32-bit, big-endian; observe both halfword lanes.

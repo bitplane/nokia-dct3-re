@@ -5,12 +5,12 @@ from pathlib import Path
 import re
 
 try:
-    from tools.extract_nsm3_verifier import extract
+    from tools.extract_nsm3_verifier import extract, extract_loader
 except ModuleNotFoundError:
-    from extract_nsm3_verifier import extract
+    from extract_nsm3_verifier import extract, extract_loader
 
 
-def check(text, program):
+def check(text, program, loader=None):
     captures = re.findall(r"nsm3d_verifier_program: words=([0-9a-f]+)", text)
     if len(captures) != 1 or bytes.fromhex(captures[0]) != program:
         raise ValueError("runtime program differs from the pinned handset upload")
@@ -31,6 +31,12 @@ def check(text, program):
         raise ValueError("MCU did not retain the result after 58 ordered pairs")
     if "nsm3d_loader_descriptor: address=00311d14 fields=fd00/ff80/027e/0500/0078/0000" not in text:
         raise ValueError("next loader descriptor was not observed")
+    if loader is not None:
+        uploads = re.findall(r"nsm3d_loader_upload: words=([0-9a-f]+)", text)
+        if len(uploads) != 1 or bytes.fromhex(uploads[0]) != loader:
+            raise ValueError("runtime loader upload differs from pinned flash")
+        if not re.search(r"staged_dsp: unavailable_program address=ff80 pc=0f20 stage=loader t=[0-9.]+", text):
+            raise ValueError("loader did not reach the exact missing-mask read")
     if "[LUA ERROR]" in text:
         raise ValueError("observer failed")
 
@@ -41,10 +47,11 @@ def main():
     parser.add_argument("flash", type=Path)
     args = parser.parse_args()
     try:
-        check(args.log.read_text(), extract(args.flash.read_bytes(), "8250"))
+        image = args.flash.read_bytes()
+        check(args.log.read_text(), extract(image, "8250"), extract_loader(image))
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 live verifier failed: {error}\n")
-    print("8250 native publication and MCU retention verified; next DSP loader remains unsupported")
+    print("8250 native publication, MCU retention and exact loader upload verified; mask read ff80 remains unavailable")
 
 
 if __name__ == "__main__":

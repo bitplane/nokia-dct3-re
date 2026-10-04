@@ -76,13 +76,35 @@ at 0.996196 seconds. MCU `0x2cb328` has retained `0000/0006` after exactly
 58 ordered ownership pairs per buffer. The next initialization clears shared
 memory, loads descriptor `0x311d14` with fields
 `fd00/ff80/027e/0500/0078/0000`, and releases DSP reset at `0x2cb4c0`
-at 1.014471 seconds. This is a different loader contract: the research device
-deliberately exits with an unsupported-contract error instead of treating it
-as another verifier or pretending to execute the missing mask.
+at 1.014471 seconds. The research composition executes the independently
+recovered loader prefix and stops at its first missing program-ROM read,
+`ff80` from instruction `0f1e` (reported next PC `0f20`), at 1.015569 seconds.
+It does not pretend to execute the missing mask.
+
+The descriptor's 638-word upload has SHA-1
+`1250a9e17ce44ec8cc373f222a817f99f505bcdf`. A read-only capture reproduces
+every word at MCU `0x10a00` (DSP DARAM `0d00..0f7d`); the final 126 words
+are executable loader code at `0f00..0f7d`, SHA-1
+`5bcd6f091b23730b2484eb844841361ef7a12889`. The earlier words contain a
+branch table and padding, not a complete DSP ROM.
+
+GNU tic54x disassembly independently decodes the prefix: preserve fingerprint
+words `04f7/04f8`, clear work memory, then repeat `MVPD ff80,*AR2+` for
+104 words into data `0780..07e7`. The needed source range is `ff80..ffe7`;
+the declared single version input at `ff87` does not supply the other words.
+Later code installs 422 uploaded branch-table words into program `0590..0735`
+using `MVDP`, posts selectors `14` then `01` at `0871`, strobes bit 3 at
+MMR `29`, and waits on `0872`. It copies input chunks from `087e+0800` to
+destination `087b`, decrementing the remaining `087d` count, then branches
+to `0a00` when done. These later paths are statically decoded, not executed
+or validated against ROM6. The next software question is the MCU consumer of
+those selectors and whether its observable loader contract permits an honest
+HLE implementation without importing ROM4 mask instructions.
 
 Run `nsm3dr6` with the private-directory options below and
 `tools/nsm3d_verifier_observe.lua`. The expected bounded run exits nonzero at
-the second release. Validate the captured native publication and MCU retention:
+the loader's missing-mask read. Validate the captured native publication,
+MCU retention, complete loader upload and precise stop boundary:
 
 ```sh
 .venv/bin/python tools/nsm3d_live_verifier_check.py RUN/error.log \
@@ -137,5 +159,5 @@ endpoint registers. Separate passive `gensio_select` records restore coverage
 without changing register ownership or behavior; `verify-gensio` now passes
 both 3210 firmware revisions. After adding the separate live staged-code
 composition, the normal 8250 boundary, 3210 baseline and coherent frontier
-still reproduce. The expanded tool suite passes 1,244 tests and all 11 MAME
+still reproduce. The expanded tool suite passes 1,250 tests and all 11 MAME
 overlay patches apply to the pinned upstream commit.

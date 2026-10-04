@@ -17,6 +17,22 @@ NSE5_DESCRIPTOR_OFFSET = 0x2D904
 NSE5_PROGRAM_SHA1 = "caca7599d9ca1a7dddf2df37f32be4aacd420deb"
 NSM3D_FLASH_SHA1 = "f26c98ffcfffbbd5714889e10cfa41c5f6dd2529"
 NSM3D_DESCRIPTOR_OFFSET = 0x1188C0
+NSM3D_LOADER_OFFSET = 0x111D14
+NSM3D_LOADER_SHA1 = "1250a9e17ce44ec8cc373f222a817f99f505bcdf"
+
+
+def extract_loader(image):
+    """Return the whole NSM-3D upload, including its table and code tail."""
+    if hashlib.sha1(image).hexdigest() != NSM3D_FLASH_SHA1:
+        raise ValueError("not the pinned 8250 flash")
+    if struct.unpack_from(">6H", image, NSM3D_LOADER_OFFSET) != (
+            0xfd00, 0xff80, 0x027e, 0x0500, 0x0078, 0):
+        raise ValueError("unexpected loader descriptor")
+    start = NSM3D_LOADER_OFFSET + 12
+    payload = image[start:start + 638 * 2]
+    if hashlib.sha1(payload).hexdigest() != NSM3D_LOADER_SHA1:
+        raise ValueError("unexpected loader upload")
+    return payload
 
 
 def extract(image, product="8210"):
@@ -50,14 +66,18 @@ def main():
     parser.add_argument("flash", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--product", choices=("8210", "6210", "7110", "8250"), default="8210")
+    parser.add_argument("--loader", action="store_true", help="extract the 8250 second-stage upload")
     args = parser.parse_args()
     try:
-        program = extract(args.flash.read_bytes(), args.product)
+        if args.loader and args.product != "8250":
+            raise ValueError("loader extraction is only recovered for 8250")
+        program = extract_loader(args.flash.read_bytes()) if args.loader else extract(args.flash.read_bytes(), args.product)
     except (OSError, ValueError) as error:
         parser.exit(1, f"NSM-3 verifier extraction failed: {error}\n")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(program)
-    print(f"{args.product} verifier: {len(program) // 2} words at 0x0f00, SHA-1 {hashlib.sha1(program).hexdigest()}")
+    kind = "loader upload" if args.loader else "verifier"
+    print(f"{args.product} {kind}: {len(program) // 2} words, SHA-1 {hashlib.sha1(program).hexdigest()}")
 
 
 if __name__ == "__main__":

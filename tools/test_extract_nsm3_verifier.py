@@ -6,6 +6,27 @@ from tools import extract_nsm3_verifier as verifier
 
 
 class VerifierExtractionTest(unittest.TestCase):
+    def loader_image(self):
+        image = bytearray(verifier.NSM3D_LOADER_OFFSET + 12)
+        struct.pack_into(">6H", image, verifier.NSM3D_LOADER_OFFSET,
+                         0xfd00, 0xff80, 638, 0x500, 0x78, 0)
+        return bytes(image) + b"\x56\x78" * 638
+
+    def test_loader_word_order_and_full_extent(self):
+        with patch.object(verifier.hashlib, "sha1", side_effect=[
+                self.digest(verifier.NSM3D_FLASH_SHA1), self.digest(verifier.NSM3D_LOADER_SHA1)]):
+            self.assertEqual(verifier.extract_loader(self.loader_image()), b"\x56\x78" * 638)
+
+    def test_loader_rejects_wrong_flash(self):
+        with self.assertRaisesRegex(ValueError, "pinned"):
+            verifier.extract_loader(self.loader_image())
+
+    def test_loader_rejects_wrong_payload(self):
+        with patch.object(verifier.hashlib, "sha1", side_effect=[
+                self.digest(verifier.NSM3D_FLASH_SHA1), self.digest("wrong")]):
+            with self.assertRaisesRegex(ValueError, "loader upload"):
+                verifier.extract_loader(self.loader_image())
+
     def image(self, header=None):
         image = bytearray(verifier.DESCRIPTOR_OFFSET + 12)
         struct.pack_into(">6H", image, verifier.DESCRIPTOR_OFFSET,
