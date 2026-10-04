@@ -6,9 +6,11 @@ The acquired v5.03 PPM C and product-local PMM reach a correctly dimensioned
 96x60 `CONTACT SERVICE` frame in research composition `nhm3hle`, after native
 verifier/loaders and request-correlated service-control completion. With the
 explicit initial-record PMM comparison and nominal channel-2 battery input,
-the same composition reaches `Insert SIM`, startup readiness `0f`, and scans
-a physical row-1/column-1 press as raw key `06`. Menus, idle with SIM, and
-phone features remain unvalidated. Normal `noki6250`
+the same composition reaches graphical boot, startup readiness `0f`, and scans
+a physical row-1/column-1 press as raw key `06`. The research composition now
+enables the existing SIMI/card boundary: ATR, PPS and file reads run through
+the firmware, and a settled physical press opens the Messages menu. Network
+registration, phonebook persistence, calls and SMS remain unvalidated. Normal `noki6250`
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
@@ -362,6 +364,29 @@ using the fresh-run command above, then run
 The checker proves report delivery, settled startup predicates and matrix
 scan; it does not prove menu semantics or pixel identity. Inspect the captured
 96x60 frame separately. Default and coherent 3210 regression gates reproduce.
+
+## SIM boundary and interactive menu
+
+The own-ROM initializer `491fd8..492034` writes SIMI causes at `20038`,
+control at `20039`, and FIFO controls at `2003d/2003e`. Reset routine
+`491bb4..491c0c` drains `20037`, asserts control bit 0, then bit 7. These
+match the existing controller grammar. `nhm3hle` enables the controller and
+synthetic card as a declared boundary comparison; `PRODUCT_6250` remains
+conservative outside this research composition.
+
+Observed receive routine `491edc` consumes ATR `3b 10 05`; transmitter
+`491cb8` performs PPS and SELECT/STATUS/READ BINARY/GET RESPONSE/READ RECORD
+exchanges. The controller's existing FIQ route is sufficient for these
+firmware-owned exchanges. This is runtime validation of the path, not a
+complete static census of all SIM faults or electrical timing.
+
+The initial-record fixture reaches a `Headset` idle-style frame with Menu
+and Names at 20 seconds without late input. The literal label is an
+observation; its accessory/profile ownership is not yet decoded. The physical
+probe at 16/16.15 seconds opens the Messages menu (Select/Exit), captured
+at 20 seconds by `noki6250_key_observe.lua`. The probe contains physical
+input only; it does not select callbacks, write RAM, or post UI messages.
+The first 6-second press occurs during SIM reads and is not the menu proof.
 
 Missing native mask code and immutable peripheral identity remain explicitly
 unvalidated; runtime HLE must not manufacture record/self-test verdicts merely

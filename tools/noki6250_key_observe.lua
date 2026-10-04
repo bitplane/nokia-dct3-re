@@ -27,5 +27,14 @@ emu.register_periodic(function()
         key:set_value(0)
         phase = 2
         machine:logerror("6250_physical_cell: column=1 row=1 pressed=0\n")
+    elseif phase == 2 and time >= 16 then
+        context("settled_press")
+        key:set_value(1)
+        phase = 3
+        machine:logerror("6250_physical_cell: column=1 row=1 pressed=1 t=16\n")
+    elseif phase == 3 and time >= 16.15 then
+        key:set_value(0)
+        phase = 4
+        machine:logerror("6250_physical_cell: column=1 row=1 pressed=0 t=16.15\n")
     end
 end)

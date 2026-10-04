@@ -8,6 +8,19 @@ local nv_writers = {}
 local nv_copy_count = 0
 local keypad_readers = {}
 local scalar_posts = {}
+local sim_accesses = {}
+for _, direction in ipairs({"read", "write"}) do
+    local install = direction == "read" and memory.install_read_tap or memory.install_write_tap
+    taps[#taps + 1] = install(memory, 0x20034, 0x2003f,
+        "6250_simi_" .. direction, function(offset, value, mask)
+            local pc = cpu.state["PC"].value
+            local key = string.format("%s:%x:%x:%x:%x", direction, offset, value, mask, pc)
+            if sim_accesses[key] then return end
+            sim_accesses[key] = true
+            machine:logerror(string.format("6250_simi_access: direction=%s address=%08x data=%08x mask=%08x pc=%08x t=%.6f\n",
+                direction, offset, value, mask, pc, machine.time:as_double()))
+        end)
+end
 local analog_writes, analog_receiver_seen = {}, false
 local analog_predicates = {}
 local analog_samples = {}

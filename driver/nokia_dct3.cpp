@@ -3383,6 +3383,11 @@ void nokia_dct3_state::nhm3hle(machine_config &config)
 	// Native uploads stop before the absent mask routine; the existing
 	// request-derived transport peer owns runtime afterward, not mask code.
 	nokia_product_config runtime = PRODUCT_6250;
+	// Own SIM initialization 0x491fd8..0x492034 and reset 0x491bb4
+	// use the existing 0x37/0x38/0x39 SIMI grammar. Keep this boundary
+	// comparison in the research composition until the card exchange is gated.
+	runtime.simi_controller = true;
+	runtime.synthetic_sim_card = true;
 	runtime.external_service_transport = true;
 	// 6250 consumer 304494 dispatches 0d, clears its armed timer and reads
 	// two fault bits from the following octet. This is a declared peer model.
