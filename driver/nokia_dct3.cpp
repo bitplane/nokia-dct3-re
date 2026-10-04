@@ -3405,6 +3405,12 @@ void nokia_dct3_state::nhm3hle(machine_config &config)
 	// Own physical-End release publishes type 02 with channel 0x60 and
 	// parameter 0x14; acknowledge that transaction through the peer.
 	runtime.radio.traffic_release_parameter = 0x14;
+	// NHM-3 compiler 0x3fbc54/0x3fbc68 clears field 0x0200 with ROM
+	// keep-mask 0xfdff and adds 0x0200 from its selector table. Physical
+	// Answer/End publish 0x8626/0x8426 through own command-8 helper.
+	runtime.dsp_speech_control = {
+		0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0200, 0x0200 }
+	};
 	// 6250 consumer 304494 dispatches 0d, clears its armed timer and reads
 	// two fault bits from the following octet. This is a declared peer model.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;

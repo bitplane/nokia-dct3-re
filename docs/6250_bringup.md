@@ -544,3 +544,32 @@ arithmetic and menu layout are ROM-owned. Run the initial-record fixture
 with fresh storage for 45 seconds and validate capture 14 using
 `noki6250_app_check.py LOG FRAME`. This proves a complete application
 input/result workflow, not every installed application or game.
+
+## Speech-control boundary
+
+The 6250 command-8 helper is `429a34`: its jump table at `429a88` selects
+`429de6`, which combines the low 12 parameter bits with `8000`, stores its
+own shadow at `16e47e`, publishes shared `100a8`, and commits through DSPIF.
+Compiler publication at `3fc33a` calls it with `0102` during startup,
+`0426` after initialization, `0626` on physical Answer, and `0426` on End.
+Transient startup value `0506` has a different caller (`4ae5d7`).
+
+This is not the NSE-8/NSM-5 speech field `0201`. Own compiler `3fbc54`
+reads keep-mask `fdff` from ROM `263160`; `3fbc62..3fbc6c` adds the selector
+halfword from ROM `263154`. The five table entries are `0200`, and the
+observed answer selector is 1 with desired word `0426` before the addition.
+The inactive branch `3fbc40..3fbc46` applies the same keep-mask without
+adding the field. Research HLE therefore decodes command 8 and predicates
+speech requests on field `0200`; no physical bit meaning is assigned.
+
+`noki6250_audio_observe.lua` passively traces helper calls, field selection
+and writes during the incoming physical Answer/End fixture. Validate the
+own ROM plus a 35-second run using `noki6250_speech_control_check.py ROM LOG`.
+The normal call-signaling checker also passes after this configuration.
+
+This does not establish working audio. The conservative 6250 profile has
+no independently evidenced PCM bus clock/shape or COBBA analog route; its
+zero frame clock leaves the HLE speech cadence disabled. Recover those
+contracts from product documentation/firmware before supplying a donor
+profile or claiming audible voice. Native mask execution remains a separate
+unresolved boundary.
