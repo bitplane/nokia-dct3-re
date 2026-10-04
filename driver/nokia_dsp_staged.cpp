@@ -29,6 +29,7 @@ void nokia_dsp_staged_device::device_start()
 	save_item(NAME(m_program_ram));
 	save_item(NAME(m_program_valid));
 	save_item(NAME(m_loader2_verified));
+	save_item(NAME(m_observation_halted));
 	save_item(NAME(m_data));
 	save_item(NAME(m_control));
 	save_item(NAME(m_active));
@@ -44,6 +45,8 @@ void nokia_dsp_staged_device::device_reset()
 	m_program_ram.fill(0);
 	m_program_valid.fill(0);
 	m_loader2_verified = false;
+	m_observation_halted = false;
+	m_cpu->resume(SUSPEND_REASON_DISABLE);
 	m_active = false;
 	m_published = false;
 	m_program_end = 0x0fdf;
@@ -56,6 +59,8 @@ void nokia_dsp_staged_device::reset_line_w(int released)
 {
 	if (!released)
 	{
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_observation_halted = false;
 		m_active = false;
 		m_guard->adjust(attotime::never);
 		m_cpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
@@ -228,6 +233,18 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::check_execution)
 		logerror("staged_dsp: installed_program words=%u first=%04x last=%04x target_data=%04x pmst=%04x\n",
 				installed, first, last, data_r(pc), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
 		logerror("staged_dsp: outside_uploaded_code pc=%04x t=%.6f\n", pc, machine().time().as_double());
+		if (m_observe_after_missing_code)
+		{
+			// Diagnostic isolation, not a substitute helper or hardware claim.
+			// Keep ownership active so HLE cannot manufacture acknowledgements
+			// while the MCU is observed with an explicitly silent DSP.
+			m_observation_halted = true;
+			m_guard->adjust(attotime::never);
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			machine().scheduler().abort_timeslice();
+			logerror("staged_dsp: observation_halt pc=%04x ownership_retained=1\n", pc);
+			return;
+		}
 		throw emu_fatalerror(1, "Staged DSP escaped uploaded program: pc=%04x", pc);
 	}
 	if (m_verifier && !m_published && m_transport->dsp_data_r(0x0801) != 0xffff)

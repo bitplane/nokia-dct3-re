@@ -3322,6 +3322,9 @@ void nokia_dct3_state::nsm3dr6(machine_config &config)
 	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
 	staged.set_program_fragment(0x11770c);
 	staged.set_loader2_source(0x117838);
+	// Diagnostic-only composition: stop before missing native code, retain
+	// DSP ownership, and observe subsequent MCU requests without replies.
+	staged.set_observe_after_missing_code(true);
 }
 
 void nokia_dct3_state::noki8210(machine_config &config)

@@ -17,6 +17,7 @@ public:
 	bool active() const { return m_active; }
 	void set_program_fragment(u32 flash_offset) { m_fragment_offset = flash_offset; }
 	void set_loader2_source(u32 flash_offset) { m_loader2_offset = flash_offset; }
+	void set_observe_after_missing_code(bool enable) { m_observe_after_missing_code = enable; }
 
 protected:
 	virtual void device_add_mconfig(machine_config &config) override;
@@ -43,6 +44,8 @@ private:
 	u32 m_fragment_offset = 0;
 	u32 m_loader2_offset = 0;
 	bool m_loader2_verified = false;
+	bool m_observe_after_missing_code = false;
+	bool m_observation_halted = false;
 	std::array<u16, 0x800> m_program_ram{};
 	std::array<u8, 0x800> m_program_valid{};
 	std::array<u16, 0x10000> m_data{};

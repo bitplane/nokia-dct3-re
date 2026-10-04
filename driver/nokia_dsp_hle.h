@@ -158,6 +158,7 @@ protected:
 	virtual void device_reset() override;
 
 private:
+	bool native_owns_transport() const;
 	TIMER_CALLBACK_MEMBER(service_tick);
 	TIMER_CALLBACK_MEMBER(packet_tick);
 	TIMER_CALLBACK_MEMBER(response_tick);

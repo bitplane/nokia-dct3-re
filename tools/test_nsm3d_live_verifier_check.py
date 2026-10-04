@@ -1,9 +1,9 @@
 import unittest
 
 try:
-    from tools.nsm3d_live_verifier_check import check, check_boundary
+    from tools.nsm3d_live_verifier_check import check, check_boundary, check_silent_observation
 except ModuleNotFoundError:
-    from nsm3d_live_verifier_check import check, check_boundary
+    from nsm3d_live_verifier_check import check, check_boundary, check_silent_observation
 
 
 class LiveVerifierTests(unittest.TestCase):
@@ -74,6 +74,27 @@ class LiveVerifierTests(unittest.TestCase):
                 "unmodelled program write")
         with self.assertRaisesRegex(ValueError, "program write"):
             check_boundary(text)
+
+    def test_silent_owner_does_not_acknowledge_control_request(self):
+        text = ("staged_dsp: observation_halt pc=2c75 ownership_retained=1\n"
+                "nsm3d_control_request: command=0032 argument=3fff commit=0001 "
+                "wire=900f pending=0001 t=1.026648\n"
+                "nsm3d_loader_boundary: pc=2c75 selector=0000 ack=0000 "
+                "pending=0001 fields=1e2e/1f80 t=8.000000\n")
+        check_silent_observation(text)
+        for old, new in (("pending=0001 fields", "pending=0000 fields"),
+                         ("pc=2c75 selector", "pc=2c76 selector")):
+            with self.subTest(change=new), self.assertRaises(ValueError):
+                check_silent_observation(text.replace(old, new))
+
+    def test_second_request_exposes_an_accidental_ack(self):
+        text = ("staged_dsp: observation_halt pc=2c75 ownership_retained=1\n"
+                "nsm3d_control_request: command=0032 argument=3fff commit=0001 "
+                "wire=900f pending=0001\n"
+                "nsm3d_control_request: command=0031 argument=ff00 commit=0001 "
+                "wire=900f pending=0001\n")
+        with self.assertRaisesRegex(ValueError, "unexpected requests"):
+            check_silent_observation(text)
 
     def test_missing_fragment(self):
         with self.assertRaises(ValueError):

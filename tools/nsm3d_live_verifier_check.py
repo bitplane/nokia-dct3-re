@@ -68,6 +68,21 @@ def check_boundary(text):
         raise ValueError("native loader attempted an unsupported program write")
 
 
+def check_silent_observation(text):
+    if "staged_dsp: observation_halt pc=2c75 ownership_retained=1" not in text:
+        raise ValueError("missing native observation halt")
+    requests = re.findall(
+        r"nsm3d_control_request: command=([0-9a-f]+) argument=([0-9a-f]+) "
+        r"commit=([0-9a-f]+) wire=([0-9a-f]+) pending=([0-9a-f]+)", text)
+    if requests != [("0032", "3fff", "0001", "900f", "0001")]:
+        raise ValueError("unexpected requests while the DSP is explicitly silent")
+    boundary = re.findall(
+        r"nsm3d_loader_boundary: pc=([0-9a-f]+) selector=[0-9a-f]+ "
+        r"ack=[0-9a-f]+ pending=([0-9a-f]+) fields=[^\n]+ t=([0-9.]+)", text)
+    if boundary != [("2c75", "0001", "8.000000")]:
+        raise ValueError("native PC or pending ownership changed during observation")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -78,9 +93,10 @@ def main():
         text = args.log.read_text()
         check(text, extract(image, "8250"), extract_loader(image), extract_program_fragment(image))
         check_boundary(text)
+        check_silent_observation(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 live verifier failed: {error}\n")
-    print("8250 native verifier, product-local program fragment and organic loader2 delivery verified; phone boot remains unproved")
+    print("8250 native verifier and loaders verified; silent-DSP command-32 boundary preserved; phone boot remains unproved")
 
 
 if __name__ == "__main__":

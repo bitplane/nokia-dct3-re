@@ -119,6 +119,8 @@ void nokia_dsp_hle_device::device_reset()
 
 void nokia_dsp_hle_device::mcu_shared_write(u16 byte_offset)
 {
+	if (native_owns_transport())
+		return;
 	// Product-specific silicon identity can occupy a different shared cell.
 	// Observe the physical write; DSPIF continues to own storage only.
 	handle_bootstrap_parked_write(byte_offset);
@@ -176,6 +178,11 @@ bool nokia_dsp_hle_device::bootstrap_ping_pong() const
 	return m_bootstrap.exchange == bootstrap_exchange_strategy::ping_pong;
 }
 
+bool nokia_dsp_hle_device::native_owns_transport() const
+{
+	return m_staged && m_staged->active();
+}
+
 void nokia_dsp_hle_device::publish_bootstrap_completion()
 {
 	const unsigned count = std::min<unsigned>(
@@ -201,6 +208,8 @@ void nokia_dsp_hle_device::publish_bootstrap_completion()
 
 void nokia_dsp_hle_device::tx_commit_w(int state)
 {
+	if (native_owns_transport())
+		return;
 	if (state && (m_external_service_enabled || m_radio_peer->enabled() ||
 			m_service_control.enabled()))
 		m_packet_timer->adjust(attotime::from_usec(100));
@@ -208,12 +217,16 @@ void nokia_dsp_hle_device::tx_commit_w(int state)
 
 void nokia_dsp_hle_device::service_pending_w(int state)
 {
+	if (native_owns_transport())
+		return;
 	if (state && m_service_enabled)
 		m_service_timer->adjust(attotime::from_usec(m_service_delay_us));
 }
 
 void nokia_dsp_hle_device::doorbell_w(int state)
 {
+	if (native_owns_transport())
+		return;
 	if (state && m_transport->dspif_r(0) == 0 && m_transport->dspif_r(1) == 4)
 	{
 		m_mcu_control_wire = m_transport->shared_word(0x0a8 / 2);
@@ -245,6 +258,8 @@ void nokia_dsp_hle_device::shared_002_write_w(int state)
 void nokia_dsp_hle_device::handle_bootstrap_parked_write(
 		u16 callback_offset)
 {
+	if (native_owns_transport())
+		return;
 	if (!m_bootstrap.parked)
 		return;
 	const bootstrap_parked_contract &parked = *m_bootstrap.parked;
@@ -262,6 +277,8 @@ void nokia_dsp_hle_device::shared_006_write_w(int state)
 void nokia_dsp_hle_device::handle_bootstrap_preupload_write(
 		u16 callback_offset)
 {
+	if (native_owns_transport())
+		return;
 	if (!m_bootstrap.preupload)
 		return;
 	const bootstrap_pair_contract &preupload = *m_bootstrap.preupload;
@@ -309,7 +326,7 @@ void nokia_dsp_hle_device::shared_100_write_w(int state)
 
 void nokia_dsp_hle_device::handle_bootstrap_exchange_read(u16 offset)
 {
-	if (m_staged && m_staged->active())
+	if (native_owns_transport())
 		return;
 	if (!bootstrap_ping_pong() ||
 			m_transport->shared_word(offset / 2) == 0 ||
@@ -321,7 +338,7 @@ void nokia_dsp_hle_device::handle_bootstrap_exchange_read(u16 offset)
 
 void nokia_dsp_hle_device::handle_bootstrap_exchange_write(u16 offset)
 {
-	if (m_staged && m_staged->active())
+	if (native_owns_transport())
 	{
 		machine().scheduler().perfect_quantum(attotime::from_usec(100));
 		machine().scheduler().abort_timeslice();
@@ -362,6 +379,8 @@ void nokia_dsp_hle_device::reset_line_w(int released)
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
 {
+	if (native_owns_transport())
+		return;
 	// NHM-2's DSP publishes the initial code-block selector. Firmware consumes
 	// bounded chunks and eventually clears 0x0e2 itself before publishing final
 	// state 4 at 0x0e4. Reasserting selector 1 on every IRQ completion restarts
@@ -383,6 +402,8 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::service_tick)
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::keepalive_tick)
 {
+	if (native_owns_transport())
+		return;
 	// A running DSP continues to publish an idle group-0x03 indication. The MCU
 	// treats any non-fault MDI packet as DSP activity and otherwise enters its
 	// reason-0x68 terminal watchdog path after roughly 32 seconds. This packet
@@ -394,6 +415,8 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::keepalive_tick)
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::speech_tick)
 {
+	if (native_owns_transport())
+		return;
 	// Command 0x08 is a bit-field, not an enum. Across both NSE-8 ROMs the
 	// non-speech dedicated-channel state is 0x040a; Answer adds field 0x0201,
 	// and release removes that same field before the TCH is deconfigured.
@@ -551,6 +574,8 @@ void nokia_dsp_hle_device::schedule_response()
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::response_tick)
 {
+	if (native_owns_transport())
+		return;
 	drain_responses();
 	nokia_external_service_peer_device::response response;
 	if (m_external_peer->peek_response(response))
@@ -583,6 +608,8 @@ bool nokia_dsp_hle_device::consume_memory_upload(const nokia_dspif_device::packe
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 {
+	if (native_owns_transport())
+		return;
 	if (m_external_service_enabled || m_radio_peer->enabled() ||
 			m_service_control.enabled())
 	{

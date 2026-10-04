@@ -4,6 +4,19 @@ local cpu = assert(machine.devices[":maincpu"])
 local memory = cpu.spaces["program"]
 local transfers = { [0x100fe] = 0, [0x10100] = 0 }
 local order_errors, last = 0, nil
+local doorbell_tap = memory:install_write_tap(0x30000, 0x30003,
+    "nsm3d_dspif_writes", function(offset, data, mask)
+        machine:logerror(string.format(
+            "nsm3d_dspif_write: address=%08x data=%08x mask=%08x pc=%08x t=%.6f\n",
+            offset, data, mask, cpu.state["PC"].value, machine.time:as_double()))
+        if cpu.state["PC"].value == 0x2cb838 then
+            machine:logerror(string.format(
+                "nsm3d_control_request: command=%04x argument=%04x commit=%04x wire=%04x pending=%04x t=%.6f\n",
+                cpu.state["R4"].value & 0xffff, cpu.state["R6"].value & 0xffff,
+                cpu.state["R5"].value & 0xffff, memory:read_u16(0x100a8),
+                memory:read_u16(0x100e0), machine.time:as_double()))
+        end
+    end)
 local release_tap = memory:install_write_tap(0x20000, 0x20003,
     "nsm3d_dsp_release", function(offset, data, mask)
         if offset ~= 0x20000 or (mask & 0x0000ff00) == 0 then return end
@@ -67,9 +80,9 @@ local sample = coroutine.create(function()
         for address = 0x110f6, 0x11102, 2 do
             fields[#fields + 1] = string.format("%04x", memory:read_u16(address))
         end
-        machine:logerror(string.format("nsm3d_loader_boundary: pc=%04x selector=%04x ack=%04x fields=%s t=%.6f\n",
+        machine:logerror(string.format("nsm3d_loader_boundary: pc=%04x selector=%04x ack=%04x pending=%04x fields=%s t=%.6f\n",
             dsp.state["PC"].value, memory:read_u16(0x100e2), memory:read_u16(0x100e4),
-            table.concat(fields, "/"), machine.time:as_double()))
+            memory:read_u16(0x100e0), table.concat(fields, "/"), machine.time:as_double()))
     end
     machine:logerror(string.format(
         "nsm3d_verifier_boundary: pc=%08x result0=%04x result1=%04x pairs0=%d pairs1=%d order_errors=%d\n",
@@ -81,4 +94,4 @@ assert(tap)
 assert(release_tap)
 -- Keep the tap userdata rooted for the entire run, including GC triggered
 -- by the larger loader capture. A local assertion is not a lifetime root.
-_G.nsm3d_observer_handles = {tap, release_tap}
+_G.nsm3d_observer_handles = {tap, release_tap, doorbell_tap}

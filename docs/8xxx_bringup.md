@@ -10,7 +10,8 @@ provenance remain in `roms/README.md`.
 The normal 8250 remains at its fail-closed verifier boundary. The separate
 `nsm3dr6` research composition executes the MCU-uploaded verifier and two DSP
 loaders using a product-flash bootstrap fragment. This is not a fitted-mask dump;
-graphical boot and phone functionality remain unproved.
+at the unavailable call it halts only the DSP for a silent-peer observation.
+Graphical boot and phone functionality remain unproved.
 
 ## 8250 staged verifier
 
@@ -127,6 +128,11 @@ boot claim for 8250 v6.02 is not an execution oracle for this v5.02 image;
 its advertised model/version and provisioning must be matched before
 using it to justify a peer response.
 
+A same-input reference run with the stock v5.02 flash, its acquired virgin
+PMM at `0x3d0000` and checksum repair disabled reaches a Security-code
+frame under the sibling HLE. This is a software-path lead, not mask-ROM
+execution evidence or proof that its responses match real NSM-3D hardware.
+
 The bounded native run installs exactly 422 program words at `0590..0735`
 before reaching `2c75`, with PMST `07ac` and zero in the research data
 backing at `2c75`. Other program writes outside the known RAM and immutable
@@ -164,10 +170,25 @@ implements the signed 40-bit comparison with taken/not-taken cycle tests.
 The expanded observer also roots its tap userdata, preventing garbage
 collection from leaving an invalid callback during the larger upload capture.
 
+`nsm3dr6` now suspends native execution at `2c75` and retains transport
+ownership while the MCU continues. This is diagnostic isolation, not
+execution of missing code or an emulated helper return. The MCU then issues
+control command `32`, argument `3fff`, commit `1`, through the encoder at
+`0x2cb518` and doorbell site `0x2cb838`. Pending word `0x100e0` stays `1`
+through eight seconds; the native PC stays `2c75`. The first request's
+semantic effect and legitimate completion are the next peer contract.
+Do not advance it with a guessed acknowledgement.
+
+HLE callbacks and queued service/packet/response/keepalive/speech work must
+not mutate the transport while native ownership is active. In particular,
+the generic HLE doorbell clear of `0x100e0` is suppressed: otherwise the
+MCU proceeds to later requests despite the explicitly silent native peer,
+invalidating the observation.
+
 Run `nsm3dr6` with the private-directory options below and
-`tools/nsm3d_verifier_observe.lua`. The expected bounded run exits nonzero at
-the call outside acquired code. Validate native publication, MCU retention,
-complete loader upload, mapped fragment and organic loader2 delivery:
+`tools/nsm3d_verifier_observe.lua`. Validate native publication, MCU retention,
+complete loader upload, mapped fragment, organic loader2 delivery and the
+silent command-32 boundary; successful process exit is not phone boot:
 
 ```sh
 .venv/bin/python tools/nsm3d_live_verifier_check.py RUN/error.log \
@@ -223,5 +244,5 @@ without changing register ownership or behavior; `verify-gensio` now passes
 both 3210 firmware revisions. After adding the separate live staged-code
 composition, the normal 8250 boundary, 3210 baseline and coherent frontier
 still reproduce. C54x core conformance passes, including the new BLEQ cases.
-The expanded tool suite passes 1,254 tests and all 11 MAME
-overlay patches apply to the pinned upstream commit.
+The tool suite passes; all 11 MAME overlay patches apply to the pinned
+upstream commit.
