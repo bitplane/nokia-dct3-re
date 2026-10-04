@@ -49,11 +49,28 @@ local sample = coroutine.create(function()
         words[#words + 1] = string.format("%04x", memory:read_u16(0x11e00 + index * 2))
     end
     machine:logerror("nsm3d_verifier_program: words=" .. table.concat(words) .. "\n")
+    local dsp = machine.devices[":dsp_staged:cpu"]
+    if dsp then
+        local fragment = {}
+        for index = 0, 103 do
+            fragment[#fragment + 1] = string.format("%04x", dsp.spaces["program"]:read_u16(0xff80 + index))
+        end
+        machine:logerror("nsm3d_program_fragment: words=" .. table.concat(fragment) .. "\n")
+    end
     for address = 0x110f6, 0x11102, 2 do
         machine:logerror(string.format("nsm3d_verifier_input: address=%08x value=%04x\n",
             address, memory:read_u16(address)))
     end
     if not emu.wait(7.5) then return end
+    if dsp then
+        local fields = {}
+        for address = 0x110f6, 0x11102, 2 do
+            fields[#fields + 1] = string.format("%04x", memory:read_u16(address))
+        end
+        machine:logerror(string.format("nsm3d_loader_boundary: pc=%04x selector=%04x ack=%04x fields=%s t=%.6f\n",
+            dsp.state["PC"].value, memory:read_u16(0x100e2), memory:read_u16(0x100e4),
+            table.concat(fields, "/"), machine.time:as_double()))
+    end
     machine:logerror(string.format(
         "nsm3d_verifier_boundary: pc=%08x result0=%04x result1=%04x pairs0=%d pairs1=%d order_errors=%d\n",
         cpu.state["PC"].value, memory:read_u16(0x10000), memory:read_u16(0x10002),
@@ -62,3 +79,6 @@ end)
 assert(coroutine.resume(sample))
 assert(tap)
 assert(release_tap)
+-- Keep the tap userdata rooted for the entire run, including GC triggered
+-- by the larger loader capture. A local assertion is not a lifetime root.
+_G.nsm3d_observer_handles = {tap, release_tap}

@@ -6,6 +6,19 @@ from tools import extract_nsm3_verifier as verifier
 
 
 class VerifierExtractionTest(unittest.TestCase):
+    def test_fragment_preserves_acquired_word_order(self):
+        image = bytearray(0x1177dc)
+        struct.pack_into(">6H", image, 0x117700, 0xff80, 0xff80, 104, 0x200, 0x8c, 0)
+        image[0x11770c:0x1177dc] = b"\x12\x34" * 104
+        with patch.object(verifier.hashlib, "sha1", side_effect=[
+                self.digest(verifier.NSM3D_FLASH_SHA1),
+                self.digest("440bf49f1eba4cadb12f7f7581c992b0025807d6")]):
+            self.assertEqual(verifier.extract_program_fragment(image), b"\x12\x34" * 104)
+
+    def test_fragment_rejects_unpinned_input(self):
+        with self.assertRaisesRegex(ValueError, "pinned"):
+            verifier.extract_program_fragment(b"not a mask or firmware")
+
     def loader_image(self):
         image = bytearray(verifier.NSM3D_LOADER_OFFSET + 12)
         struct.pack_into(">6H", image, verifier.NSM3D_LOADER_OFFSET,

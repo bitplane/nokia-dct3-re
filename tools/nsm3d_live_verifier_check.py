@@ -5,12 +5,12 @@ from pathlib import Path
 import re
 
 try:
-    from tools.extract_nsm3_verifier import extract, extract_loader
+    from tools.extract_nsm3_verifier import extract, extract_loader, extract_program_fragment
 except ModuleNotFoundError:
-    from extract_nsm3_verifier import extract, extract_loader
+    from extract_nsm3_verifier import extract, extract_loader, extract_program_fragment
 
 
-def check(text, program, loader=None):
+def check(text, program, loader=None, fragment=None):
     captures = re.findall(r"nsm3d_verifier_program: words=([0-9a-f]+)", text)
     if len(captures) != 1 or bytes.fromhex(captures[0]) != program:
         raise ValueError("runtime program differs from the pinned handset upload")
@@ -35,8 +35,17 @@ def check(text, program, loader=None):
         uploads = re.findall(r"nsm3d_loader_upload: words=([0-9a-f]+)", text)
         if len(uploads) != 1 or bytes.fromhex(uploads[0]) != loader:
             raise ValueError("runtime loader upload differs from pinned flash")
-        if not re.search(r"staged_dsp: unavailable_program address=ff80 pc=0f20 stage=loader t=[0-9.]+", text):
-            raise ValueError("loader did not reach the exact missing-mask read")
+    if fragment is not None:
+        fragments = re.findall(r"nsm3d_program_fragment: words=([0-9a-f]+)", text)
+        if len(fragments) != 1 or bytes.fromhex(fragments[0]) != fragment:
+            raise ValueError("program fragment differs from product-local flash")
+        requests = re.findall(r"staged_dsp: request selector=([0-9a-f]+)", text)
+        if requests[:2] != ["0014", "0001"]:
+            raise ValueError("native loader request order differs")
+        if "staged_dsp: loader2_verified words=613 entry=0a00" not in text:
+            raise ValueError("MCU-supplied loader2 was not verified before execution")
+    if "unimplemented C54x opcode" in text:
+        raise ValueError("native execution stopped on an unimplemented instruction")
     if "[LUA ERROR]" in text:
         raise ValueError("observer failed")
 
@@ -48,10 +57,10 @@ def main():
     args = parser.parse_args()
     try:
         image = args.flash.read_bytes()
-        check(args.log.read_text(), extract(image, "8250"), extract_loader(image))
+        check(args.log.read_text(), extract(image, "8250"), extract_loader(image), extract_program_fragment(image))
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 live verifier failed: {error}\n")
-    print("8250 native publication, MCU retention and exact loader upload verified; mask read ff80 remains unavailable")
+    print("8250 native verifier, product-local program fragment and organic loader2 delivery verified; phone boot remains unproved")
 
 
 if __name__ == "__main__":

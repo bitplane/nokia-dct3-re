@@ -8,7 +8,7 @@ DEFINE_DEVICE_TYPE(NOKIA_DSP_STAGED, nokia_dsp_staged_device, "nokia_dsp_staged"
 
 nokia_dsp_staged_device::nokia_dsp_staged_device(const machine_config &config, const char *tag, device_t *owner, u32 clock) :
 	device_t(config, NOKIA_DSP_STAGED, tag, owner, clock),
-	m_cpu(*this, "cpu"), m_transport(*this, "^dspif"), m_cobba(*this, "^cobba")
+	m_cpu(*this, "cpu"), m_transport(*this, "^dspif"), m_cobba(*this, "^cobba"), m_flash(*this, "^flash")
 {
 }
 
@@ -23,6 +23,12 @@ void nokia_dsp_staged_device::device_add_mconfig(machine_config &config)
 void nokia_dsp_staged_device::device_start()
 {
 	m_guard = timer_alloc(FUNC(nokia_dsp_staged_device::check_execution), this);
+	if (!m_fragment_offset || m_fragment_offset + m_fragment.size() * 2 > m_flash.bytes())
+		fatalerror("Staged DSP requires a configured product-local program fragment");
+	std::copy_n(&m_flash[m_fragment_offset / 2], m_fragment.size(), m_fragment.begin());
+	save_item(NAME(m_program_ram));
+	save_item(NAME(m_program_valid));
+	save_item(NAME(m_loader2_verified));
 	save_item(NAME(m_data));
 	save_item(NAME(m_control));
 	save_item(NAME(m_active));
@@ -35,6 +41,9 @@ void nokia_dsp_staged_device::device_reset()
 {
 	m_data.fill(0);
 	m_control.fill(0);
+	m_program_ram.fill(0);
+	m_program_valid.fill(0);
+	m_loader2_verified = false;
 	m_active = false;
 	m_published = false;
 	m_program_end = 0x0fdf;
@@ -81,8 +90,8 @@ void nokia_dsp_staged_device::reset_line_w(int released)
 	machine().scheduler().synchronize(timer_expired_delegate(FUNC(nokia_dsp_staged_device::begin_execution), this));
 	machine().scheduler().perfect_quantum(attotime::from_usec(100));
 	machine().scheduler().abort_timeslice();
-	logerror("staged_dsp: release entry=0f00 words=%u prom_input=0006 clock=%u stage=%s t=%.6f\n",
-			m_program_end - 0x0f00, clock(), verifier ? "verifier" : "loader", machine().time().as_double());
+	logerror("staged_dsp: release entry=0f00 words=%u prom_input=%04x clock=%u stage=%s t=%.6f\n",
+			m_program_end - 0x0f00, m_fragment[7], clock(), verifier ? "verifier" : "loader", machine().time().as_double());
 }
 
 TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::begin_execution)
@@ -95,9 +104,22 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::begin_execution)
 
 u16 nokia_dsp_staged_device::program_r(offs_t offset)
 {
-	// Declared HLE input, not a claim that the fitted mask has been acquired.
-	if (offset == 0xff87)
-		return 6;
+	if (!m_verifier && offset == 0x0a00 && !m_loader2_verified)
+	{
+		if (!m_loader2_offset || m_loader2_offset + 613 * 2 > m_flash.bytes())
+			fatalerror("Staged DSP requires a configured loader2 source");
+		for (unsigned index = 0; index != 613; ++index)
+			if (m_transport->dsp_data_r(0x0a00 + index) != m_flash[m_loader2_offset / 2 + index])
+				throw emu_fatalerror(1, "Staged DSP loader2 differs from product flash at word %u", index);
+		m_loader2_verified = true;
+		logerror("staged_dsp: loader2_verified words=613 entry=0a00 t=%.6f\n", machine().time().as_double());
+	}
+	// Firmware-contained bootstrap fragment, not a fitted-mask dump. The
+	// product profile chooses its source; no missing words are fabricated.
+	if (offset >= 0xff80 && offset < 0xff80 + m_fragment.size())
+		return m_fragment[offset - 0xff80];
+	if (offset < m_program_ram.size() && m_program_valid[offset])
+		return m_program_ram[offset];
 	if (offset >= 0x0800 && offset < 0x1000)
 		return m_transport->dsp_data_r(offset);
 	if (m_active)
@@ -116,6 +138,11 @@ void nokia_dsp_staged_device::program_w(offs_t offset, u16 data)
 {
 	if (offset >= 0x0800 && offset < 0x1000)
 		m_transport->dsp_data_w(offset, data);
+	else if (offset < m_program_ram.size())
+	{
+		m_program_ram[offset] = data;
+		m_program_valid[offset] = 1;
+	}
 }
 
 u16 nokia_dsp_staged_device::data_r(offs_t offset)
@@ -125,16 +152,30 @@ u16 nokia_dsp_staged_device::data_r(offs_t offset)
 
 void nokia_dsp_staged_device::data_w(offs_t offset, u16 data)
 {
+	const u16 previous = data_r(offset);
 	if (offset >= 0x0800 && offset < 0x1000)
 		m_transport->dsp_data_w(offset, data);
 	else
 		m_data[offset] = data;
+	if (offset == 0x0029 && BIT(previous ^ data, 3))
+	{
+		// Native loader code publishes a selector before stroking this wire.
+		// MAD2/DSPIF owns routing; no MCU task or message is injected here.
+		m_transport->service_irq_w(BIT(data, 3));
+		if (BIT(data, 3))
+			logerror("staged_dsp: request selector=%04x ack=%04x remaining=%04x destination=%04x pc=%04x t=%.6f\n",
+				m_transport->dsp_data_r(0x0871), m_transport->dsp_data_r(0x0872),
+				m_transport->dsp_data_r(0x087d), m_transport->dsp_data_r(0x087b),
+				u16(m_cpu->state_int(tms320c54x_device::STATE_PC)), machine().time().as_double());
+	}
 }
 
 u16 nokia_dsp_staged_device::io_r(offs_t offset)
 {
 	if (offset == 0x002d)
 		return m_cobba->control_data_r();
+	if (offset == 0x0000 || offset == 0x000c || offset == 0x000e)
+		return m_control[offset];
 	throw emu_fatalerror(1, "Staged DSP needs unsupported port read %04x", u16(offset));
 }
 
@@ -144,7 +185,7 @@ void nokia_dsp_staged_device::io_w(offs_t offset, u16 data)
 		m_cobba->control_select_w(data);
 	else if (offset == 0x002d)
 		m_cobba->control_data_w(data);
-	else if (offset == 0x0000 || offset == 0x000c || offset == 0x000e)
+	else if (offset == 0x0000 || offset == 0x0002 || offset == 0x000c || offset == 0x000e)
 	{
 		// Uploaded code initializes these CTSI control/frame registers but
 		// does not read them or await their interrupts in this bounded stage.
@@ -159,8 +200,12 @@ void nokia_dsp_staged_device::io_w(offs_t offset, u16 data)
 TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::check_execution)
 {
 	const u16 pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
-	if (pc < 0x0f00 || pc >= m_program_end)
+	if ((pc < 0x0f00 || pc >= m_program_end) &&
+			!(m_loader2_verified && pc >= 0x0a00 && pc < 0x0c65))
+	{
+		logerror("staged_dsp: outside_uploaded_code pc=%04x t=%.6f\n", pc, machine().time().as_double());
 		throw emu_fatalerror(1, "Staged DSP escaped uploaded program: pc=%04x", pc);
+	}
 	if (m_verifier && !m_published && m_transport->dsp_data_r(0x0801) != 0xffff)
 	{
 		m_published = true;

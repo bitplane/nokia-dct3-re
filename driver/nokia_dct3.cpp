@@ -3316,10 +3316,12 @@ void nokia_dct3_state::noki8xxx(machine_config &config)
 void nokia_dct3_state::nsm3dr6(machine_config &config)
 {
 	noki8xxx(config);
-	// NSM-3D service packages name ROM6. This fixture declares its version
-	// input only; the missing mask is not replaced with invented executable code.
+	// Product flash contains a ROM6 bootstrap fragment and two uploaded
+	// loaders. Execute those bytes only; the complete fitted mask is absent.
 	m_mad2->set_dsp_reset_wiring_contract({ 0x10, 0x01 });
-	NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x11770c);
+	staged.set_loader2_source(0x117838);
 }
 
 void nokia_dct3_state::noki8210(machine_config &config)

@@ -2388,6 +2388,9 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf84b: // BC pmad, BLT
 		branch_if((s64(m_b << 24) >> 24) < 0);
 		return;
+	case 0xf84f: // BC pmad, BLEQ
+		branch_if((s64(m_b << 24) >> 24) <= 0);
+		return;
 	case 0xf48d: // SQUR A,A
 	case 0xf58d: // SQUR A,B
 	{

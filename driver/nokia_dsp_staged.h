@@ -15,6 +15,8 @@ public:
 	nokia_dsp_staged_device(const machine_config &config, const char *tag, device_t *owner, u32 clock);
 	void reset_line_w(int released);
 	bool active() const { return m_active; }
+	void set_program_fragment(u32 flash_offset) { m_fragment_offset = flash_offset; }
+	void set_loader2_source(u32 flash_offset) { m_loader2_offset = flash_offset; }
 
 protected:
 	virtual void device_add_mconfig(machine_config &config) override;
@@ -36,6 +38,13 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	required_device<nokia_dspif_device> m_transport;
 	required_device<nokia_cobba_device> m_cobba;
+	required_region_ptr<u16> m_flash;
+	std::array<u16, 104> m_fragment{};
+	u32 m_fragment_offset = 0;
+	u32 m_loader2_offset = 0;
+	bool m_loader2_verified = false;
+	std::array<u16, 0x800> m_program_ram{};
+	std::array<u8, 0x800> m_program_valid{};
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x10> m_control{};
 	emu_timer *m_guard = nullptr;

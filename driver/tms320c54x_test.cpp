@@ -313,6 +313,7 @@ private:
 		for (unsigned i = 0; i != 26; ++i)
 			data.write_word(0x1300 + i, 0x6000 + i);
 		m_phase = 0;
+		m_bleq_case = 0;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0100);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0700);
@@ -10029,8 +10030,8 @@ private:
 		}
 		if (m_phase >= 500 && m_phase <= 503)
 		{
-			const bool taken = m_phase == 500 || m_phase == 502;
-			const u16 opcode = m_phase <= 501 ? 0xf84a : 0xf84b;
+			const bool taken = m_bleq_case ? m_bleq_case < 3 : m_phase == 500 || m_phase == 502;
+			const u16 opcode = m_bleq_case ? 0xf84f : m_phase <= 501 ? 0xf84a : 0xf84b;
 			expect_opcode(opcode,
 					m_port_writes == 2 &&
 					m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 5) &&
@@ -10046,6 +10047,17 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			if (m_bleq_case < 3)
+			{
+				static constexpr u64 values[] = {0, 0xff00000000ULL, 1};
+				program.write_word(0x05e2, 0xf84f); // BC 05f0,BLEQ
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, values[m_bleq_case++]);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_port_writes = 0;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
@@ -14062,6 +14074,7 @@ private:
 	optional_device<nokia_dspif_device> m_transport;
 	emu_timer *m_check_timer = nullptr;
 	unsigned m_phase = 0;
+	unsigned m_bleq_case = 0;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_repeat_reads = 0;

@@ -21,6 +21,17 @@ NSM3D_LOADER_OFFSET = 0x111D14
 NSM3D_LOADER_SHA1 = "1250a9e17ce44ec8cc373f222a817f99f505bcdf"
 
 
+def extract_program_fragment(image):
+    if hashlib.sha1(image).hexdigest() != NSM3D_FLASH_SHA1:
+        raise ValueError("not the pinned 8250 flash")
+    if struct.unpack_from(">6H", image, 0x117700) != (0xff80, 0xff80, 104, 0x200, 0x8c, 0):
+        raise ValueError("unexpected bootstrap fragment descriptor")
+    fragment = image[0x11770c:0x1177dc]
+    if hashlib.sha1(fragment).hexdigest() != "440bf49f1eba4cadb12f7f7581c992b0025807d6":
+        raise ValueError("unexpected bootstrap program fragment")
+    return fragment
+
+
 def extract_loader(image):
     """Return the whole NSM-3D upload, including its table and code tail."""
     if hashlib.sha1(image).hexdigest() != NSM3D_FLASH_SHA1:

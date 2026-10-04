@@ -49,9 +49,21 @@ class LiveVerifierTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check(self.fixture(), bytes.fromhex("1234"), bytes.fromhex("8765"))
 
-    def test_wrong_missing_mask_address(self):
+    def test_fragment_and_native_delivery(self):
+        text = self.fixture() + (
+            "nsm3d_program_fragment: words=9abc\n"
+            "staged_dsp: request selector=0014\n"
+            "staged_dsp: request selector=0001\n"
+            "staged_dsp: loader2_verified words=613 entry=0a00\n")
+        check(text, bytes.fromhex("1234"), bytes.fromhex("5678"), bytes.fromhex("9abc"))
+
+    def test_missing_fragment(self):
         with self.assertRaises(ValueError):
-            check(self.fixture().replace("address=ff80", "address=ff81"), bytes.fromhex("1234"), bytes.fromhex("5678"))
+            check(self.fixture(), bytes.fromhex("1234"), bytes.fromhex("5678"), bytes.fromhex("9abc"))
+
+    def test_illegal_instruction_is_not_progress(self):
+        with self.assertRaises(ValueError):
+            check(self.fixture() + "unimplemented C54x opcode f84f", bytes.fromhex("1234"))
 
 
 if __name__ == "__main__":

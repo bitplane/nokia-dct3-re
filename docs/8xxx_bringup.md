@@ -8,8 +8,8 @@ boot, interactive UI, registration or calls. Input hashes and acquisition
 provenance remain in `roms/README.md`.
 
 The normal 8250 remains at its fail-closed verifier boundary. The separate
-`nsm3dr6` research composition executes the MCU-uploaded verifier and advances
-to the next DSP loader. Its declared PROM6 input is not an acquired mask ROM;
+`nsm3dr6` research composition executes the MCU-uploaded verifier and two DSP
+loaders using a product-flash bootstrap fragment. This is not a fitted-mask dump;
 graphical boot and phone functionality remain unproved.
 
 ## 8250 staged verifier
@@ -52,8 +52,8 @@ flash finds one candidate call to `0x2cb226`, at `0x2f33d0`; its decoded
 caller continues initialization after return. The direct literal reader of
 `0x12f026`, at `0x2de1ca`, formats a three-character COBBA identifier; it is
 not a verdict check. Indirect consumers through aliased structure pointers
-are not closed by the scan. The next target is the descriptor-driven loader
-and its mask-entry/publication contract, not an assumed result-validation gate.
+are not closed by the scan. The remaining execution boundary is the second
+loader's call to `2c75`, not an assumed result-validation gate.
 
 ### Live uploaded-code composition
 
@@ -66,9 +66,9 @@ words, transfer-count completion or MCU state are manufactured.
 The authentic service package `nsm3d_604.exe`, member `nsm-3d.ini`, names
 `Rom6ImageFile=nsm3dx_6.040`. This supports a ROM6-family experiment, not a
 fitted-mask identification for v5.02. The composition supplies immutable
-PROM version 6, existing nominal COBBA register-F/status inputs, and a
+PROM version 6 from the product-flash fragment, nominal COBBA register-F/status inputs, and a
 declared 13 MHz execution clock. It retains the staged code's CTSI writes
-to ports 0/0c/0e without fabricating interrupts; other ports and execution
+to ports 0/2/0c/0e without fabricating timer interrupts; other ports and execution
 outside the recovered program fail closed.
 
 On a product-local cold run, native execution publishes `0000/0006/0006/0006`
@@ -76,10 +76,8 @@ at 0.996196 seconds. MCU `0x2cb328` has retained `0000/0006` after exactly
 58 ordered ownership pairs per buffer. The next initialization clears shared
 memory, loads descriptor `0x311d14` with fields
 `fd00/ff80/027e/0500/0078/0000`, and releases DSP reset at `0x2cb4c0`
-at 1.014471 seconds. The research composition executes the independently
-recovered loader prefix and stops at its first missing program-ROM read,
-`ff80` from instruction `0f1e` (reported next PC `0f20`), at 1.015569 seconds.
-It does not pretend to execute the missing mask.
+at 1.014471 seconds. Its loader executes the acquired bootstrap fragment,
+then drives descriptor requests through the ordinary MAD2 IRQ4 path.
 
 The descriptor's 638-word upload has SHA-1
 `1250a9e17ce44ec8cc373f222a817f99f505bcdf`. A read-only capture reproduces
@@ -91,20 +89,44 @@ branch table and padding, not a complete DSP ROM.
 GNU tic54x disassembly independently decodes the prefix: preserve fingerprint
 words `04f7/04f8`, clear work memory, then repeat `MVPD ff80,*AR2+` for
 104 words into data `0780..07e7`. The needed source range is `ff80..ffe7`;
-the declared single version input at `ff87` does not supply the other words.
+catalogue entry `0f` supplies those exact 104 words. Its descriptor is
+`ff80/ff80/0068/0200/008c/0000`, payload at `0x31770c`, SHA-1
+`440bf49f1eba4cadb12f7f7581c992b0025807d6`. This is a firmware-contained
+bootstrap template, not proof of its identity to the physical mask. The
+research composition maps the template explicitly and no longer synthesizes
+the version word. The read-only observer verifies every mapped word.
 Later code installs 422 uploaded branch-table words into program `0590..0735`
 using `MVDP`, posts selectors `14` then `01` at `0871`, strobes bit 3 at
 MMR `29`, and waits on `0872`. It copies input chunks from `087e+0800` to
 destination `087b`, decrementing the remaining `087d` count, then branches
-to `0a00` when done. These later paths are statically decoded, not executed
-or validated against ROM6. The next software question is the MCU consumer of
-those selectors and whether its observable loader contract permits an honest
-HLE implementation without importing ROM4 mask instructions.
+to `0a00` when done. These paths now execute natively: the first `14` request
+is followed by 133 `01` chunk requests. The MCU supplies descriptor 14's
+613-word loader2 at `0a00`, then descriptor 1's `0a5c` words in chunks of
+`0014`, ending with 12 words. The second loader is byte-compared with its
+product-flash payload before execution; SHA-1
+`b1df4b301d67c6c4421ae346478c465a7fd20ff0`. At 1.023949 seconds it enters
+`0a00`, initializes retained CTSI registers, and calls `2c75` at `0a40`.
+That routine is outside the acquired code and remains fail-closed. No ROM4
+instructions or guessed helper return values were imported.
+
+The MCU handler at `0x2cb874` consumes the selector from shared byte offset
+`e2`, indexes the relocated catalogue, copies at most the declared input
+chunk length, and acknowledges through `e4`. The flash initialization record
+at `0x309560` copies `0x74` bytes to RAM `0x12f040`: 28 descriptor pointers
+and a null terminator. Its source table is `0x309568`; selectors 0, 1, 0f,
+14 and 1b resolve respectively to `0x311d14`, `0x312220`, `0x317700`,
+`0x31782c` and `0x3188c0`. This bounds the catalogue independently of a
+literal-call scan. Selector 14 is not ROM4's loader2 selector 12.
+
+Native execution exposed missing `BC BLEQ` opcode `f84f`; the core now
+implements the signed 40-bit comparison with taken/not-taken cycle tests.
+The expanded observer also roots its tap userdata, preventing garbage
+collection from leaving an invalid callback during the larger upload capture.
 
 Run `nsm3dr6` with the private-directory options below and
 `tools/nsm3d_verifier_observe.lua`. The expected bounded run exits nonzero at
-the loader's missing-mask read. Validate the captured native publication,
-MCU retention, complete loader upload and precise stop boundary:
+the call outside acquired code. Validate native publication, MCU retention,
+complete loader upload, mapped fragment and organic loader2 delivery:
 
 ```sh
 .venv/bin/python tools/nsm3d_live_verifier_check.py RUN/error.log \
@@ -159,5 +181,6 @@ endpoint registers. Separate passive `gensio_select` records restore coverage
 without changing register ownership or behavior; `verify-gensio` now passes
 both 3210 firmware revisions. After adding the separate live staged-code
 composition, the normal 8250 boundary, 3210 baseline and coherent frontier
-still reproduce. The expanded tool suite passes 1,250 tests and all 11 MAME
+still reproduce. C54x core conformance passes, including the new BLEQ cases.
+The expanded tool suite passes 1,254 tests and all 11 MAME
 overlay patches apply to the pinned upstream commit.
