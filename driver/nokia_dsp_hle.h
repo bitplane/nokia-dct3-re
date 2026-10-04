@@ -5,6 +5,7 @@
 #define MAME_NOKIA_NOKIA_DSP_HLE_H
 
 #include "nokia_dsp_backend.h"
+#include "nokia_cobba.h"
 #include "nokia_dspif.h"
 #include "nokia_dsp_staged.h"
 #include "nokia_external_service.h"
@@ -112,6 +113,8 @@ public:
 
 	void set_service_enabled(bool enabled) { m_service_enabled = enabled; }
 	void set_opaque_parameter_acceptance(bool enabled) { m_opaque_parameter_acceptance = enabled; }
+	// Research HLE selection, not a claim about the fitted ROM6 mask.
+	void set_msid83_query(bool enabled, u8 revision) { m_msid83_query = enabled; m_msid_revision = revision; }
 	void set_external_service_enabled(bool enabled) { m_external_service_enabled = enabled; }
 	void set_service_control_contract(service_control_contract contract)
 	{
@@ -178,7 +181,9 @@ private:
 	void prepare_speech_codec_save();
 	void restore_speech_codec_state();
 	bool consume_memory_upload(const nokia_dspif_device::packet &packet);
+	bool answer_identity_query(const nokia_dspif_device::packet &packet);
 	required_device<nokia_dspif_device> m_transport;
+	required_device<nokia_cobba_device> m_cobba;
 	optional_device<nokia_dsp_staged_device> m_staged;
 	required_device<nokia_external_service_peer_device> m_external_peer;
 	required_device<nokia_radio_peer_device> m_radio_peer;
@@ -202,6 +207,8 @@ private:
 	u16 m_mcu_control_word = 0;
 	u16 m_mcu_control_wire = 0;
 	bool m_opaque_parameter_acceptance = false;
+	bool m_msid83_query = false;
+	u8 m_msid_revision = 0;
 	std::array<u16, 14> m_applied_parameters{};
 	speech_control_contract m_speech_control;
 	tone_control_contract m_tone_control;

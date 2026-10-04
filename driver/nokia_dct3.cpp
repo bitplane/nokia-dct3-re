@@ -3338,6 +3338,9 @@ void nokia_dct3_state::nsm3dhle(machine_config &config)
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 	m_dsp_hle->set_opaque_parameter_acceptance(true);
+	// Declared candidate codec only: no record/self-test verdict, no PMM edits.
+	// Revision 0 is an unmeasured HLE input, not a donor chip identity.
+	m_dsp_hle->set_msid83_query(true, 0);
 }
 
 void nokia_dct3_state::noki8210(machine_config &config)

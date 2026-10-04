@@ -7,9 +7,11 @@ import re
 try:
     from tools.extract_nsm3_verifier import extract, extract_loader, extract_program_fragment
     from tools.nsm3d_live_verifier_check import check, check_boundary
+    from tools.dct3_msid_codec import decode_msid
 except ModuleNotFoundError:
     from extract_nsm3_verifier import extract, extract_loader, extract_program_fragment
     from nsm3d_live_verifier_check import check, check_boundary
+    from dct3_msid_codec import decode_msid
 
 
 def check_handoff(text):
@@ -81,6 +83,23 @@ def check_service_inputs(text, image, pmm):
         raise ValueError("service requests do not match ordered product-local inputs")
 
 
+def check_identity_query(text, image):
+    identities = re.findall(r"identity_query family=83 chip=([0-9a-f]{8}) "
+                            r"revision=([0-9a-f]{2}) verdict=not_evaluated", text)
+    replies = re.findall(r"RX enqueue type=74 payload=16 producer=[0-9a-f]+ "
+                         r"data=(340e0083[0-9a-f]{24})", text)
+    if len(identities) != 1 or len(replies) != 1:
+        raise ValueError("missing unique computed identity query/reply")
+    chip, revision = identities[0]
+    msid = bytes.fromhex(replies[0])[3:]
+    if decode_msid(msid) != image[-4:] + bytes.fromhex(chip + "acadab" + revision):
+        raise ValueError("identity reply does not encode request checksum and modeled chip inputs")
+    if f"nsm3d_identity_boundary: ready=01 record={msid.hex()}" not in text:
+        raise ValueError("MCU did not retain the computed identity reply")
+    if re.search(r"RX enqueue type=74[^\n]*data=0d00", text):
+        raise ValueError("unrecovered self-test success was synthesized")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -88,6 +107,8 @@ def main():
     parser.add_argument("--discovery", action="store_true", help="require verbose discovery and ring observations")
     parser.add_argument("--pmm", type=Path,
                         help="check verbose service requests against acquired product-local PMM")
+    parser.add_argument("--identity", action="store_true",
+                        help="require computed identity response and firmware retention, not final verdict")
     args = parser.parse_args()
     try:
         text, image = args.log.read_text(), args.flash.read_bytes()
@@ -98,6 +119,8 @@ def main():
             check_discovery(text)
         if args.pmm:
             check_service_inputs(text, image, args.pmm.read_bytes())
+        if args.identity:
+            check_identity_query(text, image)
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 runtime HLE failed: {error}\n")
     print("8250 native uploads and exclusive runtime HLE parameter acceptance verified; phone boot unproved")

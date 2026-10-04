@@ -95,6 +95,12 @@ local sample = coroutine.create(function()
     if not emu.wait(7.5) then return end
     -- Do not attribute the observer's own boundary reads to the MCU's PC.
     observe_rx = false
+    local identity = {}
+    for index = 0, 12 do
+        identity[#identity + 1] = string.format("%02x", memory:read_u8(0x12da5c + index))
+    end
+    machine:logerror(string.format("nsm3d_identity_boundary: ready=%02x record=%s\n",
+        memory:read_u8(0x12da3f), table.concat(identity)))
     if dsp then
         local fields = {}
         for address = 0x110f6, 0x11102, 2 do

@@ -3,6 +3,7 @@
 #include "emu.h"
 #include "emuopts.h"
 #include "nokia_dsp_hle.h"
+#include "nokia_record_codec.h"
 
 #define LOG_DSP_HLE (1U << 0)
 #define VERBOSE (LOG_DSP_HLE)
@@ -15,6 +16,7 @@ nokia_dsp_hle_device::nokia_dsp_hle_device(
 	device_t(mconfig, NOKIA_DSP_HLE, tag, owner, clock),
 	nokia_dsp_backend_interface(mconfig, *this),
 	m_transport(*this, "^dspif"),
+	m_cobba(*this, "^cobba"),
 	m_staged(*this, "^dsp_staged"),
 	m_external_peer(*this, "^external_service_peer"),
 	m_radio_peer(*this, "^radio_peer"),
@@ -618,6 +620,36 @@ bool nokia_dsp_hle_device::consume_memory_upload(const nokia_dspif_device::packe
 	return true;
 }
 
+bool nokia_dsp_hle_device::answer_identity_query(const nokia_dspif_device::packet &packet)
+{
+	if (!m_msid83_query || packet.type != 0x70 || packet.length != 6 ||
+			packet.payload[0] != 0x13 || packet.payload[1] != 4)
+		return false;
+	using namespace nokia_dct3_record_codec;
+	record plain{};
+	std::copy_n(packet.payload.begin() + 2, 4, plain.begin());
+	// ROM4's observed register packing; explicitly a ROM6 HLE hypothesis.
+	const u32 chip = ((m_cobba->control_register(5) & 0xfff) << 12) |
+			(m_cobba->control_register(6) & 0xfff);
+	for (unsigned i = 0; i < 4; ++i)
+		plain[4 + i] = chip >> (24 - 8 * i);
+	plain[8] = 0xac;
+	plain[9] = 0xad;
+	plain[10] = 0xab;
+	plain[11] = m_msid_revision;
+	static constexpr record table = {0x50, 0xf3, 0x65, 0x25, 0xd2, 0xb1, 0xc1, 0xb6, 0x09, 0xae, 0xff, 0x4c};
+	static constexpr record schedule = {0xd0, 0x16, 0x2c, 0x58, 0xb0, 0x71, 0xe2, 0xd5, 0x5a, 0x67, 0xce, 0x8d};
+	const record encoded = inverse(plain, table, schedule);
+	std::array<u8, 16> response = {0x34, 0x0e, 0x00, 0x83};
+	std::copy(encoded.begin(), encoded.end(), response.begin() + 4);
+	if (!m_transport->enqueue_rx_packet(0x74, response.data(), response.size()))
+		return false;
+	m_transport->notify_rx();
+	LOGMASKED(LOG_DSP_HLE, "dsp_hle: identity_query family=83 chip=%08x revision=%02x verdict=not_evaluated t=%.6f\n",
+			chip, m_msid_revision, machine().time().as_double());
+	return true;
+}
+
 TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 {
 	if (native_owns_transport())
@@ -629,6 +661,10 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_hle_device::packet_tick)
 		while (m_transport->peek_tx_packet(packet))
 		{
 			consume_memory_upload(packet);
+			if (m_msid83_query && packet.type == 0x70 && packet.length == 6 &&
+					packet.payload[0] == 0x13 && packet.payload[1] == 4 &&
+					!answer_identity_query(packet))
+				break; // Preserve the request until RX has room.
 			if (m_external_service_enabled && packet.type == 0x05 &&
 					packet.length >= 9 && packet.length <= 75)
 				m_external_peer->receive_frame(packet.payload.data(), packet.length);

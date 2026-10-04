@@ -244,8 +244,9 @@ seconds (`a4/a6=0002/0002`, `1c8/1ca=008c/008c`). This validates the
 shared discovery grammar against this MCU, not a donor application setup.
 The independently captured LCD is still blank. Subsequent organic type-70
 requests start with primitives `13/14/15/16` and `0d00`; their resident
-service completion is the next boundary. No response to those requests is
-yet synthesized in this composition.
+service completion is the next boundary. The research HLE answers the
+identity query only; record decoding and the final self-test reply remain
+unimplemented.
 
 The producer at `0x28cb68` supplies product-local inputs, not an arbitrary
 challenge: primitive `13` reads the firmware checksum at `0x3cfffc` through
@@ -298,6 +299,28 @@ independent codec-family validation, not a donor identity for this machine
 or proof that the 8250 selects `83`. The encoder requires all plaintext
 bytes and the family explicitly; it never chooses a passing identity.
 
+The `nsm3dhle` research composition now explicitly selects a candidate
+family-`83` identity-query model. It encodes the checksum actually sent by
+the MCU, the existing COBBA register-5/6 packing (`00160010` with current
+calibrated reset inputs), the published `ac ad ab` family marker and an
+explicitly unmeasured revision input of zero. Its compiled C++ inverse is
+checked against 101 independent Python word-model vectors. The ROM4
+register packing and family selection remain declared ROM6 HLE hypotheses,
+not recovered physical reset values or an assertion of PMM compatibility.
+
+On a fresh coherent run, the device queues type `74` payload
+`340e0083cf9a70aea6ab6dc5febbd33c` in response to the organic `1304`
+request. Firmware handler `0x28d02c` retains all 13 MSID bytes at `0x12da5c`
+and sets its ready flag at `0x12da3f`. The decoded reply reproduces the
+request checksum and modeled chip inputs; the low-record requests still
+match the acquired PMM. RX drains at `0095/0095`, MCU remains at
+`0x2f3498`, and the captured LCD remains blank. This validates the computed
+query/receive contract, not the identity record verdict. No `0d00` success,
+ABBA cookie, PMM rewrite or firmware-state change is synthesized.
+`--identity` checks the encoded inputs and firmware-owned retention and
+rejects a fabricated final success. The strict `nsm3dr6` control remains
+silent at command 32 with native transport ownership retained.
+
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
 The `35` handler's envelope branch (`0x28d286..0x28d2c6`) accepts size
@@ -318,7 +341,8 @@ and validate its log separately:
 
 ```sh
 .venv/bin/python tools/nsm3d_runtime_hle_check.py RUN/error.log \
-  roms/noki8250/8250-502mcuppmk.fls --discovery
+  roms/noki8250/8250-502mcuppmk.fls --discovery --identity \
+  --pmm 'roms/noki8250/8250 virgin eeprom 003d0000.fls'
 ```
 
 Use `-verbose` for discovery transport observations. Setting fixture variable

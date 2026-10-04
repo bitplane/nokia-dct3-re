@@ -29,6 +29,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_dsp_backend.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
+	driver/nokia_record_codec.h \
 	driver/nokia_dsp_staged.cpp driver/nokia_dsp_staged.h \
 	driver/nokia_dspif.cpp driver/nokia_dspif.h \
 	driver/nokia_external_service.cpp driver/nokia_external_service.h \
