@@ -84,6 +84,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("pmm", type=Path)
     parser.add_argument("--timeout-ms", type=int, default=30000)
+    parser.add_argument("--all-distinct", action="store_true",
+                        help="constrain both distinct low-record ciphertexts with one chip")
     args = parser.parse_args()
     try:
         import z3
@@ -115,12 +117,18 @@ def main():
              else z3.BitVecVal(KEY[index], 8) for index in range(12)]
     solver = z3.SolverFor("QF_BV")
     solver.set(timeout=args.timeout_ms)
-    for start in (0, 12):
-        decoded = symbolic_inverse(z3, raw[start:start + 12], table)
-        solver.add(decoded[10] == 0x54, decoded[11] == 0xc2)
+    records = [raw]
+    if args.all_distinct:
+        records = list(dict.fromkeys(image[0x10046 + index * 24:0x1005e + index * 24]
+                                    for index in range(10)))
+    for record in records:
+        for start in (0, 12):
+            decoded = symbolic_inverse(z3, record[start:start + 12], table)
+            solver.add(decoded[10] == 0x54, decoded[11] == 0xc2)
     result = solver.check()
     report = {"result": str(result), "timeout_ms": args.timeout_ms,
               "model": "family83/raw-input/24-bit-chip/ROM4-marker54c2",
+              "distinct_records": len(records),
               "codec_crosscheck": "passed", "provisioning": "none"}
     if result == z3.unknown:
         report["reason"] = solver.reason_unknown()

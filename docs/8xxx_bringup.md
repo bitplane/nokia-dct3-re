@@ -13,6 +13,24 @@ loaders using a product-flash bootstrap fragment. This is not a fitted-mask dump
 at the unavailable call it halts only the DSP for a silent-peer observation.
 Graphical boot and phone functionality remain unproved.
 
+The separate `nsm3dhle` diagnostic composition explicitly yields transport
+ownership at that missing call. It completes parameter acknowledgements and
+request-derived discovery, computes a candidate family-83 identity reply,
+and returns transformed original PMM records through the real RX path.
+The MCU rejects those records at `28d3c4 -> 28d56e`, before format selection;
+the final self-test request remains unanswered and the LCD remains blank.
+This composition is not normal 8250 support or proof of fitted ROM6 behavior.
+
+The unresolved contracts are the original chip/provisioning pairing and
+the missing ROM6 initialization/self-test/record-processing behavior.
+ROM4 arithmetic, published codec tables and the acquired MCU consumers
+constrain them but do not establish them. Useful new evidence would be a
+compatible ROM6 mask image, an independently captured 8250 peer exchange,
+or a verified original chip identity with its record preprocessing contract.
+No default unlocked record, inferred success flag or donor profile is an
+acceptable substitute. Software-only identity constraints remain explicitly
+inconclusive; feature acceptance cannot begin until a coherent boot advances.
+
 ## 8250 staged verifier
 
 The stock descriptor at flash `0x3188c0` is
@@ -405,6 +423,10 @@ No solver output is connected to a device setter, PMM writer or HLE verdict.
 The acquired first record returns `unknown (timeout)` with both 10-second
 and 120-second limits. This avenue has not recovered a serial or falsified
 the unknown-chip hypothesis; neither a candidate nor an absence proof exists.
+The `--all-distinct` experiment constrains both distinct records with the
+same symbolic chip and returns `unknown (timeout)` at 60 seconds. It adds
+independent ciphertext conditions, not extra observations from repeated
+slots. No further identity is inferred from these inconclusive results.
 
 The 8250 decoder independently routes primitive `34` to `0x28d02c`
 (13-byte retention), `35` to `0x28d250`, and `36` to `0x28d0d0`.
