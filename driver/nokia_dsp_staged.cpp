@@ -83,6 +83,8 @@ void nokia_dsp_staged_device::reset_line_w(int released)
 	m_active = true;
 	m_published = false;
 	m_verifier = verifier;
+	if (loader)
+		m_loader2_verified = false;
 	m_program_end = verifier ? 0x0fdf : 0x0f7e;
 	m_cpu->set_input_line(INPUT_LINE_RESET, CLEAR_LINE);
 	// CPU input-line changes are synchronized by MAME. Set the uploaded
@@ -136,13 +138,23 @@ u16 nokia_dsp_staged_device::program_r(offs_t offset)
 
 void nokia_dsp_staged_device::program_w(offs_t offset, u16 data)
 {
-	if (offset >= 0x0800 && offset < 0x1000)
+	if (offset >= 0xff80 && offset < 0xff80 + m_fragment.size())
+	{
+		// The verifier deliberately writes version 6 before reading this
+		// resident ROM cell. The declared immutable fragment rejects writes;
+		// do not turn that probe into a writable version-selection register.
+		logerror("staged_dsp: readonly_program_write address=%04x data=%04x pc=%04x\n",
+				u16(offset), data, u16(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+	}
+	else if (offset >= 0x0800 && offset < 0x1000)
 		m_transport->dsp_data_w(offset, data);
 	else if (offset < m_program_ram.size())
 	{
 		m_program_ram[offset] = data;
 		m_program_valid[offset] = 1;
 	}
+	else
+		throw emu_fatalerror(1, "Staged DSP needs unmodelled program write: address=%04x data=%04x", u16(offset), data);
 }
 
 u16 nokia_dsp_staged_device::data_r(offs_t offset)
@@ -203,6 +215,18 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::check_execution)
 	if ((pc < 0x0f00 || pc >= m_program_end) &&
 			!(m_loader2_verified && pc >= 0x0a00 && pc < 0x0c65))
 	{
+		unsigned installed = 0;
+		unsigned first = m_program_valid.size();
+		unsigned last = 0;
+		for (unsigned index = 0; index < m_program_valid.size(); ++index)
+			if (m_program_valid[index])
+			{
+				++installed;
+				first = std::min(first, index);
+				last = index;
+			}
+		logerror("staged_dsp: installed_program words=%u first=%04x last=%04x target_data=%04x pmst=%04x\n",
+				installed, first, last, data_r(pc), u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
 		logerror("staged_dsp: outside_uploaded_code pc=%04x t=%.6f\n", pc, machine().time().as_double());
 		throw emu_fatalerror(1, "Staged DSP escaped uploaded program: pc=%04x", pc);
 	}

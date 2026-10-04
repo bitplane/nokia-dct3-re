@@ -127,6 +127,29 @@ boot claim for 8250 v6.02 is not an execution oracle for this v5.02 image;
 its advertised model/version and provisioning must be matched before
 using it to justify a peer response.
 
+The bounded native run installs exactly 422 program words at `0590..0735`
+before reaching `2c75`, with PMST `07ac` and zero in the research data
+backing at `2c75`. Other program writes outside the known RAM and immutable
+fragment are rejected, not silently discarded. This excludes a preceding
+`MVDP` relocation to the call target in the executed stream; it does not
+establish the complete MAD2 ROM6 overlay geometry. TI documents the effect
+of OVLY as device-specific, so a generic C54x RAM map is not a substitute
+for the fitted ASIC's map ([TI SPRU131G](https://www.ti.com/lit/pdf/spru131)).
+
+The verifier at `0f0f` deliberately attempts `MVDP D0803,Pff87`, with
+`D0803=6`, before reading the same resident cell. The explicit read-only
+fragment rejects that write; its acquired word, not the attempted value,
+supplies the result. This probe must not become a writable version latch.
+
+The second loader also contains a ten-word transaction at `0c08`: it
+copies input through `AR2`, calls unavailable helper `8513`, copies six
+words XORed with `a5a5` to `04ef..04f4`, compares paired input words, writes
+`abba` to `0906` and branches to unavailable `45ba`. The main loop at
+`0aa7` waits for that cookie before branching to `2000`. Thus neither
+`abba` nor a generic "upload complete" notification can be manufactured
+as a replacement for the unrecovered transaction. Recover the MCU-side
+request/response contract before choosing a declared HLE alternative.
+
 The MCU handler at `0x2cb874` consumes the selector from shared byte offset
 `e2`, indexes the relocated catalogue, copies at most the declared input
 chunk length, and acknowledges through `e4`. The flash initialization record

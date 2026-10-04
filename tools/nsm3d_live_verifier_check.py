@@ -40,7 +40,7 @@ def check(text, program, loader=None, fragment=None):
         if len(fragments) != 1 or bytes.fromhex(fragments[0]) != fragment:
             raise ValueError("program fragment differs from product-local flash")
         requests = re.findall(r"staged_dsp: request selector=([0-9a-f]+)", text)
-        if requests[:2] != ["0014", "0001"]:
+        if requests != ["0014"] + ["0001"] * 133:
             raise ValueError("native loader request order differs")
         if "staged_dsp: loader2_verified words=613 entry=0a00" not in text:
             raise ValueError("MCU-supplied loader2 was not verified before execution")
@@ -50,6 +50,24 @@ def check(text, program, loader=None, fragment=None):
         raise ValueError("observer failed")
 
 
+def check_boundary(text):
+    installs = re.findall(
+        r"staged_dsp: installed_program words=(\d+) first=([0-9a-f]+) "
+        r"last=([0-9a-f]+) target_data=([0-9a-f]+) pmst=([0-9a-f]+)", text)
+    if installs != [("422", "0590", "0735", "0000", "07ac")]:
+        raise ValueError("unexpected executed-loader program installation")
+    probes = re.findall(
+        r"staged_dsp: readonly_program_write address=([0-9a-f]+) "
+        r"data=([0-9a-f]+) pc=([0-9a-f]+)", text)
+    if probes != [("ff87", "0006", "0f12")]:
+        raise ValueError("unexpected resident-ROM write probe")
+    stops = re.findall(r"staged_dsp: outside_uploaded_code pc=([0-9a-f]+)", text)
+    if stops != ["2c75"]:
+        raise ValueError("native boundary is not the recovered CALL 2c75")
+    if "unmodelled program write" in text:
+        raise ValueError("native loader attempted an unsupported program write")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
@@ -57,7 +75,9 @@ def main():
     args = parser.parse_args()
     try:
         image = args.flash.read_bytes()
-        check(args.log.read_text(), extract(image, "8250"), extract_loader(image), extract_program_fragment(image))
+        text = args.log.read_text()
+        check(text, extract(image, "8250"), extract_loader(image), extract_program_fragment(image))
+        check_boundary(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f"8250 live verifier failed: {error}\n")
     print("8250 native verifier, product-local program fragment and organic loader2 delivery verified; phone boot remains unproved")
