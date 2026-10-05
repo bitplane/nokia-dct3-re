@@ -1,7 +1,7 @@
 import struct
 import unittest
 
-from tools.nse5_transform_trace_check import inverse_transform_words
+from tools.nse5_transform_trace_check import inverse_transform_words, transform_words
 from tools.nsm3d_runtime_hle_check import check_record_query
 
 
@@ -45,6 +45,24 @@ class RecordQueryTests(unittest.TestCase):
         for text in ("", self.text * 2):
             with self.assertRaises(ValueError):
                 check_record_query(text)
+
+    def test_acquired_record_direction_comparison(self):
+        # Both directions use the declared candidate key, not an inferred
+        # physical identity. Neither passes the own-ROM ordinary +21 gate.
+        encoded = bytes.fromhex('f26aa2e90d880230eb1ee358448a6b92c36710945239c864')
+        key = struct.unpack('>6H', bytes.fromhex('7ba2d0ff9eb20abe73dad335'))
+        schedule = tuple(v * 0x101 for v in bytes.fromhex('b173e65aab478e0d1a34680b'))
+        results = {}
+        for name, operation in (('forward', transform_words), ('inverse', inverse_transform_words)):
+            results[name] = b''.join(struct.pack('>6H', *operation(
+                struct.unpack('>6H', encoded[start:start + 12]), key, schedule))
+                for start in (0, 12))
+        self.assertEqual(results['forward'].hex(),
+                         '253fe7330c12f635031edc2946d796a5f418539ebaa6ac9d')
+        self.assertEqual(results['inverse'].hex(),
+                         '65c48f02ab73bb006fee5146bd0df7c181e6c5956d06f343')
+        for decoded in results.values():
+            self.assertFalse(0x78 <= decoded[21] < 0x80)
 
 
 if __name__ == "__main__":

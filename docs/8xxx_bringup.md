@@ -398,6 +398,17 @@ single-sector extent contract does not apply. Existing runtime request
 checks establish the selected low-record bytes directly; a generic journal
 replay must not silently replace those observations.
 
+The primitive-16 builder at `28cc32..28cc64` allocates the own 30-byte
+object, reads logical PMM `20/18` through `306448` and sends it directly
+through `2890c4`. Unlike the NSE-1 conditional transform path, there is no
+additional caller-side preprocessing between read and send. The existing
+live check independently matches all 24 transmitted bytes to the acquired
+PMM. An offline direction comparison with the declared candidate chip/key
+gives second-block byte 9 `a6` forward versus `06` inverse; neither lies in
+the required `78..7f` range. `test_nsm3d_record_query.py` pins both complete
+results. This closes a direction-only correction, not unknown ROM6 keys,
+chip identity or DSP-side preprocessing.
+
 An offline comparison uses only the two published `82`/`83` lock tables,
 the same original PMM bytes and the same nominal chip packing. Before
 marker stripping, family `82` gives byte-9 values `43/bc` and markers
