@@ -18,3 +18,5 @@ cpu.debug:bpset(0x23c23c, nil,
     'logerror "8890_editor_restore: descriptor=%02x saved=%04x/%04x/%04x context=%08x\\n",b@(r5+d),w@r5,w@(r5+2),w@(r5+a),r4;g')
 cpu.debug:bpset(0x25eed4, nil,
     'logerror "8890_editor_cursor_reset: context=%08x old=%04x new=%04x caller=%08x\\n",r4,w@(r4+1c),r5,r14;g')
+cpu.debug:bpset(0x25ee74, nil,
+    'logerror "8890_editor_save: source=%08x position=%04x/%04x caller=%08x\\n",r0,w@r0,w@(r0+2),r14;g')

@@ -736,44 +736,30 @@ Disconnect, Release/Release Complete and RR release; own deconfiguration
 `040000001117001a6000003c0000001400000001` accepts the idle confirmation
 and returns to paging. This is signaling, not speech acceptance.
 
-Dialing fidelity remains open: typing `1234567` from idle displays and
-transmits `2345671`. Three seconds of editor settling and a physical
-Scroll Down do not correct the rotation. Neither diagnostic is retained
-in the fixture. No firmware state is changed to conceal the mismatch.
-Per-digit screenshots localize it to editor entry: `1` becomes `21` on
-the second physical digit, then later digits insert before the original
-`1`. Reducing only the first press from 150 ms to 30 ms reproduces the
-same ordering; that diagnostic is not retained. The SMS recipient editor
-accepts the intended ordering, so recover the idle-entry cursor setup
-rather than changing shared keypad wiring.
-`noki8890_outgoing_call_check.py` defaults to the intended `1234567` and
-correctly fails; `--number 2345671` verifies only the observed signaling
-lifecycle. Reproduce with `noki8890_outgoing_call_input.lua`, fresh
-cfg/NVRAM and 60 seconds. Recover the idle-to-number-editor lifecycle
-before promoting physically correct outgoing dialing.
+Physical outgoing dialing now preserves the intended `1234567` in both
+the displayed editor and SETUP. Reproduce with
+`noki8890_outgoing_call_input.lua`, fresh cfg/NVRAM and 60 seconds, then
+run `noki8890_outgoing_call_check.py RUN/error.log` with its default
+expected number. The fixture directly cancels the initial clock editor
+with End, dismisses the notice with Names/C, then enters the number.
 
-The own execution trace now identifies the cursor overwrite, not merely
-the visible ordering. At `2603bc` the first digit is inserted into the
-buffer at `136750`, and `2603c2` advances editor context `1348cc + 1c`
-to 1. Subsequent UI construction dispatches `23c0bc` with operation 1;
-its `23c23c..23c242` path restores saved position `1324a2 == 0` through
-`25ee94`. The latter first computes buffer length 1, then `25eed4`
-overwrites the cursor with saved position 0. The restore is conditional
-on saved descriptor `1324ad == 64`, matching the current UI descriptor.
-After restoration the saved position fields are marked `00ff` again.
+Avoid confirming the empty clock editor before cancellation: that creates
+an invalid-input saved position, which the next editor can consume. Own
+clock dispatcher `236130` reaches `236182` on its validation input;
+`2357f0` parses the clock fields and returns the failing field position.
+On failure, `2361bc..2361c4` passes `{0, failing_position}` to `25ee74`,
+which stores it at `1324a0/1324a2`. These positions survive cancellation.
+First-digit insertion at `2603bc` advances context `1348cc + 1c` to 1,
+but construction through `23c23c..23c242` restores saved position 0 via
+`25eed4` when descriptor `1324ad == 64` matches. Subsequent digits then
+insert before the original digit. Direct cancellation does not create
+that failing-position record and passes correct dialing without device
+changes, cursor pokes or reordered test digits. Extra settling, Scroll
+Down and a shorter first-key pulse do not repair the invalid-input path.
 
-`noki8890_dial_observe.lua` adds read-only write observations of
-`1324a0..1324af` and the restore/reset branch targets. The record is
-initialized with `00ff` sentinels at `26354c..263564`; firmware's
-`25ee74` saved-position receiver subsequently writes zero positions
-during the clock/editor lifecycle, including after the fixture's first
-Menu input. Those positions survive cancellation and are consumed on
-first dial-editor construction. This establishes the mechanism but does
-not yet establish which lifecycle step is wrong: do not patch cursor RAM
-or compensate by reordering dialed digits. A physical clock-entry trial
-also failed validation, so completing clock setup is not yet an accepted
-solution. Recover the saved-position receiver's producer and cancellation
-ownership before changing device behavior or claiming correct dialing.
+`noki8890_dial_observe.lua` is a read-only diagnostic for the saved record
+and restore sites. Clock-error cancellation behavior remains a separate
+UI lifecycle observation, not a missing keypad or radio contract.
 
 Incoming-call signaling separately passes IMSI paging, Paging Response,
 contention UA, cipher/MM-information exchange, incoming SETUP, Call
@@ -815,8 +801,8 @@ scenario enabled; check with `noki8890_outgoing_sms_check.py RUN/error.log`.
 The SMS recipient editor preserves digit ordering; the direct-call editor's
 rotation is not a general keypad wiring or numeric-entry defect.
 
-GSM1900 behavior remains unproved; direct-dial number rotation and
-clock-notice settlement remain presentation/input fidelity questions.
+GSM1900 behavior remains unproved; clock-notice settlement and invalid-clock
+error cancellation remain presentation/lifecycle questions.
 
 ### 8850 stock-input runtime boundary
 

@@ -13,7 +13,6 @@ local function press(column, name, action)
 end
 local input = coroutine.create(function()
     if not emu.wait(21) then return end
-    if not press(1, 'Menu', 'clock_notice') then return end
     if not press(0, 'End', 'clock_cancel') then return end
     if not press(1, 'Names / C', 'idle') then return end
     machine.screens[':screen']:snapshot('8890_registered_idle.png')
