@@ -4,6 +4,7 @@ from tools.noki8890_incoming_sms_check import verify as verify_incoming
 from tools.noki8890_outgoing_sms_check import verify as verify_outgoing
 from tools.test_noki8850_sms_check import FRESH, storage
 from tools.test_noki8850_outgoing_sms_check import GOOD
+from tools.test_noki8890_registration_check import PCS_LOG
 
 INCOMING = FRESH.replace('0080ffffffff', '0076ffffffff').replace(
     '8850_sms_physical: action=read_4', '8890_sms_physical: action=read_2').replace(
@@ -30,6 +31,16 @@ class Nokia8890SmsTest(unittest.TestCase):
 
     def test_outgoing(self):
         verify_outgoing(OUTGOING)
+
+    def test_pcs_incoming(self):
+        verify_incoming(PCS_LOG + '\n' + INCOMING, storage(), pcs1900=True)
+
+    def test_pcs_outgoing(self):
+        verify_outgoing(PCS_LOG + '\n' + OUTGOING, pcs1900=True)
+
+    def test_pcs_sms_rejects_unproved_band(self):
+        with self.assertRaisesRegex(ValueError, 'candidate window'):
+            verify_outgoing(OUTGOING, pcs1900=True)
 
     def test_wrong_destination(self):
         with self.assertRaises(ValueError):

@@ -14,6 +14,7 @@ from tools.radio_call_lifecycle_common import (
     RR_CHANNEL_RELEASE, TRAFFIC_RELEASE_UA, RELEASE_CONFIRMATION, IDLE_PCH,
     require_count, require_ordered,
 )
+from tools.noki8890_registration_check import verify as verify_registration
 
 CHECKPOINTS = (
     ('registration release', REGISTRATION_RELEASE), ('IMSI page', IMSI_PAGE),
@@ -38,10 +39,19 @@ CHECKPOINTS = (
 )
 
 
-def verify(text):
+def verify(text, *, pcs1900=False):
     if '[LUA ERROR]' in text:
         raise ValueError('fixture error')
-    require_ordered(text, CHECKPOINTS, '8890 incoming signaling')
+    checkpoints = CHECKPOINTS
+    if pcs1900:
+        verify_registration(text, pcs1900=True)
+        checkpoints = tuple((label, re.compile(
+            r'TX packet type=02 payload=20 .*data=041202000271012fc10002580000000400000000'
+            if label == 'own traffic configuration' else
+            r'TX packet type=02 payload=20 .*data=041202001117001a600002580000001400000001'
+            if label == 'own release configuration' else pattern.pattern))
+            for label, pattern in CHECKPOINTS)
+    require_ordered(text, checkpoints, '8890 incoming signaling')
     for label, pattern in (('incoming SETUP', INCOMING_SETUP), ('Connect', CONNECT), ('Disconnect', DISCONNECT)):
         require_count(text, pattern, 1, f'exactly one {label}')
 
@@ -49,9 +59,10 @@ def verify(text):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
+    parser.add_argument('--pcs1900', action='store_true')
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'))
+        verify(args.log.read_text(errors='replace'), pcs1900=args.pcs1900)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8890 incoming FAIL: {error}\n')
     print('8890 incoming physical Answer/End and CC/RR signaling PASS; speech unproved')

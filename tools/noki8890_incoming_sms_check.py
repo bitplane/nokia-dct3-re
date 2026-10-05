@@ -10,12 +10,15 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.radio_call_lifecycle_common import require_ordered
+from tools.noki8890_registration_check import verify as verify_registration
 from tools.radio_incoming_sms_trace_check import (
     COMMON_CHECKPOINTS, SMS_NVRAM_OFFSET, STORED_RECORD_PREFIX,
 )
 
 
-def verify(text, storage):
+def verify(text, storage, *, pcs1900=False):
+    if pcs1900:
+        verify_registration(text, pcs1900=True)
     checkpoints = COMMON_CHECKPOINTS[:5] + ((
         'own DSP cipher control', re.compile(
             r'TX packet type=14 payload=12 .*data=0076ffffffffffffffff0000'),
@@ -42,9 +45,10 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('storage', type=Path)
     parser.add_argument('frame', type=Path)
+    parser.add_argument('--pcs1900', action='store_true')
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'), args.storage.read_bytes())
+        verify(args.log.read_text(errors='replace'), args.storage.read_bytes(), pcs1900=args.pcs1900)
         import hashlib
         with Image.open(args.frame) as source:
             frame = source.convert('L')

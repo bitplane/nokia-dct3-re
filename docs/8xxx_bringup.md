@@ -803,7 +803,8 @@ rotation is not a general keypad wiring or numeric-entry defect.
 
 GSM900 and PCS1900 laboratory registration are verified separately;
 clock-notice settlement and invalid-clock error cancellation remain
-presentation/lifecycle questions. PCS speech/media remains unproved.
+presentation/lifecycle questions. Call signaling and SMS are verified on
+both bands; speech/media remains unproved.
 
 ### 8890 PCS1900 Acquisition Contract
 
@@ -896,6 +897,37 @@ RSSI -61 and -71, and completes with class-3 count 2. At 8.966 seconds
 firmware selects carrier 600; Location Updating Accept is acknowledged
 at 14.575 seconds. These timings and signal levels are laboratory HLE
 observations, not measured silicon latency or calibrated RF units.
+
+### 8890 PCS1900 Call And SMS Acceptance
+
+Fresh strict-topology runs also complete incoming and outgoing call
+signaling and incoming/outgoing SMS. The network's existing assignment
+encoder derives the non-hopping traffic carrier from the serving ARFCN;
+firmware configures TCH/F with
+`041202000271012fc10002580000000400000000` and releases to carrier 600
+with `041202001117001a600002580000001400000001`. Physical Send/Answer/End
+close the CC/RR lifecycle. Outgoing SETUP contains the intended `1234567`.
+These are signaling proofs, not audible speech or a native DSP claim.
+
+Use fresh private NVRAM and cfg directories, verbose logging, and 60-second
+runs. Each PCS checker first requires the independently checked scan,
+carrier-600 registration and SI1 band indication; a GSM900-only run cannot
+pass by reaching the same UI or sending the same Layer-3 messages.
+
+| Workflow | Fixture Directory | Physical Input Script | Checker |
+| --- | --- | --- | --- |
+| Outgoing call | `fixtures/noki8890_pcs1900` | `noki8890_outgoing_call_input.lua` | `noki8890_outgoing_call_check.py --pcs1900 RUN/error.log` |
+| Incoming call | `fixtures/noki8890_pcs1900_incoming_call` | `noki8890_incoming_call_input.lua` | `noki8890_incoming_call_check.py --pcs1900 RUN/error.log` |
+| Outgoing SMS | `fixtures/noki8890_pcs1900` | `noki8890_outgoing_sms_input.lua` | `noki8890_outgoing_sms_check.py --pcs1900 RUN/error.log` |
+| Incoming SMS | `fixtures/noki8890_pcs1900_incoming_sms` | `noki8890_incoming_sms_input.lua` | `noki8890_incoming_sms_check.py --pcs1900 RUN/error.log RUN/nvram/nsb6hle/sim_card RUN/snap/8890_sms_read_2.png` |
+
+Scripts and checkers are under `tools/`; copy the selected fixture's cfg
+file rather than allowing MAME to rewrite the tracked fixture. Incoming
+SMS acceptance requires the physical Read transaction, persistent read
+record containing `hello`, its reviewed body pixels, and CP/RP closure.
+Outgoing SMS acceptance requires physical composition of `A` to `5551234`,
+the exact SMS-SUBMIT and its network acknowledgements. The default checker
+options retain the independently verified GSM900 contracts.
 
 ### 8850 stock-input runtime boundary
 

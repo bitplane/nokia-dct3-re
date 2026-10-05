@@ -7,6 +7,7 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.radio_call_lifecycle_common import require_count, require_ordered
+from tools.noki8890_registration_check import verify as verify_registration
 from tools.radio_outgoing_call_trace_check import (
     CM_SERVICE_REQUEST, CM_SERVICE_ACCEPT, SETUP, CALL_PROCEEDING,
     TRAFFIC_ASSIGNMENT, ASSIGNMENT_COMPLETE, ALERTING, CONNECT,
@@ -33,10 +34,19 @@ CHECKPOINTS = (
 )
 
 
-def verify(text, number='1234567'):
+def verify(text, number='1234567', *, pcs1900=False):
     if '[LUA ERROR]' in text:
         raise ValueError('fixture error')
-    require_ordered(text, CHECKPOINTS, '8890 outgoing signaling')
+    checkpoints = CHECKPOINTS
+    if pcs1900:
+        verify_registration(text, pcs1900=True)
+        checkpoints = tuple((label, re.compile(
+            r'TX packet type=02 payload=20 .*data=041202000271012fc10002580000000400000000'
+            if label == 'own traffic configuration' else
+            r'TX packet type=02 payload=20 .*data=041202001117001a600002580000001400000001'
+            if label == 'own release configuration' else pattern.pattern))
+            for label, pattern in CHECKPOINTS)
+    require_ordered(text, checkpoints, '8890 outgoing signaling')
     for label, pattern in (('SETUP', SETUP), ('assignment', TRAFFIC_ASSIGNMENT),
                            ('Connect Acknowledge', CONNECT_ACKNOWLEDGE), ('Disconnect', DISCONNECT)):
         require_count(text, pattern, 1, f'8890 exactly one {label}')
@@ -50,9 +60,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--number', default='1234567')
+    parser.add_argument('--pcs1900', action='store_true')
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'), args.number)
+        verify(args.log.read_text(errors='replace'), args.number, pcs1900=args.pcs1900)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8890 outgoing FAIL: {error}\n')
     print(f'8890 outgoing signaling PASS for {args.number}; speech unproved')
