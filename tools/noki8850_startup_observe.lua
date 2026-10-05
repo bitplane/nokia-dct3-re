@@ -13,6 +13,16 @@ cpu.debug:bpset(0x28846c, "temp1<200",
     'temp1=temp1+1;logerror "8850_queue_publish destination=%08x source=%08x r14=%08x\\n",r0,r1,r14;g')
 cpu.debug:bpset(0x3054ac, nil,
     'logerror "8850_keypad_disable r14=%08x\\n",r14;g')
+cpu.debug:bpset(0x2885bc, "r0==1 && temp2<200",
+    'temp2=temp2+1;logerror "8850_task1_post report=%08x r14=%08x\\n",r1,r14;g')
+cpu.debug:bpset(0x2a1be8, nil,
+    'logerror "8850_startup_receive report=%08x\\n",r0;g')
+cpu.debug:bpset(0x2a0dde, "temp3<200",
+    'temp3=temp3+1;logerror "8850_task1_receive report=%08x r14=%08x\\n",r0,r14;g')
+cpu.debug:bpset(0x244caa, nil,
+    'logerror "8850_report14_predecessor pc=%08x\\n",pc;g')
+cpu.debug:bpset(0x2ff870, nil,
+    'logerror "8850_report14_stub r14=%08x\\n",r14;g')
 cpu.debug:go()
 
 local mask_writes = 0

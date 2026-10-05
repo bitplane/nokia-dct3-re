@@ -641,9 +641,27 @@ changed. Reproduce this comparison with `noki8850_power_start_observe.lua`
 instead of the startup observer. No analog values, software state or peer application body were
 altered by these observations.
 
-Next trace the selected branch's ordinary startup/report continuations:
-`2a1be4..2a1bfe` consumes reports `10/14/16/15/17`. Establish which predicate
-remains unmet before attributing this to power state, analog provisioning,
+The task-1 post probe at `2885bc` and receive probe after `2886c0` observe
+reports `17`, `16` and `15` in a fresh runtime-HLE run. The receive wrapper
+`2a0dd8` explicitly returns these three reports, and `14`, unchanged. Only
+`37/c8/33/32` reach the separately observed continuation at `2a1be8` in this
+run; publication or receipt is therefore not proof that a particular
+startup continuation consumed a report. Both probes are capped at 200
+records, not an exhaustive producer census.
+
+The comparisons at `2a1bea..2a1bfe` select handlers for
+`10/14/16/15/17`. Other inputs call `2a105c`, an interior entry of the wider
+startup dispatcher, not a standalone generic handler. Its effects must be
+decoded before describing this branch as a five-report wait. The later
+tests at `2a1c96..2a1caa` require low nibbles 6 at `13ff00` and `f` at
+`137fdd`. Report `14`'s stub `2ff870` has one direct-BL caller, `244cb6`;
+neither that stub nor the preceding `244caa` probe is observed in the fresh
+eight-second run. This is bounded runtime evidence, not absence of an
+indirect producer.
+
+Next recover the wider dispatcher's startup-state/continuation contract
+and the entry conditions of the `244cb6` publication path. Establish the
+unmet predicate before attributing the blank display to analog values,
 display geometry or an external registration peer.
 
 All three independently select CCONT with control `0x22`, write the command
