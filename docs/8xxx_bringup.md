@@ -627,7 +627,7 @@ menu. The research composition also completes laboratory Location Updating,
 persists EF_LOCI and returns to steady paging/BCCH. Physical outgoing-call
 and incoming-call signaling plus registered-operator pixels are verified.
 Incoming SMS delivery, physical reading and cold-boot persistence are also
-verified. Outgoing SMS and speech media remain separate capability boundaries.
+verified. Outgoing SMS has separate acceptance below; speech media remains unverified.
 
 #### Radio Contract
 
@@ -822,6 +822,27 @@ delivery or UPDATE RECORD. Check that run with the same storage path and
 Read decoding and reviewed text-body pixels. The fresh mode additionally
 requires the full delivery, CP/RP closure and paging return. Outgoing SMS
 is not established by these checks.
+
+### Outgoing SMS
+
+`tools/noki8850_outgoing_sms_input.lua` uses physical keys to open
+Messages/Write messages, enter `A`, select Send, enter `5551234` and confirm.
+Run it in a fresh private directory on `nsm2hle` for 60 seconds with the
+same ROM paths and no incoming-message configuration. Validate the log:
+
+```sh
+.venv/bin/python tools/noki8850_outgoing_sms_check.py RUN/error.log
+```
+
+The firmware emits exact CP/RP/SMS-SUBMIT bytes
+`390118000100069121436587090d11010781551532f40000a70141`:
+GSM-7 `A`, destination `5551234`, SMSC `1234567890`. The laboratory peer
+accepts one submission; network CP-ACK/RP-ACK and handset CP-ACK close the
+exchange, followed by acknowledged RR release and paging return. The final
+captured frame returns to the text editor, not a claimed success banner.
+This verifies signaling against the declared HLE network, not delivery to
+an external carrier or speech media.
+
 IRQ0 handler `301714` reads pending column bits at `2b` and posts
 event `41` through `305370` before acknowledging IRQ0. KBGPIO now owns
 that optional pending-column register and the row-pin shift. Defaults

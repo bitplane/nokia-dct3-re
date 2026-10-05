@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_research_outgoing_sms", "owner": "product_profile", "status": "satisfied",
+      "predicate": "8850 research composition physically submits A to 5551234 and closes CP/RP and RR before returning to paging",
+      "current": "Physical Write messages/Options/Send produces exact 27-byte SMS-SUBMIT with GSM-7 A, destination 5551234 and SMSC 1234567890. The declared laboratory network accepts one submission, returns CP-ACK and RP-ACK, and receives handset CP-ACK. Acknowledged RR release precedes paging return. The final frame is the editor; no success-banner, external-carrier delivery or speech-media claim is made.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8850_outgoing_sms_input.lua", "tools/noki8850_outgoing_sms_check.py", "tools/test_noki8850_outgoing_sms_check.py"]
+    },
+    {
       "id": "nsm2_research_incoming_sms", "owner": "product_profile", "status": "satisfied",
       "predicate": "8850 research composition receives hello in EF_SMS, physically reads it and presents the same message after a preserved-storage cold restart",
       "current": "Own no-cipher packet 14:0080ffffffffffffffff0000 precedes SAPI-3 segmented CP-DATA. Firmware persists exact SMS-DELIVER bytes for hello from 5551234, emits CP/RP acknowledgements and closes RR before paging resumes. Physical Messages/Inbox/Read displays reviewed hello pixels and updates EF_SMS from unread 03 to read 01. A cold run with network delivery disabled preserves the same record, reads it and displays identical body pixels without redelivery or UPDATE RECORD. The initial delivery occurs during startup; no post-startup notification banner or outgoing SMS is claimed.",
