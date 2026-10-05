@@ -748,6 +748,14 @@ For example, `253890/2538ae/2538c8` activate indices `09/0a/0b` only
 for populated source records, otherwise selecting the removal routine.
 Zero enables therefore do not by themselves prove a missing hardware
 response; the callers' source-record lifecycle must be recovered first.
+The stronger remaining `05e4` consumer is an indirect dispatch in the
+second filter, not a literal catalogue record: `2fd09c` calls the active
+UI context's function pointer. A fresh run observes context `2f`, target
+`2ad609` (Thumb entry `2ad608`) for all of `0731/0735/05e4`.
+That dispatcher selects `2ad1be/2ad2c0/2ad334/2ad3d4/2ad4c0` using its
+local structure's mode bytes and another flag. Next capture that selection
+and recover its startup contract. A direct-BL-only branch audit cannot
+classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;
 the observed wall-time interval is not yet a validated physical cadence.
 Passive samples show owner `05`, flags `03`, state `02` after arming;

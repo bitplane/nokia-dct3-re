@@ -78,6 +78,8 @@ cpu.debug:bpset(0x25f2ec, "r0==74",
     'logerror "8850_ui_resource74 index=%02x value=%02x\\n",r1,r2;g')
 cpu.debug:bpset(0x2f1a28, nil,
     'logerror "8850_ui_index_activate index=%02x first=%08x second=%08x third=%08x r14=%08x\\n",r0,r1,r2,r3,r14;g')
+cpu.debug:bpset(0x2fd09c, "r0==5e4 || r0==731 || r0==735",
+    'logerror "8850_ui_context_dispatch input=%04x target=%08x context=%02x\\n",r0,r1,b@(r5+3);g')
 cpu.debug:go()
 
 local mask_writes = 0
