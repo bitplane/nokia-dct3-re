@@ -681,6 +681,24 @@ Next decode the state-3 owner's completion/initialization conditions and
 the routes to its report-`14` publication. Establish that contract before
 changing analog values or adding a peer response.
 
+The extended 39-second fresh run rules out merely ending before the retry
+window: timeout event `49` reduces the state-3 counter at `1376c0+4` from
+4 through 0, without report `14`. Its `+a` initialization byte remains 1
+and `+d` flag remains 0. The status read at `245c22` uses encoded field
+`00009004`: field index `10`, mask `04`, normalized to one bit by
+`3030de..3030ee`. The own-ROM field table `33f688` maps index `10` to
+command base `70`, hence CCONT register `0e` bit 2; all four observed reads
+return zero. This is the modeled charger-present/reset bit, not an ADC
+sample. At zero retries the path waits again rather than fabricating a
+completion.
+
+Two literal-argument direct posts send event `21` to task `13` at
+`245284` and `2457c0`; the latter requires event `42` in owner state 7.
+Those are routes to the report-publication branch, not permission to inject
+the event. Next establish the no-charger startup/owner initialization
+contract and why the current composition selects this lifecycle. Do not
+assert charger presence merely to satisfy the observed bit test.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 
