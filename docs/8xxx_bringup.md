@@ -610,6 +610,42 @@ Reproduce using `nsm2hle`, the same observer/private directories and
 `-verbose`; run `noki8850_staged_trace_check.py <run>/error.log --runtime-hle`.
 This validates the upload/handoff/self-test sequence, not graphical boot.
 
+### 8850 Startup/Input Frontier
+
+`noki8850_startup_observe.lua` installs CPU debugger probes directly on
+`:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
+Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not
+the Lua state alias `LR`; an invalid debugger expression can hide a probe's
+output. The working reply probe observes class `74`, command `0d`, status
+`00`. Queue publication at `28846c` is now observable and bounded to 200
+records. Treat absent earlier PC-tap/debug-script records as instrumentation
+limitations, not evidence of an unexecuted path.
+
+The raw press changes physical columns `1f -> 17 -> 1f` but generates no
+keypad IRQ because firmware masked all five columns. A write observation
+locates `6b=3f` at store `3054ec`, 1.285520 seconds. Entry `3054ac` ORs the
+five mask bits after updating its software state. Its complete direct-BL
+caller scan finds `2a1ac2`, `2a1bc2`, `2a1dea`; runtime takes `2a1bc2`.
+Do not bypass that firmware-owned mask or claim a validated Menu mapping:
+the reused host label does not establish this product's semantic key.
+
+The selected startup branch tests byte `137fe0` at `2a1a7e..2a1a8c` and
+enters `2a1b30` on value 2. This byte is initialized from helper `2ff716`;
+its inputs include boot-state byte `13fec1` (reader `2f6a84`), power-state
+byte `13ff00`, two analog samples and a decoded-key predicate. Fresh samples
+show boot-state `0a` throughout; startup selector becomes 2 and power-state
+becomes `06`. An explicit physical Power hold from script start to 1.5
+seconds changes the later selector to 5, but still observes the same
+`2a1bc2` mask caller and blank frame. That does not prove the initial branch
+changed. Reproduce this comparison with `noki8850_power_start_observe.lua`
+instead of the startup observer. No analog values, software state or peer application body were
+altered by these observations.
+
+Next trace the selected branch's ordinary startup/report continuations:
+`2a1be4..2a1bfe` consumes reports `10/14/16/15/17`. Establish which predicate
+remains unmet before attributing this to power state, analog provisioning,
+display geometry or an external registration peer.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 

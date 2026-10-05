@@ -62,6 +62,10 @@ local samples = coroutine.create(function()
             memory:read_u8(0x135664), memory:read_u16(0x100e4),
             memory:read_u16(0x10004), memory:read_u16(0x10002),
             machine.time:as_double()))
+        machine:logerror(string.format(
+            "8850_boot_state: selector=%02x source=%02x power_state=%02x t=%.6f\n",
+            memory:read_u8(0x137fe0), memory:read_u8(0x13fec1),
+            memory:read_u8(0x13ff00), machine.time:as_double()))
         machine.screens[":screen"]:snapshot(string.format("8850_%04d.png", time * 1000))
     end
 end)
