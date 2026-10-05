@@ -774,8 +774,16 @@ Pending work uses byte `1350a5`; fresh probes observe three flush entries
 at `25f514`, called from `260d1e` (return address `260d23`). The constructed
 class-5a object reaches indirect renderer `23fc31` (Thumb entry `23fc30`)
 with command `06`, flags `0020`. Thus the content and dirty-queue consumer
-are both active. Next trace this renderer's layout/raster path through
-`23d4c0` and subsequent LCD transfer; queue starvation is not established.
+are both active. Command 6 calls text/layout routine `23e9dc` with argument
+`ffffffff`; runtime then observes flags `0022`, options `01940000` at
+`23fcf0`. The subsequent bit-12-dependent follow-up is skipped. Helper
+`23d4c0` performs layout setup through `23d024/23d118` and sets flag bit 1;
+calling it is not proof of raster output. Text resolution at `23ea62`
+produces RAM pointer `12fe50` from source `32ecf6`, with UTF-16 prefix
+`0049006e` ("In"). Thus text lookup is nonempty, not a missing-content
+result. Next recover the layout-versus-paint invocation and object
+visibility/dirty contract before blaming LCD transfer; queue starvation
+is not established.
 A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;
