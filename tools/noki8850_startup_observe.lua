@@ -46,8 +46,8 @@ cpu.debug:bpset(0x2886c0, "b@1115d2==5 && temp0<100",
 cpu.debug:bpset(0x30134e, "temp9<100",
     'temp9=temp9+1;logerror "8850_catalogue_receive message=%08x input=%04x\\n",r0,w@r0;g')
 for _, address in ipairs({0x300aae, 0x2fce32, 0x27bd84, 0x270f00,
-        0x2c3d38, 0x271bd8, 0x266730}) do
-    cpu.debug:bpset(address, "r0==731 || r0==735 || r0==e77",
+        0x2c3d38, 0x271bd8, 0x266730, 0x2bd40c}) do
+    cpu.debug:bpset(address, "r0==731 || r0==735 || r0==e77 || r0==5e4",
         string.format('logerror "8850_ui_filter entry=%08x input=%%04x\\n",r0;g', address))
 end
 cpu.debug:bpset(0x268a3c, nil,
@@ -66,6 +66,8 @@ cpu.debug:bpset(0x268068, nil,
     'logerror "8850_ui_fallback_handler input=%04x\\n",r0;g')
 cpu.debug:bpset(0x255c5c, "r14==268073",
     'logerror "8850_ui_fallback_context input=%04x first=%02x second=%02x\\n",r0,r1,r2;g')
+cpu.debug:bpset(0x255ebc, "r7==e77",
+    'logerror "8850_ui_fallback_default input=%04x\\n",r7;g')
 cpu.debug:go()
 
 local mask_writes = 0

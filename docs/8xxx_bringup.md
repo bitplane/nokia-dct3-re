@@ -704,12 +704,18 @@ used by mode operations `3032ec` and `3027e6`.
 The `0731` unconditional record `24a` has action `4e77`; helper `300914`
 queues its low input `0e77` via `301548`, confirmed in the fresh run.
 The low input has no primary catalogue entry. A fresh runtime trace follows
-it unchanged through all seven filter entries to final-filter handler
+it unchanged through the first seven filter entries to handler
 `268068`. That handler calls `255c5c` with context bytes `10/02`, observed
-at the callee, then enters continuation `268e46`. Next recover this context
-operation and its continuation, not the rejected special-mode branch; do
-not force the source to `40/41`. The focused native/runtime-readiness check
-still passes; graphical boot remains unproved.
+at the callee. The helper recognizes `0afe/0aff` and `0376..0379`, not
+`0e77`; a fresh probe confirms the default zero-return path at `255ebc`.
+`268e46` is the filter's stack-restoring return epilogue, not an application
+continuation. This context call therefore does not establish a missing
+UI-start dependency. The task-5 loop also calls an eighth filter, `2bd40c`,
+after `266730`; fresh traces confirm `0731`, `0e77`, `0735` and the latter's
+queued `05e4` reach it. Next decode the `05e4` handling across this complete
+pipeline, not the rejected special-mode branch; do not force the source to
+`40/41`. The focused native/runtime-readiness check still passes; graphical
+boot remains unproved.
 Its full-address literals are `2302fc`, `3028dc`, `3033f8` (not a complete
 writer census). Timer `51` has a 12-byte RTOS record at
 `11174c+51*12`; its expiry target remains to be observed.
