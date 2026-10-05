@@ -56,8 +56,10 @@ cpu.debug:bpset(0x301564, "temp1<250",
     'temp1=temp1+1;logerror "8850_catalogue_internal input=%08x r14=%08x\\n",r0,r14;g')
 cpu.debug:bpset(0x287a0e, "r0==51",
     'logerror "8850_ui_timer51_arm delay=%08x r14=%08x\\n",r1,r14;g')
-cpu.debug:bpset(0x300894, "r0>=247 && r0<=263",
-    'logerror "8850_startup_transition record=%04x selector=%02x state=%02x\\n",r0,b@(325b80+r0*8),b@(13fc00+b@(325b80+r0*8));g')
+cpu.debug:bpset(0x300894, "(r0>=247 && r0<=263) || r0==621",
+    'logerror "8850_startup_transition record=%04x selector=%02x raw_slot=%02x\\n",r0,b@(325b80+r0*8),b@(13fc00+b@(325b80+r0*8));g')
+cpu.debug:bpset(0x303214, nil,
+    'logerror "8850_virtual_db source=%02x\\n",b@13805a;g')
 cpu.debug:go()
 
 local mask_writes = 0

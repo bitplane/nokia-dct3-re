@@ -686,11 +686,20 @@ Catalogue `324230` locates `0731` at entry 125, transition records
 transition table `325b80`. Runtime predicate entry `300894` observes
 `0731` selectors/states `5d/00`, `5d/00`, `1b/01`, `ff/00`; `0735`
 observes `5d/01`, `63/01`, `64/01`, `64/01`, `34/00`, `6c/00`.
-State storage is `13fc00+selector`. These are predicate-entry observations,
+Stored selectors below `ca` use `13fc00+selector`; higher selectors have
+other providers. These are predicate-entry observations,
 not proof that every record accepts or that each associated action runs.
-Next decode acceptance and the nested action of record `249`
-(`1b013f0086210000`) before attributing the blank display to missing
-transport content. Timer `51` has a 12-byte RTOS record at
+Record `249` (`1b013f0086210000`) accepts stored selector `1b==1` and
+references nested record `621` (`db023f0086220000`). Runtime reaches that
+predicate. Virtual selector `db` uses function table `324170`, index
+`db-cd`, resolving to `303214`, not state byte `13fcdb`. It returns 2 for
+source byte `13805a` equal to `40/41`, otherwise 1. The fresh run observes
+source `0f`, so this nested predicate does not accept its expected value 2.
+The observer labels direct storage samples `raw_slot` to avoid interpreting
+virtual selectors as stored states. Next recover this source byte's owner
+and the alternative accepted startup actions; do not force it to `40/41`.
+Its full-address literals are `2302fc`, `3028dc`, `3033f8` (not a complete
+writer census). Timer `51` has a 12-byte RTOS record at
 `11174c+51*12`; its expiry target remains to be observed.
 
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
