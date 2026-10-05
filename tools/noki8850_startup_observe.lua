@@ -37,6 +37,10 @@ cpu.debug:bpset(0x304a72, nil,
     'logerror "8850_channel_map_apply source=%08x mode=%02x node=%02x kind=%02x\\n",r3,r1,r0,r2;g')
 cpu.debug:bpset(0x304a4a, "temp7<100",
     'temp7=temp7+1;logerror "8850_channel_available resource=%08x\\n",r0;g')
+cpu.debug:bpset(0x2d1140, nil,
+    'logerror "8850_ui_start r14=%08x\\n",r14;g')
+cpu.debug:bpset(0x3014b6, "temp8<100",
+    'temp8=temp8+1;logerror "8850_ui_catalogue input=%08x r14=%08x\\n",r0,r14;g')
 cpu.debug:go()
 
 local mask_writes = 0

@@ -646,6 +646,17 @@ The research composition still supplies no unsolicited application map.
 Next trace the post-readiness display/application request producer and its
 consumer before defining any product-local peer application contract.
 
+The post-readiness tail takes `2a1d64` and invokes `2d1140` at `2a1d98`.
+Fresh passive CPU probes observe its catalogue input `0731` entering
+`3014b6`, followed by `0735` from `2d1120`. `3014b6` treats `r0` as a
+packed scalar input, allocates a 16-byte message, stores its low halfword,
+and posts to task 5 through `2885bc`; it is not a descriptor-pointer API.
+The corrected observer run exits normally and passes startup readiness.
+Next trace task 5's reception and transition selection for `0731/0735`.
+The UI-start producer itself is therefore present; neither a missing
+readiness report nor an assumed missing channel map justifies injecting
+another UI-start event.
+
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
 Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not
