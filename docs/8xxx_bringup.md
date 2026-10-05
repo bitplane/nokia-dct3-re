@@ -612,6 +612,26 @@ This validates the upload/handoff/self-test sequence, not graphical boot.
 
 ### 8850 Startup/Input Frontier
 
+Current runtime-HLE composition completes startup readiness organically
+and delivers a raw physical matrix press through keypad IRQ/ack, but its
+eight-second LCD is still blank. Graphical boot and semantic key mapping
+remain unproven. The next boundary is display/application initialization
+after task 1 reaches state 4, not the readiness retry described below.
+
+`PRODUCT_8850` uses the existing BLB-2 nominal ADC tuple
+`000/3ff/2c0/150/140/000/200/000`, replacing the conservative full-scale
+placeholders. Nokia's [NSM-2 system-module manual](https://www.eserviceinfo.com/preview_html.php?fileid=5444&previewid=2990)
+identifies BLB-2, its 68 kohm BSI resistor and battery temperature circuit.
+The raw tuple is a shared calibrated board input, **not measured NSM-2
+voltage scaling**. In one fresh isolated comparison, firmware posts `14`
+from `244cb6`, consumes it in state `0d`, reaches `power=06 reports=0f`,
+then enters state 4. It unmasks keypad columns (`6b=60`) before the physical
+press, which raises IRQ and is acknowledged. No charger was asserted,
+firmware state changed, PMM repaired or peer message added by the fixture.
+Reproduce with the startup observer and `-verbose`, then check using
+`noki8850_staged_trace_check.py <log> --runtime-hle --startup-readiness`.
+This gate establishes readiness and physical IRQ delivery only.
+
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
 Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not
@@ -621,7 +641,7 @@ output. The working reply probe observes class `74`, command `0d`, status
 records. Treat absent earlier PC-tap/debug-script records as instrumentation
 limitations, not evidence of an unexecuted path.
 
-The raw press changes physical columns `1f -> 17 -> 1f` but generates no
+With the conservative placeholder ADC tuple, the raw press changes physical columns `1f -> 17 -> 1f` but generates no
 keypad IRQ because firmware masked all five columns. A write observation
 locates `6b=3f` at store `3054ec`, 1.285520 seconds. Entry `3054ac` ORs the
 five mask bits after updating its software state. Its complete direct-BL

@@ -50,6 +50,31 @@ class StagedTraceTests(unittest.TestCase):
         self.assertTrue(check_trace(self.runtime_trace().replace(
             "0000000000000000ffff", "0f10000000000000ffff"), runtime_hle=True))
 
+    def test_startup_readiness(self):
+        self.assertEqual(check_trace(self.startup_trace(), True, True), [])
+
+    def test_incomplete_readiness(self):
+        self.assertTrue(check_trace(self.startup_trace().replace("reports=0f", "reports=0e"), True, True))
+
+    def test_no_physical_irq(self):
+        self.assertTrue(check_trace(self.startup_trace().replace("irq=1", "irq=0"), True, True))
+
+    def test_ack_before_press(self):
+        trace = self.startup_trace().replace("kbgpio: ack latched=1", "")
+        self.assertTrue(check_trace("kbgpio: ack latched=1\n" + trace, True, True))
+
+    @classmethod
+    def startup_trace(cls):
+        return cls.runtime_trace() + """
+8850_report14_stub r14=00244cbb
+8850_startup_dispatch report=00000014 state=000d base=00138070
+8850_startup_check power=06 reports=0f
+8850_startup_dispatch report=00000033 state=0004 base=00138070
+8850_matrix_press: column=3 host_bit=10
+kbgpio: irq=1
+kbgpio: ack latched=1
+"""
+
     @staticmethod
     def runtime_trace():
         return TRACE.replace(

@@ -946,6 +946,11 @@ constexpr nokia_product_config PRODUCT_8XXX = make_8xxx_config();
 constexpr nokia_product_config make_8850_config()
 {
 	nokia_product_config result = make_8xxx_config();
+	// NSM-2's system-module manual identifies the ordinary BLB-2 pack.
+	// Use the existing BLB-2 nominal board inputs rather than conservative
+	// full-scale placeholders. Raw transfer values remain calibrated, not
+	// measured NSM-2 electrical units; firmware owns all pack decisions.
+	result.ccont_board = ADC_5210;
 	// NSM-2 v5.31 independently accepts silicon identity 5 or 6 at
 	// 0x2cae26, then alternates upload ownership until its final-result poll.
 	// Select ROM6 HLE; acknowledge transfers without inventing that verdict.
