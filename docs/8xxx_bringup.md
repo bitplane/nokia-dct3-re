@@ -620,8 +620,11 @@ ICCID, phase, SST, IMSI and all 50 ADN records, then displays **Security
 code / OK**. Physical `12345` and the left softkey dismiss the prompt,
 show the Nokia startup graphic and reach Menu/Names idle. Further physical
 softkeys open Messages, Inbox and the Names menu (Search/Add entry/Erase).
-Persistent phonebook writes, applications, radio registration and call/SMS
-lifecycles remain unverified. Those are the next capability boundaries.
+Physical Add entry stores A/123 in SIM ADN record 1, and a preserved-storage
+cold restart displays both the name and number through Search/Detail.
+Calculator also computes 12+3=15 through physical inputs and its Options
+menu. Radio registration and call/SMS lifecycles remain unverified; those
+are the next capability boundaries.
 
 #### Reproduction and Acceptance
 
@@ -649,6 +652,34 @@ Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first
 text: the eight-second sample precedes it. `--display-transfer` checks the
 no-card Insert SIM card framebuffer signature, not the SIM/security UI.
+
+For durable phonebook acceptance, run `noki8850_phonebook_input.lua` for
+46 seconds in fresh storage, then `noki8850_phonebook_read.lua` for 40
+seconds in a new private working/configuration directory while preserving
+the first run's NVRAM directory. Do not reseed the SIM or copy a donor PMM.
+The first script presses Names, Add entry, A, 123, Save. The second uses
+Search/Detail and must not issue any UPDATE RECORD. Check both stages:
+
+```sh
+.venv/bin/python tools/noki8850_phonebook_check.py save WRITE/error.log \
+  WRITE/nvram/nsm2hle/sim_card WRITE/snap/8850_phonebook_save.png
+.venv/bin/python tools/noki8850_phonebook_check.py readback READ/error.log \
+  WRITE/nvram/nsm2hle/sim_card READ/snap/8850_phonebook_contact.png
+```
+
+The checks require exact A/123 bytes, the other 49 ADN records erased,
+organic UPDATE RECORD/commit for Save, a cold READ RECORD without writes
+for readback, physical input markers and reviewed display pixels including
+the full number. A saved NVRAM file alone cannot establish UI readback.
+
+Run `noki8850_calculator_input.lua` for 52 seconds in fresh storage.
+Its own firmware menu order places Games at 6 and Calculator at 7.
+The fixture opens Calculator, enters 12, selects Options/Add, enters 3,
+and selects Options/Equals. Add
+`--calculator-frame RUN/snap/8850_calculator_result.png` to the staged
+checker above. It requires correlated decoded inputs and stable arithmetic
+pixels for 15, not mere app entry. The keypad star produces a decimal
+point on this firmware and is not used as an assumed add shortcut.
 
 #### Board Readiness
 

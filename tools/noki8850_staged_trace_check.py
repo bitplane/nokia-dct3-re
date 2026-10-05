@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check native 8850 upload execution, not graphical phone acceptance."""
+"""Check 8850 native upload ownership and optional scoped SIM/UI acceptance."""
 
 import argparse
 import hashlib
@@ -21,9 +21,7 @@ STAGES = (
 
 
 def check_physical_inputs(text: str) -> list[str]:
-    errors = []
-    cursor = 0
-    for label, key in (
+    return check_correlated_inputs(text, (
         ("security_physical: key=Keypad 1", "01"),
         ("security_physical: key=Keypad 2", "02"),
         ("security_physical: key=Keypad 3", "03"),
@@ -33,16 +31,41 @@ def check_physical_inputs(text: str) -> list[str]:
         ("navigation_physical: action=messages_menu", "19"),
         ("navigation_physical: action=inbox", "19"),
         ("navigation_physical: action=names", "1a"),
-    ):
+    ))
+
+
+def check_correlated_inputs(text: str, events: tuple[tuple[str, str], ...]) -> list[str]:
+    errors = []
+    cursor = 0
+    for label, key in events:
         marker = text.find("8850_" + label, cursor)
         if marker < 0:
             errors.append(f"missing or out-of-order physical input {label}")
             continue
-        next_marker = re.search(r"8850_(?:security|navigation)_physical:", text[marker + 1:])
+        next_marker = re.search(r"8850_[a-z_]+_physical:", text[marker + 1:])
         end = marker + 1 + next_marker.start() if next_marker else len(text)
         if not re.search(rf"8850_keypad_decoded key={key}\b", text[marker:end]):
             errors.append(f"physical input {label} did not decode as {key}")
         cursor = end
+    return errors
+
+
+def check_calculator(text: str, path: Path) -> list[str]:
+    from PIL import Image
+    errors = check_correlated_inputs(text, tuple(
+        ("application_physical: action=" + action, key) for action, key in (
+            ("input_1", "01"), ("input_12", "02"),
+            ("operation_options", "19"), ("add", "18"), ("plus", "19"),
+            ("input_3", "03"), ("options", "19"), ("result", "19"),
+        )))
+    try:
+        with Image.open(path) as frame:
+            # Arithmetic output only; exclude cursor/softkeys and the status row.
+            digest = hashlib.sha256(frame.convert("L").crop((0, 8, 84, 36)).tobytes()).hexdigest()
+            if frame.size != (84, 48) or digest != "afed4f977aaabaad65fb2d0d0090d0056cb6cda2df297146ae7b90c302503f68":
+                errors.append("calculator result differs from reviewed 12+3=15 frame")
+    except OSError as error:
+        errors.append(f"calculator frame: {error}")
     return errors
 
 
@@ -143,6 +166,8 @@ def main() -> int:
                         help="require the organic identity/service/ADN read conversation, not persistence or registration")
     parser.add_argument("--physical-navigation", type=Path, metavar="SNAPSHOT_DIR",
                         help="require physical security digits/softkeys and Messages/Inbox/Names frame crops")
+    parser.add_argument("--calculator-frame", type=Path,
+                        help="require correlated calculator inputs and the reviewed 12+3=15 result")
     args = parser.parse_args()
     try:
         text = args.log.read_text(encoding="utf-8", errors="replace")
@@ -151,6 +176,8 @@ def main() -> int:
         if args.physical_navigation:
             errors.extend(check_physical_inputs(text))
             errors.extend(check_navigation_frames(args.physical_navigation))
+        if args.calculator_frame:
+            errors.extend(check_calculator(text, args.calculator_frame))
     except OSError as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
@@ -161,6 +188,7 @@ def main() -> int:
     print("OK - 8850 native uploads" +
           (" and compact runtime self-test" if args.runtime_hle else " reach the missing-mask boundary") +
           ("; nonzero LCD framebuffer transfer verified" if args.display_transfer else "") +
+          ("; calculator 12+3=15 verified" if args.calculator_frame else "") +
           ("; physical Messages/Inbox/Names navigation verified" if args.physical_navigation
            else "; interactive phone acceptance not proven"))
     return 0

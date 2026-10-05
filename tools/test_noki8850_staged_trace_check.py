@@ -4,7 +4,7 @@ import unittest
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from noki8850_staged_trace_check import check_trace, check_physical_inputs, check_navigation_frames
+from noki8850_staged_trace_check import check_trace, check_physical_inputs, check_navigation_frames, check_calculator
 
 
 TRACE = """
@@ -116,6 +116,22 @@ sim_device: header cla=a0 ins=f2 p1=00 p2=00 p3=16 selected=6f3a
             for name in ("8850_messages_menu.png", "8850_inbox.png", "8850_names.png"):
                 Image.new("L", (84, 48), 255).save(root / name)
             self.assertEqual(len(check_navigation_frames(root)), 3)
+
+    def test_calculator_rejects_wrong_result_and_uncorrelated_input(self):
+        from PIL import Image
+        trace = "\n".join(
+            f"8850_application_physical: action={action}\n8850_keypad_decoded key={key}"
+            for action, key in (
+                ("input_1", "01"), ("input_12", "02"),
+                ("operation_options", "19"), ("add", "18"), ("plus", "19"),
+                ("input_3", "03"), ("options", "19"), ("result", "19"),
+            ))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "result.png"
+            Image.new("L", (84, 48), 255).save(path)
+            self.assertEqual(len(check_calculator(trace, path)), 1)
+            self.assertGreater(len(check_calculator(trace.replace("key=18", "key=17"), path)), 1)
+            self.assertGreater(len(check_calculator("", path)), 1)
 
     @classmethod
     def startup_trace(cls):

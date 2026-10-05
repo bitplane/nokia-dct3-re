@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_research_phonebook_and_calculator", "owner": "product_profile", "status": "satisfied",
+      "predicate": "8850 research profile physically saves A/123, presents it after a preserved-storage cold restart and computes 12+3=15",
+      "current": "Own-ROM physical inputs issue absolute UPDATE RECORD for ADN record 1 and receive success. Exact storage validation proves A/123 and 49 erased records. A separate cold execution preserves the SIM/flash files, reads ADN, and physically opens Search/Detail with reviewed name/number pixels and no UPDATE RECORD. A separate fresh fixture navigates the own menu to Calculator, selects Options/Add then Equals and displays 15 with correlated decoded inputs. This is research-composition software acceptance, not normal-machine promotion or radio/call/SMS completion.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8850_phonebook_input.lua", "tools/noki8850_phonebook_read.lua", "tools/noki8850_phonebook_check.py", "tools/noki8850_calculator_input.lua", "tools/noki8850_staged_trace_check.py"]
+    },
+    {
       "id": "nsm2_research_physical_navigation", "owner": "product_profile", "status": "satisfied",
       "predicate": "8850 v5.31 product-local PMM and declared native-upload/runtime-HLE composition reaches physical security input and Messages/Inbox/Names menus",
       "current": "The research nsm2hle machine uses own row pins 1..4, optional pending-column register 2b and key table 33f504. Physical digits 1..5 decode exactly and OK dismisses Security code, followed by Nokia startup and Menu/Names idle. Ordered physical navigation and stable title/list pixel crops verify Messages, Inbox and Names after organic ICCID/SST/IMSI and 50 ADN reads. Normal noki8850 remains fail-closed; this predicate does not establish durable phonebook, applications, registration or call/SMS lifecycles.",
