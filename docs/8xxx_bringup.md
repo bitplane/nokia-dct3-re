@@ -859,6 +859,35 @@ configured PCS cells. The firmware later emits `04080000`. The trace's
 not recovered semantics of mode 1. Distinguish these modes and recover the
 own receive-side selection/completion rules before replacing that response.
 
+The own receive path is `301710 -> 2db270 -> task 12 -> 29d010`.
+`29d010` passes the first report to `2809fc` and subsequent reports to
+`280b0a`; these are measurement-list builders, not an opaque reply queue.
+The first builder consumes up to forty four-byte records from message
+offset 6: a big-endian ARFCN at offsets 6/7 and signed RSSI at offset 9,
+advancing four bytes per record. RSSI below -104 terminates the list.
+Accepted records are stored in sixteen-byte internal entries and counted
+by the band classification returned by `2c06bc`.
+
+`280904` tests those counters according to the constructor mode: mode 1
+requires thirty class-1 entries, mode 2 forty class-2 entries, mode 3 both,
+mode 4 forty class-3 entries, and mode 5 class 1 plus class 3. This is a
+receive-side distinction between modes, not a meaning inferred from the
+three-byte parameter tables. In `2c06bc`, the enabled class-3 branch is
+the 512-and-up range behind capability 5; overlapping channel numbers
+must still be interpreted using the handset's enabled band capabilities.
+Report-count limits in `28097e` provide another completion condition;
+they are firmware policy, not permission to replay arbitrary packets.
+
+A fresh twelve-second strict-topology run with
+`noki8890_radio_observe.lua` records the current mode-1 response completing
+with state 4, zero counters in all three classes, and one report. Its first
+RSSI is `81` (-127), so parsing stops before accepting any record. The next
+organic request is mode 4 (`04080000`). The missing work is therefore a
+mode-specific scan/reply lifecycle, including the second request; a single
+generic terminal acknowledgement does not satisfy that contract. The
+observer now logs parser mode, accepted records and final counters without
+changing firmware or packet contents.
+
 ### 8850 stock-input runtime boundary
 
 A fresh v5.31 PPM C run with its acquired PMM renders `CONTACT SERVICE`
