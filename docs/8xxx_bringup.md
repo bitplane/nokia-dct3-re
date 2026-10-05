@@ -731,8 +731,14 @@ The latter helper updates selector-indexed state under `137e8c`; the
 the ordinary-value path conditionally calls `2f1c20`, which tests per-index
 mask bytes before calling `2f19de`. The expiry therefore reaches its
 firmware consumer; it is not evidence of a missing timer delivery. The
-semantics of this indexed subsystem and earlier `05e4` filter side effects
-remain unresolved. The requested delay is `075a`;
+indexed refresh routine `2f19de` first requires byte `137e94+index != 0`,
+then uses resource class `74` through `25f2ec/25f324`. A 35-second trace
+observes timeout refresh visits for indices `01..05` and `0c..12`, all
+with enable byte zero; their resource work is skipped at that local gate.
+Earlier class-74 initialization calls are observed separately, so absence
+of all class-74 activity is not the claim. Next recover the enable-byte
+writers/activation contract and classify earlier `05e4` side effects;
+do not synthesize those enable bytes. The requested delay is `075a`;
 the observed wall-time interval is not yet a validated physical cadence.
 Passive samples show owner `05`, flags `03`, state `02` after arming;
 the record links to `111950` and stores `04f9` at four and eight seconds.
