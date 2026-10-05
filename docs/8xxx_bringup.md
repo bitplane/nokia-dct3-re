@@ -539,7 +539,31 @@ silent command-32 boundary; successful process exit is not phone boot:
 
 ## Recovered GENSIO contract
 
-### 8890 stock bootstrap boundary
+### 8890 Support And Native Boundary
+
+The acquired v12.20 PPM C and product-local PMM have verified research-HLE
+acceptance for the following workflows. Normal `noki8890` is deliberately
+conservative; select `nsb6hle` explicitly. No donor PMM, firmware-state
+injection or borrowed product verdict is part of these workflows.
+
+| Requirement | Acceptance Evidence |
+| --- | --- |
+| Own native upload and explicit HLE boundary | `noki8890_staged_check.py --runtime --selftest`; acquired verifier/loaders execute before suspension at absent resident `2c75` |
+| Own service consumer | `noki8890_selftest_contract.py`; request-correlated runtime reply and fault-byte updates |
+| Graphical boot, SIM and physical menus | `noki8890_ui_check.py`; SIM/APDU coverage, key decode and reviewed menu pixels |
+| Durable phonebook | `noki8890_phonebook_check.py save/readback`; exact A/123 storage and separate cold read without rewriting it |
+| Application input | `noki8890_calculator_check.py`; physical 12+3 and result 15 |
+| GSM900 and PCS1900 registration | `noki8890_registration_check.py`, with `--pcs1900` for strict carrier-600 acceptance |
+| Incoming/outgoing calls | Own incoming/outgoing call checkers; physical Answer/Send/End, correct called number and CC/RR closure on both bands |
+| Incoming/outgoing SMS | Own SMS checkers; physical composition/read, CP/RP closure, persistent hello and reviewed body pixels on both bands |
+
+Native resident DSP execution, speech/media, identity/security-record
+replies, neighbour/handover contracts and normal-machine promotion remain
+separate unproved work. Calibrated board inputs and the declared runtime
+HLE are not measurements of real NSB-6 silicon. The current graphical and
+signaling acceptance must not be described as complete native emulation.
+
+#### Stock Bootstrap Contract
 
 An isolated v12.20 PPM C run with its acquired PMM renders `CONTACT
 SERVICE`. The sampled loop `2f0d3e..2f0d44` is not a blank-display result.
@@ -557,8 +581,8 @@ The own upload payload at file `11624c` is byte-identical to the mapped
 223-word staged verifier; its descriptor at `116240` is
 `0f00/0000/00df/0f00/00dc/0000`. The own 104-word program fragment at
 file `11508c` is byte-identical to the acquired 8250 fragment, while the
-loader and loader2 payloads are not identical. Recover their catalogue and
-execute only acquired bytes before defining any runtime HLE handoff.
+loader and loader2 payloads are not identical. Their product-local catalogue
+and acquired bytes are used for execution before the runtime HLE handoff.
 Shared-fragment identity is not a physical chip-identity measurement or
 permission to copy a sibling's record/self-test verdict.
 
@@ -603,8 +627,9 @@ discovery frame `1eff00d000030101e000`, receives its echo and discovery
 response, then organically acknowledges with `1e0200d0000305014100`.
 It subsequently transmits type-70 requests `13/14/15/16` and `0d00`.
 Those acquired-product requests are evidence for the next consumer audit,
-not permission to import sibling reply semantics. No interactive acceptance
-is established. Reproduce with `nsb6hle`, the same observer and twelve
+not permission to import sibling reply semantics. This short transport
+check alone does not establish interactive acceptance. Reproduce with
+`nsb6hle`, the same observer and twelve
 simulated seconds; check with the staged checker's `--runtime` option.
 
 Own dispatcher `243706..243746` decodes class `74` by a subtract cascade
@@ -714,8 +739,8 @@ acknowledges Location Updating Accept and Channel Release, writes both
 EF_LOCI LAI/status fields and returns to paging/BCCH after own
 deconfiguration `040000000000001a6000003c0000000f00000000`.
 
-This is laboratory GSM900 registration on a handset whose product also
-supports GSM1900; no separate GSM1900 acquisition acceptance is claimed.
+This is the independently verified GSM900 contract. Separate PCS1900
+acquisition and user-service acceptance are documented below.
 Physical End after a connected outgoing call publishes traffic-release
 parameter `14`; that own observation now selects the release contract.
 Handover, neighbour and speech contracts remain unset until product

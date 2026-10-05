@@ -3534,7 +3534,8 @@ void nokia_dct3_state::nsb6hle(machine_config &config)
 {
 	nsb6stage(config);
 	// Explicit runtime transport comparison, not missing resident execution.
-	// Keep self-test and security-record results unimplemented here.
+	// Identity and security-record replies remain unimplemented here;
+	// the request-correlated compact self-test contract is selected below.
 	nokia_product_config runtime = m_product;
 	// NSB-6's Nokia user manual specifies BLB-2. These shared nominal
 	// board samples are calibrated inputs, not measured electrical units.
