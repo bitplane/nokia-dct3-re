@@ -63,6 +63,22 @@ class StagedTraceTests(unittest.TestCase):
         trace = self.startup_trace().replace("kbgpio: ack latched=1", "")
         self.assertTrue(check_trace("kbgpio: ack latched=1\n" + trace, True, True))
 
+    def test_display_transfer(self):
+        trace = self.startup_trace() + """
+8850_glyph_framebuffer_done pixels=80800000/007f7e0c mask=00000000/00000000
+8850_lcd_framebuffer_transfer start=00 count=54 flags=00 pixels=80800000/007f7e0c mask=00000000/00000000
+"""
+        self.assertEqual(check_trace(trace, True, True, True), [])
+        self.assertTrue(check_trace(trace.replace("count=54", "count=00"), True, True, True))
+        self.assertTrue(check_trace(trace.replace("007f7e0c", "00000000"), True, True, True))
+
+    def test_transfer_before_glyphs(self):
+        trace = self.startup_trace() + """
+8850_lcd_framebuffer_transfer start=00 count=54 flags=00 pixels=80800000/007f7e0c mask=00000000/00000000
+8850_glyph_framebuffer_done pixels=80800000/007f7e0c mask=00000000/00000000
+"""
+        self.assertTrue(check_trace(trace, True, True, True))
+
     @classmethod
     def startup_trace(cls):
         return cls.runtime_trace() + """

@@ -19,7 +19,8 @@ STAGES = (
 )
 
 
-def check_trace(text: str, runtime_hle: bool = False, startup_readiness: bool = False) -> list[str]:
+def check_trace(text: str, runtime_hle: bool = False, startup_readiness: bool = False,
+                display_transfer: bool = False) -> list[str]:
     errors = []
     cursor = 0
     stages = STAGES
@@ -55,6 +56,14 @@ def check_trace(text: str, runtime_hle: bool = False, startup_readiness: bool = 
                 errors.append(f"missing or out-of-order {name}")
             else:
                 cursor += match.end()
+    if display_transfer:
+        # This establishes nonzero framebuffer delivery, not semantic UI input.
+        glyph = re.search(r"8850_glyph_framebuffer_done pixels=80800000/007f7e0c mask=00000000/00000000", text)
+        transfer = None if glyph is None else re.search(
+            r"8850_lcd_framebuffer_transfer start=00 count=54 flags=00 pixels=80800000/007f7e0c mask=00000000/00000000",
+            text[glyph.end():])
+        if glyph is None or transfer is None:
+            errors.append("missing or out-of-order nonzero glyph framebuffer transfer")
     return errors
 
 
@@ -65,10 +74,12 @@ def main() -> int:
                         help="check native uploads followed by compact request-correlated HLE")
     parser.add_argument("--startup-readiness", action="store_true",
                         help="also require organic readiness and physical IRQ delivery, not a rendered UI")
+    parser.add_argument("--display-transfer", action="store_true",
+                        help="require nonzero glyph pixels followed by framebuffer transfer; not interactive acceptance")
     args = parser.parse_args()
     try:
         errors = check_trace(args.log.read_text(encoding="utf-8", errors="replace"),
-                             args.runtime_hle, args.startup_readiness)
+                             args.runtime_hle, args.startup_readiness, args.display_transfer)
     except OSError as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
@@ -78,7 +89,8 @@ def main() -> int:
         return 1
     print("OK - 8850 native uploads" +
           (" and compact runtime self-test" if args.runtime_hle else " reach the missing-mask boundary") +
-          "; phone boot not proven")
+          ("; nonzero LCD framebuffer transfer verified" if args.display_transfer else "") +
+          "; interactive phone acceptance not proven")
     return 0
 
 

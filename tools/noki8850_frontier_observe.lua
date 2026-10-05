@@ -41,7 +41,7 @@ taps[#taps + 1] = memory:install_write_tap(0x2000c, 0x2000f,
     end)
 local samples = coroutine.create(function()
     local previous = 0
-    for _, time in ipairs({0.1, 0.5, 1, 2, 4, 8, 16, 24, 32}) do
+    for _, time in ipairs({0.1, 0.5, 1, 2, 4, 8, 10, 16, 24, 32}) do
         if not emu.wait(time - previous) then return end
         previous = time
         machine:logerror(string.format(

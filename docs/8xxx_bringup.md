@@ -613,10 +613,11 @@ This validates the upload/handoff/self-test sequence, not graphical boot.
 ### 8850 Startup/Input Frontier
 
 Current runtime-HLE composition completes startup readiness organically
-and delivers a raw physical matrix press through keypad IRQ/ack, but its
-eight-second LCD is still blank. Graphical boot and semantic key mapping
-remain unproven. The next boundary is display/application initialization
-after task 1 reaches state 4, not the readiness retry described below.
+and renders **Insert SIM card** after 8.05 simulated seconds. The
+eight-second sample precedes the first text transfer and is blank; use the
+ten-second or end-of-run capture. A raw physical matrix press reaches
+keypad IRQ/ack, but semantic key mapping and interactive acceptance remain
+unproven. Next establish the product-local SIM and semantic keypad contracts.
 
 `PRODUCT_8850` uses the existing BLB-2 nominal ADC tuple
 `000/3ff/2c0/150/140/000/200/000`, replacing the conservative full-scale
@@ -631,6 +632,8 @@ firmware state changed, PMM repaired or peer message added by the fixture.
 Reproduce with the startup observer and `-verbose`, then check using
 `noki8850_staged_trace_check.py <log> --runtime-hle --startup-readiness`.
 This gate establishes readiness and physical IRQ delivery only.
+Add `--display-transfer` to require nonzero glyph framebuffer delivery in
+order; inspect `8850_10000.png` independently for the rendered text.
 
 The live GENSIO stream carries LCD initialization at `30461c..3046fc`:
 command `24`, bank/column addressing, zero-fill data, then extended setup
@@ -800,22 +803,23 @@ routine `27e662`: bounded probes observe destinations `1304e3..130508`
 and `130592..1305b3`, operation `01`. Its output submission uses resource
 `7305` through `304a3c/304a0a`. At `304a18` the channel-map predicate
 `30491c` returns zero, preventing `304944` from forwarding the request.
-This is a failed service-channel submission boundary, not evidence of absent
-text, stalled timers, or idle UI tasks. The `nsm2hle` research composition
-now supplies a product-local application contract: registration query
-`64/01`, followed by command `70` enabling class `73` in both bitmap
-directions. The own-ROM mask table is MSB-first, so byte 14 and byte 46
-carry mask `10`. A fresh isolated run accepts the map with mode `02`,
-node `1e`, kind `01`, and both `7305` submissions return allowed `01`.
-The nominal 36-tick peer delay remains calibrated. No map RAM is written
-by the emulator directly.
+This gate controls service-channel forwarding, not physical LCD output.
+Routine `304944` packages the resource and payload into a service frame
+and sends it through `302506`. A transport-only query/map experiment
+enabled class `73` (MSB-first bitmap bytes 14/46, mask `10`) and both
+submissions became allowed, but the earlier no-map run renders the same
+Insert SIM card frame. Therefore this application profile is unnecessary
+for boot and is removed from the research composition.
 
-The LCD remains blank after this acceptance. Routine `304944` packages
-the resource and payload into a service frame and sends it through
-`302506`; it is not proof of physical LCD transfer. The next boundary is
-the framebuffer-to-controller path, with service forwarding kept distinct
-from raster output. The native-upload/startup-readiness checker and the
-3210 default/frontier gates pass; these do not establish 8850 graphical boot.
+Physical transfer `27f550` reads framebuffer `1304d8`, optionally masking
+it with bitmap `1302e0` while byte `13029e` is zero. Fresh probes observe
+glyph completion producing nonzero pixels (`80800000` and `007f7e0c` at
+the sampled positions) with zero mask bytes, followed by transfer of all
+84 columns across six banks. GENSIO emits these bytes through `2e`, then
+the normal-display command `0c` through `6e`; the end-of-run frame visibly
+reads Insert SIM card. The early blank screenshot was a sampling error,
+not an unmet display dependency. This proves text presentation, not menus,
+SIM initialization, or semantic physical-key interaction.
 A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;

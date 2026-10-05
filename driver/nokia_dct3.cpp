@@ -439,16 +439,6 @@ constexpr nokia_external_service_peer_device::application_contract
 	0x5f >> 3, 0x01, 0x62 >> 3, 0x20, 0x43
 };
 
-// NSM-2's own 30491c/304a4a decoders use MSB-first permission bits.
-// Its glyph submission is resource 7305, requiring class 73 in both
-// 32-byte directions. Registration command 64/value 1 queries state.
-// Cadence remains calibrated; acceptance is tested on nsm2hle only.
-constexpr nokia_external_service_peer_device::application_contract
-		EXTERNAL_SERVICE_NSM2_DISPLAY = {
-	36, 0x01, 0x42,
-	0x73 >> 3, 0x10, 32 + (0x73 >> 3), 0x10, 0x43
-};
-
 constexpr nokia_dsp_hle_device::bootstrap_contract BOOTSTRAP_READY_64 = {
 	nokia_dsp_hle_device::bootstrap_exchange_strategy::zero_acknowledge,
 	64,
@@ -3416,10 +3406,9 @@ void nokia_dct3_state::nsm2hle(machine_config &config)
 	nokia_product_config runtime = PRODUCT_8850;
 	runtime.dsp_reset_wiring = { 0x10, 0x01 };
 	// Native uploads publish their own verdict. Runtime acknowledges the
-	// shared service handshake and product-local display channel contract.
+	// shared service handshake; LCD output does not require a service map.
 	runtime.dsp_service = true;
 	runtime.external_service_transport = true;
-	runtime.external_service = EXTERNAL_SERVICE_NSM2_DISPLAY;
 	// Own dispatcher 243a42 routes class 74 to 240dbc; command 0d at
 	// 240e2c cancels the armed wait and reads two fault bits at body +9.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
