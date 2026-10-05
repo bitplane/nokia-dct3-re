@@ -716,8 +716,10 @@ deconfiguration `040000000000001a6000003c0000000f00000000`.
 
 This is laboratory GSM900 registration on a handset whose product also
 supports GSM1900; no separate GSM1900 acquisition acceptance is claimed.
-Traffic release, handover, neighbour and speech contracts remain unset
-until product observations justify them. Native missing DSP execution
+Physical End after a connected outgoing call publishes traffic-release
+parameter `14`; that own observation now selects the release contract.
+Handover, neighbour and speech contracts remain unset until product
+observations justify them. Native missing DSP execution
 remains distinct from these HLE transport/network results.
 
 Reproduce with the research machine and security input fixture for 65
@@ -727,8 +729,24 @@ seconds, from fresh cfg/NVRAM; then run:
 .venv/bin/python tools/noki8890_registration_check.py RUN/error.log
 ```
 
-Incoming/outgoing calls, SMS, operator pixels and GSM1900 behavior remain
-unproved on this product.
+Physical outgoing Send produces CM Service Request/Accept, SETUP,
+Call Proceeding, traffic assignment/configuration, Assignment Complete,
+Alerting, Connect and Connect Acknowledge. Physical End produces
+Disconnect, Release/Release Complete and RR release; own deconfiguration
+`040000001117001a6000003c0000001400000001` accepts the idle confirmation
+and returns to paging. This is signaling, not speech acceptance.
+
+Dialing fidelity remains open: typing `1234567` from idle displays and
+transmits `2345671`. Three seconds of editor settling and a physical
+Scroll Down do not correct the rotation. Neither diagnostic is retained
+in the fixture. No firmware state is changed to conceal the mismatch.
+`noki8890_outgoing_call_check.py` defaults to the intended `1234567` and
+correctly fails; `--number 2345671` verifies only the observed signaling
+lifecycle. Reproduce with `noki8890_outgoing_call_input.lua`, fresh
+cfg/NVRAM and 60 seconds. Recover the idle-to-number-editor lifecycle
+before promoting physically correct outgoing dialing.
+
+Incoming calls, SMS and GSM1900 behavior remain unproved on this product.
 
 ### 8850 stock-input runtime boundary
 

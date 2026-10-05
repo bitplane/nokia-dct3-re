@@ -254,10 +254,11 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM2 = {
 
 // NSB-6 v12.20 independently publishes 56/160. Own dispatcher 30168e
 // maps 8b to task 12 and 89 body bit 0 to its pending channel context.
-// Release, neighbour and handover contracts remain unobserved and unset.
+// Physical End publishes release parameter 14. Neighbour and handover
+// contracts remain unobserved and unset.
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NSB6 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0, 0x01
+	0x14, 0x01
 };
 
 constexpr nokia_dsp_hle_device::service_control_contract
