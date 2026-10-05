@@ -752,6 +752,29 @@ lifecycle. Reproduce with `noki8890_outgoing_call_input.lua`, fresh
 cfg/NVRAM and 60 seconds. Recover the idle-to-number-editor lifecycle
 before promoting physically correct outgoing dialing.
 
+The own execution trace now identifies the cursor overwrite, not merely
+the visible ordering. At `2603bc` the first digit is inserted into the
+buffer at `136750`, and `2603c2` advances editor context `1348cc + 1c`
+to 1. Subsequent UI construction dispatches `23c0bc` with operation 1;
+its `23c23c..23c242` path restores saved position `1324a2 == 0` through
+`25ee94`. The latter first computes buffer length 1, then `25eed4`
+overwrites the cursor with saved position 0. The restore is conditional
+on saved descriptor `1324ad == 64`, matching the current UI descriptor.
+After restoration the saved position fields are marked `00ff` again.
+
+`noki8890_dial_observe.lua` adds read-only write observations of
+`1324a0..1324af` and the restore/reset branch targets. The record is
+initialized with `00ff` sentinels at `26354c..263564`; firmware's
+`25ee74` saved-position receiver subsequently writes zero positions
+during the clock/editor lifecycle, including after the fixture's first
+Menu input. Those positions survive cancellation and are consumed on
+first dial-editor construction. This establishes the mechanism but does
+not yet establish which lifecycle step is wrong: do not patch cursor RAM
+or compensate by reordering dialed digits. A physical clock-entry trial
+also failed validation, so completing clock setup is not yet an accepted
+solution. Recover the saved-position receiver's producer and cancellation
+ownership before changing device behavior or claiming correct dialing.
+
 Incoming-call signaling separately passes IMSI paging, Paging Response,
 contention UA, cipher/MM-information exchange, incoming SETUP, Call
 Confirmed/Alerting, own traffic configuration and Assignment Complete.
