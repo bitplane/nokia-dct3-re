@@ -504,6 +504,19 @@ writer-absence proof. The firmware-owned clear is independently decoded.
 Use the private-directory invocation below with this observer for nine
 seconds. No guest state is written.
 
+The own-ROM application checksum routine is `2408c8`; startup compares its
+result with logical NV `0254` at `240b8c..240b94`. Failure branch `240c02`
+writes `0c` to fault-array offset `0c`. Literal `240da8` independently
+identifies that array as `13fbe0`. Fresh runtime samples from 0.5 through
+8 seconds contain `ffff00ff00ffff00ffffff0000ff0e0fffff00000000ffff`:
+offset `0c` is clear, while offsets `0e/0f` contain `0e/0f`. The latter
+stores occur at `240b4c/240b50` when readiness helper `2f6aa4` does not
+return 1. Several other slots retain `ff`, so do not reduce this screen to
+one completed self-test failure or import the 6250 checksum repair path.
+The next contract is the helper's firmware-owned readiness byte and the
+remaining startup-test completion paths. The read taps on checksum entry
+and failure produced no records; those negatives are not execution proofs.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 

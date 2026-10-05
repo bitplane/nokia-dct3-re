@@ -4,6 +4,24 @@ local cpu = assert(machine.devices[":maincpu"])
 local memory = cpu.spaces["program"]
 local taps = {}
 local counts = {flag = 0, control = 0}
+local nv_hits = 0
+taps[#taps + 1] = memory:install_read_tap(0x2408c8, 0x2408cb,
+    "8850_nv_entry", function(address, data, mask)
+        if nv_hits >= 8 then return end
+        nv_hits = nv_hits + 1
+        machine:logerror(string.format("8850_nv_entry: pc=%08x lr=%08x t=%.6f\n",
+            cpu.state["PC"].value, cpu.state["LR"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = memory:install_read_tap(0x240c00, 0x240c03,
+    "8850_nv_failure", function(address, data, mask)
+        if cpu.state["PC"].value ~= 0x240c02 then return end
+        local stack = cpu.state["SP"].value
+        machine:logerror(string.format(
+            "8850_nv_failure: computed=%04x stored=%04x companion=%04x faults=%08x t=%.6f\n",
+            cpu.state["R9"].value & 0xffff, memory:read_u16(stack + 4),
+            memory:read_u16(stack + 6), cpu.state["R6"].value,
+            machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_write_tap(0x1381ec, 0x1381ef,
     "8850_frontier_flag", function(address, data, mask)
         if counts.flag >= 24 then return end
@@ -34,6 +52,11 @@ local samples = coroutine.create(function()
             memory:read_u8(0x2000c), memory:read_u16(0x20010),
             memory:read_u16(0x20012),
             machine.time:as_double()))
+        local faults = {}
+        for index = 0, 23 do
+            faults[#faults + 1] = string.format("%02x", memory:read_u8(0x13fbe0 + index))
+        end
+        machine:logerror("8850_faults: bytes=" .. table.concat(faults) .. "\n")
         machine.screens[":screen"]:snapshot(string.format("8850_%04d.png", time * 1000))
     end
 end)
