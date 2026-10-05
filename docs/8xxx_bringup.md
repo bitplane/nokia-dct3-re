@@ -723,8 +723,16 @@ state `02 -> 03 -> 01` and unlinking by 31.003648 seconds. Delivery code
 `2888a0` indexes ROM descriptor table `331ae4` with the timer's event ID;
 entry `51` is `0033e0c8 03050000`, pointing to the product-local message
 whose first halfword is `023f`. The task-5 receive observer confirms that
-exact ROM message address/input. Next classify this expiry consumer before
-claiming a missing timer or changing rates. The requested delay is `075a`;
+exact ROM message address/input. Its filter handler is `268dec`: byte
+`13fc57 == 0` permits `2f1d9c(0,1)`. A fresh 35-second trace observes
+that zero gate and call, paired with startup's earlier `2f1d9c(0,ff)`.
+The latter helper updates selector-indexed state under `137e8c`; the
+`ff` path clears an activation byte and visits indices `1..12`, while
+the ordinary-value path conditionally calls `2f1c20`, which tests per-index
+mask bytes before calling `2f19de`. The expiry therefore reaches its
+firmware consumer; it is not evidence of a missing timer delivery. The
+semantics of this indexed subsystem and earlier `05e4` filter side effects
+remain unresolved. The requested delay is `075a`;
 the observed wall-time interval is not yet a validated physical cadence.
 Passive samples show owner `05`, flags `03`, state `02` after arming;
 the record links to `111950` and stores `04f9` at four and eight seconds.
