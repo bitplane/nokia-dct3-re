@@ -41,6 +41,10 @@ cpu.debug:bpset(0x2d1140, nil,
     'logerror "8850_ui_start r14=%08x\\n",r14;g')
 cpu.debug:bpset(0x3014b6, "temp8<100",
     'temp8=temp8+1;logerror "8850_ui_catalogue input=%08x r14=%08x\\n",r0,r14;g')
+cpu.debug:bpset(0x2886c0, "b@1115d2==5 && temp0<100",
+    'temp0=temp0+1;logerror "8850_task5_receive_entry r14=%08x\\n",r14;g')
+cpu.debug:bpset(0x30134e, "temp9<100",
+    'temp9=temp9+1;logerror "8850_catalogue_receive message=%08x input=%04x\\n",r0,w@r0;g')
 cpu.debug:go()
 
 local mask_writes = 0

@@ -657,6 +657,15 @@ The UI-start producer itself is therefore present; neither a missing
 readiness report nor an assumed missing channel map justifies injecting
 another UI-start event.
 
+Task 5's RTOS receive caller is `30134a` (return `30134f`), proven by
+the RTOS task byte `1115d2==5` at entry `2886c0`. Its catalogue wrapper
+`301348` reads the packed message halfword and copies optional arguments
+according to its top two bits. A fresh run observes queued `0731` and
+`0735` at `30134e`; both startup publications reach task 5. The next
+unresolved boundary is callback/transition selection after this wrapper,
+not missing publication or RTOS delivery. Mid-routine probes that did not
+fire were retired rather than used as absence evidence.
+
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
 Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not
