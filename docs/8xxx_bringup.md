@@ -666,8 +666,27 @@ title/list pixels (excluding animation and scrollbar):
 .venv/bin/python tools/noki8890_ui_check.py RUN/error.log RUN/snap
 ```
 
-Persistent phonebook writes, applications, radio registration, call
-signaling and SMS are still unproved on this product.
+Physical phonebook Add entry additionally stores A/123 through
+`A0 DC 01 04 20`, receiving `9000`. The exact persisted GSM 11.11 ADN
+record is validated, not just the German SIM-save confirmation screen.
+A preserved-storage cold process reads record 1, then physical
+Names/Search/Detail displays number 123 without any UPDATE RECORD.
+Fresh and preserved boots have different clock-notice dismissal paths;
+the save/read fixtures deliberately keep those sequences separate.
+
+Run `noki8890_phonebook_input.lua` for 40 seconds from fresh storage;
+run `noki8890_phonebook_read.lua` for 32 seconds with that preserved
+NVRAM directory. Check each stage:
+
+```sh
+.venv/bin/python tools/noki8890_phonebook_check.py save SAVE/error.log \
+  SAVE/nvram/nsb6hle/sim_card SAVE/snap/8890_phonebook_save.png
+.venv/bin/python tools/noki8890_phonebook_check.py readback READ/error.log \
+  SAVE/nvram/nsb6hle/sim_card READ/snap/8890_phonebook_contact.png
+```
+
+Applications, radio registration, call signaling and SMS are still unproved
+on this product.
 
 ### 8850 stock-input runtime boundary
 

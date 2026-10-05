@@ -22,6 +22,7 @@ local input = coroutine.create(function()
     end
     if not emu.wait(5) then return end
     machine.screens[":screen"]:snapshot("8890_after_security.png")
+    if _G.noki8890_security_only then return end
     local left = assert(machine.ioport.ports[":COL.1"].fields["Menu"])
     for index = 1, 3 do
         machine:logerror(string.format("8890_navigation_physical: press=%d\n", index))
