@@ -666,6 +666,16 @@ unresolved boundary is callback/transition selection after this wrapper,
 not missing publication or RTOS delivery. Mid-routine probes that did not
 fire were retired rather than used as absence evidence.
 
+Both `0731` and `0735` reach each filter entry in task 5's pipeline:
+`300aae -> 2fce32 -> 27bd84 -> 270f00 -> 2c3d38 -> 271bd8 -> 266730`.
+Unchanged input does not imply absence of filter side effects. A bounded
+BE Thumb branch execution of `266730` (stop at its first BL, no firmware
+RAM model) selects epilogue `268e46` for `0731`, but handler `268a3c` for
+`0735`. The latter reads boot-state helper `2ff6ce`, chooses one of two
+catalogue actions via `301564`, calls `25f12e`, and arms timer `51` via
+`287a0e`. Next observe that action and timer continuation in the coherent
+run; the static branch decode alone is not a completed UI lifecycle.
+
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
 Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not

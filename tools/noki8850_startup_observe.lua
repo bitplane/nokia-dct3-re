@@ -45,6 +45,11 @@ cpu.debug:bpset(0x2886c0, "b@1115d2==5 && temp0<100",
     'temp0=temp0+1;logerror "8850_task5_receive_entry r14=%08x\\n",r14;g')
 cpu.debug:bpset(0x30134e, "temp9<100",
     'temp9=temp9+1;logerror "8850_catalogue_receive message=%08x input=%04x\\n",r0,w@r0;g')
+for _, address in ipairs({0x300aae, 0x2fce32, 0x27bd84, 0x270f00,
+        0x2c3d38, 0x271bd8, 0x266730}) do
+    cpu.debug:bpset(address, "r0==731 || r0==735",
+        string.format('logerror "8850_ui_filter entry=%08x input=%%04x\\n",r0;g', address))
+end
 cpu.debug:go()
 
 local mask_writes = 0
