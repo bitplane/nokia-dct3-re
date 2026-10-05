@@ -753,8 +753,16 @@ second filter, not a literal catalogue record: `2fd09c` calls the active
 UI context's function pointer. A fresh run observes context `2f`, target
 `2ad609` (Thumb entry `2ad608`) for all of `0731/0735/05e4`.
 That dispatcher selects `2ad1be/2ad2c0/2ad334/2ad3d4/2ad4c0` using its
-local structure's mode bytes and another flag. Next capture that selection
-and recover its startup contract. A direct-BL-only branch audit cannot
+local structure's mode bytes and another flag. Runtime captures mode/phase
+`00/00`, flag zero, selecting `2ad1be` for `0731/0735/05e4`; those inputs
+take its unchanged-return path. The mode-zero handler instead recognizes
+`00ca/035c/0370/05dc/05e1` (derived from its subtract cascade and BE pool
+literal `0292`). Fresh input probes observe `05dc` before the startup
+inputs, `05e1` with mode zero, and another `05e1` after mode becomes one.
+Thus this context has an organic transaction lifecycle, not simply an
+uninitialized mode byte. Next follow `05dc/05e1`'s resource requests and
+context transition; do not synthesize mode or missing statuses.
+A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;
 the observed wall-time interval is not yet a validated physical cadence.

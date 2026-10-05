@@ -80,6 +80,12 @@ cpu.debug:bpset(0x2f1a28, nil,
     'logerror "8850_ui_index_activate index=%02x first=%08x second=%08x third=%08x r14=%08x\\n",r0,r1,r2,r3,r14;g')
 cpu.debug:bpset(0x2fd09c, "r0==5e4 || r0==731 || r0==735",
     'logerror "8850_ui_context_dispatch input=%04x target=%08x context=%02x\\n",r0,r1,b@(r5+3);g')
+cpu.debug:bpset(0x2ad608, "r0==5e4 || r0==731 || r0==735 || r0==ca || r0==35c || r0==370 || r0==5dc || r0==5e1",
+    'logerror "8850_ui_context_mode input=%04x mode=%02x phase=%02x flag=%02x\\n",r0,b@13fc6c,b@13fc72,b@13fc4b;g')
+for _, address in ipairs({0x2ad1be, 0x2ad2c0, 0x2ad334, 0x2ad3d4, 0x2ad4c0}) do
+    cpu.debug:bpset(address, "r0==5e4 || r0==731 || r0==735",
+        string.format('logerror "8850_ui_context_branch entry=%08x input=%%04x\\n",r0;g', address))
+end
 cpu.debug:go()
 
 local mask_writes = 0
