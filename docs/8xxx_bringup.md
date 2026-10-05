@@ -619,9 +619,9 @@ not a copied silicon verdict or execution of absent resident code.
 With that contract, TX `70:0d00` at 1.247515 seconds receives RX
 `74:0d00` at 1.247615. The own consumer sees armed flag `c4` and returns
 with fault bytes `0f/10/11=00/00/00`. A subsequent `70:0a09` request
-appears. The thirty-second isolated run still ends with a blank LCD:
-self-test acceptance alone does not establish graphical boot. Identity
-and security-record requests remain unanswered pending their own audit.
+appears. Self-test acceptance alone does not establish graphical boot.
+Identity and security-record requests remain unanswered; neither is required
+for the graphical and physical-input result below.
 
 ```sh
 .venv/bin/python tools/noki8890_selftest_contract.py \
@@ -629,6 +629,45 @@ and security-record requests remain unanswered pending their own audit.
 .venv/bin/python tools/noki8890_staged_check.py RUN/error.log \
   roms/noki8890/8890_12.20_ppmc.fls --runtime --selftest
 ```
+
+#### 8890 Graphical and Physical Input
+
+Nokia's [NSB-6 user manual](https://fcc.report/FCC-ID/ljpnsb6ny/85827.pdf)
+specifies a BLB-2 pack. The research composition uses the existing nominal
+BLB-2 CCONT tuple rather than full-scale conservative placeholders.
+These are calibrated board inputs, not measured NSB-6 electrical units.
+Firmware retains voltage, pack and temperature decisions. With no card,
+that input correction yields the German **SIM-Karte einsetzen** frame;
+no identity/record result is synthesized.
+
+Own scanner `2fb850` drives row pins 1..4 and returns row*5+column.
+IRQ0 handler `2fb9a4` reads pending columns at `2b` and posts scan event
+`41` through `2fef6c`. Decoder `2ff006` indexes the 25-byte matrix at
+`339f4c`; the own table matches the shared five-column host layout.
+The research machine selects that layout, with Menu `19`, Names `1a`
+and Send/End `0e/0f`, rather than the generic 3310 layout.
+
+With the physical SIMI controller and ordinary removable laboratory card,
+the firmware organically reads ICCID, phase, SST, IMSI and all 50 ADN
+records, then renders **Sicherheitscode / OK**. Physical `12345` followed
+by Menu decodes `01/02/03/04/05/19` and dismisses the prompt into the
+Nokia startup graphic. Further physical Menu presses acknowledge the
+clock-not-set notice, open **Mitteilungen**, then its message submenu.
+The own acquired PMM remains unchanged; no donor provisioning is used.
+Native DSP completion and normal `noki8890` promotion are not implied.
+
+Reproduce with `nsb6hle`, fresh private cfg/NVRAM, verbose logging,
+`-debug -debugger none`, `tools/noki8890_security_input.lua`, autoboot
+delay zero and 35 simulated seconds. Acceptance combines SIM/APDU
+coverage, physically correlated decoded keys and stable reviewed
+title/list pixels (excluding animation and scrollbar):
+
+```sh
+.venv/bin/python tools/noki8890_ui_check.py RUN/error.log RUN/snap
+```
+
+Persistent phonebook writes, applications, radio registration, call
+signaling and SMS are still unproved on this product.
 
 ### 8850 stock-input runtime boundary
 

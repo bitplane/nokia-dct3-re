@@ -39,6 +39,9 @@ def verify(image):
     for address, value in ((0x240d18, 0x13fde1), (0x240a68, 0x13fbe0)):
         if int.from_bytes(image[address-0x200000:address-0x200000+4], 'big') != value:
             raise ValueError(f'contract literal mismatch at {address:08x}')
+    if image[0x139f4c:0x139f4c+25] != bytes.fromhex(
+            '3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b'):
+        raise ValueError('own NSB-6 decoded matrix table mismatch')
 
 
 if __name__ == '__main__':

@@ -3050,6 +3050,12 @@ static INPUT_PORTS_START( noki8850 )
 	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Keypad *") PORT_CODE(KEYCODE_ASTERISK) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( noki8890 )
+	// Own NSB-6 v12.20 table 339f4c has the same 25 decoded matrix
+	// entries, including Menu=19 and Send/End=0e/0f.
+	PORT_INCLUDE(noki8850)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki2100 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3512,6 +3518,17 @@ void nokia_dct3_state::nsb6hle(machine_config &config)
 	// Explicit runtime transport comparison, not missing resident execution.
 	// Keep self-test and security-record results unimplemented here.
 	nokia_product_config runtime = m_product;
+	// NSB-6's Nokia user manual specifies BLB-2. These shared nominal
+	// board samples are calibrated inputs, not measured electrical units.
+	runtime.ccont_board = ADC_5210;
+	// Own scanner 2fb850 drives row pins 1..4. IRQ handler 2fb9a4
+	// reads pending columns at 2b before acknowledging IRQ0.
+	runtime.keypad_wiring.row_pin_shift = 1;
+	runtime.keypad_wiring.column_irq_status = 0x2b;
+	// Compose the physical SIM interface and removable laboratory card;
+	// the NSB-6 firmware still owns activation and every APDU.
+	runtime.simi_controller = true;
+	runtime.synthetic_sim_card = true;
 	runtime.dsp_service = true;
 	runtime.external_service_transport = true;
 	// Own class-74 dispatcher 24373a calls 240938; command 0d at
@@ -4021,7 +4038,7 @@ SYST( 2000, nsm3dr6, noki8250, 0,    nsm3dr6, noki3310, nokia_dct3_state, empty_
 SYST( 2000, nsm3dhle, noki8250, 0,   nsm3dhle, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsb6stage, noki8890, 0, nsb6stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8890 native uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 2000, nsb6hle, noki8890, 0, nsb6hle, noki3310, nokia_dct3_state, empty_init, "Nokia", "8890 native uploads with runtime transport HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsb6hle, noki8890, 0, nsb6hle, noki8890, nokia_dct3_state, empty_init, "Nokia", "8890 native uploads with runtime transport HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
