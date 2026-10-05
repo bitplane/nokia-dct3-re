@@ -800,11 +800,22 @@ routine `27e662`: bounded probes observe destinations `1304e3..130508`
 and `130592..1305b3`, operation `01`. Its output submission uses resource
 `7305` through `304a3c/304a0a`. At `304a18` the channel-map predicate
 `30491c` returns zero, preventing `304944` from forwarding the request.
-This is a concrete failed submission boundary, not evidence of absent
-text, stalled timers, or idle UI tasks. Next recover the product-local
-map-enabling peer contract and implement it at the transport boundary;
-do not set the map bytes directly or import another product's application
-profile without validation.
+This is a failed service-channel submission boundary, not evidence of absent
+text, stalled timers, or idle UI tasks. The `nsm2hle` research composition
+now supplies a product-local application contract: registration query
+`64/01`, followed by command `70` enabling class `73` in both bitmap
+directions. The own-ROM mask table is MSB-first, so byte 14 and byte 46
+carry mask `10`. A fresh isolated run accepts the map with mode `02`,
+node `1e`, kind `01`, and both `7305` submissions return allowed `01`.
+The nominal 36-tick peer delay remains calibrated. No map RAM is written
+by the emulator directly.
+
+The LCD remains blank after this acceptance. Routine `304944` packages
+the resource and payload into a service frame and sends it through
+`302506`; it is not proof of physical LCD transfer. The next boundary is
+the framebuffer-to-controller path, with service forwarding kept distinct
+from raster output. The native-upload/startup-readiness checker and the
+3210 default/frontier gates pass; these do not establish 8850 graphical boot.
 A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;
