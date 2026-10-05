@@ -50,6 +50,12 @@ for _, address in ipairs({0x300aae, 0x2fce32, 0x27bd84, 0x270f00,
     cpu.debug:bpset(address, "r0==731 || r0==735",
         string.format('logerror "8850_ui_filter entry=%08x input=%%04x\\n",r0;g', address))
 end
+cpu.debug:bpset(0x268a3c, nil,
+    'logerror "8850_ui_735_handler entry=268a3c\\n";g')
+cpu.debug:bpset(0x301564, "temp1<250",
+    'temp1=temp1+1;logerror "8850_catalogue_internal input=%08x r14=%08x\\n",r0,r14;g')
+cpu.debug:bpset(0x287a0e, "r0==51",
+    'logerror "8850_ui_timer51_arm delay=%08x r14=%08x\\n",r1,r14;g')
 cpu.debug:go()
 
 local mask_writes = 0

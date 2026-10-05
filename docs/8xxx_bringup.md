@@ -673,8 +673,13 @@ BE Thumb branch execution of `266730` (stop at its first BL, no firmware
 RAM model) selects epilogue `268e46` for `0731`, but handler `268a3c` for
 `0735`. The latter reads boot-state helper `2ff6ce`, chooses one of two
 catalogue actions via `301564`, calls `25f12e`, and arms timer `51` via
-`287a0e`. Next observe that action and timer continuation in the coherent
-run; the static branch decode alone is not a completed UI lifecycle.
+`287a0e`. Runtime confirms entry `268a3c`, queues action `05e4` from
+`268a52`, and arms timer `51` with delay `075a` from `268a6a`. A fresh
+29-second run retains startup readiness but is not graphical acceptance.
+Receive/action probes are capped, so their late negative results cannot
+prove timer expiry absence. Next recover the `05e4` action's catalogue
+transition and the timer's target/expiry semantics, rather than inventing
+an external completion.
 
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
