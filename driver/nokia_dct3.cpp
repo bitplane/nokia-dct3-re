@@ -3514,6 +3514,9 @@ void nokia_dct3_state::nsb6hle(machine_config &config)
 	nokia_product_config runtime = m_product;
 	runtime.dsp_service = true;
 	runtime.external_service_transport = true;
+	// Own class-74 dispatcher 24373a calls 240938; command 0d at
+	// 2409ac cancels the armed wait and interprets fault bits at +9.
+	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	apply_product_config(runtime);
 	m_dsp_hle->set_opaque_parameter_acceptance(true);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);

@@ -22,3 +22,7 @@ cpu.debug:bpset(0x2c3398, 'temp7<24',
     'temp7=temp7+1;logerror "8890_service_control: command=%04x argument=%04x commit=%04x pending_address=%08x\\n",r4,r6,r5,r3+r8;g')
 cpu.debug:bpset(0x2c307c, 'temp8<24',
     'temp8=temp8+1;logerror "8890_service_encoder: command=%04x argument=%04x commit=%04x caller=%08x\\n",r0,r1,r2,r14;g')
+cpu.debug:bpset(0x2409ac, 'temp9<8',
+    'temp9=temp9+1;logerror "8890_selftest_reply: command=%02x faults=%02x flag=%02x\\n",b@(r4+8),b@(r4+9),b@13fde1;g')
+cpu.debug:bpset(0x240a60, 'temp6<16',
+    'temp6=temp6+1;logerror "8890_service_return: command=%02x faults=%02x/%02x/%02x\\n",b@(r4+8),b@13fbef,b@13fbf0,b@13fbf1;g')

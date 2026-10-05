@@ -593,7 +593,8 @@ dynamic relocation. Native upload acceptance is not graphical/UI acceptance.
 execution at that same absent routine, then enables shared parameter
 acknowledgement and request-derived external-service discovery. These
 settings belong to the product configuration so reset preserves them.
-It does not implement identity, security-record or self-test verdicts.
+It does not implement identity or security-record verdicts. Its compact
+self-test HLE response is selected by the own consumer contract below.
 The observer's bounded debugger probes at `2c307c/2c3398` record the own
 service encoder and shared pending-word commit without changing firmware.
 
@@ -605,6 +606,29 @@ Those acquired-product requests are evidence for the next consumer audit,
 not permission to import sibling reply semantics. No interactive acceptance
 is established. Reproduce with `nsb6hle`, the same observer and twelve
 simulated seconds; check with the staged checker's `--runtime` option.
+
+Own dispatcher `243706..243746` decodes class `74` by a subtract cascade
+(`03+02+0c+02+2d+02+32=74`), then calls `240938` except command `32`.
+The own handler's command cascade `240952..240960` selects command `0d`
+at `2409ac`. Flag `13fde1` bit 2 arms the wait; timer `19` is cancelled,
+fault array `13fbe0` offset `0f` cleared, and reply byte `+9` bits 0/1
+select clear/failure values for offsets `10/11`. These own-ROM facts
+justify the existing request-correlated compact HLE self-test contract,
+not a copied silicon verdict or execution of absent resident code.
+
+With that contract, TX `70:0d00` at 1.247515 seconds receives RX
+`74:0d00` at 1.247615. The own consumer sees armed flag `c4` and returns
+with fault bytes `0f/10/11=00/00/00`. A subsequent `70:0a09` request
+appears. The thirty-second isolated run still ends with a blank LCD:
+self-test acceptance alone does not establish graphical boot. Identity
+and security-record requests remain unanswered pending their own audit.
+
+```sh
+.venv/bin/python tools/noki8890_selftest_contract.py \
+  roms/noki8890/8890_12.20_ppmc.fls
+.venv/bin/python tools/noki8890_staged_check.py RUN/error.log \
+  roms/noki8890/8890_12.20_ppmc.fls --runtime --selftest
+```
 
 ### 8850 stock-input runtime boundary
 

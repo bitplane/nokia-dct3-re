@@ -24,6 +24,12 @@ RUNTIME = GOOD.replace('observation_halt pc=2c75 ownership_retained=1',
     'TX pending type=70 payload=2 data=0d00',
 ))
 
+SELFTEST = RUNTIME + '\n' + '\n'.join((
+    'RX enqueue type=74 payload=2 producer=08e data=0d00',
+    '8890_selftest_reply: command=0d faults=00 flag=c4',
+    '8890_service_return: command=0d faults=00/00/00',
+))
+
 
 class StagedTest(unittest.TestCase):
     def test_complete(self):
@@ -51,3 +57,10 @@ class StagedTest(unittest.TestCase):
     def test_runtime_requires_firmware_ack(self):
         with self.assertRaises(ValueError):
             verify(RUNTIME.replace('data=1e0200d0000305014100', 'data=unknown'), runtime=True)
+
+    def test_selftest_consumer(self):
+        verify(SELFTEST, runtime=True, selftest=True)
+
+    def test_selftest_requires_consumer(self):
+        with self.assertRaises(ValueError):
+            verify(SELFTEST.replace('faults=00/00/00', 'faults=00/10/00'), runtime=True, selftest=True)
