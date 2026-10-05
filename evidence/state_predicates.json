@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_research_incoming_call", "owner": "product_profile", "status": "satisfied",
+      "predicate": "8850 research composition receives an IMSI-paged call, physically answers and ends it, then returns to idle paging",
+      "current": "The declared laboratory network config queues one incoming call. Firmware completes Paging Response, cipher/MM exchange, SETUP and its own 11-byte Call Confirmed, Alerting and traffic assignment. Physical Send 0e emits Connect and receives acknowledgement; End 0f emits Disconnect and completes CC/RR release with the own parameter-14 transaction and zero confirmation. Reviewed frames show caller 5551234, connected presentation and DCT3 LAB after release. Media and SMS are separate capabilities.",
+      "evidence": ["docs/8xxx_bringup.md", "fixtures/noki8850_incoming_call/nsm2hle.cfg", "tools/noki8850_incoming_call_input.lua", "tools/noki8850_incoming_call_check.py", "tools/test_noki8850_incoming_call_check.py"]
+    },
+    {
       "id": "nsm2_research_outgoing_call", "owner": "product_profile", "status": "satisfied",
       "predicate": "8850 research composition physically dials 5551234, completes outgoing CC/RR signaling and returns to registered operator presentation",
       "current": "Own matrix column-0 bits 2/3 decode as Send 0e and End 0f; the prior 11/10 labels were incorrect. Physical Send triggers CM Service and exact-number SETUP, traffic assignment, Alerting, Connect and handset acknowledgement. End triggers Disconnect, Release Complete and RR release. Its organic release packet establishes parameter 14; the request-correlated peer confirmation returns firmware to paging. Operator pixel crops verify numeric PLMN before dialing and DCT3 LAB after release. No 8850 speech-media configuration or incoming/SMS acceptance is implied.",

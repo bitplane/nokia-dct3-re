@@ -20,6 +20,7 @@ local input = coroutine.create(function()
     end
     if not emu.wait(3) then return end
     machine.screens[":screen"]:snapshot("8850_after_security.png")
+    if _G.noki8850_security_only then return end
     if not emu.wait(5) then return end
     for _, name in ipairs({"messages_menu", "inbox"}) do
         local key = assert(machine.ioport.ports[":COL.1"].fields["Menu"])

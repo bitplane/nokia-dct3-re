@@ -625,8 +625,8 @@ cold restart displays both the name and number through Search/Detail.
 Calculator also computes 12+3=15 through physical inputs and its Options
 menu. The research composition also completes laboratory Location Updating,
 persists EF_LOCI and returns to steady paging/BCCH. Physical outgoing-call
-signaling and registered-operator pixels are verified. Incoming calls, SMS
-and speech media remain the next capability boundaries.
+and incoming-call signaling plus registered-operator pixels are verified.
+SMS and speech media remain the next capability boundaries.
 
 #### Radio Contract
 
@@ -774,6 +774,25 @@ return to paging. Reviewed operator-only pixel crops show numeric `001 01`
 before dialing and `DCT3 LAB` after release, excluding animated indicators.
 The wire also contains `860b`/`840a` speech-control commands, but no NSM-2
 speech-media contract is selected; this acceptance does not prove audio.
+
+#### Incoming Call Acceptance
+
+Copy `fixtures/noki8850_incoming_call/nsm2hle.cfg` into a private run's
+configuration directory. Run `noki8850_incoming_call_input.lua` for 45
+seconds with fresh NVRAM. The fixture completes physical security input
+without continuing menu navigation during ringing, answers with Send at
+20 seconds and hangs up with End at 28 seconds. Check:
+
+```sh
+.venv/bin/python tools/noki8850_incoming_call_check.py RUN/error.log
+```
+
+Acceptance requires IMSI paging, Paging Response, cipher/MM exchange,
+incoming SETUP, own 11-byte Call Confirmed, Alerting, TCH assignment,
+physical Send/Connect and network acknowledgement, physical End/Disconnect,
+CC/RR release and idle paging. Captures show caller `5551234`, connected
+call presentation and return to `DCT3 LAB`. No additional firmware or
+device behavior change was required; this remains signaling-only acceptance.
 IRQ0 handler `301714` reads pending column bits at `2b` and posts
 event `41` through `305370` before acknowledging IRQ0. KBGPIO now owns
 that optional pending-column register and the row-pin shift. Defaults
