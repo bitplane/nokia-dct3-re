@@ -718,7 +718,14 @@ pipeline, not the rejected special-mode branch; do not force the source to
 boot remains unproved.
 Its full-address literals are `2302fc`, `3028dc`, `3033f8` (not a complete
 writer census). Timer `51` has a 12-byte RTOS record at
-`11174c+51*12`; its expiry target remains to be observed.
+`11174c+51*12`. A fresh 35-second run observes expiry at 31.000144 seconds,
+state `02 -> 03 -> 01` and unlinking by 31.003648 seconds. Delivery code
+`2888a0` indexes ROM descriptor table `331ae4` with the timer's event ID;
+entry `51` is `0033e0c8 03050000`, pointing to the product-local message
+whose first halfword is `023f`. The task-5 receive observer confirms that
+exact ROM message address/input. Next classify this expiry consumer before
+claiming a missing timer or changing rates. The requested delay is `075a`;
+the observed wall-time interval is not yet a validated physical cadence.
 Passive samples show owner `05`, flags `03`, state `02` after arming;
 the record links to `111950` and stores `04f9` at four and eight seconds.
 The insertion routine `287950` subtracts accumulated preceding intervals

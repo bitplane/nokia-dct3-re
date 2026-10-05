@@ -41,7 +41,7 @@ taps[#taps + 1] = memory:install_write_tap(0x2000c, 0x2000f,
     end)
 local samples = coroutine.create(function()
     local previous = 0
-    for _, time in ipairs({0.1, 0.5, 1, 2, 4, 8}) do
+    for _, time in ipairs({0.1, 0.5, 1, 2, 4, 8, 16, 24, 32}) do
         if not emu.wait(time - previous) then return end
         previous = time
         machine:logerror(string.format(
@@ -68,7 +68,7 @@ local samples = coroutine.create(function()
             memory:read_u8(0x13ff00), machine.time:as_double()))
         local timer = 0x11174c + 0x51 * 12
         machine:logerror(string.format(
-            "8850_ui_timer51: link=%08x remaining=%04x owner=%02x flags=%02x state=%02x event=%04x t=%.6f\n",
+            "8850_ui_timer51: link=%08x delta=%04x owner=%02x flags=%02x state=%02x event=%04x t=%.6f\n",
             memory:read_u32(timer), memory:read_u16(timer + 4),
             memory:read_u8(timer + 6), memory:read_u8(timer + 7),
             memory:read_u8(timer + 8), memory:read_u16(timer + 10),

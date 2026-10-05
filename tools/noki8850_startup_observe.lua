@@ -80,6 +80,15 @@ local mask_tap = cpu.spaces["program"]:install_write_tap(0x20068, 0x2006b,
             address, data, mask, cpu.state["PC"].value, machine.time:as_double()))
     end)
 _G.noki8850_keypad_control_tap = mask_tap
+local timer_writes = 0
+_G.noki8850_ui_timer_tap = cpu.spaces["program"]:install_write_tap(
+    0x111b18, 0x111b23, "8850_ui_timer51", function(address, data, mask)
+        if timer_writes >= 64 then return end
+        timer_writes = timer_writes + 1
+        machine:logerror(string.format(
+            "8850_ui_timer51_write: address=%08x data=%08x mask=%08x pc=%08x t=%.6f\n",
+            address, data, mask, cpu.state["PC"].value, machine.time:as_double()))
+    end)
 _G.noki8850_mode_source_tap = cpu.spaces["program"]:install_write_tap(
     0x138058, 0x13805b, "8850_mode_source", function(address, data, mask)
         machine:logerror(string.format(
