@@ -696,8 +696,15 @@ predicate. Virtual selector `db` uses function table `324170`, index
 source byte `13805a` equal to `40/41`, otherwise 1. The fresh run observes
 source `0f`, so this nested predicate does not accept its expected value 2.
 The observer labels direct storage samples `raw_slot` to avoid interpreting
-virtual selectors as stored states. Next recover this source byte's owner
-and the alternative accepted startup actions; do not force it to `40/41`.
+virtual selectors as stored states. Firmware initializer `3033d8` explicitly
+writes `0f` to the source at `3033de`; the passive write tap observes it
+at 1.284880 seconds. Thus failure of this special-mode predicate is not
+evidence that the source needs repair. Structure base `138058` is also
+used by mode operations `3032ec` and `3027e6`.
+The `0731` unconditional record `24a` has action `4e77`; helper `300914`
+queues its low input `0e77` via `301548`, confirmed in the fresh run.
+Next follow this ordinary action's consumer/continuation, not the rejected
+special-mode branch; do not force the source to `40/41`.
 Its full-address literals are `2302fc`, `3028dc`, `3033f8` (not a complete
 writer census). Timer `51` has a 12-byte RTOS record at
 `11174c+51*12`; its expiry target remains to be observed.

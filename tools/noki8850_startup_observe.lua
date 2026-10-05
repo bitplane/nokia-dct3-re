@@ -60,6 +60,8 @@ cpu.debug:bpset(0x300894, "(r0>=247 && r0<=263) || r0==621",
     'logerror "8850_startup_transition record=%04x selector=%02x raw_slot=%02x\\n",r0,b@(325b80+r0*8),b@(13fc00+b@(325b80+r0*8));g')
 cpu.debug:bpset(0x303214, nil,
     'logerror "8850_virtual_db source=%02x\\n",b@13805a;g')
+cpu.debug:bpset(0x301548, "(r0&1fff)==e77",
+    'logerror "8850_ui_fallback_queued input=%08x r14=%08x\\n",r0,r14;g')
 cpu.debug:go()
 
 local mask_writes = 0
@@ -72,6 +74,12 @@ local mask_tap = cpu.spaces["program"]:install_write_tap(0x20068, 0x2006b,
             address, data, mask, cpu.state["PC"].value, machine.time:as_double()))
     end)
 _G.noki8850_keypad_control_tap = mask_tap
+_G.noki8850_mode_source_tap = cpu.spaces["program"]:install_write_tap(
+    0x138058, 0x13805b, "8850_mode_source", function(address, data, mask)
+        machine:logerror(string.format(
+            "8850_mode_source_write: data=%08x mask=%08x pc=%08x t=%.6f\n",
+            data, mask, cpu.state["PC"].value, machine.time:as_double()))
+    end)
 
 local source = debug.getinfo(1, "S").source:sub(2)
 local directory = assert(source:match("^(.*[/])"))
