@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm3d_original_record_acceptance", "owner": "dsp_staged_research", "status": "unresolved",
+      "predicate": "8250 v5.02 runtime peer processes acquired product-local records using an evidenced identity and transformation accepted by the own-ROM consumer",
+      "current": "Fresh isolated runtime comparison rejects the candidate family-83 decode before format selection. Startup deliberately sets validation-selector bit 7 at 13fdd9; the MCU sends the acquired 24-byte record directly. Forward and inverse operations under the declared nominal identity both fail the ordinary structural branch. The PMM initial record spans 32768 bytes, outside the existing single-sector journal replay contract. Public family tables and independently documented v6.02 HLE/provisioning success do not recover this PMM's original chip identity or missing ROM6 record processing. No fabricated verdict, donor PMM or unlocked record is supplied. Graphical boot and downstream phone capabilities remain unverified pending matched identity/transformation evidence, a physical exchange or resident ROM6 code.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8250_record_context_observe.lua", "tools/nsm3d_runtime_hle_check.py", "tools/test_nsm3d_record_query.py"]
+    },
+    {
       "id": "nsm2_research_outgoing_sms", "owner": "product_profile", "status": "satisfied",
       "predicate": "8850 research composition physically submits A to 5551234 and closes CP/RP and RR before returning to paging",
       "current": "Physical Write messages/Options/Send produces exact 27-byte SMS-SUBMIT with GSM-7 A, destination 5551234 and SMSC 1234567890. The declared laboratory network accepts one submission, returns CP-ACK and RP-ACK, and receives handset CP-ACK. Acknowledged RR release precedes paging return. The final frame is the editor; no success-banner, external-carrier delivery or speech-media claim is made.",

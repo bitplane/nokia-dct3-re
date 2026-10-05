@@ -33,6 +33,32 @@ No default unlocked record, inferred success flag or donor profile is an
 acceptable substitute. Software-only identity constraints remain explicitly
 inconclusive; feature acceptance cannot begin until a coherent boot advances.
 
+### 8250 missing-evidence boundary
+
+Fresh stock and runtime-comparison runs reproduce the protected upload and
+record-rejection contracts. Selector ownership, direct MCU input copying,
+both codec directions and the actual PMM extent do not provide a correction
+that preserves the acquired provisioning. Graphical/UI/SIM/phonebook/radio/
+call/SMS acceptance for this product remains absent, not implied by 8850.
+
+The public [codec author's protocol discussion](https://nokiafree.org/forums/archive/index.php/t-38381.html?s=905ef8616030d0920e8836236655ced0)
+supplies family tables and an identity-dependent record model, not this
+dump's original chip pairing. The independent emulator's
+[model inventory](https://github.com/djr-747/nokia-dct3-emulator/blob/main/docs/MODELS.md)
+reports 8250 v6.02 HLE success; its
+[architecture description](https://github.com/djr-747/nokia-dct3-emulator)
+explicitly includes identity provisioning. Neither is an original v5.02
+PMM/physical-peer oracle. A bounded public search found no usable ROM6 mask
+or matching physical record exchange; that is a search result, not proof
+that none exists.
+
+Resume on an independently verified original COBBA identity and matching
+record transformation, a product-matched service/peer capture, or executable
+ROM6 resident code. Generated open-lock data, another product's PMM, a
+candidate satisfying only local byte constraints or a successful sibling
+screen are not substitutes. The normal machine and research comparison
+remain fail-closed; no new success or record verdict is installed.
+
 ## 8250 staged verifier
 
 The stock descriptor at flash `0x3188c0` is
