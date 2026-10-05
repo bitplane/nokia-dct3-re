@@ -31,6 +31,12 @@ cpu.debug:bpset(0x2463a4, "temp6<200",
     'temp6=temp6+1;logerror "8850_report14_owner_receive event=%08x state=%04x base=%08x count=%02x init=%02x flag=%02x\\n",r0,w@(r6+1c),r6,b@(r6+4),b@(r6+a),b@(r6+d);g')
 cpu.debug:bpset(0x245c28, nil,
     'logerror "8850_owner_status_read value=%08x\\n",r0;g')
+cpu.debug:bpset(0x2429a6, nil,
+    'logerror "8850_channel_map_receive command=%02x length=%02x\\n",b@(r0+8),b@(r0+5);g')
+cpu.debug:bpset(0x304a72, nil,
+    'logerror "8850_channel_map_apply source=%08x mode=%02x node=%02x kind=%02x\\n",r3,r1,r0,r2;g')
+cpu.debug:bpset(0x304a4a, "temp7<100",
+    'temp7=temp7+1;logerror "8850_channel_available resource=%08x\\n",r0;g')
 cpu.debug:go()
 
 local mask_writes = 0

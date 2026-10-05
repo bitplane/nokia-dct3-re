@@ -632,6 +632,20 @@ Reproduce with the startup observer and `-verbose`, then check using
 `noki8850_staged_trace_check.py <log> --runtime-hle --startup-readiness`.
 This gate establishes readiness and physical IRQ delivery only.
 
+The live GENSIO stream carries LCD initialization at `30461c..3046fc`:
+command `24`, bank/column addressing, zero-fill data, then extended setup
+and normal-display command `0c`. Thus the blank frame is not evidence of
+missing serial routing. The own-ROM channel-map handler is `2429a6`:
+command `70` invokes `242970`, requires the length field above `42`, and
+passes a 64-byte map to `304a72`; command `71` disables it. Map enable is
+stored at `13fe78`. Availability reader `304a4a` checks this byte before
+using a class-indexed bit map. Neither handler/application nor availability
+probe is observed in the fresh eleven-second readiness run. This locates a
+candidate application boundary, **not proof that its absence blocks UI**.
+The research composition still supplies no unsolicited application map.
+Next trace the post-readiness display/application request producer and its
+consumer before defining any product-local peer application contract.
+
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
 Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not
