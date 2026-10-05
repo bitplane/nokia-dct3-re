@@ -94,6 +94,14 @@ cpu.debug:bpset(0x23d4c0, "b@(r1+3e)==5a",
     'logerror "8850_ui_layout_entry object=%08x command=%02x\\n",r1,r2;g')
 cpu.debug:bpset(0x23ea62, "b@(r4+3e)==5a",
     'logerror "8850_ui_text_resolved object=%08x source=%08x text=%08x prefix=%08x\\n",r4,d@(r4+34),r0,d@r0;g')
+for _, address in ipairs({0x23eab6, 0x23ef1e, 0x23f4d4, 0x23e8f8, 0x23f5e8, 0x23f610}) do
+    cpu.debug:bpset(address, nil,
+        string.format('logerror "8850_ui_text_stage pc=%08x r0=%%08x r1=%%08x r2=%%08x r3=%%08x\\n",r0,r1,r2,r3;g', address))
+end
+cpu.debug:bpset(0x27ed94, nil,
+    'logerror "8850_ui_glyph_state first=%08x second=%08x\\n",r1,d@(r0+10);g')
+cpu.debug:bpset(0x27ed9e, nil,
+    'logerror "8850_ui_glyph_request x=%02x y=%02x source=%08x count=%02x mode=%02x\\n",b@(r4+8),b@(r4+9),d@r4,b@(r4+a),b@(r4+b);g')
 cpu.debug:bpset(0x2fd09c, "r0==5e4 || r0==731 || r0==735",
     'logerror "8850_ui_context_dispatch input=%04x target=%08x context=%02x\\n",r0,r1,b@(r5+3);g')
 cpu.debug:bpset(0x2ad608, "r0==5e4 || r0==731 || r0==735 || r0==ca || r0==35c || r0==370 || r0==5dc || r0==5e1",

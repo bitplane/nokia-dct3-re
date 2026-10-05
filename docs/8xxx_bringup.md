@@ -789,6 +789,15 @@ produces RAM pointer `12fe50` from source `32ecf6`, with UTF-16 prefix
 result. Next recover the layout-versus-paint invocation and object
 visibility/dirty contract before blaming LCD transfer; queue starvation
 is not established.
+Fresh stage probes reach text layout `23d7b8/23dc28` and glyph-processing
+call `23e6ec`. The latter reaches submission `27ed6c` twice: coordinates
+`0b/0d` and `0b/16`, source `340494`, counts `06/08`, mode `01`.
+Its nonzero-state checks pass with values `34043c/00000004` under block
+`130298`; the second value must not be mislabeled a buffer pointer merely
+because it is checked against zero. Thus missing text or missing font-state
+initialization is not established. Next follow draw routine `27e7f8` and
+output submission `304a3c` into framebuffer/LCD transfer without changing
+those state values.
 A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;
