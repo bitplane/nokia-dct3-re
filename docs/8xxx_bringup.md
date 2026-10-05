@@ -3,8 +3,10 @@
 ## Current boundary
 
 The stock 8250 v5.02 PPM K, 8850 v5.31 PPM C and 8890 v12.20 PPM C
-execute with their own acquired flash/PMM inputs. None is promoted to graphical
-boot, interactive UI, registration or calls. Input hashes and acquisition
+execute with their own acquired flash/PMM inputs. Normal machines remain
+unpromoted. The separate 8850 research composition has graphical, physical
+UI, registration, call-signaling and SMS acceptance below; those results do
+not establish the 8250 or 8890 contracts. Input hashes and acquisition
 provenance remain in `roms/README.md`.
 
 The normal 8250 remains at its fail-closed verifier boundary. The separate
@@ -378,6 +380,23 @@ code at `28d476` is never reached. This narrows the next investigation to
 the decoded content's chip/key/preprocessing contract, not envelope format.
 The read-only Lua observer retains the last 16 decoder PCs to reproduce
 the path; it does not modify the response or CPU state.
+
+The preceding selector at `28d356` reads bit 7 of `13fdd9` (literal
+`28d6b4`). Clear selects the path at `28d434`; set selects the structural
+checks above. Own initialization unconditionally ORs `80` at `2447f2..f6`,
+after setting `40`, and the passive runtime trace observes `c0` before
+record receipt. Its later value zero follows teardown and must not be
+mistaken for the startup input. `noki8250_record_context_observe.lua`
+reproduces these writes without modifying them. Bypassing bit 7 is not a
+provisioning fix or a legitimate decoder alternative.
+
+The acquired sector begins at file `10000`, with initial record header
+`00ce/8000/0000` at `10020`: an extended 32768-byte body starting `10026`.
+It crosses multiple 8-KiB sectors. The bounded NSE-5/NHM-3 journal replayer
+therefore cannot establish this product's latest-record selection: its
+single-sector extent contract does not apply. Existing runtime request
+checks establish the selected low-record bytes directly; a generic journal
+replay must not silently replace those observations.
 
 An offline comparison uses only the two published `82`/`83` lock tables,
 the same original PMM bytes and the same nominal chip packing. Before
