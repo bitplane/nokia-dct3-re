@@ -30,7 +30,8 @@ bool nokia_kbgpio_device::owns(offs_t offset) const
 	return offset == m_wiring.row_signal ||
 			offset == m_wiring.column_input ||
 			offset == m_wiring.column_irq_mask ||
-			offset == m_wiring.row_direction;
+			offset == m_wiring.row_direction ||
+			(m_wiring.column_irq_status != 0xff && offset == m_wiring.column_irq_status);
 }
 
 void nokia_kbgpio_device::device_start()
@@ -43,6 +44,7 @@ void nokia_kbgpio_device::device_start()
 	save_item(NAME(m_regs));
 	save_item(NAME(m_columns));
 	save_item(NAME(m_power_on));
+	save_item(NAME(m_pending_columns));
 	save_item(NAME(m_irq_latched));
 	machine().save().register_postload(save_prepost_delegate(FUNC(nokia_kbgpio_device::update_irq), this));
 }
@@ -58,6 +60,7 @@ void nokia_kbgpio_device::device_reset()
 	m_columns = 0x1f;
 	m_power_on = ~m_wiring.power_on_column_mask;
 	m_irq_latched = false;
+	m_pending_columns = 0;
 	update_irq();
 }
 
@@ -67,7 +70,7 @@ u8 nokia_kbgpio_device::sample_columns(bool consume_power_on)
 	const bool five_rows = m_wiring.rows == 5;
 	const u8 row_mask = five_rows ? 0x1f : 0x0f;
 	const u8 rows_low = m_regs[m_wiring.row_direction] &
-			~m_regs[m_wiring.row_signal] & row_mask;
+			~m_regs[m_wiring.row_signal] & (row_mask << m_wiring.row_pin_shift);
 	const unsigned row_count = m_wiring.rows;
 
 	for (unsigned column = 0; column < 5; column++)
@@ -76,7 +79,7 @@ u8 nokia_kbgpio_device::sample_columns(bool consume_power_on)
 		for (unsigned row = 0; row < row_count; row++)
 		{
 			const unsigned key_bit = five_rows ? row : row + 1;
-			if (BIT(rows_low, row) && !BIT(keys, key_bit))
+			if (BIT(rows_low, row + m_wiring.row_pin_shift) && !BIT(keys, key_bit))
 				data &= ~(u8(1) << column);
 		}
 	}
@@ -118,6 +121,7 @@ void nokia_kbgpio_device::update_columns()
 	m_columns = columns;
 	if (changed)
 	{
+		m_pending_columns |= changed;
 		m_irq_latched = true;
 		update_irq();
 	}
@@ -125,6 +129,8 @@ void nokia_kbgpio_device::update_columns()
 
 u8 nokia_kbgpio_device::peek(offs_t offset) const
 {
+	if (m_wiring.column_irq_status != 0xff && offset == m_wiring.column_irq_status)
+		return m_pending_columns;
 	return owns(offset) ? m_regs[offset] : 0;
 }
 
@@ -160,6 +166,7 @@ void nokia_kbgpio_device::irq_acknowledge()
 		LOGMASKED(LOG_KEYPAD, "kbgpio: ack latched=%u power=%02x t=%.9f\n",
 				m_irq_latched, m_power_on, machine().time().as_double());
 	m_irq_latched = false;
+	m_pending_columns = 0;
 	clear_power_on_latch();
 	update_irq();
 }

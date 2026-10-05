@@ -63,6 +63,14 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
         self.assertNotIn("pc()", source)
         self.assertNotRegex(source, r"0x2[0-9a-f]{5}")
 
+    def test_shifted_rows_and_optional_pending_columns_are_device_owned(self):
+        self.assertIn("row + m_wiring.row_pin_shift", self.device)
+        self.assertIn("rows + row_pin_shift <= 5", self.header)
+        self.assertIn("column_irq_status = 0xff", self.header)
+        self.assertIn("m_pending_columns |= changed", self.device)
+        self.assertIn("save_item(NAME(m_pending_columns))", self.device)
+        self.assertIn("return m_pending_columns", self.device)
+
     def test_row_topology_and_power_column_are_one_typed_contract(self):
         source = self.device + self.header + self.phone
         for token in (

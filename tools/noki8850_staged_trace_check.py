@@ -2,6 +2,7 @@
 """Check native 8850 upload execution, not graphical phone acceptance."""
 
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import sys
@@ -17,6 +18,54 @@ STAGES = (
     ("fail-closed suspension", r"staged_dsp: observation_halt pc=2c75 ownership_retained=1"),
     ("firmware readiness", r"8850_ready: state=01 shared_e4=0000"),
 )
+
+
+def check_physical_inputs(text: str) -> list[str]:
+    errors = []
+    cursor = 0
+    for label, key in (
+        ("security_physical: key=Keypad 1", "01"),
+        ("security_physical: key=Keypad 2", "02"),
+        ("security_physical: key=Keypad 3", "03"),
+        ("security_physical: key=Keypad 4", "04"),
+        ("security_physical: key=Keypad 5", "05"),
+        ("security_physical: key=Menu", "19"),
+        ("navigation_physical: action=messages_menu", "19"),
+        ("navigation_physical: action=inbox", "19"),
+        ("navigation_physical: action=names", "1a"),
+    ):
+        marker = text.find("8850_" + label, cursor)
+        if marker < 0:
+            errors.append(f"missing or out-of-order physical input {label}")
+            continue
+        next_marker = re.search(r"8850_(?:security|navigation)_physical:", text[marker + 1:])
+        end = marker + 1 + next_marker.start() if next_marker else len(text)
+        if not re.search(rf"8850_keypad_decoded key={key}\b", text[marker:end]):
+            errors.append(f"physical input {label} did not decode as {key}")
+        cursor = end
+    return errors
+
+
+def check_navigation_frames(directory: Path) -> list[str]:
+    from PIL import Image
+    errors = []
+    # Top-left title/list rows only: exclude the animated menu icon and scrollbar.
+    for name, expected in (
+        ("8850_messages_menu.png", "1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654"),
+        ("8850_inbox.png", "8655c31363c0632c945343fa325d5487b9cc9cecc236fc46d12b97fd85506798"),
+        ("8850_names.png", "8805936b7afa6dc245d2df6a22a387e8080290c1db117f5c5ee3e7aa234f72d0"),
+    ):
+        try:
+            with Image.open(directory / name) as frame:
+                if frame.size != (84, 48):
+                    errors.append(f"{name}: unexpected geometry {frame.size}")
+                    continue
+                digest = hashlib.sha256(frame.convert("L").crop((0, 0, 72, 16)).tobytes()).hexdigest()
+                if digest != expected:
+                    errors.append(f"{name}: stable title/list pixels differ")
+        except OSError as error:
+            errors.append(f"{name}: {error}")
+    return errors
 
 
 def check_trace(text: str, runtime_hle: bool = False, startup_readiness: bool = False,
@@ -47,7 +96,7 @@ def check_trace(text: str, runtime_hle: bool = False, startup_readiness: bool = 
             ("report 14 consumption", r"8850_startup_dispatch report=00000014 state=000d"),
             ("complete startup predicate", r"8850_startup_check power=06 reports=0f"),
             ("startup continuation", r"8850_startup_dispatch report=[0-9a-f]{8} state=0004"),
-            ("physical matrix press", r"8850_matrix_press: column=3 host_bit=10"),
+            ("physical matrix press", r"8850_matrix_press: column=1 host_bit=02"),
             ("physical keypad IRQ", r"kbgpio: irq=1"),
             ("firmware keypad acknowledgement", r"kbgpio: ack latched=1"),
         ):
@@ -92,10 +141,16 @@ def main() -> int:
                         help="require nonzero glyph pixels followed by framebuffer transfer; not interactive acceptance")
     parser.add_argument("--sim-reads", action="store_true",
                         help="require the organic identity/service/ADN read conversation, not persistence or registration")
+    parser.add_argument("--physical-navigation", type=Path, metavar="SNAPSHOT_DIR",
+                        help="require physical security digits/softkeys and Messages/Inbox/Names frame crops")
     args = parser.parse_args()
     try:
-        errors = check_trace(args.log.read_text(encoding="utf-8", errors="replace"),
+        text = args.log.read_text(encoding="utf-8", errors="replace")
+        errors = check_trace(text,
                              args.runtime_hle, args.startup_readiness, args.display_transfer, args.sim_reads)
+        if args.physical_navigation:
+            errors.extend(check_physical_inputs(text))
+            errors.extend(check_navigation_frames(args.physical_navigation))
     except OSError as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1
@@ -106,7 +161,8 @@ def main() -> int:
     print("OK - 8850 native uploads" +
           (" and compact runtime self-test" if args.runtime_hle else " reach the missing-mask boundary") +
           ("; nonzero LCD framebuffer transfer verified" if args.display_transfer else "") +
-          "; interactive phone acceptance not proven")
+          ("; physical Messages/Inbox/Names navigation verified" if args.physical_navigation
+           else "; interactive phone acceptance not proven"))
     return 0
 
 

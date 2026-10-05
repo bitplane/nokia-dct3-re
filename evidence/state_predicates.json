@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_research_physical_navigation", "owner": "product_profile", "status": "satisfied",
+      "predicate": "8850 v5.31 product-local PMM and declared native-upload/runtime-HLE composition reaches physical security input and Messages/Inbox/Names menus",
+      "current": "The research nsm2hle machine uses own row pins 1..4, optional pending-column register 2b and key table 33f504. Physical digits 1..5 decode exactly and OK dismisses Security code, followed by Nokia startup and Menu/Names idle. Ordered physical navigation and stable title/list pixel crops verify Messages, Inbox and Names after organic ICCID/SST/IMSI and 50 ADN reads. Normal noki8850 remains fail-closed; this predicate does not establish durable phonebook, applications, registration or call/SMS lifecycles.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8850_security_input.lua", "tools/noki8850_staged_trace_check.py", "tools/test_noki8850_staged_trace_check.py"]
+    },
+    {
       "id": "nsm3d_uploaded_verifier_publication", "owner": "dsp_staged_research", "status": "modeled",
       "predicate": "Native MCU-uploaded 8250 verifier publishes results and firmware retains them after 58 ordered buffer pairs",
       "current": "The separate nsm3dr6 research composition executes the stock 223-word verifier with the authentic product-flash bootstrap fragment and nominal COBBA inputs. Native code publishes 0000/0006/0006/0006; MCU 0x2cb328 retains 0000/0006 after 58 ordered pairs. The next 638-word upload matches pinned flash. Its native loader reads the 104-word fragment at ff80..ffe7, posts selector 14 then 133 selector-1 requests through MAD2 IRQ4, and receives the product's 613-word second loader at 0a00. All second-loader words are verified before execution. Native execution stops at CALL 2c75 from 0a40, outside acquired code; no helper body or return value is guessed. Diagnostic suspension retains ownership while the MCU continues: it issues command 32 with argument 3fff and pending word 100e0 remains 1 through eight seconds. HLE must not clear that word or produce queued responses under native ownership. The fragment is firmware-contained evidence, not a fitted-mask dump or graphical boot. Normal noki8250 remains fail-closed.",

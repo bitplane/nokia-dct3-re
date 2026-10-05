@@ -13,6 +13,12 @@ cpu.debug:bpset(0x28846c, "temp1<200",
     'temp1=temp1+1;logerror "8850_queue_publish destination=%08x source=%08x r14=%08x\\n",r0,r1,r14;g')
 cpu.debug:bpset(0x3054ac, nil,
     'logerror "8850_keypad_disable r14=%08x\\n",r14;g')
+cpu.debug:bpset(0x305410, nil,
+    'logerror "8850_keypad_raw key=%02x\\n",r0;g')
+for _, address in ipairs({0x2a12e0, 0x2a12fe, 0x2a1358}) do
+    cpu.debug:bpset(address, nil,
+        'logerror "8850_keypad_decoded key=%02x\\n",r0;g')
+end
 cpu.debug:bpset(0x2885bc, "r0==1 && temp2<200",
     'temp2=temp2+1;logerror "8850_task1_post report=%08x r14=%08x\\n",r1,r14;g')
 cpu.debug:bpset(0x2a1be8, nil,
@@ -152,10 +158,10 @@ dofile(directory .. "noki8850_frontier_observe.lua")
 
 local input = coroutine.create(function()
     if not emu.wait(5) then return end
-    -- Host Menu is column 3/bit 4; its 8850 semantic key is not established.
-    local key = assert(machine.ioport.ports[":COL.3"].fields["Menu"])
+    -- Own-ROM table 33f504 maps row 1/column 1 to softkey 19.
+    local key = assert(machine.ioport.ports[":COL.1"].fields["Menu"])
     key:set_value(1)
-    machine:logerror("8850_matrix_press: column=3 host_bit=10\n")
+    machine:logerror("8850_matrix_press: column=1 host_bit=02\n")
     if not emu.wait(0.15) then key:set_value(0); return end
     key:set_value(0)
     if not emu.wait(0.85) then return end

@@ -3,6 +3,12 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsm2_service_channel_map_required_for_lcd", "status": "disproven",
+      "hypothesis": "The 8850's rejected resource 7305 service-channel submission prevents the glyph framebuffer from reaching its LCD",
+      "conclusion": "Routine 304944 forwards a service frame rather than performing physical LCD transfer. The unchanged no-map composition transfers nonzero framebuffer 1304d8 through 27f550 and GENSIO and renders Insert SIM card after 8.05 seconds. The eight-second blank capture precedes this output. Enabling the decoded class-73 map changes forwarding permission but is unnecessary for graphical boot and has been removed.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8850_startup_observe.lua", "tools/noki8850_frontier_observe.lua"]
+    },
+    {
       "id": "8250_pmm_matches_codec83_nominal_cobba",
       "status": "disproven",
       "hypothesis": "The acquired 8250 low records form an accepted primitive-35 reply when decoded directly with the published family-83 lock codec, nominal modeled COBBA packing 00160010 and format zero",

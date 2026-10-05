@@ -16,10 +16,12 @@ public:
 		u8 column_input = 0x2a;
 		u8 column_irq_mask = 0x6b;
 		u8 row_direction = 0xa8;
+		u8 row_pin_shift = 0;
+		u8 column_irq_status = 0xff; // absent unless independently selected
 
 		constexpr bool valid() const
 		{
-			return (rows == 4 || rows == 5) &&
+			return (rows == 4 || rows == 5) && rows + row_pin_shift <= 5 &&
 					power_on_column_mask != 0 &&
 					(power_on_column_mask & ~0x1f) == 0 &&
 					(power_on_column_mask &
@@ -59,6 +61,7 @@ private:
 	u8 m_regs[0x100] = {0};
 	u8 m_columns = 0x1f;
 	u8 m_power_on = 0xff;
+	u8 m_pending_columns = 0;
 	wiring_contract m_wiring;
 	bool m_irq_latched = false;
 	bool m_trace = false;

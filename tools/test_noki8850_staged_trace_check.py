@@ -1,9 +1,10 @@
 import sys
 from pathlib import Path
 import unittest
+import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from noki8850_staged_trace_check import check_trace
+from noki8850_staged_trace_check import check_trace, check_physical_inputs, check_navigation_frames
 
 
 TRACE = """
@@ -91,6 +92,31 @@ sim_device: header cla=a0 ins=f2 p1=00 p2=00 p3=16 selected=6f3a
         self.assertTrue(check_trace(trace.replace("p1=32", "p1=31"), True, sim_reads=True))
         self.assertTrue(check_trace(trace.replace("fid=6f07", "fid=6f08"), True, sim_reads=True))
 
+    def test_physical_navigation_requires_correlated_decoding(self):
+        lines = []
+        for label, key in (
+            ("key=Keypad 1", "01"), ("key=Keypad 2", "02"),
+            ("key=Keypad 3", "03"), ("key=Keypad 4", "04"),
+            ("key=Keypad 5", "05"), ("key=Menu", "19"),
+            ("action=messages_menu", "19"), ("action=inbox", "19"), ("action=names", "1a"),
+        ):
+            kind = "security" if label.startswith("key=") else "navigation"
+            lines.extend((f"8850_{kind}_physical: {label}", f"8850_keypad_decoded key={key}"))
+        trace = "\n".join(lines)
+        self.assertEqual(check_physical_inputs(trace), [])
+        self.assertTrue(check_physical_inputs(trace.replace("key=03", "key=02")))
+        # A late decode must not validate the preceding input marker.
+        self.assertTrue(check_physical_inputs(trace.replace("8850_keypad_decoded key=04", "")))
+
+    def test_missing_and_blank_navigation_frames_fail(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(len(check_navigation_frames(root)), 3)
+            for name in ("8850_messages_menu.png", "8850_inbox.png", "8850_names.png"):
+                Image.new("L", (84, 48), 255).save(root / name)
+            self.assertEqual(len(check_navigation_frames(root)), 3)
+
     @classmethod
     def startup_trace(cls):
         return cls.runtime_trace() + """
@@ -98,7 +124,7 @@ sim_device: header cla=a0 ins=f2 p1=00 p2=00 p3=16 selected=6f3a
 8850_startup_dispatch report=00000014 state=000d base=00138070
 8850_startup_check power=06 reports=0f
 8850_startup_dispatch report=00000033 state=0004 base=00138070
-8850_matrix_press: column=3 host_bit=10
+8850_matrix_press: column=1 host_bit=02
 kbgpio: irq=1
 kbgpio: ack latched=1
 """

@@ -524,8 +524,8 @@ One decoded setter is `2cb43c..2cb450`: if that byte and shared-memory
 halfword `100e4` are both zero, firmware stores 1 to the byte. Fresh passive
 samples at 0.1, 0.5, 1, 2, 4 and 8 seconds show both values remain zero.
 Thus the sampled shared-memory predicate already permits this setter;
-fabricating a DSP completion is not justified by this condition. Next trace
-the execution/dispatch prerequisites of this routine and its other writers.
+fabricating a DSP completion is not justified by this condition. The native
+upload research composition below supplies its genuine IRQ4 prerequisite.
 The samples do not prove the predicate held at every intervening instant.
 
 The readiness setter belongs to DSP service IRQ4: IRQ dispatcher `302eb6`
@@ -599,334 +599,142 @@ request-correlated `74:0d00` HLE contract. This models a successful peer
 self-test; it does not execute the missing DSP self-test implementation.
 
 Fresh runtime observes the response at 1.293467 seconds and subsequent
-fault bytes `0f/10/11=00/00/00`. Firmware publishes later calibration/config
-traffic and reaches its idle loop; the eight-second frame is blank white.
-SIM/card, product application registration, keypad mapping and interactive
-UI acceptance remain unproved. Do not interpret the loop as a missing wake
-event or supply another unsolicited application body without its contract.
-Next recover the unattended UI/startup dependency on this composition.
+fault bytes `0f/10/11=00/00/00`. The stronger graphical and physical-input
+acceptance below uses the same runtime boundary. The eight-second blank
+frame precedes text output and does not establish an unmet startup event.
 
 Reproduce using `nsm2hle`, the same observer/private directories and
 `-verbose`; run `noki8850_staged_trace_check.py <run>/error.log --runtime-hle`.
 This validates the upload/handoff/self-test sequence, not graphical boot.
 
-### 8850 Startup/Input Frontier
+### 8850 Graphical and Physical-Input Contract
 
-Current runtime-HLE composition completes startup readiness organically
-and renders **Insert SIM card** after 8.05 simulated seconds. The
-eight-second sample precedes the first text transfer and is blank; use the
-ten-second or end-of-run capture. A raw physical matrix press reaches
-keypad IRQ/ack, but semantic key mapping and interactive acceptance remain
-unproven. The research composition now enables the existing physical SIMI
-controller and synthetic laboratory card. Own firmware selects MF/GSM,
-reads ICCID, phase, service table and IMSI, then all 50 ADN records and
-issues STATUS at 10.82 s. A fresh own-PMM run renders **Security code**
-with OK at 16 s. This is phone-side security presentation, not evidence
-of accepted input, durable phonebook writes or network registration.
-Reproduce with `--runtime-hle --startup-readiness --sim-reads` and a
-36-second isolated observer run. Next recover the semantic keypad matrix
-and test the security transaction through physical input only.
+The separate `nsm2hle` research composition reaches an interactive idle
+screen using native uploaded bootstrap/verifier/loader execution followed
+by declared runtime HLE. Normal `noki8850` remains fail-closed at its final
+DSP-result poll; this milestone does not promote the normal machine.
 
-`PRODUCT_8850` uses the existing BLB-2 nominal ADC tuple
-`000/3ff/2c0/150/140/000/200/000`, replacing the conservative full-scale
-placeholders. Nokia's [NSM-2 system-module manual](https://www.eserviceinfo.com/preview_html.php?fileid=5444&previewid=2990)
-identifies BLB-2, its 68 kohm BSI resistor and battery temperature circuit.
-The raw tuple is a shared calibrated board input, **not measured NSM-2
-voltage scaling**. In one fresh isolated comparison, firmware posts `14`
-from `244cb6`, consumes it in state `0d`, reaches `power=06 reports=0f`,
-then enters state 4. It unmasks keypad columns (`6b=60`) before the physical
-press, which raises IRQ and is acknowledged. No charger was asserted,
-firmware state changed, PMM repaired or peer message added by the fixture.
-Reproduce with the startup observer and `-verbose`, then check using
-`noki8850_staged_trace_check.py <log> --runtime-hle --startup-readiness`.
-This gate establishes readiness and physical IRQ delivery only.
-Add `--display-transfer` to require nonzero glyph framebuffer delivery in
-order; inspect `8850_10000.png` independently for the rendered text.
+With no card, firmware renders **Insert SIM card** after 8.05 simulated
+seconds. With the laboratory SIM and its own acquired PMM, it reads
+ICCID, phase, SST, IMSI and all 50 ADN records, then displays **Security
+code / OK**. Physical `12345` and the left softkey dismiss the prompt,
+show the Nokia startup graphic and reach Menu/Names idle. Further physical
+softkeys open Messages, Inbox and the Names menu (Search/Add entry/Erase).
+Persistent phonebook writes, applications, radio registration and call/SMS
+lifecycles remain unverified. Those are the next capability boundaries.
 
-The live GENSIO stream carries LCD initialization at `30461c..3046fc`:
-command `24`, bank/column addressing, zero-fill data, then extended setup
-and normal-display command `0c`. Thus the blank frame is not evidence of
-missing serial routing. The own-ROM channel-map handler is `2429a6`:
-command `70` invokes `242970`, requires the length field above `42`, and
-passes a 64-byte map to `304a72`; command `71` disables it. Map enable is
-stored at `13fe78`. Availability reader `304a4a` checks this byte before
-using a class-indexed bit map. Neither handler/application nor availability
-probe is observed in the fresh eleven-second readiness run. This locates a
-candidate application boundary, **not proof that its absence blocks UI**.
-The research composition still supplies no unsolicited application map.
-Next trace the post-readiness display/application request producer and its
-consumer before defining any product-local peer application contract.
+#### Reproduction and Acceptance
 
-The post-readiness tail takes `2a1d64` and invokes `2d1140` at `2a1d98`.
-Fresh passive CPU probes observe its catalogue input `0731` entering
-`3014b6`, followed by `0735` from `2d1120`. `3014b6` treats `r0` as a
-packed scalar input, allocates a 16-byte message, stores its low halfword,
-and posts to task 5 through `2885bc`; it is not a descriptor-pointer API.
-The corrected observer run exits normally and passes startup readiness.
-Next trace task 5's reception and transition selection for `0731/0735`.
-The UI-start producer itself is therefore present; neither a missing
-readiness report nor an assumed missing channel map justifies injecting
-another UI-start event.
+Use fresh private working, configuration and NVRAM directories with
+`-noreadconfig -debug -debugger none -verbose -log -video none -sound none`.
+Run `nsm2hle` for 36 seconds with
+`tools/noki8850_security_input.lua` as the autoboot script, delay zero.
+The script changes physical input fields only; all CPU probes are passive.
+Then run:
 
-Task 5's RTOS receive caller is `30134a` (return `30134f`), proven by
-the RTOS task byte `1115d2==5` at entry `2886c0`. Its catalogue wrapper
-`301348` reads the packed message halfword and copies optional arguments
-according to its top two bits. A fresh run observes queued `0731` and
-`0735` at `30134e`; both startup publications reach task 5. The next
-unresolved boundary is callback/transition selection after this wrapper,
-not missing publication or RTOS delivery. Mid-routine probes that did not
-fire were retired rather than used as absence evidence.
+```sh
+.venv/bin/python tools/noki8850_staged_trace_check.py RUN/error.log \
+  --runtime-hle --startup-readiness --sim-reads \
+  --physical-navigation RUN/snap
+```
 
-Both `0731` and `0735` reach each filter entry in task 5's pipeline:
-`300aae -> 2fce32 -> 27bd84 -> 270f00 -> 2c3d38 -> 271bd8 -> 266730`.
-Unchanged input does not imply absence of filter side effects. A bounded
-BE Thumb branch execution of `266730` (stop at its first BL, no firmware
-RAM model) selects epilogue `268e46` for `0731`, but handler `268a3c` for
-`0735`. The latter reads boot-state helper `2ff6ce`, chooses one of two
-catalogue actions via `301564`, calls `25f12e`, and arms timer `51` via
-`287a0e`. Runtime confirms entry `268a3c`, queues action `05e4` from
-`268a52`, and arms timer `51` with delay `075a` from `268a6a`. A fresh
-29-second run retains startup readiness but is not graphical acceptance.
-Receive/action probes are capped, so their late negative results cannot
-prove timer expiry absence. Next recover the `05e4` action's catalogue
-transition and the timer's target/expiry semantics, rather than inventing
-an external completion.
+The checker requires native/HLE ownership order, organic readiness, SIM
+identity/service/ADN reads, physical inputs correlated with decoded keys,
+and stable top-left 72x16 pixel crops from Messages, Inbox and Names.
+The crop excludes the animated menu icon and scrollbar. Raw IRQ delivery
+alone cannot pass this acceptance. Stock absent DSP-mask warnings are not
+evidence of native mask execution.
 
-Catalogue `324230` locates `0731` at entry 125, transition records
-`247..24a`, and `0735` at entry 129, records `25e..263`, in the eight-byte
-transition table `325b80`. Runtime predicate entry `300894` observes
-`0731` selectors/states `5d/00`, `5d/00`, `1b/01`, `ff/00`; `0735`
-observes `5d/01`, `63/01`, `64/01`, `64/01`, `34/00`, `6c/00`.
-Stored selectors below `ca` use `13fc00+selector`; higher selectors have
-other providers. These are predicate-entry observations,
-not proof that every record accepts or that each associated action runs.
-Record `249` (`1b013f0086210000`) accepts stored selector `1b==1` and
-references nested record `621` (`db023f0086220000`). Runtime reaches that
-predicate. Virtual selector `db` uses function table `324170`, index
-`db-cd`, resolving to `303214`, not state byte `13fcdb`. It returns 2 for
-source byte `13805a` equal to `40/41`, otherwise 1. The fresh run observes
-source `0f`, so this nested predicate does not accept its expected value 2.
-The observer labels direct storage samples `raw_slot` to avoid interpreting
-virtual selectors as stored states. Firmware initializer `3033d8` explicitly
-writes `0f` to the source at `3033de`; the passive write tap observes it
-at 1.284880 seconds. Thus failure of this special-mode predicate is not
-evidence that the source needs repair. Structure base `138058` is also
-used by mode operations `3032ec` and `3027e6`.
-The `0731` unconditional record `24a` has action `4e77`; helper `300914`
-queues its low input `0e77` via `301548`, confirmed in the fresh run.
-The low input has no primary catalogue entry. A fresh runtime trace follows
-it unchanged through the first seven filter entries to handler
-`268068`. That handler calls `255c5c` with context bytes `10/02`, observed
-at the callee. The helper recognizes `0afe/0aff` and `0376..0379`, not
-`0e77`; a fresh probe confirms the default zero-return path at `255ebc`.
-`268e46` is the filter's stack-restoring return epilogue, not an application
-continuation. This context call therefore does not establish a missing
-UI-start dependency. The task-5 loop also calls an eighth filter, `2bd40c`,
-after `266730`; fresh traces confirm `0731`, `0e77`, `0735` and the latter's
-queued `05e4` reach it. Next decode the `05e4` handling across this complete
-pipeline, not the rejected special-mode branch; do not force the source to
-`40/41`. The focused native/runtime-readiness check still passes; graphical
-boot remains unproved.
-Its full-address literals are `2302fc`, `3028dc`, `3033f8` (not a complete
-writer census). Timer `51` has a 12-byte RTOS record at
-`11174c+51*12`. A fresh 35-second run observes expiry at 31.000144 seconds,
-state `02 -> 03 -> 01` and unlinking by 31.003648 seconds. Delivery code
-`2888a0` indexes ROM descriptor table `331ae4` with the timer's event ID;
-entry `51` is `0033e0c8 03050000`, pointing to the product-local message
-whose first halfword is `023f`. The task-5 receive observer confirms that
-exact ROM message address/input. Its filter handler is `268dec`: byte
-`13fc57 == 0` permits `2f1d9c(0,1)`. A fresh 35-second trace observes
-that zero gate and call, paired with startup's earlier `2f1d9c(0,ff)`.
-The latter helper updates selector-indexed state under `137e8c`; the
-`ff` path clears an activation byte and visits indices `1..12`, while
-the ordinary-value path conditionally calls `2f1c20`, which tests per-index
-mask bytes before calling `2f19de`. The expiry therefore reaches its
-firmware consumer; it is not evidence of a missing timer delivery. The
-indexed refresh routine `2f19de` first requires byte `137e94+index != 0`,
-then uses resource class `74` through `25f2ec/25f324`. A 35-second trace
-observes timeout refresh visits for indices `01..05` and `0c..12`, all
-with enable byte zero; their resource work is skipped at that local gate.
-Earlier class-74 initialization calls are observed separately, so absence
-of all class-74 activity is not the claim. Next recover the enable-byte
-writers/activation contract and classify earlier `05e4` side effects;
-do not synthesize those enable bytes. The local activation routine is
-`2f1a28`: for each nonzero supplied element it sets `137e8c+8+index`
-to one and constructs class-74 resources. Removal routine `2f1e9c`
-clears the same enable byte while removing its resource elements. A raw
-BE-Thumb direct-BL scan finds 18 activation call sites (not a complete
-indirect-call/writer census); none executes in the observed 35-second run.
-For example, `253890/2538ae/2538c8` activate indices `09/0a/0b` only
-for populated source records, otherwise selecting the removal routine.
-Zero enables therefore do not by themselves prove a missing hardware
-response; the callers' source-record lifecycle must be recovered first.
-The stronger remaining `05e4` consumer is an indirect dispatch in the
-second filter, not a literal catalogue record: `2fd09c` calls the active
-UI context's function pointer. A fresh run observes context `2f`, target
-`2ad609` (Thumb entry `2ad608`) for all of `0731/0735/05e4`.
-That dispatcher selects `2ad1be/2ad2c0/2ad334/2ad3d4/2ad4c0` using its
-local structure's mode bytes and another flag. Runtime captures mode/phase
-`00/00`, flag zero, selecting `2ad1be` for `0731/0735/05e4`; those inputs
-take its unchanged-return path. The mode-zero handler instead recognizes
-`00ca/035c/0370/05dc/05e1` (derived from its subtract cascade and BE pool
-literal `0292`). Fresh input probes observe `05dc` before the startup
-inputs, `05e1` with mode zero, and another `05e1` after mode becomes one.
-Thus this context has an organic transaction lifecycle, not simply an
-uninitialized mode byte. Next follow `05dc/05e1`'s resource requests and
-context transition; do not synthesize mode or missing statuses.
-The transaction calls `25f12e(5b,0)` and later constructs class `5a`
-from product-local content pointer `32ecf6`. Runtime observes object
-`114604` at `25f114`; its `+4` link is zero. Allocation routine `25ee1e`
-shows that this is a linked-list predecessor, **not a display parent**;
-zero is legitimate for the first object. Resource constructor `25ec06`
-marks the associated queue dirty and sets a pending-work byte. Next follow
-that dirty-resource queue's consumer and transport, rather than assuming
-content is absent or interpreting the list link as a missing hierarchy.
-Pending work uses byte `1350a5`; fresh probes observe three flush entries
-at `25f514`, called from `260d1e` (return address `260d23`). The constructed
-class-5a object reaches indirect renderer `23fc31` (Thumb entry `23fc30`)
-with command `06`, flags `0020`. Thus the content and dirty-queue consumer
-are both active. The flush performs command `06` at `25f660`, followed
-by command `05` at `25fece`, both targeting `23fc31`. The renderer's
-subtract cascade distinguishes them: command 6 goes directly to layout
-helper `23d4c0`; command 5 calls text/layout routine `23e9dc` with argument
-`ffffffff`. Runtime then observes flags `0022`, options `01940000` at
-`23fcf0` on the command-5 path, not command 6. The subsequent
-bit-12-dependent follow-up is skipped; this does not prove command 5
-failed to draw, since the text routine has already executed. Helper
-`23d4c0` performs layout setup through `23d024/23d118` and sets flag bit 1;
-calling it is not proof of raster output. Text resolution at `23ea62`
-produces RAM pointer `12fe50` from source `32ecf6`, with UTF-16 prefix
-`0049006e` ("In"). Thus text lookup is nonempty, not a missing-content
-result. Next recover the layout-versus-paint invocation and object
-visibility/dirty contract before blaming LCD transfer; queue starvation
-is not established.
-Fresh stage probes reach text layout `23d7b8/23dc28` and glyph-processing
-call `23e6ec`. The latter reaches submission `27ed6c` twice: coordinates
-`0b/0d` and `0b/16`, source `340494`, counts `06/08`, mode `01`.
-Its nonzero-state checks pass with values `34043c/00000004` under block
-`130298`; the second value must not be mislabeled a buffer pointer merely
-because it is checked against zero. Thus missing text or missing font-state
-initialization is not established. Draw routine `27e7f8` reaches byte-blit
-routine `27e662`: bounded probes observe destinations `1304e3..130508`
-and `130592..1305b3`, operation `01`. Its output submission uses resource
-`7305` through `304a3c/304a0a`. At `304a18` the channel-map predicate
-`30491c` returns zero, preventing `304944` from forwarding the request.
-This gate controls service-channel forwarding, not physical LCD output.
-Routine `304944` packages the resource and payload into a service frame
-and sends it through `302506`. A transport-only query/map experiment
-enabled class `73` (MSB-first bitmap bytes 14/46, mask `10`) and both
-submissions became allowed, but the earlier no-map run renders the same
-Insert SIM card frame. Therefore this application profile is unnecessary
-for boot and is removed from the research composition.
+Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
+The ten-second and end-of-run frames are authoritative for the first
+text: the eight-second sample precedes it. `--display-transfer` checks the
+no-card Insert SIM card framebuffer signature, not the SIM/security UI.
 
-Physical transfer `27f550` reads framebuffer `1304d8`, optionally masking
-it with bitmap `1302e0` while byte `13029e` is zero. Fresh probes observe
-glyph completion producing nonzero pixels (`80800000` and `007f7e0c` at
-the sampled positions) with zero mask bytes, followed by transfer of all
-84 columns across six banks. GENSIO emits these bytes through `2e`, then
-the normal-display command `0c` through `6e`; the end-of-run frame visibly
-reads Insert SIM card. The early blank screenshot was a sampling error,
-not an unmet display dependency. This proves text presentation, not menus,
-SIM initialization, or semantic physical-key interaction.
-A direct-BL-only branch audit cannot
-classify this filter's side effects, because it misses `bx r1`.
-The requested delay is `075a`;
-the observed wall-time interval is not yet a validated physical cadence.
-Passive samples show owner `05`, flags `03`, state `02` after arming;
-the record links to `111950` and stores `04f9` at four and eight seconds.
-The insertion routine `287950` subtracts accumulated preceding intervals
-and adjusts the next record, establishing a delta-linked queue. The stored
-field is therefore not an independently decrementing countdown; unchanged
-samples alone cannot establish a timing defect. Input `05e4` also takes
-the eighth filter's default return epilogue `2be1da`; side effects in earlier
-filters and timer-expiry delivery remain to be classified.
+#### Board Readiness
 
-`noki8850_startup_observe.lua` installs CPU debugger probes directly on
-`:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
-Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not
-the Lua state alias `LR`; an invalid debugger expression can hide a probe's
-output. The working reply probe observes class `74`, command `0d`, status
-`00`. Queue publication at `28846c` is now observable and bounded to 200
-records. Treat absent earlier PC-tap/debug-script records as instrumentation
-limitations, not evidence of an unexecuted path.
+`PRODUCT_8850` selects the existing BLB-2 nominal ADC tuple
+`000/3ff/2c0/150/140/000/200/000`.
+Nokia's [NSM-2 system-module manual](https://www.eserviceinfo.com/preview_html.php?fileid=5444&previewid=2990)
+identifies BLB-2, its 68 kohm BSI resistor and temperature circuit.
+The tuple is a calibrated board input, **not measured NSM-2 voltage
+scaling**. No charger is asserted to satisfy startup.
 
-With the conservative placeholder ADC tuple, the raw press changes physical columns `1f -> 17 -> 1f` but generates no
-keypad IRQ because firmware masked all five columns. A write observation
-locates `6b=3f` at store `3054ec`, 1.285520 seconds. Entry `3054ac` ORs the
-five mask bits after updating its software state. Its complete direct-BL
-caller scan finds `2a1ac2`, `2a1bc2`, `2a1dea`; runtime takes `2a1bc2`.
-Do not bypass that firmware-owned mask or claim a validated Menu mapping:
-the reused host label does not establish this product's semantic key.
+Task 1 dispatches through the 14-entry BE32 table at `2a1a28`, using
+state `138070+4`. State `0d` reaches `2a1bea`; reports `17/16/15`
+accumulate readiness `08/0a/0e` at `137fdd`. Report `14` is published
+at `2ff870` from `244cb6`, completes readiness `0f` with power nibble
+6 at `13ff00`, and permits state 4 and keypad unmasking.
+The earlier conservative-input retry is not the current frontier:
+owner `24481c` / receive `2463a4` / table `2463bc` uses state at
+`1376c0+1c`; its state-3 path `245be4` retries event `49`.
+Encoded field `9004`, index 10 in `33f688`, reads CCONT register
+`0e` bit 2 (charger presence), not an ADC sample. Do not assert that
+bit or inject task-13 event `21` to manufacture readiness.
 
-The selected startup branch tests byte `137fe0` at `2a1a7e..2a1a8c` and
-enters `2a1b30` on value 2. This byte is initialized from helper `2ff716`;
-its inputs include boot-state byte `13fec1` (reader `2f6a84`), power-state
-byte `13ff00`, two analog samples and a decoded-key predicate. Fresh samples
-show boot-state `0a` throughout; startup selector becomes 2 and power-state
-becomes `06`. An explicit physical Power hold from script start to 1.5
-seconds changes the later selector to 5, but still observes the same
-`2a1bc2` mask caller and blank frame. That does not prove the initial branch
-changed. Reproduce this comparison with `noki8850_power_start_observe.lua`
-instead of the startup observer. No analog values, software state or peer application body were
-altered by these observations.
+#### Keypad
 
-The task-1 post probe at `2885bc` and receive probe after `2886c0` observe
-reports `17`, `16` and `15` in a fresh runtime-HLE run. The receive wrapper
-`2a0dd8` explicitly returns these three reports, and `14`, unchanged. Only
-`37/c8/33/32` reach the separately observed continuation at `2a1be8` in this
-run; publication or receipt is therefore not proof that a particular
-startup continuation consumed a report. Both probes are capped at 200
-records, not an exhaustive producer census.
+Own scan `3015c0` drives row pins 1..4 and returns raw row*5+column.
+Decoder `30540a` uses selector `13803b` and table `33f504`.
+For the observed selector zero:
 
-The comparisons at `2a1bea..2a1bfe` select handlers for
-`10/14/16/15/17`. Other inputs call `2a105c`, an interior entry of the wider
-startup dispatcher, not a standalone generic handler. Its effects must be
-decoded before describing this branch as a five-report wait. The later
-tests at `2a1c96..2a1caa` require low nibbles 6 at `13ff00` and `f` at
-`137fdd`. Report `14`'s stub `2ff870` has one direct-BL caller, `244cb6`;
-neither that stub nor the preceding `244caa` probe is observed in the fresh
-eight-second run. This is bounded runtime evidence, not absence of an
-indirect producer.
+| Row pin | Column 0 | Column 1 | Column 2 | Column 3 | Column 4 |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 11 | 19 | 01 | 02 | 03 |
+| 2 | 0e | 17 | 04 | 05 | 06 |
+| 3 | 0f | 18 | 07 | 08 | 09 |
+| 4 | 10 | 1a | 0c | 0a | 0b |
 
-The wider receive loop at `2a1a0c` dispatches through the 14-entry BE32
-table at `2a1a28`, using the state halfword at `138070+4`. State `0d`
-selects `2a1bea`, so the reports absent from the direct `2a1be8` probe
-still reach that continuation through the table. A fresh state trace proves
-`17/16/15` accumulate `08/0a/0e` at `137fdd`; input `10` also arrives and
-the power nibble becomes 6. Startup remains in state `0d` because readiness
-bit 0 (report `14`) is missing, not because `15..17` were lost. The direct
-return probe alone was insufficient to identify the consumer.
+The product input layout follows this table. Entries `0e/0f` remain
+unmapped; their semantics are not inferred from adjacent products.
+IRQ0 handler `301714` reads pending column bits at `2b` and posts
+event `41` through `305370` before acknowledging IRQ0. KBGPIO now owns
+that optional pending-column register and the row-pin shift. Defaults
+remain unchanged for existing products. Pending columns are accumulated
+only for unmasked physical changes, cleared on acknowledgement and saved.
+The independent row/power status at `29` is not yet modeled for NSM-2.
 
-Report `14`'s owner is the dispatcher entered at `24481c`. Its receive
-boundary `2463a4` stores the event at `1376c0+1a`; the 21-entry BE32 table
-at `2463bc` selects continuations using `1376c0+1c`. In the fresh run this
-state changes `11 -> 4 -> 3`, with repeated event `26` and occasional
-`49` (also `4a/4b/4c` earlier). State 3 selects `245be4`; this is an active
-firmware lifecycle, not an absent owner. All observation probes are capped
-at 200 records. The same run passes the native-upload/runtime-self-test
-checker with verbose transport logging.
+Runtime checks observe raw `07/08/09/0c/0d` mapping to digits 1..5,
+raw `06` to softkey `19`, and right-softkey `1a`.
+Use branch-target probes: `305410` is the raw scanner return and
+`2a12e0/2a12fe/2a1358` observe decoded returns. Mid-block return
+instructions `30170c/305440` are not reliable hook locations.
+ARM debugger actions use `r14`, not the Lua alias `LR`.
 
-Next decode the state-3 owner's completion/initialization conditions and
-the routes to its report-`14` publication. Establish that contract before
-changing analog values or adding a peer response.
+#### UI Rendering and Closed Misreadings
 
-The extended 39-second fresh run rules out merely ending before the retry
-window: timeout event `49` reduces the state-3 counter at `1376c0+4` from
-4 through 0, without report `14`. Its `+a` initialization byte remains 1
-and `+d` flag remains 0. The status read at `245c22` uses encoded field
-`00009004`: field index `10`, mask `04`, normalized to one bit by
-`3030de..3030ee`. The own-ROM field table `33f688` maps index `10` to
-command base `70`, hence CCONT register `0e` bit 2; all four observed reads
-return zero. This is the modeled charger-present/reset bit, not an ADC
-sample. At zero retries the path waits again rather than fabricating a
-completion.
+Post-readiness `2a1d64` invokes `2d1140` and `2d1120`, posting
+scalar catalogue inputs `0731/0735` through `3014b6`.
+Task-5 receive loop is `30134a..3013fc`. The eight ordered filters are
+`300aae, 2fce32, 27bd84, 270f00, 2c3d38, 271bd8, 266730, 2bd40c`;
+a direct-BL census misses the active-context `bx r1` at `2fd09c`.
+Context 2f invokes `2ad608`, with mode `13fc6c`, phase `13fc72`
+and flag `13fc4b`. Its organic `05dc/05e1` transaction constructs
+class-5a content `32ecf6` at object `114604`. Object +4 is the prior
+list node, not a missing display parent. Dirty work flushes at `25f514`;
+renderer command 6 sets up layout, while command 5 executes text handling
+`23e9dc`. Text resolves through `23ea62` to `12fe50`, UTF-16
+prefix `0049006e` (In). Missing text and an uninitialized UI task are
+not supported explanations.
 
-Two literal-argument direct posts send event `21` to task `13` at
-`245284` and `2457c0`; the latter requires event `42` in owner state 7.
-Those are routes to the report-publication branch, not permission to inject
-the event. Next establish the no-charger startup/owner initialization
-contract and why the current composition selects this lifecycle. Do not
-assert charger presence merely to satisfy the observed bit test.
+Glyph `27ed6c` / draw `27e7f8` / blit `27e662` writes framebuffer
+`1304d8`. Physical transfer `27f550` reads it, optionally masked by
+`1302e0` while flag `13029e` is zero; sampled glyph pixels are nonzero
+and mask bytes zero. It transfers 84 columns across six banks through
+GENSIO `2e`, then normal-display command `0c` through `6e`.
+Resource `7305` also attempts service forwarding through
+`304a3c/304a0a/30491c/304944`, but a channel map is not needed for
+physical LCD output. The own MSB-first permission grammar (class 73,
+bitmap bytes 14/46 mask 10) can enable forwarding, but the no-map
+composition renders identically. No unsolicited map is retained.
+
+Timer 51 at `111b18` is a delta-linked queue record, not an independently
+decrementing counter. `287950` subtracts preceding intervals; an unchanged
+stored delta does not establish a stalled clock. Organic expiry near
+31 s follows `02 -> 03 -> 01` and posts `023f` through descriptor
+`331ae4+51*8` (`0033e0c8 03050000`). Handler `268dec` invokes
+`2f1d9c(0,1)`. Its indexed class-74 refresh checks enable bytes
+`137e94+index`; `2f1a28` activates and `2f1e9c` removes entries.
+Zero enables on this path are not evidence of a missing hardware peer.
 
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
@@ -943,8 +751,9 @@ completion, identity or provisioning was added by this correction.
 
 The 8250 writes each ownership word (`0xfe`, `0x100`) to zero 58 times in
 alternating order. It then polls shared offset 2 against `0xffff` at
-`0x2cb30e..0x2cb314`. The 8850 and 8890 instead reach software flag loops;
-their ownership and prerequisites are not yet classified. Similar GENSIO
+`0x2cb30e..0x2cb314`. The normal 8850 and 8890 machines instead reach
+software flag loops. The separate 8850 native/HLE research boundary is
+documented above, not inherited by either normal machine. Similar GENSIO
 code does not establish identical DSP families or completion semantics.
 
 ## Reproduction and limits
