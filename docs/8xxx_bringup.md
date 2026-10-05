@@ -539,6 +539,29 @@ silent command-32 boundary; successful process exit is not phone boot:
 
 ## Recovered GENSIO contract
 
+### 8890 stock bootstrap boundary
+
+An isolated v12.20 PPM C run with its acquired PMM renders `CONTACT
+SERVICE`. The sampled loop `2f0d3e..2f0d44` is not a blank-display result.
+`tools/noki8890_bootstrap_observe.lua` passively records the first shared
+memory access sites and captures the screen through the common scout.
+
+Own bootstrap `2c2d94..2c2eaa` reads word offsets `4/6` through `r5`.
+At `2c2dbc/2c2ddc` offset 4 remains `ffff`; the bounded retry expires and
+clears its readiness byte at `2c2de6`. Although both words match at
+`2c2dee`, zero readiness takes the failure exit `2c2e8c` before the sparse
+upload loop. The existing conservative product composition therefore does
+not establish a verifier verdict or absent post-upload completion.
+
+The own upload payload at file `11624c` is byte-identical to the mapped
+223-word staged verifier; its descriptor at `116240` is
+`0f00/0000/00df/0f00/00dc/0000`. The own 104-word program fragment at
+file `11508c` is byte-identical to the acquired 8250 fragment, while the
+loader and loader2 payloads are not identical. Recover their catalogue and
+execute only acquired bytes before defining any runtime HLE handoff.
+Shared-fragment identity is not a physical chip-identity measurement or
+permission to copy a sibling's record/self-test verdict.
+
 ### 8850 stock-input runtime boundary
 
 A fresh v5.31 PPM C run with its acquired PMM renders `CONTACT SERVICE`
