@@ -719,6 +719,14 @@ boot remains unproved.
 Its full-address literals are `2302fc`, `3028dc`, `3033f8` (not a complete
 writer census). Timer `51` has a 12-byte RTOS record at
 `11174c+51*12`; its expiry target remains to be observed.
+Passive samples show owner `05`, flags `03`, state `02` after arming;
+the record links to `111950` and stores `04f9` at four and eight seconds.
+The insertion routine `287950` subtracts accumulated preceding intervals
+and adjusts the next record, establishing a delta-linked queue. The stored
+field is therefore not an independently decrementing countdown; unchanged
+samples alone cannot establish a timing defect. Input `05e4` also takes
+the eighth filter's default return epilogue `2be1da`; side effects in earlier
+filters and timer-expiry delivery remain to be classified.
 
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
