@@ -528,6 +528,27 @@ fabricating a DSP completion is not justified by this condition. Next trace
 the execution/dispatch prerequisites of this routine and its other writers.
 The samples do not prove the predicate held at every intervening instant.
 
+The readiness setter belongs to DSP service IRQ4: IRQ dispatcher `302eb6`
+calls entry `2cb418` when unmasked pending bit 4 is set. A second direct
+caller is `308446`. A fresh conservative-profile transport trace shows no
+service-pending transaction before two seconds. It writes shared identity
+`10004=ffff`, which the conservative HLE does not answer; own-ROM
+`2cae26..2cae34` consequently skips the upload unless identity is 5 or 6.
+This precedes the readiness failure and supersedes a missing-IRQ hypothesis
+as the immediate frontier.
+
+`PRODUCT_8850` now explicitly selects the ROM6 HLE identity (6) and
+alternating upload acknowledgements. This is a declared silicon selection,
+not evidence of the fitted mask revision. Final verification is deliberately
+unmodelled. A fresh nine-second run reaches `2caeae..2caeb4`, polling shared
+result `10002` against `ffff`, with startup tests unfinished and no accepted
+graphical boot. The former CONTACT SERVICE frame describes the conservative
+profile, not the new upload frontier. The next software avenue is executing
+the acquired flash's verifier/loader through the staged DSP composition;
+the 104-word bootstrap fragment at flash offset `11ad54` exactly matches
+the already decoded NSM-3D fragment, while candidate loader sources must be
+checked independently before use.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 

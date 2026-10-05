@@ -943,6 +943,22 @@ constexpr nokia_product_config make_8xxx_config()
 }
 constexpr nokia_product_config PRODUCT_8XXX = make_8xxx_config();
 
+constexpr nokia_product_config make_8850_config()
+{
+	nokia_product_config result = make_8xxx_config();
+	// NSM-2 v5.31 independently accepts silicon identity 5 or 6 at
+	// 0x2cae26, then alternates upload ownership until its final-result poll.
+	// Select ROM6 HLE; acknowledge transfers without inventing that verdict.
+	result.dsp_bootstrap = {
+		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+		0, {}, 0, std::nullopt,
+		nokia_dsp_hle_device::bootstrap_parked_contract { 0x004, 0xffff, 6 },
+		0
+	};
+	return result;
+}
+constexpr nokia_product_config PRODUCT_8850 = make_8850_config();
+
 constexpr nokia_product_config make_8210_config()
 {
 	nokia_product_config result = make_conservative_config({ 4, 0x10 });
@@ -1164,6 +1180,7 @@ public:
 	void noki3210(machine_config &config);
 	void noki5210(machine_config &config);
 	void noki8xxx(machine_config &config);
+	void noki8850(machine_config &config);
 	void nsm3dr6(machine_config &config);
 	void nsm3dhle(machine_config &config);
 	void noki8210(machine_config &config);
@@ -3356,6 +3373,12 @@ void nokia_dct3_state::noki8xxx(machine_config &config)
 	apply_product_config(PRODUCT_8XXX);
 }
 
+void nokia_dct3_state::noki8850(machine_config &config)
+{
+	dct3_base(config);
+	apply_product_config(PRODUCT_8850);
+}
+
 void nokia_dct3_state::nsm3dr6(machine_config &config)
 {
 	noki8xxx(config);
@@ -3827,7 +3850,7 @@ SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empt
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 1999, noki8850, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, noki8850, 0,      0,      noki8850, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
