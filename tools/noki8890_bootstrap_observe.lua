@@ -17,3 +17,8 @@ local tap = memory:install_read_tap(0x10000, 0x10103,
             pc, address, data, mask, machine.time:as_double()))
     end)
 _G.noki8890_bootstrap_tap = tap
+assert(cpu.debug, "8890 service observation requires the MAME debugger")
+cpu.debug:bpset(0x2c3398, 'temp7<24',
+    'temp7=temp7+1;logerror "8890_service_control: command=%04x argument=%04x commit=%04x pending_address=%08x\\n",r4,r6,r5,r3+r8;g')
+cpu.debug:bpset(0x2c307c, 'temp8<24',
+    'temp8=temp8+1;logerror "8890_service_encoder: command=%04x argument=%04x commit=%04x caller=%08x\\n",r0,r1,r2,r14;g')

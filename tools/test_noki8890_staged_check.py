@@ -12,6 +12,18 @@ GOOD = '\n'.join((
     'observation_halt pc=2c75 ownership_retained=1',
 ))
 
+RUNTIME = GOOD.replace('observation_halt pc=2c75 ownership_retained=1',
+                       'runtime_hle_handoff pc=2c75 native_suspended=1') + '\n' + '\n'.join((
+    '8890_service_encoder: command=0032 argument=3fff commit=0001',
+    'TX pending type=05 payload=10 data=1eff00d000030101e000',
+    'RX enqueue type=8e payload=10 producer=086 data=1e0002d000030101e000',
+    'RX enqueue type=8e payload=10 producer=08c data=1e0002d000030401c100',
+    'TX pending type=05 payload=10 data=1e0200d0000305014100',
+    'TX pending type=70 payload=6 data=1304eca05beb',
+    'TX pending type=70 payload=26 data=16184bc0613636443a235d792fd4ba7e6b71defabf9b19e00f43',
+    'TX pending type=70 payload=2 data=0d00',
+))
+
 
 class StagedTest(unittest.TestCase):
     def test_complete(self):
@@ -28,3 +40,14 @@ class StagedTest(unittest.TestCase):
     def test_unexpected_handoff(self):
         with self.assertRaises(ValueError):
             verify(GOOD + '\nruntime_hle_handoff')
+
+    def test_runtime_discovery(self):
+        verify(RUNTIME, runtime=True)
+
+    def test_runtime_requires_native_handoff(self):
+        with self.assertRaises(ValueError):
+            verify(RUNTIME.replace('native_suspended=1', 'native_suspended=0'), runtime=True)
+
+    def test_runtime_requires_firmware_ack(self):
+        with self.assertRaises(ValueError):
+            verify(RUNTIME.replace('data=1e0200d0000305014100', 'data=unknown'), runtime=True)

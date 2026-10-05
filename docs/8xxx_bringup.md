@@ -589,6 +589,23 @@ simulated seconds and verbose logging; then check:
 The latter reports declared descriptor coverage, not a proof against
 dynamic relocation. Native upload acceptance is not graphical/UI acceptance.
 
+`nsb6hle` is a separate runtime transport comparison: it suspends native
+execution at that same absent routine, then enables shared parameter
+acknowledgement and request-derived external-service discovery. These
+settings belong to the product configuration so reset preserves them.
+It does not implement identity, security-record or self-test verdicts.
+The observer's bounded debugger probes at `2c307c/2c3398` record the own
+service encoder and shared pending-word commit without changing firmware.
+
+The coherent comparison commits command `32` with argument `3fff`, emits
+discovery frame `1eff00d000030101e000`, receives its echo and discovery
+response, then organically acknowledges with `1e0200d0000305014100`.
+It subsequently transmits type-70 requests `13/14/15/16` and `0d00`.
+Those acquired-product requests are evidence for the next consumer audit,
+not permission to import sibling reply semantics. No interactive acceptance
+is established. Reproduce with `nsb6hle`, the same observer and twelve
+simulated seconds; check with the staged checker's `--runtime` option.
+
 ### 8850 stock-input runtime boundary
 
 A fresh v5.31 PPM C run with its acquired PMM renders `CONTACT SERVICE`

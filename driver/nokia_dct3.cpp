@@ -1206,6 +1206,7 @@ public:
 	void nsm3dr6(machine_config &config);
 	void nsm3dhle(machine_config &config);
 	void nsb6stage(machine_config &config);
+	void nsb6hle(machine_config &config);
 	void noki8210(machine_config &config);
 
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
@@ -3505,6 +3506,19 @@ void nokia_dct3_state::nsb6stage(machine_config &config)
 	staged.set_observe_after_missing_code(true);
 }
 
+void nokia_dct3_state::nsb6hle(machine_config &config)
+{
+	nsb6stage(config);
+	// Explicit runtime transport comparison, not missing resident execution.
+	// Keep self-test and security-record results unimplemented here.
+	nokia_product_config runtime = m_product;
+	runtime.dsp_service = true;
+	runtime.external_service_transport = true;
+	apply_product_config(runtime);
+	m_dsp_hle->set_opaque_parameter_acceptance(true);
+	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
+}
+
 void nokia_dct3_state::nhm3stage(machine_config &config)
 {
 	noki6250(config);
@@ -3973,6 +3987,13 @@ ROM_START( nsb6stage )
 	ROM_LOAD("8890 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(1d8ef3b5) SHA1(cc0924cfd4c0ce796fca157c640fc3183c2b5f2c))
 ROM_END
 
+ROM_START( nsb6hle )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("8890_12.20_ppmc.fls", 0, 0x1d0000, CRC(77206f78) SHA1(a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed))
+	ROM_LOAD("8890 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(1d8ef3b5) SHA1(cc0924cfd4c0ce796fca157c640fc3183c2b5f2c))
+ROM_END
+
 } // anonymous namespace
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
@@ -3997,6 +4018,7 @@ SYST( 2000, nsm3dr6, noki8250, 0,    nsm3dr6, noki3310, nokia_dct3_state, empty_
 SYST( 2000, nsm3dhle, noki8250, 0,   nsm3dhle, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsb6stage, noki8890, 0, nsb6stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8890 native uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsb6hle, noki8890, 0, nsb6hle, noki3310, nokia_dct3_state, empty_init, "Nokia", "8890 native uploads with runtime transport HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
