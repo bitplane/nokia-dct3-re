@@ -774,9 +774,14 @@ Pending work uses byte `1350a5`; fresh probes observe three flush entries
 at `25f514`, called from `260d1e` (return address `260d23`). The constructed
 class-5a object reaches indirect renderer `23fc31` (Thumb entry `23fc30`)
 with command `06`, flags `0020`. Thus the content and dirty-queue consumer
-are both active. Command 6 calls text/layout routine `23e9dc` with argument
-`ffffffff`; runtime then observes flags `0022`, options `01940000` at
-`23fcf0`. The subsequent bit-12-dependent follow-up is skipped. Helper
+are both active. The flush performs command `06` at `25f660`, followed
+by command `05` at `25fece`, both targeting `23fc31`. The renderer's
+subtract cascade distinguishes them: command 6 goes directly to layout
+helper `23d4c0`; command 5 calls text/layout routine `23e9dc` with argument
+`ffffffff`. Runtime then observes flags `0022`, options `01940000` at
+`23fcf0` on the command-5 path, not command 6. The subsequent
+bit-12-dependent follow-up is skipped; this does not prove command 5
+failed to draw, since the text routine has already executed. Helper
 `23d4c0` performs layout setup through `23d024/23d118` and sets flag bit 1;
 calling it is not proof of raster output. Text resolution at `23ea62`
 produces RAM pointer `12fe50` from source `32ecf6`, with UTF-16 prefix

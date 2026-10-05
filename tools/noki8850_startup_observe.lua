@@ -86,6 +86,8 @@ cpu.debug:bpset(0x25f514, "b@1350a5!=0 && temp7<120",
     'temp7=temp7+1;logerror "8850_ui_resource_flush pending=%02x r14=%08x\\n",b@1350a5,r14;g')
 cpu.debug:bpset(0x25f660, "b@(r4+3e)==5a",
     'logerror "8850_ui_resource_renderer object=%08x target=%08x command=%02x flags=%04x\\n",r4,r2,r1,w@(r4+3c);g')
+cpu.debug:bpset(0x25fece, "b@(r4+3e)==5a",
+    'logerror "8850_ui_resource_paint_dispatch object=%08x target=%08x command=%02x flags=%04x\\n",r4,r2,r1,w@(r4+3c);g')
 cpu.debug:bpset(0x23fcf0, "b@(r4+3e)==5a",
     'logerror "8850_ui_renderer_layout_done object=%08x flags=%04x options=%08x\\n",r4,w@(r4+3c),d@(r4+28);g')
 cpu.debug:bpset(0x23d4c0, "b@(r1+3e)==5a",
