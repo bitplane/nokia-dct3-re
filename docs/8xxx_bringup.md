@@ -762,6 +762,14 @@ inputs, `05e1` with mode zero, and another `05e1` after mode becomes one.
 Thus this context has an organic transaction lifecycle, not simply an
 uninitialized mode byte. Next follow `05dc/05e1`'s resource requests and
 context transition; do not synthesize mode or missing statuses.
+The transaction calls `25f12e(5b,0)` and later constructs class `5a`
+from product-local content pointer `32ecf6`. Runtime observes object
+`114604` at `25f114`; its `+4` link is zero. Allocation routine `25ee1e`
+shows that this is a linked-list predecessor, **not a display parent**;
+zero is legitimate for the first object. Resource constructor `25ec06`
+marks the associated queue dirty and sets a pending-work byte. Next follow
+that dirty-resource queue's consumer and transport, rather than assuming
+content is absent or interpreting the list link as a missing hierarchy.
 A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;
