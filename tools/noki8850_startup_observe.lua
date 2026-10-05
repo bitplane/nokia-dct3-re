@@ -19,10 +19,16 @@ cpu.debug:bpset(0x2a1be8, nil,
     'logerror "8850_startup_receive report=%08x\\n",r0;g')
 cpu.debug:bpset(0x2a0dde, "temp3<200",
     'temp3=temp3+1;logerror "8850_task1_receive report=%08x r14=%08x\\n",r0,r14;g')
+cpu.debug:bpset(0x2a1a10, "temp4<200",
+    'temp4=temp4+1;logerror "8850_startup_dispatch report=%08x state=%04x base=%08x\\n",r0,w@(r4+4),r4;g')
+cpu.debug:bpset(0x2a1c96, "temp5<200",
+    'temp5=temp5+1;logerror "8850_startup_check power=%02x reports=%02x\\n",b@13ff00,b@137fdd;g')
 cpu.debug:bpset(0x244caa, nil,
     'logerror "8850_report14_predecessor pc=%08x\\n",pc;g')
 cpu.debug:bpset(0x2ff870, nil,
     'logerror "8850_report14_stub r14=%08x\\n",r14;g')
+cpu.debug:bpset(0x2463a4, "temp6<200",
+    'temp6=temp6+1;logerror "8850_report14_owner_receive event=%08x state=%04x base=%08x\\n",r0,w@(r6+1c),r6;g')
 cpu.debug:go()
 
 local mask_writes = 0

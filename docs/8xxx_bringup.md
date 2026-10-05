@@ -659,10 +659,27 @@ neither that stub nor the preceding `244caa` probe is observed in the fresh
 eight-second run. This is bounded runtime evidence, not absence of an
 indirect producer.
 
-Next recover the wider dispatcher's startup-state/continuation contract
-and the entry conditions of the `244cb6` publication path. Establish the
-unmet predicate before attributing the blank display to analog values,
-display geometry or an external registration peer.
+The wider receive loop at `2a1a0c` dispatches through the 14-entry BE32
+table at `2a1a28`, using the state halfword at `138070+4`. State `0d`
+selects `2a1bea`, so the reports absent from the direct `2a1be8` probe
+still reach that continuation through the table. A fresh state trace proves
+`17/16/15` accumulate `08/0a/0e` at `137fdd`; input `10` also arrives and
+the power nibble becomes 6. Startup remains in state `0d` because readiness
+bit 0 (report `14`) is missing, not because `15..17` were lost. The direct
+return probe alone was insufficient to identify the consumer.
+
+Report `14`'s owner is the dispatcher entered at `24481c`. Its receive
+boundary `2463a4` stores the event at `1376c0+1a`; the 21-entry BE32 table
+at `2463bc` selects continuations using `1376c0+1c`. In the fresh run this
+state changes `11 -> 4 -> 3`, with repeated event `26` and occasional
+`49` (also `4a/4b/4c` earlier). State 3 selects `245be4`; this is an active
+firmware lifecycle, not an absent owner. All observation probes are capped
+at 200 records. The same run passes the native-upload/runtime-self-test
+checker with verbose transport logging.
+
+Next decode the state-3 owner's completion/initialization conditions and
+the routes to its report-`14` publication. Establish that contract before
+changing analog values or adding a peer response.
 
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
