@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_research_registration", "owner": "product_profile", "status": "satisfied",
+      "predicate": "8850 research composition completes organic laboratory Location Updating, SIM location persistence and return to steady camp",
+      "current": "Own-ROM ring dispatcher 307346 and its thirteen-entry table independently route 80/8b/89 to recovered consumers. After 55:03050000 accepts RSSI, firmware publishes its own 56/160 candidate window; the explicit product contract permits this completed-scan continuation. The coherent 60-second physical-input run completes Location Updating, both LAPDm acknowledgements, EF_LOCI LAI/status writes and steady paging/BCCH. Assigned 89 body bit 0 matches the recovered pending-context predicate. Calls, SMS, operator-frame acceptance and normal-machine native DSP completion remain unverified.",
+      "evidence": ["docs/8xxx_bringup.md", "driver/nokia_dct3.cpp", "driver/nokia_radio_peer.cpp", "tools/noki8850_radio_observe.lua", "tools/radio_registration_trace_check.py", "tools/test_radio_registration_trace_check.py"]
+    },
+    {
       "id": "nsm2_research_phonebook_and_calculator", "owner": "product_profile", "status": "satisfied",
       "predicate": "8850 research profile physically saves A/123, presents it after a preserved-storage cold restart and computes 12+3=15",
       "current": "Own-ROM physical inputs issue absolute UPDATE RECORD for ADN record 1 and receive success. Exact storage validation proves A/123 and 49 erased records. A separate cold execution preserves the SIM/flash files, reads ADN, and physically opens Search/Detail with reviewed name/number pixels and no UPDATE RECORD. A separate fresh fixture navigates the own menu to Calculator, selects Options/Add then Equals and displays 15 with correlated decoded inputs. This is research-composition software acceptance, not normal-machine promotion or radio/call/SMS completion.",

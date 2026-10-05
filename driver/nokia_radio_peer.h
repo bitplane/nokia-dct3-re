@@ -60,6 +60,7 @@ public:
 				neighbour_arfcn_encoding::direct_octet;
 		neighbour_bsic_encoding neighbour_instruction_bsic =
 				neighbour_bsic_encoding::none;
+		bool band_scan_accepts_candidate_window = false;
 
 		constexpr bool enabled() const
 		{

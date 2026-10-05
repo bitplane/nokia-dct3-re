@@ -241,6 +241,16 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
 	nokia_radio_peer_device::neighbour_bsic_encoding::none
 };
 
+// NSM-2 v5.31 publishes 55:03050000. Its own ring dispatcher 307346
+// routes 8b to task 12; 2df316 correlates 89 body bit 0 with the pending
+// channel context. Keep unobserved release/neighbour contracts unset.
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM2 = {
+	nokia_radio_peer_device::acquisition_strategy::candidate_window,
+	0, 0x01, 0, 0, false, 0, false, false,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::none, true
+};
+
 constexpr nokia_dsp_hle_device::service_control_contract
 		DSP_SERVICE_CONTROL_COMPACT = {
 	{ 0x0d, 0x00 }, 2
@@ -3450,6 +3460,7 @@ void nokia_dct3_state::nsm2hle(machine_config &config)
 	// Research card input: firmware still owns reset, detection and APDUs.
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
+	runtime.radio = RADIO_NSM2;
 	// Own dispatcher 243a42 routes class 74 to 240dbc; command 0d at
 	// 240e2c cancels the armed wait and reads two fault bits at body +9.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;

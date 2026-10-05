@@ -1443,12 +1443,13 @@ bool nokia_radio_peer_device::handle_search_request(search_request request)
 	if (request == search_request::candidate_window)
 	{
 		// This one is load-bearing, unlike the band-scan branch below: both
-		// candidate-window strategies decode this request, and only the
-		// autonomous scan may be followed by an explicit window while its own
-		// measurement is still the current phase.
+		// candidate-window strategies decode this request. A completed band
+		// scan may be followed by an explicit window only where the product
+		// contract establishes that continuation (NHM-2 and NSM-2).
 		const bool autonomous_scan_complete =
-				m_protocol.acquisition ==
-						acquisition_strategy::autonomous_band_scan &&
+				(m_protocol.acquisition ==
+						acquisition_strategy::autonomous_band_scan ||
+						m_protocol.band_scan_accepts_candidate_window) &&
 				current_phase() == phase::candidate_measurement;
 		if ((!autonomous_scan_complete && current_phase() != phase::inactive) ||
 				m_reports_remaining != 0)

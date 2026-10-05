@@ -55,11 +55,17 @@ NHM6_GOOD = NHM5_GOOD.replace(
     "data=040000000000001a600003370000000f00000000",
 )
 
+# The current NHM-5 firmware owns a zeroed release header, not NSE-8's.
+NHM5_GOOD = NHM5_GOOD.replace(
+    "data=041202000000001a600000580000000f00000000",
+    "data=040000000000001a600000580000000f00000000",
+)
+
 NHM2_GOOD = NHM5_GOOD.replace(
     "00580000030045050200f110",
     "00010000030045050200f110",
 ).replace(
-    "data=041202000000001a600000580000000f00000000",
+    "data=040000000000001a600000580000000f00000000",
     "data=041202000000001a600000010000000f00000000",
 )
 
@@ -67,7 +73,7 @@ NSM5_GOOD = NHM5_GOOD.replace(
     "00580000030045050200f110",
     "00560000030045050200f110",
 ).replace(
-    "data=041202000000001a600000580000000f00000000",
+    "data=040000000000001a600000580000000f00000000",
     "data=040000000000001a600000560000000f00000000",
 )
 
@@ -92,6 +98,20 @@ NHM2_PRESERVED_GOOD = NHM2_GOOD.replace(
 
 
 class RegistrationTraceCheckTest(unittest.TestCase):
+    def test_nhm5_rejects_stale_release_header(self):
+        with self.assertRaisesRegex(ValueError, "deconfiguration"):
+            verify(NHM5_GOOD.replace(
+                "data=040000000000001a600000580000000f00000000",
+                "data=041202000000001a600000580000000f00000000"), "nhm5")
+
+    def test_nsm2_registration(self):
+        verify(NHM2_GOOD, "nsm2")
+
+    def test_nsm2_requires_location_storage(self):
+        with self.assertRaisesRegex(ValueError, "EF_LOCI status"):
+            verify(NHM2_GOOD.replace(
+                "sim_device: update-binary fid=6f7e offset=10 length=1", ""), "nsm2")
+
     def test_complete_registration(self):
         verify(GOOD)
 
@@ -125,7 +145,7 @@ class RegistrationTraceCheckTest(unittest.TestCase):
                 1,
             ), "nhm6")
 
-    def test_nhm6_rejects_borrowed_nhm5_release_prefix(self):
+    def test_nhm6_rejects_borrowed_nse8_release_prefix(self):
         with self.assertRaisesRegex(ValueError, "RR channel deconfiguration"):
             verify(NHM6_GOOD.replace(
                 "data=040000000000001a600003370000000f00000000",
@@ -135,7 +155,7 @@ class RegistrationTraceCheckTest(unittest.TestCase):
     def test_nhm5_rejects_nse8_channel_deconfiguration(self):
         with self.assertRaisesRegex(ValueError, "RR channel deconfiguration"):
             verify(NHM5_GOOD.replace(
-                "data=041202000000001a600000580000000f00000000",
+                "data=040000000000001a600000580000000f00000000",
                 "data=041202000000001a600000010000000f00000000",
             ), "nhm5")
 

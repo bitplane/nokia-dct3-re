@@ -67,6 +67,11 @@ PROFILE_CHECKPOINTS = {
             r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
             r"030045050200f11000011708")),
     ),
+    "nsm2": (
+        ("Location Updating Accept", re.compile(
+            r"RX enqueue type=80 payload=34 .*data=80[0-9a-f]{18}"
+            r"030045050200f11000011708")),
+    ),
 }
 
 PROFILE_ARFCN = {
@@ -76,18 +81,20 @@ PROFILE_ARFCN = {
     "nhm6": "0337",
     "nhm2": "0001",
     "nsm5": "0056",
+    "nsm2": "0001",
 }
 
 PROFILE_DECONFIG_PREFIX = {
     "nhm3": "040000",
     "nse8": "041202",
-    "nhm5": "041202",
+    "nhm5": "040000",
     # NHM-6's ordinary registration release publishes the same zeroed
     # header observed in its candidate/serving channel-change family.  The
-    # older 0x041202 expectation was borrowed from NHM-5 packet grammar.
+    # older 0x041202 expectation belongs to the NSE-8 packet grammar.
     "nhm6": "040000",
     "nhm2": "041202",
     "nsm5": "040000",
+    "nsm2": "041202",
 }
 
 COMMON_POST_ACCEPT_CHECKPOINTS = (
@@ -154,7 +161,7 @@ def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
             r"sim_device: update-binary fid=6f7e", text):
         raise ValueError(f"{profile.upper()} redundantly mutated persisted EF_LOCI")
 
-    if profile in ("nhm3", "nhm5", "nhm6", "nhm2", "nsm5"):
+    if profile in ("nhm3", "nhm5", "nhm6", "nhm2", "nsm5", "nsm2"):
         assigned_confirmation = re.search(
             r"radio_phase=assigned_channel_change[^\n]*"
             r"(?:\n.*)*?RX enqueue type=89 payload=8 .*data=0100000000000000",

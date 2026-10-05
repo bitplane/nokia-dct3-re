@@ -623,8 +623,39 @@ softkeys open Messages, Inbox and the Names menu (Search/Add entry/Erase).
 Physical Add entry stores A/123 in SIM ADN record 1, and a preserved-storage
 cold restart displays both the name and number through Search/Detail.
 Calculator also computes 12+3=15 through physical inputs and its Options
-menu. Radio registration and call/SMS lifecycles remain unverified; those
-are the next capability boundaries.
+menu. The research composition also completes laboratory Location Updating,
+persists EF_LOCI and returns to steady paging/BCCH. Call/SMS lifecycles and
+registered-operator pixel acceptance remain the next capability boundaries.
+
+#### Radio Contract
+
+Own-ROM RX assembly at `2cac20` produces a four-byte envelope whose type is
+at byte 3. Dispatcher `307346` routes type `80` to `2df198`; its table at
+`307380` has thirteen entries for `83..8f` (32-bit entries require the
+swap16 halfword rotation). In particular, `8b` reaches `2df56c`, which posts
+the packet to task 12, and `89` reaches `2df2f8`, where body bit 0 must match
+the pending channel context. This is independent product evidence, not a
+copied sibling address map.
+
+The initial organic `55:03050000` scan accepts a laboratory RSSI result and
+immediately constructs its own `56/160` candidate window containing ARFCN
+1. `RADIO_NSM2` therefore explicitly permits that completed-band-scan to
+candidate-window continuation. Release/neighbour/handover calibrations not
+yet recovered for this product remain unset. The normal machine is unchanged.
+
+Run `noki8850_radio_observe.lua` for 60 simulated seconds with the isolated
+research invocation above, then check:
+
+```sh
+.venv/bin/python tools/radio_registration_trace_check.py RUN/error.log --profile nsm2
+```
+
+Acceptance requires the handset's Location Updating Request, contention UA,
+Location Updating Accept acknowledgement, Channel Release acknowledgement,
+both EF_LOCI writes, assigned/released channel confirmations and sustained
+post-release paging/BCCH. Own-ROM handler probes additionally show `80`,
+`8b` and `89` entering the recovered consumers. This proves laboratory
+registration with the declared radio HLE, not RF or missing native mask code.
 
 #### Reproduction and Acceptance
 
