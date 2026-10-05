@@ -3409,6 +3409,9 @@ void nokia_dct3_state::nsm2hle(machine_config &config)
 	// shared service handshake; LCD output does not require a service map.
 	runtime.dsp_service = true;
 	runtime.external_service_transport = true;
+	// Research card input: firmware still owns reset, detection and APDUs.
+	runtime.simi_controller = true;
+	runtime.synthetic_sim_card = true;
 	// Own dispatcher 243a42 routes class 74 to 240dbc; command 0d at
 	// 240e2c cancels the armed wait and reads two fault bits at body +9.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;

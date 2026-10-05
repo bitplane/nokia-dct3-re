@@ -20,7 +20,7 @@ STAGES = (
 
 
 def check_trace(text: str, runtime_hle: bool = False, startup_readiness: bool = False,
-                display_transfer: bool = False) -> list[str]:
+                display_transfer: bool = False, sim_reads: bool = False) -> list[str]:
     errors = []
     cursor = 0
     stages = STAGES
@@ -64,6 +64,20 @@ def check_trace(text: str, runtime_hle: bool = False, startup_readiness: bool = 
             text[glyph.end():])
         if glyph is None or transfer is None:
             errors.append("missing or out-of-order nonzero glyph framebuffer transfer")
+    if sim_reads:
+        cursor = 0
+        for name, pattern in (
+            ("ICCID read", r"sim_device: read-binary fid=2fe2 offset=0 length=10"),
+            ("service table read", r"sim_device: read-binary fid=6f38 offset=0 length=12"),
+            ("IMSI read", r"sim_device: read-binary fid=6f07 offset=0 length=9"),
+            ("last ADN record read", r"sim_device: header cla=a0 ins=b2 p1=32 p2=04 p3=20 selected=6f3a"),
+            ("post-ADN card status", r"sim_device: header cla=a0 ins=f2 p1=00 p2=00 p3=16 selected=6f3a"),
+        ):
+            match = re.search(pattern, text[cursor:])
+            if match is None:
+                errors.append(f"missing or out-of-order {name}")
+            else:
+                cursor += match.end()
     return errors
 
 
@@ -76,10 +90,12 @@ def main() -> int:
                         help="also require organic readiness and physical IRQ delivery, not a rendered UI")
     parser.add_argument("--display-transfer", action="store_true",
                         help="require nonzero glyph pixels followed by framebuffer transfer; not interactive acceptance")
+    parser.add_argument("--sim-reads", action="store_true",
+                        help="require the organic identity/service/ADN read conversation, not persistence or registration")
     args = parser.parse_args()
     try:
         errors = check_trace(args.log.read_text(encoding="utf-8", errors="replace"),
-                             args.runtime_hle, args.startup_readiness, args.display_transfer)
+                             args.runtime_hle, args.startup_readiness, args.display_transfer, args.sim_reads)
     except OSError as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return 1

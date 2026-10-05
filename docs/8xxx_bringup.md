@@ -617,7 +617,15 @@ and renders **Insert SIM card** after 8.05 simulated seconds. The
 eight-second sample precedes the first text transfer and is blank; use the
 ten-second or end-of-run capture. A raw physical matrix press reaches
 keypad IRQ/ack, but semantic key mapping and interactive acceptance remain
-unproven. Next establish the product-local SIM and semantic keypad contracts.
+unproven. The research composition now enables the existing physical SIMI
+controller and synthetic laboratory card. Own firmware selects MF/GSM,
+reads ICCID, phase, service table and IMSI, then all 50 ADN records and
+issues STATUS at 10.82 s. A fresh own-PMM run renders **Security code**
+with OK at 16 s. This is phone-side security presentation, not evidence
+of accepted input, durable phonebook writes or network registration.
+Reproduce with `--runtime-hle --startup-readiness --sim-reads` and a
+36-second isolated observer run. Next recover the semantic keypad matrix
+and test the security transaction through physical input only.
 
 `PRODUCT_8850` uses the existing BLB-2 nominal ADC tuple
 `000/3ff/2c0/150/140/000/200/000`, replacing the conservative full-scale

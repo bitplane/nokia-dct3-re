@@ -79,6 +79,18 @@ class StagedTraceTests(unittest.TestCase):
 """
         self.assertTrue(check_trace(trace, True, True, True))
 
+    def test_sim_reads(self):
+        trace = self.runtime_trace() + """
+sim_device: read-binary fid=2fe2 offset=0 length=10
+sim_device: read-binary fid=6f38 offset=0 length=12
+sim_device: read-binary fid=6f07 offset=0 length=9
+sim_device: header cla=a0 ins=b2 p1=32 p2=04 p3=20 selected=6f3a
+sim_device: header cla=a0 ins=f2 p1=00 p2=00 p3=16 selected=6f3a
+"""
+        self.assertEqual(check_trace(trace, True, sim_reads=True), [])
+        self.assertTrue(check_trace(trace.replace("p1=32", "p1=31"), True, sim_reads=True))
+        self.assertTrue(check_trace(trace.replace("fid=6f07", "fid=6f08"), True, sim_reads=True))
+
     @classmethod
     def startup_trace(cls):
         return cls.runtime_trace() + """
