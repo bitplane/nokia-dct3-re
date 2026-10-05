@@ -703,8 +703,13 @@ evidence that the source needs repair. Structure base `138058` is also
 used by mode operations `3032ec` and `3027e6`.
 The `0731` unconditional record `24a` has action `4e77`; helper `300914`
 queues its low input `0e77` via `301548`, confirmed in the fresh run.
-Next follow this ordinary action's consumer/continuation, not the rejected
-special-mode branch; do not force the source to `40/41`.
+The low input has no primary catalogue entry. A fresh runtime trace follows
+it unchanged through all seven filter entries to final-filter handler
+`268068`. That handler calls `255c5c` with context bytes `10/02`, observed
+at the callee, then enters continuation `268e46`. Next recover this context
+operation and its continuation, not the rejected special-mode branch; do
+not force the source to `40/41`. The focused native/runtime-readiness check
+still passes; graphical boot remains unproved.
 Its full-address literals are `2302fc`, `3028dc`, `3033f8` (not a complete
 writer census). Timer `51` has a 12-byte RTOS record at
 `11174c+51*12`; its expiry target remains to be observed.
