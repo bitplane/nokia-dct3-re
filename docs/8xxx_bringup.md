@@ -843,6 +843,18 @@ captured frame returns to the text editor, not a claimed success banner.
 This verifies signaling against the declared HLE network, not delivery to
 an external carrier or speech media.
 
+### Capability acceptance boundary
+
+On the final radio-enabled `nsm2hle` composition, fresh physical-input runs
+verify Calculator `12+3=15` and exact SIM phonebook Save; a separate cold
+run retaining only NVRAM verifies Search/Detail without rewriting ADN.
+Together with the independent registration, incoming/outgoing call and SMS
+checks above, these establish the requested research software capabilities.
+They do not promote `noki8850`: native completion still requires the absent
+resident DSP routine at `2c75`. Speech media is also unverified. The runtime
+HLE, synthetic SIM and laboratory network remain explicit substitutes,
+not evidence for a recovered DSP mask or real-carrier interoperability.
+
 IRQ0 handler `301714` reads pending column bits at `2b` and posts
 event `41` through `305370` before acknowledging IRQ0. KBGPIO now owns
 that optional pending-column register and the row-pin shift. Defaults
