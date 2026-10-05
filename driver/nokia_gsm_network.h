@@ -164,6 +164,7 @@ public:
 	bool cell_receivable(u16 arfcn) const;
 	void set_mobility_profile(mobility_profile profile);
 	void set_cell_carriers(u16 primary_arfcn, u16 neighbour_arfcn);
+	void set_pcs1900_band(bool enabled) { m_pcs1900_band = enabled; }
 	void set_neighbour_bsic(u8 bsic);
 	void set_neighbour_fault_profile(neighbour_fault_profile profile);
 	u8 synchronization_bsic(u16 arfcn, u32 frame_number) const;
@@ -349,6 +350,7 @@ private:
 	gsm::a5::algorithm m_cipher_algorithm = gsm::a5::algorithm::a5_0;
 	gsm::mobility::periodic_update_timer m_periodic_update_timer;
 	gsm::mobility::topology m_cells;
+	bool m_pcs1900_band = false;
 	gsm::subscriber::profile m_subscriber = gsm::subscriber::laboratory;
 	mobility_profile m_mobility_profile = mobility_profile::single_cell;
 	smart_message_profile m_smart_message_profile =

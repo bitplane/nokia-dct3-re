@@ -8,6 +8,10 @@
 
 int main()
 {
+	static_assert(gsm::mobility::si1_band_rest_octets(false) == 0x2b);
+	static_assert(gsm::mobility::si1_band_rest_octets(true) == 0x6b);
+	static_assert((gsm::mobility::si1_band_rest_octets(false) ^
+			gsm::mobility::si1_band_rest_octets(true)) == 0x40);
 	static_assert(gsm::mobility::synchronization_frame(0) == 2'715'638);
 	static_assert(gsm::mobility::synchronization_frame(1) == 1);
 	static_assert(gsm::mobility::synchronization_frame(10) == 1);

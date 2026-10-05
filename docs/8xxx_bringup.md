@@ -804,6 +804,32 @@ rotation is not a general keypad wiring or numeric-entry defect.
 GSM1900 behavior remains unproved; clock-notice settlement and invalid-clock
 error cancellation remain presentation/lifecycle questions.
 
+### 8890 PCS1900 acquisition frontier
+
+`fixtures/noki8890_pcs1900/nsb6hle.cfg` selects laboratory carriers 600/601
+and the stable two-cell topology. The latter is essential: legacy single-cell
+mode treats unlisted ARFCNs as receivable, so merely changing its configured
+carrier can still yield GSM900 registration on the handset's initial ARFCN
+60. That run is not PCS acceptance.
+
+The network emits SI1 Rest Octets `6b` for PCS, rather than DCS `2b`:
+absent NCH followed by H rather than L in the band-indicator position.
+This is the standards-level distinction described in
+[ETSI TS 145 014 section 4.1.6](https://www.etsi.org/deliver/etsi_ts/145000_145099/145014/07.01.00_60/ts_145014v070100p.pdf),
+not a Nokia packet label. Existing defaults remain DCS/GSM900.
+
+With fresh own PMM and the explicit topology, a 90-second research run
+emits its initial `56/160` candidate window for `003c`, then `55/4`
+`01140000` and `04080000`. It does not reach Location Updating or select
+carrier 600. The peer currently recognizes only subcommand `03` as the
+untargeted four-byte scan form; the semantics and reply contract of own
+subcommand `01` are unresolved. Recover its producer/consumer boundary
+before extending the decoder. Do not relabel the failed scan as registration
+or make the topology return a configured carrier outside the requested
+contract. Reproduce by copying the fixture into a private cfg directory and
+running `noki8890_security_input.lua` with fresh NVRAM, verbose logging and
+90 seconds. Default and coherent 3210 gates remain green.
+
 ### 8850 stock-input runtime boundary
 
 A fresh v5.31 PPM C run with its acquired PMM renders `CONTACT SERVICE`

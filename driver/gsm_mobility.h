@@ -11,6 +11,13 @@
 namespace gsm::mobility
 {
 
+// TS 05.14 4.1.6: absent NCH, then L (DCS) or H (PCS), relative
+// to the CSN.1 padding pattern. The rest of the octet remains padding.
+constexpr std::uint8_t si1_band_rest_octets(bool pcs1900)
+{
+	return pcs1900 ? 0x6b : 0x2b;
+}
+
 // TS 45.010 synchronization-channel frame positions and TS 44.018
 // Synchronization Channel Information. The four information octets carry the
 // six-bit BSIC together with the reduced TDMA frame number.

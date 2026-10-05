@@ -63,6 +63,7 @@ void nokia_gsm_network_device::device_start()
 	m_delayed_loss_timer = timer_alloc(
 			FUNC(nokia_gsm_network_device::delayed_persistent_loss), this);
 	save_item(NAME(m_stable_camp_seen));
+	save_item(NAME(m_pcs1900_band));
 	save_item(NAME(m_neighbour_bcch_seen));
 	save_item(NAME(m_primary_cell_lost));
 	save_item(NAME(m_all_cells_lost));
@@ -484,6 +485,10 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 	const unsigned message_index = index % SYSTEM_INFORMATION.size();
 	std::array<u8, 24> result =
 			SYSTEM_INFORMATION[message_index];
+	if (message_index == 0)
+	{
+		result[22] = gsm::mobility::si1_band_rest_octets(m_pcs1900_band);
+	}
 	if (message_index == 0 &&
 			serving_arfcn >= 1 && serving_arfcn <= 124)
 	{
@@ -519,7 +524,7 @@ std::array<u8, 24> nokia_gsm_network_device::system_information(
 		// RF-channel bits set. This represents DCS 1800 (and other non-bitmap-0
 		// ARFCNs) without assigning product-specific meaning to the carrier.
 		// Its mandatory SI1 Rest Octets byte is already the following 0x2b:
-		// no NCH, DCS 1800 band indicator, then the standard padding pattern.
+		// no NCH, the configured band indicator, then standard padding.
 		result[0] = 0x59;
 		result[3] = 0x8e | BIT(serving_arfcn, 9);
 		result[4] = serving_arfcn >> 1;

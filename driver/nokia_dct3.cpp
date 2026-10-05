@@ -1758,6 +1758,10 @@ void nokia_dct3_state::machine_reset()
 	}
 	if (BIT(m_neighbour_config.read_safe(0x00), 5))
 		m_gsm_network->set_cell_carriers(86, 87);
+	const bool pcs1900 = BIT(m_neighbour_config.read_safe(0x00), 6);
+	m_gsm_network->set_pcs1900_band(pcs1900);
+	if (pcs1900)
+		m_gsm_network->set_cell_carriers(600, 601);
 	if (BIT(m_neighbour_config.read_safe(0x00), 4))
 		m_gsm_network->set_neighbour_bsic(0);
 	static constexpr std::array NEIGHBOUR_FAULT_PROFILES = {
@@ -2756,6 +2760,9 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x20, 0x00, "NSM-5 laboratory carrier pair")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x20, "GSM 900 (ARFCN 86/87)")
+	PORT_CONFNAME(0x40, 0x00, "Laboratory PCS 1900 carriers")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x40, "PCS 1900 (ARFCN 600/601)")
 
 	PORT_START("NEIGHBORFAULT")
 	PORT_CONFNAME(0x07, 0x00, "Neighbour validation fault")
