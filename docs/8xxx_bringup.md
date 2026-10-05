@@ -795,9 +795,16 @@ call `23e6ec`. The latter reaches submission `27ed6c` twice: coordinates
 Its nonzero-state checks pass with values `34043c/00000004` under block
 `130298`; the second value must not be mislabeled a buffer pointer merely
 because it is checked against zero. Thus missing text or missing font-state
-initialization is not established. Next follow draw routine `27e7f8` and
-output submission `304a3c` into framebuffer/LCD transfer without changing
-those state values.
+initialization is not established. Draw routine `27e7f8` reaches byte-blit
+routine `27e662`: bounded probes observe destinations `1304e3..130508`
+and `130592..1305b3`, operation `01`. Its output submission uses resource
+`7305` through `304a3c/304a0a`. At `304a18` the channel-map predicate
+`30491c` returns zero, preventing `304944` from forwarding the request.
+This is a concrete failed submission boundary, not evidence of absent
+text, stalled timers, or idle UI tasks. Next recover the product-local
+map-enabling peer contract and implement it at the transport boundary;
+do not set the map bytes directly or import another product's application
+profile without validation.
 A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;
