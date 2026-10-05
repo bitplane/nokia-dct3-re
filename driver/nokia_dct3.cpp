@@ -252,6 +252,14 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM2 = {
 	nokia_radio_peer_device::neighbour_bsic_encoding::none, true
 };
 
+// NSB-6 v12.20 independently publishes 56/160. Own dispatcher 30168e
+// maps 8b to task 12 and 89 body bit 0 to its pending channel context.
+// Release, neighbour and handover contracts remain unobserved and unset.
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NSB6 = {
+	nokia_radio_peer_device::acquisition_strategy::candidate_window,
+	0, 0x01
+};
+
 constexpr nokia_dsp_hle_device::service_control_contract
 		DSP_SERVICE_CONTROL_COMPACT = {
 	{ 0x0d, 0x00 }, 2
@@ -3529,6 +3537,7 @@ void nokia_dct3_state::nsb6hle(machine_config &config)
 	// the NSB-6 firmware still owns activation and every APDU.
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
+	runtime.radio = RADIO_NSB6;
 	runtime.dsp_service = true;
 	runtime.external_service_transport = true;
 	// Own class-74 dispatcher 24373a calls 240938; command 0d at

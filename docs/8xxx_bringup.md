@@ -685,8 +685,50 @@ NVRAM directory. Check each stage:
   SAVE/nvram/nsb6hle/sim_card READ/snap/8890_phonebook_contact.png
 ```
 
-Applications, radio registration, call signaling and SMS are still unproved
-on this product.
+Physical calculator navigation reaches menu 7 (**Rechner**) and computes
+12+3=15 through the application's Options/Add/Result sequence. Reproduce
+with `noki8890_calculator_input.lua`, fresh storage and 44 seconds, then
+check decoded physical inputs and the arithmetic-area pixel oracle:
+
+```sh
+.venv/bin/python tools/noki8890_calculator_check.py RUN/error.log \
+  RUN/snap/8890_calculator_result.png
+```
+
+#### 8890 Radio Contract
+
+The own RX dispatcher at `30168e` selects type `80` at `301750`, calling
+`2dae9c`. Its thirteen-entry `83..8f` table at `3016bc` maps `8b` to
+`301710 -> 2db270`, which posts to task 12 through `28190c`.
+Type `89` maps to `301720 -> 2daffc`; `2db01a..2db024` compares body
+bit 0 against the pending channel context. These are independently decoded
+NSB-6 consumers, not reused sibling addresses.
+
+Own startup directly emits `56/160` with ARFCN `003c` in its candidate
+window. `RADIO_NSB6` therefore uses candidate-window acquisition, not the
+8850's initial `55` band-scan continuation. The request-derived experiment
+organically constructs candidate and assigned CHANNEL_CONFIGURE, accepts
+their confirmations, then sends Location Updating Request with its own
+capability octet `23`. The contention UA echoes that request; the handset
+acknowledges Location Updating Accept and Channel Release, writes both
+EF_LOCI LAI/status fields and returns to paging/BCCH after own
+deconfiguration `040000000000001a6000003c0000000f00000000`.
+
+This is laboratory GSM900 registration on a handset whose product also
+supports GSM1900; no separate GSM1900 acquisition acceptance is claimed.
+Traffic release, handover, neighbour and speech contracts remain unset
+until product observations justify them. Native missing DSP execution
+remains distinct from these HLE transport/network results.
+
+Reproduce with the research machine and security input fixture for 65
+seconds, from fresh cfg/NVRAM; then run:
+
+```sh
+.venv/bin/python tools/noki8890_registration_check.py RUN/error.log
+```
+
+Incoming/outgoing calls, SMS, operator pixels and GSM1900 behavior remain
+unproved on this product.
 
 ### 8850 stock-input runtime boundary
 
