@@ -9,13 +9,20 @@ import struct
 from tools.extract_nsm3_verifier import NSM3D_FLASH_SHA1
 
 
-def catalogue(image):
-    if hashlib.sha1(image).hexdigest() != NSM3D_FLASH_SHA1:
-        raise ValueError("not the pinned 8250 flash")
-    size, destination = struct.unpack_from(">2I", image, 0x109560)
-    if (size, destination) != (0x74, 0x12f040):
+def catalogue(image, product="8250"):
+    profiles = {
+        "8250": (NSM3D_FLASH_SHA1, 0x109560, 0x12f040),
+        "8890": ("a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed", 0x107608, 0x134c78),
+    }
+    if product not in profiles:
+        raise ValueError("unsupported catalogue product")
+    digest, initialization, expected_destination = profiles[product]
+    if hashlib.sha1(image).hexdigest() != digest:
+        raise ValueError(f"not the pinned {product} flash")
+    size, destination = struct.unpack_from(">2I", image, initialization)
+    if (size, destination) != (0x74, expected_destination):
         raise ValueError("unexpected catalogue initialization record")
-    pointers = struct.unpack_from(">29I", image, 0x109568)
+    pointers = struct.unpack_from(">29I", image, initialization + 8)
     if pointers[-1] != 0 or any(not pointer for pointer in pointers[:-1]):
         raise ValueError("unexpected catalogue terminator")
     entries = []
@@ -47,10 +54,11 @@ def covering(entries, address):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("flash", type=Path)
+    parser.add_argument("--product", choices=("8250", "8890"), default="8250")
     parser.add_argument("--address", type=lambda value: int(value, 0), action="append", default=[])
     args = parser.parse_args()
     try:
-        entries = catalogue(args.flash.read_bytes())
+        entries = catalogue(args.flash.read_bytes(), args.product)
     except (OSError, ValueError, struct.error) as error:
         parser.exit(1, f"NSM-3D catalogue failed: {error}\n")
     print(json.dumps({"entries": entries, "coverage": {

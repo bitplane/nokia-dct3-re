@@ -1205,6 +1205,7 @@ public:
 	void nsm2hle(machine_config &config);
 	void nsm3dr6(machine_config &config);
 	void nsm3dhle(machine_config &config);
+	void nsb6stage(machine_config &config);
 	void noki8210(machine_config &config);
 
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
@@ -3483,6 +3484,27 @@ void nokia_dct3_state::nsm3dr6(machine_config &config)
 	staged.set_observe_after_missing_code(true);
 }
 
+void nokia_dct3_state::nsb6stage(machine_config &config)
+{
+	noki8xxx(config);
+	nokia_product_config research = PRODUCT_8XXX;
+	research.dsp_reset_wiring = { 0x10, 0x01 };
+	// Own consumer 2c2dbc requires matching non-sentinel identity words.
+	// Six is the acquired fragment's ROM input, not measured NSB-6 silicon.
+	research.dsp_bootstrap = {
+		nokia_dsp_hle_device::bootstrap_exchange_strategy::ping_pong,
+		0, {}, 0, std::nullopt,
+		nokia_dsp_hle_device::bootstrap_parked_contract { 0x004, 0xffff, 6 }, 0
+	};
+	apply_product_config(research);
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x11508c);
+	staged.set_loader2_source(0x1151b8);
+	staged.set_loader_control_address(0x0880);
+	staged.set_cycle_guard_for_loader(true);
+	staged.set_observe_after_missing_code(true);
+}
+
 void nokia_dct3_state::nhm3stage(machine_config &config)
 {
 	noki6250(config);
@@ -3944,6 +3966,13 @@ ROM_START( noki8890 )
 	ROM_LOAD("8890 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(1d8ef3b5) SHA1(cc0924cfd4c0ce796fca157c640fc3183c2b5f2c))
 ROM_END
 
+ROM_START( nsb6stage )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("8890_12.20_ppmc.fls", 0, 0x1d0000, CRC(77206f78) SHA1(a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed))
+	ROM_LOAD("8890 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(1d8ef3b5) SHA1(cc0924cfd4c0ce796fca157c640fc3183c2b5f2c))
+ROM_END
+
 } // anonymous namespace
 
 //    YEAR  NAME      PARENT  COMPAT  MACHINE   INPUT     CLASS           INIT        COMPANY  FULLNAME      FLAGS
@@ -3967,6 +3996,7 @@ SYST( 2000, noki8250, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empt
 SYST( 2000, nsm3dr6, noki8250, 0,    nsm3dr6, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D staged DSP with declared ROM6 input (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nsm3dhle, noki8250, 0,   nsm3dhle, noki3310, nokia_dct3_state, empty_init, "Nokia", "NSM-3D native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki8890, 0,      0,      noki8xxx, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8890", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, nsb6stage, noki8890, 0, nsb6stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8890 native uploaded DSP research fixture", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

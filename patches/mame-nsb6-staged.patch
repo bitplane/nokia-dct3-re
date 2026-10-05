@@ -1,0 +1,10 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -47200,3 +47200,6 @@
+ 
+ @source:zvt/pp01.cpp
+ pp01
++
++@source:nokia/nokia_dct3.cpp
++nsb6stage

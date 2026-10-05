@@ -562,6 +562,33 @@ execute only acquired bytes before defining any runtime HLE handoff.
 Shared-fragment identity is not a physical chip-identity measurement or
 permission to copy a sibling's record/self-test verdict.
 
+`nsb6stage` is a separate native-upload research composition. Its explicit
+pre-upload ROM input is 6 from the acquired fragment, not a measurement of
+physical NSB-6 silicon; normal `noki8890` is unchanged. The 28-entry table
+at `307610` is initialized by `307608` into `134c78`. Selector 0 contains
+638 loader words (SHA1 `a5f4f14638f0cbfd0bab29cb4995a8e05641af22`),
+selector 14 contains the own 613-word second loader (SHA1
+`7fc1c5a9435664f15b7064de1cf129f764ab21ac`), and selector 1 contains
+`092f` words. Own observed loader release uses control word `0880=0078`.
+
+Native verifier execution publishes `0000/0006/0006/0006`, followed by
+loader requests `14` and 118 requests `01`. The executor byte-verifies the
+second loader before running it; 422 installed program words precede its
+call to absent `2c75`. It suspends with native ownership retained, without
+a guessed helper return or runtime reply. Reproduce in fresh private
+directories with machine `nsb6stage`, the bootstrap observer above, nine
+simulated seconds and verbose logging; then check:
+
+```sh
+.venv/bin/python tools/noki8890_staged_check.py RUN/error.log \
+  roms/noki8890/8890_12.20_ppmc.fls
+.venv/bin/python -m tools.nsm3d_catalogue \
+  roms/noki8890/8890_12.20_ppmc.fls --product 8890 --address 0x2c75
+```
+
+The latter reports declared descriptor coverage, not a proof against
+dynamic relocation. Native upload acceptance is not graphical/UI acceptance.
+
 ### 8850 stock-input runtime boundary
 
 A fresh v5.31 PPM C run with its acquired PMM renders `CONTACT SERVICE`
