@@ -740,6 +740,12 @@ Dialing fidelity remains open: typing `1234567` from idle displays and
 transmits `2345671`. Three seconds of editor settling and a physical
 Scroll Down do not correct the rotation. Neither diagnostic is retained
 in the fixture. No firmware state is changed to conceal the mismatch.
+Per-digit screenshots localize it to editor entry: `1` becomes `21` on
+the second physical digit, then later digits insert before the original
+`1`. Reducing only the first press from 150 ms to 30 ms reproduces the
+same ordering; that diagnostic is not retained. The SMS recipient editor
+accepts the intended ordering, so recover the idle-entry cursor setup
+rather than changing shared keypad wiring.
 `noki8890_outgoing_call_check.py` defaults to the intended `1234567` and
 correctly fails; `--number 2345671` verifies only the observed signaling
 lifecycle. Reproduce with `noki8890_outgoing_call_input.lua`, fresh

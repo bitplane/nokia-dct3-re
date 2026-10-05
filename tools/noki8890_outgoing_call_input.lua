@@ -20,6 +20,7 @@ local input = coroutine.create(function()
     for _, digit in ipairs({1, 2, 3, 4, 5, 6, 7}) do
         local column = ({[1]=2, [2]=3, [3]=4, [4]=2, [5]=3, [6]=4, [7]=2})[digit]
         if not press(column, 'Keypad ' .. digit, 'digit_' .. digit) then return end
+        machine.screens[':screen']:snapshot('8890_dial_digit_' .. digit .. '.png')
     end
     machine.screens[':screen']:snapshot('8890_dialed_number.png')
     if not press(0, 'Call / Send', 'send') then return end
