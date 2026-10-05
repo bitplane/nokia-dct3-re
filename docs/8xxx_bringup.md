@@ -681,6 +681,18 @@ prove timer expiry absence. Next recover the `05e4` action's catalogue
 transition and the timer's target/expiry semantics, rather than inventing
 an external completion.
 
+Catalogue `324230` locates `0731` at entry 125, transition records
+`247..24a`, and `0735` at entry 129, records `25e..263`, in the eight-byte
+transition table `325b80`. Runtime predicate entry `300894` observes
+`0731` selectors/states `5d/00`, `5d/00`, `1b/01`, `ff/00`; `0735`
+observes `5d/01`, `63/01`, `64/01`, `64/01`, `34/00`, `6c/00`.
+State storage is `13fc00+selector`. These are predicate-entry observations,
+not proof that every record accepts or that each associated action runs.
+Next decode acceptance and the nested action of record `249`
+(`1b013f0086210000`) before attributing the blank display to missing
+transport content. Timer `51` has a 12-byte RTOS record at
+`11174c+51*12`; its expiry target remains to be observed.
+
 `noki8850_startup_observe.lua` installs CPU debugger probes directly on
 `:maincpu` and performs one raw column-3/host-bit-4 press at five seconds.
 Invoke with `-debug -debugger none`. ARM debugger actions use `r14`, not
