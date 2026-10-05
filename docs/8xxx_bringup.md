@@ -483,6 +483,27 @@ silent command-32 boundary; successful process exit is not phone boot:
 
 ## Recovered GENSIO contract
 
+### 8850 stock-input runtime boundary
+
+A fresh v5.31 PPM C run with its acquired PMM renders `CONTACT SERVICE`
+at eight seconds. This is a graphical failure frame, not interactive boot.
+The former `2f6e44` PC-only observation was insufficient to classify the
+firmware as blocked: routine `2f6da0` polls byte `1381ec`, but Timer-0
+compare values advance throughout the observation (`0047` at 0.5 seconds,
+`00a5` at 1 second, `0497` at 8 seconds). FIQ mask/control are `e3/05`.
+FIQ dispatcher `302eec` loads the same flag from literal `302fb4` and clears
+it at `302ef2`. The observed loop is therefore not a proven missing wake
+or final DSP publication wait. Its complete entry/exit cadence remains to
+be observed; investigate the service-failure verdict rather than injecting
+a flag clear.
+
+`tools/noki8850_frontier_observe.lua` records bounded PC/register and
+side-effect-free MAD2 status/counter samples plus screenshots. Its flag
+write tap produced no records in this run; that negative result is not a
+writer-absence proof. The firmware-owned clear is independently decoded.
+Use the private-directory invocation below with this observer for nine
+seconds. No guest state is written.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 
