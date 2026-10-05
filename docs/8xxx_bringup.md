@@ -763,7 +763,20 @@ Use fresh NVRAM and `noki8890_incoming_call_input.lua` for 50 seconds:
 .venv/bin/python tools/noki8890_incoming_call_check.py RUN/error.log
 ```
 
-SMS and GSM1900 behavior remain unproved; direct-dial number rotation and
+Incoming ordinary text SMS is verified on the research composition: IMSI
+paging, SAPI-3 segmented delivery, handset CP/RP acknowledgements, network
+CP acknowledgement and RR release complete. Physical input opens the
+message and displays `hello`; the SIM retains the exact read SMS record.
+The own DSP cipher-control publication is `0076ffffffffffffffff0000`.
+Copy `fixtures/noki8890_incoming_sms/nsb6hle.cfg` into a private cfg
+directory and run `noki8890_incoming_sms_input.lua` with fresh NVRAM,
+verbose logging and 36 emulated seconds. Validate with:
+
+```sh
+.venv/bin/python tools/noki8890_incoming_sms_check.py RUN/error.log RUN/nvram/nsb6hle/sim_card RUN/snap/8890_sms_read_2.png
+```
+
+Outgoing SMS and GSM1900 behavior remain unproved; direct-dial number rotation and
 clock-notice settlement remain presentation/input fidelity questions.
 
 ### 8850 stock-input runtime boundary
