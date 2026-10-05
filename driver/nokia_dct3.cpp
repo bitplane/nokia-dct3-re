@@ -243,10 +243,11 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NHM2 = {
 
 // NSM-2 v5.31 publishes 55:03050000. Its own ring dispatcher 307346
 // routes 8b to task 12; 2df316 correlates 89 body bit 0 with the pending
-// channel context. Keep unobserved release/neighbour contracts unset.
+// channel context. Physical End publishes release parameter 14. Keep
+// unobserved neighbour/handover contracts unset.
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM2 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0, 0x01, 0, 0, false, 0, false, false,
+	0x14, 0x01, 0, 0, false, 0, false, false,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::none, true
 };
@@ -3016,11 +3017,11 @@ INPUT_PORTS_END
 static INPUT_PORTS_START( noki8850 )
 	PORT_INCLUDE(noki3310)
 	// NSM-2 v5.31 table 33f504: raw row * 5 + column, rows 1..4.
-	// Unidentified entries 0e/0f remain unmapped rather than named by analogy.
+	// Send/End are the 0e/0f entries; 11/10 are not call controls.
 	PORT_MODIFY("COL.0")
-	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Call / Send") PORT_CODE(KEYCODE_F1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
-	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("End") PORT_CODE(KEYCODE_F2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
-	PORT_BIT( 0x0d, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Call / Send") PORT_CODE(KEYCODE_F1) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("End") PORT_CODE(KEYCODE_F2) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x13, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_MODIFY("COL.1")
 	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
 	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Menu") PORT_CODE(KEYCODE_ENTER) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)

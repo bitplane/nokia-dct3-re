@@ -624,8 +624,9 @@ Physical Add entry stores A/123 in SIM ADN record 1, and a preserved-storage
 cold restart displays both the name and number through Search/Detail.
 Calculator also computes 12+3=15 through physical inputs and its Options
 menu. The research composition also completes laboratory Location Updating,
-persists EF_LOCI and returns to steady paging/BCCH. Call/SMS lifecycles and
-registered-operator pixel acceptance remain the next capability boundaries.
+persists EF_LOCI and returns to steady paging/BCCH. Physical outgoing-call
+signaling and registered-operator pixels are verified. Incoming calls, SMS
+and speech media remain the next capability boundaries.
 
 #### Radio Contract
 
@@ -746,8 +747,33 @@ For the observed selector zero:
 | 3 | 0f | 18 | 07 | 08 | 09 |
 | 4 | 10 | 1a | 0c | 0a | 0b |
 
-The product input layout follows this table. Entries `0e/0f` remain
-unmapped; their semantics are not inferred from adjacent products.
+Physical call evidence identifies `0e` as Send and `0f` as End (column 0,
+row-pin bits 2/3). Entries `11/10` do not initiate/end calls and remain
+unmapped rather than carrying misleading Send/End labels.
+
+#### Outgoing Call Acceptance
+
+`noki8850_outgoing_call_input.lua` completes the physical security/menu
+sequence, returns to idle, dials `5551234`, presses Send and later End.
+The own-ROM traffic configuration is
+`041202000271012fc10000010000000400000000`. Physical End emits
+`041202001117001a600000010000001400000001`, independently establishing
+release parameter `14` for `RADIO_NSM2`.
+
+Run the fixture for 60 simulated seconds in fresh isolated storage, then:
+
+```sh
+.venv/bin/python tools/noki8850_outgoing_call_check.py RUN/error.log --frames RUN/snap
+```
+
+The gate requires Send/End decoded as `0e/0f`, CM Service Request/Accept,
+exact Called Party BCD digits, SETUP/Proceeding/Assignment/Alerting/Connect,
+handset Connect Acknowledge, physical Disconnect, Release/Release Complete,
+RR release, the product-local channel transaction and confirmation, and
+return to paging. Reviewed operator-only pixel crops show numeric `001 01`
+before dialing and `DCT3 LAB` after release, excluding animated indicators.
+The wire also contains `860b`/`840a` speech-control commands, but no NSM-2
+speech-media contract is selected; this acceptance does not prove audio.
 IRQ0 handler `301714` reads pending column bits at `2b` and posts
 event `41` through `305370` before acknowledging IRQ0. KBGPIO now owns
 that optional pending-column register and the row-pin shift. Defaults

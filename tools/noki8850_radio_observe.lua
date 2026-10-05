@@ -1,5 +1,7 @@
 -- Own-ROM DSP RX probes; inputs remain physical and the payload is peer-owned.
-dofile('/data/gaz/src/nokia-dct3-re/tools/noki8850_security_input.lua')
+local source = debug.getinfo(1, 'S').source:sub(2)
+local directory = assert(source:match('^(.*[/])'))
+dofile(directory .. 'noki8850_security_input.lua')
 local cpu = assert(manager.machine.devices[':maincpu'])
 cpu.debug:bpset(0x307352, 'temp8<200',
     'temp8=temp8+1;logerror "8850_radio_dispatch type=%02x length=%02x\\n",b@(r4+3),b@(r4+2);g')

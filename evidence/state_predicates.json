@@ -3,9 +3,15 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_research_outgoing_call", "owner": "product_profile", "status": "satisfied",
+      "predicate": "8850 research composition physically dials 5551234, completes outgoing CC/RR signaling and returns to registered operator presentation",
+      "current": "Own matrix column-0 bits 2/3 decode as Send 0e and End 0f; the prior 11/10 labels were incorrect. Physical Send triggers CM Service and exact-number SETUP, traffic assignment, Alerting, Connect and handset acknowledgement. End triggers Disconnect, Release Complete and RR release. Its organic release packet establishes parameter 14; the request-correlated peer confirmation returns firmware to paging. Operator pixel crops verify numeric PLMN before dialing and DCT3 LAB after release. No 8850 speech-media configuration or incoming/SMS acceptance is implied.",
+      "evidence": ["docs/8xxx_bringup.md", "driver/nokia_dct3.cpp", "tools/noki8850_outgoing_call_input.lua", "tools/noki8850_outgoing_call_check.py", "tools/test_noki8850_outgoing_call_check.py"]
+    },
+    {
       "id": "nsm2_research_registration", "owner": "product_profile", "status": "satisfied",
       "predicate": "8850 research composition completes organic laboratory Location Updating, SIM location persistence and return to steady camp",
-      "current": "Own-ROM ring dispatcher 307346 and its thirteen-entry table independently route 80/8b/89 to recovered consumers. After 55:03050000 accepts RSSI, firmware publishes its own 56/160 candidate window; the explicit product contract permits this completed-scan continuation. The coherent 60-second physical-input run completes Location Updating, both LAPDm acknowledgements, EF_LOCI LAI/status writes and steady paging/BCCH. Assigned 89 body bit 0 matches the recovered pending-context predicate. Calls, SMS, operator-frame acceptance and normal-machine native DSP completion remain unverified.",
+      "current": "Own-ROM ring dispatcher 307346 and its thirteen-entry table independently route 80/8b/89 to recovered consumers. After 55:03050000 accepts RSSI, firmware publishes its own 56/160 candidate window; the explicit product contract permits this completed-scan continuation. The coherent 60-second physical-input run completes Location Updating, both LAPDm acknowledgements, EF_LOCI LAI/status writes and steady paging/BCCH. Assigned 89 body bit 0 matches the recovered pending-context predicate. Outgoing signaling and operator pixels have separate acceptance; incoming calls, SMS and normal-machine native DSP completion remain unverified.",
       "evidence": ["docs/8xxx_bringup.md", "driver/nokia_dct3.cpp", "driver/nokia_radio_peer.cpp", "tools/noki8850_radio_observe.lua", "tools/radio_registration_trace_check.py", "tools/test_radio_registration_trace_check.py"]
     },
     {
