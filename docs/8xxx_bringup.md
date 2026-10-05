@@ -830,6 +830,35 @@ contract. Reproduce by copying the fixture into a private cfg directory and
 running `noki8890_security_input.lua` with fresh NVRAM, verbose logging and
 90 seconds. Default and coherent 3210 gates remain green.
 
+Own construction is now mapped: state-1 path `21ef44..21ef74` (embedded
+firmware diagnostic name `PH_1050`) calls `2aed52` with mode 1 and parameter
+index 0. It allocates eight bytes, creates a four-byte type-55 message,
+encodes it through `2aecf2`, and posts it to transport task 3 via `28190c`.
+The encoder implements five distinct mode branches, preserving the mode in
+wire byte 0 and selecting wire byte 1 from a three-byte table:
+
+| Firmware Mode | Parameter Table | Bytes |
+| --- | --- | --- |
+| 1 | `3398d0` | `14 05 03` |
+| 2 | `3398d3` | `07 04 03` |
+| 3 | `3398d9` | `03 05 03` |
+| 4 | `3398d6` | `08 04 03` |
+| 5 | `3398dc` | `05 03 03` |
+
+`noki8890_radio_observe.lua` passively captures constructor mode/index/caller
+and final wire bytes. The strict topology reproduces mode 1/index 0 from
+caller `21ef75`, then mode 4/index 0 from caller `21ee1b`.
+Do not infer units, bands or result counts solely from the table values.
+
+The existing HLE terminal branch accepts any four-byte type-55 packet once
+the candidate window has drained. Consequently it treats the own `01140000`
+as terminal control and returns one type-8b measurement report containing
+the previous candidate list (`003c`, `0006`, then absent entries), not the
+configured PCS cells. The firmware later emits `04080000`. The trace's
+`candidate_terminal_control` label is therefore a model classification,
+not recovered semantics of mode 1. Distinguish these modes and recover the
+own receive-side selection/completion rules before replacing that response.
+
 ### 8850 stock-input runtime boundary
 
 A fresh v5.31 PPM C run with its acquired PMM renders `CONTACT SERVICE`
