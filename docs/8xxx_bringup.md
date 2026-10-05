@@ -549,6 +549,38 @@ the 104-word bootstrap fragment at flash offset `11ad54` exactly matches
 the already decoded NSM-3D fragment, while candidate loader sources must be
 checked independently before use.
 
+### 8850 Native Upload Boundary
+
+Research machine `nsm2stage` executes the acquired NSM-2 code instead of
+supplying a verifier verdict. Its flash bootstrap payload at `11ad54` is
+104 words, SHA-1 `440bf49f1eba4cadb12f7f7581c992b0025807d6`; the preceding
+descriptor is `ff80/ff80/0068/0200/008c/0000`. This recovered template is
+not a fitted mask dump. The native verifier publishes shared words
+`0000/0006/0006/0006` at 1.179761 seconds. Loader release fields independently
+identify control word `0880=0078`, unlike NSM-3D's `087f`.
+
+The native loader requests selector `14` once and selector `01` 133 times
+through MAD2 IRQ4. Its second loader at flash offset `11ae80` is 613 words,
+SHA-1 `f543a5807a4abf19e2429d48c8690d5137dbaba9`. The staged device compares
+every uploaded word against this product-local source before entry `0a00`.
+At `0a37` it reads I/O port `001c`, ORs `0200`, and writes the value back;
+the composition now retains that register for the RMW only. Its physical
+bit meaning and reset value remain unverified; no completion is generated.
+
+At 1.208090 seconds the loader calls absent mask routine `2c75`; observation
+suspends the DSP with transport ownership retained. MCU readiness byte
+`135664` subsequently becomes 1 organically, resolving that prerequisite.
+The eight-second frame is blank and startup fault slots remain unfinished:
+this is native upload validation, not graphical boot or phone acceptance.
+The next software experiment may select runtime HLE after this verified
+loader boundary, but must derive subsequent requests from NSM-2 traffic.
+
+Run `nsm2stage` with the private-directory invocation and observer described
+above, using `noki8850` as the parent ROM directory. Then check the captured
+log with `python3 tools/noki8850_staged_trace_check.py <run>/error.log`.
+The checker requires ordered native publication, loader verification,
+missing-mask suspension and firmware readiness; it rejects an HLE handoff.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 
@@ -595,5 +627,5 @@ without changing register ownership or behavior; `verify-gensio` now passes
 both 3210 firmware revisions. After adding the separate live staged-code
 composition, the normal 8250 boundary, 3210 baseline and coherent frontier
 still reproduce. C54x core conformance passes, including the new BLEQ cases.
-The tool suite passes; all 11 MAME overlay patches apply to the pinned
+The tool suite passes; all 13 MAME overlay patches apply to the pinned
 upstream commit.

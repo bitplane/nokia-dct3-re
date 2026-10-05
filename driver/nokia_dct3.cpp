@@ -1181,6 +1181,7 @@ public:
 	void noki5210(machine_config &config);
 	void noki8xxx(machine_config &config);
 	void noki8850(machine_config &config);
+	void nsm2stage(machine_config &config);
 	void nsm3dr6(machine_config &config);
 	void nsm3dhle(machine_config &config);
 	void noki8210(machine_config &config);
@@ -3379,6 +3380,20 @@ void nokia_dct3_state::noki8850(machine_config &config)
 	apply_product_config(PRODUCT_8850);
 }
 
+void nokia_dct3_state::nsm2stage(machine_config &config)
+{
+	noki8850(config);
+	// NSM-2's own upload releases reset through CTSI+2 bit 0. Execute
+	// flash-contained code only, leaving absent mask instructions unknown.
+	m_mad2->set_dsp_reset_wiring_contract({ 0x10, 0x01 });
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x11ad54);
+	staged.set_loader2_source(0x11ae80);
+	staged.set_loader_control_address(0x0880);
+	staged.set_cycle_guard_for_loader(true);
+	staged.set_observe_after_missing_code(true);
+}
+
 void nokia_dct3_state::nsm3dr6(machine_config &config)
 {
 	noki8xxx(config);
@@ -3831,6 +3846,13 @@ ROM_START( noki8850 )
 	ROM_LOAD("8850 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(4823f27e) SHA1(b09455302d98fbedf35072c9ecfd7721a04924b0))
 ROM_END
 
+ROM_START( nsm2stage )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("8850v531.fls", 0, 0x1d0000, CRC(8864fcb3) SHA1(9f966787403b68a09530680ad911302403eb1521))
+	ROM_LOAD("8850 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(4823f27e) SHA1(b09455302d98fbedf35072c9ecfd7721a04924b0))
+ROM_END
+
 ROM_START( noki8890 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -3851,6 +3873,7 @@ SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empt
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

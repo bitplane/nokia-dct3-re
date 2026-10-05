@@ -19,6 +19,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-sed1565-test.patch \
 	patches/mame-nse5-rom4-compat.patch \
 	patches/mame-nsm3d-runtime-hle.patch \
+	patches/mame-nsm2-staged.patch \
 	patches/mame-libgsm-build.patch
 LIB_COMPONENTS := lib/util/gsmfr.cpp lib/util/gsmfr.h
 CPU_COMPONENTS := cpu/tms320c54x/tms320c54x.cpp \

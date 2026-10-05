@@ -59,7 +59,7 @@ private:
 	std::array<u16, 0x800> m_program_ram{};
 	std::array<u8, 0x800> m_program_valid{};
 	std::array<u16, 0x10000> m_data{};
-	std::array<u16, 0x10> m_control{};
+	std::array<u16, 0x20> m_control{};
 	emu_timer *m_guard = nullptr;
 	bool m_active = false;
 	bool m_published = false;

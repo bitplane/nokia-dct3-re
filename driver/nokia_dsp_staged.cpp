@@ -201,7 +201,7 @@ u16 nokia_dsp_staged_device::io_r(offs_t offset)
 {
 	if (offset == 0x002d)
 		return m_cobba->control_data_r();
-	if (offset == 0x0000 || offset == 0x000c || offset == 0x000e)
+	if (offset == 0x0000 || offset == 0x000c || offset == 0x000e || offset == 0x001c)
 		return m_control[offset];
 	throw emu_fatalerror(1, "Staged DSP needs unsupported port read %04x", u16(offset));
 }
@@ -212,11 +212,13 @@ void nokia_dsp_staged_device::io_w(offs_t offset, u16 data)
 		m_cobba->control_select_w(data);
 	else if (offset == 0x002d)
 		m_cobba->control_data_w(data);
-	else if (offset == 0x0000 || offset == 0x0002 || offset == 0x000c || offset == 0x000e)
+	else if (offset == 0x0000 || offset == 0x0002 || offset == 0x000c || offset == 0x000e || offset == 0x001c)
 	{
 		// Uploaded code initializes these CTSI control/frame registers but
 		// does not read them or await their interrupts in this bounded stage.
 		// Retain writes; do not invent timer or radio completion behavior.
+		// NSM-2 loader 0a37 reads port 1c, ORs 0200 and writes it back.
+		// Storage supports that RMW only; bit meaning/reset value is unverified.
 		m_control[offset] = data;
 		logerror("staged_dsp: control_write port=%04x data=%04x\n", u16(offset), data);
 	}
