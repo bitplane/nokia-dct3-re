@@ -746,7 +746,25 @@ lifecycle. Reproduce with `noki8890_outgoing_call_input.lua`, fresh
 cfg/NVRAM and 60 seconds. Recover the idle-to-number-editor lifecycle
 before promoting physically correct outgoing dialing.
 
-Incoming calls, SMS and GSM1900 behavior remain unproved on this product.
+Incoming-call signaling separately passes IMSI paging, Paging Response,
+contention UA, cipher/MM-information exchange, incoming SETUP, Call
+Confirmed/Alerting, own traffic configuration and Assignment Complete.
+Physical Answer (`0e`) produces Connect, and physical End (`0f`) closes
+Disconnect, network Release, Release Complete and RR release before the
+same own deconfiguration and return to idle paging. Call indicators are
+visible, but the foreground clock notice after release is not an idle
+presentation oracle. Neither signaling run proves speech media.
+
+Copy `fixtures/noki8890_incoming_call/nsb6hle.cfg` into a private cfg
+directory (do not run with the tracked fixture directory writable by MAME).
+Use fresh NVRAM and `noki8890_incoming_call_input.lua` for 50 seconds:
+
+```sh
+.venv/bin/python tools/noki8890_incoming_call_check.py RUN/error.log
+```
+
+SMS and GSM1900 behavior remain unproved; direct-dial number rotation and
+clock-notice settlement remain presentation/input fidelity questions.
 
 ### 8850 stock-input runtime boundary
 
