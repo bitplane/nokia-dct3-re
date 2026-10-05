@@ -517,6 +517,17 @@ The next contract is the helper's firmware-owned readiness byte and the
 remaining startup-test completion paths. The read taps on checksum entry
 and failure produced no records; those negatives are not execution proofs.
 
+Helper `2f6aa4` reads byte `135664` (literal at `2f6d9c`). A
+halfword-aligned literal-reference scan finds four pool copies and fourteen
+PC-relative loads; this is not an exhaustive indirect-writer census.
+One decoded setter is `2cb43c..2cb450`: if that byte and shared-memory
+halfword `100e4` are both zero, firmware stores 1 to the byte. Fresh passive
+samples at 0.1, 0.5, 1, 2, 4 and 8 seconds show both values remain zero.
+Thus the sampled shared-memory predicate already permits this setter;
+fabricating a DSP completion is not justified by this condition. Next trace
+the execution/dispatch prerequisites of this routine and its other writers.
+The samples do not prove the predicate held at every intervening instant.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 

@@ -57,6 +57,10 @@ local samples = coroutine.create(function()
             faults[#faults + 1] = string.format("%02x", memory:read_u8(0x13fbe0 + index))
         end
         machine:logerror("8850_faults: bytes=" .. table.concat(faults) .. "\n")
+        machine:logerror(string.format(
+            "8850_ready: state=%02x shared_e4=%04x t=%.6f\n",
+            memory:read_u8(0x135664), memory:read_u16(0x100e4),
+            machine.time:as_double()))
         machine.screens[":screen"]:snapshot(string.format("8850_%04d.png", time * 1000))
     end
 end)
