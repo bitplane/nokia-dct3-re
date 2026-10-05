@@ -34,6 +34,14 @@ def nvram_with_message() -> bytes:
 
 
 class IncomingSmsTraceCheckTest(unittest.TestCase):
+    def test_nsm2_cipher_control_contract(self):
+        verify(GOOD.replace("00f4ffffffff", "0080ffffffff"),
+               nvram_with_message(), "nsm2")
+
+    def test_nsm2_rejects_foreign_cipher_control(self):
+        with self.assertRaisesRegex(ValueError, "DSP cipher-control"):
+            verify(GOOD, nvram_with_message(), "nsm2")
+
     def test_complete_persistent_delivery(self):
         verify(GOOD, nvram_with_message())
 

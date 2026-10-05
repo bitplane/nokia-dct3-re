@@ -626,7 +626,8 @@ Calculator also computes 12+3=15 through physical inputs and its Options
 menu. The research composition also completes laboratory Location Updating,
 persists EF_LOCI and returns to steady paging/BCCH. Physical outgoing-call
 and incoming-call signaling plus registered-operator pixels are verified.
-SMS and speech media remain the next capability boundaries.
+Incoming SMS delivery, physical reading and cold-boot persistence are also
+verified. Outgoing SMS and speech media remain separate capability boundaries.
 
 #### Radio Contract
 
@@ -793,6 +794,34 @@ physical Send/Connect and network acknowledgement, physical End/Disconnect,
 CC/RR release and idle paging. Captures show caller `5551234`, connected
 call presentation and return to `DCT3 LAB`. No additional firmware or
 device behavior change was required; this remains signaling-only acceptance.
+
+#### Incoming SMS Acceptance
+
+Copy `fixtures/noki8850_incoming_sms/nsm2hle.cfg` into a private run's
+configuration directory and run `noki8850_incoming_sms_input.lua` for 43
+seconds with fresh NVRAM. The laboratory delivery occurs during startup;
+the fixture subsequently opens Messages, Inbox, the sender entry and Read.
+It does not claim a post-startup new-message notification banner.
+
+The handset's own no-cipher publication is
+`14:0080ffffffffffffffff0000`. SAPI 3 receives segmented CP-DATA, firmware
+persists `hello` from `5551234` in EF_SMS record 1, and CP/RP acknowledgements
+close before RR release and return to paging. Physical Read displays the
+text and changes record status from unread `03` to read `01`.
+
+```sh
+.venv/bin/python tools/noki8850_sms_check.py WRITE/error.log \
+  WRITE/nvram/nsm2hle/sim_card WRITE/snap/8850_sms_read_4.png
+```
+
+Repeat the same physical input fixture in a fresh working/configuration
+directory with **no incoming-SMS config**, preserving only the previous
+NVRAM directory. Its Inbox/Read path again shows `hello`, without a new
+delivery or UPDATE RECORD. Check that run with the same storage path and
+`--preserved`. Both modes verify exact SMS-DELIVER bytes/read status, physical
+Read decoding and reviewed text-body pixels. The fresh mode additionally
+requires the full delivery, CP/RP closure and paging return. Outgoing SMS
+is not established by these checks.
 IRQ0 handler `301714` reads pending column bits at `2b` and posts
 event `41` through `305370` before acknowledging IRQ0. KBGPIO now owns
 that optional pending-column register and the row-pin shift. Defaults

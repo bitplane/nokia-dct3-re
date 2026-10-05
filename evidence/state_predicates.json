@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsm2_research_incoming_sms", "owner": "product_profile", "status": "satisfied",
+      "predicate": "8850 research composition receives hello in EF_SMS, physically reads it and presents the same message after a preserved-storage cold restart",
+      "current": "Own no-cipher packet 14:0080ffffffffffffffff0000 precedes SAPI-3 segmented CP-DATA. Firmware persists exact SMS-DELIVER bytes for hello from 5551234, emits CP/RP acknowledgements and closes RR before paging resumes. Physical Messages/Inbox/Read displays reviewed hello pixels and updates EF_SMS from unread 03 to read 01. A cold run with network delivery disabled preserves the same record, reads it and displays identical body pixels without redelivery or UPDATE RECORD. The initial delivery occurs during startup; no post-startup notification banner or outgoing SMS is claimed.",
+      "evidence": ["docs/8xxx_bringup.md", "fixtures/noki8850_incoming_sms/nsm2hle.cfg", "tools/noki8850_incoming_sms_input.lua", "tools/noki8850_sms_check.py", "tools/test_noki8850_sms_check.py", "tools/radio_incoming_sms_trace_check.py"]
+    },
+    {
       "id": "nsm2_research_incoming_call", "owner": "product_profile", "status": "satisfied",
       "predicate": "8850 research composition receives an IMSI-paged call, physically answers and ends it, then returns to idle paging",
       "current": "The declared laboratory network config queues one incoming call. Firmware completes Paging Response, cipher/MM exchange, SETUP and its own 11-byte Call Confirmed, Alerting and traffic assignment. Physical Send 0e emits Connect and receives acknowledgement; End 0f emits Disconnect and completes CC/RR release with the own parameter-14 transaction and zero confirmation. Reviewed frames show caller 5551234, connected presentation and DCT3 LAB after release. Media and SMS are separate capabilities.",

@@ -49,6 +49,8 @@ CIPHER_CONTROL = {
         r"TX packet type=14 payload=12 .*data=00ebffffffffffffffff0000"),
     "nhm3": re.compile(
         r"TX packet type=14 payload=12 .*data=002effffffffffffffff0000"),
+    "nsm2": re.compile(
+        r"TX packet type=14 payload=12 .*data=0080ffffffffffffffff0000"),
 }
 
 SMS_NVRAM_OFFSET = 50 * 32 + 11 + 9 + 16
