@@ -38,6 +38,27 @@ class StagedTraceTests(unittest.TestCase):
     def test_hle_not_native(self):
         self.assertTrue(check_trace(TRACE + "runtime_hle_handoff"))
 
+    def test_runtime_selftest(self):
+        trace = self.runtime_trace()
+        self.assertEqual(check_trace(trace, runtime_hle=True), [])
+
+    def test_runtime_wrong_response(self):
+        self.assertTrue(check_trace(self.runtime_trace().replace(
+            "RX enqueue type=74", "RX enqueue type=70"), runtime_hle=True))
+
+    def test_runtime_fault_not_cleared(self):
+        self.assertTrue(check_trace(self.runtime_trace().replace(
+            "0000000000000000ffff", "0f10000000000000ffff"), runtime_hle=True))
+
+    @staticmethod
+    def runtime_trace():
+        return TRACE.replace(
+            "staged_dsp: observation_halt pc=2c75 ownership_retained=1",
+            """staged_dsp: runtime_hle_handoff pc=2c75 native_suspended=1
+dspif_transport: TX pending type=70 payload=2 data=0d00
+dspif_transport: RX enqueue type=74 payload=2 producer=08e data=0d00
+8850_faults: bytes=ffff00ff00ffff00ffffff0000ff0000000000000000ffff""")
+
 
 if __name__ == "__main__":
     unittest.main()

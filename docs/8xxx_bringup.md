@@ -581,6 +581,35 @@ log with `python3 tools/noki8850_staged_trace_check.py <run>/error.log`.
 The checker requires ordered native publication, loader verification,
 missing-mask suspension and firmware readiness; it rejects an HLE handoff.
 
+### 8850 Runtime Self-Test Contract
+
+Research machine `nsm2hle` preserves native verifier/loader execution, then
+suspends native execution at `2c75` and assigns subsequent transport to HLE.
+No missing instruction, return value or verifier cookie is fabricated.
+It enables request-derived external discovery without an unsolicited
+registration/channel-map application contract.
+
+Own TX at 1.293367 seconds is type `70`, body `0d00`. Dispatcher
+`243a0e..243a4a` selects class `74` (subtract cascade totals `74`) and
+calls `240dbc` except command `32`. Handler `240dd2..240de0` selects `0d`
+at `240e2c`: flag byte `13fde1` bit 2 arms the wait, timer `18` is cancelled,
+fault-array offset `0f` is cleared, and reply byte `+9` bits 0/1 clear or set
+fault slots `10/11`. These own-ROM facts select the existing compact
+request-correlated `74:0d00` HLE contract. This models a successful peer
+self-test; it does not execute the missing DSP self-test implementation.
+
+Fresh runtime observes the response at 1.293467 seconds and subsequent
+fault bytes `0f/10/11=00/00/00`. Firmware publishes later calibration/config
+traffic and reaches its idle loop; the eight-second frame is blank white.
+SIM/card, product application registration, keypad mapping and interactive
+UI acceptance remain unproved. Do not interpret the loop as a missing wake
+event or supply another unsolicited application body without its contract.
+Next recover the unattended UI/startup dependency on this composition.
+
+Reproduce using `nsm2hle`, the same observer/private directories and
+`-verbose`; run `noki8850_staged_trace_check.py <run>/error.log --runtime-hle`.
+This validates the upload/handoff/self-test sequence, not graphical boot.
+
 All three independently select CCONT with control `0x22`, write the command
 at `0x2c`, poll status `0x6d` bit 2, and read the response at `0x6c`:
 
