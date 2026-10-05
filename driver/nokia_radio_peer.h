@@ -61,6 +61,7 @@ public:
 		neighbour_bsic_encoding neighbour_instruction_bsic =
 				neighbour_bsic_encoding::none;
 		bool band_scan_accepts_candidate_window = false;
+		bool split_gsm_pcs_scans = false;
 
 		constexpr bool enabled() const
 		{
@@ -256,7 +257,7 @@ private:
 		transmitted
 	};
 	// Answer an untargeted search from the receivable topology.
-	void populate_search_from_receivable_cells(u8 mode);
+	void populate_search_from_receivable_cells(u8 mode, u8 scan_mode = 0);
 	// Move the receiver to another carrier, returning the carrier it left.
 	// Invalidates both decoded BCCH contexts, which belonged to that carrier.
 	u16 retune_receiver(u16 arfcn);

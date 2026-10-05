@@ -1022,7 +1022,7 @@ u32 nokia_radio_peer_device::paging_frame_number(
 	return frame_number % FRAME_NUMBER_MODULUS;
 }
 
-void nokia_radio_peer_device::populate_search_from_receivable_cells(u8 mode)
+void nokia_radio_peer_device::populate_search_from_receivable_cells(u8 mode, u8 scan_mode)
 {
 	// Both untargeted search forms answer from the standards-level topology
 	// rather than from an MCU-supplied candidate list, so the receivability
@@ -1037,7 +1037,17 @@ void nokia_radio_peer_device::populate_search_from_receivable_cells(u8 mode)
 	{
 		if (const auto *cell = m_gsm_network->cell_at(index);
 				cell && m_gsm_network->cell_receivable(cell->arfcn))
+		{
+			// NSB-6 builds distinct class-1 and PCS measurement lists.  The
+			// overlap of DCS/PCS channel numbers is resolved by its scan mode,
+			// not by borrowing the previous explicit candidate window.
+			const bool gsm = cell->arfcn <= 124 ||
+					(cell->arfcn >= 955 && cell->arfcn <= 1023);
+			const bool pcs = cell->arfcn >= 512 && cell->arfcn <= 810;
+			if ((scan_mode == 1 && !gsm) || (scan_mode == 4 && !pcs))
+				continue;
 			m_search_arfcns[m_search_arfcn_count++] = cell->arfcn;
+		}
 	}
 	m_search_has_serving_arfcn = m_search_arfcn_count != 0;
 }
@@ -1147,6 +1157,16 @@ auto nokia_radio_peer_device::decode_search_request(
 	case acquisition_strategy::candidate_window:
 		if (decode_candidate_window(packet, false))
 			return search_request::candidate_window;
+		if (m_protocol.split_gsm_pcs_scans && packet.type == 0x55 &&
+				packet.length == 4 &&
+				(packet.payload[0] == 1 || packet.payload[0] == 4))
+		{
+			// NSB-6 consumes ordinary 8b measurements for both modes, with
+			// separate GSM and PCS band-count completion predicates.
+			populate_search_from_receivable_cells(
+					packet.payload[1], packet.payload[0]);
+			return search_request::autonomous_band_scan;
+		}
 		if (packet.type != 0x55 || packet.length != 4 ||
 				packet.payload[0] != 0x03)
 			return search_request::none;

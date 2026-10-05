@@ -258,7 +258,9 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM2 = {
 // contracts remain unobserved and unset.
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NSB6 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0x14, 0x01
+	0x14, 0x01, 0, 0, false, 0, false, false,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::none, true, true
 };
 
 constexpr nokia_dsp_hle_device::service_control_contract

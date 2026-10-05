@@ -801,10 +801,16 @@ scenario enabled; check with `noki8890_outgoing_sms_check.py RUN/error.log`.
 The SMS recipient editor preserves digit ordering; the direct-call editor's
 rotation is not a general keypad wiring or numeric-entry defect.
 
-GSM1900 behavior remains unproved; clock-notice settlement and invalid-clock
-error cancellation remain presentation/lifecycle questions.
+GSM900 and PCS1900 laboratory registration are verified separately;
+clock-notice settlement and invalid-clock error cancellation remain
+presentation/lifecycle questions. PCS speech/media remains unproved.
 
-### 8890 PCS1900 acquisition frontier
+### 8890 PCS1900 Acquisition Contract
+
+Current result: fresh own PMM reaches PCS1900 registration on ARFCN 600,
+writes EF_LOCI, acknowledges release and returns to paging. This uses the
+explicit runtime research HLE, not a completed native DSP. The handset
+builds its candidate window and PCS channel configuration organically.
 
 `fixtures/noki8890_pcs1900/nsb6hle.cfg` selects laboratory carriers 600/601
 and the stable two-cell topology. The latter is essential: legacy single-cell
@@ -818,17 +824,24 @@ This is the standards-level distinction described in
 [ETSI TS 145 014 section 4.1.6](https://www.etsi.org/deliver/etsi_ts/145000_145099/145014/07.01.00_60/ts_145014v070100p.pdf),
 not a Nokia packet label. Existing defaults remain DCS/GSM900.
 
-With fresh own PMM and the explicit topology, a 90-second research run
-emits its initial `56/160` candidate window for `003c`, then `55/4`
-`01140000` and `04080000`. It does not reach Location Updating or select
-carrier 600. The peer currently recognizes only subcommand `03` as the
-untargeted four-byte scan form; the semantics and reply contract of own
-subcommand `01` are unresolved. Recover its producer/consumer boundary
-before extending the decoder. Do not relabel the failed scan as registration
-or make the topology return a configured carrier outside the requested
-contract. Reproduce by copying the fixture into a private cfg directory and
-running `noki8890_security_input.lua` with fresh NVRAM, verbose logging and
-90 seconds. Default and coherent 3210 gates remain green.
+With fresh own PMM and the explicit topology, firmware emits its initial
+`56/160` candidate window for `003c`, then `55/4` `01140000` and
+`04080000`. The own protocol enables separate GSM and PCS scans: the first
+has no receivable GSM cells; the second reports 600/601. Firmware then
+publishes a `56/160` window beginning `02580259`, selects 600, emits
+PCS configuration prefix `0412`, consumes SI1 with band indicator `6b`
+and publishes its Location Updating Request with power-class byte `20`
+(GSM900 uses `23`). No state or callback is injected.
+
+Reproduce by copying the fixture into a private cfg directory and running
+`noki8890_radio_observe.lua` with fresh NVRAM, verbose logging and 90
+seconds. Check the resulting log with
+`tools/noki8890_registration_check.py --pcs1900 RUN/error.log`.
+The check requires ordered scan requests, PCS measurements, firmware
+candidate selection, carrier 600 configuration, SI1 band indication,
+correlated registration, EF_LOCI writes, release and paging. Its negative
+tests reject a GSM-only candidate, DCS SI1 indication, reversed scans and
+the wrong power-class field. Default and coherent 3210 gates remain green.
 
 Own construction is now mapped: state-1 path `21ef44..21ef74` (embedded
 firmware diagnostic name `PH_1050`) calls `2aed52` with mode 1 and parameter
@@ -850,14 +863,11 @@ and final wire bytes. The strict topology reproduces mode 1/index 0 from
 caller `21ef75`, then mode 4/index 0 from caller `21ee1b`.
 Do not infer units, bands or result counts solely from the table values.
 
-The existing HLE terminal branch accepts any four-byte type-55 packet once
-the candidate window has drained. Consequently it treats the own `01140000`
-as terminal control and returns one type-8b measurement report containing
-the previous candidate list (`003c`, `0006`, then absent entries), not the
-configured PCS cells. The firmware later emits `04080000`. The trace's
-`candidate_terminal_control` label is therefore a model classification,
-not recovered semantics of mode 1. Distinguish these modes and recover the
-own receive-side selection/completion rules before replacing that response.
+The generic terminal branch's phase label does not establish the meaning
+of a four-byte type-55 request. NSB-6 modes 1 and 4 are decoded as band scans
+before that branch, replacing the stale previous-candidate response with
+measurements of the corresponding receivable topology. Its protocol also
+permits the firmware-owned explicit candidate window after a band scan.
 
 The own receive path is `301710 -> 2db270 -> task 12 -> 29d010`.
 `29d010` passes the first report to `2809fc` and subsequent reports to
@@ -878,15 +888,14 @@ must still be interpreted using the handset's enabled band capabilities.
 Report-count limits in `28097e` provide another completion condition;
 they are firmware policy, not permission to replay arbitrary packets.
 
-A fresh twelve-second strict-topology run with
-`noki8890_radio_observe.lua` records the current mode-1 response completing
-with state 4, zero counters in all three classes, and one report. Its first
-RSSI is `81` (-127), so parsing stops before accepting any record. The next
-organic request is mode 4 (`04080000`). The missing work is therefore a
-mode-specific scan/reply lifecycle, including the second request; a single
-generic terminal acknowledgement does not satisfy that contract. The
-observer now logs parser mode, accepted records and final counters without
-changing firmware or packet contents.
+The strict-topology observer records mode 1 completing with state 4, zero
+counters and one report: its first RSSI is `81` (-127), so parsing stops
+before accepting a record. The next organic request is mode 4
+(`04080000`). That result accepts ARFCNs `0258` and `0259`, with signed
+RSSI -61 and -71, and completes with class-3 count 2. At 8.966 seconds
+firmware selects carrier 600; Location Updating Accept is acknowledged
+at 14.575 seconds. These timings and signal levels are laboratory HLE
+observations, not measured silicon latency or calibrated RF units.
 
 ### 8850 stock-input runtime boundary
 
