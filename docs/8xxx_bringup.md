@@ -770,6 +770,12 @@ zero is legitimate for the first object. Resource constructor `25ec06`
 marks the associated queue dirty and sets a pending-work byte. Next follow
 that dirty-resource queue's consumer and transport, rather than assuming
 content is absent or interpreting the list link as a missing hierarchy.
+Pending work uses byte `1350a5`; fresh probes observe three flush entries
+at `25f514`, called from `260d1e` (return address `260d23`). The constructed
+class-5a object reaches indirect renderer `23fc31` (Thumb entry `23fc30`)
+with command `06`, flags `0020`. Thus the content and dirty-queue consumer
+are both active. Next trace this renderer's layout/raster path through
+`23d4c0` and subsequent LCD transfer; queue starvation is not established.
 A direct-BL-only branch audit cannot
 classify this filter's side effects, because it misses `bx r1`.
 The requested delay is `075a`;

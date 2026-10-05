@@ -82,6 +82,10 @@ cpu.debug:bpset(0x25f12e, "r0==5a || r0==5b || r0==78",
     'logerror "8850_ui_resource_request class=%02x value=%08x r14=%08x\\n",r0,r1,r14;g')
 cpu.debug:bpset(0x25f114, "r5==5a",
     'logerror "8850_ui_resource_constructed object=%08x content=%08x predecessor=%08x\\n",r4,r6,d@(r4+4);g')
+cpu.debug:bpset(0x25f514, "b@1350a5!=0 && temp7<120",
+    'temp7=temp7+1;logerror "8850_ui_resource_flush pending=%02x r14=%08x\\n",b@1350a5,r14;g')
+cpu.debug:bpset(0x25f660, "b@(r4+3e)==5a",
+    'logerror "8850_ui_resource_renderer object=%08x target=%08x command=%02x flags=%04x\\n",r4,r2,r1,w@(r4+3c);g')
 cpu.debug:bpset(0x2fd09c, "r0==5e4 || r0==731 || r0==735",
     'logerror "8850_ui_context_dispatch input=%04x target=%08x context=%02x\\n",r0,r1,b@(r5+3);g')
 cpu.debug:bpset(0x2ad608, "r0==5e4 || r0==731 || r0==735 || r0==ca || r0==35c || r0==370 || r0==5dc || r0==5e1",
