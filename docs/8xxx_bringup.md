@@ -738,7 +738,17 @@ with enable byte zero; their resource work is skipped at that local gate.
 Earlier class-74 initialization calls are observed separately, so absence
 of all class-74 activity is not the claim. Next recover the enable-byte
 writers/activation contract and classify earlier `05e4` side effects;
-do not synthesize those enable bytes. The requested delay is `075a`;
+do not synthesize those enable bytes. The local activation routine is
+`2f1a28`: for each nonzero supplied element it sets `137e8c+8+index`
+to one and constructs class-74 resources. Removal routine `2f1e9c`
+clears the same enable byte while removing its resource elements. A raw
+BE-Thumb direct-BL scan finds 18 activation call sites (not a complete
+indirect-call/writer census); none executes in the observed 35-second run.
+For example, `253890/2538ae/2538c8` activate indices `09/0a/0b` only
+for populated source records, otherwise selecting the removal routine.
+Zero enables therefore do not by themselves prove a missing hardware
+response; the callers' source-record lifecycle must be recovered first.
+The requested delay is `075a`;
 the observed wall-time interval is not yet a validated physical cadence.
 Passive samples show owner `05`, flags `03`, state `02` after arming;
 the record links to `111950` and stores `04f9` at four and eight seconds.
