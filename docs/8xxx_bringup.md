@@ -776,7 +776,17 @@ verbose logging and 36 emulated seconds. Validate with:
 .venv/bin/python tools/noki8890_incoming_sms_check.py RUN/error.log RUN/nvram/nsb6hle/sim_card RUN/snap/8890_sms_read_2.png
 ```
 
-Outgoing SMS and GSM1900 behavior remain unproved; direct-dial number rotation and
+Outgoing SMS also passes through physical UI input: Write message, `A`,
+Send, recipient `5551234`, confirmation. The emitted SMS-SUBMIT is exactly
+`390118000100069121436587090d11010781551532f40000a70141`;
+the laboratory network accepts it, CP/RP acknowledgements close and the
+handset returns to paging. Run `noki8890_outgoing_sms_input.lua` for 52
+seconds with fresh NVRAM, private cfg, verbose logging and no incoming
+scenario enabled; check with `noki8890_outgoing_sms_check.py RUN/error.log`.
+The SMS recipient editor preserves digit ordering; the direct-call editor's
+rotation is not a general keypad wiring or numeric-entry defect.
+
+GSM1900 behavior remains unproved; direct-dial number rotation and
 clock-notice settlement remain presentation/input fidelity questions.
 
 ### 8850 stock-input runtime boundary
