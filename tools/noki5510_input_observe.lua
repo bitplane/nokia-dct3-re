@@ -26,6 +26,13 @@ for _, tap in ipairs({
 end
 cpu.debug:bpset(0x335cfa, nil,
     'logerror "5510_input_serial_ui_receive: message=%08x length=%04x header=%02x,%02x,%02x,%02x,%02x,%02x,%02x payload=%02x,%02x,%02x\\n",r0,w@(r0+4),b@r0,b@(r0+1),b@(r0+2),b@(r0+3),b@(r0+6),b@(r0+7),b@(r0+8),b@(r0+9),b@(r0+a),b@(r0+b);g')
+-- Header-only taps: never assume an external frame has the key payload extent.
+for _, tap in ipairs({{0x399fbc, 'serial_ingress'}, {0x362958, 'local_route'}}) do
+    cpu.debug:bpset(tap[1], tap[2] == 'local_route' and 'b@(r0+6)==d2' or nil,
+        string.format('logerror "5510_input_%s: caller=%%08x object=%%08x length=%%04x transport=%%02x destination=%%02x source=%%02x class=%%02x\\n",r14,r0,w@(r0+4),b@r0,b@(r0+1),b@(r0+2),b@(r0+6);g', tap[2]))
+end
+cpu.debug:bpset(0x362de0, nil,
+    'logerror "5510_input_internal_control: caller=%08x arguments=%02x,%02x,%02x\\n",r14,r0,r1,r2;g')
 cpu.debug:bpset(0x335f34, 'temp8<40',
     'temp8=temp8+1;logerror "5510_input_task_delivery: object=%08x\\n",r0;g')
 cpu.debug:bpset(0x335ea8, nil,

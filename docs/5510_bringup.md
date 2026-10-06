@@ -277,6 +277,19 @@ control object has an MCU-side producer; it does not demonstrate an MU4
 response. The package report enumerates the entire local class table, but
 the external FBUS-to-class-`d2` ingress remains unvalidated.
 
+Serial ingress helper `399fbc` copies/queues received objects to task 7.
+Its decoded call sites include sequenced/fragmented receive completions
+`2f58ac/2f5994` and the separate single-wire parser completion `3841e2`.
+The latter reads MAD2 register `1a`, accepts sync `1f`, collects the
+header/length and body, and calls ingress; it is not the MU4 FBUS parser.
+A cold sixteen-second hybrid run captures two objects at `399fbc`, both
+from `2f58ac`, with transport `1e`, source `02`, destination zero and
+classes `01/04`. These do not establish MU4 traffic. The sole observed
+local `d2` delivery follows constructor `362de0` with arguments `01/02/1e`
+and router caller `362d5e`, confirming the internal-control interpretation.
+The next boundary is the sequenced receive path's external sender and
+startup exchange, not an inactive generic receive queue.
+
 ### Candidate serial-UI task and service-battery control
 
 Task 29's physical MU4 ownership is not established. Its decoded key
