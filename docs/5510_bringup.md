@@ -219,6 +219,24 @@ acquired schematic is retained locally, ignored, at
 `roms/reference-docs/npm5/nokia_5510_npm-5_schematics.pdf`, SHA-256
 `e642943045b2f1ae8dfd6cf0ebee3a0c0d7cb7026de4543c7b48bd8da97f3d58`.
 This source does not provide the controller's firmware or packet grammar.
+The primary User Interface Module manual, pages 10/11 (connector table 2),
+and MU4 MCU sheet 3 identify these MA4/MU4 interface nets:
+
+| J301 pin | Net | MU4 endpoint / documented role |
+| --- | --- | --- |
+| 1 | PURX | MA4-origin active-low reset |
+| 12 | ROW4 | MSP430 P2.5; general-purpose bidirectional interface |
+| 13 | ROW3 | MSP430 P2.4; general-purpose output toward MA4 |
+| 15 | ROW2 | MSP430 P2.3; general-purpose input at MA4 |
+| 21 | FBUSRX | MU4 transmit, MSP430 P3.4/UTXD0 |
+| 22 | MBUS | MSP430 P3.0; programmer detection |
+| 23 | FBUSTX | MU4 receive, MSP430 P3.5/URXD0 |
+
+MA4 block diagram A3-3 connects the row nets to its CPU row bus; they are
+not QWERTY switch contacts. Their electrical specification does not supply
+startup levels, edge timing or a mapping to firmware's `2002b` status bits.
+The MU4 schematic's pull resistors are not a recovered firmware-driven
+handshake. Keep that distinction before introducing GPIO transitions.
 The current MAME source tree has no MSP430 CPU core. A faithful native MU4
 backend therefore needs both a core and the matching program; an explicitly
 declared serial-boundary HLE still requires recovered message semantics.
