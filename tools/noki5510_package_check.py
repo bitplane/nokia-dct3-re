@@ -21,6 +21,36 @@ UPLOADS = (
 )
 
 
+def assess_bootstrap(flash, records):
+    """Pin the selected consumer code and its literal-pool dependencies."""
+    for start, end, digest in (
+        (0x319032, 0x31913e, '1af8a9f5b694ae9871a2d745a5790d328d12610b078d8d09720076569b6f82e4'),
+        (0x31916c, 0x3192e2, '39ad61c02f1aa75c5019a96f001caaae3c27cd333091d89293f956292431f8c7'),
+    ):
+        if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
+            raise ValueError('bootstrap consumer code mismatch')
+    for address, value in ((0x3192f8, 0x1237f0), (0x3192fc, 0x100f6),
+                           (0x319300, 0x20002), (0x319304, 0x100fe),
+                           (0x319308, 0x10200), (0x31930c, 0x200040),
+                           (0x319248, 0x123760), (0x31931c, 0x123784)):
+        if struct.unpack_from('>I', flash, address - 0x200000)[0] != value:
+            raise ValueError('bootstrap literal dependency mismatch')
+    if flash[0x17be7a:0x17be7e] != bytes.fromhex('f79df8da'):
+        raise ValueError('startup verifier call mismatch')
+    if initialized_bytes(records, 0x123784, 4) != struct.pack('>I', 0x3e3304):
+        raise ValueError('initial loader selection mismatch')
+    fields = struct.unpack_from('>6H', flash, 0x1e3304)
+    payload = flash[0x1e3310:0x1e3310 + 638 * 2]
+    digest = 'dc3c2a37913e07a2962d09f6a17cde676a04dd76'
+    if fields != (0xfd00, 0xff80, 638, 0x500, 0x78, 0) or hashlib.sha1(payload).hexdigest() != digest:
+        raise ValueError('initial loader descriptor/payload mismatch')
+    return {'scope': 'static code and data, not runtime acceptance',
+            'verifier_call': '37be7a', 'verifier_result_words': ['12376a', '12376c'],
+            'initial_loader_pointer': '123784', 'initial_loader_descriptor': '3e3304',
+            'initial_loader_consumer': '319284', 'initial_loader_words': 638,
+            'initial_loader_sha1': digest}
+
+
 def assess_flash(flash):
     if len(flash) != 0x350000 or hashlib.sha256(flash).hexdigest() != FLASH_SHA256:
         raise ValueError('not the pinned NPM-5 v3.53 PPM C image')
@@ -44,6 +74,7 @@ def assess_flash(flash):
         if initialized_bytes(records, address, 4) != struct.pack('>I', descriptor):
             raise ValueError('initialized upload pointer mismatch')
     return {'product': 'NPM-5', 'version': '3.53', 'ppm': 'C',
+            'bootstrap_contract': assess_bootstrap(flash, records),
             'startup_copy': {'records': len(records), 'payload_bytes': 26487,
                              'terminator_end': f'{end:06x}',
                              'verifier_pointer': '1237f0', 'consumer': '319032'},
@@ -93,7 +124,8 @@ def main():
             write_derived(args.output_dir / '5510f353c.fls', flash)
             # Keep the immutable normalization manifest independent of
             # expanding static-analysis results reported on stdout.
-            manifest = {key: value for key, value in report.items() if key != 'startup_copy'}
+            manifest = {key: value for key, value in report.items()
+                        if key not in ('startup_copy', 'bootstrap_contract')}
             write_derived(args.output_dir / 'normalization.json',
                           (json.dumps(manifest, indent=2) + '\n').encode())
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
