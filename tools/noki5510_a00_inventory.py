@@ -9,6 +9,40 @@ import struct
 MARKERS = {0xaa55, 0xaa22, 0xaa44, 0xaa88, 0xaabb, 0xaadd, 0xaa99}
 
 
+def destination_inventory(image, sections):
+    """Describe linear record extents; do not choose an overwrite policy."""
+    seen = {}
+    pages = {}
+    same = changed = crossing = 0
+    for section in sections:
+        address = section['destination_word_address']
+        count = section['words']
+        if address + count > 0x800000:
+            raise ValueError('section extent exceeds 23-bit program address space')
+        crossing += (address >> 16) != ((address + count - 1) >> 16)
+        start = section['offset'] + 6
+        for index, (word,) in enumerate(struct.iter_unpack('>H', image[start:start + count * 2])):
+            destination = address + index
+            page = destination >> 16
+            row = pages.setdefault(page, {'page': page, 'write_words': 0,
+                                         'unique_words': 0, 'first_word_address': destination,
+                                         'last_word_address': destination})
+            row['write_words'] += 1
+            row['first_word_address'] = min(row['first_word_address'], destination)
+            row['last_word_address'] = max(row['last_word_address'], destination)
+            if destination in seen:
+                same += seen[destination] == word
+                changed += seen[destination] != word
+            else:
+                row['unique_words'] += 1
+            seen[destination] = word
+    return {'write_words': sum(section['words'] for section in sections),
+            'unique_words': len(seen), 'repeated_same_words': same,
+            'repeated_changed_words': changed, 'cross_page_records': crossing,
+            'pages': [pages[page] for page in sorted(pages)],
+            'scope': 'linear destination extents; repeated values compared with preceding record write; no flattened image or physical aliasing inferred'}
+
+
 def serial_boot_inventory(image):
     """Decode SPRA602F figure 11; never execute register or memory writes."""
     if len(image) < 16 or len(image) % 2:
@@ -38,7 +72,8 @@ def section_inventory(image, offset=0):
         if not count:
             if offset != len(image):
                 raise ValueError('bytes follow serial boot terminator')
-            return {'sections': sections, 'coverage_bytes': offset}
+            return {'sections': sections, 'coverage_bytes': offset,
+                    'destination_inventory': destination_inventory(image, sections)}
         if offset + 4 + count * 2 > len(image):
             raise ValueError('serial boot section exceeds input')
         xpc, pc = struct.unpack_from('>HH', image, offset)
@@ -78,10 +113,18 @@ def inventory(image):
         offset = end + 4
     if not segments or segments[0]['marker'] != 'aa55':
         raise ValueError('missing initial aa55 segment')
-    return {'decoded_bytes': len(image),
+    report = {'decoded_bytes': len(image),
             'decoded_sha256': hashlib.sha256(image).hexdigest(),
             'segments': segments, 'coverage_bytes': offset,
             'scope': 'container and section extents; trailer integrity, overlay selection and DA150 execution unvalidated'}
+    if all('serial_boot' in segment or 'section_stream' in segment for segment in segments):
+        sections = []
+        for segment in segments:
+            stream = segment.get('serial_boot', segment.get('section_stream'))
+            sections.extend({**section, 'offset': segment['offset'] + 6 + section['offset']}
+                            for section in stream['sections'])
+        report['all_segment_destinations'] = destination_inventory(image, sections)
+    return report
 
 
 def extract_section(image, address, marker=None):

@@ -49,6 +49,36 @@ class A00InventoryTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             section_inventory(stream + b'\x00\x00')
 
+    def test_destination_overlap_preserves_record_order_and_pages(self):
+        stream = struct.pack('>16H',
+                             3, 2, 0xfffe, 0x1111, 0x2222, 0x3333,
+                             2, 2, 0xffff, 0x2222, 0x4444,
+                             1, 0, 0xffff, 0x5555, 0)
+        report = section_inventory(stream)['destination_inventory']
+        self.assertEqual(report['write_words'], 6)
+        self.assertEqual(report['unique_words'], 4)
+        self.assertEqual(report['repeated_same_words'], 1)
+        self.assertEqual(report['repeated_changed_words'], 1)
+        self.assertEqual(report['cross_page_records'], 2)
+        self.assertEqual([row['page'] for row in report['pages']], [0, 2, 3])
+        self.assertEqual(report['pages'][1]['unique_words'], 2)
+        self.assertEqual(report['pages'][2]['first_word_address'], 0x30000)
+
+    def test_destination_extent_exceeding_address_space_is_rejected(self):
+        stream = struct.pack('>6H', 2, 0x7f, 0xffff, 1, 2, 0)
+        with self.assertRaisesRegex(ValueError, '23-bit'):
+            section_inventory(stream)
+
+    def test_cross_segment_conflicts_are_not_hidden_by_individual_reports(self):
+        stream = struct.pack('>6H', 2, 2, 0x900, 0xbeef, 0x5678, 0)
+        report = inventory(segment(0xaa55, self.boot_image()) + segment(0xaa22, stream))
+        combined = report['all_segment_destinations']
+        self.assertEqual(combined['unique_words'], 2)
+        self.assertEqual(combined['repeated_same_words'], 1)
+        self.assertEqual(combined['repeated_changed_words'], 1)
+        self.assertEqual(report['segments'][1]['section_stream']
+                         ['destination_inventory']['repeated_changed_words'], 0)
+
     def test_extraction_preserves_words_and_requires_exact_selection(self):
         image = self.boot_image()
         expected = bytes.fromhex('beef1234')

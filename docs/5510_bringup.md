@@ -323,6 +323,25 @@ extended-program capability, separate from existing 16-bit handset profiles.
 DA150 memory mapping and overlay selection remain unvalidated; silently
 truncating these stream addresses is forbidden.
 
+The inventory also measures linear destination coverage without exporting a
+flattened image. Every individual segment, and standalone InitDisk, has zero
+internal destination overlaps and zero records crossing a page boundary.
+Across all InitData segments the destinations conflict extensively:
+
+| Container | Word writes | Unique destinations | Same-value rewrites | Changed-value rewrites |
+| --- | ---: | ---: | ---: | ---: |
+| R060 | 313,867 | 126,235 | 5,016 | 182,616 |
+| R061 | 313,961 | 126,241 | 5,029 | 182,691 |
+
+Rewrite counts compare each record value with the preceding write at that
+destination in container order; they do not infer the device's loading order.
+This is evidence against treating the entire container as a single resident
+program image. It supports separate-overlay interpretation, but does not
+establish overlay selection, shared resident regions or physical page aliases.
+The report retains per-page extents and rejects ranges beyond the 23-bit
+address space. Unit fixtures distinguish same-value/conflicting rewrites,
+cross-page ranges and cross-segment conflicts.
+
 Do not load the complete container as flat program ROM or substitute its
 music DSP for MAD2's baseband DSP.
 
