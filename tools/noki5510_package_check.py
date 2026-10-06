@@ -21,6 +21,35 @@ UPLOADS = (
 )
 
 
+def assess_input(flash):
+    """Pin the input consumers; table presence is not wiring acceptance."""
+    for start, end, digest in (
+        (0x3a738c, 0x3a7424, 'ade0727b15abb6de032ea2b7ee6711f3f643f32b5aa8505a0d7561208abf7bf4'),
+        (0x39dc14, 0x39dc4c, 'f5f23ae052176f383844aab5ad69926341fe206301c65ffdbda2a37c5e3eb278'),
+    ):
+        if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
+            raise ValueError('input consumer code mismatch')
+    for address, value in ((0x3a74dc, 0x20000), (0x39dc98, 0x44d164),
+                           (0x39dc9c, 0x126ec6), (0x39dca0, 0x44d180)):
+        if struct.unpack_from('>I', flash, address - 0x200000)[0] != value:
+            raise ValueError('input literal dependency mismatch')
+    normal = flash[0x24d164:0x24d164 + 25]
+    special = flash[0x24d180:0x24d180 + 5]
+    if normal != bytes.fromhex('3e170a3e1a3e180102013e3e0605043e3e0908073e030b190c'):
+        raise ValueError('normal key table mismatch')
+    if special != bytes.fromhex('3e3c3e3e3e'):
+        raise ValueError('special key table mismatch')
+    return {'scope': 'static consumers only; no MU4 matrix wiring validated',
+            'gpio_reader': '3a738c', 'column_register': '2002a',
+            'active_low_mask': '02', 'pressed_raw': '81', 'released_raw': 'ff',
+            'decoder': '39dc14', 'mode_byte': '126ec6',
+            'normal_table': '44d164', 'normal_codes': list(normal),
+            'special_table': '44d180', 'special_codes': list(special),
+            'mode_zero_pressed_code': '3c', 'released_code': '3e',
+            'irq_status_register': '2002b',
+            'irq_bit1_handler': '39dae8', 'irq_bit3_handler': '335624'}
+
+
 def assess_bootstrap(flash, records):
     """Pin the selected consumer code and its literal-pool dependencies."""
     for start, end, digest in (
@@ -74,6 +103,7 @@ def assess_flash(flash):
         if initialized_bytes(records, address, 4) != struct.pack('>I', descriptor):
             raise ValueError('initialized upload pointer mismatch')
     return {'product': 'NPM-5', 'version': '3.53', 'ppm': 'C',
+            'input_contract': assess_input(flash),
             'bootstrap_contract': assess_bootstrap(flash, records),
             'startup_copy': {'records': len(records), 'payload_bytes': 26487,
                              'terminator_end': f'{end:06x}',
@@ -125,7 +155,7 @@ def main():
             # Keep the immutable normalization manifest independent of
             # expanding static-analysis results reported on stdout.
             manifest = {key: value for key, value in report.items()
-                        if key not in ('startup_copy', 'bootstrap_contract')}
+                        if key not in ('startup_copy', 'bootstrap_contract', 'input_contract')}
             write_derived(args.output_dir / 'normalization.json',
                           (json.dumps(manifest, indent=2) + '\n').encode())
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:

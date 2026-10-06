@@ -201,6 +201,30 @@ journal decoder retains NSE-5 version-1/8 KiB defaults; NPM-5 explicitly
 selects version 3, a 64 KiB sector and a `3800`-byte cache. No records are
 generated or borrowed by the checker.
 
+## Input consumer boundary
+
+The pinned image's GPIO reader `3a738c` temporarily enables mask bit 1 at
+`2006b`, reads `2002a` bit 1 and returns `81` for low or `ff` for high.
+It does not scan rows. Decoder `39dc14` maps `ff` to `3e`; otherwise it
+uses mode byte `126ec6` to select a 25-byte normal table (`44d164`) or a
+five-byte special table (`44d180`). For mode zero, raw `81` selects special
+code `3c`. These are numeric firmware codes, not validated host bindings.
+The ordinary table's presence does not establish an attached MU4 matrix.
+
+IRQ consumer `3a73d8` independently tests `2002b` bits 1 and 3, calling
+`39dae8` and `335624` respectively. The latter posts literal `0128` through
+`2cdf42`; its physical source and subsequent input transport are unresolved.
+Do not combine these branches into a borrowed handset key map.
+
+`verify-5510-package` pins the consumer code, literal pools and both tables
+in its `input_contract` report. This is static evidence, not behavioral
+acceptance. `noki5510_input_observe.lua` observes the GPIO initializer,
+reader, IRQ handler, key decoder and secondary interrupt publisher without
+changing firmware state. On a fresh eight-second `nmp5hle` run reaching
+the service frontier, none of these five entry taps fires. This establishes
+only their inactivity in that boot window, not their absence from normal
+boots with valid product data. No input bindings are enabled by this result.
+
 Next recover the MU4 interface and seek matching product-state evidence rather
 than fill identity/security fields from another phone. Keep the missing PMM, MU4 interface
 and resident DSP inputs explicit; no donor provisioning or guessed success

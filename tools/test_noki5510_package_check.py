@@ -21,6 +21,10 @@ class PackageCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'consumer code'):
             checker.assess_bootstrap(bytes(0x350000), [])
 
+    def test_input_rejects_changed_consumer(self):
+        with self.assertRaisesRegex(ValueError, 'input consumer code'):
+            checker.assess_input(bytes(0x350000))
+
     def test_existing_different_artifact_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'image'
