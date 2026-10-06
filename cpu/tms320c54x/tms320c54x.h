@@ -12,6 +12,7 @@ public:
 	tms320c54x_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock);
 	void set_power_on_imr(u16 value) { m_power_on_imr = value; }
+	void set_extended_program(bool enabled) { m_extended_program = enabled; }
 
 	enum : unsigned
 	{
@@ -36,7 +37,8 @@ public:
 		STATE_IFR,
 		STATE_IMR,
 		STATE_IDLE,
-		STATE_ILLEGAL
+		STATE_ILLEGAL,
+		STATE_XPC
 	};
 
 protected:
@@ -51,6 +53,8 @@ protected:
 
 	virtual space_config_vector memory_space_config() const override;
 	virtual std::unique_ptr<util::disasm_interface> create_disassembler() override;
+	virtual void state_import(const device_state_entry &entry) override;
+	virtual void state_export(const device_state_entry &entry) override;
 
 private:
 	static constexpr u64 ACC_MASK = (u64(1) << 40) - 1;
@@ -63,6 +67,8 @@ private:
 	void update_timer_counter();
 	void arm_timer();
 	u16 fetch();
+	u32 program_address(u16 address) const { return (u32(m_extended_program ? m_xpc : 0) << 16) | address; }
+	void far_transfer(u32 address, bool delayed);
 	u16 data_read(u16 address);
 	void data_write(u16 address, u16 value);
 	u16 direct_address(u8 mode) const;
@@ -95,12 +101,14 @@ private:
 	address_space_config m_data_config;
 	address_space_config m_io_config;
 
-	memory_access<16, 1, -1, ENDIANNESS_LITTLE>::cache m_cache;
-	memory_access<16, 1, -1, ENDIANNESS_LITTLE>::specific m_program;
+	memory_access<23, 1, -1, ENDIANNESS_LITTLE>::cache m_cache;
+	memory_access<23, 1, -1, ENDIANNESS_LITTLE>::specific m_program;
 	memory_access<16, 1, -1, ENDIANNESS_LITTLE>::specific m_data;
 	memory_access<16, 1, -1, ENDIANNESS_LITTLE>::specific m_io;
 
 	u16 m_pc = 0;
+	u8 m_xpc = 0;
+	u32 m_debug_pc = 0;
 	u16 m_op = 0;
 	u64 m_a = 0;
 	u64 m_b = 0;
@@ -121,11 +129,14 @@ private:
 	u16 m_rpt_iteration = 0;
 	bool m_rpt_armed = false;
 	u16 m_delayed_target = 0;
+	u8 m_delayed_xpc = 0;
+	bool m_delayed_far = false;
 	u8 m_delayed_words = 0;
 	u8 m_xc_guard = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
 	u16 m_power_on_imr = 0;
+	bool m_extended_program = false;
 	u16 m_clkmd = 0;
 	u16 m_tim = 0xffff;
 	u16 m_prd = 0xffff;

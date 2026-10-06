@@ -318,10 +318,10 @@ each zero-count terminator consumes the payload exactly:
 
 This validates static stream structure, not which payload is selected for
 which operation, NAND placement or address-space aliasing. Preserve the
-extended word addresses: the current project C54x core has a 16-bit program
-space and no XPC state, so it cannot represent these streams faithfully as
-one flat image. Extended-program support needs its own ISA/peripheral
-evidence and executable tests; silently truncating addresses is forbidden.
+extended word addresses. The project C54x core now has an explicit
+extended-program capability, separate from existing 16-bit handset profiles.
+DA150 memory mapping and overlay selection remain unvalidated; silently
+truncating these stream addresses is forbidden.
 
 Do not load the complete container as flat program ROM or substitute its
 music DSP for MAD2's baseband DSP.
@@ -340,9 +340,9 @@ original section payloads identifies these bounded startup contracts:
 | InitData `0db8` | Dispatches far function pointers through data `1742/1702/1744`, then calls `0df4`, which loops. Do not interpret that terminal loop as a missing peer reply. |
 | InitData `2fbf/302f` | Writes/reads I/O port `4000`; neighboring `2fca` waits on BIO, and `2fe6` performs masked read-modify-write of data `003d`. This is a candidate external-storage interface; electrical pin identities remain unvalidated. |
 
-The current core does not implement the observed `FCALL/FCALA/FB/FRET`
-families or XPC. Even page-zero startup therefore needs ISA work before
-DA150 execution can be claimed. Core MMR accesses (for example SP at data
+The core's explicit extended-program mode implements the observed far
+control-flow families and XPC, with instruction-level conformance fixtures.
+This is not DA150 execution or peripheral validation. Core MMR accesses (for example SP at data
 `18`) must remain distinct from board/peripheral accesses. No success value
 or busy-line transition is inferred from these static routines.
 

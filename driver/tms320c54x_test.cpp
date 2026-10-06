@@ -27,6 +27,44 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	static constexpr u16 far_opcodes[] = {
+		0xf882, 0xfa82, 0xf4e6, 0xf5e6, 0xf6e6, 0xf7e6,
+		0xf982, 0xfb82, 0xf4e7, 0xf5e7, 0xf6e7, 0xf7e7,
+		0xf4e4, 0xf6e4, 0xf4e5, 0xf6e5
+	};
+
+	void start_far_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		const u16 op = far_opcodes[index];
+		const bool immediate = (op & 0xfc80) == 0xf880;
+		const bool returning = (op & 0xfdfe) == 0xf4e4;
+		const bool call = !returning && (immediate ? BIT(op, 8) : BIT(op, 0));
+		unsigned next = 0x010600;
+		program.write_word(next++, op);
+		if (immediate)
+			program.write_word(next++, 0x0700);
+		if (BIT(op, 9))
+		{
+			program.write_word(next++, 0xe905);
+			program.write_word(next++, 0xe906);
+		}
+		program.write_word(next, 0xf4e1);
+		program.write_word(0x020700, 0xe807);
+		program.write_word(0x020701, call ? 0xf4e4 : 0xf4e1);
+		data.write_word(0x03fe, 2);
+		data.write_word(0x03ff, 0x0700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, returning ? 0x03fe : 0x0400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x020700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x020700);
+		m_cpu->set_state_int(STATE_GENPC, 0x010600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 765 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
@@ -326,6 +364,8 @@ private:
 	void program_map(address_map &map) ATTR_COLD
 	{
 		map(0x0000, 0xffff).ram();
+		map(0x010000, 0x03ffff).ram();
+		map(0x7f0000, 0x7fffff).ram();
 	}
 
 	void data_map(address_map &map) ATTR_COLD
@@ -13888,6 +13928,231 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			// Far-control fixtures use distinct pages, not mirrored low RAM.
+			program.write_word(0x020600, 0xf983); // FCALL 03:0700
+			program.write_word(0x020601, 0x0700);
+			program.write_word(0x020602, 0xf4e1);
+			program.write_word(0x030700, 0xe807);
+			program.write_word(0x030701, 0xf4e4); // FRET
+			m_cpu->set_state_int(STATE_GENPC, 0x020600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0400);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 758;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 758)
+		{
+			expect_opcode(0xf983,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				m_cpu->state_int(STATE_GENPC) == 0x020603 &&
+				data.read_word(0x03fe) == 2 && data.read_word(0x03ff) == 0x0602,
+				"FCALL/FRET preserve extended page and PC-then-XPC stack order");
+			program.write_word(0x020600, 0xfb83); // FCALLD 03:0700
+			program.write_word(0x020602, 0xe901);
+			program.write_word(0x020603, 0xe902);
+			program.write_word(0x020604, 0xf4e1);
+			m_cpu->set_state_int(STATE_GENPC, 0x020600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 759;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 759)
+		{
+			expect_opcode(0xfb83,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
+				m_cpu->state_int(STATE_GENPC) == 0x020605 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				data.read_word(0x03ff) == 0x0604,
+				"FCALLD executes two caller-page delay words and returns after them");
+			program.write_word(0x020600, 0xf7e6); // FBACCD B
+			program.write_word(0x020601, 0xf020); // One two-word delay instruction.
+			program.write_word(0x020602, 0x1234);
+			program.write_word(0x7f0800, 0xf4e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12347f0800ULL);
+			m_cpu->set_state_int(STATE_GENPC, 0x020600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 760;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 760)
+		{
+			expect_opcode(0xf7e6,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(STATE_GENPC) == 0x7f0801 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400,
+				"FBACCD masks to 23 bits and accepts a two-word caller-page delay instruction");
+			program.write_word(0x7f0600, 0xf5e7); // FCALA B
+			program.write_word(0x7f0601, 0xf4e1);
+			program.write_word(0x020700, 0xe805);
+			program.write_word(0x020701, 0xf4e4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x020700);
+			m_cpu->set_state_int(STATE_GENPC, 0x7f0600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 761;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 761)
+		{
+			expect_opcode(0xf5e7,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 5 &&
+				m_cpu->state_int(STATE_GENPC) == 0x7f0602 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				data.read_word(0x03fe) == 0x7f && data.read_word(0x03ff) == 0x0601,
+				"FCALA B returns to the caller's highest supported program page");
+			program.write_word(0x030700, 0xf6e5); // FRETED
+			program.write_word(0x030701, 0xe901);
+			program.write_word(0x030702, 0xe902);
+			program.write_word(0x020800, 0xf4e1);
+			data.write_word(0x03fe, 0x0082);
+			data.write_word(0x03ff, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x03fe);
+			m_cpu->set_state_int(STATE_GENPC, 0x030700);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 762;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 762)
+		{
+			expect_opcode(0xf6e5,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
+				m_cpu->state_int(STATE_GENPC) == 0x020801 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
+				"FRETED masks the stacked page, restores PC, executes callee-page delay words and enables interrupts");
+			program.write_word(0x02ffff, 0xe803);
+			program.write_word(0x020000, 0xf4e1);
+			program.write_word(0x030000, 0xe809);
+			m_cpu->set_state_int(STATE_GENPC, 0x02ffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 763;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 763)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
+				m_cpu->state_int(STATE_GENPC) == 0x020001,
+				"sequential PC wrap does not increment XPC");
+			program.write_word(0x020600, 0x771e); // STM #ffff, XPC
+			program.write_word(0x020601, 0xffff);
+			program.write_word(0x7f0602, 0x481e); // LDM XPC, A
+			program.write_word(0x7f0603, 0xf4e1);
+			m_cpu->set_state_int(STATE_GENPC, 0x020600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 764;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 764)
+		{
+			expect_opcode(0x771e,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7f &&
+				m_cpu->state_int(STATE_GENPC) == 0x7f0604,
+				"XPC memory-mapped writes mask to seven bits and affect the next fetch");
+			start_far_case(0);
+			return;
+		}
+		if (m_phase >= 765 && m_phase < 765 + std::size(far_opcodes))
+		{
+			const unsigned index = m_phase - 765;
+			const u16 op = far_opcodes[index];
+			const bool immediate = (op & 0xfc80) == 0xf880;
+			const bool returning = (op & 0xfdfe) == 0xf4e4;
+			const bool call = !returning && (immediate ? BIT(op, 8) : BIT(op, 0));
+			const unsigned continuation = 0x0600 + (immediate ? 2 : 1) + (BIT(op, 9) ? 2 : 0);
+			expect_opcode(op,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (BIT(op, 9) ? 6 : 0x020700) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				m_cpu->state_int(STATE_GENPC) == (call ? 0x010000 + continuation + 1 : 0x020702) &&
+				(!returning || bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) == !BIT(op, 0)),
+				"all far branch/call/return variants execute on distinct pages with correct delay and stack semantics");
+			if (call)
+				expect(data.read_word(0x03fe) == 1 && data.read_word(0x03ff) == continuation,
+					"far call variant stores PC then XPC");
+			if (index + 1 < std::size(far_opcodes))
+			{
+				start_far_case(index + 1);
+				return;
+			}
+			// READA/WRITA use A's extended address, not the executing page.
+			program.write_word(0x010600, 0x7ff8); // WRITA *(0500)
+			program.write_word(0x010601, 0x0500);
+			program.write_word(0x010602, 0x7ef8); // READA *(0501)
+			program.write_word(0x010603, 0x0501);
+			program.write_word(0x010604, 0xf4e1);
+			data.write_word(0x0500, 0xbeef);
+			data.write_word(0x0501, 0);
+			program.write_word(0x020900, 0);
+			program.write_word(0x010900, 0x1111);
+			program.write_word(0x000900, 0x2222);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x020900);
+			m_cpu->set_state_int(STATE_GENPC, 0x010600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 781;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 781)
+		{
+			expect_opcode(0x7ff8,
+				data.read_word(0x0501) == 0xbeef &&
+				program.read_word(0x020900) == 0xbeef &&
+				program.read_word(0x010900) == 0x1111 && program.read_word(0x000900) == 0x2222,
+				"READA/WRITA address extended program memory independently of XPC");
+			program.write_word(0x010148, 0x4a1e); // ISR saves XPC explicitly.
+			program.write_word(0x010149, 0xf883); // FB 03:0700
+			program.write_word(0x01014a, 0x0700);
+			program.write_word(0x030700, 0xe809);
+			program.write_word(0x030701, 0xf4e5); // FRETE restores saved XPC/PC.
+			program.write_word(0x010605, 0xf4e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_input_line(2, ASSERT_LINE);
+			m_phase = 782;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 782)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 9 &&
+				m_cpu->state_int(STATE_GENPC) == 0x010606 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				data.read_word(0x03fe) == 1 && data.read_word(0x03ff) == 0x0605 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
+				"interrupt retains XPC and pushes only PC; explicit ISR XPC save allows a far return");
+			m_cpu->set_input_line(2, CLEAR_LINE);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+			program.write_word(0x020600, 0xf074); // Near CALL on page 2.
+			program.write_word(0x020601, 0x0700);
+			program.write_word(0x020602, 0xf4e1);
+			program.write_word(0x020700, 0xe803);
+			program.write_word(0x020701, 0xfc00);
+			m_cpu->set_state_int(STATE_GENPC, 0x020600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 783;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 783)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
+				m_cpu->state_int(STATE_GENPC) == 0x020603 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				data.read_word(0x03ff) == 0x0602,
+				"near CALL/RET retain the current page and use one return-stack word");
+			osd_printf_info("TMS320C54x extended program conformance: PASS\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -14099,6 +14364,7 @@ private:
 void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
+	m_cpu->set_extended_program(true);
 	NOKIA_DSPIF(config, m_transport, 0);
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);

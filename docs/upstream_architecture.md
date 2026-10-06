@@ -84,6 +84,25 @@ profile behavior remain outside the CPU directory. The 5110 machine removes
 `dsp_hle` and instantiates `NOKIA_DSP_C54X` with its own ROM4 images; other
 handsets do not inherit that ROM or execution contract.
 
+Extended-program capability is explicit (`set_extended_program(true)`), not
+inferred from a handset name or inherited by the existing ROM4 profile.
+It provides seven-bit XPC at data MMR `1e`, 23-bit instruction fetches and
+accumulator-addressed program transfers, and far branches/calls/returns.
+PC remains a 16-bit architectural register; debugger GENPC combines XPC/PC.
+Sequential PC wrap does not increment XPC. Far calls push PC then XPC,
+whereas hardware interrupts retain XPC and push only PC. Delayed far
+transfers execute their two delay words on the original page.
+
+`check-c54x-core` exercises all 16 immediate/accumulator/delayed far-control
+variants on distinct program pages, stack order, seven-bit masking, two-word
+delay instructions, XPC MMR access, extended READA/WRITA, near-call page
+retention and an ISR which explicitly saves XPC before a far branch. Rules
+and base cycle counts come from [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+and [SPRU131G, section 6](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+This does not model a DA150 peripheral map, on-chip RAM aliases, external
+wait states or full pipeline timing. XPC and pending delayed-page state are
+save-registered; an extended-mode save/restore execution gate remains due.
+
 The first semantic tranche covers the generic encodings exercised at the
 transform boundary for CALL/RET, RPT/RPTB, immediate auxiliary-register loads,
 auxiliary-register moves, ordinary indirect pre/post addressing, accumulator

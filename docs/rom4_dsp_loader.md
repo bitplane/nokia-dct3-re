@@ -43,12 +43,19 @@ The normalized ordered trace is:
 6. run mode requests block 1, then block families with input lengths `0x0078`,
    `0x0118`, and `0x04ec`.
 
-`make check-c54x-rom4-cold-execute` independently starts the local clean-room
-core at the mask-ROM reset vector with only the recovered program image and
-complete `0xb000..0xefff` DROM populated. Reset reaches PC `0x0f00`, where the
-program word is still zero, and stops at PC `0x0f01`. This is the expected MCU
-upload boundary: loader1 is not resident in the mask image and isolated DSP
-execution cannot proceed by pre-seeding it.
+`make check-c54x-rom4-cold-execute` starts the local clean-room core at the
+mask-ROM reset vector with the recovered program image and complete
+`0xb000..0xefff` DROM populated. Its expected isolated upload frontier is
+PC `0x0f01`, with program word `0f00` still zero: loader1 is not resident in
+the mask image and must be uploaded by the MCU.
+
+The current cold fixture does **not** reproduce that expectation: both the
+committed core baseline `0f9436b` and the extended-program implementation
+reach idle at PC `7eca`, SP `fffa`, PMST `ffa8`. The transform-entry fixture
+and coherent MCU-driven boot still pass independently. Keep the cold gate's
+existing expectation; resolve the fixture/input discrepancy before using
+it as passing cold-reset evidence. This result is not native RF or speech
+completion and is not a reason to seed loader code into the isolated core.
 
 `tools/dsp_rom4_upload_trace_check.py` verifies this ordering and rejects an
 observed input length absent from the recovered catalogue.

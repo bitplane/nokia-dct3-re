@@ -36,7 +36,7 @@ DEFINE_DEVICE_TYPE(TMS320C54X, tms320c54x_device, "tms320c54x",
 tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 		const char *tag, device_t *owner, u32 clock) :
 	cpu_device(mconfig, TMS320C54X, tag, owner, clock),
-	m_program_config("program", ENDIANNESS_LITTLE, 16, 16, -1),
+	m_program_config("program", ENDIANNESS_LITTLE, 16, 23, -1),
 	m_data_config("data", ENDIANNESS_LITTLE, 16, 16, -1),
 	m_io_config("io", ENDIANNESS_LITTLE, 16, 16, -1)
 {
@@ -69,6 +69,7 @@ void tms320c54x_device::device_start()
 	set_icountptr(m_icount);
 
 	state_add(STATE_PC, "PC", m_pc).formatstr("%04X");
+	state_add(STATE_XPC, "XPC", m_xpc).mask(0x7f).formatstr("%02X");
 	state_add(STATE_A, "A", m_a).mask(ACC_MASK).formatstr("%010X");
 	state_add(STATE_B, "B", m_b).mask(ACC_MASK).formatstr("%010X");
 	state_add(STATE_T, "T", m_t).formatstr("%04X");
@@ -84,10 +85,11 @@ void tms320c54x_device::device_start()
 	state_add(STATE_IMR, "IMR", m_imr).formatstr("%04X");
 	state_add(STATE_IDLE, "IDLE", m_idle).formatstr("%1u");
 	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
-	state_add(STATE_GENPC, "GENPC", m_pc).noshow();
-	state_add(STATE_GENPCBASE, "CURPC", m_pc).noshow();
+	state_add(STATE_GENPC, "GENPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
+	state_add(STATE_GENPCBASE, "CURPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
 
 	save_item(NAME(m_pc));
+	save_item(NAME(m_xpc));
 	save_item(NAME(m_op));
 	save_item(NAME(m_a));
 	save_item(NAME(m_b));
@@ -108,6 +110,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_rpt_iteration));
 	save_item(NAME(m_rpt_armed));
 	save_item(NAME(m_delayed_target));
+	save_item(NAME(m_delayed_xpc));
+	save_item(NAME(m_delayed_far));
 	save_item(NAME(m_delayed_words));
 	save_item(NAME(m_xc_guard));
 	save_item(NAME(m_ifr));
@@ -135,6 +139,7 @@ void tms320c54x_device::device_stop()
 void tms320c54x_device::device_reset()
 {
 	m_pc = 0xff80;
+	m_xpc = 0;
 	m_op = 0;
 	m_a = 0;
 	m_b = 0;
@@ -157,6 +162,8 @@ void tms320c54x_device::device_reset()
 	m_rpt_iteration = 0;
 	m_rpt_armed = false;
 	m_delayed_target = 0;
+	m_delayed_xpc = 0;
+	m_delayed_far = false;
 	m_delayed_words = 0;
 	m_xc_guard = 0;
 	m_ifr = 0;
@@ -202,7 +209,38 @@ TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
 
 u16 tms320c54x_device::fetch()
 {
-	return m_cache.read_word(m_pc++);
+	return m_cache.read_word(program_address(m_pc++));
+}
+
+void tms320c54x_device::state_import(const device_state_entry &entry)
+{
+	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
+	{
+		m_pc = u16(m_debug_pc);
+		m_xpc = m_extended_program ? (m_debug_pc >> 16) & 0x7f : 0;
+	}
+}
+
+void tms320c54x_device::state_export(const device_state_entry &entry)
+{
+	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
+		m_debug_pc = program_address(m_pc);
+}
+
+void tms320c54x_device::far_transfer(u32 address, bool delayed)
+{
+	if (delayed)
+	{
+		m_delayed_target = u16(address);
+		m_delayed_xpc = (address >> 16) & 0x7f;
+		m_delayed_far = true;
+		m_delayed_words = 2;
+	}
+	else
+	{
+		m_pc = u16(address);
+		m_xpc = (address >> 16) & 0x7f;
+	}
 }
 
 u16 tms320c54x_device::data_read(u16 address)
@@ -243,6 +281,8 @@ u16 tms320c54x_device::data_read(u16 address)
 		return m_rea;
 	if (address == 0x1d)
 		return m_pmst;
+	if (address == 0x1e && m_extended_program)
+		return m_xpc;
 	if (address == 0x24)
 	{
 		update_timer_counter();
@@ -304,6 +344,8 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		m_rea = value;
 	else if (address == 0x1d)
 		m_pmst = value;
+	else if (address == 0x1e && m_extended_program)
+		m_xpc = value & 0x7f;
 	else if (address == 0x24)
 	{
 		m_tim = value;
@@ -692,6 +734,45 @@ bool tms320c54x_device::service_interrupt()
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	// SPRU172C: far calls push PC then XPC; delayed transfers retain the
+	// caller's page while the two delay words execute.
+	if (m_extended_program && (op & 0xfc80) == 0xf880) // FB[D] / FCALL[D] extpmad
+	{
+		const u32 destination = (u32(op & 0x7f) << 16) | fetch();
+		const bool delayed = BIT(op, 9);
+		if (BIT(op, 8))
+		{
+			push(u16(m_pc + (delayed ? 2 : 0)));
+			push(m_xpc);
+		}
+		far_transfer(destination, delayed);
+		m_icount -= delayed ? 1 : 3;
+		return;
+	}
+	if (m_extended_program && (op & 0xfcfe) == 0xf4e6) // FBACC[D] / FCALA[D] A/B
+	{
+		const u32 destination = accumulator(BIT(op, 8)) & 0x7fffff;
+		const bool delayed = BIT(op, 9);
+		if (BIT(op, 0))
+		{
+			push(u16(m_pc + (delayed ? 2 : 0)));
+			push(m_xpc);
+		}
+		far_transfer(destination, delayed);
+		m_icount -= delayed ? 3 : 5;
+		return;
+	}
+	if (m_extended_program && (op & 0xfdfe) == 0xf4e4) // FRET[D] / FRETE[D]
+	{
+		const u32 page = pop() & 0x7f;
+		const u32 destination = (page << 16) | pop();
+		if (BIT(op, 0))
+			m_st1 &= ~u16(0x0800);
+		const bool delayed = BIT(op, 9);
+		far_transfer(destination, delayed);
+		m_icount -= delayed ? 3 : 5;
+		return;
+	}
 	const auto branch_if = [this](bool condition)
 	{
 		const u16 destination = fetch();
@@ -980,8 +1061,8 @@ void tms320c54x_device::execute_one(u16 op)
 		const u16 xvalue = data_read(m_ar[xar]);
 		const u16 yvalue = data_read(m_ar[yar]);
 		const u16 coefficient_address = fetch();
-		const u16 coefficient = m_program.read_word(u16(coefficient_address +
-				(repeated ? m_rpt_iteration : 0)));
+		const u16 coefficient = m_program.read_word(program_address(u16(coefficient_address +
+				(repeated ? m_rpt_iteration : 0))));
 		s64 product = s64(accumulator_high17(m_a)) * s64(s16(coefficient));
 		if (BIT(m_st1, 6))
 			product *= 2;
@@ -1432,7 +1513,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
-		m_program.write_word(u16(m_a) + (repeated ? m_rpt_iteration : 0),
+		m_program.write_word((m_a + (repeated ? m_rpt_iteration : 0)) & (m_extended_program ? 0x7fffff : 0xffff),
 				indirect_read(low));
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 5 : 4;
@@ -1814,8 +1895,8 @@ void tms320c54x_device::execute_one(u16 op)
 			coefficient_address = fetch();
 		}
 		const u16 value = data_read(address);
-		const u16 coefficient = m_program.read_word(u16(coefficient_address +
-				(repeated ? m_rpt_iteration : 0)));
+		const u16 coefficient = m_program.read_word(program_address(u16(coefficient_address +
+				(repeated ? m_rpt_iteration : 0))));
 		s64 product = s64(s16(value)) * s64(s16(coefficient));
 		if (BIT(m_st1, 6))
 			product *= 2;
@@ -1847,7 +1928,7 @@ void tms320c54x_device::execute_one(u16 op)
 			value = indirect_read(low);
 			destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		}
-		m_program.write_word(destination, value);
+		m_program.write_word(program_address(destination), value);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 4 : 3;
 		return;
@@ -1868,7 +1949,7 @@ void tms320c54x_device::execute_one(u16 op)
 			source = fetch();
 			destination = low >= 0xe0 ? long_offset_address(low) : short_smem_address(low);
 		}
-		const u16 value = m_program.read_word(source + (repeated ? m_rpt_iteration : 0));
+		const u16 value = m_program.read_word(program_address(u16(source + (repeated ? m_rpt_iteration : 0))));
 		data_write(destination, value);
 		if (low >= 0x80 && low < 0xe0)
 			indirect_modify(low);
@@ -1880,8 +1961,8 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
-		const u16 value = m_program.read_word(u16(m_a) +
-				(repeated ? m_rpt_iteration : 0));
+		const u16 value = m_program.read_word((m_a +
+				(repeated ? m_rpt_iteration : 0)) & (m_extended_program ? 0x7fffff : 0xffff));
 		indirect_write(low, value);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 5 : 4;
@@ -2511,7 +2592,7 @@ void tms320c54x_device::execute_run()
 			m_icount = 0;
 			break;
 		}
-		debugger_instruction_hook(m_pc);
+		debugger_instruction_hook(program_address(m_pc));
 		if (m_illegal)
 		{
 			m_icount = 0;
@@ -2538,7 +2619,12 @@ void tms320c54x_device::execute_run()
 			{
 				m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;
 				if (!m_delayed_words)
+				{
 					m_pc = m_delayed_target;
+					if (m_delayed_far)
+						m_xpc = m_delayed_xpc;
+					m_delayed_far = false;
+				}
 			}
 			if (xc_guarded)
 				m_xc_guard = words >= m_xc_guard ? 0 : m_xc_guard - words;
