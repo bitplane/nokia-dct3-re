@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_file_dma_loader", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
+      "boundary": "Original InitData startup 09b5 selects descriptor zero and calls 2080->3538->2ed4 before a far branch to program 2000. A 44-word descriptor at data 36b0 feeds file readers 33ea/32d3; three one-word header reads yield count and 32-bit destination, payload is read to data 3c21, and 2f56 programs DMA 54/55/56 then polls completion. VC5410A family documentation corroborates DMPREC/DMSA/DMSDI and banked channel fields. Actual file population/media placement, destination-space rules, full DA150 DMA mapping/timing and runtime loader execution remain unvalidated; outer A00 segments are not this file stream",
+      "evidence": ["docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
+    },
+    {
       "id": "npm5_mu4_original_nand_flush", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Isolated mu4nand fixture executes unchanged InitData R060 dirty-cache flush 0725 with declared ABI cache/base/dirty inputs. Original GPIO/BIO code erases block 2, programs 32 pages, writes ff spare fill and verifies each page against the cache. Independent device reads verify 8192 patterned words and 512 spare bytes; return zero, balanced SP, cleared dirty flag and preserved CPL are required. Test-only program/data maps, clock and ADD_H remain assumptions; no filesystem, full DA150 startup or handset boot is claimed",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "Makefile"]

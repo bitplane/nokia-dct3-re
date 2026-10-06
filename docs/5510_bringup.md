@@ -414,6 +414,42 @@ At `095e` the code prepares a directory context, scans entries through
 at `184b` (`MCUSI16 `) and `1854` (`BIN`). That is a concrete named-file
 consumer, not yet proof that its contents are a selected DSP overlay.
 
+#### File-backed program loader
+
+The startup tail `09b5..09b7` explicitly selects index zero and calls
+trampoline `2080 -> 3538`. That entry masks interrupts, selects PMST `2028`,
+sets SP `3aea`, calls `2ed4`, then far-branches to program `2000`. It is a
+storage-backed load followed by a program transfer, not the callback registry
+at `0db8` or a selector for the outer A00 markers.
+
+| Boundary | Derived contract |
+| --- | --- |
+| `2ed4..2ee3` | Index selects a 44-word descriptor at data `36b0 + 44*index`; its `+12/+13` pair supplies remaining length. |
+| `2092 -> 33ea` | Resets/seeks descriptor state against the filesystem context at `3aea`. |
+| `2086 -> 32d3` | Reads through `330e` and byte-swaps each returned word. This is a file-reader boundary, not raw NAND port access. |
+| `2f12..2f39` | Reads three single-word fields: count, destination high word, destination low word. Reconstructs a 32-bit destination. A nonpositive signed count ends loading. |
+| `2ef5..2f10` | Reads count payload words into data `3c21`, then calls `2f56` with the destination, count and a destination-space selector. |
+| `2f56..2fa8` | Clears `54/55`, fills the auto-incrementing bank through `56`, enables bit 0 at `54` and polls it for completion. |
+| `3538..3546` | Resets the stack/processor mapping, loads descriptor zero, then transfers to program `2000`. |
+
+The [TI VC5410A family register map](https://www.ti.com/lit/ds/symlink/tms320vc5410a.pdf)
+independently identifies `54` as DMPREC, `55` as DMSA and `56` as
+auto-incrementing DMSDI. The five bank-zero writes match source `3c21`,
+destination low word, count minus one, zero sync/frame control and mode
+`0144 + selector`. Bank `1e` receives source page zero and destination high
+word. This is strong DMA-family evidence, not proof that DA150 has every
+VC5410A DMA feature or its timing.
+
+Do not conflate the file stream with the serial-boot table: this consumer
+reads all three header words before testing the count, and its destination
+space/page handling has additional rules in `2f00..2f0e` and `2f60..2f70`.
+Those rules and the file's placement are not yet a validated loader model.
+The resident `36b0` record contains placeholder `beef` words; startup fills
+its file descriptors by directory traversal. It is not an acquired filesystem
+or evidence that a selected file is present. Next recover the actual file
+population path and DMA contract before attaching this loader to a full MU4
+profile; never replace its completion poll with unconditional success.
+
 For reproduction, `noki5510_a00_inventory.py --segment aa55
 --extract-section 0x200 --output <new-file>` exports only the exact original
 InitData section, rejecting ambiguous addresses and existing outputs. Use
