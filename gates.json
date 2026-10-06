@@ -101,6 +101,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "outgoing-sms", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-accessory",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "accessory", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-state-idle",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",

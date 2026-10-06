@@ -223,7 +223,7 @@ Updating and acknowledged release. `verify-6210-registration` requires the
 ordered exchange, persisted laboratory LAI `00f1100001` and updated EF_LOCI
 status, plus the reviewed `DCT3 LAB` idle frame (SHA-256
 `1138954cc94944c83019823ea500fa9ea9f8857c76e3d8ba929cdc40db4c0b74`).
-The literal `Headset` accessory label remains unresolved. Neighbour/handover
+The unattached-input accessory contract is described below. Neighbour/handover
 and speech are not accepted; unrecovered handover fields remain unset.
 
 ### Phone-service acceptance
@@ -274,44 +274,42 @@ explicitly resumes its physical input schedule after the replay interval;
 it does not restore or inject handset state. ARM7's named `PC` is a debugger
 cache: the snapshot reads the saved architectural `R15` instead.
 
-## Accessory-input audit
+## Unattached accessory input
 
 The NPE-3 schematic sheets 2/3 connect `HEADDET` to CCONT's EAD pin A2
 and the microphone bias network. With no external microphone fitted, that
-network provides a pull-up path. The schematic does **not** assign a numeric
-ADC mux selector. Do not import the selector-7/EAD interpretation from the
-NSE-8 documentation as a proved NPE-3 mapping.
+network provides a pull-up path. The sheet names pins, not ADC selector
+numbers; the numbered contract below comes from the product's firmware.
 
-`noki6210_adc_observe.lua` is a read-only, manual instrument for a bounded
-24-second `npe3hle` cold boot (`-debug -debugger none -autoboot_delay 0
--autoboot_script tools/noki6210_adc_observe.lua`). Use absolute ROM/script
-paths and a fresh working directory, as for the acceptance runner. Retire
-this instrument once the accessory input/state contract is recovered.
-It observes the direct ADC reader at `504100`
-and its return at `5041a0`, with the stacked caller address. The unchanged
-profile produces 179 paired requests/results through 19 caller addresses:
+Reader `46b3d6` selects ADC input 0 via `504100`. Consumer
+`39d678/39d686/39d692` stores the result and evaluates accessory state byte
+`173a97`. Initialization `46b982` writes `0f`. At a constant zero input,
+`39ccc8` advances that state to `10`; `39d784` calls UI selector `41a944`
+with argument 1, and the idle frame displays `Headset`. A nominal high input
+`03ff` leaves the state at `0f` and the reviewed idle frame has no accessory
+label. This controlled input/state/frame correspondence supports the
+product-local unattached default; it is not measured voltage calibration.
 
-| Selector | Requests | Raw result |
-| --- | ---: | --- |
-| 0 | 39 | `0000` |
-| 2 | 36 | `0230` |
-| 3 | 28 | `0280` |
-| 4 | 20 | `0200` |
-| 5 | 15 | `0000` |
-| 7 | 41 | `0000` |
+`verify-6210-accessory` requires a real decision at `39d6b2`, high sample
+and state `0f`, the reviewed registered unattached idle frame, and physical
+Menu decoding with the reviewed Messages frame. It does not inject firmware
+state, change the PMM, or synthesize an accessory event. The idle oracle was
+deliberately re-banked to remove the false attachment indication; menu and
+application oracles remain unchanged. All 15 product scenarios, including
+call/SMS save-load continuation, pass with this profile.
 
-Selectors 1/6 are not observed in this interval, not proved unused.
-Direct Thumb BL scanning finds 39 candidates for `504100` and two for the
-source-mapping wrapper `4f3962`; this excludes indirect calls and is not a
-complete ownership proof. Selector 0 is consumed via `46b3d6` by
-`39d678/39d686/39d692`; selector 7 is consumed at `4cd170/4cd1d6`.
+Do not import the selector-7/EAD interpretation from the NSE-8 documentation:
+raising NPE-3 selector 7 does not remove `Headset`. The ADC audit observed
+179 paired reads through 19 caller addresses over a 24-second old-profile
+boot; selectors 1/6 were not observed, not proved unused. Static direct-BL
+scanning found 39 ADC-reader candidates and excludes indirect calls. Full
+accessory identification, button/hook behavior, electrical thresholds and
+cross-product mux identity remain outside this unattached-input contract.
 
-A product-local selector-7 high/open-input experiment preserved the exact
-idle/menu registration frames, including `Headset`. It does not establish
-EAD's mux identity or remove the accessory indication; the change is not
-retained. Next recover the consumer-to-accessory-state contract and numeric
-EAD selector before choosing an unattached-input default. No RAM state,
-PMM identity or peer message is changed by the observation instrument.
+Registration verification permits SIM EF_LOCI writes after Location Updating
+Accept either before or after radio release. The network and SIM consumers
+are independently scheduled; each ordered chain and final persistent state
+is required, not the accidental interleaving of a prior trace.
 
 ## Missing native bootstrap observation
 

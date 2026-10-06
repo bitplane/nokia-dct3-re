@@ -1033,6 +1033,11 @@ constexpr nokia_product_config make_6210_config()
 	nokia_product_config result;
 	result.keypad_wiring = KEYPAD_NPE3;
 	result.display = DISPLAY_6210;
+	// NPE-3 HEADDET has an open-microphone pull-up (schematic sheets 2/3).
+	// Own selector-0 reader 46b3d6 feeds accessory state 173a97:
+	// zero selects state 10/Headset; nominal high leaves state 0f/unattached.
+	// This is an open-input nominal value, not measured ADC calibration.
+	result.ccont_board.channel_defaults[0] = 0x3ff;
 	// NPE-3 v5.56 0x4dc0e4 sets release bit 2 at CTSI+2, then
 	// 0x4dc0fa tests bit 4 via LSRS #5/carry. No bootstrap reply is assumed.
 	// Verifier start 426c36..426c3e separately sets CTSI+2 bit 0.

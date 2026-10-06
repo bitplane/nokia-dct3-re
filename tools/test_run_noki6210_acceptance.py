@@ -34,6 +34,34 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_accessory_requires_observed_high_unattached_decision(self):
+        frame = Image.new('L', (96, 60), 255)
+        with patch.object(runner, 'OPERATOR_SHA256', hashlib.sha256(frame.tobytes()).hexdigest()):
+            runner.check_accessory('6210_accessory_decision: state=0f sample=03ff', frame)
+            for text in ('', '6210_accessory_decision: state=10 sample=0000',
+                         '6210_accessory_decision: state=0f sample=0000'):
+                with self.assertRaises(ValueError):
+                    runner.check_accessory(text, frame)
+
+    def test_sim_persistence_can_precede_or_follow_radio_release(self):
+        records = [
+            'TX packet type=56 payload=160 data=0023',
+            'TX packet type=02 radio_phase=candidate_channel_change data=040000000000005050000023',
+            'TX packet type=0c radio_phase=random_access',
+            'RX enqueue type=89 payload=8 data=0100000000000000',
+            'TX packet type=1b data=0080013f4905087000f000fffe33080910101032547698',
+            'LAPDm Location Updating Accept acknowledged nr=1',
+            'LAPDm Channel Release acknowledged nr=2',
+            'TX packet type=02 radio_phase=release_channel_change data=040000000000001a600000230000000f']
+        updates = ['update-binary fid=6f7e offset=4 length=5',
+                   'update-binary fid=6f7e offset=10 length=1']
+        storage = bytearray(3524)
+        storage[1604:1609] = bytes.fromhex('00f1100001')
+        for index in (6, 7, 8):
+            runner.check_registration('\n'.join(records[:index] + updates + records[index:]), storage)
+        with self.assertRaises(ValueError):
+            runner.check_registration('\n'.join(updates + records), storage)
+
     def test_artifact_failure_cannot_pass(self):
         for error in ('Disk quota exceeded', 'Error writing NVRAM file', 'Error generating PNG'):
             with self.assertRaisesRegex(ValueError, 'acceptance artifacts'):

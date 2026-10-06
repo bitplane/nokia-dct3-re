@@ -27,11 +27,12 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'security': ('npe3hle', 'security_input', 37),
              'state-idle': ('npe3hle', 'state_idle', 24),
              'state-call': ('npe3hle', 'state_call', 48),
-             'state-sms': ('npe3hle', 'state_sms', 30)}
+             'state-sms': ('npe3hle', 'state_sms', 30),
+             'accessory': ('npe3hle', 'accessory_input', 25)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
-OPERATOR_SHA256 = '1138954cc94944c83019823ea500fa9ea9f8857c76e3d8ba929cdc40db4c0b74'
+OPERATOR_SHA256 = '9b3fe27be727ece0d99040211b125ac319ee93f6c7ce6a0599b9ebe27ab84d37'
 SMS_READ_SHA256 = 'ab21e640456a297698ff12e89d315fb469eca215975b8ba4cc5a1a9cb2a41be3'
 SMS_SENT_SHA256 = '67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc7c8'
 SECURITY_MENU_SHA256 = 'dca943c465ed8b7cc2c766e9ac0f6f69ce86228c04aa68cd52d1b20a75a8bf3f'
@@ -47,8 +48,6 @@ def check_registration(text, storage):
         r'TX packet type=1b .*data=0080013f4905087000f000fffe33080910101032547698',
         r'LAPDm Location Updating Accept acknowledged nr=1',
         r'LAPDm Channel Release acknowledged nr=2',
-        r'update-binary fid=6f7e offset=4 length=5',
-        r'update-binary fid=6f7e offset=10 length=1',
         r'TX packet type=02 .*radio_phase=release_channel_change data=040000000000001a600000230000000f',
     )
     cursor = 0
@@ -57,6 +56,15 @@ def check_registration(text, storage):
         if not match:
             raise ValueError(f'missing ordered NPE-3 registration evidence: {pattern}')
         cursor += match.end()
+    # SIM persistence is downstream of LU acceptance, but may complete
+    # before or after radio release. Do not serialize independent consumers.
+    cursor = text.index('LAPDm Location Updating Accept acknowledged nr=1')
+    for record in ('update-binary fid=6f7e offset=4 length=5',
+                   'update-binary fid=6f7e offset=10 length=1'):
+        position = text.find(record, cursor)
+        if position < 0:
+            raise ValueError('missing ordered NPE-3 SIM location persistence: ' + record)
+        cursor = position + len(record)
     if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
         raise ValueError('persisted EF_LOCI is not laboratory location-updated')
 
@@ -67,6 +75,14 @@ def events(path):
                       ('staged_dsp:', '6210_', 'dspif_transport:', 'sim_device:',
                        'SIM status', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:',
                        'state_replay:', 'state_roundtrip:', '[LUA ERROR]')))
+
+
+def check_accessory(text, frame):
+    import re
+    decisions = re.findall(r'6210_accessory_decision: state=(\w+) sample=(\w+)', text)
+    if not decisions or any(state != '0f' or sample != '03ff' for state, sample in decisions):
+        raise ValueError('unattached accessory input/state did not remain high/0f')
+    check_frame(frame, OPERATOR_SHA256, 'registered unattached idle without Headset')
 
 
 def check_frame(frame, digest, description):
@@ -168,10 +184,13 @@ def main():
         text = events(run / 'error.log')
         runtime = args.scenario != 'stage'
         verify(text, runtime=runtime, selftest=runtime)
-        if args.scenario == 'menu':
+        if args.scenario in ('menu', 'accessory'):
             from PIL import Image
             with Image.open(run / 'snap/6210_after_menu.png') as frame:
                 check_menu(text, frame)
+            if args.scenario == 'accessory':
+                with Image.open(run / 'snap/6210_before_menu.png') as frame:
+                    check_accessory(text, frame)
         elif args.scenario == 'calculator':
             from PIL import Image
             with Image.open(run / 'snap/6210_calculator_result.png') as frame:
