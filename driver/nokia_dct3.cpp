@@ -1220,6 +1220,7 @@ public:
 	void nsb6hle(machine_config &config);
 	void noki8210(machine_config &config);
 	void nsm3stage(machine_config &config);
+	void nsm3hle(machine_config &config);
 
 	DECLARE_INPUT_CHANGED_MEMBER(key_irq);
 	DECLARE_INPUT_CHANGED_MEMBER(charger_irq);
@@ -3644,6 +3645,18 @@ void nokia_dct3_state::nsm3stage(machine_config &config)
 	staged.set_observe_after_missing_code(true);
 }
 
+void nokia_dct3_state::nsm3hle(machine_config &config)
+{
+	nsm3stage(config);
+	// Explicit missing-resident boundary comparison. No service verdict or
+	// donor provisioning is selected. Own TX type 05 carries the ordinary
+	// D0 discovery transaction after native upload completion.
+	nokia_product_config runtime = m_product;
+	runtime.external_service_transport = true;
+	apply_product_config(runtime);
+	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
+}
+
 void nokia_dct3_state::noki3410(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
@@ -3986,6 +3999,13 @@ ROM_START( nsm3stage )
 	ROM_LOAD("8210 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(37fddeea) SHA1(1c01ad3948ff9919890498a84f31052369d93e1d))
 ROM_END
 
+ROM_START( nsm3hle )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("8210_5.31ppm_c.fls", 0, 0x1d0000, CRC(927022b1) SHA1(c1a0fe95cedb89a92b19654208cc4855e1a4988e))
+	ROM_LOAD("8210 virgin eeprom 003d0000.fls", 0x1d0000, 0x030000, CRC(37fddeea) SHA1(1c01ad3948ff9919890498a84f31052369d93e1d))
+ROM_END
+
 ROM_START( noki8250 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -4066,6 +4086,7 @@ SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empt
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

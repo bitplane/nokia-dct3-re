@@ -8,7 +8,9 @@ executes this product's uploaded verifier and loaders, then retains native
 ownership and stops at absent resident DSP routine `0x2c75`. No working-phone
 promotion or physical-verdict equivalence is claimed. The next software
 boundary is an explicitly declared runtime HLE handoff at that missing-code
-call, followed by recovery of this product's service consumers.
+call, followed by recovery of this product's service consumers. The separate
+`nsm3hle` comparison now reaches request-correlated service discovery; identity,
+record and self-test success replies remain unselected.
 
 The explicit-version fixture produces 6, while the collaborator bridge reports
 an 8210 verdict of `1eff`. A matching raw capture has not been recovered;
@@ -47,6 +49,37 @@ result with:
 This establishes execution under explicit version/peripheral inputs and the
 own-upload boundary; it does not supply missing ROM6 mask code, validate the
 physical PMST mapping, or prove graphical boot.
+
+## Runtime service frontier
+
+`nsm3hle` suspends native execution only at the observed missing `0x2c75`
+call. Without a service peer, its own MCU sends type `05` body
+`1eff00d000030101e000` repeatedly. Enabling the shared request-correlated D0
+discovery transport yields response `1e0002d000030401c100`, which this MCU
+acknowledges with `1e0200d0000305014100`. This is a research HLE transaction,
+not native execution of missing resident code.
+
+After discovery the acquired composition publishes type `70` requests:
+
+| Command | Payload Length | Observed Body |
+| --- | --- | --- |
+| `13` | 6 | `1304d52a008f` |
+| `14` | 14 | `140c47ecf9859aff4d3ba84f86bd` |
+| `15` | 22 | `151429ad7d6cc76d5b55a0dbc4d7ffffffffffffffff` |
+| `16` | 26 | `161839a29f978ca9fe05c7a73068f2947c45e76a574e9c7f8ad8` |
+| `0d` | 2 | `0d00` |
+
+No identity, record or self-test success response is configured by this
+composition. Recover the own type-74 consumer and its armed wait/fault-field
+semantics before selecting a compact completion; do not infer that consumer
+from another product's addresses. The run also sends seven type-51 parameter
+chunks, but parameter acceptance and radio semantics are not yet validated.
+
+Run the same fresh-directory command with `nsm3hle` instead of `nsm3stage`,
+then add `--runtime` to `noki8210_staged_check.py`. This acceptance requires
+native upload completion, explicit ownership handoff, the own discovery
+request and its firmware acknowledgement. It makes no display or handset
+functionality claim.
 
 ## Inputs and hardware
 

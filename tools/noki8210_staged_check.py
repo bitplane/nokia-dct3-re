@@ -10,7 +10,7 @@ from tools.nsm3d_catalogue import catalogue
 from tools.radio_call_lifecycle_common import require_ordered
 
 
-def verify(text):
+def verify(text, runtime=False):
     patterns = (
         ('own verifier descriptor', '8210_verifier_descriptor: pointer=0031bcf0'),
         ('native verifier', 'release entry=0f00 words=223 prom_input=0006 clock=13000000 stage=verifier'),
@@ -21,7 +21,8 @@ def verify(text):
         ('own second loader', 'loader2_verified words=623 entry=0a00'),
         ('installed program', 'installed_program words=422 first=0590 last=0735'),
         ('missing resident code', 'outside_uploaded_code pc=2c75'),
-        ('retained ownership', 'observation_halt pc=2c75 ownership_retained=1'),
+        ('ownership boundary', 'runtime_hle_handoff pc=2c75 native_suspended=1' if runtime
+         else 'observation_halt pc=2c75 ownership_retained=1'),
     )
     require_ordered(text, tuple((name, re.compile(re.escape(pattern)))
                               for name, pattern in patterns), '8210 native boundary')
@@ -29,14 +30,22 @@ def verify(text):
         raise ValueError('expected 133 product-local selector-1 requests')
     if len(re.findall(r'request selector=0014\b', text)) != 1:
         raise ValueError('expected one second-loader request')
-    if '[LUA ERROR]' in text or 'runtime_hle_handoff' in text:
+    if '[LUA ERROR]' in text or (not runtime and 'runtime_hle_handoff' in text):
         raise ValueError('observer error or unexpected ownership handoff')
+    if runtime:
+        require_ordered(text, tuple((name, re.compile(re.escape(pattern)))
+                                  for name, pattern in (
+            ('own discovery request', 'TX pending type=05 payload=10 data=1eff00d000030101e000'),
+            ('discovery response', 'data=1e0002d000030401c100'),
+            ('firmware discovery acknowledgement', 'TX pending type=05 payload=10 data=1e0200d0000305014100'),
+        )), '8210 runtime discovery')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('flash', type=Path)
+    parser.add_argument('--runtime', action='store_true')
     args = parser.parse_args()
     try:
         entries = catalogue(args.flash.read_bytes(), '8210')
@@ -45,11 +54,13 @@ def main():
         # Discard verbose instruction traces before matching the contract.
         with args.log.open(errors='replace') as stream:
             text = ''.join(line for line in stream if 'staged_dsp:' in line
-                           or '8210_verifier_' in line or '[LUA ERROR]' in line)
-        verify(text)
+                           or '8210_verifier_' in line or '[LUA ERROR]' in line
+                           or 'dspif_transport:' in line)
+        verify(text, args.runtime)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 staged FAIL: {error}\n')
-    print('8210 native uploads PASS; absent resident 2c75 remains fail-closed')
+    print('8210 runtime discovery PASS; native resident execution unproved' if args.runtime
+          else '8210 native uploads PASS; absent resident 2c75 remains fail-closed')
 
 
 if __name__ == '__main__':

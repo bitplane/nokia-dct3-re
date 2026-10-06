@@ -35,3 +35,13 @@ class StagedTest(unittest.TestCase):
     def test_handoff_rejected(self):
         with self.assertRaises(ValueError):
             verify(GOOD + '\nruntime_hle_handoff')
+
+    def test_runtime_discovery(self):
+        runtime = GOOD.replace('observation_halt pc=2c75 ownership_retained=1',
+                               'runtime_hle_handoff pc=2c75 native_suspended=1')
+        runtime += '\nTX pending type=05 payload=10 data=1eff00d000030101e000'
+        runtime += '\nRX enqueue type=8e data=1e0002d000030401c100'
+        runtime += '\nTX pending type=05 payload=10 data=1e0200d0000305014100'
+        verify(runtime, runtime=True)
+        with self.assertRaises(ValueError):
+            verify(runtime.replace('0305014100', '0300014100'), runtime=True)
