@@ -91,9 +91,34 @@ request and its firmware acknowledgement. It makes no display or handset
 functionality claim.
 
 Add `--selftest` to require the own armed handler and cleared fault outcomes.
-The next contract is service-application registration/channel binding, which
-the conservative product composition has not selected; identity/record and
-board-input dependencies must remain separate from that transport question.
+The next question is which ordinary startup dependency leaves physical-key
+delivery disabled after the accepted self-test. An unsolicited service map is
+not established as that dependency. Keep identity/record, board inputs and
+application binding separate until the own consumer identifies the boundary.
+
+## Board and physical-input observations
+
+Nokia's [8210 user guide](https://www.telefonguru.hu/manuals/nokia_8210_en.pdf)
+specifies the BLB-2 battery. The research composition selects the existing
+nominal BLB-2 board tuple instead of the conservative full-scale placeholders;
+its raw values are calibrated laboratory inputs, not measured NSM-3 units.
+The own firmware then samples BSI/temperature selectors 3/4 and VBATT selector
+2 repeatedly, rather than the earlier selector-3-only path. This change alone
+does not paint the screen.
+
+The own scanner `0x305940` drives row pins 0..4 and computes row*5+column at
+`0x3059c8..0x3059ce`. Decoder `0x307dbe` loads the matrix pointer at
+`0x307e40`, which resolves to `0x33ee78`. Its 25 bytes are
+`3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b`: row 0 is unused,
+and the four physical rows occupy pins 1..4. The research machine therefore
+selects the five-column host layout and row-pin shift 1. This is static wiring
+evidence, not functional-input acceptance.
+
+`tools/noki8210_menu_input.lua` applies only a physical Menu field for 150 ms
+at 12 seconds and captures the result. The fresh 18-second run has no decoded
+key, no new keypad IRQ edge and a blank after-Menu frame. It does not prove
+that a desktop is live behind the blank output. Investigate the ordinary
+startup/mask lifecycle before adding UI or callback responses.
 
 ## Inputs and hardware
 

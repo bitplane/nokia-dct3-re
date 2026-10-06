@@ -3657,6 +3657,12 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	// 240e20 requires the armed flag and consumes two fault bits at +9.
 	runtime.dsp_service = true;
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	// NSM-3's Nokia user guide specifies BLB-2. Nominal board samples
+	// are calibrated external inputs, not measured 8210 electrical units.
+	runtime.ccont_board = ADC_5210;
+	// Own scanner 305998 drives pins 0..4 and returns row*5+column;
+	// matrix 33ee78 leaves row 0 empty and maps physical keys on 1..4.
+	runtime.keypad_wiring.row_pin_shift = 1;
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }
@@ -4090,7 +4096,7 @@ SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empt
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1999, nsm3hle, noki8210, 0, nsm3hle, noki8890, nokia_dct3_state, empty_init, "Nokia", "8210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8850, 0,      0,      noki8850, noki8850, nokia_dct3_state, empty_init, "Nokia", "Nokia 8850", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2stage, noki8850, 0, nsm2stage, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_init, "Nokia", "8850 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
