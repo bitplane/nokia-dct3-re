@@ -1230,6 +1230,7 @@ public:
 	void noki6210(machine_config &config);
 	void npe3stage(machine_config &config);
 	void npe3hle(machine_config &config);
+	void nmp5stage(machine_config &config);
 	void noki6250(machine_config &config);
 	void nhm3stage(machine_config &config);
 	void nhm3hle(machine_config &config);
@@ -3010,6 +3011,25 @@ static INPUT_PORTS_START( noki7110 )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nmp5stage )
+	PORT_INCLUDE(dct3_network_config)
+	// MU4 key transport is unrecovered; expose no borrowed logical keys.
+	PORT_START("COL.0")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.1")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.2")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.3")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("COL.4")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("PWR")
+	PORT_BIT( 0x1f, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_START("CHARGER")
+	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_UNUSED )
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki6210 )
 	// Independently checked NPE-3 normal/special tables and board switches;
 	// reuse the identical logical matrix, not the NSM-5 hardware profile.
@@ -3798,6 +3818,28 @@ void nokia_dct3_state::noki6210(machine_config &config)
 	apply_product_config(PRODUCT_6210);
 }
 
+void nokia_dct3_state::nmp5stage(machine_config &config)
+{
+	dct3_32mbit_flash_base(config);
+	nokia_product_config research;
+	// Own 3acc98 polls 6d, selects 25 at 2d, transfers through 2c
+	// and receives at 6c. Only this recovered serial boundary is enabled.
+	research.gensio_wiring = GENSIO_NSM3;
+	// Bootstrap instrument: bit 0 is the own verifier execution release.
+	// Keep the written 0c setup bits in readback; no silicon-ready bit is
+	// asserted. This is not a general NPM-5 clock-status contract.
+	research.dsp_reset_wiring = { 0x0d, 0x01 };
+	apply_product_config(research);
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x1e924c);
+	staged.set_loader2_source(0x1e9378, 629);
+	staged.set_verifier_source_end(0xa800);
+	staged.set_cycle_guard_for_loader(true);
+	staged.set_observe_after_missing_code(true);
+	// Own 638-word block spans shared D:0d00..0f7d: 512 data words
+	// followed by the 126-word 0f00 loader. Missing mask calls remain silent.
+}
+
 void nokia_dct3_state::npe3stage(machine_config &config)
 {
 	noki6210(config);
@@ -4011,6 +4053,18 @@ ROM_START( noki6210 )
 	ROM_LOAD("6210 virgin eeprom 005fa000.fls", 0x3fa000, 0x006000, CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
 ROM_END
 
+ROM_START( nmp5stage )
+	// No fitted NPM-5 mask dump is acquired. The staged executor reads
+	// only own flash uploads; do not require or imply the NSE-1 ROM4 dump.
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF )
+	ROM_LOAD("npm5_mad2_mask.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASEFF )
+	ROM_LOAD("npm5_dsp_mask.bin", 0, 0x20000, NO_DUMP)
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("5510f353c.fls", 0, 0x350000,
+		CRC(82bb9888) SHA1(1c0217fb2b2fe350c455b3b1d71b3f920eeed8ec))
+ROM_END
+
 ROM_START( npe3stage )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF )
@@ -4207,3 +4261,4 @@ SYST( 2000, nsb6hle, noki8890, 0, nsb6hle, noki8890, nokia_dct3_state, empty_ini
 SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3330", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, nmp5stage, 0, 0, nmp5stage, nmp5stage, nokia_dct3_state, empty_init, "Nokia", "5510 own-upload bootstrap (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

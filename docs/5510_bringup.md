@@ -3,7 +3,8 @@
 ## Current boundary
 
 The acquired v3.53 PPM C service package is normalized and statically
-validated. No MAME machine profile, graphical boot, input, SIM, registration,
+validated. The `nmp5stage` research fixture executes its own verifier and
+loaders to absent mask address `2c75`. No graphical boot, input, SIM, registration,
 call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
@@ -84,17 +85,46 @@ Startup calls the verifier directly at `37be7a`. The subsequent initializer
 at `31916c` clears the DSP window and ring pointers, then loads the initial
 loader pointer at `319284` through literal `31931c` and RAM `123784`.
 The copy table initializes that pointer to `3e3304`: a 638-word upload to
-DSP program address `0500`. Its first five descriptor fields are published
+MCU shared address `10a00` (DSP data `0d00`). Its 638 words span 512
+data words followed by the 126-word loader at `0f00`. Its first five descriptor fields are published
 to the shared control cells; CTSI bit 0 is released at `3192ce`.
 This is not the separate 629-word descriptor at `3e936c`; its later
 selection and loader completion remain to be mapped.
 
 The package gate verifies initializer coverage, all four initialized
 pointers, both consumer-code hashes, dependent literal pools and the direct
-startup call. The consumer interpretation remains static evidence; runtime
-release, ownership and result delivery still need an execution gate.
+startup call. `noki5510_bootstrap_check.py` separately checks the executed
+own verifier publication, MCU consumption and loader boundary.
 
-Next instantiate a fail-closed product
-profile and observe its own bootstrap. Keep the missing PMM, MU4 interface
+## Executed bootstrap boundary
+
+`nmp5stage` uses only normalized NPM-5 flash, erased nonvolatile state and
+explicitly unavailable NPM-5 mask regions. It does not import the ROM4 mask
+dump. Own ADC routine `3acc98` establishes GENSIO data/control/status at
+`2c/2d/6d`, receiving at `6c`; the nominal full-scale selector-2 input passes
+the startup threshold. Electrical calibration remains unvalidated.
+
+CTSI bit 0 controls staged execution. The fixture's `0d` running readback
+preserves the written setup bits without asserting ready bit 4; it is an
+instrument setting, not the general NPM-5 silicon status contract.
+No MU4 keys are mapped and no runtime radio/service peer is enabled.
+
+The fresh eight-second run observes verifier result `0000/0006` consumed
+by the MCU, initial loader selection `3e3304`, and exact 629-word second
+loader verification at `0a00`. At `2c75` the DSP is suspended with transport
+ownership retained: no missing opcode, return or runtime completion is
+fabricated. Version 6 comes from the own firmware fragment, not a fitted
+mask identity measurement. The framebuffer remains blank.
+
+Reproduce after `make build` by placing the normalized image in
+`roms/nmp5stage/5510f353c.fls`, launching `nmp5stage` from a fresh working
+directory with `-noreadconfig -debug -debugger none -autoboot_delay 0
+-autoboot_script <absolute path>/tools/noki5510_bootstrap_observe.lua
+-seconds_to_run 8 -video none -sound none -nothrottle -log`, and supplying
+an absolute `-rompath`. Validate the resulting `error.log` with
+`python3 tools/noki5510_bootstrap_check.py <log>`.
+
+Next recover the MCU's post-loader service contract and MU4 interface before
+considering an explicitly separate research-HLE composition. Keep the missing PMM, MU4 interface
 and resident DSP inputs explicit; no donor provisioning or guessed success
 publication may be used to claim graphical or phone-service parity.
