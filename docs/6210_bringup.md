@@ -259,6 +259,21 @@ mask routine `2c75` remain research assumptions. Native mask execution,
 measured DSP self-test values, speech/audio parity and electrical ADC units
 remain separate work, not implied by the phone-service gates.
 
+## Save-state acceptance
+
+`verify-6210-state-idle`, `verify-6210-state-call` and
+`verify-6210-state-sms` save and restore emulated time, architectural R15/R13
+and a digest of the complete handset RAM. Each requires a nonempty, identical
+ordered protocol replay interval after restoration. The call fixture then
+presses physical End and verifies release and resumed paging; the SMS fixture
+opens the delivered message and verifies its persistent read status and frame.
+These remain signaling/storage checks, not speech validation.
+
+MAME cancels pending Lua waits when loading a state. The host fixture therefore
+explicitly resumes its physical input schedule after the replay interval;
+it does not restore or inject handset state. ARM7's named `PC` is a debugger
+cache: the snapshot reads the saved architectural `R15` instead.
+
 ## Missing native bootstrap observation
 
 No matching raw NPE-3 final publication or ROM6 mask image was identified in

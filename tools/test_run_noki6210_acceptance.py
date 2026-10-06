@@ -40,6 +40,10 @@ class ApplicationAcceptanceTest(unittest.TestCase):
                 runner.check_output(error)
         runner.check_output('Average speed: 450%')
 
+    def test_lua_error_cannot_pass(self):
+        with self.assertRaises(ValueError):
+            runner.check_output('[LUA ERROR] fixture failed')
+
     def test_registration_rejects_missing_exchange(self):
         with self.assertRaisesRegex(ValueError, 'ordered NPE-3'):
             runner.check_registration('', bytes(3524))

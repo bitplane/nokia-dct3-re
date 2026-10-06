@@ -24,7 +24,10 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'incoming-call': ('npe3hle', 'incoming_call_input', 42),
              'incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
              'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
-             'security': ('npe3hle', 'security_input', 37)}
+             'security': ('npe3hle', 'security_input', 37),
+             'state-idle': ('npe3hle', 'state_idle', 24),
+             'state-call': ('npe3hle', 'state_call', 48),
+             'state-sms': ('npe3hle', 'state_sms', 30)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -62,7 +65,8 @@ def events(path):
     with path.open(errors='replace') as stream:
         return ''.join(line for line in stream if any(token in line for token in
                       ('staged_dsp:', '6210_', 'dspif_transport:', 'sim_device:',
-                       'SIM status', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:', '[LUA ERROR]')))
+                       'SIM status', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:',
+                       'state_replay:', 'state_roundtrip:', '[LUA ERROR]')))
 
 
 def check_frame(frame, digest, description):
@@ -72,7 +76,7 @@ def check_frame(frame, digest, description):
 
 def check_output(text):
     for failure in ('Disk quota exceeded', 'No space left on device',
-                    'Error writing NVRAM file', 'Error generating PNG'):
+                    'Error writing NVRAM file', 'Error generating PNG', '[LUA ERROR]'):
         if failure in text:
             raise ValueError(f'MAME could not persist acceptance artifacts: {failure}')
 
@@ -142,7 +146,7 @@ def main():
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
-        if args.scenario in ('incoming-call', 'incoming-sms'):
+        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms'):
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
@@ -224,6 +228,21 @@ def main():
             from PIL import Image
             with Image.open(run / 'snap/6210_security_then_menu.png') as frame:
                 check_frame(frame, SECURITY_MENU_SHA256, 'Messages after PIN verification')
+        elif args.scenario.startswith('state-'):
+            from tools.noki6210_state_check import verify as check_state
+            check_state(text, args.scenario.removeprefix('state-'))
+            if args.scenario == 'state-call':
+                from tools.noki6210_outgoing_call_check import verify as check_call
+                check_call(text)
+            elif args.scenario == 'state-sms':
+                from tools.radio_incoming_sms_trace_check import SMS_NVRAM_OFFSET, STORED_RECORD_PREFIX
+                storage = (run / 'nvram/npe3hle/sim_card').read_bytes()
+                expected = b'\x01' + STORED_RECORD_PREFIX[1:]
+                if storage[SMS_NVRAM_OFFSET:SMS_NVRAM_OFFSET + len(expected)] != expected:
+                    raise ValueError('restored SMS did not persist read hello')
+                from PIL import Image
+                with Image.open(run / 'snap/6210_state_sms_read_1.png') as frame:
+                    check_frame(frame, SMS_READ_SHA256, 'restored received hello SMS')
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,

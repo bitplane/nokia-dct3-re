@@ -101,6 +101,27 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "outgoing-sms", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-state-idle",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "state-idle", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-state-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "state-call", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-state-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "state-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-security",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
