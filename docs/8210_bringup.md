@@ -159,6 +159,31 @@ call coverage, not a claim that indirect producers cannot exist.
 | `14` | 7 | `2085ba` |
 | `15` | 8 | `2aaa7e` |
 
+The strongest preceding failure is local NV validation, not an absent DSP
+self-test verdict. Firmware clears bit `0x40` of `0x13fde1` at `0x240c00`
+before the compact self-test response arrives. The checksum routine
+`0x2408bc` sums logical NV bytes `0x120..0x253`, excluding `0x154/0x155`,
+and the caller compares that result with the word at `0x254`; it also
+requires the checksum/companion word at `0x170` not both to be zero.
+Logical reads use the cache at `0x11ea18` through `0x2ca3ec`.
+
+The acquired PMM's base record is valid for this check: its body at file
+`0x10026` computes and stores `0x77e2`. A passive cache snapshot at the
+failure has the same bytes throughout `0x120..0x253`, but stores `0x7b26`
+at `0x254`. A write watch proves that firmware first copies `0x77e2` at
+0.044949 seconds, then writes `0x7b66` at 0.200631 and `0x7b26` at
+0.208416, all through copy routine `0x30bc98`. Own sector scanner
+`0x2c9d40` invokes flash-copy routine `0x2eca08`: the initial body is read
+from MCU `0x3e0026`, then the checksum updates from `0x3e821e` and
+`0x3e866c`. They are existing journal records, not a new computation.
+`tools/noki8210_pmm_check.py` independently replays all 870 records through
+file `0x1f68a`; its entire 32 KiB result exactly matches the passive runtime
+cache snapshot. The archive's journal is therefore inconsistent with this
+firmware's checksum, while the storage read path reproduces it correctly.
+Preserve the original archive. Before selecting any derived base-record
+fixture, establish its provenance and which later product records it would
+omit; do not mistake a donor or edited success verdict for a storage fix.
+
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
 injected. Reproduce the observation with the physical Menu fixture above;

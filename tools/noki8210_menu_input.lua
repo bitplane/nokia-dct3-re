@@ -10,6 +10,55 @@ local mask_tap = cpu.spaces['program']:install_write_tap(0x20068, 0x2006b,
             address, data, mask, cpu.state['PC'].value, machine.time:as_double()))
     end)
 _G.noki8210_column_mask_tap = mask_tap
+local checksum_tap = cpu.spaces['program']:install_write_tap(0x11ec6c, 0x11ec6f,
+    '8210_nv_checksum', function(address, data, mask)
+        machine:logerror(string.format(
+            '8210_nv_checksum_write: data=%08x mask=%08x pc=%08x lr=%08x r0=%08x r1=%08x r2=%08x source_next=%08x t=%.6f\n',
+            data, mask, cpu.state['PC'].value, cpu.state['R14'].value,
+            cpu.state['R0'].value, cpu.state['R1'].value,
+            cpu.state['R2'].value, cpu.state['R4'].value, machine.time:as_double()))
+    end)
+_G.noki8210_nv_checksum_tap = checksum_tap
+cpu.debug:bpset(0x2eca08, 'r0<=11ec6c && r0+r2>11ec6c',
+    'logerror "8210_nv_flash_copy: destination=%08x source=%08x length=%04x caller=%08x\\n",r0,r1,r2,r14;g')
+local service_tap = cpu.spaces['program']:install_write_tap(0x13fde0, 0x13fde3,
+    '8210_service_flag', function(address, data, mask)
+        machine:logerror(string.format(
+            '8210_service_flag_write: data=%08x mask=%08x pc=%08x t=%.6f\n',
+            data, mask, cpu.state['PC'].value, machine.time:as_double()))
+        if cpu.state['PC'].value == 0x240c00 and mask == 0x00ff0000 then
+            local space = cpu.spaces['program']
+            local base = 0x11ea18
+            local sum = 0
+            for offset = 0x120, 0x253 do
+                if offset ~= 0x154 and offset ~= 0x155 then
+                    sum = (sum + space:read_u8(base + offset)) & 0xffff
+                end
+            end
+            local function word(offset)
+                return (space:read_u8(base + offset) << 8) |
+                    space:read_u8(base + offset + 1)
+            end
+            machine:logerror(string.format(
+                '8210_nv_cache_check: computed=%04x stored=%04x companion=%04x\n',
+                sum, word(0x254), word(0x170)))
+            local file = assert(io.open('8210_nv_cache.bin', 'wb'))
+            for offset = 0, 0x7fff do
+                file:write(string.char(space:read_u8(base + offset)))
+            end
+            file:close()
+        end
+    end)
+_G.noki8210_service_flag_tap = service_tap
+cpu.debug:bpset(0x287e48, 'temp0<64',
+    'temp0=temp0+1;logerror "8210_task_resume: task=%02x caller=%08x\\n",r0,r14;g')
+cpu.debug:bpset(0x2418d6, nil,
+    'logerror "8210_mode_release: mode=%02x argument=%02x caller=%08x\\n",r0,r1,r14;g')
+-- Branch destination: straight-line ARM fetch hooks may skip mid-block PCs.
+cpu.debug:bpset(0x240bf6, nil,
+    'logerror "8210_nv_sum_check: computed=%04x stored=%04x companion=%04x\\n",r9,w@(sp+4),w@(sp+6);g')
+cpu.debug:bpset(0x2fa99a, nil,
+    'logerror "8210_status_dispatch: status=%04x caller=%08x\\n",r0,r14;g')
 cpu.debug:bpset(0x307df4, nil,
     'logerror "8210_keypad_decoded: key=%02x\\n",r0;g')
 cpu.debug:bpset(0x30aa88, 'temp5<16',
