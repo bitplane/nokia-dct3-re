@@ -18,7 +18,18 @@ def serial_boot_inventory(image):
         raise ValueError('unknown serial boot signature')
     if words[5] > 0x7f:
         raise ValueError('entry XPC exceeds seven bits')
-    offset = 14
+    report = section_inventory(image, 14)
+    return {'format': 'C54x serial boot, SPRA602F figure 11',
+            'compatibility_words': [f'{w:04x}' for w in words[1:5]],
+            'entry_word_address': (words[5] << 16) | words[6],
+            **report,
+            'scope': 'static word addresses; DA150 execution and peripheral map unvalidated'}
+
+
+def section_inventory(image, offset=0):
+    """Inventory count/XPC/PC records, retaining extended word addresses."""
+    if len(image) % 2:
+        raise ValueError('odd-length section stream')
     sections = []
     while offset + 2 <= len(image):
         start = offset
@@ -27,11 +38,7 @@ def serial_boot_inventory(image):
         if not count:
             if offset != len(image):
                 raise ValueError('bytes follow serial boot terminator')
-            return {'format': 'C54x serial boot, SPRA602F figure 11',
-                    'compatibility_words': [f'{w:04x}' for w in words[1:5]],
-                    'entry_word_address': (words[5] << 16) | words[6],
-                    'sections': sections, 'coverage_bytes': offset,
-                    'scope': 'static word addresses; DA150 execution and peripheral map unvalidated'}
+            return {'sections': sections, 'coverage_bytes': offset}
         if offset + 4 + count * 2 > len(image):
             raise ValueError('serial boot section exceeds input')
         xpc, pc = struct.unpack_from('>HH', image, offset)
@@ -66,13 +73,15 @@ def inventory(image):
                          'opaque_trailer': image[end:end + 4].hex()})
         if offset == 0 and payload[:2] in (b'\x08\xaa', b'\x10\xaa'):
             segments[-1]['serial_boot'] = serial_boot_inventory(payload)
+        elif offset and 'serial_boot' in segments[0]:
+            segments[-1]['section_stream'] = section_inventory(payload)
         offset = end + 4
     if not segments or segments[0]['marker'] != 'aa55':
         raise ValueError('missing initial aa55 segment')
     return {'decoded_bytes': len(image),
             'decoded_sha256': hashlib.sha256(image).hexdigest(),
             'segments': segments, 'coverage_bytes': offset,
-            'scope': 'container extents and initial serial boot; trailer integrity, overlay addresses and execution unvalidated'}
+            'scope': 'container and section extents; trailer integrity, overlay selection and DA150 execution unvalidated'}
 
 
 def main():

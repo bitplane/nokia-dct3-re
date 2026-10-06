@@ -282,7 +282,7 @@ InitData containers independently: two-byte marker, big-endian four-byte
 payload length, payload, and opaque four-byte trailer. Seven segments
 (`aa55/aa22/aa44/aabb/aa88/aa99/aadd`) cover all 741,916 decoded R060 bytes
 and 742,146 R061 bytes. Payload hashes and bounds are reported; trailer
-integrity and the six later segments' load grammar remain unvalidated.
+integrity remains unvalidated.
 
 The first segment and standalone InitDisk match the serial-boot grammar in
 [TI SPRA602F, figure 11](https://www.ti.com/lit/an/spra602/spra602.pdf):
@@ -301,8 +301,32 @@ data and unsupported XPC bits. All recovered sections use page zero.
 Both entries lie inside their respective loaded sections. The InitData
 first segment is byte-identical across R060/R061. These are static format
 results, not validation of DA150 memory mapping, boot-ROM behavior or native
-execution. Next inspect the recovered entry routines and their peripheral
-dependencies, and derive the later overlay grammar from the loader before
+execution.
+
+The six later payloads match the same count/XPC/PC section grammar without
+the signature, compatibility words or entry. Every record is bounded and
+each zero-count terminator consumes the payload exactly:
+
+| Marker | R060 records | R061 records | Destination pages |
+| --- | ---: | ---: | --- |
+| `aa22` | 3,254 | 3,256 | 0, 2, 3 |
+| `aa44` | 3,365 | 3,367 | 0, 2, 3 |
+| `aabb` | 2,744 | 2,745 | 0, 2 |
+| `aa88` | 4,622 | 4,622 | 0, 2, 3 |
+| `aa99` | 3,127 | 3,129 | 0, 2, 3 |
+| `aadd` | 1,895 | 1,895 | 0, 2 |
+
+This validates static stream structure, not which payload is selected for
+which operation, NAND placement or address-space aliasing. Preserve the
+extended word addresses: the current project C54x core has a 16-bit program
+space and no XPC state, so it cannot represent these streams faithfully as
+one flat image. Extended-program support needs its own ISA/peripheral
+evidence and executable tests; silently truncating addresses is forbidden.
+
+The recovered InitDisk entry `492b` and InitData entry `0e41` start with
+stack/status setup, but the existing MAME disassembler only emits `.word`.
+No complete instruction-boundary or peripheral-dependency census is claimed.
+Next decode those entry routines and the overlay-selection consumer before
 constructing a DA150 research machine. Do not load the complete container
 as flat program ROM or substitute its music DSP for MAD2's baseband DSP.
 

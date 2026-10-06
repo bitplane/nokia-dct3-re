@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.noki5510_a00_inventory import inventory, serial_boot_inventory
+from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory
 
 
 def segment(marker, payload):
@@ -36,6 +36,18 @@ class A00InventoryTest(unittest.TestCase):
             struct.pack_into('>H', image, offset, value)
             with self.assertRaises(ValueError):
                 serial_boot_inventory(image)
+
+    def test_overlay_retains_extended_address(self):
+        stream = struct.pack('>6H', 2, 2, 0x2000, 0xbeef, 0x1234, 0)
+        image = segment(0xaa55, self.boot_image()) + segment(0xaa22, stream)
+        report = inventory(image)['segments'][1]['section_stream']
+        self.assertEqual(report['coverage_bytes'], len(stream))
+        self.assertEqual(report['sections'][0]['destination_word_address'], 0x22000)
+        for length in range(len(stream)):
+            with self.assertRaises(ValueError):
+                section_inventory(stream[:length])
+        with self.assertRaises(ValueError):
+            section_inventory(stream + b'\x00\x00')
 
     def test_extent_and_trailer_are_distinct(self):
         image = segment(0xaa55, b'ab') + segment(0xaa22, b'c')
