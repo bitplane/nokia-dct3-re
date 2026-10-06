@@ -402,6 +402,18 @@ unmodified template into a claim about the real medium's format: the copy's
 consumer and any subsequent field changes still need decoding. No disk image
 is synthesized from it.
 
+The template is not installed unconditionally. At `0943` startup mounts
+through `2082`; zero result branches directly to `095e`. A nonzero result
+runs a second mount call with argument zero, invokes template consumer `0880`,
+then `051d`, and retries the original mount. A nonzero retry enters the
+error tail at `09bb`. This is a storage-initialization/recovery path; forcing
+mount success would bypass genuine storage operations.
+
+At `095e` the code prepares a directory context, scans entries through
+`09fa/0a0b`, and compares name/extension strings against the word strings
+at `184b` (`MCUSI16 `) and `1854` (`BIN`). That is a concrete named-file
+consumer, not yet proof that its contents are a selected DSP overlay.
+
 For reproduction, `noki5510_a00_inventory.py --segment aa55
 --extract-section 0x200 --output <new-file>` exports only the exact original
 InitData section, rejecting ambiguous addresses and existing outputs. Use
@@ -471,6 +483,30 @@ bare NAND chip connected directly to the DSP. Controller semantics, BIO
 drive, spare-area/ECC handling and container-to-media placement remain open.
 The `aa55` outer firmware-container marker must not be confused with the
 FAT boot-sector signature: their consumers and address spaces differ.
+
+The dirty-cache flush at `0725` strengthens the NAND-protocol identification:
+
+| Code | Observed operation |
+| --- | --- |
+| `0745..0778` | Outputs `60`, three row-address components, `d0`, waits on BIO, outputs `70` and tests status bit 0. |
+| `0789..07e9` | Outputs `80`, one column plus three row components, 256 low/high word pairs, eight pairs of `ff` spare bytes, then `10`; waits and requests status with `70`. |
+| `069b..0724` | Maintains a 32-row cache at data `4000`, with 256 words per row and a dirty flag at `3b14`; the write-back path tests that flag before flushing. |
+
+These commands and 512+16-byte organization match the small-page NAND
+protocol documented in Samsung's
+[K9F1208 family datasheet](https://www1.futureelectronics.com/doc/SAMSUNG/K9F1208R0C-JIB000.pdf).
+That reference is a later revision and does not establish the fitted MU4
+part, its ID or timing. The spare-byte loop writes erased fill on this path;
+it does not prove that all media operations omit ECC or bad-block handling.
+The observed control masks are consistent with command/address/chip selection,
+but the R/W controller's complete behavior remains unknown.
+
+MAME already provides `machine/nandflash` with command/address/data methods,
+ready/busy callbacks and NVRAM ownership. Prefer extending that device for
+the evidenced part and attaching it at the recovered boundary over a new
+Nokia-specific NAND implementation. No existing configured part has yet been
+shown to match MU4. Do not attach a guessed part or seed a filesystem merely
+to satisfy the mount consumer.
 
 Next recover the storage-controller/media placement and independently locate
 the overlay selector before constructing a native music-DSP fixture. A valid
