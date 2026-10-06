@@ -27,6 +27,75 @@
   },
   "gates": [
 {
+      "name": "verify-6210-stage",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki6210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "stage",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-6210-runtime",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki6210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "runtime",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-6210-menu",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki6210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "menu",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
       "name": "verify-8210-registration",
       "prerequisites": [
             "build"

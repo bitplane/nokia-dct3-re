@@ -25,7 +25,7 @@ absent product is a coverage question, not a drifted gate.
 | `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — |
 | `keypad-controller` | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — |
-| `menu` | — | — | yes | — | yes | — | yes | yes | — | — | — | — |
+| `menu` | — | — | yes | — | yes | — | yes | yes | — | yes | — | — |
 | `navigation` | — | — | yes | yes | yes | — | — | yes | — | — | — | — |
 | `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — | — | — | — |
 | `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — |
@@ -106,6 +106,7 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `tools/check_lcd_frame.py`
 - **5110**: `tools/make_5110_eeprom_profile.py`
 - **5210**: `tools/check_lcd_frame.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
 
 ### `power-lifecycle`
 
@@ -381,6 +382,7 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: _(none)_
 - **5110**: `build`
 - **5210**: _(none)_
+- **6210**: `build`
 
 ### `power-lifecycle`
 
@@ -563,6 +565,7 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `structured`
 - **5110**: `shell`
 - **5210**: `structured`
+- **6210**: `structured`
 
 ### `power-lifecycle`
 

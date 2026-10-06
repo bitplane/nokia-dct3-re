@@ -1025,7 +1025,8 @@ constexpr nokia_product_config make_6210_config()
 	result.display = DISPLAY_6210;
 	// NPE-3 v5.56 0x4dc0e4 sets release bit 2 at CTSI+2, then
 	// 0x4dc0fa tests bit 4 via LSRS #5/carry. No bootstrap reply is assumed.
-	result.dsp_reset_wiring = { 0x10, 0x04 };
+	// Verifier start 426c36..426c3e separately sets CTSI+2 bit 0.
+	result.dsp_reset_wiring = { 0x10, 0x04, 0x01 };
 	result.gensio_wiring = GENSIO_NPE3;
 	// 0x426c58 alternates the two shared-buffer ownership words. Keep
 	// transfer acknowledgements separate from the unresolved final verdict.
@@ -1212,6 +1213,8 @@ public:
 	void noki7110(machine_config &config);
 	void nse5r4t(machine_config &config);
 	void noki6210(machine_config &config);
+	void npe3stage(machine_config &config);
+	void npe3hle(machine_config &config);
 	void noki6250(machine_config &config);
 	void nhm3stage(machine_config &config);
 	void nhm3hle(machine_config &config);
@@ -3780,6 +3783,43 @@ void nokia_dct3_state::noki6210(machine_config &config)
 	apply_product_config(PRODUCT_6210);
 }
 
+void nokia_dct3_state::npe3stage(machine_config &config)
+{
+	noki6210(config);
+	// Own NPE-3 uploads: descriptor 224a44 contains 104 words;
+	// descriptor 224b70 contains 629 second-loader words, not NSM-3's 623.
+	auto &staged = NOKIA_DSP_STAGED(config, "dsp_staged", 13'000'000);
+	staged.set_program_fragment(0x24a50);
+	staged.set_loader2_source(0x24b7c, 629);
+	staged.set_verifier_source_end(0xd000);
+	staged.set_loader_control_address(0x0880);
+	staged.set_cycle_guard_for_loader(true);
+	staged.set_observe_after_missing_code(true);
+}
+
+void nokia_dct3_state::npe3hle(machine_config &config)
+{
+	npe3stage(config);
+	nokia_product_config runtime = PRODUCT_6210;
+	// Own 3d71f8 converts source 7 (selector 2) by calibration * 1500/232.
+	// Full scale yields 19f0, outside its 0708..157c accepted window.
+	// Nominal 0230 models about 3.6 V; this is not a measured ADC curve.
+	runtime.ccont_board.channel_defaults[2] = 0x230;
+	// Own SIMI path (48b7ac cause write / 48b7be control write) uses
+	// the physical controller; the firmware owns activation and APDUs.
+	runtime.simi_controller = true;
+	runtime.synthetic_sim_card = true;
+	// Explicit research handoff after own uploads, before absent mask code.
+	// Own 3029fe..302a02 selects command 0d -> 302a52, requires
+	// flag 17fd99 bit 2 and consumes fault bits 0/1 from message byte 9.
+	// This is a declared compact peer; no identity/record replies are selected.
+	runtime.external_service_transport = true;
+	runtime.dsp_service = true;
+	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	apply_product_config(runtime);
+	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
+}
+
 void nokia_dct3_state::noki6250(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
@@ -3955,6 +3995,24 @@ ROM_START( noki6210 )
 	ROM_LOAD("6210 virgin eeprom 005fa000.fls", 0x3fa000, 0x006000, CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
 ROM_END
 
+ROM_START( npe3stage )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("6210_556c.fls", 0, 0x3a0000,
+		CRC(203fb962) SHA1(3d9ea319503e78ec69b60d72cda23e461e118ea9))
+	ROM_LOAD("6210 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
+		CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
+ROM_END
+
+ROM_START( npe3hle )
+	DCT3_SHARED_MAD2_INTERNAL_ROMS
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("6210_556c.fls", 0, 0x3a0000,
+		CRC(203fb962) SHA1(3d9ea319503e78ec69b60d72cda23e461e118ea9))
+	ROM_LOAD("6210 virgin eeprom 005fa000.fls", 0x3fa000, 0x6000,
+		CRC(3c6d3437) SHA1(b3a527ede1be87bd715fb3741a81eef5bd422efa))
+ROM_END
+
 ROM_START( noki6250 )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 
@@ -4119,6 +4177,8 @@ SYST( 1999, nsm2hle, noki8850, 0, nsm2hle, noki8850, nokia_dct3_state, empty_ini
 SYST( 2000, noki3310, 0,      0,      noki3310, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3310", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki3610, 0,      0,      noki3610, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 3610 (NAM-1 bring-up)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6210, 0,      0,      noki6210, noki6210, nokia_dct3_state, empty_init, "Nokia", "Nokia 6210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, npe3stage, noki6210, 0, npe3stage, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2000, npe3hle, noki6210, 0, npe3hle, noki6210, nokia_dct3_state, empty_init, "Nokia", "6210 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, noki6250, 0,      0,      noki6250, noki6250, nokia_dct3_state, empty_init, "Nokia", "Nokia 6250", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nhm3stage, noki6250, 0, nhm3stage, noki6250, nokia_dct3_state, empty_init, "Nokia", "6250 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2000, nhm3hle, noki6250, 0, nhm3hle, noki6250, nokia_dct3_state, empty_init, "Nokia", "6250 native uploads with runtime DSP HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

@@ -1,0 +1,15 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -49617,6 +49617,11 @@
+ armada
+ seabattl
+ 
++
++@source:nokia/nokia_dct3.cpp
++npe3stage
++npe3hle
++
+ @source:zaccaria/zac1b1120.cpp
+ dodgem
+ sia2650

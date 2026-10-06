@@ -6,7 +6,18 @@ NPE-3 v5.56 PPM C reaches the final DSP verification wait at
 `0x426cc2..0x426cc8` after 232 alternating buffer handoffs. The product-local
 profile models the independently decoded MAD2 DSP release/ready and GENSIO
 contracts. Final DSP completion is not published. Boot/UI, SIM, network,
-calls/audio and handset save/load are not yet validated.
+calls/audio and handset save/load are not yet validated on the normal machine.
+
+Separate research compositions establish the own-upload/runtime boundary:
+`npe3stage` executes the acquired verifier/loaders and retains native ownership
+at absent mask routine `2c75`; `npe3hle` explicitly hands transport to HLE there.
+The latter uses the unchanged acquired PMM, request-correlated D0 discovery,
+the own compact self-test consumer and a declared nominal battery sample.
+SIM initialization reads all 50 EF_ADN records, and physical Menu decodes as
+`19` and opens Messages on the 96x60 display. Native resident DSP execution,
+measured final silicon verdict, radio, speech and full fidelity are not claimed.
+The next acceptance boundaries are Calculator, persistent SIM contacts and
+own-ROM radio acquisition/registration.
 
 ## Inputs
 
@@ -21,6 +32,9 @@ at region offset `0x3fa000`. Sources and archive hashes are in
 - At `0x4dc0e4`, firmware writes CTSI offset 2 with `0x40`, then sets bit 2
   and polls bit 4. `LSRS #5` tests original bit 4 through carry, not bit 5.
   The profile exposes that ready bit only when the release line is asserted.
+- Verifier start `426c36..426c3e` separately sets CTSI+2 bit 0 after writing
+  the uploaded descriptor. Execution therefore uses bit 0, not the bit-2
+  early readiness handshake; the original frontier gate still reproduces.
 - At `0x4ec7b0`, GENSIO control `0x22` selects CCONT; a write to offset
   `0x2c` precedes polling status offset `0x6d` bit 2 at `0x4ec7bc` and
   reading offset `0x6c`. Control bit 2 stays clear, so receive-ready follows
@@ -55,9 +69,10 @@ matrix keys across all five driven lines (100 reads), and held-Power
 press/release through the actual MAME controller. It is an MMIO conformance
 fixture: Lua drives controller registers and host inputs, never firmware RAM
 or messages. It restores the row/direction/mask registers. This proves the
-configured matrix, not firmware decoding, debounce or usable menus; those
-remain gated by the unresolved DSP bootstrap. The ordinary input exerciser
-now selects this product's logical key layout too.
+configured matrix, not firmware decoding, debounce or usable menus. The
+separate research-HLE menu gate below proves physical firmware decoding and
+menu interaction; the normal machine still retains the native DSP boundary.
+The ordinary input exerciser selects this product's logical key layout too.
 
 Nokia's [NPE-3 board schematics](https://altehandys.de/downloads/ser-no-6210-schematics.pdf)
 (Version 1.0, 09.02.2001) show the fitted matrix switches on page 5 and
@@ -137,7 +152,46 @@ receive-ready, all 232 ordered handoffs, no reset and the uncompleted final
 wait. It is a frontier gate, not usable-phone acceptance. Generic harness
 task/mode RAM addresses still describe the 3210 and are not NPE-3 semantics.
 
-## Missing Bootstrap Observation
+## Research-HLE acceptance
+
+Own descriptor `224a44` uploads 104 program words from file `24a50`, SHA-1
+`440bf49f1eba4cadb12f7f7581c992b0025807d6`. Descriptor `224b70` uploads
+**629** second-loader words from `24b7c`, SHA-1
+`734491708f00ca396b422ec4d489d0d4c491d0c9`. Native execution publishes
+`0000/0006` under the explicitly fragment-derived PROM/COBBA inputs, requests
+selector `14` once and selector `01` 156 times, verifies the whole second
+loader and installs 422 words at `0590..0735`. The next call is missing
+resident `2c75`. This executes own acquired uploads, not a ROM6 mask dump.
+
+The runtime comparison's type-05 discovery request is
+`1eff00d000030101e000`; response `1e0002d000030401c100` is acknowledged by
+the MCU with `1e0200d0000305014100`. Own class-74 dispatcher `305a0c..305a5e`
+calls `3029d4`; command `0d` selects `302a52`, checks flag `17fd99` bit 2,
+cancels timer `1b` and consumes fault bits 0/1 from byte 9. The declared
+compact peer clears fields `17fbef/17fbf0/17fbf1`; identity/record replies
+are not enabled.
+
+Independent PMM replay finds 295 records, a 2500-byte initial cache record,
+and journal end `1bb0`. Both base and replayed application checksums compute
+and store `6d85`. No journal deletion, donor storage or checksum edit is used.
+This static grammar assessment is not a full runtime NV-reader census.
+
+Analogue routine `3d71f8` reads source 7 through `4f3962`; table `2869dc`
+maps it to selector 2. Calibration gain/offset are at `17fce0/17fce4`, followed
+by integer scale 1500/232. Both samples must be in `0708..157c`. Conservative
+full scale `3ff` produces rejected `19f0`; the declared nominal input `230`
+produces accepted `0e31`, with acquired gain `3f809bca` and zero offset.
+This is a nominal battery fixture, not a measured electrical transfer curve.
+
+`make verify-6210-stage`, `verify-6210-runtime` and `verify-6210-menu` invoke
+`run_noki6210_acceptance.py` with a new isolated `RUN_DIR`. The runner checks
+pinned own inputs, refuses an existing directory and writes `acceptance.json`.
+Menu acceptance requires all 50 ADN reads, physical Menu followed by own
+decoder `4fad30` reporting `19`, and the reviewed Messages frame SHA-256
+`8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65`.
+Neither a host press alone nor a blank framebuffer establishes interactivity.
+
+## Missing native bootstrap observation
 
 No matching raw NPE-3 final publication or ROM6 mask image was identified in
 the acquired collection or checked-out reference implementation. The latter
