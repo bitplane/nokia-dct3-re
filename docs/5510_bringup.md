@@ -241,6 +241,36 @@ The current MAME source tree has no MSP430 CPU core. A faithful native MU4
 backend therefore needs both a core and the matching program; an explicitly
 declared serial-boundary HLE still requires recovered message semantics.
 
+### Software-accessible MU4 references
+
+The [original EXT_UI flashing-tool guide](https://files.elektroda.pl/12624,5510%2Bui%2Bdsp%2Bsoftware%2Bflashing%2Btool.html)
+describes an FBUS-connected UI MCU forwarding music-DSP updates into NAND;
+it names a separate Maverick FBUS specification, not yet acquired.
+The [RetroHack repair package](https://retrohack.eu/gsm/nokia-5510-dsp-repair-tool/)
+provides original R060/R061 music images alongside modified variants and
+an analysis of captured flashing traffic. Its hardware claims remain
+external-oracle evidence until independently matched to the NPM-5 image.
+
+Retained, ignored, under `roms/5510-mu4-reference/`:
+
+| Artifact | SHA256 |
+| --- | --- |
+| `5510-dsp-repair-tool_1.00_all.deb` | `1ac1261929fdf48829669ad00597f5d01a8f872d02ee6262acad9dcb9488776e` |
+| `InitData_R060.a00` | `65118e00dfd8d78726a45e781e2c7c96714228ec025bc5ccb141d445d85db094` |
+| `InitData_R061.a00` | `fad9a4d8c340c91fc06355ba18b42cdff9f2682ed48abb88903344d281b89d99` |
+| `initdisk_R060.a00` | `8240fc14b3683dee1018426359e74fc9cb1bb5d0ed438685312015b14e79fe4c` |
+
+The package was extracted, not installed or executed; its hash matches
+the publisher's value. Only the unmodified image names above were selected
+as emulation inputs. Its application source has no declared reuse license;
+keep it as a reference, not copied driver code. The packaged protocol
+analysis identifies node `28` and the `42/d2` transaction wrapper, agreeing
+with outgoing constructor `335a50`. It also describes unsolicited opcode
+`06` and self-test/product-info exchanges. These are leads for the MCU
+consumer census, not sufficient evidence for normal key/startup replies.
+Music-DSP images are separate from MAD2's missing resident baseband mask
+code and are not MSP430 program dumps.
+
 ### Firmware consumers
 
 The pinned image's GPIO reader `3a738c` temporarily enables mask bit 1 at
