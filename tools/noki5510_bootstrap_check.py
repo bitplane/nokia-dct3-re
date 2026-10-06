@@ -61,18 +61,35 @@ def verify_serial_readiness(text):
         cursor = found + len(event)
 
 
+def verify_input_lifecycle(text):
+    cursor = 0
+    for event in (
+        '5510_task_enter: index=1d entry=00335f1e',
+        '5510_input_serial_ui_init: mode=00 caller=00335f25',
+        '5510_input_serial_ui_receive:',
+    ):
+        found = text.find(event, cursor)
+        if found < 0:
+            raise ValueError('missing ordered input-lifecycle evidence: ' + event)
+        cursor = found + len(event)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--runtime', action='store_true', help='check explicitly hybrid service frontier')
     parser.add_argument('--serial-readiness', action='store_true',
                         help='also require observed MBUSTIM queue drainage')
+    parser.add_argument('--input-lifecycle', action='store_true',
+                        help='also require MU4 task initialization and receiver entry, not keys')
     args = parser.parse_args()
     try:
         text = args.log.read_text(errors='replace')
         verify(text, args.runtime)
         if args.serial_readiness:
             verify_serial_readiness(text)
+        if args.input_lifecycle:
+            verify_input_lifecycle(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5510 bootstrap FAIL: {error}\n')
     print('5510 own uploads PASS; ' + ('hybrid discovery/self-test consumed, not idle boot'

@@ -1,5 +1,7 @@
 import unittest
-from tools.noki5510_bootstrap_check import CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness
+from tools.noki5510_bootstrap_check import (
+    CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
+)
 
 
 class BootstrapCheckTest(unittest.TestCase):
@@ -12,6 +14,18 @@ class BootstrapCheckTest(unittest.TestCase):
 
     def test_serial_queues_drain_in_order(self):
         verify_serial_readiness(self.SERIAL)
+
+    def test_input_lifecycle_requires_positive_consumers(self):
+        events = (
+            '5510_task_enter: index=1d entry=00335f1e',
+            '5510_input_serial_ui_init: mode=00 caller=00335f25',
+            '5510_input_serial_ui_receive: message=0012ea8c',
+        )
+        verify_input_lifecycle('\n'.join(events))
+        for text in ('\n'.join(events[:1]), '\n'.join(events[1:]),
+                     '\n'.join(reversed(events))):
+            with self.assertRaises(ValueError):
+                verify_input_lifecycle(text)
 
     def test_serial_final_state_alone_is_insufficient(self):
         with self.assertRaises(ValueError):

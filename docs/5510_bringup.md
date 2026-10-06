@@ -242,10 +242,10 @@ Do not combine these branches into a borrowed handset key map.
 in its `input_contract` report. This is static evidence, not behavioral
 acceptance. `noki5510_input_observe.lua` observes the GPIO initializer,
 reader, IRQ handler, key decoder and secondary interrupt publisher without
-changing firmware state. On a fresh eight-second `nmp5hle` run reaching
-the service frontier, none of these five entry taps fires. This establishes
-only their inactivity in that boot window, not their absence from normal
-boots with valid product data. No input bindings are enabled by this result.
+changing firmware state. A fresh eight-second `nmp5hle` run confirms GPIO
+initialization and two reader entries. Register-bearing debugger actions
+must use ARM `r14`, not the unsupported `lr` alias; earlier absence claims
+from those actions are withdrawn. No input bindings are enabled by this result.
 
 The candidate serial UI receive path `335cfa` calls dispatcher `335854`.
 Selector byte `[message+9] == 0c` selects `33594c`: `[message+0a] == 1`
@@ -257,11 +257,14 @@ or permission to inject messages into the RTOS. The key routines are also
 used by the legacy local-key path, corroborating input ownership without
 assigning QWERTY positions from another handset.
 
-The observer also covers initializer `335f1e`, receive `335cfa`, dispatcher
-`335854` and probe constructor `335dac`. None fires in the fresh eight-second
-service-frontier run. The package checker pins the dispatcher's full code
-extent. MU4 serial startup is not yet exercised by the current lifecycle;
-recover its enabling call chain and wire transport before implementing a peer.
+The observer confirms task entry `335f1e`, initialization `33565a` and
+receiver `335cfa`. The received six-byte internal control object has byte
+6 equal to `d2`, byte 7 zero and payload bytes `02 02 1e` at offsets 9..11.
+The zero byte 7 selects disposal before the key dispatcher; this is not a
+keypress or proof of external MU4 traffic. Dispatcher `335854` and probe
+constructor `335dac` remain unobserved in this window. The package checker
+pins the dispatcher's full code extent. Recover the control/probe route and
+wire transport before implementing a peer.
 
 ### Task creation and serial readiness
 
@@ -270,9 +273,10 @@ constructs contexts with initial scheduler state `05`. Index 29 at `419e7c`
 contains entry `335f1f` (Thumb), stack size `0320`, priority byte `64` and
 queue fields `28/0a`. Its receive loop accepts message byte 6 equal to `d2`.
 The fresh run confirms task-29 state `05` and an allocated stack before
-ordinary startup; inactivity is not evidence that its descriptor is missing.
+ordinary startup, followed by positive task entry and receiver execution.
 
-Supervisor `37be9c` tests `399e54` first in its startup readiness chain.
+Lowest-priority task-0 supervisor `37be9c` tests `399e54` first in its
+idle/sleep eligibility chain, not a task-activation barrier.
 That predicate requires `38b1a8` and `2f5d72`. The former requires four
 serial busy/count bytes (`120c70`, `120c74`, `11cddc`, `11cdd8`) to be zero,
 FIQ-mask bit 3 to be set and delayed event `7b` absent. The original research
@@ -282,16 +286,18 @@ terminal timer while starting queued serial work.
 
 The NPM-5 profile now enables the existing MBUSTIM controller model. A fresh
 run observes actual queue writes from 1 to 0, mask `c8`, and readiness 1;
-no reply bytes or firmware state are injected. The MCU next passes `3139a4`
-but fails `31475c`, which tests byte `124880`, predicate `2c03c6` and byte
-`11ac2a`. Their ownership remains the next lifecycle question; this correction
-does not establish MU4 reception or resolve erased NV self-tests. The final
+no reply bytes or firmware state are injected. The supervisor next passes
+`3139a4` but fails `31475c`, which tests byte `124880`, predicate `2c03c6`
+and byte `11ac2a`. Failure selects the supervisor's busy-wait path instead
+of sleep; task 29 executes despite it. This is not an idle-screen boot gate
+and does not resolve erased NV self-tests. The final
 service-screen PNG is byte-identical to the timer-disabled control.
 
 Validate verbose `noki5510_input_observe.lua` evidence with
-`noki5510_bootstrap_check.py --runtime --serial-readiness <error.log>`.
+`noki5510_bootstrap_check.py --runtime --serial-readiness --input-lifecycle <error.log>`.
 The added check requires ordered task creation, queue occupation, queue
-drainage and the ready observation, not just a final flag. Native
+drainage, the ready observation and positive MU4 lifecycle entries, not just
+a final flag or an absence of trace output. Native
 `nmp5stage` still passes its separate missing-mask boundary check. MBUSTIM's
 existing cadence remains an inherited controller approximation, not a
 measured NPM-5 timing specification.
