@@ -298,7 +298,20 @@ The laboratory network delivers one ordinary message; the phone shows
 segmented CP-DATA, CP/RP acknowledgements, RR release, physical reading,
 and exact durable read-status/content. Exactly two EF_SMS record-1 writes
 occur: delivery and marking read. Screen captures are independently
-reviewed, not recognized by the trace checker. Outgoing SMS remains open.
+reviewed, not recognized by the trace checker.
+
+### Outgoing SMS
+
+`noki8210_outgoing_sms_input.lua` navigates Messages -> Write messages,
+physically enters `A` and `5551234`, and confirms Send. The success capture
+shows “Message sent”; the composer subsequently clears. The network
+decodes the exact GSM 7-bit SMS-SUBMIT, receives one accepted submission,
+and closes CP/RP and RR before returning to paging.
+`noki8210_outgoing_sms_check.py LOG` uses shared GSM transaction checks,
+but requires the own physical-key log. TP-MR is allowed to advance across
+successive submissions; destination, alphabet and exact `A` payload remain
+pinned. Two consecutive preserved-storage runs pass with TP-MR `01/02`.
+Apps and the aggregate model acceptance harness remain to be completed.
 
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
