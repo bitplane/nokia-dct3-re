@@ -357,7 +357,7 @@ original section payloads identifies these bounded startup contracts:
 | InitData `090f` | Direct writes to data addresses `54/28/2b/29/58/3c`; writes I/O port `0080`; far-calls `2082`. These addresses are not all ordinary RAM. |
 | InitData `2080..20ad` | 23 two-word far-branch trampolines; `2082` branches to `308e`. This is a function-entry table, not proof of interrupt-vector ownership. |
 | InitData `0db8` | Dispatches far function pointers through data `1742/1702/1744`, then calls `0df4`, which loops. Do not interpret that terminal loop as a missing peer reply. |
-| InitData `2fbf/302f` | Writes/reads I/O port `4000`; neighboring `2fca` waits on BIO, and `2fe6` performs masked read-modify-write of data `003d`. This is a candidate external-storage interface; electrical pin identities remain unvalidated. |
+| InitData `2fbf/302f` | Writes/reads NAND I/O port `4000`; neighboring `2fca` waits on BIO, and `2fe6` performs masked read-modify-write of data `003d`. Physical HD0/HD1/HD2 and BIO wiring is recovered below; board execution remains unvalidated. |
 
 The core's explicit extended-program mode implements the observed far
 control-flow families and XPC, with instruction-level conformance fixtures.
@@ -466,11 +466,13 @@ The lower read chain is `3234 -> 3035 -> 2fca/306c -> 302e`:
   followed by three address components derived from its argument plus one.
   It clears mask `2` and waits on BIO again.
 - Those control changes call `2fe6`, a masked update of data register
-  `003d`. Masks `1/2/4` are observed bits, not established CLE/ALE/CE pins.
+  `003d`. Command/address sequencing identifies masks `1/2/4` as CLE/ALE/CE;
+  the schematic and HPI GPIO register contract independently corroborate it.
 - `2fb5` saves interrupt state, writes I/O port `4000`, executes a bounded
   NOP repeat, and restores the prior interrupt-mask condition.
-- `2fca` loops while the BIO branch condition is true. No busy latency or
-  electrical polarity is inferred beyond that instruction condition.
+- `2fca` loops while BIO is low, which the schematic wires directly to the
+  NAND's active-low ready/busy output. Latency comes from the NAND operation,
+  not a fabricated firmware-ready event.
 - `306c` performs two port reads through `302e/302f` and assembles the low
   and high bytes of a word. The row reader caches words in its context and
   uses `0100` as its word-count boundary; do not equate that alone with a
@@ -495,8 +497,37 @@ place NAND strobes in the DSP I/O quadrant `4000..7fff` and USB strobes in
 enter this decoder. That independently agrees with the observed NAND port
 `4000`; the rest of DA150 address decoding and `ADD_H` ownership still need
 mapping. This removes the need to invent an opaque R/W-controller protocol.
-GPIO-bit-to-NAND-net mapping, BIO drive, spare-area/ECC handling and
+The DSP sheet 4 completes the control wiring:
+
+| U101 DA150 pin | Board net / U201 input |
+| --- | --- |
+| HD0, pin 60 | `NF_CLE` -> CLE |
+| HD1, pin 59 | `NF_ALE` -> ALE |
+| HD2, pin 81 | `NF_CE1` -> active-low CE |
+| BIO, pin 31 | `NF_R/B` <- NAND ready/busy |
+| HPIENA, pin 92 | Ground; HPI interface disabled. |
+
+TI's [VC5410A data manual, section 3.9.2](https://www.ti.com/lit/ds/symlink/tms320vc5410a.pdf)
+documents HD0..HD7 GPIO via direction register `003c` and status/output
+register `003d` when HPI is disabled. This is corroborating family evidence,
+not a claim that DA150 is a VC5410A or shares its full memory/peripheral map.
+The original MU4 startup at `0933..0939` ORs `7` into `003c`, and storage commands toggle `003d`
+bits 0/1/2 in exactly the matching command/address/select phases. Together,
+these establish a board-level attachment contract without importing an
+unrelated DSP profile. The family PDF is retained outside SCM as
+`roms/reference-docs/npm5/ti_tms320vc5410a_sprs139i.pdf`, SHA-256
+`6c3a0258b64817faf46bd7ac41c034da8b17ca4e4e1849a954778eb81ca50e4f`.
+
+[SPRU172C's condition-code definition](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+specifies BIO as low and NBIO as high. The core exposes a board-supplied
+`bio_in_cb` with an unconnected high default; no pin identity or NAND behavior
+belongs inside the CPU. Spare-area/ECC handling, address enables and
 container-to-media placement remain open.
+
+`make check-c54x-core` checks 28 BIO/NBIO variants at both pin levels
+(branch, delayed branch, conditional call/return, delayed return and one-/two-word
+conditional execution), plus a running busy loop released by a live pin change.
+This proves instruction/input behavior, not native MU4 firmware execution.
 The `aa55` outer firmware-container marker must not be confused with the
 FAT boot-sector signature: their consumers and address spaces differ.
 
@@ -526,7 +557,7 @@ revision 0.2, January 17, 2001. The original PDF is retained outside SCM as
 The spare-byte loop writes erased fill on this path;
 it does not prove that all media operations omit ECC or bad-block handling.
 The observed control masks are consistent with command/address/chip selection,
-but the DA150 GPIO mapping to those physical nets remains unvalidated.
+and the corresponding GPIO mapping now has independent schematic support.
 
 The overlay patch `patches/mame-nandflash-mu4.patch` extends MAME's generic
 `machine/nandflash`, rather than introducing a Nokia NAND implementation.
@@ -548,8 +579,8 @@ persistence, analog pin timing, copy-back, factory bad-block contents or
 all existing NAND users. Typical program/erase and maximum read/reset times
 are deterministic datasheet selections, not measured MU4 board latencies.
 
-U201 is not attached to a handset yet: DA150 control-pin ownership, BIO,
-address enables and original media placement remain prerequisites. Do not
+U201 is not attached to a handset yet: executing the recovered GPIO/BIO
+attachment, address enables and original media placement remain prerequisites. Do not
 seed a filesystem merely to satisfy the mount consumer.
 
 Next recover the storage-controller/media placement and independently locate

@@ -27,6 +27,48 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	int bio_r() { return m_bio_level; }
+	static constexpr u16 bio_opcodes[] = {
+		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
+		0xfc02, 0xfc03, 0xfe02, 0xfe03, 0xfd02, 0xfd03, 0xff02, 0xff03
+	};
+	void start_bio_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		u16 const op = bio_opcodes[index / 2];
+		m_bio_level = index & 1;
+		unsigned next = 0x010900;
+		program.write_word(next++, op);
+		bool const branch_or_call = (op & 0xfc00) == 0xf800;
+		bool const conditional_execute = (op & 0xfd00) == 0xfd00;
+		if (branch_or_call) program.write_word(next++, 0x0910);
+		if (conditional_execute)
+		{
+			program.write_word(next++, 0xe802);
+			if (BIT(op, 9)) program.write_word(next++, 0xe903);
+		}
+		else
+		{
+			if (BIT(op, 9))
+			{
+				program.write_word(next++, 0xe905);
+				program.write_word(next++, 0xe906);
+			}
+			program.write_word(next++, 0xe801);
+		}
+		program.write_word(next, 0xf4e1);
+		program.write_word(0x010910, 0xe802);
+		program.write_word(0x010911, 0xf4e1);
+		data.write_word(0x0400, 0x0910);
+		m_cpu->set_state_int(STATE_GENPC, 0x010900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 789 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	static constexpr u16 far_opcodes[] = {
 		0xf882, 0xfa82, 0xf4e6, 0xf5e6, 0xf6e6, 0xf7e6,
 		0xf982, 0xfb82, 0xf4e7, 0xf5e7, 0xf6e7, 0xf7e7,
@@ -14323,6 +14365,62 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 				"extended repeated program transfer retains A, executing XPC and wrong-page sentinels");
 			osd_printf_info("TMS320C54x extended program conformance: PASS\n");
+			start_bio_case(0);
+			return;
+		}
+		if (m_phase >= 789 && m_phase < 817)
+		{
+			unsigned const index = m_phase - 789;
+			u16 const op = bio_opcodes[index / 2];
+			bool const take = BIT(op, 0) ? !m_bio_level : bool(m_bio_level);
+			bool const execute = (op & 0xfd00) == 0xfd00;
+			bool const returning = (op & 0xfc00) == 0xfc00 && !execute;
+			bool const call = (op & 0xff00) == 0xf900;
+			u16 const sp = 0x0400 + (take && returning ? 1 : take && call ? -1 : 0);
+			expect_opcode(op, m_cpu->state_int(tms320c54x_device::STATE_A) ==
+					(execute ? (take ? 2 : 0) : take ? 2 : 1) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(execute ? (take && BIT(op, 9) ? 3 : 0) : BIT(op, 9) ? 6 : 0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == sp &&
+					m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+					"live BIO/NBIO branch, call, return and conditional execution at both pin levels");
+			if (index + 1 < std::size(bio_opcodes) * 2)
+			{
+				start_bio_case(index + 1);
+				return;
+			}
+			osd_printf_info("TMS320C54x live BIO conformance: PASS variants=28\n");
+			program.write_word(0x010930, 0xf803);
+			program.write_word(0x010931, 0x0930);
+			program.write_word(0x010932, 0xe807);
+			program.write_word(0x010933, 0xf4e1);
+			m_bio_level = 0;
+			m_cpu->set_state_int(STATE_GENPC, 0x010930);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 817;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 817)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x010930 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				!m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"BIO-low busy loop remains live without illegal opcode or forced PC");
+			m_bio_level = 1;
+			m_phase = 818;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 818)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x010934 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"BIO rising edge releases the executing wait loop through ordinary instruction flow");
+			osd_printf_info("TMS320C54x live BIO wait release: PASS\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -14500,6 +14598,7 @@ private:
 	}
 
 	required_device<tms320c54x_device> m_cpu;
+	int m_bio_level = 1;
 	optional_device<nokia_dspif_device> m_transport;
 	emu_timer *m_check_timer = nullptr;
 	unsigned m_phase = 0;
@@ -14530,6 +14629,7 @@ void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
+	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));
 	NOKIA_DSPIF(config, m_transport, 0);
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);

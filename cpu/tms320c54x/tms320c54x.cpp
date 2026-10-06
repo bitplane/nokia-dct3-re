@@ -38,7 +38,8 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	cpu_device(mconfig, TMS320C54X, tag, owner, clock),
 	m_program_config("program", ENDIANNESS_LITTLE, 16, 23, -1),
 	m_data_config("data", ENDIANNESS_LITTLE, 16, 16, -1),
-	m_io_config("io", ENDIANNESS_LITTLE, 16, 16, -1)
+	m_io_config("io", ENDIANNESS_LITTLE, 16, 16, -1),
+	m_bio_in_cb(*this, 1)
 {
 }
 
@@ -780,6 +781,23 @@ void tms320c54x_device::execute_one(u16 op)
 			m_pc = destination;
 		m_icount -= condition ? 4 : 2;
 	};
+	if ((op & 0xfdfe) == 0xf802) // BC[D] pmad, BIO/NBIO (SPRU172C).
+	{
+		const u16 destination = fetch();
+		const bool take = BIT(op, 0) ? !m_bio_in_cb() : bool(m_bio_in_cb());
+		if (take)
+		{
+			if (BIT(op, 9))
+			{
+				m_delayed_target = destination;
+				m_delayed_words = 2;
+			}
+			else
+				m_pc = destination;
+		}
+		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
+		return;
+	}
 	if ((op & 0xfcff) == 0xf4e1) // IDLE 1/2/3
 	{
 		m_idle = true;
@@ -853,8 +871,7 @@ void tms320c54x_device::execute_one(u16 op)
 						? BIT(m_st0, 11) : !BIT(m_st0, 11));
 			if (low & 0x03)
 			{
-				// BIO defaults deasserted until a board supplies the input line.
-				execute = execute && ((low & 0x03) == 0x02);
+				execute = execute && ((low & 3) == 3 ? !m_bio_in_cb() : (low & 3) == 2 && m_bio_in_cb());
 			}
 		}
 		if (!execute)
@@ -2229,16 +2246,16 @@ void tms320c54x_device::execute_one(u16 op)
 			else if ((condition & 0x70) == 0x60)
 				take = !BIT(m_st0, b ? 9 : 10);
 		}
-		else if ((condition & 0x30) == 0x30)
-			take = BIT(m_st0, 12);
-		else if ((condition & 0x30) == 0x20)
-			take = !BIT(m_st0, 12);
-		else if ((condition & 0x0c) == 0x0c)
-			take = BIT(m_st0, 11);
-		else if ((condition & 0x0c) == 0x08)
-			take = !BIT(m_st0, 11);
 		else
+		{
 			take = true;
+			if (condition & 0x30)
+				take = take && ((condition & 0x30) == 0x30 ? BIT(m_st0, 12) : !BIT(m_st0, 12));
+			if (condition & 0x0c)
+				take = take && ((condition & 0x0c) == 0x0c ? BIT(m_st0, 11) : !BIT(m_st0, 11));
+			if (condition & 3)
+				take = take && ((condition & 3) == 3 ? !m_bio_in_cb() : (condition & 3) == 2 && m_bio_in_cb());
+		}
 		m_icount -= 2;
 		if (take)
 		{
@@ -2259,6 +2276,22 @@ void tms320c54x_device::execute_one(u16 op)
 		else
 			m_icount -= 2;
 	};
+	if ((op & 0xfdfe) == 0xfc02) // RC[D] BIO/NBIO.
+	{
+		const bool take = BIT(op, 0) ? !m_bio_in_cb() : bool(m_bio_in_cb());
+		if (!BIT(op, 9))
+			return_if(take);
+		else
+		{
+			if (take)
+			{
+				m_delayed_target = pop();
+				m_delayed_words = 2;
+			}
+			m_icount -= 2;
+		}
+		return;
+	}
 	switch (op)
 	{
 	case 0xfc00: // RET

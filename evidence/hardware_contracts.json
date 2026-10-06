@@ -3,8 +3,13 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "c54x_live_bio_input", "subsystem": "dsp", "status": "partial", "confidence": "strong",
+      "boundary": "Core BIO callback reads the board pin, defaulting high when unconnected. SPRU172C defines BIO low/NBIO high. Executable conformance covers 28 pin-level variants of BC/BCD/CC/RC/RCD/XC plus a live busy-loop release. MU4 sheet 4 wires NAND R/B to DA150 BIO, but no handset currently executes that storage attachment; this validates CPU pin semantics rather than DA150 memory mapping or media provisioning",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp"]
+    },
+    {
       "id": "npm5_mu4_nand_strobe_decode", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
-      "boundary": "MU4 schematic sheet 7 identifies U201 K9K1208U0A NAND and U202 SN74LV138APWR combinational decoder. DSP R/W,A14,A15 select NAND Y2/Y3 write/read strobes in I/O quadrant 0x4000..0x7fff and USB Y6/Y7 in 0xc000..0xffff subject to IOSTRB and ADD_H enables. Separate CLE,ALE,CE and ready/busy nets reach DSP; their GPIO-bit mapping and NAND media placement remain unresolved. This is schematic plus decoder-equation evidence, not runtime device validation",
+      "boundary": "MU4 schematic sheets 4/7 identify U201 K9K1208U0A and U202 SN74LV138APWR. DSP R/W,A14,A15 select NAND Y2/Y3 strobes in I/O quadrant 0x4000..0x7fff and USB Y6/Y7 in 0xc000..0xffff subject to IOSTRB and ADD_H. HD0/HD1/HD2 connect CLE/ALE/CE; BIO connects NAND R/B, and HPIENA is grounded. Original 003d masks 1/2/4 command sequencing agrees with TI HPI-GPIO family registers 003c/003d. DA150 full peripheral mapping, address-enable ownership and media placement remain unresolved. This is schematic plus static-contract evidence, not board execution",
       "evidence": ["docs/5510_bringup.md"]
     },
     {
