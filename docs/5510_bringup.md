@@ -146,7 +146,37 @@ validate with `noki5510_bootstrap_check.py --runtime <error.log>`.
 The inherited 84x48 display geometry is still a research projection; the
 observed frame does not validate MU4 wiring or all display commands.
 
-Next decode the `0a09` consumer and product-state validity checks, and
-recover the MU4 interface. Keep the missing PMM, MU4 interface
+### Decoded product-state failures
+
+The read-only self-test audit identifies two failed logical-NV checks, not
+an unhandled DSP self-test fault. Reader `3ac638` reaches `2fd578`, which
+copies from logical cache `100044+offset`, bounded to `3800` bytes.
+The fresh runtime snapshot is erased in the critical regions.
+
+| Self-test record | Own check | Observed erased result |
+| --- | --- | --- |
+| `13fbf2`, code `12` at `24c7dc` | `3510ba -> 2a058c`: sum16 of `0000..011b` compared with big-endian u32 at `011c` | `1ae4 != ffffffff` |
+| `13fbec`, code `0c` at `24c858` | `24c612`: sum16 of `0120..0255`, excluding `0154..0155`, compared with u16 at `0256`; sum OR u16 at `0170` must also be nonzero | `32cc != ffff` |
+
+`36a1b0` is an additive byte sum, not CRC32. `33689c` supplies the excluded
+`0154` word. The latter failure explicitly clears status flag bit 6 at
+`24c862`. After compact DSP completion, fault records `13fbef..13fbf1`
+are zero while the two NV failures remain. This does not prove every other
+self-test or the absent PMM's identity/provisioning contract.
+
+`noki5510_selftest_observe.lua` records bounded writes and dumps the logical
+cache after four seconds, without changing firmware or MMIO. Assess with
+`noki5510_nv_check.py <npm5_nv_cache.bin> --erased-frontier-log <error.log>`;
+successful audit means the negative control reproduced, not valid NV.
+
+The decoded type-`74` command-`0a` handler at `24cab2` formats message byte
+11 as an ASCII digit and passes it to `33629e`. It is not a self-test-ready
+completion path. Therefore the unanswered `0a09` request alone is not
+evidence of the graphical boot dependency. No guessed response is added.
+
+The four acquired NPM-5 installers contain MCU/PPM and service assets, but
+no matching handset PMM is established. Next recover the flash-to-cache
+record replay and MU4 interface; seek matching product-state evidence rather
+than fill identity/security fields from another phone. Keep the missing PMM, MU4 interface
 and resident DSP inputs explicit; no donor provisioning or guessed success
 publication may be used to claim graphical or phone-service parity.
