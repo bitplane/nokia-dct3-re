@@ -274,6 +274,16 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM3 = {
 	nokia_radio_peer_device::neighbour_bsic_encoding::none, true, true
 };
 
+// NPE-3 v5.56 emits 56/160. Own RX table 4f6078 routes 8b to
+// 45835c -> task 14 (not NSM-3's task 12); 458106 correlates 89
+// body bit 0 with pending context byte 2. Call release remains unset.
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NPE3 = {
+	nokia_radio_peer_device::acquisition_strategy::candidate_window,
+	0, 0x01, 0, 0, false, 0, false, false,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::none, true
+};
+
 constexpr nokia_dsp_hle_device::service_control_contract
 		DSP_SERVICE_CONTROL_COMPACT = {
 	{ 0x0d, 0x00 }, 2
@@ -3809,6 +3819,7 @@ void nokia_dct3_state::npe3hle(machine_config &config)
 	// the physical controller; the firmware owns activation and APDUs.
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
+	runtime.radio = RADIO_NPE3;
 	// Explicit research handoff after own uploads, before absent mask code.
 	// Own 3029fe..302a02 selects command 0d -> 302a52, requires
 	// flag 17fd99 bit 2 and consumes fault bits 0/1 from message byte 9.

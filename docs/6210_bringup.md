@@ -207,11 +207,23 @@ and display the reviewed contact frame (SHA-256
 The storage validator independently checks the saved name and number.
 Neither process patches phone memory or seeds a contact directly.
 
+### Laboratory registration
+
 The runtime emits an organic type-`0x56` acquisition request with a 160-byte
-body, starting `0023` followed by erased candidate entries. No radio response
-contract has yet been enabled for NPE-3; registration, calls and SMS remain
-unaccepted. RX dispatch and pending-context semantics must be recovered from
-this product before selecting a network peer contract.
+body, starting `0023` followed by erased candidate entries. Own RX dispatcher
+`4f604a` indexes the thirteen-entry table at `4f6078` for types `83..8f`.
+Type `8b` calls `45835c`, which posts to **task 14**, not the NSM-3 task 12.
+Type `89` calls `4580e8`; `458106..458110` compares body bit 0 against pending
+context byte 2. `noki6210_radio_contract.py` pins these product-local facts.
+
+The NPE-3 candidate-window peer completes organic acquisition, Location
+Updating and acknowledged release. `verify-6210-registration` requires the
+ordered exchange, persisted laboratory LAI `00f1100001` and updated EF_LOCI
+status, plus the reviewed `DCT3 LAB` idle frame (SHA-256
+`1138954cc94944c83019823ea500fa9ea9f8857c76e3d8ba929cdc40db4c0b74`).
+The literal `Headset` accessory label remains unresolved. Call release,
+incoming/outgoing calls, SMS, neighbour/handover and speech are not accepted;
+unrecovered call-release and handover fields remain unset in the contract.
 
 ## Missing native bootstrap observation
 

@@ -11,22 +11,49 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.noki6210_upload_contract import assess
 from tools.noki6210_staged_check import verify
+from tools.noki6210_radio_contract import verify as verify_radio_contract
 
 SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'runtime': ('npe3hle', 'staged_observe', 18),
              'menu': ('npe3hle', 'menu_input', 25),
              'calculator': ('npe3hle', 'application_input', 38),
-             'phonebook': ('npe3hle', 'phonebook_input', 33)}
+             'phonebook': ('npe3hle', 'phonebook_input', 33),
+             'registration': ('npe3hle', 'menu_input', 25)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
+OPERATOR_SHA256 = '1138954cc94944c83019823ea500fa9ea9f8857c76e3d8ba929cdc40db4c0b74'
+
+
+def check_registration(text, storage):
+    import re
+    patterns = (
+        r'TX packet type=56 payload=160 .*data=0023',
+        r'TX packet type=02 .*radio_phase=candidate_channel_change data=040000000000005050000023',
+        r'TX packet type=0c .*radio_phase=random_access',
+        r'RX enqueue type=89 payload=8 .*data=0100000000000000',
+        r'TX packet type=1b .*data=0080013f4905087000f000fffe33080910101032547698',
+        r'LAPDm Location Updating Accept acknowledged nr=1',
+        r'LAPDm Channel Release acknowledged nr=2',
+        r'update-binary fid=6f7e offset=4 length=5',
+        r'update-binary fid=6f7e offset=10 length=1',
+        r'TX packet type=02 .*radio_phase=release_channel_change data=040000000000001a600000230000000f',
+    )
+    cursor = 0
+    for pattern in patterns:
+        match = re.search(pattern, text[cursor:])
+        if not match:
+            raise ValueError(f'missing ordered NPE-3 registration evidence: {pattern}')
+        cursor += match.end()
+    if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
+        raise ValueError('persisted EF_LOCI is not laboratory location-updated')
 
 
 def events(path):
     with path.open(errors='replace') as stream:
         return ''.join(line for line in stream if any(token in line for token in
                       ('staged_dsp:', '6210_', 'dspif_transport:', 'sim_device:',
-                       'SIM status', '[LUA ERROR]')))
+                       'SIM status', 'radio peer', 'dsp_hle:', '[LUA ERROR]')))
 
 
 def check_frame(frame, digest, description):
@@ -90,6 +117,7 @@ def main():
     try:
         contract = assess((root / 'roms/noki6210/6210_556c.fls').read_bytes(),
                           (root / 'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes())
+        contract['radio_receive'] = verify_radio_contract((root / 'roms/noki6210/6210_556c.fls').read_bytes())
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
@@ -129,6 +157,11 @@ def main():
             with Image.open(cold / 'snap/6210_phonebook_read_contact.png') as frame:
                 check_phonebook(text, read_trace,
                                (cold / 'nvram/npe3hle/sim_card').read_bytes(), frame)
+        elif args.scenario == 'registration':
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            from PIL import Image
+            with Image.open(run / 'snap/6210_before_menu.png') as frame:
+                check_frame(frame, OPERATOR_SHA256, 'DCT3 LAB registered idle')
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,

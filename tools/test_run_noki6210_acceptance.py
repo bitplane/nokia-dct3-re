@@ -34,6 +34,10 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_registration_rejects_missing_exchange(self):
+        with self.assertRaisesRegex(ValueError, 'ordered NPE-3'):
+            runner.check_registration('', bytes(3524))
+
     def test_calculator_requires_ordered_keys(self):
         frame = Image.new('L', (96, 60), 255)
         actions = ('application', 'input_1', 'input_12', 'operation_options',

@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 52
-Differences found: 93
+Families with more than one product: 53
+Differences found: 94
 
 ## ROM normalisation reachability
 
@@ -69,6 +69,7 @@ absent product is a coverage question, not a drifted gate.
 | `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — | — | — | — |
 | `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — | — | — | — |
 | `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — |
+| `registration` | — | — | — | — | — | — | — | — | — | yes | — | yes |
 | `save-state` | — | — | — | — | — | — | yes | yes | — | — | — | — |
 | `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — |
 | `verifier` | — | — | — | — | — | — | — | — | — | yes | yes | yes |
@@ -309,6 +310,11 @@ absent product is a coverage question, not a drifted gate.
 
 - **3330**: `tools/radio_3330_unsuitable_cell_trace_check.py`
 - **3410**: `tools/radio_3410_registration_negative_trace_check.py`
+
+### `registration`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
 
 ### `save-state`
 
