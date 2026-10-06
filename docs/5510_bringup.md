@@ -342,6 +342,15 @@ original section payloads identifies these bounded startup contracts:
 
 The core's explicit extended-program mode implements the observed far
 control-flow families and XPC, with instruction-level conformance fixtures.
+The library contains a program-copy helper at `20ae..20b2`: it loads AR0
+from an argument, repeats `WRITA *AR0+`, and far-returns. `2ebf` provides a
+single-word WRITA entry through trampoline `20aa`; `2ec1` is an
+accumulator-indirect far branch through `20ac`. These establish available
+program-write/dispatch primitives, not an identified overlay selector.
+An executable core fixture repeats WRITA and READA across `02:ffff` into
+`03:0000`, checking wrong-page sentinels, unchanged A and executing XPC,
+and the advancing data pointer. This tests the extended PAR contract in
+TI SPRU172C's WRITA/READA definitions independently of DA150 mapping.
 This is not DA150 execution or peripheral validation. Core MMR accesses (for example SP at data
 `18`) must remain distinct from board/peripheral accesses. No success value
 or busy-line transition is inferred from these static routines.

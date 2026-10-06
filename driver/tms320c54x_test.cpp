@@ -14281,6 +14281,47 @@ private:
 				return;
 			}
 			osd_printf_info("TMS320C54x extended save replay: PASS pending_call pending_return xpc stack delay\n");
+			program.write_word(0x010800, 0xec02); // RPT #2
+			program.write_word(0x010801, 0x7f90); // WRITA *AR0+
+			program.write_word(0x010802, 0xec02);
+			program.write_word(0x010803, 0x7e90); // READA *AR0+
+			program.write_word(0x010804, 0xf4e1);
+			data.write_word(0x0500, 0x1234);
+			data.write_word(0x0501, 0x5678);
+			data.write_word(0x0502, 0x9abc);
+			for (unsigned address = 0x0503; address != 0x0506; ++address)
+				data.write_word(address, 0);
+			program.write_word(0x00fffe, 0xaaaa);
+			program.write_word(0x00ffff, 0xbbbb);
+			program.write_word(0x000000, 0xcccc);
+			program.write_word(0x020000, 0xdddd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0500);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x02fffe);
+			m_cpu->set_state_int(STATE_GENPC, 0x010800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 788;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 788)
+		{
+			expect_opcode(0x7f90,
+				program.read_word(0x02fffe) == 0x1234 &&
+				program.read_word(0x02ffff) == 0x5678 &&
+				program.read_word(0x030000) == 0x9abc &&
+				data.read_word(0x0503) == 0x1234 &&
+				data.read_word(0x0504) == 0x5678 &&
+				data.read_word(0x0505) == 0x9abc,
+				"repeated extended WRITA/READA cross a page boundary without truncating PAR");
+			expect(program.read_word(0x00fffe) == 0xaaaa &&
+				program.read_word(0x00ffff) == 0xbbbb &&
+				program.read_word(0x000000) == 0xcccc &&
+				program.read_word(0x020000) == 0xdddd &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x02fffe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0506 &&
+				m_cpu->state_int(STATE_GENPC) == 0x010805 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"extended repeated program transfer retains A, executing XPC and wrong-page sentinels");
 			osd_printf_info("TMS320C54x extended program conformance: PASS\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
