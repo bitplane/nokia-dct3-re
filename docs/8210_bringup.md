@@ -205,9 +205,17 @@ Generate that explicitly diagnostic persistent flash in an isolated run:
 ```
 
 Run `nsm3hle` with the physical Menu fixture and that NVRAM directory.
-Next validate the own SIM-controller path and physical menu interaction on
-this labelled snapshot, while retaining the original-journal negative
-control. Do not silently promote this fixture to the normal machine ROM.
+`nsm3hle` now composes SIMI and the removable laboratory card. On this
+labelled snapshot, the firmware activates the card, performs its own
+SELECT/STATUS/read conversation, reads all 50 EF_ADN records (`6f3a`), and
+reaches the phone security editor. `tools/noki8210_security_input.lua`
+presses physical digits `1..5` and Menu at 12 seconds; the own decoder logs
+`01..05` and `19`. The editor dismisses to a Menu/Names idle presentation,
+and the subsequent physical Menu press opens the Messages menu. This is
+interactive UI and SIM-read acceptance, not cold-persistent phonebook
+write, registration, call or SMS acceptance. Radio remains unselected.
+Retain the original-journal negative control and do not silently promote
+this fixture to the normal machine ROM.
 
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be

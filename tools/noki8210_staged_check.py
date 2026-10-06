@@ -10,7 +10,7 @@ from tools.nsm3d_catalogue import catalogue
 from tools.radio_call_lifecycle_common import require_ordered
 
 
-def verify(text, runtime=False, selftest=False):
+def verify(text, runtime=False, selftest=False, base_record=False):
     patterns = (
         ('own verifier descriptor', '8210_verifier_descriptor: pointer=0031bcf0'),
         ('native verifier', 'release entry=0f00 words=223 prom_input=0006 clock=13000000 stage=verifier'),
@@ -45,7 +45,8 @@ def verify(text, runtime=False, selftest=False):
         require_ordered(text, tuple((name, re.compile(re.escape(pattern)))
                                   for name, pattern in (
             ('own self-test request', 'TX pending type=70 payload=2 data=0d00'),
-            ('own armed consumer', '8210_selftest_reply: command=0d faults=00 flag=84'),
+            ('own armed consumer', '8210_selftest_reply: command=0d faults=00 flag=' +
+             ('c4' if base_record else '84')),
             ('own cleared faults', '8210_service_return: command=0d faults=00/00/00'),
         )), '8210 compact self-test')
 
@@ -56,6 +57,8 @@ def main():
     parser.add_argument('flash', type=Path)
     parser.add_argument('--runtime', action='store_true')
     parser.add_argument('--selftest', action='store_true')
+    parser.add_argument('--base-record', action='store_true',
+                        help='expect the labelled checksum-valid base-record fixture')
     args = parser.parse_args()
     try:
         entries = catalogue(args.flash.read_bytes(), '8210')
@@ -67,7 +70,7 @@ def main():
                            or '8210_verifier_' in line or '[LUA ERROR]' in line
                            or '8210_selftest_' in line or '8210_service_return:' in line
                            or 'dspif_transport:' in line)
-        verify(text, args.runtime, args.selftest)
+        verify(text, args.runtime, args.selftest, args.base_record)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 staged FAIL: {error}\n')
     print('8210 compact self-test PASS; UI and native resident execution unproved' if args.selftest

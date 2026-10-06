@@ -3663,6 +3663,10 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	// Own scanner 305998 drives pins 0..4 and returns row*5+column;
 	// matrix 33ee78 leaves row 0 empty and maps physical keys on 1..4.
 	runtime.keypad_wiring.row_pin_shift = 1;
+	// Compose the physical controller and removable laboratory card.
+	// NSM-3 firmware owns reset, activation and APDU sequencing.
+	runtime.simi_controller = true;
+	runtime.synthetic_sim_card = true;
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }

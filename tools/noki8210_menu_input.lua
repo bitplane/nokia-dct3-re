@@ -76,6 +76,7 @@ cpu.debug:bpset(0x24a8e4, 'temp8<64',
 cpu.debug:bpset(0x24a9b0, 'temp7<64',
     'temp7=temp7+1;logerror "8210_readiness_flags: values=%02x%02x%02x%02x%02x%02x%02x%02x%02x\\n",b@137e44,b@137e45,b@137e46,b@137e47,b@137e48,b@137e49,b@137e4a,b@137e4b,b@137e4c;g')
 local input = coroutine.create(function()
+    if _G.noki8210_observe_only then return end
     if not emu.wait(12) then return end
     local key = assert(machine.ioport.ports[':COL.1'].fields['Menu'])
     machine:logerror('8210_menu_physical: press=1\n')
