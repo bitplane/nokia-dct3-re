@@ -20,6 +20,27 @@ def write(destination, data, short=False):
 
 
 class JournalTests(unittest.TestCase):
+    def test_npm5_explicit_version_and_large_sector(self):
+        image = bytearray(b'\xff' * 0x10000)
+        image[6:12] = b'EEPROM'
+        image[0x18:0x1a] = b'\x00\x03'
+        record = write(0, b'\xff' * 0x3800)
+        image[0x20:0x20 + len(record)] = record
+        cache, writes, end = replay(image, 0x3800, sector_size=0x10000, version=3)
+        self.assertEqual(cache, b'\xff' * 0x3800)
+        self.assertEqual(len(writes), 1)
+        self.assertEqual(end, 0x3826)
+        with self.assertRaises(ValueError):
+            replay(image, 0x3800)
+
+    def test_truncated_extended_fields_are_rejected(self):
+        image = sector(b'')
+        image[0x20:0x22] = bytes(2)
+        with self.assertRaisesRegex(ValueError, 'extended'):
+            replay(image, sector_size=0x22)
+        with self.assertRaisesRegex(ValueError, 'destination'):
+            replay(image, sector_size=0x24)
+
     def test_trace_requires_complete_matching_snapshot(self):
         self.assertEqual(check_trace(b"ab", "nse5_compat_storage_cache_snapshot: bytes=6162"), 1)
         for text in ("", "nse5_compat_storage_cache_snapshot: bytes=61",

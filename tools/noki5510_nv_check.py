@@ -3,6 +3,11 @@ import argparse
 import json
 from pathlib import Path
 import struct
+import sys
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.nse5_pmm_journal import replay
 
 
 def assess(cache):
@@ -35,14 +40,36 @@ def verify_erased_frontier(text, cache):
     return report
 
 
+def verify_storage(text, flash, cache):
+    if len(flash) != 0x400000:
+        raise ValueError('expected complete 4 MiB persisted flash')
+    for event in ('5510_storage_version: index=00 base0=005e0000 base1=005f0000 version=0003',
+                  '5510_storage_result: accepted=01 flags=00 status=e111'):
+        if event not in text:
+            raise ValueError('missing storage selection evidence: ' + event)
+    reconstructed, writes, end = replay(flash[0x3e0000:0x3f0000], 0x3800,
+                                       sector_size=0x10000, version=3)
+    if reconstructed != cache:
+        raise ValueError('independent journal replay differs from live logical cache')
+    return {'sector_address': '5e0000', 'version': 3, 'writes': len(writes),
+            'stop_offset': f'{end:x}', 'cache_matches': True,
+            'nv': verify_erased_frontier(text, cache)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('cache', type=Path)
     parser.add_argument('--erased-frontier-log', type=Path)
+    parser.add_argument('--flash', type=Path, help='compare selected journal with the runtime cache')
     args = parser.parse_args()
     try:
         cache = args.cache.read_bytes()
-        report = (verify_erased_frontier(args.erased_frontier_log.read_text(), cache)
+        if args.flash:
+            if not args.erased_frontier_log:
+                raise ValueError('--flash requires --erased-frontier-log')
+            report = verify_storage(args.erased_frontier_log.read_text(), args.flash.read_bytes(), cache)
+        else:
+            report = (verify_erased_frontier(args.erased_frontier_log.read_text(), cache)
                   if args.erased_frontier_log else assess(cache))
     except (OSError, ValueError) as error:
         parser.exit(1, f'5510 NV audit FAIL: {error}\n')

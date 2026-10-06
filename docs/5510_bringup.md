@@ -175,8 +175,33 @@ completion path. Therefore the unanswered `0a09` request alone is not
 evidence of the graphical boot dependency. No guessed response is added.
 
 The four acquired NPM-5 installers contain MCU/PPM and service assets, but
-no matching handset PMM is established. Next recover the flash-to-cache
-record replay and MU4 interface; seek matching product-state evidence rather
+no matching handset PMM is established.
+
+### Flash-to-cache replay
+
+Own initializer `2fd8d0` examines two descriptors at `11f41c`, selecting
+flash sectors `5e0000/5f0000`. Their first six bytes must match
+`f0f0fff80001`, and the version word at header offset `18` must equal 3.
+Replay `2fcc5c` starts at offset `20`: the high six header bits encode a
+short length (zero selects the following extended u16 length), then a u16
+logical destination and even-padded bytes. `ffff` or header bit 9 stops
+the stream. Deletion effects remain outside the write-only decoder.
+
+The fresh firmware creates a version-3 journal, selects index 0 and returns
+accepted `01`, flags `00`, status `e111`. Independent replay of the saved
+64 KiB sector yields ten writes, stop offset `38ce`, and exactly matches
+all `3800` live cache bytes. The critical NV records remain erased despite
+successful storage initialization. This excludes a flash/cache mapping
+failure for this observed boot; it does not establish every flash failure,
+sector rollover, deletion or persistent-product-state contract.
+
+Run `noki5510_storage_observe.lua` from a fresh working directory, then
+extend the NV audit command with `--flash <nvram/nmp5hle/flash>`. The shared
+journal decoder retains NSE-5 version-1/8 KiB defaults; NPM-5 explicitly
+selects version 3, a 64 KiB sector and a `3800`-byte cache. No records are
+generated or borrowed by the checker.
+
+Next recover the MU4 interface and seek matching product-state evidence rather
 than fill identity/security fields from another phone. Keep the missing PMM, MU4 interface
 and resident DSP inputs explicit; no donor provisioning or guessed success
 publication may be used to claim graphical or phone-service parity.

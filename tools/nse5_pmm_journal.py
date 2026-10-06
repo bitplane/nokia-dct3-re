@@ -8,15 +8,15 @@ from pathlib import Path
 import re
 
 
-def replay(image, cache_size=0x898):
-    if len(image) < 0x2000 or image[6:12] != b"EEPROM":
-        raise ValueError("expected a complete NSE-5 EEPROM sector")
-    if int.from_bytes(image[0x18:0x1A], "big") != 1:
+def replay(image, cache_size=0x898, *, sector_size=0x2000, version=1):
+    if sector_size < 0x22 or len(image) < sector_size or image[6:12] != b"EEPROM":
+        raise ValueError("expected a complete EEPROM journal sector")
+    if int.from_bytes(image[0x18:0x1A], "big") != version:
         raise ValueError("sector is not accepted by the startup reader")
     cache = bytearray(cache_size)
     writes = []
     cursor = 0x20
-    while cursor <= 0x1FFF:
+    while cursor + 2 <= sector_size:
         start = cursor
         header = int.from_bytes(image[cursor:cursor + 2], "big")
         if header == 0xFFFF or header & 0x200:
@@ -24,15 +24,19 @@ def replay(image, cache_size=0x898):
         cursor += 2
         length = header >> 10
         if not length:
+            if cursor + 2 > sector_size:
+                raise ValueError("truncated extended journal length")
             length = int.from_bytes(image[cursor:cursor + 2], "big")
             cursor += 2
         # The acquired sector has no deletion records. Do not guess their
         # cache effects from the observed write-only path.
         if header & 0x100:
             raise ValueError("deletion record requires a separate contract")
+        if cursor + 2 > sector_size:
+            raise ValueError("truncated journal destination")
         destination = int.from_bytes(image[cursor:cursor + 2], "big")
         cursor += 2
-        if not length or cursor + length > 0x2000 or destination + length > cache_size:
+        if not length or cursor + length > sector_size or destination + length > cache_size:
             raise ValueError("journal write exceeds the observed sector/cache")
         cache[destination:destination + length] = image[cursor:cursor + length]
         writes.append({"record": start, "source": cursor,
