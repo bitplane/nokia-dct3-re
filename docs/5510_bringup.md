@@ -266,7 +266,12 @@ constructor `335dac` remain unobserved in this window. The package checker
 pins the dispatcher's full code extent. Recover the control/probe route and
 wire transport before implementing a peer.
 
-### MU4 timer and analog-dependent control
+### Candidate serial-UI task and service-battery control
+
+Task 29's physical MU4 ownership is not established. Its decoded key
+consumer and serial routing make it a candidate, but its analog-gated
+control branch is consistent with service/test operation, not proof of
+ordinary MU4 startup.
 
 Initializer `33565a` arms timer `0127` with argument `0469`. Its RTOS
 record at `10c3b8` has owner `1d` and armed state `02`; a longer cold run
@@ -279,11 +284,12 @@ Event `01e7` calls predicate `335b74`. It requires two selector-3 ADC
 reads in the inclusive range `00da..010e`, then selector 4 below `015c`.
 Success calls `335e18`, constructing control selector `ca` through
 `399f12`; failure calls `391830`, posting report 7 to task 1. The current
-research inputs return selector 3 = `0280` twice, failing the upper bound
+research inputs return selector 3 = `0253` twice, failing the upper bound
 before selector 4 is read. No control `ca` or probe `fe` is observed.
-The predicate's physical NPM-5 channel meaning and valid electrical values
-are unresolved: do not tune ADC inputs to satisfy it or call it an MU4
-presence detector without independent evidence.
+The documented 22 kohm service battery maps inside this window; the normal
+BLB-2 maps outside it (derivation below). This supports a service-battery
+interpretation, not an MU4 presence detector. Do not tune normal inputs to
+make this branch succeed.
 
 Probe `335dac` is a separate constructor reached through `335df4`, not
 the successful `01e7` branch itself. Its node-`28` message is rejected by
@@ -306,14 +312,25 @@ independently identifies the same BLB-2's nominal 68 kohm BSI resistance.
 The NPM-5 technical manual's battery table instead lists BMC/BLC packs;
 it does not override the product-specific BLB-2 identification.
 
-`37bb96` also samples selectors 3/4 during startup, independently of MU4's
+The [Nokia NSE-8/9 CCONT ADC specification](https://manualmachine.com/nokia/3210/8179317-service-manual/)
+(System Module, tables 28/29) identifies the BSI input's 1.5 V reference.
+Using that shared CCONT input contract with NPM-5's own divider gives
+`1023 * 2.8 * 68 / (1.5 * (150 + 68)) = 595` (`0253`) for BLB-2.
+The documented 22 kohm service battery gives 244 (`00f4`), inside
+`00da..010e`. The 100 kohm VREF pull-up and nominal 47 kohm NTC at 25 C
+give BTEMP 327 (`0147`). These are nominal electrical inputs, not measured
+NPM-5 calibration; no other product's board divider is imported.
+
+`37bb96` also samples selectors 3/4 during startup, independently of task 29's
 later timer. A cold fixture with selector 3 = `013f` and selector 4 = `0147`
 enters power-down `3aa5c2` from `37bc4e` before loader entry. The `013f`
 calculation assumed an unverified ratiometric VBB reference; it is not an
-accepted profile. The shipped research defaults remain unchanged. Recover
-selector 3's conversion reference and input scaling before deriving a new
-raw value; neither the later timer's window nor startup acceptance is a
-physical calibration source.
+accepted profile. The NPM-5 research profile now uses the independently
+derived `0253/0147` pair. Fresh cold runs preserve both the native missing-mask
+boundary and the hybrid discovery/self-test, serial-readiness, task-entry
+and first timer-delivery checks. The timer predicate still fails normally;
+this does not establish an idle boot. Other ADC channels retain explicitly
+unvalidated research defaults.
 
 Full PDFs are retained outside SCM in `roms/reference-docs/npm5/`:
 
@@ -354,7 +371,7 @@ service-screen PNG is byte-identical to the timer-disabled control.
 Validate verbose `noki5510_input_observe.lua` evidence with
 `noki5510_bootstrap_check.py --runtime --serial-readiness --input-lifecycle <error.log>`.
 The added check requires ordered task creation, queue occupation, queue
-drainage, the ready observation and positive MU4 lifecycle entries, not just
+drainage, the ready observation and positive candidate-task lifecycle entries, not just
 a final flag or an absence of trace output. Native
 `nmp5stage` still passes its separate missing-mask boundary check. MBUSTIM's
 existing cadence remains an inherited controller approximation, not a

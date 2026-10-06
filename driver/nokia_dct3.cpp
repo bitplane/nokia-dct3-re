@@ -93,6 +93,17 @@ constexpr nokia_ccont_board_profile ADC_DEFAULT = {
 	5, 0x03ff
 };
 
+// NPM-5 MA4 A3-6: BSI is pulled to 2.8 V VBB through 150 kohm;
+// General Information specifies BLB-2 (68 kohm). CCONT BSI conversion
+// uses 1.5 V VREF, not VBB: 1023 * 2.8 * 68 / (1.5 * 218) ~= 595.
+// BTEMP's 100 kohm VREF pull-up and 47 kohm/25 C NTC give 327.
+// Nominal divider inputs, not measured NPM-5 calibration. Other channels
+// retain research defaults until their physical transfer is recovered.
+constexpr nokia_ccont_board_profile ADC_NPM5 = {
+	{ 0x000, 0x3ff, 0x3ff, 595, 327, 0x000, 0x200, 0x000 },
+	5, 0x03ff
+};
+
 // NSE-8 repurposes the conventional DCT3 ADC pins. The service manual gives
 // typical uncalibrated transfer points for Vdc_out, Vchout, BTEMP and VCHAR.
 // Selectors 0/1 retain the firmware-proven safe battery samples. Selector 0 is
@@ -3826,6 +3837,7 @@ void nokia_dct3_state::nmp5stage(machine_config &config)
 	// Own 3acc98 polls 6d, selects 25 at 2d, transfers through 2c
 	// and receives at 6c. This selects the recovered GENSIO register contract.
 	research.gensio_wiring = GENSIO_NSM3;
+	research.ccont_board = ADC_NPM5;
 	// NPM-5 0x383fa0 arms MBUSTIM while its startup serial queue drains.
 	research.mbus_timer_enabled = true;
 	// Bootstrap instrument: bit 0 is the own verifier execution release.
