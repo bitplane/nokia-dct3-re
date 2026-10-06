@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory
+from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section
 
 
 def segment(marker, payload):
@@ -48,6 +48,19 @@ class A00InventoryTest(unittest.TestCase):
                 section_inventory(stream[:length])
         with self.assertRaises(ValueError):
             section_inventory(stream + b'\x00\x00')
+
+    def test_extraction_preserves_words_and_requires_exact_selection(self):
+        image = self.boot_image()
+        expected = bytes.fromhex('beef1234')
+        self.assertEqual(extract_section(image, 0x20900), expected)
+        wrapped = segment(0xaa55, image)
+        self.assertEqual(extract_section(wrapped, 0x20900, 'aa55'), expected)
+        for source, address, marker in ((image, 0x900, None),
+                                        (image, 0x20900, 'aa55'),
+                                        (wrapped, 0x20900, None),
+                                        (wrapped, 0x20900, 'aa22')):
+            with self.assertRaises(ValueError):
+                extract_section(source, address, marker)
 
     def test_extent_and_trailer_are_distinct(self):
         image = segment(0xaa55, b'ab') + segment(0xaa22, b'c')

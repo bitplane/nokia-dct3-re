@@ -84,13 +84,60 @@ def inventory(image):
             'scope': 'container and section extents; trailer integrity, overlay selection and DA150 execution unvalidated'}
 
 
+def extract_section(image, address, marker=None):
+    """Return one original big-endian record payload, without filling holes."""
+    if image[:2] in (b'\x08\xaa', b'\x10\xaa'):
+        if marker is not None:
+            raise ValueError('standalone boot stream has no segment marker')
+        report = serial_boot_inventory(image)
+        payload = image
+    else:
+        container = inventory(image)
+        selected = [s for s in container['segments'] if s['marker'] == marker]
+        if len(selected) != 1:
+            raise ValueError('select exactly one container segment marker')
+        segment = selected[0]
+        report = segment.get('serial_boot', segment.get('section_stream'))
+        if report is None:
+            raise ValueError('segment section grammar is unvalidated')
+        start = segment['offset'] + 6
+        payload = image[start:start + segment['payload_bytes']]
+    selected = [s for s in report['sections']
+                if s['destination_word_address'] == address]
+    if len(selected) != 1:
+        raise ValueError('select exactly one section destination word address')
+    section = selected[0]
+    start = section['offset'] + 6
+    data = payload[start:start + section['words'] * 2]
+    if hashlib.sha256(data).hexdigest() != section['payload_sha256']:
+        raise ValueError('extracted section hash mismatch')
+    return data
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
+    parser.add_argument('--extract-section', type=lambda value: int(value, 0),
+                        help='exact destination word address; export original big-endian bytes')
+    parser.add_argument('--segment', help='container marker, e.g. aa55; omit for InitDisk')
+    parser.add_argument('--output', type=Path)
     args = parser.parse_args()
+    if (args.extract_section is None) != (args.output is None):
+        parser.error('--extract-section and --output must be used together')
+    if args.segment is not None and args.output is None:
+        parser.error('--segment requires section extraction')
     try:
         source = args.image.read_bytes()
         image = bytes.fromhex(source.decode('ascii'))
+        if args.output is not None:
+            data = extract_section(image, args.extract_section, args.segment)
+            # A research export must never overwrite an existing artifact.
+            with args.output.open('xb') as output:
+                output.write(data)
+            print(json.dumps({'destination_word_address': args.extract_section,
+                              'bytes': len(data),
+                              'sha256': hashlib.sha256(data).hexdigest()}))
+            return
         report = (serial_boot_inventory(image)
                   if image[:2] in (b'\x08\xaa', b'\x10\xaa') else inventory(image))
     except (ValueError, OSError) as exc:

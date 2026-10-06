@@ -323,12 +323,50 @@ space and no XPC state, so it cannot represent these streams faithfully as
 one flat image. Extended-program support needs its own ISA/peripheral
 evidence and executable tests; silently truncating addresses is forbidden.
 
-The recovered InitDisk entry `492b` and InitData entry `0e41` start with
-stack/status setup, but the existing MAME disassembler only emits `.word`.
-No complete instruction-boundary or peripheral-dependency census is claimed.
-Next decode those entry routines and the overlay-selection consumer before
-constructing a DA150 research machine. Do not load the complete container
-as flat program ROM or substitute its music DSP for MAD2's baseband DSP.
+Do not load the complete container as flat program ROM or substitute its
+music DSP for MAD2's baseband DSP.
+
+#### Music-DSP entry dependencies
+
+Independent GNU Binutils 2.43.1 (`--target=tic54x-coff`) disassembly of the
+original section payloads identifies these bounded startup contracts:
+
+| Image/path | Observed code contract |
+| --- | --- |
+| InitDisk `492b` | Initializes SP to `0900`, aligns it after adding `02ff`, establishes status bits, reads initialization data at `2080`, then calls `3079` and `4a6c`. |
+| InitData `0e41` | Initializes SP to `1200`, aligns it after adding `03ff`, establishes status bits, reads initialization data at `0f33`, then far-calls `090f` and `0db8`. |
+| InitData `090f` | Direct writes to data addresses `54/28/2b/29/58/3c`; writes I/O port `0080`; far-calls `2082`. These addresses are not all ordinary RAM. |
+| InitData `2080..20ad` | 23 two-word far-branch trampolines; `2082` branches to `308e`. This is a function-entry table, not proof of interrupt-vector ownership. |
+| InitData `0db8` | Dispatches far function pointers through data `1742/1702/1744`, then calls `0df4`, which loops. Do not interpret that terminal loop as a missing peer reply. |
+| InitData `2fbf/302f` | Writes/reads I/O port `4000`; neighboring `2fca` waits on BIO, and `2fe6` performs masked read-modify-write of data `003d`. This is a candidate external-storage interface; electrical pin identities remain unvalidated. |
+
+The current core does not implement the observed `FCALL/FCALA/FB/FRET`
+families or XPC. Even page-zero startup therefore needs ISA work before
+DA150 execution can be claimed. Core MMR accesses (for example SP at data
+`18`) must remain distinct from board/peripheral accesses. No success value
+or busy-line transition is inferred from these static routines.
+
+For reproduction, `noki5510_a00_inventory.py --segment aa55
+--extract-section 0x200 --output <new-file>` exports only the exact original
+InitData section, rejecting ambiguous addresses and existing outputs. Use
+`--extract-section 0x256d` without a segment for InitDisk. The exporter
+preserves big-endian word bytes; Binutils' C54x binary backend reads
+little-endian words even with `-EB`, so swap each byte pair with `dd
+conv=swab` before analysis. Confirm the first decoded InitData entry word
+is `7718`, not `1877`. With that converted file:
+
+```sh
+objdump -D -b binary -m tic54x --adjust-vma=0x200 \
+  --start-address=0xe41 --stop-address=0xe8c <little-endian-section>
+```
+
+Addresses in this output are word addresses. The external tool was built
+from the [GNU release](https://sourceware.org/pub/binutils/releases/binutils-2.43.1.tar.xz),
+SHA256 `13f74202a3c4c51118b797a39ea4200d3f6cfbe224da6d1d95bb938480132dfd`;
+no tool implementation is incorporated into this project. The disassembly
+does not establish whole-image code/data boundaries or runtime reachability.
+Next recover storage/overlay selection and establish DA150-specific
+peripheral semantics before constructing a native music-DSP fixture.
 
 ### Firmware consumers
 
