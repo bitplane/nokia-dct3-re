@@ -11,3 +11,5 @@ cpu.debug:bpset(0x319122, nil,
     'logerror "5510_verifier_result: word0=%04x word1=%04x\\n",w@10000,w@10002;g')
 cpu.debug:bpset(0x319284, nil,
     'logerror "5510_loader_enter: descriptor=%08x\\n",d@123784;g')
+cpu.debug:bpset(0x24ca36, nil,
+    'logerror "5510_service_reply: command=%02x faults=%02x flag=%02x\\n",b@(r4+8),b@(r4+9),b@13fe5d;g')

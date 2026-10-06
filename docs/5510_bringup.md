@@ -4,7 +4,8 @@
 
 The acquired v3.53 PPM C service package is normalized and statically
 validated. The `nmp5stage` research fixture executes its own verifier and
-loaders to absent mask address `2c75`. No graphical boot, input, SIM, registration,
+loaders to absent mask address `2c75`. A separate `nmp5hle` fixture reaches
+the graphical `CONTACT SERVICE` diagnostic frame. No idle boot, input, SIM, registration,
 call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
@@ -124,7 +125,28 @@ directory with `-noreadconfig -debug -debugger none -autoboot_delay 0
 an absolute `-rompath`. Validate the resulting `error.log` with
 `python3 tools/noki5510_bootstrap_check.py <log>`.
 
-Next recover the MCU's post-loader service contract and MU4 interface before
-considering an explicitly separate research-HLE composition. Keep the missing PMM, MU4 interface
+## Hybrid service frontier
+
+`nmp5hle` explicitly substitutes transport HLE at missing mask `2c75` after
+both own native loaders. It enables only request-derived service discovery
+and the compact self-test completion. Application registration, radio,
+identity/record replies and SIM remain disabled; no donor PMM is supplied.
+
+Own TX type `05` carries `1eff00d000030101e000`. Common discovery responds
+through RX type `8e`; firmware acknowledges with
+`1e0200d0000305014100`. It then publishes identity/record-shaped type-`70`
+requests followed by compact `0d00`. Own selector `24c9d2..24c9e6`
+dispatches command `0d` to `24ca36`, gated by `13fe5d` bit 2; fault bits
+0/1 are consumed at `24ca6a..24ca96`. Runtime observes `0d/00`, flag `8c`
+at that consumer and a later `0a09` request. No reply to the latter is
+guessed. The eight-second frame is `CONTACT SERVICE`, not idle.
+
+Run the same fresh-directory command using `nmp5hle` and `-verbose`;
+validate with `noki5510_bootstrap_check.py --runtime <error.log>`.
+The inherited 84x48 display geometry is still a research projection; the
+observed frame does not validate MU4 wiring or all display commands.
+
+Next decode the `0a09` consumer and product-state validity checks, and
+recover the MU4 interface. Keep the missing PMM, MU4 interface
 and resident DSP inputs explicit; no donor provisioning or guessed success
 publication may be used to claim graphical or phone-service parity.

@@ -1231,6 +1231,7 @@ public:
 	void npe3stage(machine_config &config);
 	void npe3hle(machine_config &config);
 	void nmp5stage(machine_config &config);
+	void nmp5hle(machine_config &config);
 	void noki6250(machine_config &config);
 	void nhm3stage(machine_config &config);
 	void nhm3hle(machine_config &config);
@@ -3840,6 +3841,21 @@ void nokia_dct3_state::nmp5stage(machine_config &config)
 	// followed by the 126-word 0f00 loader. Missing mask calls remain silent.
 }
 
+void nokia_dct3_state::nmp5hle(machine_config &config)
+{
+	nmp5stage(config);
+	// Own first post-loader TX is type 05, 1eff00d000030101e000:
+	// enable common request-derived discovery, not sibling application events.
+	nokia_product_config runtime = m_product;
+	runtime.external_service_transport = true;
+	// Own 24c9d2..24c9e6 selects command 0d -> 24ca36, gated by
+	// 13fe5d bit 2. Bytes 0/1 of the compact reply become command/faults;
+	// fault bits 0/1 are consumed at 24ca6a..24ca96.
+	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	apply_product_config(runtime);
+	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
+}
+
 void nokia_dct3_state::npe3stage(machine_config &config)
 {
 	noki6210(config);
@@ -4065,6 +4081,16 @@ ROM_START( nmp5stage )
 		CRC(82bb9888) SHA1(1c0217fb2b2fe350c455b3b1d71b3f920eeed8ec))
 ROM_END
 
+ROM_START( nmp5hle )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF )
+	ROM_LOAD("npm5_mad2_mask.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp", ROMREGION_ERASEFF )
+	ROM_LOAD("npm5_dsp_mask.bin", 0, 0x20000, NO_DUMP)
+	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF )
+	ROM_LOAD("5510f353c.fls", 0, 0x350000,
+		CRC(82bb9888) SHA1(1c0217fb2b2fe350c455b3b1d71b3f920eeed8ec))
+ROM_END
+
 ROM_START( npe3stage )
 	DCT3_SHARED_MAD2_INTERNAL_ROMS
 	ROM_REGION16_BE(0x400000, "flash", ROMREGION_ERASEFF )
@@ -4262,3 +4288,4 @@ SYST( 2001, noki3330, 0,      0,      noki3330, noki3310, nokia_dct3_state, empt
 SYST( 2002, noki3410, 0,      0,      noki3410, noki3410, nokia_dct3_state, empty_init, "Nokia", "Nokia 3410", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2002, noki5210, 0,      0,      noki5210, noki5210, nokia_dct3_state, empty_init, "Nokia", "Nokia 5210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 2001, nmp5stage, 0, 0, nmp5stage, nmp5stage, nokia_dct3_state, empty_init, "Nokia", "5510 own-upload bootstrap (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 2001, nmp5hle, nmp5stage, 0, nmp5hle, nmp5stage, nokia_dct3_state, empty_init, "Nokia", "5510 native uploads with runtime HLE (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

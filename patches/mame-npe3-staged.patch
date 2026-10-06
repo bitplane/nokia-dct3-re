@@ -1,7 +1,7 @@
 diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 --- a/src/mame/mame.lst
 +++ b/src/mame/mame.lst
-@@ -49617,6 +49617,12 @@
+@@ -49617,6 +49617,13 @@
  armada
  seabattl
  
@@ -10,6 +10,7 @@ diff --git a/src/mame/mame.lst b/src/mame/mame.lst
 +npe3stage
 +npe3hle
 +nmp5stage
++nmp5hle
 +
  @source:zaccaria/zac1b1120.cpp
  dodgem

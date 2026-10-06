@@ -17,13 +17,27 @@ CHAIN = (
 )
 
 
-def verify(text):
-    for failure in ('unavailable_program', 'runtime_hle_handoff', '[LUA ERROR]',
-                    'Disk quota exceeded', 'No space left on device'):
+RUNTIME_CHAIN = CHAIN[:9] + (
+    'runtime_hle_handoff pc=2c75 native_suspended=1',
+    'data=1eff00d000030101e000',
+    'RX enqueue type=8e payload=10',
+    'RX enqueue type=74 payload=2',
+    '5510_service_reply: command=0d faults=00 flag=8c',
+    'data=0a09',
+    'model_scout: t=8.000',
+)
+
+
+def verify(text, runtime=False):
+    failures = ('unavailable_program', '[LUA ERROR]',
+                'Disk quota exceeded', 'No space left on device')
+    if not runtime:
+        failures += ('runtime_hle_handoff',)
+    for failure in failures:
         if failure in text:
             raise ValueError('unexpected bootstrap failure/shortcut: ' + failure)
     cursor = 0
-    for event in CHAIN:
+    for event in RUNTIME_CHAIN if runtime else CHAIN:
         found = text.find(event, cursor)
         if found < 0:
             raise ValueError('missing ordered bootstrap evidence: ' + event)
@@ -33,12 +47,14 @@ def verify(text):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
+    parser.add_argument('--runtime', action='store_true', help='check explicitly hybrid service frontier')
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'))
+        verify(args.log.read_text(errors='replace'), args.runtime)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5510 bootstrap FAIL: {error}\n')
-    print('5510 own verifier/loader PASS; missing mask 2c75 remains blocked')
+    print('5510 own uploads PASS; ' + ('hybrid discovery/self-test consumed, not idle boot'
+                                     if args.runtime else 'missing mask 2c75 remains blocked'))
 
 
 if __name__ == '__main__':
