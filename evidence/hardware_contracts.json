@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_music_storage_consumer", "subsystem": "mu4", "status": "mapped", "confidence": "moderate",
+      "boundary": "Original InitData R060/R061 first-segment code reaches FAT-family mount routine 0x308e through trampoline 0x2082. Byte/word/dword readers resolve through 0x329d/0x3234/0x32ad to control-register 0x003d masks 1/2/4, I/O port 0x4000 and BIO waits. This is a static consumer contract, not validated NAND/controller behavior, media placement, overlay selection or native execution; MU4 music DSP remains distinct from the missing MAD2 baseband mask",
+      "evidence": ["docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
+    },
+    {
       "id": "mad2_arm_boot_rom_hle", "subsystem": "mad2", "status": "prototype", "confidence": "strong",
       "boundary": "The MAD2 ARM mask ROM is undumped; every locally available shared boot_rom file is uniform erased fill. Supported profiles execute a single ARM reset-vector branch to the cross-product flash entry 0x200040 through normal CPU reset/pipeline behavior, without forcing PC. Clock, power and flashing-mode setup remain outside the HLE, and NSE-3 does not borrow a later MAD revision",
       "evidence": ["docs/mad2_fidelity.md", "docs/driver_vision.md", "roms/README.md"]

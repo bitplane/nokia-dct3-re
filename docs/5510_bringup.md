@@ -365,8 +365,60 @@ from the [GNU release](https://sourceware.org/pub/binutils/releases/binutils-2.4
 SHA256 `13f74202a3c4c51118b797a39ea4200d3f6cfbe224da6d1d95bb938480132dfd`;
 no tool implementation is incorporated into this project. The disassembly
 does not establish whole-image code/data boundaries or runtime reachability.
-Next recover storage/overlay selection and establish DA150-specific
-peripheral semantics before constructing a native music-DSP fixture.
+#### Music-DSP storage consumers
+
+The bounded InitData routines identify a filesystem mount, not an overlay
+loader. Trampoline `2082` reaches `308e`, which reads a partition-like table
+at byte offsets `01c2 + 16*n` and `01c6 + 16*n`, tests the signature at
+`01fe`, then interprets the selected volume's boot sector. These offsets
+support an MBR interpretation, but the underlying media layout is not yet
+recovered from the flashing containers.
+
+| Trampoline | Routine | Static contract |
+| --- | --- | --- |
+| `2088` | `329d` | Calls the word reader and masks the result to eight bits. |
+| `208a` | `3234` | Reads a word at a byte offset, using a cached row/word position; odd offsets combine bytes from adjacent words. |
+| `208c` | `32ad` | Combines reads at offset `n` and `n+2` into a 32-bit result. |
+| `2082` | `308e` | Mounts/interprets a volume through these readers; it is not a code-download entry. |
+
+The mount compares the word at byte `01fe` with raw `aa55`, and reads BPB
+offsets `0b/0d/0e/10/11/13/16/20/24`: bytes per sector, sectors per cluster,
+reserved sectors, FAT count, root entry count, total sectors, sectors per
+FAT, and the larger total-sector/FAT-size alternatives. The field widths,
+offsets and signature match Microsoft's
+[FAT specification, sections 3.1 and 3.5](https://www.scs.stanford.edu/~zyedidia/docs/_other/fat.pdf).
+The later comparisons contain raw cluster thresholds `0ff5` and `fff5`.
+This identifies a FAT-family consumer; it does not prove successful mounting
+or which FAT variant the original 64 MB medium uses.
+
+The lower read chain is `3234 -> 3035 -> 2fca/306c -> 302e`:
+
+- `3035` waits on BIO, clears control mask `4`, clears mask `2`, sets mask
+  `1`, outputs `00`, clears mask `1`, sets mask `2`, then outputs `00`
+  followed by three address components derived from its argument plus one.
+  It clears mask `2` and waits on BIO again.
+- Those control changes call `2fe6`, a masked update of data register
+  `003d`. Masks `1/2/4` are observed bits, not established CLE/ALE/CE pins.
+- `2fb5` saves interrupt state, writes I/O port `4000`, executes a bounded
+  NOP repeat, and restores the prior interrupt-mask condition.
+- `2fca` loops while the BIO branch condition is true. No busy latency or
+  electrical polarity is inferred beyond that instruction condition.
+- `306c` performs two port reads through `302e/302f` and assembles the low
+  and high bytes of a word. The row reader caches words in its context and
+  uses `0100` as its word-count boundary; do not equate that alone with a
+  complete physical NAND page including spare/OOB bytes.
+
+This command/address/read structure is consistent with the MU4 manual's
+NAND block, but the manual also shows an R/W controller between DSP, USB
+and flash. Therefore port `4000` is an observed interface, not proof of a
+bare NAND chip connected directly to the DSP. Controller semantics, BIO
+drive, spare-area/ECC handling and container-to-media placement remain open.
+The `aa55` outer firmware-container marker must not be confused with the
+FAT boot-sector signature: their consumers and address spaces differ.
+
+Next recover the storage-controller/media placement and independently locate
+the overlay selector before constructing a native music-DSP fixture. A valid
+FAT disk alone is not evidence that any overlay payload has been loaded.
 
 ### Firmware consumers
 
