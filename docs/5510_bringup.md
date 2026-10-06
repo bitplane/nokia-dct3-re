@@ -273,6 +273,34 @@ code and are not MSP430 program dumps.
 
 ### Firmware consumers
 
+#### MU4-specific receive contract
+
+Receiver `335cfa` first recognizes source node `28`, transport `1e` and
+byte 7 equal to `42`, then calls `335c1c`. Local class routing supplies
+byte 6 = `d2`. This incoming `d2/42` pair differs from outgoing constructor
+`335a50`'s `42/d2`; do not mirror the wrappers blindly.
+
+`335c1c` treats opcode `[message+9] == 06` as the power-up indication and
+calls `335aec`, which enables the GPIO output and constructs request `47`
+via `335aae/335a50`. Opcode `6f` calls component validator `335b12`:
+count zero defaults to five entries; counts 1..5 refresh the cached
+results, with bytes starting at message offset 12 equal to `03` for PASS.
+Larger counts skip the refresh, not an explicit malformed-packet rejection;
+they are outside the established five-component contract.
+Failure takes the analog/service-battery branch and can post shutdown
+report 7; success publishes internal `cc` through `335ba4`, initializes
+GPIO through `3a7502` and changes the local status flags. Neither result
+is an excuse to claim the absent music hardware passed self-test.
+
+With initial context bytes at `125c0c+18/19` equal to `00/0c`, opcode
+`01` is the ordinary key indication: state `[message+0a]` zero calls
+release `313b2c`, state one calls press `313d84`, and the key is at offset
+12. Codes `2c/2d/2e/32/33/34/35/36` instead enter `335bf0`. Other context
+states redirect the message to the recorded consumer. This is the normal
+MU4 consumer, distinct from generic diagnostic selector `0c` below;
+QWERTY position-to-code mapping and incoming wire framing still need
+independent evidence before host bindings are enabled.
+
 The pinned image's GPIO reader `3a738c` temporarily enables mask bit 1 at
 `2006b`, reads `2002a` bit 1 and returns `81` for low or `ff` for high.
 It does not scan rows. Decoder `39dc14` maps `ff` to `3e`; otherwise it

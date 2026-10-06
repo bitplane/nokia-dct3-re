@@ -37,6 +37,8 @@ def assess_input(flash):
         (0x335854, 0x335a2e, '595b6b9bed4b25daad0a4d588f34fd0b2fee9cb1109e6fd31652e6e7f961c76a'),
         (0x335632, 0x33565a, '2cff8c5e2680b88198864ca640c58a3b8221bb8faff9dd068656b6e170220eda'),
         (0x3a7424, 0x3a7472, 'd4c4c0a73c2b91e65b0c3cd4200e054aa878b64b0420246587eca59adb29b67d'),
+        (0x335c1c, 0x335da4, '38489482d7e1f12921a97751b72c21a878fd990e7d89a2d91bc321717c009ec5'),
+        (0x335b12, 0x335b74, 'f09da60f3625c068cecfbc3e288e5a9f6591d57f5cf1f8ebbd58d6377116337f'),
     ):
         if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
             raise ValueError('input consumer code mismatch')
@@ -85,6 +87,14 @@ def assess_input(flash):
                                     'release_state': 0, 'press_call': '313d84',
                                     'release_call': '313b2c',
                                     'wire_framing_validated': False},
+            'mu4_specific_consumer': {'receiver': '335cfa', 'handler': '335c1c',
+                                      'source_node': '28', 'transport': '1e',
+                                      'incoming_class': 'd2', 'incoming_wrapper': '42',
+                                      'opcode_offset': 9, 'key_opcode': '01',
+                                      'key_offset': 12, 'state_offset': 10,
+                                      'power_up_opcode': '06', 'selftest_reply': '6f',
+                                      'selftest_pass_value': 3,
+                                      'wire_framing_validated': False},
             'local_class_router': {'consumer': '362958', 'table': '437ca4',
                                    'records': routes, 'decoded_records': 39,
                                    'class_d2_task': 29,
