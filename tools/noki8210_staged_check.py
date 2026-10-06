@@ -10,7 +10,7 @@ from tools.nsm3d_catalogue import catalogue
 from tools.radio_call_lifecycle_common import require_ordered
 
 
-def verify(text, runtime=False):
+def verify(text, runtime=False, selftest=False):
     patterns = (
         ('own verifier descriptor', '8210_verifier_descriptor: pointer=0031bcf0'),
         ('native verifier', 'release entry=0f00 words=223 prom_input=0006 clock=13000000 stage=verifier'),
@@ -39,6 +39,15 @@ def verify(text, runtime=False):
             ('discovery response', 'data=1e0002d000030401c100'),
             ('firmware discovery acknowledgement', 'TX pending type=05 payload=10 data=1e0200d0000305014100'),
         )), '8210 runtime discovery')
+    if selftest:
+        if not runtime:
+            raise ValueError('self-test acceptance requires runtime HLE')
+        require_ordered(text, tuple((name, re.compile(re.escape(pattern)))
+                                  for name, pattern in (
+            ('own self-test request', 'TX pending type=70 payload=2 data=0d00'),
+            ('own armed consumer', '8210_selftest_reply: command=0d faults=00 flag=84'),
+            ('own cleared faults', '8210_service_return: command=0d faults=00/00/00'),
+        )), '8210 compact self-test')
 
 
 def main():
@@ -46,6 +55,7 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('flash', type=Path)
     parser.add_argument('--runtime', action='store_true')
+    parser.add_argument('--selftest', action='store_true')
     args = parser.parse_args()
     try:
         entries = catalogue(args.flash.read_bytes(), '8210')
@@ -55,11 +65,13 @@ def main():
         with args.log.open(errors='replace') as stream:
             text = ''.join(line for line in stream if 'staged_dsp:' in line
                            or '8210_verifier_' in line or '[LUA ERROR]' in line
+                           or '8210_selftest_' in line or '8210_service_return:' in line
                            or 'dspif_transport:' in line)
-        verify(text, args.runtime)
+        verify(text, args.runtime, args.selftest)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 staged FAIL: {error}\n')
-    print('8210 runtime discovery PASS; native resident execution unproved' if args.runtime
+    print('8210 compact self-test PASS; UI and native resident execution unproved' if args.selftest
+          else '8210 runtime discovery PASS; native resident execution unproved' if args.runtime
           else '8210 native uploads PASS; absent resident 2c75 remains fail-closed')
 
 

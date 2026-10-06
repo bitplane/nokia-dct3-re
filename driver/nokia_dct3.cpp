@@ -3653,6 +3653,10 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	// D0 discovery transaction after native upload completion.
 	nokia_product_config runtime = m_product;
 	runtime.external_service_transport = true;
+	// Own class-74 call 243a3e selects handler 240db0. Command 0d at
+	// 240e20 requires the armed flag and consumes two fault bits at +9.
+	runtime.dsp_service = true;
+	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }
