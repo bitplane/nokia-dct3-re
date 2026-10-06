@@ -10,6 +10,7 @@ import zipfile
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.extract_dct3_wintesla import decode_records
+from tools.dct3_startup_records import decode_startup_records, initialized_bytes
 
 PACKAGE_SHA256 = '4f13d4aab02e970a86e83c15b903aed18590584dc5c383ed126cf632763d8d60'
 FLASH_SHA256 = 'a320d808229adf1e471446547d3ec4643d597a1f67f4b0975cc9beada7c3d15a'
@@ -35,7 +36,17 @@ def assess_flash(flash):
         uploads.append({'descriptor': f'{offset + 0x200000:06x}',
                         'words': fields[2], 'sha1': digest,
                         'scope': 'static descriptor candidate, not executed ownership proof'})
+    records, end = decode_startup_records(flash, 0x200000, 0x3b0430)
+    if (len(records), end, sum(len(payload) for _, _, payload in records)) != (2090, 0x3bb8d8, 26487):
+        raise ValueError('startup initializer coverage mismatch')
+    for address, descriptor in ((0x1237c0, 0x3e9240), (0x1237d4, 0x3e936c),
+                                (0x1237f0, 0x3ea428)):
+        if initialized_bytes(records, address, 4) != struct.pack('>I', descriptor):
+            raise ValueError('initialized upload pointer mismatch')
     return {'product': 'NPM-5', 'version': '3.53', 'ppm': 'C',
+            'startup_copy': {'records': len(records), 'payload_bytes': 26487,
+                             'terminator_end': f'{end:06x}',
+                             'verifier_pointer': '1237f0', 'consumer': '319032'},
             'flash_size': len(flash), 'flash_sha256': FLASH_SHA256,
             'uploads': uploads, 'pmm_present': False,
             'graphical_boot_validated': False, 'native_dsp_complete': False}
@@ -80,8 +91,11 @@ def main():
             for name, data in members.items():
                 write_derived(args.output_dir / name, data)
             write_derived(args.output_dir / '5510f353c.fls', flash)
+            # Keep the immutable normalization manifest independent of
+            # expanding static-analysis results reported on stdout.
+            manifest = {key: value for key, value in report.items() if key != 'startup_copy'}
             write_derived(args.output_dir / 'normalization.json',
-                          (json.dumps(report, indent=2) + '\n').encode())
+                          (json.dumps(manifest, indent=2) + '\n').encode())
     except (OSError, ValueError, KeyError, zipfile.BadZipFile) as error:
         parser.exit(1, f'NPM-5 package validation FAIL: {error}\n')
     print(json.dumps(report, indent=2))
