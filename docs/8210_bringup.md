@@ -273,6 +273,20 @@ own traffic/release packets, idle confirmation and return to paging.
 The final capture returns to DCT3 LAB. This validates signaling and UI,
 not speech or native DSP execution.
 
+### Incoming call signaling
+
+Seed the isolated run's configuration directory with
+`fixtures/radio_incoming_call_answered/nsm3hle.cfg` and run
+`noki8210_incoming_call_input.lua`. The external network queues one call;
+no handset message is injected. The ringing capture presents `5551234`,
+physical Send answers, and physical End restores DCT3 LAB idle.
+Own Call Confirmed is `8308150101` (five bytes); do not inherit the
+sibling's eleven-byte expectation. `noki8210_incoming_call_check.py LOG`
+requires paging/contention, cipher/MM information, SETUP/Alerting,
+traffic assignment, physical Answer/End and full CC/RR release followed by
+idle confirmation and paging. Exactly one SETUP, CONNECT and DISCONNECT
+must occur. Speech and native DSP execution remain unproved.
+
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
 injected. Reproduce the observation with the physical Menu fixture above;
