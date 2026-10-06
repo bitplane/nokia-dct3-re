@@ -287,6 +287,19 @@ traffic assignment, physical Answer/End and full CC/RR release followed by
 idle confirmation and paging. Exactly one SETUP, CONNECT and DISCONNECT
 must occur. Speech and native DSP execution remain unproved.
 
+### Incoming SMS
+
+Copy `fixtures/radio_incoming_sms/nsm3hle.cfg` into the isolated run's
+configuration directory and run `noki8210_incoming_sms_input.lua`.
+The laboratory network delivers one ordinary message; the phone shows
+“1 message received”, and physical Read opens `hello`.
+`noki8210_incoming_sms_check.py LOG SIM_NVRAM` requires paging, the own
+`0080ffffffffffffffff0000` cipher-control publication, SAPI-3 establishment,
+segmented CP-DATA, CP/RP acknowledgements, RR release, physical reading,
+and exact durable read-status/content. Exactly two EF_SMS record-1 writes
+occur: delivery and marking read. Screen captures are independently
+reviewed, not recognized by the trace checker. Outgoing SMS remains open.
+
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
 injected. Reproduce the observation with the physical Menu fixture above;
