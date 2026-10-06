@@ -266,6 +266,33 @@ constructor `335dac` remain unobserved in this window. The package checker
 pins the dispatcher's full code extent. Recover the control/probe route and
 wire transport before implementing a peer.
 
+### MU4 timer and analog-dependent control
+
+Initializer `33565a` arms timer `0127` with argument `0469`. Its RTOS
+record at `10c3b8` has owner `1d` and armed state `02`; a longer cold run
+observes countdown and packed delivery `01e7` to `335ea8`. The eight-second
+window is insufficient to establish that this timer or its consumers are
+inactive. A sixteen-second run covers the observed first delivery, not a
+measured hardware timing guarantee.
+
+Event `01e7` calls predicate `335b74`. It requires two selector-3 ADC
+reads in the inclusive range `00da..010e`, then selector 4 below `015c`.
+Success calls `335e18`, constructing control selector `ca` through
+`399f12`; failure calls `391830`, posting report 7 to task 1. The current
+research inputs return selector 3 = `0280` twice, failing the upper bound
+before selector 4 is read. No control `ca` or probe `fe` is observed.
+The predicate's physical NPM-5 channel meaning and valid electrical values
+are unresolved: do not tune ADC inputs to satisfy it or call it an MU4
+presence detector without independent evidence.
+
+Probe `335dac` is a separate constructor reached through `335df4`, not
+the successful `01e7` branch itself. Its node-`28` message is rejected by
+`399f12` with result 4 if that node's availability bitmap bit is clear;
+otherwise it proceeds into the firmware router. Neither a matching peer
+reply nor a wire-level key grammar is established by these constructors.
+Check timer evidence with `noki5510_bootstrap_check.py --runtime
+--serial-readiness --input-lifecycle --input-timer <error.log>`.
+
 ### Task creation and serial readiness
 
 Creator `2ceb7c` consumes 30 twelve-byte descriptors at `419d20` and

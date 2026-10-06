@@ -1,10 +1,21 @@
 import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
+    verify_input_timer,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_input_timer_requires_arm_then_delivery(self):
+        armed = '5510_input_timer_armed: link=0010b824 delta=02ff flags=01 state=02 owner=1d'
+        delivered = '5510_input_timer_dispatch: event=01e7'
+        verify_input_timer(armed + '\n' + delivered)
+        for text in (armed, delivered, delivered + '\n' + armed,
+                     (armed + '\n' + delivered).replace('owner=1d', 'owner=01'),
+                     (armed + '\n' + delivered).replace('state=02', 'state=01')):
+            with self.assertRaises(ValueError):
+                verify_input_timer(text)
+
     SERIAL = '\n'.join((
         '5510_input_tasks_created: task29_state=05 stack=0012e6b0',
         'address=00120c70 data=01', 'address=0011cddc data=01',

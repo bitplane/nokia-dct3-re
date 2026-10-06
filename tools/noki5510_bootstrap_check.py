@@ -74,6 +74,17 @@ def verify_input_lifecycle(text):
         cursor = found + len(event)
 
 
+def verify_input_timer(text):
+    armed = text.find('5510_input_timer_armed:')
+    if armed < 0:
+        raise ValueError('missing MU4 timer-arm evidence')
+    line = text[armed:].splitlines()[0]
+    if 'state=02 owner=1d' not in line:
+        raise ValueError('MU4 timer is not armed for task 29')
+    if text.find('5510_input_timer_dispatch: event=01e7', armed) < 0:
+        raise ValueError('missing subsequent MU4 timer delivery; extend observation window')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -82,6 +93,8 @@ def main():
                         help='also require observed MBUSTIM queue drainage')
     parser.add_argument('--input-lifecycle', action='store_true',
                         help='also require MU4 task initialization and receiver entry, not keys')
+    parser.add_argument('--input-timer', action='store_true',
+                        help='also require MU4 timer arm and delivery; observe at least 16 seconds')
     args = parser.parse_args()
     try:
         text = args.log.read_text(errors='replace')
@@ -90,6 +103,8 @@ def main():
             verify_serial_readiness(text)
         if args.input_lifecycle:
             verify_input_lifecycle(text)
+        if args.input_timer:
+            verify_input_timer(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5510 bootstrap FAIL: {error}\n')
     print('5510 own uploads PASS; ' + ('hybrid discovery/self-test consumed, not idle boot'
