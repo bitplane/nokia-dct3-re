@@ -249,8 +249,14 @@ handover and neighbour contracts remain unset pending observations. A
 Updating Request (own capability octet `33`), acknowledgement of Location
 Updating Accept and Channel Release, writes to EF_LOCI LAI and status, and
 subsequent paging/BCCH reconfiguration. This is preliminary registration
-transport evidence: persisted location and idle operator presentation
-still require their own acceptance before coverage promotion.
+transport evidence is now independently checked by
+`noki8210_registration_check.py LOG SIM_NVRAM`: ordered own request with
+capability `33`, accept/release acknowledgements, EF_LOCI LAI update,
+deconfiguration/confirmation and post-release paging. Persisted EF_LOCI
+contains LAI `00f1100001` and status `00`. A cold process retaining that
+storage passes the same exchange and `noki8210_registration_input.lua`
+captures `DCT3 LAB` at both 24 and 44 seconds after physical unlock.
+Calls, SMS, mobility and other bands remain unproved.
 
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
