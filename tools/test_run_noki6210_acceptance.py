@@ -33,5 +33,31 @@ class MenuAcceptanceTest(unittest.TestCase):
             runner.check_menu(text, frame)
 
 
+class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_calculator_requires_ordered_keys(self):
+        frame = Image.new('L', (96, 60), 255)
+        actions = ('application', 'input_1', 'input_12', 'operation_options',
+                   'subtract', 'minus', 'input_3', 'options', 'result')
+        text = '\n'.join('6210_application_physical: action=' + action for action in actions)
+        with patch.object(runner, 'CALCULATOR_SHA256', hashlib.sha256(frame.tobytes()).hexdigest()):
+            runner.check_calculator(text, frame)
+            with self.assertRaisesRegex(ValueError, 'ordered Calculator'):
+                runner.check_calculator(text.replace('action=minus', 'action=plus'), frame)
+
+    def test_phonebook_requires_successful_update(self):
+        with self.assertRaisesRegex(ValueError, 'ordered SIM save'):
+            runner.check_phonebook('6210_phonebook_physical: action=save', '', b'',
+                                   Image.new('L', (96, 60), 255))
+
+    def test_phonebook_rejects_cold_write(self):
+        write = '\n'.join(('6210_phonebook_physical: action=save',
+                            'header cla=a0 ins=dc p1=01 p2=04 p3=20 selected=6f3a',
+                            'body ins=dc length=32 selected=6f3a', 'SIM status ins=dc sw=9000'))
+        read = '\n'.join(('header cla=a0 ins=b2 p1=01 p2=04 p3=20 selected=6f3a',
+                           '6210_phonebook_read_physical: action=contact', 'ins=dc'))
+        with self.assertRaisesRegex(ValueError, 'without writing SIM'):
+            runner.check_phonebook(write, read, b'', Image.new('L', (96, 60), 255))
+
+
 if __name__ == '__main__':
     unittest.main()

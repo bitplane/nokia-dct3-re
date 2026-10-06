@@ -73,6 +73,22 @@
       ]
 },
 {
+      "name": "verify-6210-calculator",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "calculator", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-phonebook",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "phonebook", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-menu",
       "prerequisites": [
             "build"

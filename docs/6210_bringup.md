@@ -191,6 +191,28 @@ decoder `4fad30` reporting `19`, and the reviewed Messages frame SHA-256
 `8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65`.
 Neither a host press alone nor a blank framebuffer establishes interactivity.
 
+### Applications and persistent phonebook
+
+`verify-6210-calculator` navigates the product's physical menu keys and pins
+the reviewed `12 - 3 = 9` Calculator frame (SHA-256
+`2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc`).
+Menu position is harness policy, not a hardware contract.
+
+`verify-6210-phonebook` enters `A` / `123` through physical keys, requires
+the EF_ADN record-1 UPDATE RECORD body and `9000` response, then starts a
+second isolated process with the first process's persisted NVRAM. The cold
+process must read record 1, select the contact physically, issue no update,
+and display the reviewed contact frame (SHA-256
+`39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc`).
+The storage validator independently checks the saved name and number.
+Neither process patches phone memory or seeds a contact directly.
+
+The runtime emits an organic type-`0x56` acquisition request with a 160-byte
+body, starting `0023` followed by erased candidate entries. No radio response
+contract has yet been enabled for NPE-3; registration, calls and SMS remain
+unaccepted. RX dispatch and pending-context semantics must be recovered from
+this product before selecting a network peer contract.
+
 ## Missing native bootstrap observation
 
 No matching raw NPE-3 final publication or ROM6 mask image was identified in
