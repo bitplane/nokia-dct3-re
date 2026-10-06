@@ -40,6 +40,7 @@ distinction.
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |
+| `5510_bringup.md` | NPM-5 package normalization, static upload candidates and pre-machine bring-up boundary. |
 | `8210_bringup.md` | NSM-3 stock inputs, staged-verifier execution and unresolved final DSP publication contract. |
 | `8xxx_bringup.md` | Acquired 8250/8850/8890 GENSIO contracts and bounded software-only frontiers. |
 | `6210_bringup.md` | NPE-3 reset/GENSIO contracts, staged verifier and final DSP upload frontier. |

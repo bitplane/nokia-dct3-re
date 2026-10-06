@@ -26,6 +26,14 @@
     "DCT3_EEPROM_GUARD_V501": "restore_default() { $(MAKE) --no-print-directory eeprom-profile BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls; cp \"roms/noki3210/3210 v501 eeprom.bin\" \"$(MAME_DIR)/roms/noki3210/3210 v501 eeprom.bin\"; }; trap restore_default EXIT;"
   },
   "gates": [
+    {
+      "name": "verify-5510-package",
+      "prerequisites": [], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/noki5510_package_check.py",
+                 "arguments": ["roms/archive-dct3-packages/NPM5_353_mcu.exe",
+                               "--output-dir", "roms/5510-npm5-v353"]}]
+    },
 {
       "name": "verify-6210-stage",
       "prerequisites": [

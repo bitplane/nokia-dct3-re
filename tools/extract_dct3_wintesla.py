@@ -14,7 +14,10 @@ RECORD_TYPE = 0x0B
 
 
 def extract_records(path: Path) -> tuple[int, bytes]:
-    source = path.read_bytes()
+    return decode_records(path.read_bytes(), str(path))
+
+
+def decode_records(source: bytes, path: str = '<record stream>') -> tuple[int, bytes]:
     if not source:
         raise ValueError(f"{path}: empty Wintesla record stream")
 
