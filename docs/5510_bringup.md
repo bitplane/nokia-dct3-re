@@ -579,9 +579,21 @@ persistence, analog pin timing, copy-back, factory bad-block contents or
 all existing NAND users. Typical program/erase and maximum read/reset times
 are deterministic datasheet selections, not measured MU4 board latencies.
 
-U201 is not attached to a handset yet: executing the recovered GPIO/BIO
-attachment, address enables and original media placement remain prerequisites. Do not
-seed a filesystem merely to satisfy the mount consumer.
+`make check-mu4-storage-original` executes the unchanged InitData R060
+library routines `3035` (read setup) and `306c` (word read) on the C54x core.
+The isolated `mu4nand` fixture connects GPIO `003c/003d`, NAND strobes and
+live BIO. Original code emits the five command/address bytes, waits while
+R/B is low, and returns `ffff` from erased row 1. After external test-pattern
+programming and a soft reset, it addresses row 65536 and returns `3412` from
+bytes `12 34`. Both calls preserve SP. The core gate additionally checks
+512 `BIT Xmem,BITC` variants, including the saved-INTM test used by the
+original command writer.
+
+This is original-routine execution, not a complete DA150 board: the fixture
+holds ADD_H enabled, uses a test clock and separate test program/data maps,
+and supplies a reset wrapper. It neither seeds a filesystem nor selects an
+overlay. U201 is not attached to a handset yet; address-enable ownership,
+physical memory mapping and original media placement remain prerequisites.
 
 Next recover the storage-controller/media placement and independently locate
 the overlay selector before constructing a native music-DSP fixture. A valid

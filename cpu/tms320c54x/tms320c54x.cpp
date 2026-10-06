@@ -1536,6 +1536,14 @@ void tms320c54x_device::execute_one(u16 op)
 			m_icount -= low >= 0xe0 ? 5 : 4;
 		return;
 	}
+	case 0x9600: // BIT Xmem, BITC; bit numbering is 15-BITC (SPRU172C).
+	{
+		const u8 operand = low >> 4;
+		const u16 value = data_read(m_ar[2 + (operand & 3)]);
+		m_st0 = (m_st0 & ~0x1000) | (BIT(value, 15 - (low & 15)) ? 0x1000 : 0);
+		dual_modify(operand);
+		return;
+	}
 	case 0x6100: // BITF Smem, #lk
 	{
 		u16 value;

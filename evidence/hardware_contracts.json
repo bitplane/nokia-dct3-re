@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_original_nand_read", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Isolated mu4nand fixture executes unchanged InitData R060 routines 3035 and 306c through an ordinary reset wrapper, GPIO 003c/003d, K9K1208U0A I/O and live BIO. Erased row 1 returns ffff; externally programmed row 65536 returns 3412 from bytes 12/34 after soft reset. Both require five command/address writes, two reads, a busy-pin wait and balanced SP. ADD_H is fixture-enabled and the clock/maps are test assumptions; this does not validate full DA150 startup, filesystem, overlay selection or handset boot",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "c54x_live_bio_input", "subsystem": "dsp", "status": "partial", "confidence": "strong",
       "boundary": "Core BIO callback reads the board pin, defaulting high when unconnected. SPRU172C defines BIO low/NBIO high. Executable conformance covers 28 pin-level variants of BC/BCD/CC/RC/RCD/XC plus a live busy-loop release. MU4 sheet 4 wires NAND R/B to DA150 BIO, but no handset currently executes that storage attachment; this validates CPU pin semantics rather than DA150 memory mapping or media provisioning",
       "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp"]

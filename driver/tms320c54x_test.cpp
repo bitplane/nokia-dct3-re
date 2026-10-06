@@ -28,6 +28,27 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_bit_case(unsigned index)
+	{
+		unsigned const operand = index / 32;
+		unsigned const bitcode = (index / 2) & 15;
+		bool const set = index & 1;
+		u16 const mask = u16(1) << (15 - bitcode);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x010950, 0x9600 | (operand << 4) | bitcode);
+		program.write_word(0x010951, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0507, set ? mask : u16(~mask));
+		m_cpu->set_state_int(STATE_GENPC, 0x010950);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5 | (set ? 0 : 0x1000));
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + (operand & 3), 0x0507);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x6789);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 819 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	static constexpr u16 bio_opcodes[] = {
 		0xf802, 0xf803, 0xfa02, 0xfa03, 0xf902, 0xf903,
 		0xfc02, 0xfc03, 0xfe02, 0xfe03, 0xfd02, 0xfd03, 0xff02, 0xff03
@@ -14421,6 +14442,28 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 				"BIO rising edge releases the executing wait loop through ordinary instruction flow");
 			osd_printf_info("TMS320C54x live BIO wait release: PASS\n");
+			start_bit_case(0);
+			return;
+		}
+		if (m_phase >= 819 && m_phase < 1331)
+		{
+			unsigned const index = m_phase - 819;
+			unsigned const operand = index / 32;
+			unsigned const bitcode = (index / 2) & 15;
+			u16 const addresses[] = {0x0507, 0x0506, 0x0508, 0x0502};
+			expect_opcode(0x9600 | (operand << 4) | bitcode,
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x0aa5 | ((index & 1) ? 0x1000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2 + (operand & 3)) == addresses[operand >> 2] &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x6789 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"BIT Xmem decodes all bit positions and dual address modes, modifying only TC");
+			if (index < 511)
+			{
+				start_bit_case(index + 1);
+				return;
+			}
+			osd_printf_info("TMS320C54x BIT Xmem conformance: PASS variants=512\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
