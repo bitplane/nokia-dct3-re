@@ -5,12 +5,17 @@
 The normal NSM-3 v5.31 PPM C machine remains at the final sparse-flash
 verification wait, `0x2cadce`. The separate `nsm3stage` research composition
 executes this product's uploaded verifier and loaders, then retains native
-ownership and stops at absent resident DSP routine `0x2c75`. No working-phone
-promotion or physical-verdict equivalence is claimed. The next software
-boundary is an explicitly declared runtime HLE handoff at that missing-code
-call, followed by recovery of this product's service consumers. The separate
-`nsm3hle` comparison now reaches request-correlated service discovery and the
-own compact self-test consumer; identity and record replies remain unselected.
+ownership and stops at absent resident DSP routine `0x2c75`. Physical-verdict
+equivalence and complete native DSP runtime are not claimed.
+
+The separate `nsm3hle` composition explicitly hands off at that missing-code
+call. With the acquired unchanged base-record storage fixture, seven fresh
+isolated acceptance scenarios pass: graphical/physical security and menus,
+calculator, SIM initialization and cold-persistent phonebook, registration
+and operator idle, both call-signaling directions, and both SMS directions.
+Identity and record success replies remain unselected. This is research-HLE
+phone-service acceptance, not a promotion of the normal machine, complete
+hardware fidelity, speech, or authentic factory-default provisioning.
 
 The explicit-version fixture produces 6, while the collaborator bridge reports
 an 8210 verdict of `1eff`. A matching raw capture has not been recovered;
@@ -77,12 +82,11 @@ of flag byte `0x13fde1`, cancels timer `0x18`, and interprets response byte
 the two outcomes at `0x13fbf0/0x13fbf1`. The pinned instruction/literal check
 is `tools/noki8210_selftest_contract.py`; sibling addresses are not its input.
 
-With request-correlated compact `0d00` completion, the fresh runtime observes
-the own handler armed (`flag=84`) and its return with all three fault bytes
-zero. It subsequently sends `0a09`, but the captured 8-second frame remains
-blank. Thus compact self-test acceptance does not establish application
-registration or graphical boot. The run also sends seven type-51 parameter
-chunks; parameter acceptance and radio semantics are not yet validated.
+The original acquired journal is a negative control: compact `0d00`
+completion reaches the own handler armed (`flag=84`) with cleared DSP fault
+outcomes, but local NV validation has already failed. Its frame remains
+blank. The unchanged base-record fixture below instead preserves the local
+validation bit (`flag=c4`) and supports graphical/runtime acceptance.
 
 Run the same fresh-directory command with `nsm3hle` instead of `nsm3stage`,
 then add `--runtime` to `noki8210_staged_check.py`. This acceptance requires
@@ -90,11 +94,11 @@ native upload completion, explicit ownership handoff, the own discovery
 request and its firmware acknowledgement. It makes no display or handset
 functionality claim.
 
-Add `--selftest` to require the own armed handler and cleared fault outcomes.
-The next question is what releases the MCU initializers feeding startup
-report `0x15`'s nine-byte readiness checklist. An unsolicited service map is
-not established as that dependency. Keep identity/record, board inputs and
-application binding separate until the own consumer identifies the boundary.
+Add `--selftest` to require the own armed handler and cleared fault outcomes;
+add `--base-record` for that explicitly labelled storage fixture. Local NV
+validation, not an unsolicited service map, explains the missing startup
+initializers in the original-journal negative control. Identity/record
+responses remain unselected in the accepted runtime composition.
 
 ## Board and physical-input observations
 
@@ -112,13 +116,13 @@ The own scanner `0x305940` drives row pins 0..4 and computes row*5+column at
 `3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b`: row 0 is unused,
 and the four physical rows occupy pins 1..4. The research machine therefore
 selects the five-column host layout and row-pin shift 1. This is static wiring
-evidence, not functional-input acceptance.
+evidence; the physical fixtures below also validate decoded input.
 
 `tools/noki8210_menu_input.lua` applies only a physical Menu field for 150 ms
-at 12 seconds and captures the result. The fresh 18-second run has no decoded
-key, no new keypad IRQ edge and a blank after-Menu frame. It does not prove
-that a desktop is live behind the blank output. Investigate the ordinary
-startup/mask lifecycle before adding UI or callback responses.
+at 12 seconds and captures the result. The original-journal negative control
+has no decoded key and a blank frame. On the checksum-valid base-record
+fixture the same key decodes as `19`; the security, menu and application
+fixtures below demonstrate organic physical UI interaction.
 
 ## Startup readiness boundary
 
@@ -311,7 +315,29 @@ and closes CP/RP and RR before returning to paging.
 but requires the own physical-key log. TP-MR is allowed to advance across
 successive submissions; destination, alphabet and exact `A` payload remain
 pinned. Two consecutive preserved-storage runs pass with TP-MR `01/02`.
-Apps and the aggregate model acceptance harness remain to be completed.
+### Application and isolated acceptance
+
+`noki8210_calculator_input.lua` physically navigates Menu 7, selects
+Calculator and computes `12 + 3 = 15`. The result frame is pinned in
+`run_noki8210_acceptance.py`; no firmware arithmetic or UI state is edited.
+This is a representative app check, not exhaustive coverage of all apps.
+
+Run any focused scenario from a new directory:
+
+```sh
+.venv/bin/python tools/run_noki8210_acceptance.py RUN \
+  --scenario registration
+```
+
+Available scenarios are `registration`, `incoming-call`, `outgoing-call`,
+`incoming-sms`, `outgoing-sms`, `calculator` and `phonebook`. Each seeds
+only the unchanged acquired base-record snapshot into a fresh persistent
+flash image. Incoming events use copied external network configuration;
+all UI interaction uses physical key fields. `phonebook` executes save
+and cold readback as separate processes sharing only persistent storage.
+Successful checks produce `acceptance.json`, console/log evidence and
+captures. Existing directories are refused. The normal machine remains
+unchanged; native DSP completion and speech are explicitly not claimed.
 
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
