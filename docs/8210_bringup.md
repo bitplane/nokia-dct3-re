@@ -91,8 +91,8 @@ request and its firmware acknowledgement. It makes no display or handset
 functionality claim.
 
 Add `--selftest` to require the own armed handler and cleared fault outcomes.
-The next question is which ordinary startup dependency leaves physical-key
-delivery disabled after the accepted self-test. An unsolicited service map is
+The next question is what releases the MCU initializers feeding startup
+report `0x15`'s nine-byte readiness checklist. An unsolicited service map is
 not established as that dependency. Keep identity/record, board inputs and
 application binding separate until the own consumer identifies the boundary.
 
@@ -119,6 +119,51 @@ at 12 seconds and captures the result. The fresh 18-second run has no decoded
 key, no new keypad IRQ edge and a blank after-Menu frame. It does not prove
 that a desktop is live behind the blank output. Investigate the ordinary
 startup/mask lifecycle before adding UI or callback responses.
+
+## Startup readiness boundary
+
+The physical-input observer includes bounded, read-only probes of the own
+startup report primitive `0x2885ac`, keyboard initialization and readiness
+checklist. The fresh 18-second run observes task-1 reports `17`, `16` and `14`,
+but not `15`. The four-report consumer at `0x2a59c4..0x2a5a86` records bits
+8/2/1 for those reports and bit 4 for `15`; its completion checks low nibble
+`0xf` as well as the separate mode predicate. Missing `15` is therefore a
+concrete startup dependency, not a guessed service message.
+
+Keyboard initialization `0x307df6` is invoked from `0x2a59a2`. Its write at
+`0x307e1c` ORs `0x1f` into column-mask register `0x6b` at 1.406088 seconds,
+after low-level enable `0x305a5c` has executed. The passive MMIO write tap
+locates this exact writer; neither the IRQ0 masking helper `0x305a3a` nor a
+host input failure accounts for that write.
+
+Report `15` is posted by `0x2ff7ac`, whose only direct BL caller is
+`0x24a9ac`. The preceding handler `0x24a8e4` accepts input codes `0c..15`
+through a ten-record jump table at `0x24a910`; `13` is a no-op. Inputs mark
+nine bytes at `0x137e44`, and the report posts only when all nine are nonzero.
+Input `64` clears the array. In the coherent run the handler sees only that
+reset, called from `0x2925aa`; all nine bytes remain zero.
+
+An aligned direct-BL scan of the acquired image finds ten calls to this
+handler: one reset plus these nine literal-input publishers. This is direct
+call coverage, not a claim that indirect producers cannot exist.
+
+| Input | Checklist Index | Own Direct Publisher Call |
+| --- | --- | --- |
+| `0c` | 0 | `21b876` |
+| `0d` | 1 | `25d316` |
+| `0e` | 2 | `250240` |
+| `0f` | 3 | `20b222` |
+| `10` | 4 | `2564c4` |
+| `11` | 5 | `225eba` |
+| `12` | 6 | `2bb346` |
+| `14` | 7 | `2085ba` |
+| `15` | 8 | `2aaa7e` |
+
+Follow the firmware's release/initialization path for these publishers.
+Neither report `15`, its checklist bytes nor a task-resume result should be
+injected. Reproduce the observation with the physical Menu fixture above;
+its probes log `8210_startup_post`, `8210_readiness_input` and
+`8210_readiness_flags`, without altering firmware or controller values.
 
 ## Inputs and hardware
 

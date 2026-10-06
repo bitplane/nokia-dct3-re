@@ -3,8 +3,29 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(assert(source:match('^(.*[/])')) .. 'noki8210_staged_observe.lua')
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
+local mask_tap = cpu.spaces['program']:install_write_tap(0x20068, 0x2006b,
+    '8210_column_mask', function(address, data, mask)
+        machine:logerror(string.format(
+            '8210_column_mask_write: address=%08x data=%08x mask=%08x pc=%08x t=%.6f\n',
+            address, data, mask, cpu.state['PC'].value, machine.time:as_double()))
+    end)
+_G.noki8210_column_mask_tap = mask_tap
 cpu.debug:bpset(0x307df4, nil,
     'logerror "8210_keypad_decoded: key=%02x\\n",r0;g')
+cpu.debug:bpset(0x30aa88, 'temp5<16',
+    'temp5=temp5+1;logerror "8210_input_lifecycle: mode=%04x caller=%08x\\n",r0,r14;g')
+cpu.debug:bpset(0x305a3a, 'temp4<16',
+    'temp4=temp4+1;logerror "8210_keypad_mask: caller=%08x\\n",r14;g')
+cpu.debug:bpset(0x305a5c, 'temp3<16',
+    'temp3=temp3+1;logerror "8210_keypad_enable: caller=%08x\\n",r14;g')
+cpu.debug:bpset(0x307df6, 'temp2<16',
+    'temp2=temp2+1;logerror "8210_keyboard_init: caller=%08x\\n",r14;g')
+cpu.debug:bpset(0x2885ac, 'r0==1 && temp1<128',
+    'temp1=temp1+1;logerror "8210_startup_post: code=%04x caller=%08x\\n",r1,r14;g')
+cpu.debug:bpset(0x24a8e4, 'temp8<64',
+    'temp8=temp8+1;logerror "8210_readiness_input: code=%02x caller=%08x\\n",r0,r14;g')
+cpu.debug:bpset(0x24a9b0, 'temp7<64',
+    'temp7=temp7+1;logerror "8210_readiness_flags: values=%02x%02x%02x%02x%02x%02x%02x%02x%02x\\n",b@137e44,b@137e45,b@137e46,b@137e47,b@137e48,b@137e49,b@137e4a,b@137e4b,b@137e4c;g')
 local input = coroutine.create(function()
     if not emu.wait(12) then return end
     local key = assert(machine.ioport.ports[':COL.1'].fields['Menu'])
