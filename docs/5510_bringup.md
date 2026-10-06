@@ -476,11 +476,27 @@ The lower read chain is `3234 -> 3035 -> 2fca/306c -> 302e`:
   uses `0100` as its word-count boundary; do not equate that alone with a
   complete physical NAND page including spare/OOB bytes.
 
-This command/address/read structure is consistent with the MU4 manual's
-NAND block, but the manual also shows an R/W controller between DSP, USB
-and flash. Therefore port `4000` is an observed interface, not proof of a
-bare NAND chip connected directly to the DSP. Controller semantics, BIO
-drive, spare-area/ECC handling and container-to-media placement remain open.
+The MU4 schematic sheet 7 identifies the components and separates strobe
+decode from NAND semantics:
+
+| Component / net | Primary schematic contract |
+| --- | --- |
+| U201 | Samsung `K9K1208U0A`, 64M x 8-bit NAND, TSOP1-48, Nokia part `4341191`. Do not substitute a similarly named K9F part without comparing its contract. |
+| U202 | TI `SN74LV138APWR`, Nokia part `4341175`: combinational 3-to-8 decoder, not a programmable storage controller. |
+| Decoder select inputs A/B/C | DSP `R/W`, `A14`, `A15`, respectively. |
+| Decoder enables | `IOSTRB` at active-low G2A; G2B grounded; `ADD_H` at active-high G1. |
+| Decoder outputs | Y2 -> `NF_WR`, Y3 -> `NF_RD`; Y6 -> `USB_WR`, Y7 -> `USB_RD`. |
+| NAND bus / controls | DSP D0..D7 directly reach U201; separate `NF_CLE`, `NF_ALE`, `NF_CE1`, `NF_R/B` connect DSP and NAND. WP is tied to the supply. |
+
+The enable/select equations from the
+[TI SN74LV138A datasheet](https://www.ti.com/lit/ds/symlink/sn74lv138a.pdf)
+place NAND strobes in the DSP I/O quadrant `4000..7fff` and USB strobes in
+`c000..ffff`, when the enables are active. The lower 14 address bits do not
+enter this decoder. That independently agrees with the observed NAND port
+`4000`; the rest of DA150 address decoding and `ADD_H` ownership still need
+mapping. This removes the need to invent an opaque R/W-controller protocol.
+GPIO-bit-to-NAND-net mapping, BIO drive, spare-area/ECC handling and
+container-to-media placement remain open.
 The `aa55` outer firmware-container marker must not be confused with the
 FAT boot-sector signature: their consumers and address spaces differ.
 
@@ -495,17 +511,18 @@ The dirty-cache flush at `0725` strengthens the NAND-protocol identification:
 These commands and 512+16-byte organization match the small-page NAND
 protocol documented in Samsung's
 [K9F1208 family datasheet](https://www1.futureelectronics.com/doc/SAMSUNG/K9F1208R0C-JIB000.pdf).
-That reference is a later revision and does not establish the fitted MU4
-part, its ID or timing. The spare-byte loop writes erased fill on this path;
+That reference is a related K9F part, not the schematic's fitted K9K part;
+it corroborates the command family only, not U201's ID or timing. The spare-byte loop writes erased fill on this path;
 it does not prove that all media operations omit ECC or bad-block handling.
 The observed control masks are consistent with command/address/chip selection,
-but the R/W controller's complete behavior remains unknown.
+but the DA150 GPIO mapping to those physical nets remains unvalidated.
 
 MAME already provides `machine/nandflash` with command/address/data methods,
 ready/busy callbacks and NVRAM ownership. Prefer extending that device for
 the evidenced part and attaching it at the recovered boundary over a new
-Nokia-specific NAND implementation. No existing configured part has yet been
-shown to match MU4. Do not attach a guessed part or seed a filesystem merely
+Nokia-specific NAND implementation. The fitted K9K1208U0A is not currently
+an explicit MAME part, and its exact datasheet/ID/timing contract must be
+acquired before adding it. Do not attach a guessed part or seed a filesystem merely
 to satisfy the mount consumer.
 
 Next recover the storage-controller/media placement and independently locate

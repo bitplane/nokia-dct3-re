@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_nand_strobe_decode", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
+      "boundary": "MU4 schematic sheet 7 identifies U201 K9K1208U0A NAND and U202 SN74LV138APWR combinational decoder. DSP R/W,A14,A15 select NAND Y2/Y3 write/read strobes in I/O quadrant 0x4000..0x7fff and USB Y6/Y7 in 0xc000..0xffff subject to IOSTRB and ADD_H enables. Separate CLE,ALE,CE and ready/busy nets reach DSP; their GPIO-bit mapping and NAND media placement remain unresolved. This is schematic plus decoder-equation evidence, not runtime device validation",
+      "evidence": ["docs/5510_bringup.md"]
+    },
+    {
       "id": "npm5_mu4_music_storage_consumer", "subsystem": "mu4", "status": "mapped", "confidence": "moderate",
       "boundary": "Original InitData R060/R061 first-segment code reaches FAT-family mount routine 0x308e through trampoline 0x2082. Byte/word/dword readers resolve through 0x329d/0x3234/0x32ad to control-register 0x003d masks 1/2/4, I/O port 0x4000 and BIO waits. This is a static consumer contract, not validated NAND/controller behavior, media placement, overlay selection or native execution; MU4 music DSP remains distinct from the missing MAD2 baseband mask",
       "evidence": ["docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
