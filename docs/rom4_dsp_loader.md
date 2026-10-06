@@ -47,15 +47,17 @@ The normalized ordered trace is:
 mask-ROM reset vector with the recovered program image and complete
 `0xb000..0xefff` DROM populated. Its expected isolated upload frontier is
 PC `0x0f01`, with program word `0f00` still zero: loader1 is not resident in
-the mask image and must be uploaded by the MCU.
+the mask image and must be uploaded by the MCU. A fixture-only read observer
+terminates on the fetch at `0f00`, before its word executes; the PC has already
+incremented. No loader word is supplied or CPU state forced.
 
-The current cold fixture does **not** reproduce that expectation: both the
-committed core baseline `0f9436b` and the extended-program implementation
-reach idle at PC `7eca`, SP `fffa`, PMST `ffa8`. The transform-entry fixture
-and coherent MCU-driven boot still pass independently. Keep the cold gate's
-existing expectation; resolve the fixture/input discrepancy before using
-it as passing cold-reset evidence. This result is not native RF or speech
-completion and is not a reason to seed loader code into the isolated core.
+Zero is a valid ADD opcode, not an illegal-instruction sentinel. Waiting for
+an illegal opcode let the isolated core execute unpopulated program memory
+and eventually reach unrelated idle code at `7eca`; that is not an upload
+frontier. The cold fixture initializes the selected DROM image before reset
+execution, just as the transform-entry fixture initializes its data snapshot.
+This gate establishes the reset-vector branch to the absent loader only,
+not native RF, speech, or a completed MCU/DSP upload exchange.
 
 `tools/dsp_rom4_upload_trace_check.py` verifies this ordering and rejects an
 observed input length absent from the recovered catalogue.

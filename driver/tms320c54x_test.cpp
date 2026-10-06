@@ -110,6 +110,13 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54rom4"))
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			u16 const *const initial = &memregion("dspdata")->as_u16();
+			for (unsigned address = 0; address != 0x10000; ++address)
+				data.write_word(address, initial[address]);
+		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "cold"))
 		{
@@ -122,9 +129,6 @@ private:
 		{
 			m_rom4_checks = 0;
 			auto &data = m_cpu->space(AS_DATA);
-			u16 const *const initial = &memregion("dspdata")->as_u16();
-			for (unsigned address = 0; address != 0x10000; ++address)
-				data.write_word(address, initial[address]);
 			u16 const *const drom = &memregion("dspdrom")->as_u16();
 			for (unsigned address = 0xb000; address != 0xf000; ++address)
 				data.write_word(address, drom[address]);
@@ -474,6 +478,26 @@ private:
 	void rom4_program_map(address_map &map) ATTR_COLD
 	{
 		map(0x0000, 0xffff).rom().region("dspprg", 0);
+		map(0x0f00, 0x0f00).r(FUNC(tms320c54x_test_state::rom4_loader_entry_r));
+	}
+
+	u16 rom4_loader_entry_r()
+	{
+		const u16 word = memregion("dspprg")->as_u16(0x0f00);
+		if (m_phase == 4 && !machine().side_effects_disabled())
+		{
+			// Stop at the absent loader's fetch, not at an unsupported opcode:
+			// zero is a valid ADD instruction and must not serve as a sentinel.
+			expect(word == 0 && m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01,
+				"ROM4 cold fetch reaches the unpopulated MCU-uploaded loader");
+			osd_printf_info("TMS320C54x ROM4 cold frontier: pc=%04x sp=%04x pmst=%04x idle=%u\n",
+				u16(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+				u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+				u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
+			throw emu_fatalerror(0, "TMS320C54x ROM4 cold frontier complete");
+		}
+		return word;
 	}
 
 	void rom4_data_map(address_map &map) ATTR_COLD
@@ -14276,13 +14300,7 @@ private:
 					u16(m_cpu->state_int(tms320c54x_device::STATE_SP)),
 					u16(m_cpu->state_int(tms320c54x_device::STATE_PMST)),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)));
-			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-					"ROM4 cold loader-upload boundary");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01,
-					"ROM4 cold loader entry PC");
-			expect(m_cpu->space(AS_PROGRAM).read_word(0x0f00) == 0,
-					"ROM4 loader1 must be MCU-uploaded");
-			throw emu_fatalerror(0, "TMS320C54x ROM4 cold frontier complete");
+			expect(false, "ROM4 cold execution stopped before the loader-entry fetch");
 		}
 		if (m_phase == 3)
 		{
