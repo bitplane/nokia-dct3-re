@@ -18,6 +18,7 @@ public:
 		u8 row_direction = 0xa8;
 		u8 row_pin_shift = 0;
 		u8 column_irq_status = 0xff; // absent unless independently selected
+		u8 column_direction = 0xff; // optional mixed-GPIO direction, 1 = output
 
 		constexpr bool valid() const
 		{

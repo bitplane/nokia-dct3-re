@@ -67,7 +67,7 @@ class KbgpioDeviceSplitTest(unittest.TestCase):
         self.assertIn("row + m_wiring.row_pin_shift", self.device)
         self.assertIn("rows + row_pin_shift <= 5", self.header)
         self.assertIn("column_irq_status = 0xff", self.header)
-        self.assertIn("m_pending_columns |= changed", self.device)
+        self.assertIn("m_pending_columns |= input_changes", self.device)
         self.assertIn("save_item(NAME(m_pending_columns))", self.device)
         self.assertIn("return m_pending_columns", self.device)
 

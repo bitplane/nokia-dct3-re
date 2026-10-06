@@ -260,11 +260,17 @@ Initializer `3a7424` writes `24` to port-direction register `2006a`,
 `3f` to data register `2002a`, and mask `75` to `2006b`. Routine `335632`
 sets data bit 2 when enabled; its disable branch applies mask `1b`.
 Consequently this port is used as mixed GPIO, not merely matrix inputs.
-The package checker pins both code extents. The current keyboard device
-samples `2a` from its matrix callback and does not establish NPM-5's
-direction/output readback contract; its research profile also does not
-select the independently observed `2b` status register. These are explicit
-controller-fidelity gaps, not evidence of a successful MU4 connection.
+The package checker pins both code extents. NPM-5 now selects optional
+mixed-port direction `6a` and pending status `2b` in the keyboard/GPIO
+device. Direction bits select output-latch readback; output drive does not
+generate input-pending events. This polarity is inferred from the own
+initializer and bit-2 writer, not an independent silicon measurement.
+Other profiles retain their existing matrix-only contract. Inputs remain
+unbound rather than pretending the QWERTY matrix is attached to MAD2.
+`noki5510_gpio_conformance.lua` verifies output-low/high readback and pending
+status preservation in a synchronous MMIO fixture, restoring the port
+before firmware resumes. It is controller self-conformance, not MU4 or UI
+acceptance; the hybrid lifecycle gates also pass with this configuration.
 Do not equate status bit 3 with connector ROW3 merely because the numbers
 match; the column/row pin routing still requires its own decode.
 

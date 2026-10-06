@@ -3838,6 +3838,10 @@ void nokia_dct3_state::nmp5stage(machine_config &config)
 	// and receives at 6c. This selects the recovered GENSIO register contract.
 	research.gensio_wiring = GENSIO_NSM3;
 	research.ccont_board = ADC_NPM5;
+	// Own 3a7424 configures mixed port 2a through 6a; 3a73d8 reads
+	// pending inputs at 2b. This does not attach an unverified MU4 peer.
+	research.keypad_wiring.column_direction = 0x6a;
+	research.keypad_wiring.column_irq_status = 0x2b;
 	// NPM-5 0x383fa0 arms MBUSTIM while its startup serial queue drains.
 	research.mbus_timer_enabled = true;
 	// Bootstrap instrument: bit 0 is the own verifier execution release.

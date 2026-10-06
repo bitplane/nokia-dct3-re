@@ -31,6 +31,7 @@ bool nokia_kbgpio_device::owns(offs_t offset) const
 			offset == m_wiring.column_input ||
 			offset == m_wiring.column_irq_mask ||
 			offset == m_wiring.row_direction ||
+			(m_wiring.column_direction != 0xff && offset == m_wiring.column_direction) ||
 			(m_wiring.column_irq_status != 0xff && offset == m_wiring.column_irq_status);
 }
 
@@ -92,7 +93,13 @@ u8 nokia_kbgpio_device::sample_columns(bool consume_power_on)
 		if (consume_power_on)
 			m_power_on = 0xff;
 	}
-	return data | 0xe0;
+	data |= 0xe0;
+	if (m_wiring.column_direction != 0xff)
+	{
+		const u8 outputs = m_regs[m_wiring.column_direction];
+		data = (data & ~outputs) | (m_regs[m_wiring.column_input] & outputs);
+	}
+	return data;
 }
 
 void nokia_kbgpio_device::update_irq()
@@ -112,6 +119,8 @@ void nokia_kbgpio_device::update_columns()
 	// callbacks must not bypass the hardware mask.
 	const u8 changed = (m_columns ^ columns) &
 			~m_regs[m_wiring.column_irq_mask] & 0x1f;
+	const u8 input_changes = m_wiring.column_direction == 0xff ? changed :
+			changed & ~m_regs[m_wiring.column_direction];
 	if (m_trace && m_columns != columns)
 		LOGMASKED(LOG_KEYPAD,
 				"kbgpio: columns=%02x->%02x changed=%02x row=%02x dir=%02x mask=%02x t=%.9f\n",
@@ -119,9 +128,9 @@ void nokia_kbgpio_device::update_columns()
 				m_regs[m_wiring.row_direction],
 				m_regs[m_wiring.column_irq_mask], machine().time().as_double());
 	m_columns = columns;
-	if (changed)
+	if (input_changes)
 	{
-		m_pending_columns |= changed;
+		m_pending_columns |= input_changes;
 		m_irq_latched = true;
 		update_irq();
 	}
@@ -151,7 +160,9 @@ void nokia_kbgpio_device::write(offs_t offset, u8 data)
 	m_regs[offset] = data;
 	if (offset == m_wiring.row_signal ||
 			offset == m_wiring.column_irq_mask ||
-			offset == m_wiring.row_direction)
+			offset == m_wiring.row_direction ||
+			(m_wiring.column_direction != 0xff &&
+					(offset == m_wiring.column_direction || offset == m_wiring.column_input)))
 		update_columns();
 }
 
