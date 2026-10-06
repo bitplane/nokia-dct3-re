@@ -7,7 +7,7 @@
 
 namespace {
 
-constexpr u16 ST1_BRAF = 0x4000;
+constexpr u16 ST1_BRAF = 0x8000;
 
 s32 accumulator_high17(u64 value)
 {
@@ -796,6 +796,13 @@ void tms320c54x_device::execute_one(u16 op)
 				m_pc = destination;
 		}
 		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
+		return;
+	}
+	if ((op & 0xfcf8) == 0xf4a8) // CMPR CC, ARx (unsigned comparison with AR0)
+	{
+		u16 const left = m_ar[op & 7], right = m_ar[0];
+		bool const conditions[] = {left == right, left < right, left > right, left != right};
+		m_st0 = (m_st0 & ~u16(0x1000)) | (conditions[(op >> 8) & 3] ? 0x1000 : 0);
 		return;
 	}
 	if ((op & 0xfcff) == 0xf4e1) // IDLE 1/2/3
@@ -1740,26 +1747,28 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x6c00: // BANZ pmad, *ARx modification
 	{
 		const unsigned ar = indirect_ar(low);
-		const bool branch = m_ar[ar] != 0;
-		indirect_modify(low);
+		const bool extended = low >= 0xe0 && low < 0xf8;
+		const bool branch = (extended ? long_offset_address(low) : m_ar[ar]) != 0;
+		if (!extended) indirect_modify(low);
 		const u16 destination = fetch();
 		if (branch)
 			m_pc = destination;
-		m_icount -= branch ? 3 : 1;
+		m_icount -= (branch ? 3 : 1) + unsigned(extended);
 		return;
 	}
 	case 0x6e00: // BANZD pmad, *ARx modification
 	{
 		const unsigned ar = indirect_ar(low);
-		const bool branch = m_ar[ar] != 0;
-		indirect_modify(low);
+		const bool extended = low >= 0xe0 && low < 0xf8;
+		const bool branch = (extended ? long_offset_address(low) : m_ar[ar]) != 0;
+		if (!extended) indirect_modify(low);
 		const u16 destination = fetch();
 		if (branch)
 		{
 			m_delayed_target = destination;
 			m_delayed_words = 2;
 		}
-		--m_icount;
+		m_icount -= 1 + unsigned(extended);
 		return;
 	}
 	case 0x8000: // STL A, Smem
@@ -1801,8 +1810,8 @@ void tms320c54x_device::execute_one(u16 op)
 		u16 destination;
 		if (low >= 0xe0 && low < 0xf8)
 		{
-			destination = fetch() + (repeated ? m_rpt_iteration : 0);
 			value = indirect_read(low);
+			destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		}
 		else
 		{
@@ -1855,6 +1864,14 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			const u16 destination = long_offset_address(low);
+			const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
+			data_write(destination, data_read(source));
+			if (!repeated || !m_rpt_iteration) m_icount -= 2;
+			return;
+		}
 		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
 		indirect_write(low, data_read(source));
 		if (!repeated || !m_rpt_iteration)

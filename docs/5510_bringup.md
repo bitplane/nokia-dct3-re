@@ -589,6 +589,22 @@ bytes `12 34`. Both calls preserve SP. The core gate additionally checks
 512 `BIT Xmem,BITC` variants, including the saved-INTM test used by the
 original command writer.
 
+The same gate calls unchanged dirty-cache flush `0725` with its documented
+routine inputs: dirty flag `3b14`, physical row base `3b12/3b13` and 8,192
+test words at data `4000`. Original code erases block 2, programs all 32
+pages, fills 16 spare bytes per page with `ff`, and compares each page against
+its cache. An independent NAND read checks all 8,192 words and 512 spare
+bytes. A pre-existing zero byte makes erase necessary; successful return is
+zero, SP is balanced, the dirty flag clears and compiler mode is preserved.
+
+This exercises generic core contracts that matter beyond MU4: long-offset
+`BANZ/BANZD` tests the effective Sind value and consumes displacement before
+target (96 cases); `CMPR` compares unsigned ARx against AR0 (192 cases);
+and block repeat uses ST1 bit 15 for BRAF without clearing bit 14 CPL.
+The core gate asserts active and retired BRAF with CPL set. These rules follow
+TI SPRU172C and SPRU131G; memory-copy extension ordering is also checked
+against original firmware execution rather than a synthetic test alone.
+
 This is original-routine execution, not a complete DA150 board: the fixture
 holds ADD_H enabled, uses a test clock and separate test program/data maps,
 and supplies a reset wrapper. It neither seeds a filesystem nor selects an

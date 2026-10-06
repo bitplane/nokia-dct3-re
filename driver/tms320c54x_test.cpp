@@ -28,6 +28,45 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	static constexpr u16 cmpr_values[][2] = {{0, 0}, {0, 1}, {1, 0}, {0xffff, 0x8000}, {0x8000, 0xffff}, {0xffff, 0xffff}};
+	void start_cmpr_case(unsigned index)
+	{
+		unsigned const ar = index & 7, condition = (index / 8) & 3, pair = index / 32;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x010980, 0xf4a8 | (condition << 8) | ar);
+		program.write_word(0x010981, 0xf4e1);
+		m_cpu->set_state_int(STATE_GENPC, 0x010980);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, cmpr_values[pair][1]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, cmpr_values[pair][0]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5 | ((index & 1) ? 0x1000 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 1427 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+	void start_banz_offset_case(unsigned index)
+	{
+		unsigned const ar = index & 7;
+		unsigned const mode = (index / 16) % 3;
+		bool const zero = (index / 8) & 1;
+		bool const delayed = index >= 48;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		unsigned next = 0x010960;
+		program.write_word(next++, (delayed ? 0x6e00 : 0x6c00) | (0xe0 + mode * 8 + ar));
+		program.write_word(next++, 0xffff);
+		program.write_word(next++, 0x0970);
+		if (delayed) { program.write_word(next++, 0xf495); program.write_word(next++, 0xf495); }
+		program.write_word(next++, 0xf020); program.write_word(next++, 0x1111);
+		program.write_word(next++, 0xf4e1);
+		program.write_word(0x010970, 0xf020); program.write_word(0x010971, 0x2222);
+		program.write_word(0x010972, 0xf4e1);
+		m_cpu->set_state_int(STATE_GENPC, 0x010960);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, zero ? 1 : 5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 1331 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_bit_case(unsigned index)
 	{
 		unsigned const operand = index / 32;
@@ -1053,7 +1092,7 @@ private:
 					"RPTBD executes both delay slots once");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_AR0) == 2 &&
 					m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 &&
-					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
 					"RPTBD repeats its body and retires BRAF");
 			program.write_word(0x042c, 0xa43a); // MPY *AR5, *AR4+, A
 			program.write_word(0x042d, 0xf5e1);
@@ -2770,7 +2809,7 @@ private:
 			expect_opcode(0xf272, m_port_writes == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 7 &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ea &&
-					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
 					"ROM4 f272 costs two cycles and retires after its one-word block");
 			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 			program.write_word(0x05e1, 0x0124);
@@ -2794,7 +2833,7 @@ private:
 			expect_opcode(0xf072, m_port_writes == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 7 &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
-					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
 					"ROM4 f072 costs four cycles and retires after its one-word block");
 			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 			program.write_word(0x05e1, 0x0124);
@@ -7393,8 +7432,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 STLM B,AR4 stores BL in one cycle");
 			program.write_word(0x05e3, 0x71ea); // MVDK *+AR2(5),0f20
-			program.write_word(0x05e4, 0x0f20);
-			program.write_word(0x05e5, 5);
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x0f20);
 			program.write_word(0x05e6, 0x75f8);
 			program.write_word(0x05e7, 0x0d00);
 			program.write_word(0x05e8, 0x0124);
@@ -7414,7 +7453,7 @@ private:
 			expect_opcode(0x71ea, data.read_word(0x0f20) == 0xbeef &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"long-offset MVDK consumes destination before offset in three cycles");
+					"long-offset MVDK consumes offset before destination in three cycles");
 			program.write_word(0x05e3, 0x75ea); // PORTW *+AR2(5),0124
 			program.write_word(0x05e4, 0x0124);
 			program.write_word(0x05e5, 5);
@@ -7434,8 +7473,8 @@ private:
 					m_last_port_cycle - m_middle_port_cycle == 3,
 					"long-offset PORTW consumes port before offset and takes three cycles");
 			program.write_word(0x05e3, 0x70ea); // MVKD 0f20,*+AR2(5)
-			program.write_word(0x05e4, 0x0f20);
-			program.write_word(0x05e5, 5);
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x0f20);
 			data.write_word(0x0f20, 0x5678);
 			data.write_word(0x0f05, 0);
 			m_port_writes = 0;
@@ -7451,7 +7490,7 @@ private:
 			expect_opcode(0x70ea, data.read_word(0x0f05) == 0x5678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"long-offset MVKD consumes source before offset and takes three cycles");
+					"long-offset MVKD consumes offset before source and takes three cycles");
 			program.write_word(0x05e3, 0x7dea); // MVDP *+AR2(5),0600
 			program.write_word(0x05e4, 0x0600);
 			program.write_word(0x05e5, 5);
@@ -14464,6 +14503,55 @@ private:
 				return;
 			}
 			osd_printf_info("TMS320C54x BIT Xmem conformance: PASS variants=512\n");
+			start_banz_offset_case(0);
+			return;
+		}
+		if (m_phase >= 1331 && m_phase < 1427)
+		{
+			unsigned const index = m_phase - 1331;
+			unsigned const ar = index & 7;
+			unsigned const mode = (index / 16) % 3;
+			bool const zero = (index / 8) & 1;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (zero ? 0x1111 : 0x2222) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == (mode ? (zero ? 0 : 4) : (zero ? 1 : 5)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"BANZ/BANZD long-offset Sind tests effective address and consumes displacement before destination");
+			if (index < 95) { start_banz_offset_case(index + 1); return; }
+			osd_printf_info("TMS320C54x BANZ offset conformance: PASS variants=96\n");
+			start_cmpr_case(0);
+			return;
+		}
+		if (m_phase >= 1427 && m_phase < 1619)
+		{
+			unsigned const index = m_phase - 1427;
+			unsigned const ar = index & 7, condition = (index / 8) & 3, pair = index / 32;
+			u16 const left = cmpr_values[pair][0], right = ar ? cmpr_values[pair][1] : left;
+			bool const conditions[] = {left == right, left < right, left > right, left != right};
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x0aa5 | (conditions[condition] ? 0x1000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == left &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == right &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"CMPR conditions are unsigned, cover every AR and modify only TC");
+			if (index < 191) { start_cmpr_case(index + 1); return; }
+			osd_printf_info("TMS320C54x CMPR conformance: PASS variants=192\n");
+			program.write_word(0x010990, 0x771a); program.write_word(0x010991, 1);
+			program.write_word(0x010992, 0xf072); program.write_word(0x010993, 0x0995);
+			program.write_word(0x010994, 0xf495); program.write_word(0x010995, 0x4907);
+			program.write_word(0x010996, 0xf4e1);
+			m_cpu->set_state_int(STATE_GENPC, 0x010990);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 1619;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 1619)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == 0xc800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x4800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"RPTB publishes bit-15 BRAF while preserving independent bit-14 CPL on retirement");
+			osd_printf_info("TMS320C54x BRAF/CPL independence: PASS\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -14590,7 +14678,7 @@ private:
 				data.read_word(0x0602) == 0x3333, "RPTB multiword CALL");
 		expect(m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0,
 				"RPTB terminal count");
-		expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x4000),
+		expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
 				"RPTB terminal state clears ST1.BRAF");
 		expect(data.read_word(0x0900) == 0xcccc &&
 				data.read_word(0x0901) == 0xaaaa &&

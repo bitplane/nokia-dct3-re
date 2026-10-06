@@ -884,13 +884,13 @@ AR0 value, and the one-cycle repeat setup. It was observed 25 times.
 Exact ROM4 `fa30` (`BCD pmad,TC`) checks both condition outcomes, both delay
 words, the selected destination, and delayed-branch timing. Exact `8914`
 (`STLM B,AR4`) checks the low-word transfer and one-cycle cost.
-Fixture-only `71ea` and `75ea` check the long-offset surcharge for MVDK and
-PORTW, respectively. Both assert destination/port-before-offset extension
-order, AR2 preupdate, transferred data, and three-cycle timing. The shared
-CPU correction does not change the captured ROM4 opcode-set coverage.
-Fixture-only `70ea` checks the MVKD counterpart: direct source before the
-long-offset destination extension, AR2 preupdate, copied data, and TI's
-three-cycle cost. It also leaves observed ROM4 word coverage unchanged.
+Fixture-only `71ea` and `70ea` check long-offset MVDK/MVKD: the Smem
+displacement precedes the direct destination/source extension, with AR2
+preupdate, copied data and three-cycle cost. Original MU4 `71e7/70e7`
+execution independently exercises this ordering through cache program and
+read-back. Fixture-only `75ea` checks PORTW's port-before-offset ordering,
+AR2 preupdate, transferred data and three-cycle timing. These fixtures do not
+change the captured ROM4 opcode-set coverage.
 Fixture-only `7dea` checks MVDP with long-offset source addressing: program
 destination before offset, AR2 preupdate, the program-memory word written,
 and TI's five-cycle cost. This also leaves observed ROM4 coverage unchanged.
