@@ -44,6 +44,27 @@ class PmmReplayTest(unittest.TestCase):
         self.assertEqual(fixture[0x18026:0x20000], b'\xff' * 0x7fda)
         self.assertEqual(len(replay(fixture)[1]), 1)
 
+    def test_original_journal_retains_checksum_failure(self):
+        image = self.fixture()
+        image[0x10020:0x10026] = bytes.fromhex('005980000000')
+        image[0x10026:0x18026] = bytes(0x8000)
+        image[0x18026:0x1802c] = bytes.fromhex('080002540001')
+        original = bytes(image)
+        cache, records, _ = replay(original)
+        self.assertEqual(len(records), 2)
+        self.assertNotEqual(checksum(cache), int.from_bytes(cache[0x254:0x256], 'big'))
+        repaired, _, _ = replay(base_record_fixture(original))
+        self.assertEqual(checksum(repaired), int.from_bytes(repaired[0x254:0x256], 'big'))
+        self.assertEqual(bytes(image), original)
+
+    def test_invalid_base_checksum_is_not_repaired(self):
+        image = self.fixture()
+        image[0x10020:0x10026] = bytes.fromhex('005980000000')
+        image[0x10026:0x18026] = bytes(0x8000)
+        image[0x10146] = 1
+        with self.assertRaisesRegex(ValueError, 'not checksum-valid'):
+            base_record_fixture(image)
+
 
 if __name__ == '__main__':
     unittest.main()

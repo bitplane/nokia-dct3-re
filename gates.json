@@ -26,6 +26,167 @@
     "DCT3_EEPROM_GUARD_V501": "restore_default() { $(MAKE) --no-print-directory eeprom-profile BIOS=501 ROM=roms/nokia_3210_nse-8_v05_01_full_hu.fls; cp \"roms/noki3210/3210 v501 eeprom.bin\" \"$(MAME_DIR)/roms/noki3210/3210 v501 eeprom.bin\"; }; trap restore_default EXIT;"
   },
   "gates": [
+{
+      "name": "verify-8210-registration",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki8210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "registration",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-8210-outgoing-call",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki8210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "outgoing-call",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-8210-incoming-call",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki8210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "incoming-call",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-8210-incoming-sms",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki8210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "incoming-sms",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-8210-outgoing-sms",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki8210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "outgoing-sms",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-8210-calculator",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki8210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "calculator",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
+{
+      "name": "verify-8210-phonebook",
+      "prerequisites": [
+            "build"
+      ],
+      "variables": {},
+      "steps": [
+            {
+                  "step": "check",
+                  "silent": false,
+                  "interpreter": "$(PYTHON)",
+                  "before_script": [],
+                  "script": "tools/run_noki8210_acceptance.py",
+                  "arguments": [
+                        "$(RUN_DIR)",
+                        "--scenario",
+                        "phonebook",
+                        "--mame",
+                        "$(MAME_DIR)/mame"
+                  ]
+            }
+      ]
+},
     {
       "name": "verify-7110-keypad-controller",
       "prerequisites": ["build"],

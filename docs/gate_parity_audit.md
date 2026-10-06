@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 49
-Differences found: 90
+Families with more than one product: 50
+Differences found: 91
 
 ## ROM normalisation reachability
 
@@ -23,6 +23,7 @@ absent product is a coverage question, not a drifted gate.
 | `bootstrap` | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `charger-wake` | — | yes | — | — | — | — | — | yes | — | — | — | — |
 | `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — |
+| `keypad-controller` | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — |
 | `menu` | — | — | yes | — | yes | — | yes | yes | — | — | — | — |
 | `navigation` | — | — | yes | yes | yes | — | — | yes | — | — | — | — |
@@ -87,6 +88,11 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **3610**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **5210**: `tools/check_lcd_frame.py`
+
+### `keypad-controller`
+
+- **6210**: `tools/npe3_keypad_check.py`
+- **7110**: `tools/nse5_keypad_check.py`
 
 ### `mbus`
 

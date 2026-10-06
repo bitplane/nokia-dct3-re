@@ -22,6 +22,23 @@ SCENARIOS = {
 }
 
 
+MCU_SHA1 = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
+PMM_SHA256 = '31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
+
+
+def prepare_run(run, mcu, pmm):
+    """Pin provenance before creating storage; never reuse a previous run."""
+    if hashlib.sha1(mcu).hexdigest() != MCU_SHA1:
+        raise ValueError('unexpected acquired NSM-3 MCU/PPM image')
+    if hashlib.sha256(pmm).hexdigest() != PMM_SHA256:
+        raise ValueError('unexpected acquired NSM-3 PMM image')
+    fixture = base_record_fixture(pmm)
+    run.mkdir(parents=True, exist_ok=False)
+    (run / 'nvram/nsm3hle').mkdir(parents=True)
+    (run / 'cfg').mkdir()
+    (run / 'nvram/nsm3hle/flash').write_bytes(mcu + fixture)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
@@ -33,11 +50,7 @@ def main():
     try:
         mcu = (root / 'roms/noki8210/8210_5.31ppm_c.fls').read_bytes()
         pmm = (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes()
-        fixture = base_record_fixture(pmm)
-        run.mkdir(parents=True, exist_ok=False)
-        (run / 'nvram/nsm3hle').mkdir(parents=True)
-        (run / 'cfg').mkdir()
-        (run / 'nvram/nsm3hle/flash').write_bytes(mcu + fixture)
+        prepare_run(run, mcu, pmm)
         config = {'incoming-call': 'radio_incoming_call_answered',
                   'incoming-sms': 'radio_incoming_sms'}.get(args.scenario)
         if config:

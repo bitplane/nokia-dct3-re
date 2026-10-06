@@ -126,9 +126,9 @@ fixtures below demonstrate organic physical UI interaction.
 
 ## Startup readiness boundary
 
-The physical-input observer includes bounded, read-only probes of the own
-startup report primitive `0x2885ac`, keyboard initialization and readiness
-checklist. The fresh 18-second run observes task-1 reports `17`, `16` and `14`,
+The physical-input observer retains bounded, read-only probes of the own
+startup report primitive `0x2885ac` and readiness checklist. The original-
+journal negative control observes task-1 reports `17`, `16` and `14`,
 but not `15`. The four-report consumer at `0x2a59c4..0x2a5a86` records bits
 8/2/1 for those reports and bit 4 for `15`; its completion checks low nibble
 `0xf` as well as the separate mode predicate. Missing `15` is therefore a
@@ -136,16 +136,17 @@ concrete startup dependency, not a guessed service message.
 
 Keyboard initialization `0x307df6` is invoked from `0x2a59a2`. Its write at
 `0x307e1c` ORs `0x1f` into column-mask register `0x6b` at 1.406088 seconds,
-after low-level enable `0x305a5c` has executed. The passive MMIO write tap
-locates this exact writer; neither the IRQ0 masking helper `0x305a3a` nor a
+after low-level enable `0x305a5c` has executed. The recovered MMIO write
+identifies this writer; neither the IRQ0 masking helper `0x305a3a` nor a
 host input failure accounts for that write.
 
 Report `15` is posted by `0x2ff7ac`, whose only direct BL caller is
 `0x24a9ac`. The preceding handler `0x24a8e4` accepts input codes `0c..15`
 through a ten-record jump table at `0x24a910`; `13` is a no-op. Inputs mark
 nine bytes at `0x137e44`, and the report posts only when all nine are nonzero.
-Input `64` clears the array. In the coherent run the handler sees only that
-reset, called from `0x2925aa`; all nine bytes remain zero.
+Input `64` clears the array. In the original-journal negative control the
+handler sees only that reset, called from `0x2925aa`; all nine bytes remain
+zero. The accepted base-record fixture instead completes all nine inputs.
 
 An aligned direct-BL scan of the acquired image finds ten calls to this
 handler: one reset plus these nine literal-input publishers. This is direct
@@ -192,12 +193,11 @@ A diagnostic fixture retaining the unchanged acquired base record and
 erasing only its later low-record journal (`0x18026..0x1ffff` in the PMM
 tail) passes local validation. Other PMM sectors and all base-record fields,
 including identity and checksum, remain unchanged. It is an acquired
-earlier snapshot, not an established factory-default profile. In one
-coherent 18-second run, all nine readiness publishers execute, report `15`
-arrives, and physical Menu decodes as `0x19`. The captured LCD reads
-“SIM-Karte einsetzen” (Insert SIM card). Synthetic SIM and radio remain
-unselected in this composition; this result does not establish those paths
-or native DSP completion.
+earlier snapshot, not an established factory-default profile. With this
+fixture all nine readiness publishers execute, report `15` arrives, and
+physical Menu decodes as `0x19`. The current `nsm3hle` composition includes
+the laboratory SIM and radio peer; their separate acceptance contracts are
+below. None establishes native DSP completion.
 
 Generate that explicitly diagnostic persistent flash in an isolated run:
 
@@ -216,8 +216,8 @@ reaches the phone security editor. `tools/noki8210_security_input.lua`
 presses physical digits `1..5` and Menu at 12 seconds; the own decoder logs
 `01..05` and `19`. The editor dismisses to a Menu/Names idle presentation,
 and the subsequent physical Menu press opens the Messages menu. This is
-interactive UI and SIM-read acceptance, not cold-persistent phonebook
-write, registration, call or SMS acceptance. Radio remains unselected.
+interactive UI and SIM-read acceptance; phonebook writes, registration,
+calls and SMS require the separate scenario checks below.
 Retain the original-journal negative control and do not silently promote
 this fixture to the normal machine ROM.
 
@@ -339,11 +339,24 @@ Successful checks produce `acceptance.json`, console/log evidence and
 captures. Existing directories are refused. The normal machine remains
 unchanged; native DSP completion and speech are explicitly not claimed.
 
-Follow the firmware's release/initialization path for these publishers.
-Neither report `15`, its checklist bytes nor a task-resume result should be
-injected. Reproduce the observation with the physical Menu fixture above;
-its probes log `8210_startup_post`, `8210_readiness_input` and
-`8210_readiness_flags`, without altering firmware or controller values.
+The same scenarios are standard gates: `make verify-8210-registration
+RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
+`outgoing-call`, `incoming-sms`, `outgoing-sms`, `calculator` and `phonebook`
+suffixes. Use a distinct, nonexistent `RUN_DIR` for every gate. The runner
+pins both acquired input hashes before creating storage; wrong-product inputs
+are rejected rather than silently provisioned. Incoming configuration is
+copied into the run, never modified in the tracked fixtures.
+
+The shared observer retains staged-DSP/self-test, decoded-key and readiness
+acceptance records only. PMM copy/cache dump, column-mask and input-lifecycle
+investigation probes are retired. The journal replay and checksum tools/tests
+retain their conclusions: the original journal is a failing negative control,
+and omitting its later low records is a diagnostic snapshot fixture, not an
+authentic factory-default reconstruction.
+
+Readiness observations (`8210_startup_post`, `8210_readiness_input` and
+`8210_readiness_flags`) are passive. Neither report `15`, checklist bytes nor
+task-resume results are injected by acceptance.
 
 ## Inputs and hardware
 
