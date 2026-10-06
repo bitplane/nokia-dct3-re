@@ -528,19 +528,29 @@ it does not prove that all media operations omit ECC or bad-block handling.
 The observed control masks are consistent with command/address/chip selection,
 but the DA150 GPIO mapping to those physical nets remains unvalidated.
 
-MAME already provides `machine/nandflash` with command/address/data methods,
-ready/busy callbacks and NVRAM ownership. Prefer extending that device for
-the evidenced part and attaching it at the recovered boundary over a new
-Nokia-specific NAND implementation. The fitted K9K1208U0A is not currently
-an explicit MAME part. Its constructor can now be specified without borrowing
-a K9F identity, but a constructor alone is not complete support: the current
-core performs program/erase synchronously, pulses R/B low then high in the
-same call, and its sequential-read option advances across erase blocks.
-There is no CE input to terminate the sequential-read cycle. Extend these
-contracts with defaults preserving existing NAND users before attaching U201;
-test ID/addressing, data and spare access, AND-programming, block erase,
-timed busy/status, CE termination and save-state replay independently of
-handset firmware. Do not seed a filesystem merely to satisfy the mount consumer.
+The overlay patch `patches/mame-nandflash-mu4.patch` extends MAME's generic
+`machine/nandflash`, rather than introducing a Nokia NAND implementation.
+`SAMSUNG_K9K1208U0A` supplies the exact ID, geometry and address cycles.
+Its read transfers, program, erase and reset use timed ready/busy state;
+program/erase mutate media only on completion. CE terminates its sequential
+read cycle and block-end reads do not enter the next erase block. Existing
+parts retain zero-duration operations and their previous sequential-read
+policy unless CE is explicitly connected. Media, page register, pending
+operation and address state are saved, and post-load republishes R/B.
+
+`make check-mu4-nand` exercises this device without Nokia firmware: exact
+ID, upper row address, data/spare access, AND-programming, erase,
+pre-completion busy/status, CE termination on non-erased data, block-boundary
+termination, reset cancellation and pending-program save/replay. It also
+checks one existing K9F5608 part's synchronous program/read behavior. The
+gate disables host NVRAM-file emission; it does not prove filesystem
+persistence, analog pin timing, copy-back, factory bad-block contents or
+all existing NAND users. Typical program/erase and maximum read/reset times
+are deterministic datasheet selections, not measured MU4 board latencies.
+
+U201 is not attached to a handset yet: DA150 control-pin ownership, BIO,
+address enables and original media placement remain prerequisites. Do not
+seed a filesystem merely to satisfy the mount consumer.
 
 Next recover the storage-controller/media placement and independently locate
 the overlay selector before constructing a native music-DSP fixture. A valid
