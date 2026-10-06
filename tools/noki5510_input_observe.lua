@@ -33,6 +33,10 @@ for _, tap in ipairs({{0x399fbc, 'serial_ingress'}, {0x362958, 'local_route'}}) 
 end
 cpu.debug:bpset(0x362de0, nil,
     'logerror "5510_input_internal_control: caller=%08x arguments=%02x,%02x,%02x\\n",r14,r0,r1,r2;g')
+cpu.debug:bpset(0x399eca, 'r0==28',
+    'logerror "5510_input_node28_available: caller=%08x transport=%02x\\n",r14,r1;g')
+cpu.debug:bpset(0x399f12, 'b@(r0+1)==28',
+    'logerror "5510_input_node28_send: caller=%08x class=%02x available=%02x\\n",r14,b@(r0+6),b@123895;g')
 cpu.debug:bpset(0x335f34, 'temp8<40',
     'temp8=temp8+1;logerror "5510_input_task_delivery: object=%08x\\n",r0;g')
 cpu.debug:bpset(0x335ea8, nil,

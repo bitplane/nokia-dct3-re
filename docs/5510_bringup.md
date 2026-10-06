@@ -290,6 +290,26 @@ and router caller `362d5e`, confirming the internal-control interpretation.
 The next boundary is the sequenced receive path's external sender and
 startup exchange, not an inactive generic receive queue.
 
+The two observed ingress classes are the declared external-service HLE's
+discovery replies: `nokia_external_service.cpp` echoes the discovery body
+and changes its class from `01` to `04`, using source node `02`. They are
+not independent MU4 evidence. Availability setter `399eca` marks a node
+when task 7 processes its source address; `399e6e` clears it. Thus node
+`28` availability must be established by its own sender, not borrowed from
+the service node.
+
+Secondary IRQ routine `335624` schedules timer `0128`; packed delivery
+`01e8` selects the third case of `335ea8`. That case checks bit 3 of its
+status byte and the three-byte state comparison `335a90`, reaching
+`335df4` only if the comparison fails. Event `01e6` is a separate first
+case which cancels `0126`, checks the same state and selects either the
+probe gate or control `c8`. This identifies possible software entrances,
+not the physical source of the secondary GPIO interrupt. Do not synthesize
+that interrupt or a node-`28` greeting without the MA4/MU4 wiring contract.
+A fresh sixteen-second hybrid run observes only timer event `01e7`, with
+no secondary IRQ publisher, probe gate, node-`28` send or availability-set
+entry. This is bounded runtime absence, not a proof those paths cannot run.
+
 ### Candidate serial-UI task and service-battery control
 
 Task 29's physical MU4 ownership is not established. Its decoded key
