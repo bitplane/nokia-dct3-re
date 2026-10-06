@@ -6,6 +6,19 @@ from tools.extract_dct3_wintesla import decode_records
 
 
 class PackageCheckTest(unittest.TestCase):
+    def test_class_router_preserves_task_and_function_destinations(self):
+        table = bytearray(39 * 8)
+        table[:8] = bytes.fromhex('d20000000000001d')
+        table[8:16] = bytes.fromhex('0c000000003b0199')
+        routes = checker.decode_class_routes(table)
+        self.assertEqual(len(routes), 39)
+        self.assertEqual(routes[0], {'class': 0xd2, 'destination': 29})
+        self.assertEqual(routes[1]['destination'], 0x3b0199)
+
+    def test_class_router_rejects_incomplete_extent(self):
+        with self.assertRaisesRegex(ValueError, 'extent'):
+            checker.decode_class_routes(bytes(38 * 8))
+
     def test_wrong_archive_fails_before_extraction(self):
         with tempfile.TemporaryDirectory() as directory:
             package = Path(directory) / 'package.exe'

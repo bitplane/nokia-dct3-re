@@ -266,6 +266,17 @@ constructor `335dac` remain unobserved in this window. The package checker
 pins the dispatcher's full code extent. Recover the control/probe route and
 wire transport before implementing a peer.
 
+The local class router `362958` scans all 39 eight-byte records at
+`437ca4`. Class `d2` selects task `1d` (29); destinations below `1e` are
+task numbers, while larger values are indirect handler addresses. Task 7
+(`362d88`) runs the message router through `362d10`, not the key consumer.
+Constructor `362de0` builds the observed six-byte `d6/d2` control object:
+byte 7 is zero, byte 8 is argument 0, bytes 9/10 are argument 1 and byte 11
+is argument 2. It queues to task 7 through `2cee1c`. Thus the observed
+control object has an MCU-side producer; it does not demonstrate an MU4
+response. The package report enumerates the entire local class table, but
+the external FBUS-to-class-`d2` ingress remains unvalidated.
+
 ### Candidate serial-UI task and service-battery control
 
 Task 29's physical MU4 ownership is not established. Its decoded key

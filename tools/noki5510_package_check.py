@@ -21,6 +21,14 @@ UPLOADS = (
 )
 
 
+def decode_class_routes(table):
+    """Decode the fixed class router, including function-valued destinations."""
+    if len(table) != 39 * 8:
+        raise ValueError('class router extent mismatch')
+    return [{'class': row[0], 'destination': struct.unpack_from('>I', row, 4)[0]}
+            for row in (table[offset:offset + 8] for offset in range(0, len(table), 8))]
+
+
 def assess_input(flash):
     """Pin the input consumers; table presence is not wiring acceptance."""
     for start, end, digest in (
@@ -44,6 +52,12 @@ def assess_input(flash):
         raise ValueError('task creation table literal mismatch')
     if flash[0x219e7c:0x219e88] != bytes.fromhex('00335f1f032064280a000000'):
         raise ValueError('serial UI task descriptor mismatch')
+    if struct.unpack_from('>I', flash, 0x162d0c)[0] != 0x437ca4:
+        raise ValueError('class router literal mismatch')
+    routes = decode_class_routes(flash[0x237ca4:0x237ca4 + 39 * 8])
+    if [row for row in routes if row['class'] == 0xd2] != [
+            {'class': 0xd2, 'destination': 29}]:
+        raise ValueError('candidate serial class route mismatch')
     return {'scope': 'static consumers only; no MU4 matrix wiring validated',
             'gpio_reader': '3a738c', 'column_register': '2002a',
             'active_low_mask': '02', 'pressed_raw': '81', 'released_raw': 'ff',
@@ -62,7 +76,12 @@ def assess_input(flash):
                                     'key_offset': 12, 'press_state': 1,
                                     'release_state': 0, 'press_call': '313d84',
                                     'release_call': '313b2c',
-                                    'wire_framing_validated': False}}
+                                    'wire_framing_validated': False},
+            'local_class_router': {'consumer': '362958', 'table': '437ca4',
+                                   'records': routes, 'decoded_records': 39,
+                                   'class_d2_task': 29,
+                                   'internal_control_constructor': '362de0',
+                                   'external_wire_route_validated': False}}
 
 
 def assess_bootstrap(flash, records):
