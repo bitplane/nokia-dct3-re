@@ -8,6 +8,19 @@ def checksum(cache):
     return (sum(cache[0x120:0x254]) - sum(cache[0x154:0x156])) & 0xffff
 
 
+def base_record_fixture(image):
+    """Restore only the acquired low-record snapshot; never invent fields."""
+    _, records, _ = replay(image)
+    if not records or records[0] != (0x10020, 0, 0x8000, False):
+        raise ValueError('missing complete acquired base record')
+    base = image[0x10026:0x18026]
+    if checksum(base) != int.from_bytes(base[0x254:0x256], 'big'):
+        raise ValueError('acquired base record is not checksum-valid')
+    fixture = bytearray(image)
+    fixture[0x18026:0x20000] = b'\xff' * (0x20000 - 0x18026)
+    return bytes(fixture)
+
+
 def replay(image):
     if len(image) != 0x30000:
         raise ValueError('expected a 0x30000-byte product-local PMM tail')
@@ -49,6 +62,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('pmm', type=Path)
     parser.add_argument('--cache', type=Path)
+    parser.add_argument('--base-record-flash', type=Path,
+                        help='write diagnostic flash using unchanged acquired base record')
+    parser.add_argument('--mcu', type=Path,
+                        help='own normalized MCU/PPM image for diagnostic flash')
     args = parser.parse_args()
     try:
         image = args.pmm.read_bytes()
@@ -58,6 +75,15 @@ def main():
             stored = int.from_bytes(data[0x254:0x256], 'big')
             print(f'{name}: computed={checksum(data):04x} stored={stored:04x}')
         print(f'records={len(records)} end={end:05x}')
+        if args.base_record_flash:
+            if not args.mcu or args.base_record_flash.resolve() in (
+                    args.pmm.resolve(), args.mcu.resolve()):
+                raise ValueError('fixture requires own MCU and a separate output path')
+            mcu = args.mcu.read_bytes()
+            if len(mcu) != 0x1d0000:
+                raise ValueError('unexpected normalized MCU/PPM extent')
+            args.base_record_flash.write_bytes(mcu + base_record_fixture(image))
+            print('wrote diagnostic base-record flash; archive remains unchanged')
         if args.cache:
             observed = args.cache.read_bytes()
             if observed != cache:

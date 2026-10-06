@@ -1,9 +1,9 @@
 import unittest
 
 try:
-    from tools.noki8210_pmm_check import checksum, replay
+    from tools.noki8210_pmm_check import base_record_fixture, checksum, replay
 except ModuleNotFoundError:
-    from noki8210_pmm_check import checksum, replay
+    from noki8210_pmm_check import base_record_fixture, checksum, replay
 
 
 class PmmReplayTest(unittest.TestCase):
@@ -32,6 +32,17 @@ class PmmReplayTest(unittest.TestCase):
         image[0x10020:0x10026] = bytes.fromhex('08007fff0102')
         with self.assertRaisesRegex(ValueError, 'out-of-range'):
             replay(image)
+
+    def test_base_fixture_preserves_acquired_bytes_outside_journal(self):
+        image = self.fixture()
+        image[0x10020:0x10026] = bytes.fromhex('005980000000')
+        image[0x10026:0x18026] = bytes(0x8000)
+        image[0x18026:0x1802c] = bytes.fromhex('080002540001')
+        fixture = base_record_fixture(bytes(image))
+        self.assertEqual(fixture[:0x18026], image[:0x18026])
+        self.assertEqual(fixture[0x20000:], image[0x20000:])
+        self.assertEqual(fixture[0x18026:0x20000], b'\xff' * 0x7fda)
+        self.assertEqual(len(replay(fixture)[1]), 1)
 
 
 if __name__ == '__main__':

@@ -184,6 +184,31 @@ Preserve the original archive. Before selecting any derived base-record
 fixture, establish its provenance and which later product records it would
 omit; do not mistake a donor or edited success verdict for a storage fix.
 
+A diagnostic fixture retaining the unchanged acquired base record and
+erasing only its later low-record journal (`0x18026..0x1ffff` in the PMM
+tail) passes local validation. Other PMM sectors and all base-record fields,
+including identity and checksum, remain unchanged. It is an acquired
+earlier snapshot, not an established factory-default profile. In one
+coherent 18-second run, all nine readiness publishers execute, report `15`
+arrives, and physical Menu decodes as `0x19`. The captured LCD reads
+“SIM-Karte einsetzen” (Insert SIM card). Synthetic SIM and radio remain
+unselected in this composition; this result does not establish those paths
+or native DSP completion.
+
+Generate that explicitly diagnostic persistent flash in an isolated run:
+
+```sh
+.venv/bin/python tools/noki8210_pmm_check.py \
+  'roms/noki8210/8210 virgin eeprom 003d0000.fls' \
+  --mcu roms/noki8210/8210_5.31ppm_c.fls \
+  --base-record-flash RUN/nvram/nsm3hle/flash
+```
+
+Run `nsm3hle` with the physical Menu fixture and that NVRAM directory.
+Next validate the own SIM-controller path and physical menu interaction on
+this labelled snapshot, while retaining the original-journal negative
+control. Do not silently promote this fixture to the normal machine ROM.
+
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
 injected. Reproduce the observation with the physical Menu fixture above;
