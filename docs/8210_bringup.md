@@ -256,7 +256,22 @@ deconfiguration/confirmation and post-release paging. Persisted EF_LOCI
 contains LAI `00f1100001` and status `00`. A cold process retaining that
 storage passes the same exchange and `noki8210_registration_input.lua`
 captures `DCT3 LAB` at both 24 and 44 seconds after physical unlock.
-Calls, SMS, mobility and other bands remain unproved.
+Incoming calls, SMS, mobility and other bands remain unproved.
+
+### Outgoing call signaling
+
+`noki8210_outgoing_call_input.lua` physically unlocks, dials `1234567`,
+presses Send, then End. The own decoder emits Send/End `0e/0f`, the
+laboratory session receives exactly that number, and the UI shows Call 1
+with Options/Hold. The firmware organically configures traffic with
+`040002000271012fc10000010000000400000000`; physical End publishes
+`040000001117001a600000040000001400000001`. Its observed `14` release
+parameter is now declared in `RADIO_NSM3`.
+`noki8210_outgoing_call_check.py LOG` requires the ordered physical and
+CC/RR lifecycle, exact called number, assignment/connect/disconnect counts,
+own traffic/release packets, idle confirmation and return to paging.
+The final capture returns to DCT3 LAB. This validates signaling and UI,
+not speech or native DSP execution.
 
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be

@@ -265,10 +265,11 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NSB6 = {
 
 // NSM-3 v5.31 emits 56/160. Own RX table 306fd4 maps 8b to
 // 2df484 -> task 12; 2df22e checks 89 body bit 0 against its pending
-// context. Release, neighbour and handover contracts are not yet observed.
+// context. Physical End publishes traffic release parameter 14.
+// Neighbour and handover contracts remain unobserved.
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM3 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0, 0x01, 0, 0, false, 0, false, false,
+	0x14, 0x01, 0, 0, false, 0, false, false,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::none, true, true
 };
