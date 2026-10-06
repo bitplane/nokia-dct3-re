@@ -1,8 +1,29 @@
 import unittest
-from tools.noki5510_bootstrap_check import CHAIN, RUNTIME_CHAIN, verify
+from tools.noki5510_bootstrap_check import CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    SERIAL = '\n'.join((
+        '5510_input_tasks_created: task29_state=05 stack=0012e6b0',
+        'address=00120c70 data=01', 'address=0011cddc data=01',
+        'address=0011cddc data=00', 'address=00120c70 data=00',
+        '5510_input_startup_gate: ready=01 busy=00,00,00,00 fiqmask=c8',
+    ))
+
+    def test_serial_queues_drain_in_order(self):
+        verify_serial_readiness(self.SERIAL)
+
+    def test_serial_final_state_alone_is_insufficient(self):
+        with self.assertRaises(ValueError):
+            verify_serial_readiness(self.SERIAL.splitlines()[-1])
+
+    def test_disabled_timer_or_missing_drain_fails(self):
+        for text in (self.SERIAL.replace('ready=01', 'ready=00'),
+                     self.SERIAL.replace('address=00120c70 data=00', ''),
+                     '\n'.join(reversed(self.SERIAL.splitlines()))):
+            with self.assertRaises(ValueError):
+                verify_serial_readiness(text)
+
     def test_ordered_native_boundary(self):
         verify('\n'.join(CHAIN))
 

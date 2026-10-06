@@ -3824,8 +3824,10 @@ void nokia_dct3_state::nmp5stage(machine_config &config)
 	dct3_32mbit_flash_base(config);
 	nokia_product_config research;
 	// Own 3acc98 polls 6d, selects 25 at 2d, transfers through 2c
-	// and receives at 6c. Only this recovered serial boundary is enabled.
+	// and receives at 6c. This selects the recovered GENSIO register contract.
 	research.gensio_wiring = GENSIO_NSM3;
+	// NPM-5 0x383fa0 arms MBUSTIM while its startup serial queue drains.
+	research.mbus_timer_enabled = true;
 	// Bootstrap instrument: bit 0 is the own verifier execution release.
 	// Keep the written 0c setup bits in readback; no silicon-ready bit is
 	// asserted. This is not a general NPM-5 clock-status contract.

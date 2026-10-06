@@ -40,6 +40,10 @@ def assess_input(flash):
         raise ValueError('normal key table mismatch')
     if special != bytes.fromhex('3e3c3e3e3e'):
         raise ValueError('special key table mismatch')
+    if struct.unpack_from('>I', flash, 0x0ceef0)[0] != 0x419d20:
+        raise ValueError('task creation table literal mismatch')
+    if flash[0x219e7c:0x219e88] != bytes.fromhex('00335f1f032064280a000000'):
+        raise ValueError('serial UI task descriptor mismatch')
     return {'scope': 'static consumers only; no MU4 matrix wiring validated',
             'gpio_reader': '3a738c', 'column_register': '2002a',
             'active_low_mask': '02', 'pressed_raw': '81', 'released_raw': 'ff',
@@ -49,6 +53,10 @@ def assess_input(flash):
             'mode_zero_pressed_code': '3c', 'released_code': '3e',
             'irq_status_register': '2002b',
             'irq_bit1_handler': '39dae8', 'irq_bit3_handler': '335624',
+            'serial_ui_task': {'table': '419d20', 'index': 29,
+                               'descriptor': '419e7c', 'entry': '335f1e',
+                               'stack_bytes': 800, 'priority_byte': '64',
+                               'creation_count': 30},
             'serial_key_consumer': {'dispatcher': '335854', 'selector_offset': 9,
                                     'selector': '0c', 'state_offset': 10,
                                     'key_offset': 12, 'press_state': 1,

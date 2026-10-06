@@ -263,6 +263,39 @@ service-frontier run. The package checker pins the dispatcher's full code
 extent. MU4 serial startup is not yet exercised by the current lifecycle;
 recover its enabling call chain and wire transport before implementing a peer.
 
+### Task creation and serial readiness
+
+Creator `2ceb7c` consumes 30 twelve-byte descriptors at `419d20` and
+constructs contexts with initial scheduler state `05`. Index 29 at `419e7c`
+contains entry `335f1f` (Thumb), stack size `0320`, priority byte `64` and
+queue fields `28/0a`. Its receive loop accepts message byte 6 equal to `d2`.
+The fresh run confirms task-29 state `05` and an allocated stack before
+ordinary startup; inactivity is not evidence that its descriptor is missing.
+
+Supervisor `37be9c` tests `399e54` first in its startup readiness chain.
+That predicate requires `38b1a8` and `2f5d72`. The former requires four
+serial busy/count bytes (`120c70`, `120c74`, `11cddc`, `11cdd8`) to be zero,
+FIQ-mask bit 3 to be set and delayed event `7b` absent. The original research
+profile disabled MBUSTIM: `120c70` and `11cddc` remained 1, mask was `c0`,
+and the predicate returned zero. Own routine `383fa0` explicitly arms the
+terminal timer while starting queued serial work.
+
+The NPM-5 profile now enables the existing MBUSTIM controller model. A fresh
+run observes actual queue writes from 1 to 0, mask `c8`, and readiness 1;
+no reply bytes or firmware state are injected. The MCU next passes `3139a4`
+but fails `31475c`, which tests byte `124880`, predicate `2c03c6` and byte
+`11ac2a`. Their ownership remains the next lifecycle question; this correction
+does not establish MU4 reception or resolve erased NV self-tests. The final
+service-screen PNG is byte-identical to the timer-disabled control.
+
+Validate verbose `noki5510_input_observe.lua` evidence with
+`noki5510_bootstrap_check.py --runtime --serial-readiness <error.log>`.
+The added check requires ordered task creation, queue occupation, queue
+drainage and the ready observation, not just a final flag. Native
+`nmp5stage` still passes its separate missing-mask boundary check. MBUSTIM's
+existing cadence remains an inherited controller approximation, not a
+measured NPM-5 timing specification.
+
 Next recover the MU4 serial interface and seek matching product-state evidence rather
 than fill identity/security fields from another phone. Keep the missing PMM, MU4 interface
 and resident DSP inputs explicit; no donor provisioning or guessed success

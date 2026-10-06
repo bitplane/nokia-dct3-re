@@ -44,13 +44,35 @@ def verify(text, runtime=False):
         cursor = found + len(event)
 
 
+def verify_serial_readiness(text):
+    """Require queue service, not merely a final ready-shaped observation."""
+    cursor = 0
+    for event in (
+        '5510_input_tasks_created: task29_state=05',
+        'address=00120c70 data=01',
+        'address=0011cddc data=01',
+        'address=0011cddc data=00',
+        'address=00120c70 data=00',
+        '5510_input_startup_gate: ready=01 busy=00,00,00,00 fiqmask=c8',
+    ):
+        found = text.find(event, cursor)
+        if found < 0:
+            raise ValueError('missing ordered serial-readiness evidence: ' + event)
+        cursor = found + len(event)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--runtime', action='store_true', help='check explicitly hybrid service frontier')
+    parser.add_argument('--serial-readiness', action='store_true',
+                        help='also require observed MBUSTIM queue drainage')
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'), args.runtime)
+        text = args.log.read_text(errors='replace')
+        verify(text, args.runtime)
+        if args.serial_readiness:
+            verify_serial_readiness(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5510 bootstrap FAIL: {error}\n')
     print('5510 own uploads PASS; ' + ('hybrid discovery/self-test consumed, not idle boot'
