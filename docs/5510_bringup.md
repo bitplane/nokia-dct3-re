@@ -271,6 +271,21 @@ consumer census, not sufficient evidence for normal key/startup replies.
 Music-DSP images are separate from MAD2's missing resident baseband mask
 code and are not MSP430 program dumps.
 
+The primary MU4 manual page 8 identifies the music processor as
+TMS320DA150. TI's [Audio Solutions Guide](https://www.ti.com/download/vf/audio/audiosolutionsguide1.pdf)
+identifies its C54x core, program ROM, RAM, HPI and serial peripherals.
+Shared ISA does not make its memory/peripheral map interchangeable with
+MAD2's resident DSP. The keyboard remains owned by the separate MSP430.
+
+Read-only `tools/noki5510_a00_inventory.py` inventories the original
+InitData containers independently: two-byte marker, big-endian four-byte
+payload length, payload, and opaque four-byte trailer. Seven segments
+(`aa55/aa22/aa44/aabb/aa88/aa99/aadd`) cover all 741,916 decoded R060 bytes
+and 742,146 R061 bytes. Payload hashes and bounds are reported; trailer
+integrity, native load addresses and execution are explicitly unvalidated.
+Next decode the first segment's boot-record grammar before constructing a
+DA150 research machine; do not load the A00 container as flat program ROM.
+
 ### Firmware consumers
 
 #### MU4-specific receive contract
