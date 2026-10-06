@@ -293,6 +293,37 @@ reply nor a wire-level key grammar is established by these constructors.
 Check timer evidence with `noki5510_bootstrap_check.py --runtime
 --serial-readiness --input-lifecycle --input-timer <error.log>`.
 
+### Analog evidence and startup rejection
+
+The [NPM-5 service archive](https://www.eserviceinfo.com/downloadsm/26142/Nokia_5510.html)
+contains full primary manuals, unlike truncated recent previews. General
+Information page 4 specifies BLB-2, part `0670246`. MA4 power schematic
+A3-6 shows R221's 150 kohm BSI pull-up to VBB and R222's 100 kohm BTEMP
+pull-up to VREF. Technical Information page 22 identifies VREF as 1.5 V
+and says it references some CCONT ADCs. Do not equate VBB and ADC reference.
+The [NSM-3 battery specification](https://www.eserviceinfo.com/preview_html.php?fileid=5456&previewid=3011)
+independently identifies the same BLB-2's nominal 68 kohm BSI resistance.
+The NPM-5 technical manual's battery table instead lists BMC/BLC packs;
+it does not override the product-specific BLB-2 identification.
+
+`37bb96` also samples selectors 3/4 during startup, independently of MU4's
+later timer. A cold fixture with selector 3 = `013f` and selector 4 = `0147`
+enters power-down `3aa5c2` from `37bc4e` before loader entry. The `013f`
+calculation assumed an unverified ratiometric VBB reference; it is not an
+accepted profile. The shipped research defaults remain unchanged. Recover
+selector 3's conversion reference and input scaling before deriving a new
+raw value; neither the later timer's window nor startup acceptance is a
+physical calibration source.
+
+Full PDFs are retained outside SCM in `roms/reference-docs/npm5/`:
+
+| File | SHA256 |
+| --- | --- |
+| `02-npm5-general.pdf` | `496cb3c951b12372fde63a78fc229a0ec0dab5a1aee72e20f70a87dfff0f5a23` |
+| `03-npm5-techinfo.pdf` | `7e9fa960b8d1e843be092ed4e44015584693f7b58431f9617b2d3ee9793a5043` |
+| `04-npm5-userif.pdf` | `59c2505dc498faae9c9f45ebcfa78432f77a3841cd4b8871d087a806d3b77d9d` |
+| `npm5-ma4-a3.pdf` | `06763fb93fc2073c02357e20f8c0d7379e5b135bdde931aa7165e3278d8d7531` |
+
 ### Task creation and serial readiness
 
 Creator `2ceb7c` consumes 30 twelve-byte descriptors at `419d20` and

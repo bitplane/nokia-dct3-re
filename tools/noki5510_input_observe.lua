@@ -19,6 +19,7 @@ for _, tap in ipairs({
     {0x335dac, 'serial_ui_probe'},
     {0x335e18, 'serial_ui_control_ca'},
     {0x335e60, 'serial_ui_control_c8'},
+    {0x3aa5c2, 'power_down_enter'},
 }) do
     cpu.debug:bpset(tap[1], nil,
         string.format('logerror "5510_input_%s: mode=%%02x caller=%%08x\\n",b@126ec6,r14;g', tap[2]))
