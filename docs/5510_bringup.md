@@ -203,6 +203,28 @@ generated or borrowed by the checker.
 
 ## Input consumer boundary
 
+### Physical MU4 ownership
+
+Nokia's [MU4 technical description](https://www.eserviceinfo.com/preview_html.php?fileid=26142&previewid=12780)
+assigns keyboard scanning to a separate controller and identifies FBUS as
+the control-message link to the phone. The LCD connects directly to the
+phone; it is not rendered by the keyboard controller. MU4 also manages
+accessory detection and its music subsystem. This rules out wiring the
+QWERTY keys directly into the ordinary MAD2 matrix model.
+
+The [Nokia MU4 schematic, version 1.0](https://www.s-manuals.com/manuals/phone/nokia/nokia_5510_npm-5_schematics.pdf),
+MCU sheet 3/11, identifies U301 as an MSP430F135. Its keyboard nets connect
+to U301; FBUS RX/TX, MBUS and PURX cross the 36-pin J301 connector. The
+acquired schematic is retained locally, ignored, at
+`roms/reference-docs/npm5/nokia_5510_npm-5_schematics.pdf`, SHA-256
+`e642943045b2f1ae8dfd6cf0ebee3a0c0d7cb7026de4543c7b48bd8da97f3d58`.
+This source does not provide the controller's firmware or packet grammar.
+The current MAME source tree has no MSP430 CPU core. A faithful native MU4
+backend therefore needs both a core and the matching program; an explicitly
+declared serial-boundary HLE still requires recovered message semantics.
+
+### Firmware consumers
+
 The pinned image's GPIO reader `3a738c` temporarily enables mask bit 1 at
 `2006b`, reads `2002a` bit 1 and returns `81` for low or `ff` for high.
 It does not scan rows. Decoder `39dc14` maps `ff` to `3e`; otherwise it
@@ -225,7 +247,23 @@ the service frontier, none of these five entry taps fires. This establishes
 only their inactivity in that boot window, not their absence from normal
 boots with valid product data. No input bindings are enabled by this result.
 
-Next recover the MU4 interface and seek matching product-state evidence rather
+The candidate serial UI receive path `335cfa` calls dispatcher `335854`.
+Selector byte `[message+9] == 0c` selects `33594c`: `[message+0a] == 1`
+calls `313d84` with key code `[message+0c]`; state zero calls `313b2c`
+with the same code. Other state values select the failure response. The
+response uses selector `0d` and result 1 for these accepted branches.
+This is a decoded MCU-side message contract, not an established byte stream
+or permission to inject messages into the RTOS. The key routines are also
+used by the legacy local-key path, corroborating input ownership without
+assigning QWERTY positions from another handset.
+
+The observer also covers initializer `335f1e`, receive `335cfa`, dispatcher
+`335854` and probe constructor `335dac`. None fires in the fresh eight-second
+service-frontier run. The package checker pins the dispatcher's full code
+extent. MU4 serial startup is not yet exercised by the current lifecycle;
+recover its enabling call chain and wire transport before implementing a peer.
+
+Next recover the MU4 serial interface and seek matching product-state evidence rather
 than fill identity/security fields from another phone. Keep the missing PMM, MU4 interface
 and resident DSP inputs explicit; no donor provisioning or guessed success
 publication may be used to claim graphical or phone-service parity.

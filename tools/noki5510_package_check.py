@@ -26,6 +26,7 @@ def assess_input(flash):
     for start, end, digest in (
         (0x3a738c, 0x3a7424, 'ade0727b15abb6de032ea2b7ee6711f3f643f32b5aa8505a0d7561208abf7bf4'),
         (0x39dc14, 0x39dc4c, 'f5f23ae052176f383844aab5ad69926341fe206301c65ffdbda2a37c5e3eb278'),
+        (0x335854, 0x335a2e, '595b6b9bed4b25daad0a4d588f34fd0b2fee9cb1109e6fd31652e6e7f961c76a'),
     ):
         if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
             raise ValueError('input consumer code mismatch')
@@ -47,7 +48,13 @@ def assess_input(flash):
             'special_table': '44d180', 'special_codes': list(special),
             'mode_zero_pressed_code': '3c', 'released_code': '3e',
             'irq_status_register': '2002b',
-            'irq_bit1_handler': '39dae8', 'irq_bit3_handler': '335624'}
+            'irq_bit1_handler': '39dae8', 'irq_bit3_handler': '335624',
+            'serial_key_consumer': {'dispatcher': '335854', 'selector_offset': 9,
+                                    'selector': '0c', 'state_offset': 10,
+                                    'key_offset': 12, 'press_state': 1,
+                                    'release_state': 0, 'press_call': '313d84',
+                                    'release_call': '313b2c',
+                                    'wire_framing_validated': False}}
 
 
 def assess_bootstrap(flash, records):
