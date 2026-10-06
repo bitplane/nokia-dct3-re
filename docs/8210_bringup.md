@@ -233,6 +233,25 @@ in the readback process, and exact persisted `A/123` record with the other
 claim to recognize screen text. Preserve the write log before the second
 process replaces `error.log`. Handset-local contacts remain untested.
 
+### Radio acquisition boundary
+
+The own ring dispatcher at `0x306fa6` selects the thirteen-entry
+`0x83..0x8f` table at `0x306fd4`. Type `8b` calls `0x2df484`, which posts
+to task 12 through `0x28845c`. Type `89` calls `0x2df210`; instructions
+`0x2df22e..0x2df238` correlate body bit 0 with the pending channel context.
+`noki8210_radio_contract.py` checks these own-ROM facts and the full table.
+Startup organically publishes a 160-byte type `56` candidate window.
+
+The declared `RADIO_NSM3` research contract selects request-correlated
+candidate acquisition and bit-0 assigned-channel confirmation. Release,
+handover and neighbour contracts remain unset pending observations. A
+65-second coherent run observes serving-cell selection, handset Location
+Updating Request (own capability octet `33`), acknowledgement of Location
+Updating Accept and Channel Release, writes to EF_LOCI LAI and status, and
+subsequent paging/BCCH reconfiguration. This is preliminary registration
+transport evidence: persisted location and idle operator presentation
+still require their own acceptance before coverage promotion.
+
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
 injected. Reproduce the observation with the physical Menu fixture above;

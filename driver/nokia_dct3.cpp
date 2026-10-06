@@ -263,6 +263,16 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NSB6 = {
 	nokia_radio_peer_device::neighbour_bsic_encoding::none, true, true
 };
 
+// NSM-3 v5.31 emits 56/160. Own RX table 306fd4 maps 8b to
+// 2df484 -> task 12; 2df22e checks 89 body bit 0 against its pending
+// context. Release, neighbour and handover contracts are not yet observed.
+constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM3 = {
+	nokia_radio_peer_device::acquisition_strategy::candidate_window,
+	0, 0x01, 0, 0, false, 0, false, false,
+	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
+	nokia_radio_peer_device::neighbour_bsic_encoding::none, true, true
+};
+
 constexpr nokia_dsp_hle_device::service_control_contract
 		DSP_SERVICE_CONTROL_COMPACT = {
 	{ 0x0d, 0x00 }, 2
@@ -3667,6 +3677,7 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	// NSM-3 firmware owns reset, activation and APDU sequencing.
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
+	runtime.radio = RADIO_NSM3;
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }
