@@ -20,6 +20,7 @@ local input = coroutine.create(function()
     end
     if not emu.wait(5) then return end
     machine.screens[':screen']:snapshot('8210_after_security.png')
+    if _G.noki8210_security_only then return end
     local menu = assert(machine.ioport.ports[':COL.1'].fields['Menu'])
     menu:set_value(1)
     if not emu.wait(0.15) then menu:set_value(0); return end

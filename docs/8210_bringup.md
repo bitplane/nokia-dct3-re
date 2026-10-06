@@ -217,6 +217,22 @@ write, registration, call or SMS acceptance. Radio remains unselected.
 Retain the original-journal negative control and do not silently promote
 this fixture to the normal machine ROM.
 
+### SIM phonebook persistence
+
+On the same labelled base-record composition,
+`noki8210_phonebook_input.lua` navigates Names -> Add entry and enters
+`A / 123` with physical keys. The firmware issues absolute EF_ADN record-1
+UPDATE RECORD (`A0 DC 01 04 20`), receives `9000`, and displays “Saved to
+SIM card”. A fresh process running `noki8210_phonebook_read.lua` with the
+same NVRAM reads the contact through Search -> Detail: captured screens
+show `A` and `123`. No storage is seeded between these processes.
+`noki8210_phonebook_check.py WRITE_LOG READ_LOG SIM_NVRAM` requires the
+ordered physical save/APDU completion, cold record read, absence of writes
+in the readback process, and exact persisted `A/123` record with the other
+49 entries erased. Inspect UI captures separately; the checker does not
+claim to recognize screen text. Preserve the write log before the second
+process replaces `error.log`. Handset-local contacts remain untested.
+
 Follow the firmware's release/initialization path for these publishers.
 Neither report `15`, its checklist bytes nor a task-resume result should be
 injected. Reproduce the observation with the physical Menu fixture above;
