@@ -35,6 +35,8 @@ def assess_input(flash):
         (0x3a738c, 0x3a7424, 'ade0727b15abb6de032ea2b7ee6711f3f643f32b5aa8505a0d7561208abf7bf4'),
         (0x39dc14, 0x39dc4c, 'f5f23ae052176f383844aab5ad69926341fe206301c65ffdbda2a37c5e3eb278'),
         (0x335854, 0x335a2e, '595b6b9bed4b25daad0a4d588f34fd0b2fee9cb1109e6fd31652e6e7f961c76a'),
+        (0x335632, 0x33565a, '2cff8c5e2680b88198864ca640c58a3b8221bb8faff9dd068656b6e170220eda'),
+        (0x3a7424, 0x3a7472, 'd4c4c0a73c2b91e65b0c3cd4200e054aa878b64b0420246587eca59adb29b67d'),
     ):
         if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
             raise ValueError('input consumer code mismatch')
@@ -67,6 +69,12 @@ def assess_input(flash):
             'mode_zero_pressed_code': '3c', 'released_code': '3e',
             'irq_status_register': '2002b',
             'irq_bit1_handler': '39dae8', 'irq_bit3_handler': '335624',
+            'mixed_port_contract': {'initializer': '3a7424',
+                                    'direction_register': '2006a', 'direction_value': '24',
+                                    'data_register': '2002a', 'initial_data': '3f',
+                                    'irq_mask_register': '2006b', 'irq_mask': '75',
+                                    'output_writer': '335632', 'output_bit': 2,
+                                    'mu4_pin_mapping_validated': False},
             'serial_ui_task': {'table': '419d20', 'index': 29,
                                'descriptor': '419e7c', 'entry': '335f1e',
                                'stack_bytes': 800, 'priority_byte': '64',

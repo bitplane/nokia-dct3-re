@@ -256,6 +256,18 @@ IRQ consumer `3a73d8` independently tests `2002b` bits 1 and 3, calling
 `2cdf42`; its physical source and subsequent input transport are unresolved.
 Do not combine these branches into a borrowed handset key map.
 
+Initializer `3a7424` writes `24` to port-direction register `2006a`,
+`3f` to data register `2002a`, and mask `75` to `2006b`. Routine `335632`
+sets data bit 2 when enabled; its disable branch applies mask `1b`.
+Consequently this port is used as mixed GPIO, not merely matrix inputs.
+The package checker pins both code extents. The current keyboard device
+samples `2a` from its matrix callback and does not establish NPM-5's
+direction/output readback contract; its research profile also does not
+select the independently observed `2b` status register. These are explicit
+controller-fidelity gaps, not evidence of a successful MU4 connection.
+Do not equate status bit 3 with connector ROW3 merely because the numbers
+match; the column/row pin routing still requires its own decode.
+
 `verify-5510-package` pins the consumer code, literal pools and both tables
 in its `input_contract` report. This is static evidence, not behavioral
 acceptance. `noki5510_input_observe.lua` observes the GPIO initializer,
