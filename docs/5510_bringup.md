@@ -508,11 +508,22 @@ The dirty-cache flush at `0725` strengthens the NAND-protocol identification:
 | `0789..07e9` | Outputs `80`, one column plus three row components, 256 low/high word pairs, eight pairs of `ff` spare bytes, then `10`; waits and requests status with `70`. |
 | `069b..0724` | Maintains a 32-row cache at data `4000`, with 256 words per row and a dirty flag at `3b14`; the write-back path tests that flag before flushing. |
 
-These commands and 512+16-byte organization match the small-page NAND
-protocol documented in Samsung's
-[K9F1208 family datasheet](https://www1.futureelectronics.com/doc/SAMSUNG/K9F1208R0C-JIB000.pdf).
-That reference is a related K9F part, not the schematic's fitted K9K part;
-it corroborates the command family only, not U201's ID or timing. The spare-byte loop writes erased fill on this path;
+These commands and 512+16-byte organization match Samsung's exact
+[K9K1208U0A datasheet](https://datasheet4u.com/pdf/265061/K9K1208U0A-YIB0.pdf),
+revision 0.2, January 17, 2001. The original PDF is retained outside SCM as
+`roms/reference-docs/npm5/samsung_k9k1208u0a.pdf`, SHA-256
+`c20df5ad534f2b6dc50ed1c1aeb48b70108dece3c8e3f9406a40c59d17c7ce59`.
+
+| Contract | Manufacturer evidence |
+| --- | --- |
+| ID | `90`, address `00`, then two reads return `ec 76` (Read ID, page 22). |
+| Geometry | 131,072 pages, 512 data + 16 spare bytes; 32 pages per erase block, 4,096 blocks (page 4). |
+| Address cycles | One column and three row bytes for read/program; three row bytes for erase (page 4). |
+| Read/program/erase latency | Read transfer maximum 10 us; program typical 200 us, maximum 500 us; erase typical 2 ms, maximum 3 ms (pages 7-8). These are rated values, not measured Nokia timings. |
+| Sequential row read | Advances through pages within a block; the host must terminate at the block boundary by raising CE (page 18). CE is a protocol input, not merely a host-side access filter. |
+| Ready/busy | Open-drain R/B reports internal operations; status bit 6 is ready and bit 0 is failure (pages 5, 22). |
+
+The spare-byte loop writes erased fill on this path;
 it does not prove that all media operations omit ECC or bad-block handling.
 The observed control masks are consistent with command/address/chip selection,
 but the DA150 GPIO mapping to those physical nets remains unvalidated.
@@ -521,9 +532,15 @@ MAME already provides `machine/nandflash` with command/address/data methods,
 ready/busy callbacks and NVRAM ownership. Prefer extending that device for
 the evidenced part and attaching it at the recovered boundary over a new
 Nokia-specific NAND implementation. The fitted K9K1208U0A is not currently
-an explicit MAME part, and its exact datasheet/ID/timing contract must be
-acquired before adding it. Do not attach a guessed part or seed a filesystem merely
-to satisfy the mount consumer.
+an explicit MAME part. Its constructor can now be specified without borrowing
+a K9F identity, but a constructor alone is not complete support: the current
+core performs program/erase synchronously, pulses R/B low then high in the
+same call, and its sequential-read option advances across erase blocks.
+There is no CE input to terminate the sequential-read cycle. Extend these
+contracts with defaults preserving existing NAND users before attaching U201;
+test ID/addressing, data and spare access, AND-programming, block erase,
+timed busy/status, CE termination and save-state replay independently of
+handset firmware. Do not seed a filesystem merely to satisfy the mount consumer.
 
 Next recover the storage-controller/media placement and independently locate
 the overlay selector before constructing a native music-DSP fixture. A valid
