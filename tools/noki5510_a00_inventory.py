@@ -9,6 +9,37 @@ import struct
 MARKERS = {0xaa55, 0xaa22, 0xaa44, 0xaa88, 0xaabb, 0xaadd, 0xaa99}
 
 
+def cinit_inventory(image):
+    """Decode the count/destination/words loop recovered at InitData 0xe5b."""
+    if len(image) % 2:
+        raise ValueError('odd-length C initialization table')
+    records = []
+    offset = 0
+    while offset + 2 <= len(image):
+        start = offset
+        count = struct.unpack_from('>H', image, offset)[0]
+        offset += 2
+        if not count:
+            if offset != len(image):
+                raise ValueError('bytes follow C initialization terminator')
+            return {'records': records, 'coverage_bytes': offset,
+                    'scope': 'static startup data writes; no execution or physical memory mapping inferred'}
+        if offset + 2 + count * 2 > len(image):
+            raise ValueError('C initialization record exceeds input')
+        destination = struct.unpack_from('>H', image, offset)[0]
+        offset += 2
+        if destination + count > 0x10000:
+            raise ValueError('C initialization destination wraps 16-bit data space')
+        payload = image[offset:offset + count * 2]
+        record = {'offset': start, 'words': count, 'destination_data_word_address': destination,
+                  'payload_sha256': hashlib.sha256(payload).hexdigest()}
+        if count <= 8:
+            record['values'] = [f'{word:04x}' for word in struct.unpack(f'>{count}H', payload)]
+        records.append(record)
+        offset += count * 2
+    raise ValueError('missing C initialization terminator')
+
+
 def destination_inventory(image, sections):
     """Describe linear record extents; do not choose an overwrite policy."""
     seen = {}
@@ -162,13 +193,17 @@ def main():
     parser.add_argument('image', type=Path)
     parser.add_argument('--extract-section', type=lambda value: int(value, 0),
                         help='exact destination word address; export original big-endian bytes')
+    parser.add_argument('--cinit-section', type=lambda value: int(value, 0),
+                        help='inspect one exact section as a recovered C initialization table')
     parser.add_argument('--segment', help='container marker, e.g. aa55; omit for InitDisk')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
+    if args.cinit_section is not None and (args.extract_section is not None or args.output is not None):
+        parser.error('--cinit-section cannot be combined with section export')
     if (args.extract_section is None) != (args.output is None):
         parser.error('--extract-section and --output must be used together')
-    if args.segment is not None and args.output is None:
-        parser.error('--segment requires section extraction')
+    if args.segment is not None and args.output is None and args.cinit_section is None:
+        parser.error('--segment requires section extraction or C initialization inspection')
     try:
         source = args.image.read_bytes()
         image = bytes.fromhex(source.decode('ascii'))
@@ -181,7 +216,8 @@ def main():
                               'bytes': len(data),
                               'sha256': hashlib.sha256(data).hexdigest()}))
             return
-        report = (serial_boot_inventory(image)
+        report = (cinit_inventory(extract_section(image, args.cinit_section, args.segment))
+                  if args.cinit_section is not None else serial_boot_inventory(image)
                   if image[:2] in (b'\x08\xaa', b'\x10\xaa') else inventory(image))
     except (ValueError, OSError) as exc:
         parser.exit(1, f'A00 inventory: {exc}\n')

@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section
+from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, cinit_inventory
 
 
 def segment(marker, payload):
@@ -8,6 +8,21 @@ def segment(marker, payload):
 
 
 class A00InventoryTest(unittest.TestCase):
+    def test_cinit_accounts_for_records_and_zero_values(self):
+        image = struct.pack('>8H', 2, 0x1700, 0xffff, 0xffff, 1, 0x1742, 0, 0)
+        report = cinit_inventory(image)
+        self.assertEqual(report['coverage_bytes'], len(image))
+        self.assertEqual(report['records'][0]['destination_data_word_address'], 0x1700)
+        self.assertEqual(report['records'][0]['values'], ['ffff', 'ffff'])
+        self.assertEqual(report['records'][1]['values'], ['0000'])
+        for length in range(len(image)):
+            with self.assertRaises(ValueError):
+                cinit_inventory(image[:length])
+        with self.assertRaises(ValueError):
+            cinit_inventory(image + b'\0\0')
+        with self.assertRaises(ValueError):
+            cinit_inventory(struct.pack('>5H', 2, 0xffff, 1, 2, 0))
+
     def boot_image(self):
         return struct.pack('>13H', 0x08aa, 0x18, 3, 0x800, 0x10,
                            1, 0x492b, 2, 2, 0x900, 0xbeef, 0x1234, 0)

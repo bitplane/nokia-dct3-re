@@ -374,6 +374,34 @@ This is not DA150 execution or peripheral validation. Core MMR accesses (for exa
 `18`) must remain distinct from board/peripheral accesses. No success value
 or busy-line transition is inferred from these static routines.
 
+Startup's C initialization loop at `0e5b..0e6b` reads count/destination/data
+records from program `0f33`, terminating on a zero count. Read-only
+`noki5510_a00_inventory.py --segment aa55 --cinit-section 0xf33` accounts
+for all 546 bytes and recovers these five data-space initializations:
+
+| Destination | Words | Initial content |
+| --- | ---: | --- |
+| `1700` | 2 | `ffff ffff` |
+| `1849` | 1 | `0000` |
+| `1746` | 256 | Sector template, SHA256 `29427de21e77b3d8d39e56a4f40583108f87c298c45bbeb660668666aeee11c6` |
+| `1742` | 1 | `0000` |
+| `1744` | 2 | `0000 0000` |
+
+The dispatcher at `0db8` therefore starts with an empty function registry
+and null final function pointer. Routine `0dd7` appends far pointers into
+`1702` while the count at `1742` is below 32. Neither initialization nor this
+registry alone identifies an overlay selector or a missing external reply.
+
+Routine `0880` copies all 256 words from `1746` into its working frame before
+calling `069b` and `0725`. In original big-endian payload-byte order, the
+template has signature `55 aa`, 512 bytes/sector, 32 sectors/cluster, two
+reserved sectors, two FATs, 512 root entries, 127 sectors/FAT and 124,896
+total sectors. Its textual label is `FAT16`, but those BPB fields yield only
+3,894 data clusters (a FAT12-sized count). Do not promote the label or this
+unmodified template into a claim about the real medium's format: the copy's
+consumer and any subsequent field changes still need decoding. No disk image
+is synthesized from it.
+
 For reproduction, `noki5510_a00_inventory.py --segment aa55
 --extract-section 0x200 --output <new-file>` exports only the exact original
 InitData section, rejecting ambiguous addresses and existing outputs. Use
