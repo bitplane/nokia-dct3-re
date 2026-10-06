@@ -65,6 +65,44 @@ private:
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
+	void start_far_save_case(bool returning)
+	{
+		m_far_save_return = returning;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		const unsigned origin = returning ? 0x030600 : 0x010600;
+		unsigned next = origin;
+		program.write_word(next++, returning ? 0xf6e4 : 0xfb82);
+		if (!returning)
+			program.write_word(next++, 0x0700);
+		program.write_word(next++, 0x0082); // First delay word schedules a zero-time checkpoint.
+		program.write_word(next++, 0xe905);
+		program.write_word(next, 0xf4e1);
+		program.write_word(0x020700, 0xe807);
+		program.write_word(0x020701, 0xf4e4);
+		program.write_word(0x000700, 0xe80f); // Wrong-page sentinels.
+		program.write_word(0x000701, 0xf4e4);
+		program.write_word(0x010700, 0xe80e);
+		program.write_word(0x010701, 0xf4e4);
+		if (returning)
+		{
+			program.write_word(0x010604, 0xe807);
+			program.write_word(0x010605, 0xf4e1);
+		}
+		data.write_word(0x03fe, 1);
+		data.write_word(0x03ff, 0x0604);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, returning ? 0x03fe : 0x0400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0060);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(STATE_GENPC, origin);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 784;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
@@ -409,6 +447,14 @@ private:
 	}
 	u16 repeat_irq_r(offs_t offset)
 	{
+		if (m_phase == 784)
+		{
+			// Abort this timeslice after the current instruction retires. Saving
+			// inside the operand callback would capture a partial instruction.
+			m_phase = 785;
+			m_check_timer->adjust(attotime::zero);
+			return 1;
+		}
 		if (offset)
 		{
 			m_irq_accumulator = m_cpu->state_int(tms320c54x_device::STATE_A);
@@ -14152,6 +14198,65 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
 				data.read_word(0x03ff) == 0x0602,
 				"near CALL/RET retain the current page and use one return-stack word");
+			start_far_save_case(false);
+			return;
+		}
+		if (m_phase == 784)
+		{
+			expect(false, "far save checkpoint operand was not executed");
+		}
+		if (m_phase == 785)
+		{
+			const unsigned checkpoint = m_far_save_return ? 0x030602 : 0x010603;
+			expect(m_cpu->state_int(STATE_GENPC) == checkpoint &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (m_far_save_return ? 0x0400 : 0x03fe),
+				"far save checkpoint retires exactly one delay word on the original page");
+			m_saved_repeat.str(std::string());
+			m_saved_repeat.clear();
+			expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+				"write pending far-transfer save state");
+			m_phase = 786;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 786 || m_phase == 787)
+		{
+			const unsigned continuation = m_far_save_return ? 0x010606 : 0x010605;
+			expect(m_cpu->state_int(STATE_GENPC) == continuation &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 7 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"uninterrupted and restored pending far transfer complete identically");
+			if (m_phase == 786)
+			{
+				m_cpu->set_state_int(STATE_GENPC, 0x7f0900);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0500);
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 99);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 88);
+				data.write_word(0x03fe, 0x7f);
+				data.write_word(0x03ff, 0xbad);
+				m_saved_repeat.clear();
+				m_saved_repeat.seekg(0);
+				expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE,
+					"restore pending far-transfer save state");
+				expect(m_cpu->state_int(STATE_GENPC) == (m_far_save_return ? 0x030602 : 0x010603) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+					data.read_word(0x03fe) == 1 && data.read_word(0x03ff) == 0x0604,
+					"restore exact extended checkpoint registers and stack RAM");
+				m_phase = 787;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			if (!m_far_save_return)
+			{
+				start_far_save_case(true);
+				return;
+			}
+			osd_printf_info("TMS320C54x extended save replay: PASS pending_call pending_return xpc stack delay\n");
 			osd_printf_info("TMS320C54x extended program conformance: PASS\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
@@ -14358,6 +14463,7 @@ private:
 	u16 m_last_port_value = 0;
 	unsigned m_saved_repeat_reads = 0;
 	std::stringstream m_saved_repeat;
+	bool m_far_save_return = false;
 	std::array<u16, 0x800> m_saved_transport = {};
 };
 

@@ -668,6 +668,15 @@ The internal timer is stopped by an STM instruction in this fixture to isolate
 repeat/IRQ replay from unrelated timer wakeups. This is executable state
 restoration evidence, not just a source-level save-registration check.
 
+The extended-program core fixture also saves between the two delay words of
+`FCALLD` and `FRETD`. It completes each transfer, deliberately disturbs the
+page, registers and stack, restores the snapshot, and compares replay with
+uninterrupted execution. Distinct program-page contents check the pending XPC
+transfer as well as the return PC, stack order and delay-slot effects. The
+checkpoint is a scheduler boundary after the first operand instruction retires,
+not a save from inside that instruction. This validates generic core state;
+it does not establish the DA150 memory map or a working 5510 music subsystem.
+
 The historical harness's headline `74 acknowledgements` counter is not a count
 of DSP port-1 completion strobes. The local gate separately records shared
 mailbox writes and completion strobes; their counts depend on the observation
