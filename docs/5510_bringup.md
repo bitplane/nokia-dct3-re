@@ -282,9 +282,29 @@ InitData containers independently: two-byte marker, big-endian four-byte
 payload length, payload, and opaque four-byte trailer. Seven segments
 (`aa55/aa22/aa44/aabb/aa88/aa99/aadd`) cover all 741,916 decoded R060 bytes
 and 742,146 R061 bytes. Payload hashes and bounds are reported; trailer
-integrity, native load addresses and execution are explicitly unvalidated.
-Next decode the first segment's boot-record grammar before constructing a
-DA150 research machine; do not load the A00 container as flat program ROM.
+integrity and the six later segments' load grammar remain unvalidated.
+
+The first segment and standalone InitDisk match the serial-boot grammar in
+[TI SPRA602F, figure 11](https://www.ti.com/lit/an/spra602/spra602.pdf):
+signature, four compatibility words, entry XPC/PC, then word-count/XPC/PC
+sections and a zero-count terminator. The four compatibility words are
+`0018/0003/0800/0010`; they are not assigned register semantics here.
+The parallel-boot grammar with only two configuration words does not fit.
+The strict parser accounts for every byte, rejecting truncation, trailing
+data and unsupported XPC bits. All recovered sections use page zero.
+
+| Stream | Entry (word address) | Section destinations (hex), word counts (decimal) | Covered bytes |
+| --- | --- | --- | ---: |
+| InitDisk R060 | `492b` | `08ea`:22, `0900`:768, `2080`:1261, `256d`:9532, `4aa9`:22, `0080`:120 | 23,502 |
+| InitData R060/R061 first segment | `0e41` | `2080`:46, `20ae`:5580, `36b0`:1457, `ff80`:12, `0200`:3379, `0f33`:273, `184b`:13 | 21,578 |
+
+Both entries lie inside their respective loaded sections. The InitData
+first segment is byte-identical across R060/R061. These are static format
+results, not validation of DA150 memory mapping, boot-ROM behavior or native
+execution. Next inspect the recovered entry routines and their peripheral
+dependencies, and derive the later overlay grammar from the loader before
+constructing a DA150 research machine. Do not load the complete container
+as flat program ROM or substitute its music DSP for MAD2's baseband DSP.
 
 ### Firmware consumers
 
