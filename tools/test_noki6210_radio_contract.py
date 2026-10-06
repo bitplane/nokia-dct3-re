@@ -14,7 +14,7 @@ class RadioContractTest(unittest.TestCase):
             self.skipTest('acquired firmware unavailable')
         result = verify(path.read_bytes())
         self.assertEqual(result['type_8b_destination_task'], 14)
-        self.assertEqual(result['traffic_release'], 'unresolved')
+        self.assertEqual(result['traffic_release'], 'runtime physical End observation required')
 
 
 if __name__ == '__main__':

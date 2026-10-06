@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 53
-Differences found: 94
+Families with more than one product: 57
+Differences found: 98
 
 ## ROM normalisation reachability
 
@@ -24,10 +24,14 @@ absent product is a coverage question, not a drifted gate.
 | `calculator` | — | — | — | — | — | — | — | — | — | yes | — | yes |
 | `charger-wake` | — | yes | — | — | — | — | — | yes | — | — | — | — |
 | `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — |
+| `incoming-call` | — | — | — | — | — | — | — | — | — | yes | — | yes |
+| `incoming-sms` | — | — | — | — | — | — | — | — | — | yes | — | yes |
 | `keypad-controller` | — | — | — | — | — | — | — | — | — | yes | yes | — |
 | `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — |
 | `menu` | — | — | yes | — | yes | — | yes | yes | — | yes | — | — |
 | `navigation` | — | — | yes | yes | yes | — | — | yes | — | — | — | — |
+| `outgoing-call` | — | — | — | — | — | — | — | — | — | yes | — | yes |
+| `outgoing-sms` | — | — | — | — | — | — | — | — | — | yes | — | yes |
 | `phonebook` | — | — | — | — | — | — | — | — | — | yes | — | yes |
 | `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — | — | — | — |
 | `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — |
@@ -97,6 +101,16 @@ absent product is a coverage question, not a drifted gate.
 - **3610**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **5210**: `tools/check_lcd_frame.py`
 
+### `incoming-call`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+
+### `incoming-sms`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+
 ### `keypad-controller`
 
 - **6210**: `tools/npe3_keypad_check.py`
@@ -115,6 +129,16 @@ absent product is a coverage question, not a drifted gate.
 - **5110**: `tools/make_5110_eeprom_profile.py`
 - **5210**: `tools/check_lcd_frame.py`
 - **6210**: `tools/run_noki6210_acceptance.py`
+
+### `outgoing-call`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
+
+### `outgoing-sms`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
 
 ### `phonebook`
 

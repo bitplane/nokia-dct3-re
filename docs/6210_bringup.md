@@ -13,11 +13,13 @@ Separate research compositions establish the own-upload/runtime boundary:
 at absent mask routine `2c75`; `npe3hle` explicitly hands transport to HLE there.
 The latter uses the unchanged acquired PMM, request-correlated D0 discovery,
 the own compact self-test consumer and a declared nominal battery sample.
-SIM initialization reads all 50 EF_ADN records, and physical Menu decodes as
-`19` and opens Messages on the 96x60 display. Native resident DSP execution,
-measured final silicon verdict, radio, speech and full fidelity are not claimed.
-The next acceptance boundaries are Calculator, persistent SIM contacts and
-own-ROM radio acquisition/registration.
+Acceptance gates prove graphical Menu/SIM PIN interaction, Calculator,
+persistent SIM contacts with cold readback, laboratory registration/operator
+presentation, physical incoming/outgoing call signaling and incoming/outgoing
+SMS. Physical Menu decodes as `19` on the 96x60 display. Native resident DSP
+execution, measured final silicon verdict, speech and full hardware fidelity
+are not claimed. The research phone-service milestone is complete; the normal
+machine remains fail-closed pending authentic native DSP completion.
 
 ## Inputs
 
@@ -221,9 +223,41 @@ Updating and acknowledged release. `verify-6210-registration` requires the
 ordered exchange, persisted laboratory LAI `00f1100001` and updated EF_LOCI
 status, plus the reviewed `DCT3 LAB` idle frame (SHA-256
 `1138954cc94944c83019823ea500fa9ea9f8857c76e3d8ba929cdc40db4c0b74`).
-The literal `Headset` accessory label remains unresolved. Call release,
-incoming/outgoing calls, SMS, neighbour/handover and speech are not accepted;
-unrecovered call-release and handover fields remain unset in the contract.
+The literal `Headset` accessory label remains unresolved. Neighbour/handover
+and speech are not accepted; unrecovered handover fields remain unset.
+
+### Phone-service acceptance
+
+`verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
+`verify-6210-incoming-call` queues one laboratory network call, captures
+ringing and connected screens and physically answers/ends it. Both require
+ordered CC/RR establishment, traffic assignment, Connect acknowledgement,
+Disconnect/release and return to paging. Own traffic/release configurations
+are 24 bytes, not the NSM-3 20-byte forms. Physical End emits release
+parameter `14`, now selected by the NPE-3 peer. Incoming Call Confirmed is
+`8308040460020081150101`. These prove signaling, **not speech**.
+
+`verify-6210-incoming-sms` requires segmented GSM delivery, CP/RP acknowledgments,
+EF_SMS delivery/read-status writes and persistent `hello`, plus its graphical
+read frame. `verify-6210-outgoing-sms` physically composes `A` for `5551234`,
+requires the exact own SMS-SUBMIT and network acceptance/CP/RP/RR closure,
+then pins `Message sent`. NPE-3 selects relative TP-VP `ff` (63 weeks), not
+the sibling fixture's `a7`; its message reference remains handset-managed.
+The composer is the first Messages submenu; menu positions are harness policy.
+
+`verify-6210-security` changes only the external laboratory SIM to a
+PIN-enabled profile. Physical `1234` and OK must produce VERIFY CHV1 and
+`9000`, then open the reviewed Messages menu. The acquired phone PMM is still
+unchanged and does not request a phone-lock code on this boot. This gate
+proves SIM PIN interaction, not a recovered phone-lock EEPROM contract.
+
+All service runners start with new working directories; incoming network
+events are selected through MAME configuration, not firmware injection.
+No donor PMM, forced phone state or borrowed DSP verdict is used. The staged
+verifier's declared PROM/COBBA inputs and runtime HLE substitution at missing
+mask routine `2c75` remain research assumptions. Native mask execution,
+measured DSP self-test values, speech/audio parity and electrical ADC units
+remain separate work, not implied by the phone-service gates.
 
 ## Missing native bootstrap observation
 

@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 import shutil
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -18,11 +19,19 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'menu': ('npe3hle', 'menu_input', 25),
              'calculator': ('npe3hle', 'application_input', 38),
              'phonebook': ('npe3hle', 'phonebook_input', 33),
-             'registration': ('npe3hle', 'menu_input', 25)}
+             'registration': ('npe3hle', 'menu_input', 25),
+             'outgoing-call': ('npe3hle', 'outgoing_call_input', 48),
+             'incoming-call': ('npe3hle', 'incoming_call_input', 42),
+             'incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
+             'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
+             'security': ('npe3hle', 'security_input', 37)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
 OPERATOR_SHA256 = '1138954cc94944c83019823ea500fa9ea9f8857c76e3d8ba929cdc40db4c0b74'
+SMS_READ_SHA256 = 'ab21e640456a297698ff12e89d315fb469eca215975b8ba4cc5a1a9cb2a41be3'
+SMS_SENT_SHA256 = '67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc7c8'
+SECURITY_MENU_SHA256 = 'dca943c465ed8b7cc2c766e9ac0f6f69ce86228c04aa68cd52d1b20a75a8bf3f'
 
 
 def check_registration(text, storage):
@@ -53,12 +62,19 @@ def events(path):
     with path.open(errors='replace') as stream:
         return ''.join(line for line in stream if any(token in line for token in
                       ('staged_dsp:', '6210_', 'dspif_transport:', 'sim_device:',
-                       'SIM status', 'radio peer', 'dsp_hle:', '[LUA ERROR]')))
+                       'SIM status', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:', '[LUA ERROR]')))
 
 
 def check_frame(frame, digest, description):
     if frame.size != (96, 60) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
         raise ValueError(f'frame differs from reviewed {description}')
+
+
+def check_output(text):
+    for failure in ('Disk quota exceeded', 'No space left on device',
+                    'Error writing NVRAM file', 'Error generating PNG'):
+        if failure in text:
+            raise ValueError(f'MAME could not persist acceptance artifacts: {failure}')
 
 
 def check_calculator(text, frame):
@@ -121,6 +137,20 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
+        if args.scenario == 'security':
+            from tools.make_sim_card_profile import make_profile
+            card = run / f'nvram/{machine}/sim_card'
+            card.parent.mkdir(parents=True)
+            card.write_bytes(make_profile(pin_enabled=True))
+        if args.scenario in ('incoming-call', 'incoming-sms'):
+            (run / 'cfg').mkdir()
+            config = ET.Element('mameconfig', version='10')
+            system = ET.SubElement(config, 'system', name=machine)
+            ports = ET.SubElement(system, 'input')
+            mask = '2' if args.scenario == 'incoming-call' else '4'
+            ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
+                          mask=mask, defvalue='0', value=mask)
+            ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-noreadconfig', '-debug', '-debugger', 'none',
@@ -130,6 +160,7 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
+        check_output((run / 'console.log').read_text(errors='replace'))
         text = events(run / 'error.log')
         runtime = args.scenario != 'stage'
         verify(text, runtime=runtime, selftest=runtime)
@@ -152,6 +183,7 @@ def main():
             with (cold / 'console.log').open('w') as output:
                 subprocess.run(cold_command, cwd=cold, stdout=output, stderr=subprocess.STDOUT,
                                check=True, timeout=180)
+            check_output((cold / 'console.log').read_text(errors='replace'))
             read_trace = events(cold / 'error.log')
             verify(read_trace, runtime=True, selftest=True)
             with Image.open(cold / 'snap/6210_phonebook_read_contact.png') as frame:
@@ -162,9 +194,40 @@ def main():
             from PIL import Image
             with Image.open(run / 'snap/6210_before_menu.png') as frame:
                 check_frame(frame, OPERATOR_SHA256, 'DCT3 LAB registered idle')
+        elif args.scenario == 'outgoing-call':
+            from tools.noki6210_outgoing_call_check import verify as check_call
+            check_call(text)
+        elif args.scenario == 'incoming-call':
+            from tools.noki6210_incoming_call_check import verify as check_call
+            check_call(text)
+        elif args.scenario == 'outgoing-sms':
+            from tools.noki6210_outgoing_sms_check import verify as check_submission
+            check_submission(text)
+            from PIL import Image
+            with Image.open(run / 'snap/6210_sms_sent.png') as frame:
+                check_frame(frame, SMS_SENT_SHA256, 'Message sent')
+        elif args.scenario == 'incoming-sms':
+            from tools.noki6210_incoming_sms_check import verify as check_delivery
+            check_delivery(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            from PIL import Image
+            with Image.open(run / 'snap/6210_sms_read_1.png') as frame:
+                check_frame(frame, SMS_READ_SHA256, 'received hello SMS')
+        elif args.scenario == 'security':
+            import re
+            from tools.radio_call_lifecycle_common import require_ordered
+            require_ordered(text, (
+                ('physical PIN', re.compile(r'6210_security_physical: action=confirm')),
+                ('VERIFY CHV1', re.compile(r'sim_device: header cla=a0 ins=20 p1=00 p2=01 p3=08')),
+                ('accepted PIN', re.compile(r'SIM status ins=20 sw=9000')),
+                ('physical Menu', re.compile(r'6210_security_physical: action=menu')),
+            ), '6210 security')
+            from PIL import Image
+            with Image.open(run / 'snap/6210_security_then_menu.png') as frame:
+                check_frame(frame, SECURITY_MENU_SHA256, 'Messages after PIN verification')
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
+            'sim_profile': 'PIN-enabled laboratory card' if args.scenario == 'security' else 'default laboratory card',
             'native_dsp_complete': False, 'speech_tested': False, 'command': command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

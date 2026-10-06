@@ -276,10 +276,10 @@ constexpr nokia_radio_peer_device::protocol_contract RADIO_NSM3 = {
 
 // NPE-3 v5.56 emits 56/160. Own RX table 4f6078 routes 8b to
 // 45835c -> task 14 (not NSM-3's task 12); 458106 correlates 89
-// body bit 0 with pending context byte 2. Call release remains unset.
+// body bit 0 with pending context byte 2. Physical End emits release 14.
 constexpr nokia_radio_peer_device::protocol_contract RADIO_NPE3 = {
 	nokia_radio_peer_device::acquisition_strategy::candidate_window,
-	0, 0x01, 0, 0, false, 0, false, false,
+	0x14, 0x01, 0, 0, false, 0, false, false,
 	nokia_radio_peer_device::neighbour_arfcn_encoding::direct_octet,
 	nokia_radio_peer_device::neighbour_bsic_encoding::none, true
 };

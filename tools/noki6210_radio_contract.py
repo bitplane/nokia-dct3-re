@@ -36,4 +36,4 @@ def verify(image):
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',
             'type_8b_destination_task': 14, 'type_89_handler': '4580e8',
             'correlation': 'body bit 0 equals pending context byte 2',
-            'traffic_release': 'unresolved'}
+            'traffic_release': 'runtime physical End observation required'}

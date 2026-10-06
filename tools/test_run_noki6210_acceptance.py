@@ -34,6 +34,12 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_artifact_failure_cannot_pass(self):
+        for error in ('Disk quota exceeded', 'Error writing NVRAM file', 'Error generating PNG'):
+            with self.assertRaisesRegex(ValueError, 'acceptance artifacts'):
+                runner.check_output(error)
+        runner.check_output('Average speed: 450%')
+
     def test_registration_rejects_missing_exchange(self):
         with self.assertRaisesRegex(ValueError, 'ordered NPE-3'):
             runner.check_registration('', bytes(3524))

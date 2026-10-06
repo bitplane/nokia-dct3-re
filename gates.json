@@ -73,6 +73,41 @@
       ]
 },
 {
+      "name": "verify-6210-outgoing-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "outgoing-call", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-incoming-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "incoming-call", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-incoming-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "incoming-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-outgoing-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "outgoing-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-security",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "security", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-registration",
       "prerequisites": ["build"],
       "variables": {},
