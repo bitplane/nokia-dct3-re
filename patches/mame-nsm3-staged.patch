@@ -1,0 +1,12 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -47197,5 +47197,8 @@
+ @source:zpa/iq151.cpp
+ iq151
+ 
++@source:nokia/nokia_dct3.cpp
++nsm3stage
++
+ @source:zvt/pp01.cpp
+ pp01

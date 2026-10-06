@@ -27,6 +27,26 @@ class CatalogueTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "pinned"):
             inventory.catalogue(self.image())
 
+    def test_8210_catalogues_have_distinct_initialization_origins(self):
+        digest = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
+        image = bytearray(0x10d000)
+        for origin, destination, descriptor in (
+                (0x10cf50, 0x13579c, 0x200040),
+                (0x10ced4, 0x135810, 0x200060)):
+            struct.pack_into('>2I', image, origin, 0x74, destination)
+            struct.pack_into('>29I', image, origin + 8,
+                             *([descriptor] * 28 + [0]))
+        struct.pack_into('>6H', image, 0x40, 0xa00, 0x1000, 2, 0x200, 0x3e8, 0)
+        struct.pack_into('>6H', image, 0x60, 0xa00, 0x1000, 3, 0x200, 0x3e8, 0)
+        with patch.object(inventory.hashlib, 'sha1', return_value=Mock(
+                hexdigest=Mock(return_value=digest))):
+            rom6 = inventory.catalogue(image, '8210')
+            rom5 = inventory.catalogue(image, '8210-rom5')
+        self.assertEqual(len(rom6), 28)
+        self.assertEqual(len(rom5), 28)
+        self.assertEqual(rom6[20]['words'], 2)
+        self.assertEqual(rom5[20]['words'], 3)
+
     def test_rejects_missing_terminator(self):
         image = self.image()
         struct.pack_into(">I", image, 0x1095d8, 0x200040)

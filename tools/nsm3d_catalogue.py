@@ -13,6 +13,8 @@ def catalogue(image, product="8250"):
     profiles = {
         "8250": (NSM3D_FLASH_SHA1, 0x109560, 0x12f040),
         "8890": ("a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed", 0x107608, 0x134c78),
+        "8210": ("c1a0fe95cedb89a92b19654208cc4855e1a4988e", 0x10cf50, 0x13579c),
+        "8210-rom5": ("c1a0fe95cedb89a92b19654208cc4855e1a4988e", 0x10ced4, 0x135810),
     }
     if product not in profiles:
         raise ValueError("unsupported catalogue product")
@@ -54,7 +56,7 @@ def covering(entries, address):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("flash", type=Path)
-    parser.add_argument("--product", choices=("8250", "8890"), default="8250")
+    parser.add_argument("--product", choices=("8250", "8890", "8210", "8210-rom5"), default="8250")
     parser.add_argument("--address", type=lambda value: int(value, 0), action="append", default=[])
     args = parser.parse_args()
     try:

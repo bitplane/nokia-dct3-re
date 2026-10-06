@@ -17,7 +17,11 @@ public:
 	bool active() const { return m_active; }
 	bool owns_transport() const { return m_active && !(m_runtime_hle && m_observation_halted); }
 	void set_program_fragment(u32 flash_offset) { m_fragment_offset = flash_offset; }
-	void set_loader2_source(u32 flash_offset) { m_loader2_offset = flash_offset; }
+	void set_loader2_source(u32 flash_offset, u16 words = 613)
+	{
+		m_loader2_offset = flash_offset;
+		m_loader2_words = words;
+	}
 	void set_verifier_source_end(u16 end) { m_verifier_source_end = end; }
 	void set_loader_control_address(u16 address) { m_loader_control_address = address; }
 	void set_cycle_guard_for_loader(bool enable) { m_cycle_guard_for_loader = enable; }
@@ -49,6 +53,7 @@ private:
 	std::array<u16, 104> m_fragment{};
 	u32 m_fragment_offset = 0;
 	u32 m_loader2_offset = 0;
+	u16 m_loader2_words = 613;
 	u16 m_verifier_source_end = 0xe800;
 	u16 m_loader_control_address = 0x087f;
 	bool m_cycle_guard_for_loader = false;

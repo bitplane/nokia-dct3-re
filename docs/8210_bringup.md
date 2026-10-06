@@ -2,12 +2,51 @@
 
 ## Current boundary
 
-NSM-3 v5.31 PPM C remains at the final sparse-flash verification wait,
-`0x2cadce`. No working-phone promotion is claimed. The next question is the
-DSP memory/operand contract governing the staged verifier's final publication:
-the explicit-version fixture produces 6, while the collaborator bridge reports
-an 8210 verdict of `1eff`. A matching raw capture has not been recovered, so
-neither that reported value nor the fixture's assumed version is promoted.
+The normal NSM-3 v5.31 PPM C machine remains at the final sparse-flash
+verification wait, `0x2cadce`. The separate `nsm3stage` research composition
+executes this product's uploaded verifier and loaders, then retains native
+ownership and stops at absent resident DSP routine `0x2c75`. No working-phone
+promotion or physical-verdict equivalence is claimed. The next software
+boundary is an explicitly declared runtime HLE handoff at that missing-code
+call, followed by recovery of this product's service consumers.
+
+The explicit-version fixture produces 6, while the collaborator bridge reports
+an 8210 verdict of `1eff`. A matching raw capture has not been recovered;
+neither value is promoted as a measured silicon result.
+
+## Native upload acceptance
+
+Both catalogue origins are decoded from the pinned acquired flash, not a donor
+image: ROM5 initializes at `0x30ced4` into `0x135810`; ROM6 initializes at
+`0x30cf50` into `0x13579c`. Each contains 28 descriptors. The selected ROM6
+fragment starts at file offset `0x11ab14`; its 104 words have SHA-1
+`440bf49f1eba4cadb12f7f7581c992b0025807d6`.
+
+The second-loader descriptor at `0x31ac34` contains
+`0a00 1000 026f 0200 03e8 0000`: **623 words**, not the 613-word extent of
+earlier products. Its payload starts at file offset `0x11ac40`, SHA-1
+`8e9e4aefa311375ae090b90a607f00cb8e7059ca`. Loader control is data `0x0880`,
+whose observed value is `0x0078`; using `0x087f` selects a zero field and fails
+the loader contract. These are product configuration, not transport behavior.
+
+The read-only `tools/noki8210_staged_observe.lua` fixture observes the MCU
+consuming native publication `0000/0006`. The native loader requests selector
+`0x14` once and selector `0x01` 133 times, verifies all 623 second-loader words,
+installs 422 program words at `0x0590..0x0735`, and stops at `0x2c75` with
+ownership retained. No runtime HLE handoff occurs in this fixture.
+
+Reproduce with a fresh NVRAM/config directory, `nsm3stage`, `-debug -debugger
+none`, the observer as `-autoboot_script`, and `-seconds_to_run 12`. Check the
+result with:
+
+```sh
+.venv/bin/python tools/noki8210_staged_check.py RUN/error.log \
+  roms/noki8210/8210_5.31ppm_c.fls
+```
+
+This establishes execution under explicit version/peripheral inputs and the
+own-upload boundary; it does not supply missing ROM6 mask code, validate the
+physical PMST mapping, or prove graphical boot.
 
 ## Inputs and hardware
 

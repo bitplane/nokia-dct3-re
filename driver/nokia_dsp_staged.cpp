@@ -117,13 +117,14 @@ void nokia_dsp_staged_device::verify_loader2()
 {
 	if (!m_loader2_verified)
 	{
-		if (!m_loader2_offset || m_loader2_offset + 613 * 2 > m_flash.bytes())
+		if (!m_loader2_offset || !m_loader2_words || m_loader2_words > 0x600 ||
+				m_loader2_offset + m_loader2_words * 2 > m_flash.bytes())
 			fatalerror("Staged DSP requires a configured loader2 source");
-		for (unsigned index = 0; index != 613; ++index)
+		for (unsigned index = 0; index != m_loader2_words; ++index)
 			if (m_transport->dsp_data_r(0x0a00 + index) != m_flash[m_loader2_offset / 2 + index])
 				throw emu_fatalerror(1, "Staged DSP loader2 differs from product flash at word %u", index);
 		m_loader2_verified = true;
-		logerror("staged_dsp: loader2_verified words=613 entry=0a00 t=%.6f\n", machine().time().as_double());
+		logerror("staged_dsp: loader2_verified words=%u entry=0a00 t=%.6f\n", m_loader2_words, machine().time().as_double());
 	}
 }
 
@@ -233,7 +234,7 @@ TIMER_CALLBACK_MEMBER(nokia_dsp_staged_device::check_execution)
 	if (!m_verifier && pc == 0x0a00)
 		verify_loader2();
 	if ((pc < 0x0f00 || pc >= m_program_end) &&
-			!(m_loader2_verified && pc >= 0x0a00 && pc < 0x0c65))
+			!(m_loader2_verified && pc >= 0x0a00 && pc < 0x0a00 + m_loader2_words))
 	{
 		unsigned installed = 0;
 		unsigned first = m_program_valid.size();
