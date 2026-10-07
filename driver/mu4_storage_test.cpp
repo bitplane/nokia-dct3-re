@@ -122,6 +122,7 @@ private:
 	unsigned m_native_consumer_paths[6] = {};
 	unsigned m_native_consumer_mode_writes = 0;
 	unsigned m_native_command_paths[6] = {};
+	unsigned m_native_command_cursor = 0, m_native_command_waits = 0;
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
 	unsigned m_native_allocation_call_traces = 0;
@@ -141,7 +142,7 @@ private:
 	std::vector<u16> m_codec_din_words, m_codec_saved_din;
 	unsigned m_codec_rx_snapshot_count = 0;
 	unsigned native_stream_target() const { return system_bios() >= 3 ? 1024 : 128; }
-	unsigned native_worker_tail_ms() const { return system_bios() == 7 ? 20000 : system_bios() == 6 ? 5000 : system_bios() == 5 ? 1000 : 100; }
+	unsigned native_worker_tail_ms() const { return system_bios() >= 7 ? 20000 : system_bios() == 6 ? 5000 : system_bios() == 5 ? 1000 : 100; }
 	void trace_native_iterator(char const *point)
 	{
 		auto const disable = machine().disable_side_effects();
@@ -328,6 +329,7 @@ private:
 	attotime m_read_started, m_first_data;
 	std::vector<u16> m_writes;
 	emu_timer *m_check = nullptr;
+	emu_timer *m_command = nullptr;
 	unsigned m_phase = 54;
 	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
 	unsigned m_native_mcbsp_trace = 0, m_native_mcbsp_polls = 0;
@@ -396,6 +398,20 @@ private:
 		m_cpu->set_input_line(6, ASSERT_LINE);
 		m_cpu->set_input_line(6, CLEAR_LINE);
 	}
+	TIMER_CALLBACK_MEMBER(command_input)
+	{
+		if (m_phase != 30 || system_bios() != 8) return;
+		// Original parser framing and selector 0x49: read-only software status query.
+		static constexpr u8 packet[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
+		if (m_native_command_cursor == std::size(packet)) return;
+		if (m_native_command_paths[5] && !m_serial_ready && (m_serial_regs[0][0] & 1))
+		{
+			deliver_serial(packet[m_native_command_cursor++]);
+			logerror("mu4_native_command_input: cursor=%u total=%u\n", m_native_command_cursor, unsigned(std::size(packet)));
+		}
+		else if (++m_native_command_waits > 20000) fatalerror("MU4 native serial command ingress timeout");
+		m_command->adjust(attotime::from_msec(1));
+	}
 	void io_map(address_map &map)
 	{
 		map(0x4000, 0x7fff).rw(FUNC(mu4_storage_test_state::nand_r), FUNC(mu4_storage_test_state::nand_w));
@@ -436,6 +452,7 @@ private:
 	virtual void machine_start() override
 	{
 		m_check = timer_alloc(FUNC(mu4_storage_test_state::check), this);
+		m_command = timer_alloc(FUNC(mu4_storage_test_state::command_input), this);
 	}
 	virtual void machine_reset() override
 	{
@@ -467,6 +484,8 @@ private:
 		m_native_consumer_state_traces = m_native_consumer_mode_writes = 0;
 		std::fill(std::begin(m_native_consumer_paths), std::end(m_native_consumer_paths), 0);
 		std::fill(std::begin(m_native_command_paths), std::end(m_native_command_paths), 0);
+		m_native_command_cursor = m_native_command_waits = 0;
+		m_command->adjust(attotime::never);
 		m_native_settings_call_traces = 0;
 		m_native_metadata_call_traces = 0;
 		m_native_allocation_call_traces = 0;
@@ -1580,6 +1599,7 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			m_phase = 30;
+			if (system_bios() == 8) m_command->adjust(attotime::from_msec(1));
 			m_check->adjust(attotime::from_seconds(8));
 			return;
 		}
@@ -1661,7 +1681,7 @@ private:
 				logerror("mu4_native_stream_binding: PASS descriptor=806e entry=029545 consumer_entries=%u\n", m_native_stream_consumer_entries);
 				logerror("mu4_native_startup_counts: main=%u continuation=%u helper=%u selection_start=%u\n",
 					m_native_startup_fetches[0], m_native_startup_fetches[1], m_native_startup_fetches[2], m_native_startup_fetches[3]);
-				if (system_bios() == 7)
+				if (system_bios() >= 7)
 				{
 					if (!m_native_startup_fetches[1] || !m_native_startup_fetches[2] ||
 						!m_native_stream_consumer_entries || !m_native_stream_pending_reads || m_native_stream_pending_clears < 2)
@@ -1676,6 +1696,16 @@ private:
 			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u tx_words=%u tx_irqs=%u controller_modeled=partial\n",
 				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace,
 				unsigned(m_serial_tx_words.size()), m_serial_tx_irqs);
+			if (system_bios() == 8)
+			{
+				auto const disable = machine().disable_side_effects();
+				auto &data = m_cpu->space(AS_DATA);
+				if (m_native_command_cursor != 8 || m_native_command_paths[0] != 1 || m_native_command_paths[3] != 3 ||
+					data.read_word(0x1657) != 8 || data.read_word(0x1658) != 8 || data.read_word(0x1659) != 3 ||
+					data.read_word(0x165a) != 1 || data.read_word(0x165e) != 4 || data.read_word(0x33) != 0x7f || data.read_word(0xbb80))
+					fatalerror("MU4 native framed request did not reach its original queued-command/acknowledgement boundary");
+				logerror("mu4_native_framed_request: PASS rx_words=8 queued_command=1 ack_words=3 first_tx_register=007f tx_wire=0 processing=0\n");
+			}
 			machine().schedule_exit();
 			return;
 		}
@@ -2040,6 +2070,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(4, "settle", "Original startup observation (1 second tail)")
 	ROM_SYSTEM_BIOS(5, "scan", "Original startup observation (5 second tail)")
 	ROM_SYSTEM_BIOS(6, "startup", "Original bounded storage startup observation (20 second tail)")
+	ROM_SYSTEM_BIOS(7, "command", "Original framed serial status request (20 second tail)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

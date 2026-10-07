@@ -25,8 +25,10 @@ DMA/McBSP and codec digital interfaces have isolated conformance
 and save/replay tests.
 The `startup` profile passes its 20-second window with zero illegal
 instructions and an active original streaming consumer. It observes 1,739
-consumer entries/notification reads and 1,740 clears. The open boundary is
-the consumer's software-command/data contract and independently verified output,
+consumer entries/notification reads and 1,740 clears. A separate framed
+command fixture reaches the original serial parser and queued acknowledgement,
+but transmit completion is missing at register `0033`. The open boundary is
+that serial transport, processing command/data semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
 claimed; only the initial 1,024 DIN words are independently compared.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
@@ -1394,11 +1396,14 @@ HPI software handler. ISR `02:8ba9..8bbd` reads data register `0031` into
 `1462 + [1657]` and advances the producer modulo 80. Parser `03:9dc7`
 consumes this ring using index `1658`; its eight-state program table is
 `02:4113`. The normal packet path accepts start word `001e`, a length
-strictly between zero and 80, header `00aa`, that many payload words and
-a checksum equal to the XOR of start, length, header and payload. It then
-consumes one trailing word before enqueueing type 2 at `03:9e13` through
-`03:9b6d`. The parser does **not** compare this trailing word to `0055`,
-although its outbound builder emits `0055`; do not invent that check.
+strictly between zero and 80, header `00aa`, that many payload words,
+a sequence token and a checksum equal to the XOR of start, length, header,
+payload and token. A new token with matching checksum enqueues type 2 at
+`03:9e13` through `03:9b6d`. A repeated token takes the duplicate-acknowledge
+path without enqueueing another command. The parser does **not** compare
+the subsequent trailing word to `0055`, although its outbound builder emits
+`0055`; do not invent that check. The sequence token is distinct from
+fields inside the command payload.
 An alternate start `007f` selects an acknowledgement path, not a processing
 command. Low-byte versus full-word comparisons differ between states and
 must be preserved when implementing wire tests.
@@ -1431,6 +1436,23 @@ gate still passes with 1,739 notification services and zero illegal
 instructions. Next validate a non-processing packet at the recovered
 register ingress and its original response path before selecting a music
 mode or asserting playback.
+
+`MU4_STORAGE_BIOS=command` supplies the non-processing selector `0x49`
+status request through `0031` and receive IRQ6, one byte per 1 ms bench
+interval after the original dispatcher first runs. Its packet is
+`1e 02 aa 01 49 01 ff 55`: two payload words, new sequence token 1 and
+XOR `ff`. No command RAM, mode, callback or interrupt mask is written.
+Firmware drains all eight bytes through its original RX ISR and parser,
+enqueues one command and constructs the three-word acknowledgement
+`7f 01 55`. TX ring indices end at `3/1`, and its first word `007f` is
+written to `0033`. Four words remain in the typed queue; the command
+reader returns while the TX ring is nonempty, so the status selector itself
+has not executed. The startup worker still services 1,739 notifications,
+with mode zero and zero illegal instructions. The missing boundary is
+serial transmit completion, not proof of an absent firmware producer.
+The bench interval is not a measured physical baud rate, and no TX wire or
+music processing is verified. A packet without the sequence token drains
+through the ISR but produces no queued command or acknowledgement.
 
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects
