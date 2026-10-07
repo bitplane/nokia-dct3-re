@@ -1619,6 +1619,17 @@ inspects and can rewrite an ID3 header through the file-write path; do not
 classify it as a read-only LockStream parser merely because it reads the
 same file extensions.
 
+Resident entry `02:9186` performs a named-file load: it mounts context
+`3aea`, enumerates into descriptor index one (`36b0 + 44`), compares both
+the supplied name and extension, and invokes unchanged `2080` with index
+one only on a matching directory entry. Its exact direct callers are
+`02:9fa8`, `03:a90f` and `03:a9c3`; the latter two supply name buffer `b54a`
+and extension buffer `b553`. These buffers are runtime inputs, not identified
+decoder names from the static upload. Their provenance and the original
+media-parser caller must be established before using this path to claim a
+particular decoder overlay was selected. Selecting descriptor one manually
+would bypass precisely that unresolved contract.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
