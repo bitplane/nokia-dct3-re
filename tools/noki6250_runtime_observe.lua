@@ -9,6 +9,19 @@ local nv_copy_count = 0
 local keypad_readers = {}
 local scalar_posts = {}
 local channel_confirmations = {}
+local accessory_decisions = {}
+taps[#taps + 1] = memory:install_read_tap(0x3b27c0, 0x3b27c3,
+    "6250_accessory_decision", function(offset, value, mask)
+        -- Observe the branch target, not a mid-block fetch the ARM core can cache.
+        if cpu.state["PC"].value ~= 0x3b27c0 then return end
+        local state = memory:read_u8(cpu.state["R6"].value)
+        local sample = memory:read_u16(cpu.state["R5"].value)
+        local key = state * 0x10000 + sample
+        if accessory_decisions[key] then return end
+        accessory_decisions[key] = true
+        machine:logerror(string.format("6250_accessory_decision: state=%02x sample=%04x t=%.6f\n",
+            state, sample, machine.time:as_double()))
+    end)
 taps[#taps + 1] = memory:install_read_tap(0x464738, 0x46473b,
     "6250_channel_confirmation", function(offset, value, mask)
         if cpu.state["PC"].value ~= 0x464738 then return end

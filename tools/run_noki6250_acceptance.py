@@ -44,6 +44,9 @@ def main():
     source = root / "roms/noki6250/6250 virgin eeprom 005fa000.fls"
     run = args.run_directory.resolve()
     try:
+        from tools.noki6250_accessory_contract import verify as verify_accessory
+        accessory_contract = verify_accessory(
+            (root / 'roms/noki6250/6250-503mcuppmc.fls').read_bytes())
         fixture = initial_record_fixture(source.read_bytes())
         if not mame.is_file():
             raise ValueError(f"missing MAME executable: {mame}")
@@ -156,6 +159,7 @@ def main():
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
             "shared_rom_audit_members": audit_members,
+            "accessory_contract": accessory_contract,
             "host_command": host_command,
         }, indent=2) + "\n")
         with (run / "console.log").open("w") as console:

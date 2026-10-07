@@ -527,11 +527,36 @@ complete static census of all SIM faults or electrical timing.
 
 The initial-record fixture reaches a `Headset` idle-style frame with Menu
 and Names at 20 seconds without late input. The literal label is an
-observation; its accessory/profile ownership is not yet decoded. The physical
+observation produced by the selector-0 accessory path described below. The physical
 probe at 16/16.15 seconds opens the Messages menu (Select/Exit), captured
 at 20 seconds by `noki6250_key_observe.lua`. The probe contains physical
 input only; it does not select callbacks, write RAM, or post UI messages.
 The first 6-second press occurs during SIM reads and is not the menu proof.
+
+### Accessory input boundary
+
+Own reader `4ae33e` selects ADC input 0 through `511ee0` and stores its
+sample. Consumer `3b2790` reads it into the halfword addressed by `r5`;
+the state byte loaded through the literal at `3b2938` is `172d70`.
+The threshold comparison at `3b27d4` uses the literal `0312` at `3b2b48`.
+The state-`10` setter at `3b1e4c/3b1e4e` reaches UI publisher `40fde2`
+with argument 1 through `3b28aa`. This is the accessory indication path,
+not a network/operator label.
+
+`noki6250_accessory_contract.py` hash-pins and checks these own-ROM
+instructions and literals. The acceptance runner records its result.
+Read-only observation at the branch target `3b27c0` on an unchanged
+initial-record research boot records `state=0f sample=0000` at 2.709 s,
+then `state=10 sample=0000` at 3.577 s. Location Updating still completes.
+Thus the existing zero board input induces the observed indication;
+neither a UI-state override nor altered provisioning is required to explain it.
+
+The NHM-3 unattached electrical level and transfer units remain unestablished.
+The independently validated NPE-3 high-input profile is not evidence for
+changing this board. Next establish NHM-3 HEADDET/accessory wiring and its
+unattached polarity, then test one evidenced board fixture against this
+consumer, the idle frame, and call/SMS regressions. Do not sweep values to
+remove the label.
 
 ### Input layout and phonebook save
 
