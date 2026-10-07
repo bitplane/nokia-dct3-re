@@ -6,11 +6,15 @@ by this backend; use the existing laboratory endpoints.
 """
 
 import argparse
+import array
 import asyncio
 from collections import deque
 import json
+from pathlib import Path
 import queue
 import re
+import sys
+import wave
 import time
 
 try:
@@ -34,6 +38,14 @@ class MediaQueues:
             destination.put_nowait(pcm)
         except queue.Full:
             self.dropped += 1
+
+
+def record_pcm(output, pcm):
+    if sys.byteorder != 'little':
+        samples = array.array('h', pcm)
+        samples.byteswap()
+        pcm = samples.tobytes()
+    output.writeframesraw(pcm)
 
 
 def incoming_caller(remote_uri):
@@ -223,7 +235,15 @@ async def bridge(args, pj):
     counts = {'uplink': 0, 'downlink': 0}
     codec = GsmFrCodec()
     started = time.monotonic()
+    recordings = {}
     try:
+        if getattr(args, 'record_pcm', None):
+            args.record_pcm.mkdir(parents=True, exist_ok=True)
+            for direction, name in (('uplink', 'sip-host-microphone.wav'),
+                                    ('downlink', 'sip-host-remote.wav')):
+                output = wave.open(str(args.record_pcm / name), 'wb')
+                output.setparams((1, 2, 8000, 0, 'NONE', 'not compressed'))
+                recordings[direction] = output
         async with websockets.connect(args.url, ping_interval=None, max_size=4096) as websocket:
             receive = asyncio.create_task(websocket.recv())
             try:
@@ -334,7 +354,10 @@ async def bridge(args, pj):
                                 if isinstance(sequence, int) and sequence > uplink_sequence:
                                     uplink_sequence = sequence
                                     if event.get('good') is True:
-                                        endpoint.media.put(endpoint.media.uplink, codec.decode(bytes.fromhex(event['frame'])))
+                                        pcm = codec.decode(bytes.fromhex(event['frame']))
+                                        if 'uplink' in recordings:
+                                            record_pcm(recordings['uplink'], pcm)
+                                        endpoint.media.put(endpoint.media.uplink, pcm)
                                         counts['uplink'] += 1
                     while endpoint.events:
                         call_identity, phase, status = endpoint.events.popleft()
@@ -378,6 +401,8 @@ async def bridge(args, pj):
                             pcm = endpoint.media.downlink.get_nowait()
                         except queue.Empty:
                             break
+                        if 'downlink' in recordings:
+                            record_pcm(recordings['downlink'], pcm)
                         await websocket.send(json.dumps({
                             'type': f'{direction}_call_media_downlink',
                             'epoch': identity[0], 'request_id': identity[1],
@@ -391,6 +416,8 @@ async def bridge(args, pj):
                 receive.cancel()
                 await asyncio.gather(receive, return_exceptions=True)
     finally:
+        for output in recordings.values():
+            output.close()
         codec.close()
         endpoint.close()
 
@@ -402,6 +429,7 @@ def main():
     parser.add_argument('--sip-port', type=int, default=25070)
     parser.add_argument('--once', action='store_true')
     parser.add_argument('--require-frames', type=int, default=0)
+    parser.add_argument('--record-pcm', type=Path, help='optional host-boundary PCM WAV recordings')
     args = parser.parse_args()
     if not args.destination.startswith('sip:') or any(c in args.destination for c in '\r\n'):
         parser.error('--destination must be a SIP URI without line breaks')

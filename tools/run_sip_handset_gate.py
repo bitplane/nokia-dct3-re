@@ -26,6 +26,8 @@ async def run(args):
                 '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
                 f'--auto-answer={args.sip_response}', '--duration=8', f'--play-file={root / "sip-source.wav"}',
                 '--auto-play']
+            if args.record_media:
+                remote_command += [f'--rec-file={root / "sip-microphone.wav"}', '--auto-rec']
             if not args.incoming:
                 remote = await asyncio.create_subprocess_exec(*remote_command,
                     stdin=asyncio.subprocess.PIPE, stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
@@ -59,6 +61,7 @@ async def run(args):
                 '--sip-port', str(args.sip_port + 1), '--once', '--require-frames',
                 '100' if args.sip_response == 200 and not args.cancel_incoming and
                 not (args.restore_call and args.restore_phase == 'alerting') else '0',
+                *(['--record-pcm', str(root)] if args.record_media else []),
                 stdout=bridge_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(bridge)
             if args.incoming:
@@ -333,6 +336,7 @@ def main():
     parser.add_argument('--sip-port', type=int, default=25100)
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
+    parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--restore-call', action='store_true')
     parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')

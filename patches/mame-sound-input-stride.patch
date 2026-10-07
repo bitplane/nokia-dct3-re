@@ -1,0 +1,19 @@
+diff --git a/src/emu/sound.cpp b/src/emu/sound.cpp
+--- a/src/emu/sound.cpp
++++ b/src/emu/sound.cpp
+@@ -956,7 +956,6 @@ void sound_manager::input_get(int id, sound_stream &stream)
+ 	u32 dest_samples = stream.samples();
+ 	u64 dest_start_pos = stream.start_index();
+ 	u64 dest_end_pos = dest_start_pos + dest_samples;
+-	u32 skip = stream.output_count();
+ 
+ 	for(const auto &step : m_microphones[id].m_input_mixing_steps) {
+ 		if(step.m_mode == mixing_step::CLEAR || step.m_mode == mixing_step::COPY)
+@@ -995,6 +994,6 @@ void sound_manager::input_get(int id, sound_stream &stream)
+ 			for(u32 sample = 0; sample != dest_samples; sample++) {
+ 				stream.add(step.m_device_channel, sample, *src * gain);
+-				src += skip;
++				src += istream.m_channels;
+ 			}
+ 		}
+ 	}

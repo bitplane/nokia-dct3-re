@@ -439,5 +439,36 @@ not inject anything into a phone or establish handset coverage:
 PYTHONPATH="$SIP_PYTHON_PATH" .venv/bin/python tools/run_dct3_sip_backend_probe.py --pjsua "$SIP_PJSUA_BIN" --run-dir run_sip_backend_probe
 ```
 
-Next boundaries are broader restoration/failure coverage and microphone/earpiece waveform
-acceptance. Native DSP speech remains its independent hardware/backend milestone.
+### Handset waveform gate
+
+```sh
+make verify-radio-outgoing-call-sip-waveform RUN_DIR=run_3210_sip_waveform
+```
+
+This optional gate needs `pactl`, `ffmpeg`, a live PulseAudio-compatible server
+and the PJSIP build above. It feeds a 440 Hz external analog stimulus into
+MAME's microphone and plays 660 Hz from the real remote SIP endpoint. It
+requires the ordinary physical outgoing-call lifecycle, both MAME host-audio
+streams, and at least two consecutive one-second windows of each received
+tone (RMS at least 500, expected-frequency energy fraction at least 0.5).
+Louder unrelated call/key tones are not mistaken for missing speech or counted
+as the expected tone.
+
+`sip-microphone.wav` is the remote SIP recording; `sip-earpiece.wav` captures
+MAME's output sink. Optional `--record-pcm` records the bridge's decoded GSM
+uplink and received SIP downlink as `sip-host-microphone.wav` and
+`sip-host-remote.wav`, respectively. These boundary recordings distinguish
+emulator PCM/radio faults from SIP media faults; they are not native DSP dumps.
+The fixture temporarily routes MAME onto two null sinks and restores the
+host's original default sink/source on exit. Run it sequentially with all
+other audio and handset gates.
+
+The patch `mame-sound-input-stride.patch` corrects the generic unresampled
+microphone path to advance by the interleaved **source** channel count, not the
+destination microphone's count. Stereo host capture feeding a mono device
+otherwise corrupts sample timing despite successful calls and nonzero PCM.
+The waveform gate protects this cross-channel case through the complete HLE
+audio path. It does not prove native DSP speech or real RF operation.
+
+Next boundaries are broader restoration/failure coverage and native DSP speech,
+which remains its independent hardware/backend milestone.

@@ -180,7 +180,7 @@ the same boundary.
 
 ## Upstream series
 
-The current overlay contains eight MAME patches plus local CPU, utility and Nokia
+The current overlay contains an ordered MAME patch stack plus local CPU, utility and Nokia
 sources. `make check-mame-patches` replays the patches in Makefile order against
 the pinned MAME commit in a temporary Git index. It does not inspect the dirty
 overlay worktree or prove that the resulting source builds. Run it before
@@ -189,7 +189,7 @@ and CPU gates after any behavior change.
 
 The likely reviewable sequence is:
 
-1. generic flash and PCD8544-family corrections, plus GSM-FR utility integration;
+1. generic flash, PCD8544-family and host microphone-input corrections, plus GSM-FR utility integration;
 2. independently useful Nokia hardware devices;
 3. the Nokia DCT3 family driver with explicit HLE status;
 4. the clean-room, MAME-compatible TMS320C54x CPU core now exercised by 5110;

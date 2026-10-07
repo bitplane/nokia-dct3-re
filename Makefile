@@ -15,6 +15,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-nandflash-mu4.patch \
 	patches/mame-i2cmem-write-cycle.patch \
 	patches/mame-pulseaudio-input.patch \
+	patches/mame-sound-input-stride.patch \
 	patches/mame-tms320c54x-build.patch \
 	patches/mame-tms320c54x-test.patch \
 	patches/mame-sed1565-test.patch \
@@ -228,6 +229,7 @@ SIP_HANDSET_KEYS ?= $(NOKI3210_OUTGOING_DIAL_KEYS)
 SIP_HANDSET_CONFIG ?= ../fixtures/radio_outgoing_host_adapter
 SIP_HANDSET_SECONDS ?= 45
 SIP_HANDSET_SCRIPT ?= ../mame_nokia_dct3_input_exerciser.lua
+SIP_HANDSET_SOUND ?= none
 HOST_INCOMING_USSD_RESTORE_PORT ?= 18099
 HOST_SMS_RESTORE_PORT ?= 18097
 HOST_INCOMING_SMS_RESTORE_PORT ?= 18098
