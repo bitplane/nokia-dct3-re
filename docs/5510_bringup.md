@@ -656,6 +656,42 @@ does not provision erased NAND. A valid initial media/partition contract must
 come from the original InitDisk path or a genuine medium image; no directory
 or music-DSP file has been produced by this fixture.
 
+### InitDisk storage scan and receive boundary
+
+These are static contracts from the unchanged InitDisk R060 `256d` record,
+not yet an execution gate. Startup `3079` configures GPIO direction bits
+0..2 and calls `30de` with data pointer `057e`. That routine initializes
+the NAND GPIO through `377a -> 3781`, then calls `36b9` with context `068c`
+and two output pointers. The scan covers 256 groups of 16 blocks: 4,096
+blocks in total. Each `2889` call multiplies the block index by context
+field +2 and reads the first two pages through `2832`.
+
+`2832` emits NAND command `50`, column zero and three row bytes, reads all
+16 spare bytes, then waits for status bit 6 using command `70`. `2889`
+tests spare byte 5 on each page against `ff`; it returns `ff` only when
+both match, otherwise zero. This matches the fitted NAND's factory
+bad-block-marker convention. `36b9` records zero results in a 16-bit
+per-group bitmap and separately examines blocks `0ff9..0fff`. The later
+selection at `30fe..315b` tests masks `3/6/12/24/48/96` against that final
+bitmap before choosing its data `01fa` and `04e0` values. Their allocation
+meaning is not yet established; neither a disk geometry nor successful
+provisioning should be inferred from these constants.
+
+After the scan, `30de` enters a receive-driven state machine. Its byte ring
+has producer `4bbf`, consumer `4bc0`, and storage indexed from `4abf`, with
+8-bit wrapping and both indices initialized to `ff`. Handler `2b03`
+increments the producer, reads peripheral register `0031`, writes the ring
+entry and returns with `RETE`. Consumer `34a5` increments the read index;
+`34c0` combines two received bytes high-first. Startup configures indexed
+peripheral registers `0034/0035` through `35c7`. This is an on-chip serial
+receive boundary, not evidence that InitDisk consumes the board's USB I/O
+quadrant directly. The exact DA150 serial instance, interrupt wiring,
+clock and external sender still need corroboration.
+
+The next execution fixture should run the original spare-area scan against
+erased NAND before extending this serial boundary. No received ring entries,
+successful scan return or filesystem records should be injected into RAM.
+
 This exercises generic core contracts that matter beyond MU4: long-offset
 `BANZ/BANZD` tests the effective Sind value and consumes displacement before
 target (96 cases); `CMPR` compares unsigned ARx against AR0 (192 cases);
