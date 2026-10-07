@@ -1126,9 +1126,12 @@ check-mu4-bootstrap-original: build
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
 			-seconds_to_run 30 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; \
-		grep -q 'mu4_original_bootstrap_frontier:' error.log; \
+		grep -q 'mu4_original_bootstrap_upload: records=7 words=10760 program_only=1 ' error.log; \
+		grep -q 'mu4_original_bootstrap_frontier: entry_count=1 resident_count=1 ' error.log; \
 		grep -q 'mu4_original_bootstrap_gate_init: value=0000 pc=0008f8' error.log; \
+		grep -q 'mu4_original_bootstrap_gate_init: value=0001 pc=0290ef' error.log; \
 		grep -q 'mu4_original_bootstrap_path: address=3538 ' error.log; \
+		grep -q 'mu4_original_bootstrap_loader: name=004d,0043,0055,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0001,e1e8 ' error.log; \
 		cmp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_15/nand"
 
 check-mu4-nand: build

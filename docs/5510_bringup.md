@@ -44,6 +44,11 @@ The paired `check-mu4-retained-original` test saves the reset diagnostic's
 stalled-endpoint NAND, then a fresh `retained` process mounts the identical
 image without erasure or a runtime snapshot and completes native status
 service. Persistent NAND contents alone do not explain the reset stall.
+The `bootstrap` profile loads the complete original `aa55` upload and
+executes its uploaded `ff80` reset-vector prelude, original context
+initializer, directory-selected resident loader and resident startup.
+Control transactions and reset continuation on this full-startup profile
+remain to be verified; its stream volume is not validated music output.
 The open boundary is native reset lifecycle and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
@@ -1814,26 +1819,43 @@ In particular, `08f5..08f7` is the legitimate `374d=0` store. The
 resident's `02:90ec` store sets this initialized gate to one later.
 The resident-only literal census is not a cross-overlay absence claim.
 
-The `bootstrap` BIOS enters the unchanged serial-bootstrap startup at
-`0e41` (the original `aa55` serial-boot header's entry) against a copy
-of the previously firmware-created NAND, with
+The `bootstrap` BIOS loads all seven original `aa55` serial-boot sections
+(10,760 words) into program RAM and executes the uploaded reset-vector
+prelude at `ff80`, which branches to the serial header's `0e41` entry.
+Code `ff82..ff87` sets AR0 to `0060`, then repeats
+`MVPD 0060,*AR0+` 65,313 times, performing the original program-to-data
+initialization before selecting PMST `ffe8`. The program upload includes
+the C table at `0f33`, descriptor/template section at `36b0` and constants
+at `184b`, in addition to the code slices used by the routine bench.
+No program section is silently omitted. It does not assume a hardware
+program/data alias; the original CPU instructions perform these writes.
+
+The fixture uses a copy of the previously firmware-created NAND, with
 no routine wrapper, supervisor C-table replay, state snapshot or NAND
-erasure. It models the entry handoff, not execution of an unavailable
-mask ROM or physical DA150 reset wiring. Reproduce it with
+erasure. This is execution of the uploaded reset-vector software, not
+an unavailable mask ROM, a direct serial-ROM entry handoff, or physical
+DA150 reset wiring. Reproduce it with
 `make check-mu4-bootstrap-original MU4_BOOTSTRAP_SOURCE_RUN=<completed
 check-mu4-retained-original directory>`. Its working directory and NVRAM
 are isolated; saving is disabled and the copied NAND must remain identical.
 
-The 20-second observation executes the original bootstrap, returns from
-the initial mount and directory operations, and reaches its `09b3`
-initializer call, observes the `374d=0` store at post-instruction PC
-`0008f8`, returns to `09b5`, and reaches loader `3538`. It has not
-entered resident `6d62` at the endpoint:
-PC `00321e`, 5,186,338 NAND data reads and no stream words. An unmapped
-startup I/O write to port `0080` (`00df`) also remains a board-model
-boundary. These observations are not a successful boot or proof of a
-deadlock. Pin the active bootstrap/loader operation and its original
-inputs next; do not replace this lifecycle with a flag-clear shim.
+The 20-second observation executes the original bootstrap and initializer,
+observes `374d=0` at post-instruction PC `0008f8`, enters loader `3538`,
+and reaches resident `6d62` once. The original directory-selected descriptor
+names `MCUSI16 .BIN` and has length `0001:e1e8` (123,368 bytes), exactly
+the original `aa22` payload length. Resident main sets `374d=1` at
+post-instruction PC `0290ef`. The endpoint is `02:3d78`, with 762,113
+NAND data reads and 1,633,006 stream words. This establishes the original
+uploaded startup's resident transfer without a flag-clear shim; stream
+volume alone does not validate output content, native music or control
+transactions on this profile. The routine bench's earlier omitted-section
+observation is superseded by the complete-upload gate, not a firmware
+deadlock.
+
+An unmapped startup I/O write to port `0080` (`00df`) remains a board-model
+boundary. Next validate this complete startup's control transaction and
+same-process reset lifecycle, retaining the separate physical-reset and
+output-content limitations.
 
 Next recover the accepted media container and storage layout before attempting
 native playback, and finish reset lifecycle and board attachment separately.

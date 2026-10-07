@@ -747,6 +747,7 @@ private:
 		if (system_bios() == 16)
 		{
 			m_phase = 74;
+			m_cpu->space(AS_PROGRAM).install_ram(0, 0xffff, &m_program_ram[0]);
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x0e41, 0x0e41, "mu4_original_bootstrap_entry",
 				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1) ++m_native_bootstrap_entries; });
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_original_bootstrap_resident",
@@ -760,8 +761,20 @@ private:
 					if (found == std::end(points)) return;
 					unsigned &count = m_native_bootstrap_paths[found - std::begin(points)];
 					if (count++ < 4)
+					{
 						logerror("mu4_original_bootstrap_path: address=%04x a=%010llx nand_reads=%u\n", unsigned(address),
 							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL, m_data_reads);
+						if (address == 0x3538)
+						{
+							auto const disable = machine().disable_side_effects();
+							auto &data = m_cpu->space(AS_DATA);
+							logerror("mu4_original_bootstrap_loader: name=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x ext=%04x,%04x,%04x length=%04x,%04x vector=%04x,%04x\n",
+								data.read_word(0x36b0), data.read_word(0x36b1), data.read_word(0x36b2), data.read_word(0x36b3),
+								data.read_word(0x36b4), data.read_word(0x36b5), data.read_word(0x36b6), data.read_word(0x36b7),
+								data.read_word(0x36b9), data.read_word(0x36ba), data.read_word(0x36bb), data.read_word(0x36c2), data.read_word(0x36c3),
+								m_cpu->space(AS_PROGRAM).read_word(0x2000), m_cpu->space(AS_PROGRAM).read_word(0x2001));
+						}
+					}
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
 				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });
@@ -1154,10 +1167,33 @@ private:
 		{
 			// Original serial-boot entry handoff, not mask-ROM or DA150 reset wiring.
 			// Let the original startup execute its C table and choose its NAND file.
-			program.write_word(0xff81, 0x0e41);
+			auto word = [this](unsigned offset) -> u16
+			{
+				if (offset + 1 >= m_segment.length()) fatalerror("MU4 bootstrap upload bounds");
+				return (u16(m_segment[offset]) << 8) | m_segment[offset + 1];
+			};
+			if (word(0) != 0xaa55 || word(6) != 0x08aa || word(16) || word(18) != 0x0e41)
+				fatalerror("MU4 original bootstrap header changed");
+			unsigned const end = 6 + (unsigned(word(2)) << 16) + word(4);
+			unsigned cursor = 20, records = 0, uploaded = 0;
+			while (word(cursor))
+			{
+				unsigned const count = word(cursor);
+				u32 const destination = (u32(word(cursor + 2)) << 16) | word(cursor + 4);
+				cursor += 6;
+				if (destination + count > 0x10000 || cursor + count * 2 > end)
+					fatalerror("MU4 original bootstrap upload range changed");
+				for (unsigned i = 0; i < count; ++i) program.write_word(destination + i, word(cursor + i * 2));
+				cursor += count * 2;
+				uploaded += count;
+				++records;
+			}
+			if (cursor + 2 != end || records != 7 || uploaded != 10760)
+				fatalerror("MU4 original bootstrap upload coverage changed records=%u words=%u", records, uploaded);
+			logerror("mu4_original_bootstrap_upload: records=%u words=%u program_only=1 data_alias=unvalidated\n", records, uploaded);
 			m_phase = 30;
 			m_check->adjust(attotime::from_seconds(20));
-			logerror("mu4_original_bootstrap_start: entry=000e41 retained_nand=1 routine_wrapper=0 mask_rom=0\n");
+			logerror("mu4_original_bootstrap_start: reset_vector=00ff80 serial_entry=000e41 retained_nand=1 routine_wrapper=0 mask_rom=0\n");
 		}
 	}
 	void start_media_read()
