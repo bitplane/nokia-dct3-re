@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_initdisk_marker_execution", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Isolated mu4nand loads unchanged InitDisk 256d code and original 2080 C globals, then near-calls 377a/2889 with block zero and context 0585. Erased first-two-page spare markers return ff; external NAND programming of page-zero spare byte 5 to zero makes the same original reader return zero after one page. Both require busy/status handling and balanced SP. A separate bounded full 36b9 scan did not terminate and exceeded expected read traffic; its ABI/core loop behavior remains unresolved. No filesystem or full MU4/handset boot is claimed",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "npm5_mu4_initdisk_scan_receive", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
       "boundary": "Original InitDisk R060 30de calls 36b9, which scans 256 groups of 16 NAND blocks via 2889/2832. Command 50 reads 16 spare bytes on each block's first two pages; byte 5 must be ff on both for return ff, otherwise the group bitmap records a bad block. The final seven blocks are separately examined. Subsequent receive state machine consumes an 8-bit-wrapped RAM ring whose 2b03 interrupt writer reads peripheral register 0031; 35c7 configures indexed registers 0034/0035. This establishes a serial-peripheral ingress, not direct USB FIFO delivery. Runtime scan, allocation semantics, exact DA150 serial/IRQ/clock, external sender and filesystem provisioning remain unvalidated",
       "evidence": ["docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]

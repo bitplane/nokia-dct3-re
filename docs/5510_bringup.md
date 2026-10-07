@@ -658,8 +658,9 @@ or music-DSP file has been produced by this fixture.
 
 ### InitDisk storage scan and receive boundary
 
-These are static contracts from the unchanged InitDisk R060 `256d` record,
-not yet an execution gate. Startup `3079` configures GPIO direction bits
+The complete scan is statically mapped from unchanged InitDisk R060's
+`256d` record; its block-reader predicate is also execution-tested. Startup
+`3079` configures GPIO direction bits
 0..2 and calls `30de` with data pointer `057e`. That routine initializes
 the NAND GPIO through `377a -> 3781`, then calls `36b9` with context `068c`
 and two output pointers. The scan covers 256 groups of 16 blocks: 4,096
@@ -688,9 +689,20 @@ receive boundary, not evidence that InitDisk consumes the board's USB I/O
 quadrant directly. The exact DA150 serial instance, interrupt wiring,
 clock and external sender still need corroboration.
 
-The next execution fixture should run the original spare-area scan against
-erased NAND before extending this serial boundary. No received ring entries,
-successful scan return or filesystem records should be injected into RAM.
+`check-mu4-storage-original` loads unchanged InitDisk code and its original
+`2080` C globals after the InitData checks. Original `377a/2889/2832` returns
+`ff` for erased block-zero markers. External NAND programming changes only
+page-zero spare byte 5 to zero; the same original code then returns zero
+after the first page, with balanced SP and timed status handling. The ABI
+uses near `CALL`, matching these routines' `RET`, rather than `FCALL`.
+
+A bounded full `36b9` experiment with stack output pointers `2000/2100`
+did not terminate: at eight test-clock seconds it had 426,125 NAND writes
+and 1,207,855 reads, beyond the expected scan traffic, without an illegal
+opcode. The unvalidated full-scan probe is not an acceptance gate. Audit
+its loop counters and ABI before extending serial ingress; do not interpret
+noncompletion as missing media. No received ring entries, successful scan
+return or filesystem records should be injected into RAM.
 
 This exercises generic core contracts that matter beyond MU4: long-offset
 `BANZ/BANZD` tests the effective Sind value and consumes displacement before
