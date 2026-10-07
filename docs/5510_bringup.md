@@ -58,7 +58,9 @@ validated music output.
 The open boundary is physical reset/board attachment, accepted media and
 remaining processing command/data semantics, and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
-claimed; only the initial 1,024 DIN words are independently compared.
+claimed. Routine streaming profiles compare the initial 1,024 DIN words;
+`bootmeasure` continuously compares transmitter words with codec DIN
+throughout its complete observation window, including nonzero output.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -1591,9 +1593,10 @@ folds the signed phase into the table index and applies the fractional
 amplitude product with high-word truncation. Both ping-pong buffers and
 final phase words match on every call: 11,520 sample words, including 26
 signed phase wraps. The model explicitly rejects product saturation outside
-this fixture's supported range. These are verified generated buffer values,
-not yet continuous post-prefix codec-DIN evidence, analog sound, music or
-speech decoding.
+this fixture's supported range. These are verified generated buffer values;
+the separate `bootmeasure` profile below also validates continuous digital
+transport. Exact generator-buffer-to-DMA provenance, analog sound, music and
+speech decoding are not established by the buffer arithmetic alone.
 
 The original directory scanner at `03:941d` accepts extensions `REL` and
 `LSE` (strings at data `bff3/bff7`), excludes directory entries and caps its
@@ -1942,6 +1945,19 @@ The codec input remains a declared converted-sample fixture. These checks
 prove native DSP processing and generated tone buffers after original
 startup, not accepted media decoding, analog output or native speech.
 
+The same profile continuously compares every McBSP0 transmitter word with
+the independently pin-decoded AIC23 DIN word. A four-word bounded comparison
+queue rejects overflow, unpaired codec words, channel-order errors and
+sample mismatches; it is registered for save states and cleared on reset.
+The complete 20-second observation matches 1,633,006 words, including
+11,381 nonzero words, with no pending word at its endpoint. Acceptance
+requires coverage beyond the old 1,024-word prefix, nonzero output and at
+most one final launched-but-not-yet-sampled word; exact volume is not a
+physical clock-rate oracle. This verifies sustained digital transport
+during native processing. It does not independently map each generated
+tone-buffer sample through the firmware's DMA source selection or model
+the DAC/analog output.
+
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects
 holes and verifies the selected wire checksum. Optional
@@ -1958,8 +1974,10 @@ defines receive overrun after three unread words: DRR and RBR survive,
 incoming RSR data may be lost, and a side-effectful DRR read clears RFULL.
 Executable gates check framing, status, ready edges, reset and save/restore
 of both error states. Wider, internally clocked and multichannel modes are
-not established by these tests. Only the first 1,024 DIN words in the native
-run are independently checked; later transfer counts do not prove music.
+not established by these tests. Routine profiles check the first 1,024 DIN
+words; the complete-startup measurement profile checks digital transport
+continuously as described above. Neither transfer counts nor pin-decoded
+output alone prove music decoding.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero

@@ -75,6 +75,17 @@ public:
 		subdevice<tlv320aic23_device>("codec")->converted_adc_cb().set([](offs_t channel) -> u16 { return channel ? 0x5678 : 0x1234; });
 		subdevice<tlv320aic23_device>("codec")->dout_cb().set([this](int state) { m_mcbsp0->rx_data_w(state); });
 		subdevice<tlv320aic23_device>("codec")->din_word_cb().set([this](offs_t channel, u16 value) {
+			if (m_phase == 30 && system_bios() == 20 && m_stream_words)
+			{
+				if (!m_continuous_tx_count) fatalerror("MU4 codec DIN word has no observed transmitter word");
+				if (channel != (m_continuous_din_words & 1) || value != m_continuous_tx[m_continuous_tx_head])
+					fatalerror("MU4 continuous codec DIN mismatch word=%u channel=%u actual=%04x expected=%04x",
+						m_continuous_din_words, unsigned(channel), value, m_continuous_tx[m_continuous_tx_head]);
+				m_continuous_tx_head = (m_continuous_tx_head + 1) % m_continuous_tx.size();
+				--m_continuous_tx_count;
+				++m_continuous_din_words;
+				if (value) ++m_continuous_nonzero_words;
+			}
 			if (m_phase >= 54 && m_phase <= 57)
 			{
 				if (channel != (m_codec_din_words.size() & 1)) fatalerror("MU4 codec DIN channel ordering mismatch");
@@ -119,6 +130,9 @@ private:
 	}
 	unsigned m_stream_words = 0, m_stream_config_writes = 0;
 	unsigned m_native_din_words = 0;
+	std::array<u16, 4> m_continuous_tx{};
+	unsigned m_continuous_tx_head = 0, m_continuous_tx_count = 0;
+	unsigned m_continuous_din_words = 0, m_continuous_nonzero_words = 0;
 	unsigned m_native_dma_rx_vectors = 0, m_native_dma_tx_vectors = 0;
 	unsigned m_native_dma_tx_handler = 0;
 	unsigned m_native_stream_pending_sets = 0, m_native_stream_pending_clears = 0, m_native_stream_pending_reads = 0;
@@ -330,6 +344,12 @@ private:
 		// TX reports the last launched bit before DIN samples it on the next rising edge.
 		// Idle-line DIN words before this observable transmission are not stream evidence.
 		if (m_phase == 30 && m_native_tx_words.size() < native_stream_target()) m_native_tx_words.push_back(value);
+		if (m_phase == 30 && system_bios() == 20)
+		{
+			if (m_continuous_tx_count == m_continuous_tx.size()) fatalerror("MU4 codec comparison queue overflow");
+			m_continuous_tx[(m_continuous_tx_head + m_continuous_tx_count) % m_continuous_tx.size()] = value;
+			++m_continuous_tx_count;
+		}
 		if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73)) m_external_words.push_back(value);
 		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
 		finish_stream_if_ready();
@@ -902,6 +922,13 @@ private:
 			machine().save().register_presave(save_prepost_delegate(FUNC(mu4_storage_test_state::save_command_peer), this));
 			machine().save().register_postload(save_prepost_delegate(FUNC(mu4_storage_test_state::restore_command_peer), this));
 		}
+		if (system_bios() == 20)
+		{
+			save_item(NAME(m_stream_words));
+			save_item(NAME(m_continuous_tx)); save_item(NAME(m_continuous_tx_head));
+			save_item(NAME(m_continuous_tx_count)); save_item(NAME(m_continuous_din_words));
+			save_item(NAME(m_continuous_nonzero_words));
+		}
 	}
 	void save_command_peer()
 	{
@@ -956,6 +983,8 @@ private:
 		m_rx_dma_completions = m_rx_irqs = 0;
 		m_stream_words = m_stream_config_writes = 0;
 		m_native_din_words = 0;
+		m_continuous_tx.fill(0);
+		m_continuous_tx_head = m_continuous_tx_count = m_continuous_din_words = m_continuous_nonzero_words = 0;
 		m_native_dma_rx_vectors = m_native_dma_tx_vectors = 0;
 		m_native_dma_tx_handler = 0;
 		m_native_stream_pending_sets = m_native_stream_pending_clears = m_native_stream_pending_reads = 0;
@@ -1307,6 +1336,15 @@ private:
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
 			if (measurement_profile()) verify_native_measurement();
 			else if (system_bios() >= 17) verify_native_status();
+			if (system_bios() == 20)
+			{
+				logerror("mu4_native_codec_continuous_observe: tx_words=%u din_words=%u pending=%u nonzero=%u\n",
+					m_stream_words, m_continuous_din_words, m_continuous_tx_count, m_continuous_nonzero_words);
+				if (m_continuous_din_words <= 1024 || m_continuous_tx_count > 1 ||
+					m_continuous_din_words + m_continuous_tx_count != m_stream_words || !m_continuous_nonzero_words)
+					fatalerror("MU4 processing did not produce continuously verified nonzero codec output");
+				logerror("mu4_native_codec_continuous: PASS complete_window=1 digital_din=1 nonzero=1 music_decode=0 analog_audio=0\n");
+			}
 			if (finish_native_replay()) return;
 			if (system_bios() == 18)
 			{
