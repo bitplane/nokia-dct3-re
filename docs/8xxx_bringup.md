@@ -1535,6 +1535,20 @@ during an unfinished CP/RP exchange.
 
 #### Incoming Call Acceptance
 
+Host-originated incoming calls compose with settled physical startup. Copy
+`fixtures/noki8850_host/nsm2hle.cfg` into a private cfg directory; it enables
+the host adapter without an automatic laboratory incoming call. Launch
+`tools/run_host_incoming_signaling_gate.py --caller 5551234` around `nsm2hle`
+with HTTP enabled, fresh private NVRAM/snapshots, verbose logging,
+`tools/noki8850_host_incoming_input.lua` and 65 seconds. Set `--ready-file`
+to `RUN/snap/8850_registered_idle.png`, which the physical fixture produces
+after returning to idle. The runner requires correlated
+queued/paging/alerting/connected/ended phases. Independently require
+`noki8850_incoming_call_check.py --frames RUN/snap RUN/error.log` for the
+own-product signaling, physical Answer/End, reviewed `5551234` caller pixels
+and `DCT3 LAB` after release. No native speech or other caller-number shape
+is promoted by this acceptance.
+
 Copy `fixtures/noki8850_incoming_call/nsm2hle.cfg` into a private run's
 configuration directory. Run `noki8850_incoming_call_input.lua` for 45
 seconds with fresh NVRAM. The fixture completes physical security input

@@ -4,6 +4,8 @@ import argparse
 from pathlib import Path
 import re
 import sys
+import hashlib
+from PIL import Image
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -58,12 +60,30 @@ def verify(text: str) -> None:
         require_count(text, pattern, 1, f"expected exactly one {label}")
 
 
+def check_frames(directory):
+    for filename, crop, expected in (
+        ('8850_incoming_ringing.png', (0, 8, 84, 32),
+         '6771b066d732e56179188b87c75af8eda731c5d3b3100c44e8aa716c026942e3'),
+        ('8850_after_incoming_call.png', (15, 0, 69, 16),
+         '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'),
+    ):
+        with Image.open(directory / filename) as source:
+            frame = source.convert('L')
+        # Caller and operator text only; signal and battery animations are excluded.
+        if frame.size != (84, 48) or hashlib.sha256(
+                frame.crop(crop).tobytes()).hexdigest() != expected:
+            raise ValueError(f'missing reviewed incoming presentation: {filename}')
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
+    parser.add_argument('--frames', type=Path)
     args = parser.parse_args()
     try:
         verify(args.log.read_text(errors="replace"))
+        if args.frames:
+            check_frames(args.frames)
     except (ValueError, OSError) as error:
         print(f"FAIL - {error}", file=sys.stderr)
         return 1

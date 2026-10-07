@@ -1,5 +1,9 @@
 import unittest
 from tools.noki8850_incoming_call_check import verify
+from tools.noki8850_incoming_call_check import check_frames
+from tempfile import TemporaryDirectory
+from pathlib import Path
+from PIL import Image
 from tools.test_radio_5210_incoming_call_trace_check import GOOD as NSM5_GOOD
 
 GOOD = NSM5_GOOD.replace("message=08 length=5", "message=08 length=11").replace(
@@ -19,6 +23,13 @@ GOOD = NSM5_GOOD.replace("message=08 length=5", "message=08 length=11").replace(
 
 
 class Nokia8850IncomingCallCheckTest(unittest.TestCase):
+    def test_blank_caller_presentation_rejected(self):
+        with TemporaryDirectory() as directory:
+            frames = Path(directory)
+            Image.new('L', (84, 48)).save(frames / '8850_incoming_ringing.png')
+            with self.assertRaisesRegex(ValueError, 'incoming presentation'):
+                check_frames(frames)
+
     def test_complete(self):
         verify(GOOD)
 
