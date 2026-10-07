@@ -117,6 +117,7 @@ private:
 	unsigned m_native_lookup_operand_traces = 0;
 	unsigned m_native_cache_traces[6] = {};
 	unsigned m_native_startup_subcall_traces = 0;
+	unsigned m_native_settings_call_traces = 0;
 	bool m_native_worker_window_started = false;
 	attotime m_native_worker_window_start;
 	std::vector<u16> m_native_tx_words;
@@ -374,6 +375,7 @@ private:
 		m_native_lookup_operand_traces = 0;
 		std::fill(std::begin(m_native_cache_traces), std::end(m_native_cache_traces), 0);
 		m_native_startup_subcall_traces = 0;
+		m_native_settings_call_traces = 0;
 		m_native_worker_window_started = false;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
@@ -1202,11 +1204,24 @@ private:
 				};
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x3f1d, 0x6dbf, "mu4_native_startup_common", startup_observer);
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x2904b, 0x29117, "mu4_native_startup_main", startup_observer);
-			m_cpu->space(AS_PROGRAM).install_read_tap(0x39105, 0x3bbe7, "mu4_native_startup_read",
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x38c3e, 0x3bbe7, "mu4_native_startup_read",
 				[this](offs_t address, u16 &opcode, u16)
 				{
 					if (m_phase != 30 || machine().side_effects_disabled() ||
 						u16(m_cpu->state_int(tms320c54x_device::STATE_PC)) != u16(address + 1)) return;
+					static constexpr offs_t settings_calls[] = {
+						0x38c55, 0x38c5a, 0x38c64, 0x38c75, 0x38c80, 0x38c89,
+						0x38c93, 0x38ca1, 0x38caf, 0x38cb9, 0x38cc0, 0x38cc6
+					};
+					for (offs_t site : settings_calls)
+						if ((address == site || address == site + 2) && m_native_settings_call_traces++ < 64)
+						{
+							auto const disable = machine().disable_side_effects();
+							logerror("mu4_native_settings_call: site=%06x point=%s opcode=%04x ar2=%04x a=%010llx\n",
+								unsigned(site), address == site ? "call" : "return", opcode,
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
+								static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
+						}
 					if ((address <= 0x392c2 || (address >= 0x3941d && address <= 0x3957f)) &&
 						(opcode & 0xfff8) == 0xf980 && m_native_startup_subcall_traces++ < 64)
 					{

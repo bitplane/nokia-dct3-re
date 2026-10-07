@@ -1227,7 +1227,18 @@ payload. This requests `SETTING1.BIN`. Later static calls select ASCII `2`
 and `3` for `SETTING2.BIN` and `SETTING3.BIN`. These are file operations,
 not recovered service-message tags. `03:8c3e` searches the directory and
 has file-handling paths through `03:c200`, `03:bb09` and `03:bfdb`.
-Its write/allocation completion and setting-record format remain unresolved.
+Read-only call/return observations show the directory iterator finishing:
+the name comparison eventually returns -1 and `03:bb4e` returns 1.
+The routine then executes `03:bb09`, `03:bfdb`, and two calls to
+`03:c2c2`; each returns. The first `c2c2` call receives the original
+`001c`-word payload length; the second receives zero length. The next call,
+`03:8cb9 -> 03:c404`, has no observed return in the five-second profile.
+Thus the open operation is downstream of directory search and these two
+transfer calls, not a stalled name lookup. Static `c404` code updates a
+directory-entry buffer and invokes further storage helpers; its metadata
+finalization/allocation contract and setting-record format remain unresolved.
+Return-site observations are pre-execution: AR2 is not a claimed result
+until the following instruction transfers the returned accumulator.
 
 Separate observation profiles extend time without changing firmware or
 device inputs:
@@ -1245,7 +1256,7 @@ zero illegal-opcode requirement. Additional transfer counts are not validated
 music content. In both windows the candidate consumer has zero entries and
 `b633` has zero firmware reads. The storage reader remains active: do not
 describe an endpoint PC as a stuck instruction or assume a missing peer.
-Next decode `03:8c3e`'s active write/allocation path before changing media
+Next decode `03:c404`'s active metadata/storage path before changing media
 contents or extending observation time again.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
