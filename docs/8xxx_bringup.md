@@ -1077,6 +1077,28 @@ observations, not measured silicon latency or calibrated RF units.
 
 ### 8890 PCS1900 Call And SMS Acceptance
 
+Host-originated incoming SMS is independently accepted on GSM900 and PCS1900.
+Use a private copy of `fixtures/noki8890_clock_incoming/nsb6hle.cfg` or
+`fixtures/noki8890_clock_incoming_pcs1900/nsb6hle.cfg`: these enable the host
+adapter, not automatic lab SMS. Run `tools/run_host_incoming_sms_gate.py`
+around `nsb6hle` with HTTP enabled, fresh private cfg/NVRAM/snapshot directories,
+verbose logging, `tools/noki8890_incoming_sms_input.lua` and 36 seconds.
+The runner sends external sender `5551234`, GSM7 `hello`, only after the
+adapter reports registration. Require both validators:
+
+```sh
+.venv/bin/python tools/radio_incoming_host_sms_trace_check.py RUN/error.log
+.venv/bin/python tools/noki8890_incoming_sms_check.py RUN/error.log \
+  RUN/nvram/nsb6hle/sim_card RUN/snap/8890_sms_read_2.png
+```
+
+For PCS1900 add `--arfcn 600` to the host checker and `--pcs1900` to the
+handset checker. Host acceptance/queued/delivered identity, firmware CP/RP
+closure, exactly one page, delivery/read-status SIM writes, persistent read
+content and reviewed body pixels all pass. The PCS check also requires the
+complete organic carrier/band registration contract. This is a software host
+SMS boundary, not evidence of native radio/DSP execution or an external SMSC.
+
 Fresh strict-topology runs also complete incoming and outgoing call
 signaling and incoming/outgoing SMS. The network's existing assignment
 encoder derives the non-hopping traffic carrier from the serving ARFCN;

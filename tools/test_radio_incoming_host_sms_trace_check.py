@@ -35,6 +35,18 @@ gsm_call_adapter: incoming sms state id=1 epoch=2 phase=delivered
 
 
 class IncomingHostSmsTraceCheckTest(unittest.TestCase):
+    def test_accepts_explicit_pcs_carrier(self):
+        verify(GOOD.replace('arfcn=1', 'arfcn=600'), arfcn=600)
+
+    def test_rejects_wrong_carrier_and_prefix_match(self):
+        for channel in (600, 10):
+            with self.assertRaises(ValueError):
+                verify(GOOD.replace('arfcn=1', f'arfcn={channel}'))
+
+    def test_rejects_invalid_carrier(self):
+        with self.assertRaises(ValueError):
+            verify(GOOD, arfcn=1024)
+
     def test_accepts_complete_ordered_lifecycle(self) -> None:
         verify(GOOD)
 

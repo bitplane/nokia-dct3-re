@@ -19,8 +19,11 @@ SERVICE_CHECKPOINTS = (
 )
 
 
-def verify(text: str, require_restore: bool = False) -> None:
+def verify(text: str, require_restore: bool = False, *, arfcn: int = 1) -> None:
+    if not 0 <= arfcn <= 1023:
+        raise ValueError('ARFCN outside GSM channel range')
     checkpoints = list(BASE_CHECKPOINTS)
+    checkpoints[0] = re.compile(rf"gsm_call_adapter: network registered=1 arfcn={arfcn}\b")
     if require_restore:
         checkpoints.extend((
             re.compile(r"state_roundtrip: result=pass"),
@@ -42,9 +45,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("--require-restore", action="store_true")
+    parser.add_argument("--arfcn", type=int, default=1)
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(), args.require_restore)
+        verify(args.log.read_text(), args.require_restore, arfcn=args.arfcn)
     except ValueError as error:
         raise SystemExit(str(error)) from None
     print("OK - host-originated SMS completed the firmware CP/RP lifecycle")
