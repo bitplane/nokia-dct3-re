@@ -167,17 +167,19 @@ def verify_success(root, remote_text, args):
     product = getattr(args, 'product', '3210')
     # Exact encodings from these acceptance fixtures, including their observed
     # CC sequence bit; not a claim that the bit is a fixed product property.
-    connect_data = '8307' if product == '3310' else '8347'
-    release_complete_data = '036a0802e0d1' if product == '3310' else '032a0802e0d1'
+    connect_data = '8307' if product in ('3310', '3330') else '8347'
+    # NHM-6 release checks the message body independently of CC sequence bit 6.
+    release_complete_data = ('03(?:2a|6a)0802e0d1' if product == '3330' else
+                             '036a0802e0d1' if product == '3310' else '032a0802e0d1')
     patterns = (
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=paging',
             r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
             (r'sip_state: physical Answer after idle restoration' if args.restore_idle
              else r'input-press: t=[0-9.]+ name=enter'),
-            rf'GSM service uplink sapi=0 pd=03 message=07 length=2 data={connect_data}',
+            rf'GSM service uplink sapi=0 pd=03 message=07 length=2 data={connect_data}(?:\s|$)',
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=connected',
             r'gsm_call_adapter: termination id=1 cause=16 result=accepted',
-            rf'GSM service uplink sapi=0 pd=03 message=2a .*data={release_complete_data}',
+            rf'GSM service uplink sapi=0 pd=03 message=2a .*data={release_complete_data}(?:\s|$)',
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=ended',
     ) if args.incoming else (
             outgoing_setup_pattern(product),
@@ -407,8 +409,6 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
-    if args.product == '3330' and args.incoming:
-        parser.error('3330 incoming SIP acceptance has not been established')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:

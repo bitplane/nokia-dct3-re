@@ -259,7 +259,13 @@ that product-local NVRAM. It verifies the captured 18-byte SETUP, real SIP
 confirmation, sustained ordered GSM-FR downlink and bidirectional host media,
 then ordinary CC/RR release. Queue-drop counts remain visible in the result;
 this is HLE media transport, not native DSP speech or an analogue-waveform gate.
-3330 incoming SIP acceptance remains separate and unvalidated.
+`verify-3330-radio-incoming-call-sip` independently repeats that physical
+provisioning, receives a real SIP INVITE and presses Navi only after observing
+firmware CC Alerting. Its own CONNECT (`8307`) and remote-clearing RELEASE
+COMPLETE body are checked; the CC sequence bit is not a fixed product property.
+Physical Answer, bidirectional HLE transport and normal clearing are required.
+PUP buzzer readiness is not used as its Answer trigger: the measured incoming
+call reaches Alerting without asserting that bit in this composition.
 
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps

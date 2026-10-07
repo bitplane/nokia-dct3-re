@@ -10,6 +10,7 @@ from tools.run_sip_handset_gate import verify_success
 SETUP = {
     '3210': 'length=15 data=03450401a05e0581551532f4150101',
     '3310': 'length=19 data=03450404600200815e0581551532f4a2150101',
+    '3330': 'length=18 data=03450404600200815e0581551532f4150101',
 }
 
 
@@ -52,13 +53,16 @@ class SipProductSetupCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check('3210', '3210', rejected=True)
 
-    def check_incoming(self, product, wire_product):
+    def check_incoming(self, product, wire_product, release_override=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             connect, release = {
                 '3210': ('8347', '032a0802e0d1'),
                 '3310': ('8307', '036a0802e0d1'),
+                '3330': ('8307', '032a0802e0d1'),
             }[wire_product]
+            if release_override is not None:
+                release = release_override
             (root / 'error.log').write_text(
                 'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging\n'
                 'GSM service downlink kind=9 sapi=0 pd=03 message=05\n'
@@ -86,6 +90,13 @@ class SipProductSetupCheckTest(unittest.TestCase):
         for product, other in (('3210', '3310'), ('3310', '3210')):
             with self.subTest(product=product), self.assertRaises(RuntimeError):
                 self.check_incoming(product, other)
+
+    def test_3330_release_accepts_sequence_bit_not_wrong_payload(self):
+        for release in ('032a0802e0d1', '036a0802e0d1'):
+            self.check_incoming('3330', '3330', release)
+        for release in ('036a0802e0d100', '036a0802e0d2'):
+            with self.assertRaises(RuntimeError):
+                self.check_incoming('3330', '3330', release)
 
 
 if __name__ == '__main__':

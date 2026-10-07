@@ -13109,6 +13109,18 @@
       ]
     },
     {
+      "name": "verify-3330-radio-incoming-call-sip",
+      "prerequisites": ["normalize-3330"],
+      "variables": {},
+      "unstructured": "own-product physical PMM provisioning before isolated incoming SIP call",
+      "recipe": [
+        "\t@set -e; \\",
+        "\t$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \\",
+        "\t$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0; \\",
+        "\t$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR)_call JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3330 SIP_HANDSET_BIOS=450e SIP_HANDSET_PRESERVE_NVRAM=1 SIP_HANDSET_NVRAM_DIR=$(abspath $(RUN_DIR)_provision)/nvram SIP_HANDSET_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter SIP_HANDSET_KEY_DELAY_MS=6000 SIP_HANDSET_KEY_DURATION_MS=220 SIP_HANDSET_KEY_GAP_MS=280 SIP_HANDSET_RUNNER_ARGS='--incoming --product 3330' SIP_HANDSET_SECONDS=40"
+      ]
+    },
+    {
       "name": "verify-radio-incoming-call-sip",
       "prerequisites": [],
       "variables": {},
