@@ -164,6 +164,8 @@ private:
 	// Test supervisor, not DUT state: survives the requested machine reset.
 	unsigned m_native_reset_leg = 0;
 	unsigned m_native_reset_settings_mask = 0;
+	bool m_native_runtime_observers_installed = false;
+	unsigned m_native_runtime_reads[9] = {}, m_native_runtime_writes[9] = {};
 	std::stringstream m_native_checkpoint, m_native_reference;
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
@@ -869,6 +871,8 @@ private:
 		m_native_cache_update_traces = 0;
 		std::fill(std::begin(m_native_cache_mode_traces), std::end(m_native_cache_mode_traces), 0);
 		m_native_settings_buffer_active = false;
+		std::fill(std::begin(m_native_runtime_reads), std::end(m_native_runtime_reads), 0);
+		std::fill(std::begin(m_native_runtime_writes), std::end(m_native_runtime_writes), 0);
 		std::fill(std::begin(m_native_buffer_calls), std::end(m_native_buffer_calls), 0);
 		std::fill(std::begin(m_native_buffer_returns), std::end(m_native_buffer_returns), 0);
 		m_native_worker_window_started = false;
@@ -1638,6 +1642,26 @@ private:
 			if (cursor + 2 != end || checked != 51921) fatalerror("MU4 loader coverage mismatch words=%u", checked);
 			logerror("mu4_loader: PASS original_loader=1 dma_complete=1 records=%u words=%u data_and_program=1\n", records, checked);
 			capture_native_ram("loaded");
+			if ((system_bios() == 14 || system_bios() == 15) && !m_native_runtime_observers_installed)
+			{
+				// Install once across the reset legs; counters are per-leg observations.
+				m_native_runtime_observers_installed = true;
+				auto const observe = [this](offs_t address, u16 value, bool write)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled()) return;
+					static constexpr offs_t candidates[] = {0x374a, 0x374d, 0x374e, 0x3753, 0x3754, 0x3756, 0x3757, 0x3b12, 0x3b13};
+					auto const found = std::find(std::begin(candidates), std::end(candidates), address);
+					if (found == std::end(candidates)) return;
+					unsigned &count = (write ? m_native_runtime_writes : m_native_runtime_reads)[found - std::begin(candidates)];
+					if (count++ < 16)
+						logerror("mu4_native_runtime_word: leg=%u access=%s address=%04x value=%04x pc=%06x\n",
+							m_native_reset_leg, write ? "write" : "read", unsigned(address), value, unsigned(m_cpu->state_int(STATE_GENPC)));
+				};
+				m_cpu->space(AS_DATA).install_read_tap(0x374a, 0x3b13, "mu4_native_runtime_read",
+					[observe](offs_t address, u16 &value, u16) { observe(address, value, false); });
+				m_cpu->space(AS_DATA).install_write_tap(0x374a, 0x3b13, "mu4_native_runtime_write",
+					[observe](offs_t address, u16 &value, u16) { observe(address, value, true); });
+			}
 			// Observe unchanged 3538 -> loader -> 2000 -> page-2 common-window entry.
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x2000, "mu4_native_entry",
 				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_entry_reads; });

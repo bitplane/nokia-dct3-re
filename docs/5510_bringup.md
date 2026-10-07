@@ -1756,6 +1756,28 @@ semantics or establish causation. Trace the original readers and writers
 and compare peripheral/interrupt state before any corrective change;
 clearing retained RAM to imitate a fresh process is not a reset contract.
 
+Original startup has an observed one-time gate on `374d`: instruction
+`02:90e8` loads it, `02:90ea` branches to `90ff` if nonzero, and
+`02:90ec..90ee` stores one before the initialization tail. The fresh
+retained process reads zero and writes one; the same-process reset leg
+reads one and skips this tail. The tail clears `3768`, calls
+`03:8f0d` and `03:9105`, and writes ten to `374a`. The `03:9105`
+routine constructs a settings/file context starting at `16b8`; its
+observed writers populate `3753/3754`, `3756/3757` and `374e` in the
+successful retained-media process. This establishes a firmware-owned
+initialization difference, not proof that the gate alone causes the stall.
+
+A scan of all 51,921 final logical uploaded words in original `aa22`
+finds the literal `374d` only in the load operand at `02:90e9` and the
+store operand at `02:90ed`; independent disassembly confirms those two
+instructions. This is literal coverage, not an absence proof for indirect
+stores or reset-ROM/BSS initialization. The nine candidate words are
+observed with read/write taps installed once across reset legs; each
+access class records at most 16 samples per word per leg. No candidate
+value is altered. Next recover the legitimate initialization/reset path
+for this one-time state and its dependent contexts; do not bypass it by
+clearing `374d` or invoking the skipped calls from the supervisor.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and finish reset lifecycle and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
