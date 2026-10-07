@@ -13,6 +13,40 @@ from tools.sip_handset_waveform_check import inspect_tone, verify
 
 
 class SipHandsetWaveformTest(unittest.TestCase):
+    def test_audio_defaults_are_captured_before_modules_and_restored_on_failure(self):
+        repository = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            commands = root / 'commands'
+            state = root / 'loaded'
+            pactl = root / 'pactl'
+            pactl.write_text('''#!/bin/bash
+echo "$*" >> "$TEST_COMMANDS"
+case "$1" in
+    get-default-sink) if [[ -f "$TEST_LOADED" ]]; then echo temporary; else echo original-sink; fi ;;
+    get-default-source) if [[ -f "$TEST_LOADED" ]]; then echo temporary.monitor; else echo original-source; fi ;;
+    load-module) touch "$TEST_LOADED"; echo 42 ;;
+esac
+''')
+            pactl.chmod(0o755)
+            for name in ('ffmpeg', 'python3'):
+                executable = root / name
+                executable.write_text('#!/bin/bash\nexit 1\n')
+                executable.chmod(0o755)
+            environment = dict(os.environ, SIP_PRODUCT='3410', RUN_DIR=str(root / 'run'),
+                               PATH=f'{root}:{os.environ["PATH"]}', TEST_COMMANDS=str(commands),
+                               TEST_LOADED=str(state))
+            result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
+                                    cwd=repository, env=environment, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            calls = commands.read_text().splitlines()
+            self.assertEqual(calls[:2], ['get-default-sink', 'get-default-source'])
+            self.assertIn('set-default-sink original-sink', calls)
+            self.assertIn('set-default-source original-source', calls)
+            self.assertEqual(calls.count('unload-module 42'), 2)
+            self.assertEqual(calls[-2:], ['set-default-sink original-sink',
+                                         'set-default-source original-source'])
+
     def test_3330_requires_own_provisioned_storage_before_audio_setup(self):
         repository = Path(__file__).resolve().parents[1]
         environment = dict(os.environ, SIP_PRODUCT='3330')

@@ -70,18 +70,19 @@ cleanup() {
         if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
     done
     if [[ -n "$capture_pid" ]]; then kill -INT "$capture_pid" 2>/dev/null || true; wait "$capture_pid" 2>/dev/null || true; fi
-    if [[ -n "$old_sink" ]]; then pactl set-default-sink "$old_sink" || true; fi
-    if [[ -n "$old_source" ]]; then pactl set-default-source "$old_source" || true; fi
     if [[ -n "$input_module" ]]; then pactl unload-module "$input_module" || true; fi
     if [[ -n "$output_module" ]]; then pactl unload-module "$output_module" || true; fi
+    # Pulse's automatic fallback sink reappears only after explicit sinks leave.
+    if [[ -n "$old_sink" ]]; then pactl set-default-sink "$old_sink" || true; fi
+    if [[ -n "$old_source" ]]; then pactl set-default-source "$old_source" || true; fi
 }
 trap cleanup EXIT
 for command in pactl ffmpeg; do command -v "$command" >/dev/null || { echo "missing $command" >&2; exit 1; }; done
 mkdir -p "$run_dir"
-input_module=$(pactl load-module module-null-sink "sink_name=$input_name")
-output_module=$(pactl load-module module-null-sink "sink_name=$output_name")
 old_sink=$(pactl get-default-sink)
 old_source=$(pactl get-default-source)
+input_module=$(pactl load-module module-null-sink "sink_name=$input_name")
+output_module=$(pactl load-module module-null-sink "sink_name=$output_name")
 # SDL/Pulse opens server defaults; restore these even when the gate fails.
 pactl set-default-sink "$output_name"
 pactl set-default-source "$input_name.monitor"

@@ -532,6 +532,10 @@ emulator PCM/radio faults from SIP media faults; they are not native DSP dumps.
 The fixture temporarily routes MAME onto two null sinks and restores the
 host's original default sink/source on exit. Run it sequentially with all
 other audio and handset gates.
+Defaults are captured before either temporary module is loaded. Cleanup stops
+streams, unloads both modules, then restores the original defaults, including
+PulseAudio's automatic fallback sink. An executable failure-path regression
+checks this ordering; it is host isolation, not handset calibration.
 
 The patch `mame-sound-input-stride.patch` corrects the generic unresampled
 microphone path to advance by the interleaved **source** channel count, not the
