@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify the NSM-2 physical outgoing A/5551234 SMS transaction."""
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import sys
@@ -8,6 +9,7 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.radio_call_lifecycle_common import require_ordered
+from PIL import Image
 
 SUBMIT = '390118000100069121436587090d11010781551532f40000a70141'
 
@@ -37,16 +39,49 @@ def verify(text: str, product: str = '8850', key_separator: str = '',
         raise ValueError('success RP-ACK appeared in rejected transaction')
 
 
+def check_recovery(text: str, frames: Path) -> None:
+    require_ordered(text, (
+        ('release', re.compile(r'LAPDm service Channel Release acknowledged')),
+        ('physical End', re.compile(r'8850_sms_recovery_physical: key=End')),
+        ('End decode', re.compile(r'8850_keypad_decoded key=0f\b')),
+        ('physical Menu', re.compile(r'8850_sms_recovery_physical: key=Menu')),
+        ('Menu decode', re.compile(r'8850_keypad_decoded key=19\b')),
+    ), '8850 failed SMS recovery')
+
+    def digest(path, crop):
+        with Image.open(path) as source:
+            if source.size != (84, 48):
+                raise ValueError('unexpected handset frame geometry')
+            return hashlib.sha256(source.convert('L').crop(crop).tobytes()).hexdigest()
+
+    # Exclude the result icon; retain the reviewed English error text.
+    if not any(digest(path, (0, 0, 60, 48)) ==
+               '24aea298f2e0de336ee3fb10a5c767f912a07ec6eb14ca190e426b5c6320226a'
+               for path in frames.glob('8850_sms_reject_*.png')):
+        raise ValueError('missing reviewed message-not-sent presentation')
+    if digest(frames / '8850_sms_recovery_menu.png', (0, 0, 72, 16)) != (
+            '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'):
+        raise ValueError('missing reviewed Messages recovery menu')
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
+    parser.add_argument('--rejected', action='store_true')
+    parser.add_argument('--recovery-frames', type=Path)
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'))
+        text = args.log.read_text(errors='replace')
+        verify(text, rejected=args.rejected)
+        if args.recovery_frames:
+            if not args.rejected:
+                raise ValueError('recovery frames require a rejected transaction')
+            check_recovery(text, args.recovery_frames)
     except (OSError, ValueError) as error:
         print(f'FAIL - {error}', file=sys.stderr)
         return 1
-    print('8850 outgoing SMS PASS: physical input, exact A/5551234, CP/RP closure and paging')
+    print('8850 outgoing SMS PASS: physical input, exact A/5551234, ' +
+          ('RP rejection' if args.rejected else 'RP acceptance') + ', closure and paging')
     return 0
 
 

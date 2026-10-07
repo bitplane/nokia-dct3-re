@@ -1,5 +1,8 @@
 import unittest
-from tools.noki8850_outgoing_sms_check import SUBMIT, verify
+from pathlib import Path
+import tempfile
+from PIL import Image
+from tools.noki8850_outgoing_sms_check import SUBMIT, verify, check_recovery
 
 GOOD = '\n'.join((
     '8850_sms_send_physical: action=text_A',
@@ -34,3 +37,31 @@ class OutgoingSmsTest(unittest.TestCase):
     def test_missing_paging(self):
         with self.assertRaises(ValueError):
             verify(GOOD.replace('PCH no-identity fill', ''))
+
+    def test_rejection_requires_rp_error(self):
+        rejected = GOOD.replace('kind=18', 'kind=19').replace('length=5', 'length=7')
+        verify(rejected, rejected=True)
+        with self.assertRaises(ValueError):
+            verify(GOOD, rejected=True)
+
+    def test_rejection_forbids_success_result(self):
+        rejected = GOOD.replace('kind=18', 'kind=19').replace('length=5', 'length=7')
+        with self.assertRaisesRegex(ValueError, 'success RP-ACK'):
+            verify(rejected + '\nGSM service downlink kind=18 sapi=3', rejected=True)
+
+    def test_recovery_requires_physical_navigation(self):
+        with self.assertRaises(ValueError):
+            check_recovery(GOOD, Path('unused'))
+
+    def test_recovery_rejects_blank_error_frame(self):
+        text = GOOD + '\n' + '\n'.join((
+            '8850_sms_recovery_physical: key=End',
+            '8850_keypad_decoded key=0f',
+            '8850_sms_recovery_physical: key=Menu',
+            '8850_keypad_decoded key=19',
+        ))
+        with tempfile.TemporaryDirectory() as directory:
+            frames = Path(directory)
+            Image.new('L', (84, 48)).save(frames / '8850_sms_reject_1.png')
+            with self.assertRaisesRegex(ValueError, 'message-not-sent'):
+                check_recovery(text, frames)

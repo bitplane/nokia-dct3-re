@@ -1636,6 +1636,15 @@ request once and rejects its duplicate; the handset closes CP/RP and
 returns to paging. These are HLE signaling/storage tests, not external
 carrier delivery or native DSP execution.
 
+Host RP rejection is independently verified with fresh storage, the same
+host configuration, `run_host_sms_gate.py --decision rp_error --user-data
+41 --user-data-length 1`, and `noki8850_sms_reject_input.lua` for 55 seconds.
+Validate with `noki8850_outgoing_sms_check.py --rejected --recovery-frames
+RUN/snap RUN/error.log`. The handset receives RP-ERROR rather than RP-ACK,
+closes CP/RP and RR, displays **Message not sent this time**, then physically
+decoded End and Menu reopen Messages. The reviewed error-text crop excludes
+the result icon. This proves failure handling, not successful delivery.
+
 ### Capability acceptance boundary
 
 On the final radio-enabled `nsm2hle` composition, fresh physical-input runs
