@@ -39,10 +39,10 @@ def verify(text: str, product: str = '8850', key_separator: str = '',
         raise ValueError('success RP-ACK appeared in rejected transaction')
 
 
-def verify_silence(text: str, product: str = '8850') -> None:
+def verify_silence(text: str, product: str = '8850', *, submit: str | None = None) -> None:
     require_ordered(text, (
         ('physical Send', re.compile(re.escape(product) + r'_sms_send_physical: action=confirm_send')),
-        ('exact submission', re.compile(r'GSM service uplink sapi=3 pd=09 message=01 length=27 data=' + SUBMIT + r'\b')),
+        ('exact submission', re.compile(r'GSM service uplink sapi=3 pd=09 message=01 length=27 data=' + (submit or SUBMIT) + r'\b')),
         ('network CP-ACK', re.compile(r'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2')),
         ('host silence accepted', re.compile(r'gsm_call_adapter: sms decision id=1 outcome=3 result=accepted')),
         ('mobile main-link DISC', re.compile(r'TX packet type=1b .*data=0080015301')),

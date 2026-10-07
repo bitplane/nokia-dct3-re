@@ -4,9 +4,9 @@ dofile(assert(source:match('^(.*[/])')) .. 'noki6210_outgoing_sms_input.lua')
 local machine = manager.machine
 local input = coroutine.create(function()
     assert(emu.wait(35))
-    for index = 1, 6 do
+    for index = 1, (_G.noki6210_sms_silence and 85 or 6) do
         machine.screens[':screen']:snapshot('6210_sms_reject_' .. index .. '.png')
-        assert(emu.wait(0.5))
+        assert(emu.wait(_G.noki6210_sms_silence and 1 or 0.5))
     end
     assert(emu.wait(3))
     for _, item in ipairs({{':COL.0', 'End'}, {':COL.0', 'End'},

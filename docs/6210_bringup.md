@@ -294,7 +294,13 @@ RP-ACK. Correlated error acceptance, wrong-ID/duplicate rejection, physical
 End/End/Menu decoding and reviewed `Message not sent this time`/Messages
 frames are also required. The independently reviewed 96x60 failure/menu text
 regions share the 6250 frame checker; packet and input contracts remain NPE-3.
-This does not establish RP-silence timeout recovery.
+`host-silent-sms` separately supplies CP-ACK without an RP result. Firmware
+paints `Message sending failed`, issues main-link DISC, receives UA and
+deconfigures traffic before closing the host request (observed near 101.1
+seconds). The checker requires no RP error/success, resumed paging and
+physical End/End/Menu recovery. Its shared release grammar receives the
+independently decoded NPE-3 `ff` validity value, not the sibling `a7` value.
+The 135-second fixture does not shorten firmware timers.
 
 ## Save-state acceptance
 
