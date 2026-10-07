@@ -806,6 +806,16 @@ protect event ordering, wrong/missing decodes, cross-event leakage and blank
 frame rejection. This validates the ordinary editor/UI lifecycle, not network
 registration itself or cold-restart RTC persistence. It requires no PMM, cursor or firmware
 writes. Invalid-empty-input cancellation remains unresolved separately.
+Rejecting an empty time is recoverable without cancellation: physical
+Menu/OK displays `Ungültige Uhrzeit`; another Menu/OK returns to the time
+editor. Completing the same valid time/date sequence then reaches registered
+idle and preserves subsequent `1234567` digit ordering. Reproduce with
+`noki8890_clock_invalid_input.lua`, fresh private cfg/NVRAM and 58 seconds,
+then run the checker above with `--invalid-first`. It requires the two extra
+decoded confirmations, the reviewed invalid-time text and the same accepted
+date/idle/dial pixels. Seven checker tests cover both valid and rejected-then-
+recovered sequences. This closes successful error recovery, not the separate
+cancel-after-rejection saved-position behavior.
 
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,

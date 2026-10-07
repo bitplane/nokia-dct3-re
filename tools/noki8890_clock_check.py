@@ -19,21 +19,26 @@ FRAMES = {
 }
 
 
-def verify(text):
+def verify(text, invalid_first=False):
     events = list(re.finditer(r'8890_clock_physical: key=([^\r\n]+)', text))
-    expected = ['Menu' if key == 'Menu' else f'Keypad {key}' for key in KEYS]
+    keys = (['Menu', 'Menu'] if invalid_first else []) + KEYS
+    expected = ['Menu' if key == 'Menu' else f'Keypad {key}' for key in keys]
     if [event[1] for event in events] != expected:
         raise ValueError('physical clock/date/dial sequence mismatch')
-    for index, (event, key) in enumerate(zip(events, KEYS)):
+    for index, (event, key) in enumerate(zip(events, keys)):
         end = events[index + 1].start() if index + 1 < len(events) else len(text)
         code = '19' if key == 'Menu' else f'{10 if key == 0 else key:02x}'
         if not re.search(rf'8890_keypad_decoded: key={code}\b', text[event.end():end]):
             raise ValueError(f'physical key did not decode at event {index}: {key}')
 
 
-def check_frames(directory):
+def check_frames(directory, invalid_first=False):
     # Exclude the advancing top-row clock; pin date text, idle and dial digits.
-    for name, (region, expected) in FRAMES.items():
+    frames = dict(FRAMES)
+    if invalid_first:
+        frames['8890_clock_invalid.png'] = ((0, 0, 60, 32),
+            '32605e346ad563b6acaaf460a41cb899a6e05498dfae2c1d47a82d405c10c743')
+    for name, (region, expected) in frames.items():
         with Image.open(directory / name) as frame:
             actual = hashlib.sha256(frame.convert('L').crop(region).tobytes()).hexdigest()
             if frame.size != (84, 48) or actual != expected:
@@ -44,10 +49,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('frames', type=Path)
+    parser.add_argument('--invalid-first', action='store_true')
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'))
-        check_frames(args.frames)
+        verify(args.log.read_text(errors='replace'), args.invalid_first)
+        check_frames(args.frames, args.invalid_first)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8890 clock lifecycle FAIL: {error}\n')
     print('8890 physical clock/date/idle/dial PASS; RTC persistence unproved')

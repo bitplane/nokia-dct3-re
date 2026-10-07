@@ -14,6 +14,12 @@ end
 local input = coroutine.create(function()
     if not emu.wait(21) then return end
     machine.screens[':screen']:snapshot('8890_clock_before.png')
+    if _G.noki8890_clock_invalid_first then
+        if not press(1, 'Menu') then return end
+        machine.screens[':screen']:snapshot('8890_clock_invalid.png')
+        if not press(1, 'Menu') then return end
+        machine.screens[':screen']:snapshot('8890_clock_invalid_dismissed.png')
+    end
     for index, item in ipairs({{2, 'Keypad 1'}, {3, 'Keypad 2'},
             {3, 'Keypad 0'}, {3, 'Keypad 0'}}) do
         if not press(item[1], item[2]) then return end

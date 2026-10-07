@@ -15,6 +15,15 @@ def sample():
 
 
 class ClockCheckTest(unittest.TestCase):
+    def test_invalid_recovery(self):
+        prefix = ('8890_clock_physical: key=Menu\n'
+                  '8890_keypad_decoded: key=19\n') * 2
+        verify(prefix + sample(), invalid_first=True)
+
+    def test_invalid_recovery_requires_both_confirmations(self):
+        with self.assertRaisesRegex(ValueError, 'sequence'):
+            verify(sample(), invalid_first=True)
+
     def test_complete(self):
         verify(sample())
 
