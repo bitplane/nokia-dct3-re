@@ -42,6 +42,7 @@ private:
 		// This is a routine-test address space, not the unknown DA150 silicon map.
 		map(0, 0xffff).ram();
 		map(0x0200, 0x0f32).rom().region("entry", 0);
+		map(0x2080, 0x20ad).rom().region("trampolines", 0);
 		map(0x20ae, 0x3679).rom().region("library", 0);
 	}
 	void data_map(address_map &map)
@@ -118,10 +119,16 @@ private:
 			program.write_word(0x1809, 0xf980); program.write_word(0x180a, 0x0725);
 			program.write_word(0x180b, 0xf4e1);
 		}
+		if (m_phase == 6)
+		{
+			// Original startup's mount ABI: filesystem context and partition-aware flag.
+			u16 const mount[] = {0x7600, 1, 0xf020, 0x3aea, 0xf980, 0x308e, 0xf4e1};
+			for (unsigned i = 0; i < std::size(mount); ++i) program.write_word(0x1809 + i, mount[i]);
+		}
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
-		m_check->adjust(attotime::from_msec(m_phase == 4 ? 250 : 1));
+		m_check->adjust(attotime::from_msec(m_phase == 4 ? 250 : m_phase == 6 ? 50 : 1));
 	}
 	void start_media_read()
 	{
@@ -153,7 +160,8 @@ private:
 				if (m_nand->data_r() != 0xff) fatalerror("MU4 flush spare fill mismatch");
 			if (++m_page < 32) { start_media_read(); return; }
 			logerror("mu4_storage_flush: PASS pages=32 words=8192 spare=512 erase=1 program=32 readback=32\n");
-			machine().schedule_exit();
+			m_phase = 6;
+			machine().schedule_soft_reset();
 			return;
 		}
 		u16 const pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
@@ -161,6 +169,17 @@ private:
 				!m_cpu->state_int(tms320c54x_device::STATE_IDLE))
 			fatalerror("MU4 original storage routine did not finish: pc=%04x illegal=%u writes=%u reads=%u",
 				pc, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_writes.size()), m_data_reads);
+		if (m_phase == 6)
+		{
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 1 ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_busy_reads || !m_data_reads)
+				fatalerror("MU4 erased mount contract mismatch a=%llx sp=%04x reads=%u busy=%u",
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), m_data_reads, m_busy_reads);
+			logerror("mu4_storage_mount: PASS erased_boot_sector rejected=1 reads=%u busy_reads=%u\n", m_data_reads, m_busy_reads);
+			machine().schedule_exit();
+			return;
+		}
 		if (m_phase == 4)
 		{
 			unsigned erase = 0, program = 0;
@@ -213,6 +232,8 @@ private:
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
 ROM_START(mu4nand)
+	ROM_REGION16_LE(92, "trampolines", 0)
+	ROM_LOAD16_WORD_SWAP("mu4_initdata_trampolines.bin", 0, 92, CRC(0de68a60) SHA1(3b2b1ac46f7c0cef5c5c1288a7cb0bcf1bb817de))
 	ROM_REGION16_LE(6758, "entry", 0)
 	ROM_LOAD16_WORD_SWAP("mu4_initdata_entry.bin", 0, 6758, CRC(aa68038b) SHA1(c4d0c3b8211569ee4ec23d2945a9855b5423ec89))
 	ROM_REGION16_LE(11160, "library", 0)

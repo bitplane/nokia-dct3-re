@@ -6602,8 +6602,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"STL A,*+AR2(lk) stores after signed preupdate in two cycles");
 			program.write_word(0x05e3, 0x6bea); // ADDM #1,*+AR2(5)
-			program.write_word(0x05e4, 1);
-			program.write_word(0x05e5, 5);
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 1);
 			program.write_word(0x05e6, 0x75f8);
 			program.write_word(0x05e7, 0x0d00);
 			program.write_word(0x05e8, 0x0124);
@@ -6624,7 +6624,7 @@ private:
 			expect_opcode(0x6bea, data.read_word(0x0f05) == 4 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"ADDM *+AR2(lk) consumes immediate before offset in three cycles");
+					"ADDM *+AR2(lk) consumes offset before immediate in three cycles");
 			program.write_word(0x05e3, 0x68e2); // ANDM #0f0f,*AR2(5)
 			program.write_word(0x05e4, 0x0f0f);
 			program.write_word(0x05e5, 5);
@@ -6665,9 +6665,9 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ORM *+AR2(lk)% wraps circular address and preserves carry");
-			program.write_word(0x05e3, 0x76ea); // STM #cafe,*+AR2(5)
-			program.write_word(0x05e4, 0xcafe);
-			program.write_word(0x05e5, 5);
+			program.write_word(0x05e3, 0x76ea); // ST #cafe,*+AR2(5)
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0xcafe);
 			data.write_word(0x0f05, 0);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f00);
@@ -6682,7 +6682,7 @@ private:
 			expect_opcode(0x76ea, data.read_word(0x0f05) == 0xcafe &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"STM *+AR2(lk) consumes immediate before offset in three cycles");
+					"ST *+AR2(lk) consumes offset before immediate in three cycles");
 			program.write_word(0x05e3, 0x82ea); // STH A,*+AR2(5)
 			program.write_word(0x05e4, 5);
 			program.write_word(0x05e5, 0x75f8);

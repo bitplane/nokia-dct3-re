@@ -633,6 +633,15 @@ its cache. An independent NAND read checks all 8,192 words and 512 spare
 bytes. A pre-existing zero byte makes erase necessary; successful return is
 zero, SP is balanced, the dirty flag clears and compiler mode is preserved.
 
+The original mount `308e` also runs with startup's filesystem-context
+argument `3aea` and partition-aware flag one. Against an erased boot sector,
+it performs NAND reads and busy waits, returns failure `1`, and preserves SP.
+Trampolines `2080..20ad` are taken from the original container, not rewritten
+calls. This validates rejection of missing media; it does not supply a BPB,
+directory, file or a successful mount. Long-offset `ADDM` and immediate `ST`
+use displacement-before-immediate encoding, independently exercised by these
+original context updates and their core conformance fixtures.
+
 This exercises generic core contracts that matter beyond MU4: long-offset
 `BANZ/BANZD` tests the effective Sind value and consumes displacement before
 target (96 cases); `CMPR` compares unsigned ARx against AR0 (192 cases);

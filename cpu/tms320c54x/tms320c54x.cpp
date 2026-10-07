@@ -1719,8 +1719,8 @@ void tms320c54x_device::execute_one(u16 op)
 		u16 immediate;
 		if (low >= 0xe0 && low < 0xf8)
 		{
-			immediate = fetch();
 			address = long_offset_address(low);
+			immediate = fetch();
 		}
 		else
 		{
@@ -1894,8 +1894,8 @@ void tms320c54x_device::execute_one(u16 op)
 			u16 value;
 			if (low < 0xf8)
 			{
-				value = fetch();
 				address = long_offset_address(low);
+				value = fetch();
 			}
 			else
 			{

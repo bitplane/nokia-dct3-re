@@ -1564,13 +1564,16 @@ words and applies no-update, signed preupdate, or circular preupdate as
 specified in TI SPRU131G table 5-4. Fixture-only `06ea`, `02e2`, `02f2`,
 and `80ea` check the three read modes and a long-offset store, including
 the ALU/STL extra cycle. Handlers that compute their own memory addresses
-still need separate long-offset review. The first such handler pass covers
-fixture-only `6bea`, `68e2`, and `69f2`: ADDM, ANDM, and ORM consume the
-immediate before the final offset, honor preupdate/no-update/circular addressing,
-and charge TI's three-cycle long-offset RMW class. Other manual-address
-handlers remain open. Fixture-only `76ea` now checks long-offset `STM`:
-the immediate precedes the final address offset, signed preupdate reaches the
-destination, and the instruction costs three cycles.
+still need separate long-offset review. Fixture-only `6bea` checks ADDM:
+the address displacement precedes the immediate, preupdate reaches the
+destination and the instruction costs three cycles. Original MU4 `6be6`
+context-counter updates exercise the same ordering during erased-media mount.
+Fixture-only `76ea` checks long-offset `ST #lk,Smem` with displacement before
+immediate, preupdate and three-cycle cost; original `76e1` context setup
+independently uses that encoding. The existing `68e2/69f2` ANDM/ORM cases
+check addressing and timing, but their extension order still needs independent
+machine-code corroboration rather than reliance on synthetic fixtures.
+Other manual-address handlers remain open.
 Fixture-only `82ea` and `83e2` assert the two-cycle long-offset surcharge
 for `STH A/B,Smem` and the distinct preupdate/no-update addressing behavior.
 Fixture-only `8cea` checks the same surcharge for `ST T,Smem`.
