@@ -13326,6 +13326,19 @@
       ]
     },
     {
+      "name": "verify-3410-radio-incoming-call-sip-idle-restore",
+      "prerequisites": ["normalize-3410"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS=end SIP_HANDSET_KEY_DELAY_MS=1000 SIP_HANDSET_KEY_DURATION_MS=200 SIP_HANDSET_KEY_GAP_MS=300 SIP_HANDSET_RUNNER_ARGS='--incoming --restore-idle --product 3410' SIP_HANDSET_SCRIPT=../tools/sip_3410_idle_state_roundtrip.lua SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
       "name": "verify-3330-radio-outgoing-call-sip-busy",
       "prerequisites": [],
       "variables": {},

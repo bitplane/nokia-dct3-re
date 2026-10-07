@@ -82,6 +82,11 @@ attempt and no redial in the 40-second call run after fresh physical PMM setup. 
 require every observed host request to end and reject unhandled retry attempts
 or accepted media.
 
+Fresh incoming SIP after an idle save/load is independently verified for
+3210 v6.00 and 3410 v5.46E. The new epoch admits exactly one new call, physical
+Answer, sustained ordered media and normal release. This is a separate gate
+from clearing an active restored call; other profiles have not inherited it.
+
 ## Product-boundary cautions
 
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not

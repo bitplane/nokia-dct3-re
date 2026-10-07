@@ -165,6 +165,12 @@ def verify_success(root, remote_text, args):
         if ('SIP idle snapshot accepted epoch=2' not in bridge_text or
                 bridge_text.count('SIP incoming identity=') != 1):
             raise RuntimeError('idle restoration did not admit exactly one fresh SIP call')
+        for marker in ('SIP epoch changed old=1 new=2',
+                       'SIP incoming identity=(2, 1)',
+                       'SIP physical answer identity=(2, 1)',
+                       'SIP confirmed status=200 identity=(2, 1)'):
+            if marker not in bridge_text:
+                raise RuntimeError(f'idle restoration lacks fresh-epoch SIP evidence: {marker}')
     cursor = 0
     product = getattr(args, 'product', '3210')
     # Exact encodings from these acceptance fixtures, including their observed

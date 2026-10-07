@@ -17,7 +17,9 @@ local after = emu.add_machine_post_load_notifier(function()
     if idle then
         local answer = coroutine.create(function()
             assert(emu.wait(5))
-            local key = assert(machine.ioport.ports[':COL.1'].fields['Navi / Left Softkey'])
+            local port = _G.sip_state_answer_port or ':COL.1'
+            local field = _G.sip_state_answer_field or 'Navi / Left Softkey'
+            local key = assert(machine.ioport.ports[port].fields[field])
             machine:logerror('sip_state: physical Answer after idle restoration\n')
             key:set_value(1)
             assert(emu.wait(0.22))

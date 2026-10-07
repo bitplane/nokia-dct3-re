@@ -21,6 +21,7 @@ gsm_call_adapter: incoming state id=1 epoch=2 phase=ended
 '''
 COUNTS = dict(uplink=100, downlink=100, pcm_transmitted=100, pcm_received=100)
 BRIDGE = '''
+SIP epoch changed old=1 new=2
 SIP idle snapshot accepted epoch=2
 SIP incoming identity=(2, 1) caller=5551234
 SIP physical answer identity=(2, 1)
@@ -30,7 +31,7 @@ REMOTE = 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]\n'
 
 
 class SipIdleRestoreCheckTest(unittest.TestCase):
-    def check(self, log=LOG, bridge=BRIDGE, counts=None):
+    def check(self, log=LOG, bridge=BRIDGE, counts=None, product='3210'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log + ''.join(
@@ -38,10 +39,20 @@ class SipIdleRestoreCheckTest(unittest.TestCase):
                 for i in range(100)))
             (root / 'sip-bridge.log').write_text(bridge + 'SIP bridge ended '
                 + json.dumps(COUNTS if counts is None else counts) + '\n')
-            verify_success(root, REMOTE, SimpleNamespace(incoming=True, restore_idle=True))
+            verify_success(root, REMOTE, SimpleNamespace(incoming=True, restore_idle=True, product=product))
 
     def test_fresh_call_after_idle_restoration(self):
         self.check()
+
+    def test_3410_fresh_call_uses_own_protocol(self):
+        log = LOG.replace('data=8347', 'data=8307').replace('data=032a0802e0d1', 'data=036a0802e0d1')
+        self.check(log=log, product='3410')
+
+    def test_bridge_call_and_answer_must_use_new_epoch(self):
+        for bridge in (BRIDGE.replace('identity=(2, 1)', 'identity=(1, 1)'),
+                       BRIDGE.replace('SIP epoch changed old=1 new=2', '')):
+            with self.assertRaises(RuntimeError):
+                self.check(bridge=bridge)
 
     def test_missing_restore_or_old_epoch_is_rejected(self):
         for log in (LOG.replace('sip_state: restored', ''),

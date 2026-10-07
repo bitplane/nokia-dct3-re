@@ -549,6 +549,21 @@ which remains its independent hardware/backend milestone.
 
 ## Cross-product SIP acceptance
 
+The 3410 v5.46E independently admits a fresh incoming SIP call after an idle
+snapshot is restored. Its physical Send field at `:COL.4` answers the call;
+the shared fixture defaults remain the 3210's Navi field. The gate proves
+the idle snapshot's acceptance under epoch 2, exactly one incoming identity
+`(2, 1)`, matching physical Answer and confirmation, ordered accepted media,
+and normal CC release. The original 3210 idle-restore gate is separately
+re-run under the same checker.
+
+```sh
+make verify-3410-radio-incoming-call-sip-idle-restore RUN_DIR=run_3410_sip_idle_restore
+```
+
+The fixture changes only physical input selection and emulator save/load;
+it neither injects firmware messages nor restores an external SIP dialog.
+
 The 3410 v5.46E independently passes physical outgoing busy (SIP 486 → GSM
 busy decision) and unavailable (SIP 480 → cause 18) fixtures. Each produces one
 attempt, complete CC/RR release, no CONNECT or accepted media, and no further
