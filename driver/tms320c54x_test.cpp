@@ -28,6 +28,24 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_compact_load_case(unsigned index)
+	{
+		unsigned const shifts[] = {0, 5, 8, 15};
+		unsigned const shift = shifts[index / 4];
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109d0, 0x9480 | ((index & 1) ? 0x100 : 0) | shift);
+		program.write_word(0x0109d1, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x8123);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 2) ? 0x100 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 1632 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_cmpm_offset_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -14605,6 +14623,21 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE), "CMPM consumes long displacement before immediate");
 			if (index < 3) { start_cmpm_offset_case(index + 1); return; }
 			osd_printf_info("TMS320C54x CMPM offset conformance: PASS variants=4\n");
+			start_compact_load_case(0);
+			return;
+		}
+		if (m_phase >= 1632 && m_phase < 1648)
+		{
+			unsigned const index = m_phase - 1632;
+			u64 const source = (index & 2) ? u64(s64(s16(0x8123))) : 0x8123;
+			unsigned const shifts[] = {0, 5, 8, 15};
+			u64 const expected = (source << shifts[index / 4]) & 0xffffffffffULL;
+			expect(m_cpu->state_int((index & 1) ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
+				m_cpu->state_int((index & 1) ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x1001 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Compact Xmem load shift/sign/destination/postincrement");
+			if (index < 15) { start_compact_load_case(index + 1); return; }
+			osd_printf_info("TMS320C54x compact load conformance: PASS variants=16\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

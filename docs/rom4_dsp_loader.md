@@ -920,6 +920,14 @@ Original InitDisk also corroborates long `CMPM` displacement-before-immediate
 with `60e1 0002 0001` at `431f`. Four fixtures cover equal/unequal memory
 and preupdate/no-update addressing while requiring TC-only status changes.
 The previous decoder reversed these fields and rejected a valid context.
+Original InitDisk's file-write path uses `9488` at `3be7`, the compact
+`LD *AR2+,8,A` form documented by TI SPRU172C LD syntax 5 (pages 4-66/68).
+The core implements `94/95` Xmem loads through the existing shifted-load
+and dual-address update helpers. Sixteen executable fixtures cover both
+accumulators, signed/unsigned input, shifts 0/5/8/15, postincrement and
+preservation of the other accumulator. With this instruction the original
+receiver accepts all seven R060 segments; this is not yet file-backed DMA
+load or complete MU4 execution.
 Exact ROM4 `e58b` (`MVDD *AR2+,*AR5+`) asserts the copied word, both pointer
 increments, and its one-cycle cost; it was the most-used absent word in the
 captured boot (24 executions).

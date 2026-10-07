@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, cinit_inventory
+from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, extract_segment, cinit_inventory
 
 
 def segment(marker, payload):
@@ -8,6 +8,24 @@ def segment(marker, payload):
 
 
 class A00InventoryTest(unittest.TestCase):
+    def test_receiver_checksum_is_payload_only_and_export_preserves_trailer(self):
+        payload = self.boot_image()
+        checksum = 0
+        for byte in payload:
+            checksum ^= byte
+        image = struct.pack('>HI', 0xaa55, len(payload)) + payload + struct.pack('>HH', checksum, 0x8888)
+        integrity = inventory(image)['segments'][0]['receiver_integrity']
+        self.assertTrue(integrity['checksum_matches'])
+        self.assertEqual(integrity['following_word'], '8888')
+        self.assertEqual(extract_segment(image, 'aa55'), image)
+        corrupt = bytearray(image)
+        corrupt[-3] ^= 1
+        self.assertFalse(inventory(corrupt)['segments'][0]['receiver_integrity']['checksum_matches'])
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            extract_segment(corrupt, 'aa55')
+        with self.assertRaisesRegex(ValueError, 'exactly one'):
+            extract_segment(segment(0xaa55, b'\x12\x34') * 2, 'aa55')
+
     def test_cinit_exposes_short_word_strings_without_decoding_long_payloads(self):
         words = [ord(c) for c in 'MCUSI16 '] + [0]
         image = struct.pack('>11H', 9, 0x1fd, *words) + struct.pack('>35H', 33, 0x200, *range(33)) + b'\0\0'

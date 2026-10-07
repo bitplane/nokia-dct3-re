@@ -14,7 +14,7 @@ public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
 		: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
 		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers"),
-		  m_disk_vectors(*this, "disk_vectors") { }
+		  m_disk_vectors(*this, "disk_vectors"), m_segment(*this, "segment") { }
 	void test(machine_config &config)
 	{
 		// Test clock only; DA150 PLL/physical memory mapping is not claimed here.
@@ -32,6 +32,8 @@ private:
 	required_device<samsung_k9k1208u0a_device> m_nand;
 	required_region_ptr<u16> m_cinit;
 	required_region_ptr<u16> m_initdisk, m_disk_cinit, m_disk_helpers, m_disk_vectors;
+	required_region_ptr<u8> m_segment;
+	unsigned m_segment_cursor = 0, m_segment_waits = 0;
 	u16 m_serial_index[2] = {}, m_serial_regs[2][32] = {}, m_serial_word = 0;
 	bool m_serial_ready = false;
 	unsigned m_serial_reads = 0;
@@ -258,6 +260,36 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase == 20)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+				fatalerror("MU4 segment illegal opcode pc=%04x cursor=%u", unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), m_segment_cursor);
+			// XF is the original firmware's external busy indication, not a RAM-state override.
+			if (m_serial_ready || BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 13))
+			{
+				if (++m_segment_waits > 10000) fatalerror("MU4 segment serial/busy timeout cursor=%u pc=%04x", m_segment_cursor, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			}
+			else if (m_segment_cursor < m_segment.length())
+			{
+				deliver_serial(m_segment[m_segment_cursor++]);
+				m_segment_waits = 0;
+			}
+			else if (!data.read_word(0x1f6) && data.read_word(0x4bbf) == data.read_word(0x4bc0))
+			{
+				if (m_serial_reads != m_segment.length() + 2 || data.read_word(0x1a2) != 0x40 || data.read_word(0x1f9) != 0x40 || data.read_word(0x584) != 7)
+					fatalerror("MU4 original segment checksum/receive mismatch reads=%u checksum=%04x calculated=%04x", m_serial_reads, data.read_word(0x1a2), data.read_word(0x1f9));
+				logerror("mu4_initdisk_segment: PASS segments=7 original_bytes=%u final_checksum=0040 ring_drained=1\n", m_segment_cursor);
+				m_phase = 19;
+				machine().schedule_soft_reset();
+				return;
+			}
+			else if (++m_segment_waits > 10000)
+				fatalerror("MU4 segment completion timeout pc=%04x state=%04x", unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), data.read_word(0x1f6));
+			// Bounded word-ingress cadence, not recovered physical McBSP timing.
+			m_check->adjust(attotime::from_msec(1));
+			return;
+		}
 		if (m_phase == 18)
 		{
 			auto &data = m_cpu->space(AS_DATA);
@@ -269,8 +301,8 @@ private:
 				fatalerror("MU4 original initialization did not reach receive boundary pc=%04x", pc);
 			logerror("mu4_initdisk_initialize: PASS original_init=1 erased_input=1 receiver_wait=1 no_received_words=1 writes=%u reads=%u\n",
 				unsigned(m_writes.size()), m_data_reads);
-			m_phase = 19;
-			machine().schedule_soft_reset();
+			m_phase = 20;
+			m_check->adjust(attotime::from_msec(1));
 			return;
 		}
 		if (m_phase == 14 || m_phase == 15 || m_phase == 16)
@@ -499,6 +531,8 @@ private:
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
 ROM_START(mu4nand)
+	ROM_REGION(741916, "segment", 0)
+	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
 	ROM_LOAD16_WORD_SWAP("mu4_initdisk_vectors.bin", 0, 240, CRC(2f1b5de4) SHA1(145048a918768dbee2d5fce5213a6e26ece50edf))
 	ROM_REGION16_LE(44, "disk_helpers", 0)

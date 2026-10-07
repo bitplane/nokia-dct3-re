@@ -1561,6 +1561,14 @@ void tms320c54x_device::execute_one(u16 op)
 			m_icount -= low >= 0xe0 ? 5 : 4;
 		return;
 	}
+	case 0x9400: case 0x9500: // LD Xmem, SHFT, dst (SPRU172C syntax 5).
+	{
+		const u8 operand = low >> 4;
+		const u16 value = data_read(m_ar[2 + (operand & 3)]);
+		accumulator(BIT(op, 8)) = shifted_load(data_operand(value), low & 15, BIT(op, 8));
+		dual_modify(operand);
+		return;
+	}
 	case 0x9600: // BIT Xmem, BITC; bit numbering is 15-BITC (SPRU172C).
 	{
 		const u8 operand = low >> 4;

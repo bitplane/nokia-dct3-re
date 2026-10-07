@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+from functools import reduce
+from operator import xor
 
 
 MARKERS = {0xaa55, 0xaa22, 0xaa44, 0xaa88, 0xaabb, 0xaadd, 0xaa99}
@@ -137,6 +139,13 @@ def inventory(image):
                          'payload_sha256': hashlib.sha256(payload).hexdigest(),
                          'first_bytes': payload[:16].hex(),
                          'opaque_trailer': image[end:end + 4].hex()})
+        stored, sync = struct.unpack_from('>HH', image, end)
+        calculated = reduce(xor, payload, 0)
+        segments[-1]['receiver_integrity'] = {
+            'payload_byte_xor': calculated, 'stored_word': stored,
+            'checksum_matches': stored == calculated,
+            'following_word': f'{sync:04x}',
+            'scope': 'InitDisk 3229/34a5/32a7 payload-only XOR; following word is not part of checksum'}
         if offset == 0 and payload[:2] in (b'\x08\xaa', b'\x10\xaa'):
             segments[-1]['serial_boot'] = serial_boot_inventory(payload)
         elif offset and 'serial_boot' in segments[0]:
@@ -147,7 +156,7 @@ def inventory(image):
     report = {'decoded_bytes': len(image),
             'decoded_sha256': hashlib.sha256(image).hexdigest(),
             'segments': segments, 'coverage_bytes': offset,
-            'scope': 'container and section extents; trailer integrity, overlay selection and DA150 execution unvalidated'}
+            'scope': 'container and section extents plus InitDisk payload checksum; following trailer word semantics, overlay selection and DA150 execution unvalidated'}
     if all('serial_boot' in segment or 'section_stream' in segment for segment in segments):
         sections = []
         for segment in segments:
@@ -156,6 +165,18 @@ def inventory(image):
                             for section in stream['sections'])
         report['all_segment_destinations'] = destination_inventory(image, sections)
     return report
+
+
+def extract_segment(image, marker):
+    """Export one unchanged wire segment, including length and original trailer."""
+    selected = [s for s in inventory(image)['segments'] if s['marker'] == marker]
+    if len(selected) != 1:
+        raise ValueError('segment marker must select exactly one segment')
+    segment = selected[0]
+    if not segment['receiver_integrity']['checksum_matches']:
+        raise ValueError('original segment payload checksum mismatch')
+    start = segment['offset']
+    return image[start:start + 10 + segment['payload_bytes']]
 
 
 def extract_section(image, address, marker=None):
@@ -196,11 +217,17 @@ def main():
     parser.add_argument('--cinit-section', type=lambda value: int(value, 0),
                         help='inspect one exact section as a recovered C initialization table')
     parser.add_argument('--segment', help='container marker, e.g. aa55; omit for InitDisk')
+    parser.add_argument('--extract-segment', action='store_true', help='export exact original wire segment')
+    parser.add_argument('--extract-container', action='store_true', help='export decoded original segment container')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
+    if args.extract_container and (args.segment is not None or args.extract_segment or args.extract_section is not None or args.cinit_section is not None):
+        parser.error('--extract-container excludes segment and section operations')
+    if args.extract_segment and (args.segment is None or args.extract_section is not None or args.cinit_section is not None):
+        parser.error('--extract-segment requires --segment and excludes section operations')
     if args.cinit_section is not None and (args.extract_section is not None or args.output is not None):
         parser.error('--cinit-section cannot be combined with section export')
-    if (args.extract_section is None) != (args.output is None):
+    if (args.extract_section is None and not args.extract_segment and not args.extract_container) != (args.output is None):
         parser.error('--extract-section and --output must be used together')
     if args.segment is not None and args.output is None and args.cinit_section is None:
         parser.error('--segment requires section extraction or C initialization inspection')
@@ -208,7 +235,12 @@ def main():
         source = args.image.read_bytes()
         image = bytes.fromhex(source.decode('ascii'))
         if args.output is not None:
-            data = extract_section(image, args.extract_section, args.segment)
+            if args.extract_container:
+                report = inventory(image)
+                if not all(s['receiver_integrity']['checksum_matches'] for s in report['segments']):
+                    raise ValueError('original container payload checksum mismatch')
+            data = (image if args.extract_container else extract_segment(image, args.segment) if args.extract_segment else
+                    extract_section(image, args.extract_section, args.segment))
             # A research export must never overwrite an existing artifact.
             with args.output.open('xb') as output:
                 output.write(data)

@@ -279,10 +279,10 @@ MAD2's resident DSP. The keyboard remains owned by the separate MSP430.
 
 Read-only `tools/noki5510_a00_inventory.py` inventories the original
 InitData containers independently: two-byte marker, big-endian four-byte
-payload length, payload, and opaque four-byte trailer. Seven segments
+payload length, payload, and four-byte trailer. Seven segments
 (`aa55/aa22/aa44/aabb/aa88/aa99/aadd`) cover all 741,916 decoded R060 bytes
-and 742,146 R061 bytes. Payload hashes and bounds are reported; trailer
-integrity remains unvalidated.
+and 742,146 R061 bytes. Payload hashes, bounds and payload-only XOR integrity
+are reported; the recovered receiver contract is described below.
 
 The first segment and standalone InitDisk match the serial-boot grammar in
 [TI SPRA602F, figure 11](https://www.ti.com/lit/an/spra602/spra602.pdf):
@@ -654,7 +654,8 @@ program commands: the missing boot record is still a prerequisite even after
 the row-32 template is written. Thus the startup recovery sequence alone
 does not provision erased NAND. A valid initial media/partition contract must
 come from InitDisk or a genuine medium image. The original InitDisk path is
-now executed below; no music-DSP file has yet been transferred.
+now executed below, including original segment transfer; independent file
+readback and DMA-backed execution remain open.
 
 ### InitDisk storage scan and receive boundary
 
@@ -753,15 +754,27 @@ nine descriptors. `339d` combines two high-first words into byte length
 512-byte chunks. `33fd` distinguishes `aa55`'s raw-storage path from the
 file-write path `342e -> 2cb1`; the latter uses the selected descriptor.
 Checksum state `32a7` disables accumulation, reads a word and compares it
-with the accumulated byte XOR at `01f9`. Runtime file creation, exact
-trailer handling and successful mount/load still need execution evidence.
+with the accumulated byte XOR at `01f9`. The accumulator is reset and enabled
+at `3229..322e`, after the length has been consumed: only payload bytes enter
+the XOR. All seven segments in each original R060/R061 container match this
+rule. The first two trailer bytes are the high-first checksum word; the
+following `8888` word is outside checksum coverage and is consumed by marker
+acquisition before the next segment. `mu4nand` transfers the complete original
+R060 container through receive register `0031` and IRQ6, at a test-only
+one-millisecond cadence, pausing on the firmware's external XF busy output.
+Original ISR, ring consumer, marker selection, payload writer and checksum
+comparison remain firmware-owned. The gate observes seven selected segments,
+741,916 consumed wire bytes, final checksum `0040`, state zero and a drained
+ring, then successfully mounts the retained medium with original InitData.
+This covers the raw first-segment and subsequent file-write receiver paths;
+independent file-content readback and file-backed DMA load remain unverified.
 
 The acquired repair-tool analysis describes a different, upstream layer:
 PC-to-phone blocks `80 12 length payload XOR-even XOR-odd` and byte `90`
 acknowledgements. Do not replay that envelope into McBSP2: the MCU forwarding
 path has not yet been reconciled with this DSP segment receiver. The next
-boundary is segment receive/file-write execution using the recovered
-descriptor contract, followed by file-backed InitData loading.
+boundary is independent file-content readback and file-backed InitData
+loading, using the firmware-populated medium.
 
 ### Original erased-media provisioning
 
@@ -780,7 +793,9 @@ same unchanged partition-aware mount `308e(3aea)` used in the erased-medium
 negative control. It returns zero with balanced SP and live NAND busy waits.
 Thus original firmware provisions media that the original consumer mounts;
 no BPB, partition table, directory or successful return is supplied by the
-fixture. Transfer of the firmware files and full MU4 boot remain unverified.
+fixture. The same gate then transfers the original segments as described
+above; file-content readback, loader execution and full MU4 boot remain
+unverified.
 
 Three generic CPU contracts are independently exposed by this run:
 
