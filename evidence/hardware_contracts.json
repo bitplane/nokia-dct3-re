@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_original_file_readback", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "On the medium populated only by original InitDisk and original serial ingress, original InitData mount 308e succeeds, directory routines 09c6/09fa/0a0b construct six named BIN descriptors and return end-of-directory. Original seek 33ea and reader 32d3 retrieve all 720268 file bytes in at most 256-word chunks. Exact source comparisons verify MCUSI16/aa22, MP3SI16/aa44, AACSI16/aabb, RERSI16/aa88, RELSI16/aa99 and USBSI16/aadd, names/extensions/lengths, unique markers and balanced-stack idle returns. Static 32dc name copies start at 0112 (descriptor index one), correcting the prior one-record name shift: aa55 is unnamed raw boot, bb77/bbcc name PRODINFO/TESTINFO. MCUSI16 starts with count/high/low 0010/0002/2000. No filesystem state or return success is injected. DMA completion, loader/program execution, host NVRAM persistence, full MU4 boot and native handset services remain unvalidated",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "npm5_mu4_original_segment_transfer", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "After original InitDisk provisions erased NAND, isolated mu4nand supplies all 741916 original R060 container bytes through receive register 0031 and IRQ6 at test-only 1ms cadence, pausing on external XF busy. Unchanged ISR, ring consumer, seven marker selections, raw/file write paths and payload-only XOR comparisons execute; final checksum is 0040, state zero and ring drained. Original InitData mounts the retained populated medium successfully. Both acquired R060/R061 containers statically match payload-only checksum for all seven segments. Original 9488 in file writer independently exposes compact LD Xmem,SHFT,A; 16 core fixtures cover sign, destination, shifts and postincrement. Independent file-content readback, DMA-backed load, serial physical timing, full MU4 boot and native handset services remain unvalidated",
       "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "driver/mu4_storage_test.cpp", "driver/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "tools/noki5510_a00_inventory.py", "Makefile"]
@@ -14,7 +19,7 @@
     },
     {
       "id": "npm5_mu4_initdisk_serial_ingress", "subsystem": "mu4", "status": "partial", "confidence": "strong",
-      "boundary": "Original InitDisk 0080 vectors branch from 00d8 to ISR 2b03, which reads 0031. TI VC5410A mapping corroborates McBSP2 DRR1, indexed 0034/0035 and RINT2 bit 6. Isolated mu4nand executes original 346a initialization, delivers two word-level receive inputs with RRDY/interrupts, observes original ISR populate its own ring and original 34c0 consume 1234 with balanced SP. Serial clocks/framing/overrun/DMA and MCU forwarding remain unvalidated. Original 32dc maps nine segment markers to eight named file descriptors plus unnamed bbcc; successful provisioning/file-backed boot is not claimed",
+      "boundary": "Original InitDisk 0080 vectors branch from 00d8 to ISR 2b03, which reads 0031. TI VC5410A mapping corroborates McBSP2 DRR1, indexed 0034/0035 and RINT2 bit 6. Isolated mu4nand executes original 346a initialization, delivers two word-level receive inputs with RRDY/interrupts, observes original ISR populate its own ring and original 34c0 consume 1234 with balanced SP. Serial clocks/framing/overrun/DMA and MCU forwarding remain unvalidated. Original 32dc maps nine segment markers to unnamed raw aa55 plus eight named descriptors beginning at aa22; bbcc names TESTINFO. Provisioning, segment transfer and exact consumer file readback are separately covered; file-backed boot remains unvalidated",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile", "tools/noki5510_a00_inventory.py"]
     },
     {
@@ -44,7 +49,7 @@
     },
     {
       "id": "npm5_mu4_file_dma_loader", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
-      "boundary": "Original InitData startup 09b5 selects descriptor zero and calls 2080->3538->2ed4 before a far branch to program 2000. A 44-word descriptor at data 36b0 feeds file readers 33ea/32d3; three one-word header reads yield count and 32-bit destination, payload is read to data 3c21, and 2f56 programs DMA 54/55/56 then polls completion. VC5410A family documentation corroborates DMPREC/DMSA/DMSDI and banked channel fields. Actual file population/media placement, destination-space rules, full DA150 DMA mapping/timing and runtime loader execution remain unvalidated; outer A00 segments are not this file stream",
+      "boundary": "Original InitData startup 09b5 selects descriptor zero and calls 2080->3538->2ed4 before a far branch to program 2000. A 44-word descriptor at data 36b0 feeds file readers 33ea/32d3; three one-word header reads yield count and 32-bit destination, payload is read to data 3c21, and 2f56 programs DMA 54/55/56 then polls completion. VC5410A family documentation corroborates DMPREC/DMSA/DMSDI and banked channel fields. Original firmware file population and exact consumer readback are covered by npm5_mu4_original_segment_transfer/npm5_mu4_original_file_readback. Destination-space rules, full DA150 DMA mapping/timing and runtime loader execution remain unvalidated; outer A00 segments are not this file stream",
       "evidence": ["docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
     },
     {

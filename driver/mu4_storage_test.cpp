@@ -34,6 +34,10 @@ private:
 	required_region_ptr<u16> m_initdisk, m_disk_cinit, m_disk_helpers, m_disk_vectors;
 	required_region_ptr<u8> m_segment;
 	unsigned m_segment_cursor = 0, m_segment_waits = 0;
+	unsigned m_file_source = 0, m_file_size = 0, m_file_cursor = 0, m_files_checked = 0;
+	u16 m_file_marker = 0;
+	std::vector<u16> m_verified_files;
+	unsigned m_read_words = 0;
 	u16 m_serial_index[2] = {}, m_serial_regs[2][32] = {}, m_serial_word = 0;
 	bool m_serial_ready = false;
 	unsigned m_serial_reads = 0;
@@ -161,20 +165,45 @@ private:
 			program.write_word(0x1809, 0xf980); program.write_word(0x180a, 0x0725);
 			program.write_word(0x180b, 0xf4e1);
 		}
-		if (m_phase == 6 || m_phase == 19)
+		if (m_phase == 6 || m_phase == 19 || m_phase == 21)
 		{
-			if (m_phase == 19)
+			if (m_phase == 19 || m_phase == 21)
 				program.install_rom(0x20ae, 0x3679, reinterpret_cast<u16 *>(memregion("library")->base()));
 			// Original startup's mount ABI: filesystem context and partition-aware flag.
 			u16 const mount[] = {0x7600, 1, 0xf020, 0x3aea, 0xf980, 0x308e, 0xf4e1};
 			for (unsigned i = 0; i < std::size(mount); ++i) program.write_word(0x1809 + i, mount[i]);
+			if (m_phase == 21)
+			{
+				// Same directory ABI as startup 0960..096b; no descriptor/file-state injection.
+				u16 const directory[] = {0x7600, 0x3aea, 0xf020, 0x36b0, 0xf980, 0x09c6,
+					0x7600, 0x3aea, 0xf020, 0x36b0, 0xf980, 0x09fa, 0xf4e1};
+				for (unsigned i = 0; i < std::size(directory); ++i) program.write_word(0x180f + i, directory[i]);
+			}
 		}
 		if (m_phase == 9)
 		{
 			u16 const format[] = {0xf020, 0x3aea, 0xf980, 0x051d, 0xf4e1};
 			for (unsigned i = 0; i < std::size(format); ++i) program.write_word(0x1809 + i, format[i]);
 		}
-		if (m_phase == 7 || m_phase == 19)
+		if (m_phase == 22)
+		{
+			unsigned cursor = 0x1809;
+			if (!m_file_cursor)
+			{
+				u16 const seek[] = {0x7600, 0, 0x7601, 0, 0x7602, 0x3aea, 0xf020, 0x36b0, 0xf980, 0x33ea};
+				for (u16 word : seek) program.write_word(cursor++, word);
+			}
+			m_read_words = std::min(256U, (m_file_size - m_file_cursor) / 2);
+			u16 const read[] = {0x7600, 0x6000, 0x7601, u16(m_read_words), 0x7602, 0x3aea,
+				0xf020, 0x36b0, 0xf980, 0x32d3, 0xf4e1};
+			for (u16 word : read) program.write_word(cursor++, word);
+		}
+		if (m_phase == 23)
+		{
+			u16 const next[] = {0x7600, 0x3aea, 0xf020, 0x36b0, 0xf980, 0x0a0b, 0xf4e1};
+			for (unsigned i = 0; i < std::size(next); ++i) program.write_word(0x1809 + i, next[i]);
+		}
+		if (m_phase == 7 || m_phase == 19 || m_phase == 21)
 		{
 			// Original C globals are routine inputs, not an invented disk image.
 			auto &data = m_cpu->space(AS_DATA);
@@ -465,7 +494,89 @@ private:
 					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
 			logerror("mu4_initdisk_mount: PASS original_initdata_mount=1 original_initdisk_media=1\n");
-			machine().schedule_exit();
+			m_phase = 21;
+			machine().schedule_soft_reset();
+			return;
+		}
+		if (m_phase == 21 || m_phase == 23)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200)
+				fatalerror("MU4 directory reader did not return with balanced stack");
+			logerror("mu4_directory: a=%llx sp=%04x name=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x ext=%04x,%04x,%04x length=%04x,%04x\n",
+				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+				data.read_word(0x36b0), data.read_word(0x36b1), data.read_word(0x36b2), data.read_word(0x36b3),
+				data.read_word(0x36b4), data.read_word(0x36b5), data.read_word(0x36b6), data.read_word(0x36b7),
+				data.read_word(0x36b9), data.read_word(0x36ba), data.read_word(0x36bb), data.read_word(0x36c2), data.read_word(0x36c3));
+			if (m_phase == 23 && m_cpu->state_int(tms320c54x_device::STATE_A) == 1)
+			{
+				if (m_files_checked != 6) fatalerror("MU4 file count mismatch files=%u", m_files_checked);
+				logerror("mu4_file_readback: PASS files=6 original_readers=1 complete_payloads=1\n");
+				machine().schedule_exit();
+				return;
+			}
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_A) ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200)
+				fatalerror("MU4 original directory reader failed pc=%04x", unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			m_file_size = (unsigned(data.read_word(0x36c2)) << 16) | data.read_word(0x36c3);
+			m_file_source = 0;
+			for (unsigned offset = 0; offset < m_segment.length(); )
+			{
+				unsigned const size = (unsigned(m_segment[offset + 2]) << 24) | (unsigned(m_segment[offset + 3]) << 16) |
+					(unsigned(m_segment[offset + 4]) << 8) | m_segment[offset + 5];
+				if (size == m_file_size)
+				{
+					if (m_file_source) fatalerror("MU4 ambiguous source size");
+					m_file_source = offset + 6;
+					m_file_marker = (u16(m_segment[offset]) << 8) | m_segment[offset + 1];
+				}
+				offset += size + 10;
+			}
+			if (!m_file_source || (m_file_size & 1)) fatalerror("MU4 file size has no original segment size=%u", m_file_size);
+			char const *name = nullptr;
+			switch (m_file_marker)
+			{
+			case 0xaa22: name = "MCUSI16 "; break;
+			case 0xaa44: name = "MP3SI16 "; break;
+			case 0xaa88: name = "RERSI16 "; break;
+			case 0xaabb: name = "AACSI16 "; break;
+			case 0xaadd: name = "USBSI16 "; break;
+			case 0xaa99: name = "RELSI16 "; break;
+			default: fatalerror("MU4 unexpected file marker %04x", m_file_marker);
+			}
+			for (unsigned i = 0; i < 9; ++i)
+				if (data.read_word(0x36b0 + i) != u8(name[i])) fatalerror("MU4 directory name mismatch marker=%04x", m_file_marker);
+			if (data.read_word(0x36b9) != 'B' || data.read_word(0x36ba) != 'I' || data.read_word(0x36bb) != 'N')
+				fatalerror("MU4 directory extension mismatch");
+			m_file_cursor = 0;
+			m_phase = 22;
+			machine().schedule_soft_reset();
+			return;
+		}
+		if (m_phase == 22)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_A) ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200)
+				fatalerror("MU4 original file reader failed pc=%04x", unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			for (unsigned i = 0; i < m_read_words; ++i)
+			{
+				unsigned const source = m_file_source + m_file_cursor + i * 2;
+				u16 const expected = (u16(m_segment[source]) << 8) | m_segment[source + 1];
+				if (data.read_word(0x6000 + i) != expected)
+					fatalerror("MU4 file mismatch marker=%04x byte=%u actual=%04x expected=%04x", m_file_marker, m_file_cursor + i * 2, data.read_word(0x6000 + i), expected);
+			}
+			m_file_cursor += m_read_words * 2;
+			if (m_file_cursor == m_file_size)
+			{
+				if (std::find(m_verified_files.begin(), m_verified_files.end(), m_file_marker) != m_verified_files.end())
+					fatalerror("MU4 directory repeats segment %04x", m_file_marker);
+				m_verified_files.push_back(m_file_marker);
+				++m_files_checked;
+				logerror("mu4_file_payload: PASS marker=%04x bytes=%u\n", m_file_marker, m_file_size);
+				m_phase = 23;
+			}
+			machine().schedule_soft_reset();
 			return;
 		}
 		if (m_phase == 7)

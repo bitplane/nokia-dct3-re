@@ -445,10 +445,11 @@ reads all three header words before testing the count, and its destination
 space/page handling has additional rules in `2f00..2f0e` and `2f60..2f70`.
 Those rules and the file's placement are not yet a validated loader model.
 The resident `36b0` record contains placeholder `beef` words; startup fills
-its file descriptors by directory traversal. It is not an acquired filesystem
-or evidence that a selected file is present. Next recover the actual file
-population path and DMA contract before attaching this loader to a full MU4
-profile; never replace its completion poll with unconditional success.
+its file descriptors by directory traversal. Original InitDisk now populates
+the medium and original InitData directory/read routines validate every
+stored file, as described below. Next recover and execute the DMA contract
+before attaching this loader to a full MU4 profile; never replace its
+completion poll with unconditional success.
 
 For reproduction, `noki5510_a00_inventory.py --segment aa55
 --extract-section 0x200 --output <new-file>` exports only the exact original
@@ -737,15 +738,19 @@ and are copied into descriptor name fields by `491e`:
 
 | Marker | Original name | Name source |
 | --- | --- | --- |
-| `aa55` | `MCUSI16 ` | `01fd` |
-| `aa22` | `MP3SI16 ` | `020f` |
-| `aa44` | `RERSI16 ` | `0221` |
-| `aa88` | `AACSI16 ` | `0218` |
-| `aabb` | `USBSI16 ` | `0206` |
-| `aadd` | `RELSI16 ` | `022a` |
-| `aa99` | `PRODINFO` | `0233` |
-| `bb77` | `TESTINFO` | `023c` |
-| `bbcc` | No name copy recovered | None |
+| `aa55` | Raw boot stream; no name copy | None |
+| `aa22` | `MCUSI16 ` | `01fd` |
+| `aa44` | `MP3SI16 ` | `020f` |
+| `aa88` | `RERSI16 ` | `0221` |
+| `aabb` | `AACSI16 ` | `0218` |
+| `aadd` | `USBSI16 ` | `0206` |
+| `aa99` | `RELSI16 ` | `022a` |
+| `bb77` | `PRODINFO` | `0233` |
+| `bbcc` | `TESTINFO` | `023c` |
+
+The first copy destination is `0112`, not `0100`: names start at descriptor
+index one, after the raw `aa55` record. Original directory enumeration and
+file reads independently corroborate `aa22 -> MCUSI16 .BIN`.
 
 Receiver state `01f6` selects marker acquisition (0), 32-bit length (1),
 payload words (2), and checksum (3). `3348` matches the marker against the
@@ -766,15 +771,16 @@ Original ISR, ring consumer, marker selection, payload writer and checksum
 comparison remain firmware-owned. The gate observes seven selected segments,
 741,916 consumed wire bytes, final checksum `0040`, state zero and a drained
 ring, then successfully mounts the retained medium with original InitData.
-This covers the raw first-segment and subsequent file-write receiver paths;
-independent file-content readback and file-backed DMA load remain unverified.
+This covers the raw first-segment and subsequent file-write receiver paths.
+Independent original-consumer file readback is validated below; file-backed
+DMA load remains unverified.
 
 The acquired repair-tool analysis describes a different, upstream layer:
 PC-to-phone blocks `80 12 length payload XOR-even XOR-odd` and byte `90`
 acknowledgements. Do not replay that envelope into McBSP2: the MCU forwarding
 path has not yet been reconciled with this DSP segment receiver. The next
-boundary is independent file-content readback and file-backed InitData
-loading, using the firmware-populated medium.
+boundary is file-backed InitData loading through modeled DMA, using the
+firmware-populated and independently read-back medium.
 
 ### Original erased-media provisioning
 
@@ -794,8 +800,40 @@ negative control. It returns zero with balanced SP and live NAND busy waits.
 Thus original firmware provisions media that the original consumer mounts;
 no BPB, partition table, directory or successful return is supplied by the
 fixture. The same gate then transfers the original segments as described
-above; file-content readback, loader execution and full MU4 boot remain
-unverified.
+above; loader execution and full MU4 boot remain unverified.
+
+### Original file-consumer readback
+
+After original InitDisk transfers the container, original InitData mount
+`308e(3aea,1)` succeeds. The fixture calls original `09c6/09fa` with the same
+directory ABI as startup `0960..096b`, then advances via `0a0b`. Original code
+constructs each descriptor at `36b0`; no file metadata or contents are
+supplied by the fixture. Six entries and the final end-of-directory return
+are observed with balanced SP and idle return.
+
+| Original file | Source marker | Verified bytes |
+| --- | --- | ---: |
+| `MCUSI16 .BIN` | `aa22` | 123,368 |
+| `MP3SI16 .BIN` | `aa44` | 127,528 |
+| `AACSI16 .BIN` | `aabb` | 103,902 |
+| `RERSI16 .BIN` | `aa88` | 175,266 |
+| `RELSI16 .BIN` | `aa99` | 118,450 |
+| `USBSI16 .BIN` | `aadd` | 71,754 |
+
+For each file, original seek `33ea` selects offset zero and original reader
+`32d3` returns chunks of at most 256 words through its filesystem/cache/NAND
+path. Every returned word is compared with the unchanged source payload:
+720,268 bytes total, not a prefix or checksum-only assertion. Names,
+extensions, lengths, unique source markers and complete directory count are
+also checked. The first header in `MCUSI16 .BIN` is `0010 0002 2000`, matching
+the file-backed loader's count/high/low grammar, not the raw serial-boot
+header `08aa` of `aa55`.
+
+The fixture uses routine ABI wrappers and retained in-memory NAND across
+soft resets. This does not establish host NVRAM persistence, physical DA150
+DMA mapping/timing or native music-DSP boot. The next execution boundary is
+`2ed4 -> 2f56`: original file reads followed by actual DMA transfer and
+completion, then the original program transfer to `2000`.
 
 Three generic CPU contracts are independently exposed by this run:
 
