@@ -587,6 +587,8 @@ make verify-radio-incoming-call-sip-waveform RUN_DIR=run_3210_sip_incoming_wavef
 make verify-3310-radio-incoming-call-sip-waveform RUN_DIR=run_3310_sip_incoming_waveform
 make verify-3410-radio-incoming-call-sip-waveform RUN_DIR=run_3410_sip_incoming_waveform
 make verify-3410-radio-outgoing-call-sip-waveform RUN_DIR=run_3410_sip_outgoing_waveform
+make verify-5210-radio-incoming-call-sip-waveform RUN_DIR=run_5210_sip_incoming_waveform
+make verify-5210-radio-outgoing-call-sip-waveform RUN_DIR=run_5210_sip_outgoing_waveform
 ```
 
 Run these sequentially. `sip-waveform-result.json` identifies both the product
@@ -594,8 +596,8 @@ and call direction. Incoming and outgoing gates preserve the same frequency,
 amplitude and duration thresholds; neither establishes native DSP speech or
 real-radio operation.
 
-These three products use the same 440 Hz source at 0.025 full-scale, avoiding clipping
-in the 3210's +18 dB path while providing measurable input to the 3310 and 3410 neutral
+These four products use the same 440 Hz source at 0.025 full-scale, avoiding clipping
+in the 3210's +18 dB path while providing measurable input to the other products' neutral
 HLE gain. This is an external test level, not a calibration change. The common
 acceptance threshold remains two consecutive one-second windows with RMS at
 least 500 and at least half their energy at the expected frequency. Results
@@ -604,7 +606,9 @@ identify the tested product; another product's SETUP encoding is rejected.
 The 3410 v5.46E gates use fresh product-local storage and its physical Send/End
 keys. Both directions independently pass sustained microphone and earpiece
 tone checks without gain changes. This extends HLE endpoint waveform evidence,
-not native DSP speech evidence; 3330 and 5210 SIP waveforms remain untested.
+not native DSP speech evidence. The 5210 v5.40E independently passes the same
+incoming and outgoing waveform checks with its own physical Send key, fresh
+storage and host configuration. The 3330 SIP waveforms remain untested.
 
 The external bridge sends at most one queued downlink block per 20 ms, without
 catch-up bursts after a host stall. Its eight-block queue and the emulator's

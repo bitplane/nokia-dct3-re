@@ -21,6 +21,11 @@ case "$product" in
         keys='end,wait1000,5,5,5,1,2,3,4,send'
         key_delay=16000 key_duration=120 key_gap=240
         ;;
+    5210)
+        machine=noki5210 bios=540e
+        keys='5,5,5,1,2,3,4,send'
+        key_delay=18000 key_duration=220 key_gap=280
+        ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac
 case "$direction" in
@@ -33,6 +38,8 @@ case "$direction" in
         elif [[ "$product" == 3410 ]]; then
             keys='end,waitalerting,send'
             key_delay=1000 key_duration=200 key_gap=300
+        elif [[ "$product" == 5210 ]]; then
+            keys=send
         else
             keys=enter
             key_duration=200
