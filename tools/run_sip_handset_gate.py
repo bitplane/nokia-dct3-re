@@ -106,6 +106,9 @@ async def run(args):
                     process.kill()
                     await process.wait()
     remote_text = (root / 'sip-remote.log').read_text(errors='replace')
+    if args.restore_outgoing:
+        verify_outgoing_restore(root, remote_text)
+        return
     if args.restore_call:
         verify_restore(root, remote_text, args.restore_phase)
         return
@@ -208,6 +211,41 @@ def verify_failure(root, remote_text, status):
     print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
 
 
+def verify_outgoing_restore(root, remote_text):
+    bridge = (root / 'sip-bridge.log').read_text(errors='replace')
+    log = (root / 'error.log').read_text(errors='replace')
+    for marker in ('Response msg 180/INVITE/', 'Request msg CANCEL/',
+                   'Response msg 487/INVITE/'):
+        if marker not in remote_text:
+            raise RuntimeError(f'missing real pending SIP release: {marker}')
+    if ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge or
+            re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log)):
+        raise RuntimeError('pending outgoing restoration falsely connected')
+    if (bridge.count('SIP dial identity=') != 1 or
+            'SIP epoch changed old=1 new=2' not in bridge or
+            'SIP restored call cleared identity=(2, 1)' not in bridge):
+        raise RuntimeError('restored outgoing request replayed SIP or failed to clear')
+    cursor = 0
+    for pattern in (r'gsm_call_adapter: request id=1 epoch=1 digits=5551234',
+                    r'sip_state: saved', r'sip_state: restored',
+                    r'gsm_call_adapter: request id=1 epoch=2 digits=5551234',
+                    r'termination id=1 cause=41 result=accepted',
+                    r'outgoing termination consumed id=1 cause=41',
+                    r'GSM service downlink kind=13 sapi=0 pd=03 message=25',
+                    r'GSM service uplink sapi=0 pd=03 message=2d',
+                    r'GSM service downlink kind=26 sapi=0 pd=03 message=2a',
+                    r'LAPDm service Channel Release acknowledged',
+                    r'gsm_call_adapter: state id=1 epoch=2 phase=ended'):
+        match = re.search(pattern, log[cursor:])
+        if not match:
+            raise RuntimeError(f'missing outgoing restoration checkpoint: {pattern}')
+        cursor += match.end()
+    (root / 'sip-result.json').write_text(json.dumps({
+        'scope': '3210 pending outgoing HLE SIP save/load; CANCEL/487, no redial/CONNECT',
+        'passed': True}, indent=2) + '\n')
+    print('OK - pending outgoing restoration cancelled SIP and cleared GSM without redial')
+
+
 def verify_restore(root, remote_text, phase='connected'):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
@@ -289,7 +327,8 @@ def main():
     parser.add_argument('--restore-call', action='store_true')
     parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
     parser.add_argument('--restore-idle', action='store_true')
-    parser.add_argument('--sip-response', type=int, choices=(200, 480, 486), default=200)
+    parser.add_argument('--restore-outgoing', action='store_true')
+    parser.add_argument('--sip-response', type=int, choices=(180, 200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.incoming and args.sip_response != 200:
@@ -300,6 +339,10 @@ def main():
         parser.error('--restore-call requires an answered incoming call')
     if args.restore_idle and (not args.incoming or args.cancel_incoming or args.restore_call):
         parser.error('--restore-idle requires a fresh incoming call after idle restoration')
+    if args.restore_outgoing and (args.incoming or args.restore_idle or args.restore_call or args.sip_response != 180):
+        parser.error('--restore-outgoing requires an outgoing provisional-only SIP response')
+    if args.sip_response == 180 and not args.restore_outgoing:
+        parser.error('provisional-only response requires --restore-outgoing')
     if args.command[:1] == ['--']:
         args.command = args.command[1:]
     if not args.command:

@@ -4,6 +4,7 @@ local directory = assert(source:match('^(.*[/])'))
 dofile(directory .. '../mame_nokia_dct3_input_exerciser.lua')
 local machine = manager.machine
 local idle = _G.sip_state_scenario == 'idle'
+local outgoing = _G.sip_state_scenario == 'outgoing'
 local saved, loaded = false, false
 local before = emu.add_machine_pre_save_notifier(function()
     saved = true
@@ -27,11 +28,12 @@ local after = emu.add_machine_post_load_notifier(function()
     end
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(19))
-    machine:save(idle and 'sip_idle' or 'sip_connected')
+    assert(emu.wait(outgoing and 25 or 19))
+    local name = idle and 'sip_idle' or outgoing and 'sip_outgoing' or 'sip_connected'
+    machine:save(name)
     assert(emu.wait(1))
     assert(saved, 'SIP call save failed')
-    machine:load(idle and 'sip_idle' or 'sip_connected')
+    machine:load(name)
 end)
 _G.sip_call_state_fixture = {before, after, runner,
     emu.add_machine_stop_notifier(function()

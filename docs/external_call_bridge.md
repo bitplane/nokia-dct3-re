@@ -384,6 +384,21 @@ the restored GSM transaction with cause 41 under epoch 2. Its checker requires
 alerting before save and rejects any SIP confirmation, physical Answer or
 firmware CC CONNECT. This is distinct from the caller-driven CANCEL gate.
 
+```sh
+make verify-radio-outgoing-call-sip-pending-restore RUN_DIR=run_3210_sip_pending_restore
+```
+
+The outgoing variant saves at 25 seconds while the real remote SIP endpoint
+has returned 180 Ringing but no final answer. On load the external transaction
+closes with CANCEL/487. The restored `outgoing_call` request itself starts
+clearing: it need not have a connected/alerting state event yet. The bridge
+supplies `no_answer` followed by cause-41 termination through the existing
+session interface. The checker requires exactly one SIP dial, no CONNECT,
+and firmware DISCONNECT/RELEASE/RELEASE COMPLETE plus LAPDm release before
+epoch-2 `ended`. An unrelated request cannot replace the transaction being
+cleared. This does not claim coverage of every outgoing connected-call or
+pre-SETUP restoration race.
+
 ### Idle restoration
 
 ```sh

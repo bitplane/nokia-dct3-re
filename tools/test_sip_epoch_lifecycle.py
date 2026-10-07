@@ -40,6 +40,29 @@ class Codec:
 
 
 class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
+    async def test_pending_restored_request_clears_without_redial(self):
+        async def host(socket):
+            async def send(kind, **fields):
+                await socket.send(json.dumps({'type': kind, **fields}))
+
+            await send('call_adapter_ready', protocol_version=1, epoch=1)
+            await send('outgoing_call', epoch=1, request_id=1, digits='123')
+            await asyncio.wait_for(socket.recv(), 2)
+            await send('call_adapter_ready', protocol_version=1, epoch=2, calls_idle=False)
+            await send('outgoing_call', epoch=2, request_id=1, digits='123')
+            replies = [json.loads(await asyncio.wait_for(socket.recv(), 2)) for _ in range(2)]
+            self.assertEqual(replies, sip.failure_messages((2, 1), 503))
+            self.assertEqual(Endpoint.instances[-1].dials, [(1, 1)])
+            await send('outgoing_call_state', epoch=2, request_id=1, phase='ended')
+            await socket.wait_closed()
+
+        with patch.object(sip, 'SipEndpoint', Endpoint), patch.object(sip, 'GsmFrCodec', Codec):
+            async with websockets.serve(host, '127.0.0.1', 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                args = SimpleNamespace(url=f'ws://127.0.0.1:{port}', sip_port=0,
+                    destination='sip:probe@localhost', once=True, require_frames=0)
+                await asyncio.wait_for(sip.bridge(args, None), 3)
+
     async def test_explicit_idle_snapshot_allows_fresh_call(self):
         async def host(socket):
             async def send(kind, **fields):
