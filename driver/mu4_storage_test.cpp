@@ -461,7 +461,7 @@ private:
 		if (m_command_wire_decoded.size() != m_command_tx_words.size() + 1 || m_command_wire_decoded.back() != value)
 			fatalerror("MU4 serial pin decoder disagrees with McBSP transmit word");
 		m_command_tx_words.push_back(value);
-		if (system_bios() == 13)
+		if (measurement_profile())
 		{
 			if (m_command_tx_words.size() != 12) return;
 			u8 checksum = 0;
@@ -682,7 +682,7 @@ private:
 		// Original parser framing and selector 0x49: read-only software status query.
 		static constexpr u8 status[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
 		static constexpr u8 measurement[] = {0x1e, 2, 0xaa, 1, 0x40, 1, 0xf6, 0x55};
-		auto const &packet = system_bios() == 13 ? measurement : status;
+		auto const &packet = measurement_profile() ? measurement : status;
 		bool const ack = m_native_command_cursor == std::size(packet);
 		if (ack && (!m_command_ack_pending || m_command_ack_cursor == 3)) return;
 		// Replay starts after the separately checked streaming prefix, so both
@@ -742,7 +742,8 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 19; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 20; }
+	bool measurement_profile() const { return system_bios() == 13 || system_bios() == 20; }
 	void verify_native_status()
 	{
 		auto const disable = machine().disable_side_effects();
@@ -759,12 +760,82 @@ private:
 			logerror("mu4_native_receive_pins: PASS bytes=11 rx_irqs=11 frame=1 data=1 clock=1 drr_drained=1\n");
 		}
 	}
+	void verify_native_measurement()
+	{
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		logerror("mu4_native_measurement_observe: mode=%04x complete=%04x blocks=%04x,%04x left=%04x,%04x right=%04x,%04x tx_words=%u full_boot=0\n",
+			data.read_word(0xbb80), data.read_word(0xb64e), data.read_word(0xb650), data.read_word(0xb651),
+			data.read_word(0xb652), data.read_word(0xb653), data.read_word(0xb65e), data.read_word(0xb65f), unsigned(m_command_tx_words.size()));
+		if (m_measurement_blocks != 6 || m_command_ack_cursor != 3 || m_command_tx_words.size() != 12 ||
+			m_command_tx_words[8] != 0x20 || m_command_wire_bit_count || m_command_rx_irqs != 11 ||
+			m_command_rx_busy || m_command_rx_ready || data.read_word(0x1657) != 11 || data.read_word(0x1658) != 11 ||
+			data.read_word(0x1659) != 12 || data.read_word(0x165a) != 12 ||
+			data.read_word(0xbb80) || data.read_word(0x165d) || data.read_word(0x165e))
+			fatalerror("MU4 original measurement command did not complete six blocks and settle its acknowledged response");
+		logerror("mu4_native_measurement: PASS blocks=6 stereo=1 independent_arithmetic=1 pin_request=1 ack=1 tx_words=12 mode=0 music_decode=0 full_boot=0\n");
+		if (m_tone_blocks < 6 || !m_tone_phase_wraps)
+			fatalerror("MU4 native tone observation did not cover repeated blocks and signed phase wraparound");
+		logerror("mu4_native_tone: PASS blocks=%u samples=%u stereo=1 independent_table_scale=1 phase_wraps=%u music_decode=0 analog_audio=0\n",
+			m_tone_blocks, m_tone_blocks * 128, m_tone_phase_wraps);
+	}
+	void install_measurement_observers()
+	{
+		for (offs_t address : {0x2876a, 0x287ad})
+			m_cpu->space(AS_PROGRAM).install_read_tap(address, address, "mu4_native_tone",
+				[this](offs_t address, u16 &, u16) { observe_native_tone(address); });
+		m_cpu->space(AS_DATA).install_read_tap(0x1900, 0x19ff, "mu4_measurement_input",
+			[this](offs_t, u16 &value, u16)
+			{
+				if (m_phase != 30 || machine().side_effects_disabled()) return;
+				unsigned const pc = m_cpu->pc();
+				if (pc != 0x287fa && pc != 0x2880b) return;
+				unsigned const channel = pc == 0x2880b;
+				s32 const sample = s16(value);
+				u32 const scaled = unsigned(sample < 0 ? -sample : sample) / 16;
+				u64 const sum = m_measurement_expected[channel] + u64(scaled) * scaled * m_measurement_factor;
+				if (sum > 0x7fffffff || ++m_measurement_samples[channel] > 64)
+					fatalerror("MU4 live measurement inputs exceed independently modeled block range");
+				m_measurement_expected[channel] = sum;
+			});
+		m_cpu->space(AS_PROGRAM).install_read_tap(0x287ea, 0x28816, "mu4_measurement_result",
+			[this](offs_t address, u16 &, u16)
+			{
+				if (m_phase != 30 || machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+				if (address != 0x287ea && address != 0x28816) return;
+				auto const disable = machine().disable_side_effects();
+				auto &data = m_cpu->space(AS_DATA);
+				if (address == 0x287ea)
+				{
+					// Observe live input reads: DMA can update the buffer during execution.
+					m_measurement_factor = BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 6) ? 2 : 1;
+					m_measurement_samples.fill(0);
+					for (unsigned channel = 0; channel < 2; ++channel)
+					{
+						u16 const aggregate = 0xb64a + 2 * channel;
+						m_measurement_expected[channel] = (u32(data.read_word(aggregate)) << 16) | data.read_word(aggregate + 1);
+					}
+					return;
+				}
+				u16 const left = m_cpu->state_int(tms320c54x_device::STATE_AR4), right = m_cpu->state_int(tms320c54x_device::STATE_AR5);
+				if (m_measurement_samples[0] != 64 || m_measurement_samples[1] != 64 ||
+					((u32(data.read_word(left)) << 16) | data.read_word(left + 1)) != m_measurement_expected[0] ||
+					((u32(data.read_word(right)) << 16) | data.read_word(right + 1)) != m_measurement_expected[1])
+					fatalerror("MU4 native sample-energy mismatch block=%u samples=%u,%u actual=%08x,%08x expected=%08x,%08x factor=%u", m_measurement_blocks,
+						m_measurement_samples[0], m_measurement_samples[1], (u32(data.read_word(left)) << 16) | data.read_word(left + 1),
+						(u32(data.read_word(right)) << 16) | data.read_word(right + 1), m_measurement_expected[0], m_measurement_expected[1], m_measurement_factor);
+				logerror("mu4_native_measurement_block: index=%u left=%04x,%04x right=%04x,%04x st1=%04x\n",
+					m_measurement_blocks++, data.read_word(left), data.read_word(left + 1), data.read_word(right), data.read_word(right + 1),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
+			});
+	}
 	virtual void machine_start() override
 	{
 		if (original_bootstrap_profile())
 		{
 			m_phase = 74;
 			m_cpu->space(AS_PROGRAM).install_ram(0, 0xffff, &m_program_ram[0]);
+			if (measurement_profile()) install_measurement_observers();
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x0e41, 0x0e41, "mu4_original_bootstrap_entry",
 				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1) ++m_native_bootstrap_entries; });
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_original_bootstrap_resident",
@@ -1234,7 +1305,8 @@ private:
 				m_native_bootstrap_entries, m_native_bootstrap_resident_entries, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
-			if (system_bios() >= 17) verify_native_status();
+			if (measurement_profile()) verify_native_measurement();
+			else if (system_bios() >= 17) verify_native_status();
 			if (finish_native_replay()) return;
 			if (system_bios() == 18)
 			{
@@ -2087,56 +2159,7 @@ private:
 						source, data.read_word(u16(source+0x11)), data.read_word(u16(source+0x12)), data.read_word(u16(source+0x13)),
 						static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
 				});
-			if (system_bios() == 13)
-			{
-				for (offs_t address : {0x2876a, 0x287ad})
-					m_cpu->space(AS_PROGRAM).install_read_tap(address, address, "mu4_native_tone",
-						[this](offs_t address, u16 &, u16) { observe_native_tone(address); });
-				m_cpu->space(AS_DATA).install_read_tap(0x1900, 0x19ff, "mu4_measurement_input",
-					[this](offs_t, u16 &value, u16)
-					{
-						if (m_phase != 30 || machine().side_effects_disabled()) return;
-						unsigned const pc = m_cpu->pc();
-						if (pc != 0x287fa && pc != 0x2880b) return;
-						unsigned const channel = pc == 0x2880b;
-						s32 const sample = s16(value);
-						u32 const scaled = unsigned(sample < 0 ? -sample : sample) / 16;
-						u64 const sum = m_measurement_expected[channel] + u64(scaled) * scaled * m_measurement_factor;
-						if (sum > 0x7fffffff || ++m_measurement_samples[channel] > 64)
-							fatalerror("MU4 live measurement inputs exceed independently modeled block range");
-						m_measurement_expected[channel] = sum;
-					});
-				m_cpu->space(AS_PROGRAM).install_read_tap(0x287ea, 0x28816, "mu4_measurement_result",
-					[this](offs_t address, u16 &, u16)
-					{
-						if (m_phase != 30 || machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
-						if (address != 0x287ea && address != 0x28816) return;
-						auto const disable = machine().disable_side_effects();
-						auto &data = m_cpu->space(AS_DATA);
-						if (address == 0x287ea)
-						{
-							// Observe live input reads: DMA can update the buffer during execution.
-							m_measurement_factor = BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 6) ? 2 : 1;
-							m_measurement_samples.fill(0);
-							for (unsigned channel = 0; channel < 2; ++channel)
-							{
-								u16 const aggregate = 0xb64a + 2 * channel;
-								m_measurement_expected[channel] = (u32(data.read_word(aggregate)) << 16) | data.read_word(aggregate + 1);
-							}
-							return;
-						}
-						u16 const left = m_cpu->state_int(tms320c54x_device::STATE_AR4), right = m_cpu->state_int(tms320c54x_device::STATE_AR5);
-						if (m_measurement_samples[0] != 64 || m_measurement_samples[1] != 64 ||
-							((u32(data.read_word(left)) << 16) | data.read_word(left + 1)) != m_measurement_expected[0] ||
-							((u32(data.read_word(right)) << 16) | data.read_word(right + 1)) != m_measurement_expected[1])
-							fatalerror("MU4 native sample-energy mismatch block=%u samples=%u,%u actual=%08x,%08x expected=%08x,%08x factor=%u", m_measurement_blocks,
-								m_measurement_samples[0], m_measurement_samples[1], (u32(data.read_word(left)) << 16) | data.read_word(left + 1),
-								(u32(data.read_word(right)) << 16) | data.read_word(right + 1), m_measurement_expected[0], m_measurement_expected[1], m_measurement_factor);
-						logerror("mu4_native_measurement_block: index=%u left=%04x,%04x right=%04x,%04x st1=%04x\n",
-							m_measurement_blocks++, data.read_word(left), data.read_word(left + 1), data.read_word(right), data.read_word(right + 1),
-							unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
-					});
-			}
+			if (measurement_profile()) install_measurement_observers();
 			m_cpu->space(AS_DATA).install_write_tap(0x48, 0x49, "mu4_native_mcbsp_config",
 				[this](offs_t offset, u16 &value, u16)
 				{
@@ -2289,25 +2312,7 @@ private:
 					verify_native_status();
 				}
 			}
-			if (system_bios() == 13)
-			{
-				auto const disable = machine().disable_side_effects();
-				auto &data = m_cpu->space(AS_DATA);
-				logerror("mu4_native_measurement_observe: mode=%04x complete=%04x blocks=%04x,%04x left=%04x,%04x right=%04x,%04x tx_words=%u full_boot=0\n",
-					data.read_word(0xbb80), data.read_word(0xb64e), data.read_word(0xb650), data.read_word(0xb651),
-					data.read_word(0xb652), data.read_word(0xb653), data.read_word(0xb65e), data.read_word(0xb65f), unsigned(m_command_tx_words.size()));
-				if (m_measurement_blocks != 6 || m_command_ack_cursor != 3 || m_command_tx_words.size() != 12 ||
-					m_command_tx_words[8] != 0x20 || m_command_wire_bit_count || m_command_rx_irqs != 11 ||
-					m_command_rx_busy || m_command_rx_ready || data.read_word(0x1657) != 11 || data.read_word(0x1658) != 11 ||
-					data.read_word(0x1659) != 12 || data.read_word(0x165a) != 12 ||
-					data.read_word(0xbb80) || data.read_word(0x165d) || data.read_word(0x165e))
-					fatalerror("MU4 original measurement command did not complete six blocks and settle its acknowledged response");
-				logerror("mu4_native_measurement: PASS blocks=6 stereo=1 independent_arithmetic=1 pin_request=1 ack=1 tx_words=12 mode=0 music_decode=0 full_boot=0\n");
-				if (m_tone_blocks < 6 || !m_tone_phase_wraps)
-					fatalerror("MU4 native tone observation did not cover repeated blocks and signed phase wraparound");
-				logerror("mu4_native_tone: PASS blocks=%u samples=%u stereo=1 independent_table_scale=1 phase_wraps=%u music_decode=0 analog_audio=0\n",
-					m_tone_blocks, m_tone_blocks * 128, m_tone_phase_wraps);
-			}
+			if (measurement_profile()) verify_native_measurement();
 			else if (finish_native_replay()) return;
 			if (system_bios() == 14)
 			{
@@ -2727,6 +2732,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(16, "bootstatus", "Original uploaded startup with pin-level status transaction")
 	ROM_SYSTEM_BIOS(17, "bootreset", "Original uploaded startup with mid-byte reset and status restart")
 	ROM_SYSTEM_BIOS(18, "bootreplay", "Original uploaded startup with mid-byte save-state replay")
+	ROM_SYSTEM_BIOS(19, "bootmeasure", "Original uploaded startup with pin-level sample measurement")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

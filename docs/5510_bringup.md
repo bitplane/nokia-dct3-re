@@ -48,12 +48,15 @@ The `bootstrap` profile loads the complete original `aa55` upload and
 executes its uploaded `ff80` reset-vector prelude, original context
 initializer, directory-selected resident loader and resident startup.
 The `bootstatus` variant completes the same pin-level status transaction
-after this full startup. The `bootreset` variant repeats original startup
+after this full startup; `bootreplay` verifies its mid-byte save-state
+continuation across all 1,039 registered emulation-state items. The
+`bootmeasure` variant verifies the original sample-energy and tone-buffer
+arithmetic after the same complete startup. The `bootreset` variant repeats original startup
 after a mid-byte soft reset and completes that transaction again without
 clearing firmware RAM from the supervisor. Its stream volume is not
 validated music output.
-The open boundary is physical reset/board attachment, processing command/data
-semantics and independently verified output,
+The open boundary is physical reset/board attachment, accepted media and
+remaining processing command/data semantics, and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
 claimed; only the initial 1,024 DIN words are independently compared.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
@@ -1923,6 +1926,21 @@ not restored hardware state and therefore accumulate across both legs;
 their totals must not be interpreted as one uninterrupted playback.
 This extends the verified checkpoint to complete-upload native control,
 not music decoding or physical board reset.
+
+`check-mu4-bootstrap-original MU4_BOOTSTRAP_BIOS=bootmeasure` sends the
+unchanged measurement request through McBSP2 pins after complete original
+startup, using the same retained-medium source. The measurement and tone
+observers/verifier are shared with the routine-level `measure` profile,
+not a second, weaker acceptance path. Six stereo sample-energy blocks
+match independent arithmetic applied to live firmware input reads; the
+12-byte response is acknowledged, all 11 received bytes drain, and the
+firmware returns to mode zero with empty queues. The fixed 20-second run
+also checks 90 stereo tone blocks (11,520 buffer samples) and 26 signed
+phase wraps against independent table/phase/scaling calculations. Block
+counts are observations of this fixture, not a physical timing contract.
+The codec input remains a declared converted-sample fixture. These checks
+prove native DSP processing and generated tone buffers after original
+startup, not accepted media decoding, analog output or native speech.
 
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects

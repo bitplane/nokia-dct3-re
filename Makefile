@@ -1119,7 +1119,7 @@ check-mu4-bootstrap-original: build
 			echo 'Set MU4_BOOTSTRAP_SOURCE_RUN to a completed check-mu4-retained-original run directory' >&2; exit 1; fi; \
 		test "$$(wc -c < "$$source/nvram/mu4nand_13/nand")" -eq 69206016; \
 		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
-		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; \
+		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; \
 			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
 		tmp="$$(mktemp -d '$(abspath run_mu4-bootstrap).XXXXXX')"; \
 		mkdir -p "$$tmp/nvram/$$nvtag"; \
@@ -1138,7 +1138,9 @@ check-mu4-bootstrap-original: build
 		grep -q 'mu4_original_bootstrap_gate_init: value=0001 pc=0290ef' error.log; \
 		grep -q 'mu4_original_bootstrap_path: address=3538 ' error.log; \
 		grep -q 'mu4_original_bootstrap_loader: name=004d,0043,0055,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0001,e1e8 ' error.log; \
-		if test "$$bios" != bootstrap; then \
+		if test "$$bios" = bootmeasure; then \
+			grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; \
+		elif test "$$bios" != bootstrap; then \
 			grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; fi; \
 		if test "$$bios" = bootreplay; then grep -q 'mu4_native_replay: PASS' error.log; fi; \
 		cmp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/$$nvtag/nand"
