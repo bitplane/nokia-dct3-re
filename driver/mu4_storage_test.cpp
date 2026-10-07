@@ -534,7 +534,7 @@ private:
 		if (m_command_rx_phase) m_mcbsp2->rx_frame_w(0);
 		m_mcbsp2->rx_clock_w(m_command_rx_clock);
 		if (!m_command_rx_clock) ++m_command_rx_phase;
-		if (system_bios() == 12 && !m_native_replay_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
+		if ((system_bios() == 12 || system_bios() == 19) && !m_native_replay_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
 			// Let synchronized input events settle without advancing to the next bit.
 			m_native_replay->adjust(attotime::from_nsec(1));
 		if ((system_bios() == 14 || system_bios() == 18) && !m_native_reset_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
@@ -627,7 +627,7 @@ private:
 	}
 	bool finish_native_replay()
 	{
-		if (system_bios() != 12) return false;
+		if (system_bios() != 12 && system_bios() != 19) return false;
 		if (!machine().scheduler().can_save() || !m_native_replay_leg)
 			fatalerror("MU4 native replay has no restorable checkpoint");
 		if (m_native_replay_leg == 1)
@@ -742,7 +742,7 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 18; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 19; }
 	void verify_native_status()
 	{
 		auto const disable = machine().disable_side_effects();
@@ -1235,6 +1235,7 @@ private:
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
 			if (system_bios() >= 17) verify_native_status();
+			if (finish_native_replay()) return;
 			if (system_bios() == 18)
 			{
 				if (m_native_reset_leg != 2 || m_native_bootstrap_entries != 2 || m_native_bootstrap_resident_entries != 2)
@@ -2725,6 +2726,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(15, "bootstrap", "Original uploaded startup observation (isolated bench)")
 	ROM_SYSTEM_BIOS(16, "bootstatus", "Original uploaded startup with pin-level status transaction")
 	ROM_SYSTEM_BIOS(17, "bootreset", "Original uploaded startup with mid-byte reset and status restart")
+	ROM_SYSTEM_BIOS(18, "bootreplay", "Original uploaded startup with mid-byte save-state replay")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

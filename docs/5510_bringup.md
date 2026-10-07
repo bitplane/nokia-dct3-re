@@ -1911,6 +1911,19 @@ a restored lifecycle oracle. This proves the recovered status transaction's
 native continuation, not arbitrary mid-boot checkpoints, native reset,
 processing commands, physical board attachment or full MU4 boot.
 
+`check-mu4-bootstrap-original MU4_BOOTSTRAP_BIOS=bootreplay` applies the
+same settled mid-byte checkpoint and terminal-state comparison after
+the complete original uploaded startup, using retained NAND supplied by
+`MU4_BOOTSTRAP_SOURCE_RUN`. Both continuations satisfy the unchanged
+status and pin-receive checks, and all 1,039 registered emulation-state
+items match, with the same nine Lua frontend-timer exclusions. Original
+startup/resident entry counts remain one: restoration resumes the DSP,
+not the upload or reset sequence. Read/stream observation counters are
+not restored hardware state and therefore accumulate across both legs;
+their totals must not be interpreted as one uninterrupted playback.
+This extends the verified checkpoint to complete-upload native control,
+not music decoding or physical board reset.
+
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects
 holes and verifies the selected wire checksum. Optional
