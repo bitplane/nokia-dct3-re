@@ -845,11 +845,22 @@ host phases queued/paging/alerting/connected/ended and rejects stale readiness
 artifacts. Both exploratory and tracked-runner replays show that caller on
 the ringing screen and ordinary `DCT3 LAB` idle after physical End.
 
-The fixed laboratory `noki8890_incoming_call_check.py` is **not** green for
-this composition: its SETUP pattern pins a different calling-number payload.
-The host-phase proof and reviewed screenshots do not replace a full
-caller-aware CC/RR packet checker or exact-frame incoming acceptance. Those
-checks remain the next acceptance task; native speech remains unproved.
+The default laboratory checker mode still pins its original calling-number
+payload. Explicit host mode instead requires the supplied caller's exact BCD
+number, complete SETUP bearer/signal structure and LAPDm length, followed by
+the same physical Answer/End and CC/RR lifecycle. Reviewed ringing and ordinary
+post-release idle pixels also pass on the tracked-runner replay:
+
+```sh
+.venv/bin/python tools/noki8890_incoming_call_check.py \
+  --caller 447700900123 --frames RUN/snap RUN/error.log
+```
+
+The frame oracle is scoped to that caller and excludes only the advancing
+top-row clock. Focused tests reject wrong digits/length, unreviewed callers
+and blank pixels. This closes incoming foreground settlement on the declared
+GSM900 research-HLE composition; it does not promote native speech or inherit
+this presentation result for PCS1900.
 
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
