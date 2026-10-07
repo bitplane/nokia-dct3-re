@@ -41,8 +41,8 @@ async def run(args: argparse.Namespace) -> None:
                 "epoch": request.get("epoch"),
                 "recipient": "5551234",
                 "alphabet": "gsm7",
-                "user_data_length": 2,
-                "user_data": "c824",
+                "user_data_length": args.user_data_length,
+                "user_data": args.user_data,
             }
             if request != expected:
                 raise RuntimeError(
@@ -95,6 +95,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cwd")
+    parser.add_argument("--user-data", default="c824", help="expected packed GSM7 hex bytes")
+    parser.add_argument("--user-data-length", type=int, default=2,
+                        help="expected number of GSM7 septets")
     parser.add_argument(
         "--decision", choices=("accept", "rp_error", "rp_silence"),
         default="accept")

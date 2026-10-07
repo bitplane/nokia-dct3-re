@@ -14,6 +14,17 @@ gsm_call_adapter: sms state id=1 epoch=1 phase=ended
 
 
 class HostSmsTraceCheckTest(unittest.TestCase):
+    def test_single_octet_submission(self):
+        verify(GOOD.replace('octets=2', 'octets=1'), octets=1)
+
+    def test_rejects_octet_prefix_match(self):
+        with self.assertRaises(ValueError):
+            verify(GOOD.replace('octets=2', 'octets=20'))
+
+    def test_rejects_oversize_submission(self):
+        with self.assertRaises(ValueError):
+            verify(GOOD, octets=141)
+
     def test_complete(self):
         verify(GOOD)
 

@@ -1099,6 +1099,19 @@ content and reviewed body pixels all pass. The PCS check also requires the
 complete organic carrier/band registration contract. This is a software host
 SMS boundary, not evidence of native radio/DSP execution or an external SMSC.
 
+Host-decided outgoing SMS is also independently accepted on both bands with
+the same host-enabled configurations. Run `tools/run_host_sms_gate.py` with
+`--user-data 41 --user-data-length 1`, HTTP enabled, fresh private storage,
+`tools/noki8890_outgoing_sms_input.lua` and 52 seconds. Physical inputs compose
+`A` for `5551234`; the runner requires that exact recipient, alphabet, packed
+payload and correlated request before accepting it. Wrong-ID and duplicate
+host decisions are rejected, and handset RP/CP closure returns to paging.
+Require `radio_outgoing_host_sms_trace_check.py --octets 1 RUN/error.log`
+and `noki8890_outgoing_sms_check.py RUN/error.log` (add `--pcs1900` for PCS).
+The latter requires independent PCS acquisition before accepting its transport
+lifecycle. This establishes a software host decision boundary, not SMS delivery
+to a real subscriber or a native DSP radio backend.
+
 Fresh strict-topology runs also complete incoming and outgoing call
 signaling and incoming/outgoing SMS. The network's existing assignment
 encoder derives the non-hopping traffic carrier from the serving ARFCN;
