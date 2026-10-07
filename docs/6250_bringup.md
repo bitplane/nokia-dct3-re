@@ -99,6 +99,19 @@ redelivery. Run `noki6250_state_check.py LOG SNAP --sms --storage SIM_NVRAM`.
 This proves delivered-message restoration, not an unfinished SMS transaction,
 authentic original-PMM boot or native DSP execution.
 
+### Host Incoming Call Acceptance
+
+Run `tools/run_noki6250_acceptance.py RUN --scenario host-incoming-call`
+with a fresh directory and an unused HTTP port (`--port`, default 16250).
+The private configuration enables `CALLHOST`; no automatic incoming-call
+fixture is enabled. After the physical observer captures registered idle at
+32 seconds, the WebSocket runner requests caller `5551234` with the current
+adapter epoch and request ID. It requires queued, paging, alerting, connected
+and ended phases in order. Physical Send at 38 seconds and End at 46 seconds
+must satisfy the handset CC/RR release checker and return to idle PCH.
+`6250_call_1.png` captures the caller before answer. This verifies host-backed
+HLE call signaling, not speech or an authentic original-PMM/native boot.
+
 ## Recovered hardware contracts
 
 The CTSI base literal at `4e7f70` is `00020000`. The release routine

@@ -13,6 +13,12 @@ local actions = {
     {20, cell(0, 2), 1}, {20.2, cell(0, 2), 0},
     {24, cell(0, 3), 1}, {24.2, cell(0, 3), 0}
 }
+if _G.noki6250_host_incoming then
+    actions = {
+        {38, cell(0, 2), 1}, {38.2, cell(0, 2), 0},
+        {46, cell(0, 3), 1}, {46.2, cell(0, 3), 0}
+    }
+end
 if os.getenv("NOKIA_DCT3_6250_OUTGOING") == "1" then
     actions = {
         {16, cell(2, 1), 1}, {16.15, cell(2, 1), 0},
@@ -27,9 +33,15 @@ if _G.noki6250_call_hold then
     table.remove(actions)
 end
 local captures = {17, 21, 26, 32}
+local host_ready = false
+if _G.noki6250_host_incoming then captures = {37, 44, 54} end
 local next_action, next_capture = 1, 1
 emu.register_periodic(function()
     local time = machine.time:as_double()
+    if _G.noki6250_host_incoming and not host_ready and time >= 32 then
+        machine.screens[":screen"]:snapshot("6250_host_registered_idle.png")
+        host_ready = true
+    end
     local action = actions[next_action]
     if action and time >= action[1] then
         action[2]:set_value(action[3])

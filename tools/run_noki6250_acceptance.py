@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 try:
     from tools.noki6250_pmm_check import initial_record_fixture
@@ -26,10 +27,12 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "idle-state", "call-state", "sms-state"),
+                                              "phonebook", "registration", "idle-state", "call-state", "sms-state",
+                                              "host-incoming-call"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
+    parser.add_argument("--port", type=int, default=16250)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
@@ -55,8 +58,16 @@ def main():
                                   "native_6250_evidence": False})
         (run / "cfg").mkdir()
         (run / "nvram").mkdir()
-        call = args.scenario in ("incoming-call", "outgoing-call")
+        host_call = args.scenario == "host-incoming-call"
+        call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call")
         sms = args.scenario.startswith("sms-")
+        if host_call:
+            config = ET.Element("mameconfig", version="10")
+            inputs = ET.SubElement(ET.SubElement(config, "system", name="nhm3hle"), "input")
+            ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
+                          mask="1", defvalue="0", value="1")
+            ET.ElementTree(config).write(run / "cfg/nhm3hle.cfg", encoding="utf-8",
+                                         xml_declaration=True)
         if args.scenario == "incoming-call":
             shutil.copyfile(root / "fixtures/radio_incoming_call_answered/nhm3hle.cfg",
                             run / "cfg/nhm3hle.cfg")
@@ -76,6 +87,8 @@ def main():
             script = "noki6250_state_call.lua"
         if args.scenario == "sms-state":
             script = "noki6250_state_sms.lua"
+        if host_call:
+            script = "noki6250_host_incoming_input.lua"
         seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
@@ -85,6 +98,13 @@ def main():
                    "-autoboot_delay", "0", "-seconds_to_run", seconds,
                    "-video", "none", "-sound", "none", "-nothrottle",
                    "-log", "-verbose"]
+        if host_call:
+            command[command.index("-seconds_to_run") + 1] = "60"
+            command.extend(["-http", "-http_port", str(args.port)])
+        host_command = ([sys.executable, str(root / "tools/run_host_incoming_signaling_gate.py"),
+                         "--port", str(args.port), "--cwd", str(run), "--caller", "5551234",
+                         "--ready-file", str(run / "snap/6250_host_registered_idle.png"),
+                         "--"] + command) if host_call else None
         env = os.environ.copy()
         flags = {"calculator": "NOKIA_DCT3_6250_CALCULATOR",
                  "outgoing-call": "NOKIA_DCT3_6250_OUTGOING",
@@ -100,9 +120,10 @@ def main():
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
             "shared_rom_audit_members": audit_members,
+            "host_command": host_command,
         }, indent=2) + "\n")
         with (run / "console.log").open("w") as console:
-            subprocess.run(command, cwd=run, env=env, stdout=console,
+            subprocess.run(host_command or command, cwd=run, env=env, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
         if call:
             checker = [sys.executable, str(root / "tools/noki6250_call_check.py"),
