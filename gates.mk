@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 384 gates: 237 generated from typed steps, 147 copied verbatim (shell).
+# 385 gates: 238 generated from typed steps, 147 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -231,7 +231,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-outgoing-call-sip verify-3410-radio-incoming-call-sip \
 	verify-3410-radio-incoming-call-sip-connected-restore \
 	verify-3410-radio-incoming-call-sip-alerting-restore \
-	verify-3410-radio-incoming-call-sip-cancel verify-radio-incoming-call-sip \
+	verify-3410-radio-incoming-call-sip-cancel \
+	verify-5210-radio-outgoing-call-sip verify-radio-incoming-call-sip \
 	verify-radio-incoming-call-sip-idle-restore \
 	verify-3310-radio-incoming-call-sip-connected-restore \
 	verify-3310-radio-incoming-call-sip-alerting-restore \
@@ -3737,6 +3738,9 @@ verify-3410-radio-incoming-call-sip-alerting-restore:
 
 verify-3410-radio-incoming-call-sip-cancel:
 	@$(MAKE) --no-print-directory verify-3410-radio-incoming-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3410_INCOMING_KEYS=end SIP_3410_INCOMING_RUNNER_ARGS='--incoming --cancel-incoming --product 3410'
+
+verify-5210-radio-outgoing-call-sip: normalize-5210
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki5210 SIP_HANDSET_BIOS=540e SIP_HANDSET_KEYS=5,5,5,1,2,3,4,send SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=220 SIP_HANDSET_KEY_GAP_MS=280 SIP_HANDSET_RUNNER_ARGS='--product 5210' SIP_HANDSET_SECONDS=45
 
 verify-radio-incoming-call-sip:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48

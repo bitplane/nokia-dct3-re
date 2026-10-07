@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 from tools.run_sip_handset_gate import outgoing_setup_pattern
 
@@ -12,6 +13,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SipProductPreparationTest(unittest.TestCase):
+    def test_media_products_explicitly_enable_their_own_host_adapter(self):
+        for product in ('3210', '3310', '3330', '3410', '5210'):
+            with self.subTest(product=product):
+                root = ET.parse(ROOT / 'fixtures' / 'radio_outgoing_host_adapter'
+                                / f'noki{product}.cfg').getroot()
+                system = root.find(f"system[@name='noki{product}']")
+                self.assertIsNotNone(system)
+                port = system.find("input/port[@tag=':CALLHOST']")
+                self.assertIsNotNone(port)
+                self.assertEqual(port.get('value'), '1')
+                self.assertEqual(port.get('mask'), '1')
+
     def test_live_incoming_defaults_keep_answer_and_fresh_storage(self):
         rule = ('sip-config-test: ; @$(info KEYS=$(SIP_3330_INCOMING_KEYS))'
                 '$(info NHM2_KEYS=$(SIP_3410_INCOMING_KEYS))'

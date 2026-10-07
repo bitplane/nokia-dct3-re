@@ -280,6 +280,16 @@ Send. Its CONNECT (`8307`), remote-clearing RELEASE COMPLETE body, handset-owned
 answer decision, sustained accepted downlink and bidirectional HLE media must
 precede normal clearing. Navi/Enter is not accepted as its physical Send marker.
 
+`verify-5210-radio-outgoing-call-sip` independently cold-boots NSM-5 v5.40E,
+physically dials `5551234` and presses Send using its established startup
+cadence. Its captured SETUP is 15 bytes; the shared wire encoding does not
+substitute another product's DSP, PCM, storage or keypad profile. Its own
+`noki5210.cfg` enables the laboratory `CALLHOST` configuration. Actual SIP
+confirmation, sustained ordered accepted downlink, bidirectional HLE host media
+and firmware CC/RR release are required. Queue drops remain visible, and no
+native DSP speech or new physical-waveform claim is made. Incoming 5210 SIP is
+not yet enabled.
+
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps
 486/600 to busy and other pre-confirmation failures to no-answer plus explicit

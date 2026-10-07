@@ -12,6 +12,7 @@ SETUP = {
     '3310': 'length=19 data=03450404600200815e0581551532f4a2150101',
     '3330': 'length=18 data=03450404600200815e0581551532f4150101',
     '3410': 'length=15 data=03450401a05e0581551532f4150101',
+    '5210': 'length=15 data=03450401a05e0581551532f4150101',
 }
 
 
@@ -85,7 +86,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
                            SimpleNamespace(incoming=True, restore_idle=False, product=product))
 
     def test_own_incoming_connect_and_release_are_accepted(self):
-        for product in SETUP:
+        for product in ('3210', '3310', '3330', '3410'):
             with self.subTest(product=product):
                 self.check_incoming(product, product)
 
