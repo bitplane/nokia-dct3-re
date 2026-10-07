@@ -2160,6 +2160,19 @@ multiword-store and return fixtures, but the metadata diagnostic still has
 cursor 27, RX/TX 36/47 and no metadata delivery. It does not close this
 general timer/write/pipeline boundary.
 
+The ISR's return path is also checked independently of its endpoint PC.
+The vector saves XPC, the handler reserves a frame word, and its stack store
+selects the original `FRETE` stub at `02:4044`. A bounded read-only trace
+shows the first RET taking that stub, then restoration of XPC `2`, PC
+`98de`, and the pre-interrupt SP `1272`. The following TINT repeats the
+same frame; no cumulative stack loss or substituted return target is seen.
+The temporary stack probe is removed after harvesting this conclusion.
+The firmware-free `probe-c54x-timer-boundary` reproduces starvation with
+just indirect PRD/TCR stores and a `PSHM XPC; FRETE` ISR; its long-period
+control reaches the IMR mask. This excludes NAND, codec and serial work as
+necessary causes of the stall, but is not proof of the exact physical
+interrupt latency. See [the CPU contract](rom4_dsp_loader.md) for scope.
+
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
 section 5.5.3.5 and table 5-4). Linear `*AR+0B` indexing made the codec

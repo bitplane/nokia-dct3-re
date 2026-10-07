@@ -567,6 +567,25 @@ store and an interrupt-return sequence: the ISR's stacked PC proves the
 following instruction completed before entry. These fixtures failed before
 the guard was implemented. They do not establish general six-stage pipeline
 drain timing or protect arbitrary writes to ST1.
+`make probe-c54x-timer-boundary` runs a separate, firmware-free observation
+profile (`tms54test -bios timer`). It reloads PRD through indirect stores,
+then sets AR1 to IMR and masks TINT. The ISR consists only of `PSHM XPC`
+and `FRETE`. With PRD 1 the current core repeatedly returns to `01:0608`,
+before the mask, with SP `1000` restored and IMR/IFR `0008`. With PRD 256
+it reaches the marker after masking, then the branch loop at `01:060f`;
+SP is again `1000`, IMR is zero and IFR retains pending TINT. No ROM,
+NAND, serial peripheral or handset state participates in this reproduction.
+The long-period control is checked, but the short-period result is printed
+rather than asserted as correct: this probe is not a fidelity gate. It is
+the small executable comparison for a future generic interrupt/write/drain
+timing correction. Full pipeline behavior still requires an independently
+derived timing oracle; changing PRD to make the handset proceed is not a fix.
+TI's [SPRU598B simulator overview](https://www.ti.com/lit/pdf/spru598),
+sections 1.1 and 2.3, documents timer-capable C54x configurations and a
+pipelined execution mode. This is a potential software-only differential
+oracle for the synthetic probe, not a simulator run already performed.
+Pipeline-flush-on-halt mode changes observation and profiling behavior;
+an eventual comparison must identify the selected device and execution mode.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their

@@ -407,6 +407,7 @@ help:
 	@echo "make verify-3410-radio-paging check NHM-2 PCH access and Paging Response"
 	@echo "make verify-3310-frontier boot local v6.39 to its deterministic idle frame"
 	@echo "make verify-5110-menu boot ROM4/C54x and open the NSE-1 Phone book menu"
+	@echo "make probe-c54x-timer-boundary observe synthetic timer reload/mask timing (not a fidelity gate)"
 	@echo "make verify-5110-late-input open the NSE-1 menu after the later idle interval"
 	@echo "make verify-5110-power-lifecycle check short and sustained NSE-1 power presses"
 	@echo "make verify-5110-save-state restore ROM4/C54x idle then open the menu"
@@ -1181,6 +1182,12 @@ check-c54x-core: build
 	@grep -q "TMS320C54x stack address latency conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x RC ALT conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x software interrupt conformance: PASS" /tmp/tms320c54x-core-check.log
+
+# Diagnostic observation only: the short-period outcome is deliberately not
+# asserted until interrupt recognition/drain timing has an independent oracle.
+.PHONY: probe-c54x-timer-boundary
+probe-c54x-timer-boundary: build
+	$(MAME_DIR)/mame tms54test -bios timer -video none -sound none -nothrottle -seconds_to_run 1
 
 prepare-c54x-rom4-fixture:
 	@test -f roms/research/nse1-rom4/working/transform_entry_prog.bin

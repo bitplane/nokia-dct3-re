@@ -28,6 +28,31 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_timer_boundary_probe(bool short_period)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		// Synthetic timer reload followed by IMR masking. No handset image.
+		u16 const code[] = {0x7711, 0x0025, 0x7681, u16(short_period ? 1 : 0x0100),
+			0x7711, 0x0026, 0x7681, 0x0020, 0x7711, 0,
+			0x6881, 0xfff7, 0x76f8, 0x0501, 1, 0xf073, 0x060f};
+		for (unsigned i = 0; i < std::size(code); ++i)
+			program.write_word(0x010600 + i, code[i]);
+		program.write_word(0x01004c, 0x4a1e); // Save XPC, as a far-return ISR requires.
+		program.write_word(0x01004d, 0xf4e5); // FRETE
+		data.write_word(0x0501, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x010600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = short_period ? 7000 : 7001;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_intm_protection_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -520,6 +545,12 @@ private:
 
 	virtual void machine_reset() override
 	{
+		if (!strcmp(machine().system().name, "tms54test") &&
+				!strcmp(machine().options().bios(), "timer"))
+		{
+			start_timer_boundary_probe(true);
+			return;
+		}
 		if (!strcmp(machine().system().name, "tms54rom4"))
 		{
 			auto &data = m_cpu->space(AS_DATA);
@@ -929,6 +960,23 @@ private:
 
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
+		if (m_phase == 7000 || m_phase == 7001)
+		{
+			bool const short_period = m_phase == 7000;
+			u16 const marker = m_cpu->space(AS_DATA).read_word(0x0501);
+			osd_printf_info("TMS320C54x timer boundary probe: period=%u mask_reached=%u pc=%06x sp=%04x imr=%04x ifr=%04x correctness_claim=0\n",
+				short_period ? 1 : 0x0100, marker, unsigned(m_cpu->state_int(STATE_GENPC)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Timer probe executes supported synthetic instructions");
+			if (short_period) { start_timer_boundary_probe(false); return; }
+			expect(marker == 1 && !(m_cpu->state_int(tms320c54x_device::STATE_IMR) & 8),
+				"Long-period control reaches the IMR mask before first timer expiry");
+			osd_printf_info("TMS320C54x timer boundary probe: complete cases=2 fidelity_acceptance=0\n");
+			machine().schedule_exit();
+			return;
+		}
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		static constexpr u8 rom4_saved_mmr[] = {
@@ -15705,6 +15753,8 @@ ROM_START(nse5verify)
 ROM_END
 
 ROM_START(tms54test)
+	ROM_SYSTEM_BIOS(0, "core", "Core conformance tests")
+	ROM_SYSTEM_BIOS(1, "timer", "Timer interrupt boundary observation (not fidelity acceptance)")
 ROM_END
 
 ROM_START(tms54rom4)
