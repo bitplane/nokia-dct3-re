@@ -13230,6 +13230,24 @@
       }]
     },
     {
+      "name": "verify-5210-radio-incoming-call-sip-cancel",
+      "prerequisites": ["normalize-5210"], "variables": {},
+      "steps": [{
+        "step": "delegate", "silent": true,
+        "target": "verify-radio-outgoing-call-sip",
+        "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki5210 SIP_HANDSET_BIOS=540e SIP_HANDSET_KEYS= SIP_HANDSET_RUNNER_ARGS='--incoming --cancel-incoming --product 5210' SIP_HANDSET_SECONDS=40"
+      }]
+    },
+    {
+      "name": "verify-5210-radio-incoming-call-sip-alerting-restore",
+      "prerequisites": ["normalize-5210"], "variables": {},
+      "steps": [{
+        "step": "delegate", "silent": true,
+        "target": "verify-radio-outgoing-call-sip",
+        "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki5210 SIP_HANDSET_BIOS=540e SIP_HANDSET_KEYS= SIP_HANDSET_RUNNER_ARGS='--incoming --restore-call --restore-phase alerting --product 5210' SIP_HANDSET_SCRIPT=../tools/sip_call_state_roundtrip.lua SIP_HANDSET_SECONDS=40"
+      }]
+    },
+    {
       "name": "verify-radio-incoming-call-sip",
       "prerequisites": [],
       "variables": {},

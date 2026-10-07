@@ -392,6 +392,7 @@ make verify-radio-incoming-call-sip-cancel RUN_DIR=run_3210_sip_cancel
 make verify-3310-radio-incoming-call-sip-cancel RUN_DIR=run_3310_sip_cancel
 make verify-3330-radio-incoming-call-sip-cancel RUN_DIR=run_3330_sip_cancel
 make verify-3410-radio-incoming-call-sip-cancel RUN_DIR=run_3410_sip_cancel
+make verify-5210-radio-incoming-call-sip-cancel RUN_DIR=run_5210_sip_cancel
 ```
 
 The real SIP caller cancels only after the handset reports alerting. The gate
@@ -437,6 +438,7 @@ make verify-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3210_sip_alerti
 make verify-3310-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3310_sip_alerting_restore
 make verify-3330-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3330_sip_alerting_restore
 make verify-3410-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3410_sip_alerting_restore
+make verify-5210-radio-incoming-call-sip-alerting-restore RUN_DIR=run_5210_sip_alerting_restore
 ```
 
 The alerting variant omits physical Answer. Loading the ringing snapshot closes

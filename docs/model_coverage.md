@@ -52,6 +52,28 @@ The levels are cumulative:
 `Partial` in the Booting column means a deterministic execution boundary is
 reached but the complete product boot acceptance gate does not currently pass.
 
+## External SIP evidence
+
+These independently executed profiles connect to a real local PJSIP endpoint
+through the standalone host bridge. They do not promote native DSP execution,
+real RF service or the other firmware versions of the same handset.
+
+| Tested profile | Incoming/outgoing SIP with HLE media | Connected/ringing restore and caller CANCEL | SIP physical waveform proof |
+| --- | --- | --- | --- |
+| 3210 v6.00 | Yes | Yes | Yes, both directions |
+| 3310 v6.39 | Yes | Yes | Yes, both directions |
+| 3330 v4.50E | Yes, own physical PMM setup | Yes | Not tested |
+| 3410 v5.46E | Yes, physical Send | Yes | Not tested |
+| 5210 v5.40E | Yes, physical Send | Yes | Not tested |
+
+Media transport requires sustained ordered handset acceptance, not merely
+bridge transmission counts; bounded queue drops remain reported. Restore gates
+clear the external dialog and the restored GSM call under a new epoch, rather
+than claiming to restore SIP. Unanswered scenarios reject Answer/CONNECT and
+accepted media. Named gates, protocol details and waveform limits are maintained
+in `external_call_bridge.md`. Signaling-only research products have not inherited
+this media promotion.
+
 ## Product-boundary cautions
 
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not
