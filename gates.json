@@ -13063,7 +13063,7 @@
         "\t\t$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \\",
         "\t\tnoki3210 -rompath roms -log -video none -sound none -throttle \\",
         "\t\t-keyboardprovider none -mouseprovider none -lightgunprovider none -joystickprovider none -midiprovider none \\",
-        "\t\t-skip_gameinfo -autoboot_script ../mame_nokia_dct3_input_exerciser.lua -verbose \\",
+        "\t\t-skip_gameinfo -autoboot_script $(SIP_HANDSET_SCRIPT) -verbose \\",
         "\t\t-cfg_directory $(SIP_HANDSET_CONFIG) -http -http_port 18100 \\",
         "\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run $(SIP_HANDSET_SECONDS)"
       ]
@@ -13078,6 +13078,19 @@
           "silent": true,
           "target": "verify-radio-outgoing-call-sip",
           "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
+      "name": "verify-radio-incoming-call-sip-restore",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--incoming --restore-call' SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_SCRIPT=../tools/sip_call_state_roundtrip.lua SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48"
         }
       ]
     },

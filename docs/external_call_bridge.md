@@ -331,7 +331,7 @@ The implemented mapping subset also covers 403/603 -> 21, 404/604 -> 1,
 408 -> 102 and 500/503 -> 41; these have pure mapping tests, not handset runtime
 gates. Unhandled statuses use an explicit cause-41 fallback policy. Warning and
 Reason headers, authentication retries and full RFC 3398 interoperability are
-not implemented. SIP-linked save/load remains a separate target.
+not implemented.
 
 ### Incoming cancellation
 
@@ -348,6 +348,26 @@ transaction. Stopping the traffic channel alone is not the cancellation gate's
 completion criterion. This covers cancellation while alerting, not every SIP
 transaction race or cancellation before paging.
 
+### Connected-call restoration
+
+```sh
+make verify-radio-incoming-call-sip-restore RUN_DIR=run_3210_sip_restore
+```
+
+The fixture physically answers an incoming SIP call, saves at 19 seconds and
+loads one second later. The checker requires that connection precede the save,
+the real external SIP dialog close with BYE, and the restored GSM transaction
+clear with cause 41 under epoch 2. External dialogs are not part of MAME save
+states and are never replayed. Codec state and uplink sequence tracking reset
+at the epoch boundary; media delivery remains disabled during restored-call
+clearing. Only the matching restored transaction's `ended` event releases that
+guard, not an unrelated completion message.
+
+This proves the connected incoming-call restoration boundary on the 3210 HLE
+profile, not native DSP speech, exact media continuity, idle restoration or all
+outgoing/alerting save-load races. The fixture's fixed save time is validated
+against the observed connected event rather than assumed to be connected.
+
 ### Waveform probe
 
 `tools/run_dct3_sip_backend_probe.py` independently tests the same bridge with
@@ -359,5 +379,5 @@ not inject anything into a phone or establish handset coverage:
 PYTHONPATH="$SIP_PYTHON_PATH" .venv/bin/python tools/run_dct3_sip_backend_probe.py --pjsua "$SIP_PJSUA_BIN" --run-dir run_sip_backend_probe
 ```
 
-Next boundaries are executable restoration/failure coverage and microphone/earpiece waveform
+Next boundaries are broader restoration/failure coverage and microphone/earpiece waveform
 acceptance. Native DSP speech remains its independent hardware/backend milestone.

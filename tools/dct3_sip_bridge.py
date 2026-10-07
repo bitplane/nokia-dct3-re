@@ -216,6 +216,7 @@ async def bridge(args, pj):
     decision = False
     connected = False
     blocked_restore = False
+    restored_identity = None
     registered = False
     downlink_sequence = 0
     uplink_sequence = -1
@@ -238,10 +239,14 @@ async def bridge(args, pj):
                             if epoch is not None and epoch != event.get('epoch'):
                                 endpoint.hangup()
                                 blocked_restore = True
+                                restored_identity = None
                                 connected = False
                                 identity = None
+                                decision = False
+                                uplink_sequence = -1
                                 codec.close()
                                 codec = GsmFrCodec()
+                                print(f'SIP epoch changed old={epoch} new={event.get("epoch")}; clearing external dialog', flush=True)
                             epoch = event.get('epoch')
                             endpoint.incoming_epoch = epoch
                             endpoint.incoming_enabled = False
@@ -266,6 +271,7 @@ async def bridge(args, pj):
                                     print(f'SIP dial identity={identity} digits={digits}', flush=True)
                             elif kind in ('outgoing_call_state', 'incoming_call_state'):
                                 if blocked_restore and event.get('phase') != 'ended':
+                                    restored_identity = incoming_identity
                                     await websocket.send(json.dumps({
                                         'type': kind.replace('_state', '_terminate'), 'epoch': epoch,
                                         'request_id': event['request_id'], 'cause': 41}))
@@ -296,9 +302,14 @@ async def bridge(args, pj):
                                         codec.close()
                                         codec = GsmFrCodec()
                                         endpoint.incoming_enabled = registered and not blocked_restore
-                                if event.get('phase') == 'ended':
+                                if (blocked_restore and event.get('phase') == 'ended' and
+                                        incoming_identity == restored_identity):
+                                    print(f'SIP restored call cleared identity={incoming_identity}', flush=True)
                                     blocked_restore = False
+                                    restored_identity = None
                                     endpoint.incoming_enabled = registered and identity is None
+                                    if args.once:
+                                        return
                             elif (kind == f'{direction}_call_media_uplink' and connected and
                                   incoming_identity == identity):
                                 sequence = event.get('sequence')

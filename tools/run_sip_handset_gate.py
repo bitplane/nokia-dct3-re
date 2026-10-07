@@ -103,6 +103,9 @@ async def run(args):
                     process.kill()
                     await process.wait()
     remote_text = (root / 'sip-remote.log').read_text(errors='replace')
+    if args.restore_call:
+        verify_restore(root, remote_text)
+        return
     if args.cancel_incoming:
         verify_cancel(root, remote_text)
         return
@@ -190,6 +193,34 @@ def verify_failure(root, remote_text, status):
     print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
 
 
+def verify_restore(root, remote_text):
+    bridge = (root / 'sip-bridge.log').read_text(errors='replace')
+    log = (root / 'error.log').read_text(errors='replace')
+    if ('state changed to CONFIRMED' not in remote_text or
+            'Request msg BYE/' not in remote_text):
+        raise RuntimeError('restoration did not close a real connected SIP dialog')
+    for marker in ('SIP epoch changed old=1 new=2',
+                   'SIP restored call cleared identity=(2, 1)'):
+        if marker not in bridge:
+            raise RuntimeError(f'missing SIP restoration checkpoint: {marker}')
+    if bridge.count('SIP incoming identity=') != 1:
+        raise RuntimeError('restoration replayed the incoming SIP dialog')
+    cursor = 0
+    for pattern in (
+            r'incoming state id=1 epoch=1 phase=connected',
+            r'sip_state: saved', r'sip_state: restored',
+            r'termination id=1 cause=41 result=accepted',
+            r'incoming state id=1 epoch=2 phase=ended'):
+        match = re.search(pattern, log[cursor:])
+        if not match:
+            raise RuntimeError(f'missing handset restoration checkpoint: {pattern}')
+        cursor += match.end()
+    (root / 'sip-result.json').write_text(json.dumps({
+        'scope': '3210 answered HLE SIP call save/load; external dialog cleared, not restored',
+        'passed': True}, indent=2) + '\n')
+    print('OK - save/load cleared real SIP dialog and restored GSM call under new epoch')
+
+
 def verify_cancel(root, remote_text):
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
@@ -232,6 +263,7 @@ def main():
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--cancel-incoming', action='store_true')
+    parser.add_argument('--restore-call', action='store_true')
     parser.add_argument('--sip-response', type=int, choices=(200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -239,6 +271,8 @@ def main():
         parser.error('--sip-response failure fixtures are outgoing only')
     if args.cancel_incoming and not args.incoming:
         parser.error('--cancel-incoming requires --incoming')
+    if args.restore_call and (not args.incoming or args.cancel_incoming):
+        parser.error('--restore-call requires an answered incoming call')
     if args.command[:1] == ['--']:
         args.command = args.command[1:]
     if not args.command:
