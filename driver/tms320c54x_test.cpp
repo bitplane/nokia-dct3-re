@@ -9,6 +9,7 @@
 #include "nokia_dspif.h"
 #include "nokia_cobba.h"
 #include "tms320c54x_mcbsp.h"
+#include "tms320c54x_dma.h"
 #include <sstream>
 
 namespace {
@@ -21,7 +22,8 @@ public:
 		driver_device(mconfig, type, tag),
 		m_cpu(*this, "maincpu"),
 		m_transport(*this, "dspif"),
-		m_idle_mcbsp(*this, "idle_mcbsp")
+		m_idle_mcbsp(*this, "idle_mcbsp"),
+		m_idle_dma(*this, "idle_dma")
 	{
 	}
 
@@ -29,6 +31,38 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void start_idle_dma_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		u16 const idle[] = {0xf4e1, 0xf6e1, 0xf5e1};
+		program.write_word(0x010960, idle[index / 2]);
+		program.write_word(0x010961, 0x76f8);
+		program.write_word(0x010962, 0x0501);
+		program.write_word(0x010963, 1);
+		program.write_word(0x010964, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_idle_mcbsp_external = false;
+		m_idle_mcbsp->reset();
+		m_idle_dma->reset();
+		m_idle_dma_completions = 0;
+		u16 const registers[] = {0x0520, 0x0530, 3, 0, 0x4145}; // Data/data, increment both, block IRQ.
+		m_idle_dma->write(1, 0);
+		for (u16 value : registers) m_idle_dma->write(2, value);
+		for (unsigned i = 0; i < 4; ++i)
+		{
+			data.write_word(0x0520 + i, 0x1111 * (i + 1));
+			data.write_word(0x0530 + i, 0);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, index & 1 ? 0x40 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(STATE_GENPC, 0x010960);
+		data.write_word(0x0501, 0);
+		m_phase = 6280 + index * 2;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_idle_external_serial_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -1171,6 +1205,52 @@ private:
 				"external McBSP completes while clocks stop and wakes only with its IMR bit enabled");
 			if (index < 3) { start_idle_external_serial_case(index + 1); return; }
 			osd_printf_info("TMS320C54x IDLE2/3 McBSP external clock: PASS cases=4\n");
+			start_idle_dma_case(0);
+			return;
+		}
+		if ((m_phase >= 6280 && m_phase < 6292) || (m_phase >= 6300 && m_phase < 6306))
+		{
+			unsigned const index = m_phase >= 6300 ? m_phase - 6300 : (m_phase - 6280) / 2;
+			unsigned const step = m_phase >= 6300 ? 2 : (m_phase - 6280) % 2;
+			if (!step)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(STATE_GENPC) == 0x010961 && m_idle_dma_completions == 0,
+					"DMA fixture starts with CPU idle and channel disabled");
+				m_idle_dma->write(0, 1);
+				m_saved_repeat.str(std::string());
+				m_saved_repeat.clear();
+				expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+					"save pending DMA transfer with CPU idle");
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			bool const enabled = index & 1;
+			for (unsigned i = 0; i < 4; ++i)
+				expect(m_cpu->space(AS_DATA).read_word(0x0530 + i) == 0x1111 * (i + 1),
+					"DMA copies its complete block while CPU execution is suspended");
+			expect(m_idle_dma_completions == 1 && !(m_idle_dma->read(0) & 1) &&
+				(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x40) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == (enabled ? 0x010965 : 0x010961) &&
+				m_cpu->space(AS_DATA).read_word(0x0501) == (enabled ? 1 : 0),
+				"DMA completion wakes each idle mode only when enabled in IMR, independently of INTM");
+			if (step == 1)
+			{
+				m_saved_repeat.clear();
+				m_saved_repeat.seekg(0);
+				expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE &&
+					(m_idle_dma->read(0) & 1) && m_cpu->state_int(STATE_GENPC) == 0x010961 &&
+					m_cpu->space(AS_DATA).read_word(0x0530) == 0,
+					"restore pending DMA and sleeping CPU before the first transfer");
+				m_idle_dma_completions = 0;
+				m_phase = 6300 + index;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			if (index < 5) { start_idle_dma_case(index + 1); return; }
+			osd_printf_info("TMS320C54x IDLE DMA transfer: PASS cases=6 save_replay=6 clock_rate_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -15717,6 +15797,8 @@ private:
 	optional_device<tms320c54x_mcbsp_device> m_idle_mcbsp;
 	unsigned m_idle_mcbsp_words = 0;
 	bool m_idle_mcbsp_external = false;
+	optional_device<tms320c54x_dma_device> m_idle_dma;
+	unsigned m_idle_dma_completions = 0;
 	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
@@ -15748,6 +15830,15 @@ void tms320c54x_test_state::test(machine_config &config)
 	});
 	m_idle_mcbsp->tx_irq_cb().set([this](int state) {
 		if (m_idle_mcbsp_external) m_cpu->set_input_line(5, state);
+	});
+	TMS320C54X_DMA(config, m_idle_dma, 13'000'000);
+	m_idle_dma->set_cpu(m_cpu);
+	m_idle_dma->completion_cb().set([this](u8 channel) {
+		expect(channel == 0, "idle DMA fixture completes only its configured channel");
+		++m_idle_dma_completions;
+		// Fixture routing selects the documented DMAC0/BRINT2 vector slot.
+		m_cpu->set_input_line(6, ASSERT_LINE);
+		m_cpu->set_input_line(6, CLEAR_LINE);
 	});
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);

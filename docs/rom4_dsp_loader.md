@@ -1173,6 +1173,15 @@ cases verify externally clocked words complete while asleep and wake the CPU
 only with the serial IMR bit enabled. These synthetic edges establish ordering,
 not a physical baud rate. DMA input-clock switching, PLL stabilization and
 unsupported serial clock/frame configurations remain outside this coverage.
+Six coupled CPU/DMA cases additionally cover all three IDLE modes with masked
+and enabled completion interrupts while INTM remains set. The real DMA device
+copies a four-word data-memory block after the CPU has entered idle; masked
+completion leaves the foreground asleep, while enabled completion resumes it.
+Each case saves before the first transfer, restores the pending device timer
+and sleeping CPU, and reproduces the block and wake result. The fixture selects
+the documented DMAC0/BRINT2 vector slot explicitly; it does not validate a
+product's interrupt mux. Its 100-us observation window establishes completion
+and ordering only, not the two-clock transfer cadence or IDLE3 input-clock rate.
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
 pointer. The fixture checks both results and the three one-cycle operations

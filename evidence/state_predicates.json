@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_idle_dma_transfer", "owner": "native_dsp_cpu", "status": "satisfied",
+      "predicate": "DMA transfers remain operational during IDLE1/2/3 and completion wakes the CPU only when enabled in IMR, independently of INTM",
+      "current": "Six coupled CPU/DMA fixtures enter each idle mode before enabling a four-word data-memory transfer. All blocks complete exactly once with the channel disabled afterward and its interrupt pending. Masked completion leaves the foreground asleep; enabled completion with INTM set resumes the continuation without entering an ISR. Every case saves before the first transfer and replays the complete block and wake outcome after restore. The fixture routes DMAC0 through the documented shared BRINT2 vector slot; product interrupt muxes, two-clock bus cadence and IDLE3 X2/CLKIN rate are not promoted. Full core conformance passes.",
+      "evidence": ["docs/rom4_dsp_loader.md", "driver/tms320c54x_test.cpp", "driver/tms320c54x_dma.cpp", "Makefile"]
+    },
+    {
       "id": "c54x_deep_idle_mcbsp_clock", "owner": "native_music_dsp_bench", "status": "satisfied",
       "predicate": "CPU IDLE2/3 pauses the internal McBSP bit generator while externally clocked/frame-synchronized transfers remain operational",
       "current": "Four coupled CPU/device cases keep an internal queued a55a word pending across deep idle and restore its pending clock/shift state through save/load; enabled external wake resumes completion. Four further pin-driven cases complete the same external word during IDLE2/3 with masked or enabled serial interrupts; only enabled serial IMR resumes the foreground. The MU4 CPU clock-stop callback is wired to McBSP0/1/2, and original recorder polled control passes with the unchanged raw NAND snapshot. SPRU302B 2.10/3.8 allows McBSP/DMA activity in deep idle, so no blanket internal-interrupt filter or DMA halt is introduced. Tests establish ordering, not physical baud, PLL lock time, DMA clock-source switching or unsupported clock/frame configurations.",
