@@ -57,11 +57,13 @@ class SipHandsetWaveformTest(unittest.TestCase):
             root = Path(directory)
             self.recording(root, [(440, 8000)] * 2).rename(root / 'sip-microphone.wav')
             self.recording(root, [(660, 8000)] * 2).rename(root / 'sip-earpiece.wav')
-            verify(root, '3310', 'incoming')
-            result = json.loads((root / 'sip-waveform-result.json').read_text())
-            self.assertTrue(result['scope'].startswith('3310 HLE'))
-            self.assertIn('not native DSP speech', result['scope'])
-            self.assertEqual(result['direction'], 'incoming')
+            for product in ('3210', '3310', '3410'):
+                with self.subTest(product=product):
+                    verify(root, product, 'incoming')
+                    result = json.loads((root / 'sip-waveform-result.json').read_text())
+                    self.assertTrue(result['scope'].startswith(f'{product} HLE'))
+                    self.assertIn('not native DSP speech', result['scope'])
+                    self.assertEqual(result['direction'], 'incoming')
 
 
 if __name__ == '__main__':

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 389 gates: 242 generated from typed steps, 147 copied verbatim (shell).
+# 391 gates: 244 generated from typed steps, 147 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -241,6 +241,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-incoming-call-sip-alerting-restore \
 	verify-3310-radio-outgoing-call-sip-busy-redial \
 	verify-3310-radio-outgoing-call-sip-unavailable-redial \
+	verify-3410-radio-outgoing-call-sip-waveform \
+	verify-3410-radio-incoming-call-sip-waveform \
 	verify-3310-radio-incoming-call-sip-waveform \
 	verify-radio-incoming-call-sip-waveform verify-3310-radio-incoming-call-sip \
 	verify-3310-radio-outgoing-call-sip-waveform \
@@ -3774,6 +3776,12 @@ verify-3310-radio-outgoing-call-sip-busy-redial:
 
 verify-3310-radio-outgoing-call-sip-unavailable-redial:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 SIP_HANDSET_KEYS=5,5,5,1,2,3,4,enter SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=70 SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--product 3310 --sip-response 480 --calls 2'
+
+verify-3410-radio-outgoing-call-sip-waveform: normalize-3410
+	SIP_PRODUCT=3410 RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh
+
+verify-3410-radio-incoming-call-sip-waveform: normalize-3410
+	SIP_PRODUCT=3410 SIP_DIRECTION=incoming RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh
 
 verify-3310-radio-incoming-call-sip-waveform:
 	SIP_PRODUCT=3310 SIP_DIRECTION=incoming RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh

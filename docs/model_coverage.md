@@ -63,7 +63,7 @@ real RF service or the other firmware versions of the same handset.
 | 3210 v6.00 | Yes | Yes | Yes, both directions |
 | 3310 v6.39 | Yes | Yes | Yes, both directions |
 | 3330 v4.50E | Yes, own physical PMM setup | Yes | Not tested |
-| 3410 v5.46E | Yes, physical Send | Yes | Not tested |
+| 3410 v5.46E | Yes, physical Send | Yes | Yes, incoming and outgoing |
 | 5210 v5.40E | Yes, physical Send | Yes | Not tested |
 
 Media transport requires sustained ordered handset acceptance, not merely
