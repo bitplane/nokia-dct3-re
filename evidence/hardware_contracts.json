@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_stream_selection_operands", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Original common code uses DP 017b with CPL clear: direct operand base bd80, not low peripherals. Worker observations give bdb8=0001, bdb9=0010, bde3=0000, bde4=8028 and bde7=3da6. At 3f5b A=-15 makes AGT false; at 3f5f A=0001000000 from bdbc=1 makes ALT false. Original TX ISR increments bdbc at 02:8b0d..8b0e and decrements it at 02:8b52..8b53; initialization leaves it zero. Common tail actually executes RET at 3da6. Paged epilogue probes observe TC clear after BITF 8000 at 02:8b54 and BC NTC at 02:8b56 taking ordinary epilogue 02:8b6d, not deferred return-word replacement 02:8b63. Static startup helper 6d44 calls 3f1d at 6d5e; entry calls that helper at 6dbf after far call 02:904b. Execution of that startup continuation is the next question, not a proven missing step. Official queue/priority identities and full consumer lifecycle remain unresolved; no firmware state or hardware event is injected",
+      "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
+    },
+    {
       "id": "npm5_mu4_stream_descriptor_population", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Original 02:6d89 populates data object 806e, including 8074=0002 and 8075=9545, an address pair matching the candidate consumer entry 02:9545. Worker acceptance checks the pair and separately counts actual entry fetches. Common code at 02:3f41 writes the first object word to zero; 02:3f57 writes 8071=802b. Endpoint prefix is 0000,bdc8,0010,802b,0000,0000,0002,9545. Original writes at 002fa8/02:6d89/02:6d0d leave data 007e=4000; common routines test masks c001/c020. The uninitialized-object/word hypothesis is falsified, but selection/resume semantics and official task/priority/stack identity remain unresolved. No object field, callback or firmware state is forced",
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]

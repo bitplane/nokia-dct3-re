@@ -108,6 +108,8 @@ private:
 	unsigned m_native_stream_pending_sets = 0, m_native_stream_pending_clears = 0, m_native_stream_pending_reads = 0;
 	unsigned m_native_dispatch_traces = 0, m_native_descriptor_traces = 0;
 	unsigned m_native_stream_consumer_entries = 0;
+	unsigned m_native_selection_traces[17] = {};
+	unsigned m_native_selection_writes = 0;
 	bool m_native_worker_window_started = false;
 	attotime m_native_worker_window_start;
 	std::vector<u16> m_native_tx_words;
@@ -341,6 +343,8 @@ private:
 		m_native_stream_pending_sets = m_native_stream_pending_clears = m_native_stream_pending_reads = 0;
 		m_native_dispatch_traces = m_native_descriptor_traces = 0;
 		m_native_stream_consumer_entries = 0;
+		std::fill(std::begin(m_native_selection_traces), std::end(m_native_selection_traces), 0);
+		m_native_selection_writes = 0;
 		m_native_worker_window_started = false;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
@@ -1108,6 +1112,44 @@ private:
 						m_cpu->space(AS_PROGRAM).read_word(address + 2), m_cpu->space(AS_PROGRAM).read_word(address + 3),
 						address == base + 0x68 ? 10 : 11);
 				});
+			m_cpu->space(AS_DATA).install_write_tap(0xbdb8, 0xbde7, "mu4_native_selection_state",
+				[this](offs_t address, u16 &value, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled() ||
+						(address != 0xbdb8 && address != 0xbdb9 && address != 0xbdbc &&
+						 address != 0xbde3 && address != 0xbde4 && address != 0xbde7)) return;
+					if (m_native_selection_writes++ < 32)
+						logerror("mu4_native_selection_write: address=%04x value=%04x pc=%06x\n",
+							unsigned(address), value, unsigned(m_cpu->state_int(STATE_GENPC)));
+				});
+			auto const selection_observer = [this](offs_t address, u16 &opcode, u16)
+				{
+					address &= 0xffff;
+					if (m_phase != 30 || !m_native_dma_tx_handler || machine().side_effects_disabled() ||
+						u16(m_cpu->state_int(tms320c54x_device::STATE_PC)) != address + 1) return;
+					static constexpr u16 addresses[] = {
+						0x3f37, 0x3f4b, 0x3edc, 0x3ef3, 0x3f3f, 0x3f40, 0x3f5b, 0x3f5f,
+						0x3f6b, 0x3da6, 0x3f6d, 0x8b56, 0x8b5a, 0x8b63, 0x8b6c, 0x8b74, 0x4045
+					};
+					auto const found = std::find(std::begin(addresses), std::end(addresses), address);
+					if (found == std::end(addresses)) return;
+					unsigned const slot = found - std::begin(addresses);
+					if (m_native_selection_traces[slot]++ >= 4) return;
+					u16 const st0 = m_cpu->state_int(tms320c54x_device::STATE_ST0), st1 = m_cpu->state_int(tms320c54x_device::STATE_ST1);
+					u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+					u16 const base = BIT(st1, 14) ? sp : (st0 & 0x1ff) << 7;
+					auto const disable = machine().disable_side_effects();
+					auto &data = m_cpu->space(AS_DATA);
+					logerror("mu4_native_selection: pc=%06x opcode=%04x st0=%04x st1=%04x sp=%04x base=%04x word007f=%04x ar2=%04x\n",
+						unsigned(m_cpu->state_int(STATE_GENPC)), opcode, st0, st1, sp, base, data.read_word(0x7f), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)));
+					logerror("mu4_native_selection_acc: a=%010llx\n", static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
+					if (base >= 0x80) logerror("mu4_native_selection_ram: base=%04x slot38=%04x slot39=%04x slot63=%04x slot64=%04x slot67=%04x\n",
+						base, data.read_word(u16(base + 0x38)), data.read_word(u16(base + 0x39)), data.read_word(u16(base + 0x63)),
+						data.read_word(u16(base + 0x64)), data.read_word(u16(base + 0x67)));
+					if (base >= 0x80) logerror("mu4_native_selection_control: slot3c=%04x\n", data.read_word(u16(base + 0x3c)));
+				};
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x3da6, 0x4045, "mu4_native_selection", selection_observer);
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x28afc, 0x28b74, "mu4_native_isr_selection", selection_observer);
 			m_cpu->space(AS_DATA).install_write_tap(0x48, 0x49, "mu4_native_mcbsp_config",
 				[this](offs_t offset, u16 &value, u16)
 				{

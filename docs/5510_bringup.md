@@ -1174,9 +1174,34 @@ and `02:6d0d`, and retains that value through the tail. Common routines test
 it against masks `c001` and `c020`; its broader semantics are unresolved.
 The object and word are firmware-initialized. Do not label `007e` as a missing hardware
 register or assign official task, priority or stack semantics from its value.
-Next decode how the common routines select/resume this initialized object's
-consumer and where the active lifecycle remains. Do not synthesize a worker
-callback, descriptor state or pending-word clear.
+The common routines use DP `017b` with CPL clear, so direct operands are
+RAM at base `bd80`, not low peripheral registers. In the worker run,
+`bdb8=0001`, `bdb9=0010`, `bde3=0000`, `bde4=8028` and `bde7=3da6`.
+At `3f5b`, the accumulator is signed `-15` after subtracting `0010` from
+`0001`; the AGT branch is not taken. At `3f5f`, loading `bdbc=1` into AH
+and shifting left eight produces positive `0001000000`, so the ALT branch
+to `3f6b` is not taken either. These are measured operands, not recovered
+official priority or queue names.
+
+`bdbc` is zero after initialization. The original TX ISR increments it at
+`02:8b0d..8b0e` and decrements it at `02:8b52..8b53`. Thus its value one
+inside the common helper is an interrupt-context condition, not absent
+hardware initialization. The later common path loads `bde7=3da6` and
+actually reaches `3da6`, whose instruction is `RET`. This callback alone
+does not enter the notification consumer. After decrementing `bdbc`, the
+ISR tests mask `8000` with `BITF` at `02:8b54`. Observed TC is clear and
+`BC NTC` at `02:8b56` takes `02:8b6d`, the ordinary interrupt epilogue.
+The alternative path through `02:8b63` would replace a saved return word;
+it is not observed in this tail. Probes must cover the paged `02:8xxx`
+program window, not just the common lower window.
+
+The next boundary is scheduler activation, not another DMA completion.
+Static original code has a call to common `3f1d` at `6d5e`, inside the
+startup helper at `6d44`. Entry code calls that helper at `6dbf`, after the
+far call to `02:904b`. Whether that call returns and the helper executes
+must be measured; these call sites alone are not proof of a missed startup
+step or an absent peer. Do not synthesize a worker callback, descriptor
+state or pending-word clear.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
