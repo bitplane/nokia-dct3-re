@@ -561,6 +561,17 @@ The connected fixture saves at 27 seconds, after this product's physical dial
 and before the remote endpoint's normal hangup; pending saves at 25 seconds.
 These are harness observation windows, not device timing changes.
 
+The 5210 v5.40E independently passes the same connected and pending outgoing
+restore contracts using fresh storage and its own physical Send sequence:
+
+```sh
+make verify-5210-radio-outgoing-call-sip-connected-restore RUN_DIR=run_5210_sip_outgoing_connected_restore
+make verify-5210-radio-outgoing-call-sip-pending-restore RUN_DIR=run_5210_sip_outgoing_pending_restore
+```
+
+The common pending checker also rejects accepted host media, not only CONNECT;
+an unanswered restored call must clear without starting an audio session.
+
 The 3310 NHM-5 v6.39 also completes a physical outgoing call through the local
 PJSIP bridge: handset SETUP, SIP confirmation, bidirectional host media, and
 normal CC/LAPDm release. Its SETUP bearer capability differs from the 3210;

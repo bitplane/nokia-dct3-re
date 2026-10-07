@@ -277,7 +277,8 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210'):
             raise RuntimeError(f'missing real pending SIP release: {marker}')
         remote_cursor = position + len(marker)
     if not connected and ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge or
-            re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log)):
+            re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log) or
+            re.search(r'gsm_call_adapter: media direction=\w+ id=1 .*result=accepted', log)):
         raise RuntimeError('pending outgoing restoration falsely connected')
     if (bridge.count('SIP dial identity=') != 1 or
             'SIP epoch changed old=1 new=2' not in bridge or

@@ -42,6 +42,7 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
     def test_product_scope(self):
         self.assertIn('3310 pending outgoing', self.check(product='3310'))
         self.assertIn('3410 pending outgoing', self.check(product='3410'))
+        self.assertIn('5210 pending outgoing', self.check(product='5210'))
 
     def test_missing_or_malformed_product_setup_is_rejected(self):
         for log in (LOG.replace('message=05', 'message=06'),
@@ -72,6 +73,11 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
     def test_missing_real_cancel_is_rejected(self):
         with self.assertRaises(RuntimeError):
             self.check(remote=REMOTE.replace('Request msg CANCEL/', ''))
+
+    def test_pending_media_acceptance_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            self.check(log=LOG + 'gsm_call_adapter: media direction=downlink id=1 epoch=1 result=accepted\n',
+                       product='5210')
 
     def test_reordered_sip_release_is_rejected(self):
         with self.assertRaises(RuntimeError):
