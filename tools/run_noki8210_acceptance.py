@@ -25,6 +25,8 @@ SCENARIOS = {
     'host-incoming-call': ('host_incoming_input', 60, 'incoming_call_check'),
     'host-incoming-sms': ('incoming_sms_input', 32, 'incoming_sms_check'),
     'host-outgoing-sms': ('outgoing_sms_input', 46, 'outgoing_sms_check'),
+    'host-rejected-sms': ('sms_reject_input', 58, 'outgoing_sms_check'),
+    'host-silent-sms': ('sms_silence_input', 125, 'outgoing_sms_check'),
 }
 
 
@@ -84,6 +86,10 @@ def main():
                 'host-incoming-sms': ('run_host_incoming_sms_gate', []),
                 'host-outgoing-sms': ('run_host_sms_gate', [
                     '--user-data', '41', '--user-data-length', '1']),
+                'host-rejected-sms': ('run_host_sms_gate', [
+                    '--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
+                'host-silent-sms': ('run_host_sms_gate', [
+                    '--user-data', '41', '--user-data-length', '1', '--decision', 'rp_silence']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
@@ -94,6 +100,9 @@ def main():
         storage = str(run / 'nvram/nsm3hle/sim_card')
         if args.scenario == 'host-incoming-call':
             check.extend(['--frames', str(run / 'snap')])
+        elif args.scenario in ('host-rejected-sms', 'host-silent-sms'):
+            check.extend(['--rejected' if args.scenario == 'host-rejected-sms' else '--rp-silence',
+                          '--recovery-frames', str(run / 'snap')])
         elif args.scenario == 'phonebook':
             shutil.copyfile(run / 'error.log', run / 'write.log')
             cold = command.copy()

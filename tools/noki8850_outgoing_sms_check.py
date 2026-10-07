@@ -57,15 +57,16 @@ def verify_silence(text: str, product: str = '8850') -> None:
         raise ValueError('RP result appeared in silent transaction')
 
 
-def check_recovery(text: str, frames: Path, *, rp_silence: bool = False) -> None:
+def check_recovery(text: str, frames: Path, *, rp_silence: bool = False,
+                   product: str = '8850', key_separator: str = '') -> None:
     require_ordered(text, (
         ('release', re.compile(r'TX packet type=02 .*radio_phase=release_channel_change'
                               if rp_silence else r'LAPDm service Channel Release acknowledged')),
-        ('physical End', re.compile(r'8850_sms_recovery_physical: key=End')),
-        ('End decode', re.compile(r'8850_keypad_decoded key=0f\b')),
-        ('physical Menu', re.compile(r'8850_sms_recovery_physical: key=Menu')),
-        ('Menu decode', re.compile(r'8850_keypad_decoded key=19\b')),
-    ), '8850 failed SMS recovery')
+        ('physical End', re.compile(re.escape(product) + r'_sms_recovery_physical: key=End')),
+        ('End decode', re.compile(re.escape(product + '_keypad_decoded' + key_separator) + r' key=0f\b')),
+        ('physical Menu', re.compile(re.escape(product) + r'_sms_recovery_physical: key=Menu')),
+        ('Menu decode', re.compile(re.escape(product + '_keypad_decoded' + key_separator) + r' key=19\b')),
+    ), product + ' failed SMS recovery')
 
     def digest(path, crop):
         with Image.open(path) as source:
@@ -78,9 +79,9 @@ def check_recovery(text: str, frames: Path, *, rp_silence: bool = False) -> None
                     if rp_silence else
                     '24aea298f2e0de336ee3fb10a5c767f912a07ec6eb14ca190e426b5c6320226a')
     if not any(digest(path, (0, 0, 60, 48)) == failure_hash
-               for path in frames.glob('8850_sms_reject_*.png')):
+               for path in frames.glob(product + '_sms_reject_*.png')):
         raise ValueError('missing reviewed message-not-sent presentation')
-    if digest(frames / '8850_sms_recovery_menu.png', (0, 0, 72, 16)) != (
+    if digest(frames / (product + '_sms_recovery_menu.png'), (0, 0, 72, 16)) != (
             '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'):
         raise ValueError('missing reviewed Messages recovery menu')
 

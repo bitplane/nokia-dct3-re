@@ -1,4 +1,6 @@
 import unittest
+from tools.test_noki8850_outgoing_sms_check import GOOD, SILENCE
+from tools.noki8210_outgoing_sms_check import verify_silence
 
 try:
     from tools.noki8210_outgoing_sms_check import verify
@@ -7,6 +9,21 @@ except ModuleNotFoundError:
 
 
 class OutgoingSmsTest(unittest.TestCase):
+    def test_rejected_submission_requires_error_result(self):
+        trace = GOOD.replace('8850_', '8210_').replace(
+            '8210_keypad_decoded key=', '8210_keypad_decoded: key=')
+        verify(trace.replace('kind=18', 'kind=19').replace('length=5', 'length=7'), rejected=True)
+        with self.assertRaises(ValueError):
+            verify(trace, rejected=True)
+
+    def test_silence_requires_mobile_release_and_no_rp_result(self):
+        trace = SILENCE.replace('8850_', '8210_')
+        verify_silence(trace, product='8210')
+        with self.assertRaisesRegex(ValueError, 'DISC'):
+            verify_silence(trace.replace('0080015301', '0080010301'), product='8210')
+        with self.assertRaisesRegex(ValueError, 'RP result'):
+            verify_silence(trace + '\nGSM service downlink kind=18 sapi=3', product='8210')
+
     def test_repeat_submission_reference(self):
         trace = '\n'.join((
             '8210_sms_send_physical: action=text_A',

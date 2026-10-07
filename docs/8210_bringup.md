@@ -332,7 +332,7 @@ Run any focused scenario from a new directory:
 Available scenarios are `registration`, `incoming-call`, `outgoing-call`,
 `incoming-sms`, `outgoing-sms`, `calculator`, `phonebook`, `idle-state` and
 `call-state`, `sms-state`, `host-incoming-call`, `host-incoming-sms` and
-`host-outgoing-sms`. Each seeds
+`host-outgoing-sms`, `host-rejected-sms` and `host-silent-sms`. Each seeds
 only the unchanged acquired base-record snapshot into a fresh persistent
 flash image. Incoming events use copied external network configuration;
 all UI interaction uses physical key fields. `phonebook` executes save
@@ -409,6 +409,18 @@ runner checks both the host protocol and the own-product handset contract.
 These tests establish external software SMS transport, not external carrier
 delivery or native DSP execution. `--port` and a new run directory isolate
 each case; the manifest retains the exact host command.
+
+`host-rejected-sms` selects explicit RP-ERROR: the handset closes CP/RP/RR,
+shows **Message not sent this time**, then physically decoded End/Menu
+reopen Messages. `host-silent-sms` supplies no RP result and observes for
+125 seconds. At about 104.5 seconds the handset sends main-link DISC;
+UA/channel deconfiguration ends the correlated host request and resumes
+paging. Its transient error is **Message sending failed**, not an RP result.
+Only afterwards do physical End/Menu test recovery. Both outcomes require
+their distinct reviewed English error text and Messages title, and reuse
+the evidenced 8850 protocol/presentation checker with NSM-3's own key-trace
+format. Silence fails if any RP-ACK/RP-ERROR appears. These are failure and
+recovery tests, not delivery; no handset timeout or release is injected.
 
 The shared observer retains staged-DSP/self-test, decoded-key and readiness
 acceptance records only. PMM copy/cache dump, column-mask and input-lifecycle
