@@ -1614,6 +1614,28 @@ captured frame returns to the text editor, not a claimed success banner.
 This verifies signaling against the declared HLE network, not delivery to
 an external carrier or speech media.
 
+#### Host SMS Acceptance
+
+The same GSM900 composition verifies both directions through the external
+WebSocket adapter. Use `fixtures/noki8850_host/nsm2hle.cfg` in a private
+configuration directory, fresh NVRAM for each direction, and `-http` with
+the runner's port. Do not enable automatic incoming-message delivery.
+
+For incoming SMS, wrap the 43-second `noki8850_incoming_sms_input.lua` run
+with `tools/run_host_incoming_sms_gate.py`. Require both
+`radio_incoming_host_sms_trace_check.py RUN/error.log` and the handset
+storage/frame check above: the external `hello` must complete paging and
+CP/RP delivery, persist in EF_SMS, and appear through physical Read.
+
+For outgoing SMS, wrap the 52-second `noki8850_outgoing_sms_input.lua` run
+with `tools/run_host_sms_gate.py --user-data 41 --user-data-length 1`.
+Require `radio_outgoing_host_sms_trace_check.py --octets 1 RUN/error.log`
+and `noki8850_outgoing_sms_check.py RUN/error.log`. The host receives exact
+`A/5551234`, rejects a mismatched request decision, accepts the correlated
+request once and rejects its duplicate; the handset closes CP/RP and
+returns to paging. These are HLE signaling/storage tests, not external
+carrier delivery or native DSP execution.
+
 ### Capability acceptance boundary
 
 On the final radio-enabled `nsm2hle` composition, fresh physical-input runs
