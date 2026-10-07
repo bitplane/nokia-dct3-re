@@ -941,6 +941,34 @@ startup interval. A longer run reaches the DMA device's explicit unsupported
 channel-3 mode `c541`, sync `203f` guard. Decode that streaming contract next;
 neither its endpoint nor music playback is established by these control words.
 
+### Streaming DMA boundary
+
+Continuing unchanged firmware past serial setup enables channel 3 with source
+`1300`, destination `0023`, element count `0001`, sync `203f`, mode `c541`
+and DMPREC `4848`. Global indices are DMIDX0 `0040`, DMFRI0 `ffc1`; both
+program pages and the four global reload registers are zero at enable time.
+SPRU302B tables 3-8 and 3-10 decode this as McBSP0-transmit synchronization,
+16-bit data-to-data transfers, two elements per frame, 64 frames, source sorting
+indexing, fixed destination, block interrupts and auto-initialization. CTMOD
+is zero: this is not ABU mode. The related VC5410A maps `0023` to McBSP0 DXR1.
+
+Section 3.2.3.5 uses DMIDX0 on non-final elements and DMFRI0 **instead** on
+the final element. Initial source addresses therefore alternate
+`1300,1340,1301,1341,...,133f,137f`, not a linear copy. The first block has
+128 words. Zero reload registers describe the captured enable instant only;
+firmware may program them before completion. The guard stops at enable, so
+neither this first block nor its interrupt/reload behavior has executed yet.
+Next work requires event-driven DMA and a separately configured McBSP0 data
+transmitter; forwarding it into McBSP1 would conflate different ports.
+The VC5410A datasheet's IFR diagram puts XINT1 at bit 11; table 3-21's
+priority rank 14 is not an interrupt-bit number. The fixture uses bit 11.
+The same datasheet adds per-channel reload banks beyond the older shared
+`24..27` layout. DA150's reload-bank variant remains to be established from
+original accesses before auto-initialization is implemented.
+At captured DMPREC `4848`, INTOSEL is 1; VC5410A table 3-16 assigns IFR
+bit 11 to DMA channel 3 rather than XINT1. Streaming work must model that
+interrupt mux, not let the two devices independently drive the same CPU line.
+
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
 

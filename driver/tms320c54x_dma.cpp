@@ -69,7 +69,10 @@ void tms320c54x_dma_device::enable(unsigned channel)
 	// Do not silently complete unimplemented serial sync, ABU, reload or interrupt modes.
 	if (m_regs[base + 3] || (mode & ~u16(0x03df)) || ((mode >> 8) & 7) > 2 ||
 		((mode >> 2) & 7) > 2 || ((mode >> 6) & 3) == 3 || (mode & 3) == 3)
-		fatalerror("C54x DMA unsupported active mode channel=%u mode=%04x sync=%04x", channel, mode, m_regs[base + 3]);
+		fatalerror("C54x DMA unsupported active mode channel=%u mode=%04x sync=%04x source=%04x destination=%04x count=%04x control=%04x globals=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x",
+			channel, mode, m_regs[base + 3], m_regs[base], m_regs[base + 1], m_regs[base + 2], m_control,
+			m_regs[0x1e], m_regs[0x1f], m_regs[0x20], m_regs[0x21], m_regs[0x22],
+			m_regs[0x23], m_regs[0x24], m_regs[0x25], m_regs[0x26], m_regs[0x27]);
 	// Two-clock transfer cadence is a model assumption, not recovered DA150 arbitration timing.
 	m_timers[channel]->adjust(attotime::from_ticks(2, clock()), channel);
 }

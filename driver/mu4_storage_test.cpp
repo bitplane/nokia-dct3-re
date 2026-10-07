@@ -44,7 +44,8 @@ private:
 	std::vector<int> m_serial_tx_bits;
 	unsigned m_serial_saved_bits = 0;
 	unsigned m_serial_tx_irqs = 0;
-	void serial_tx_irq(int value) { if (value) ++m_serial_tx_irqs; m_cpu->set_input_line(14, value); }
+	// VC5410A IFR bit 11 is XINT1; its priority rank 14 is not a bit index.
+	void serial_tx_irq(int value) { if (value) ++m_serial_tx_irqs; m_cpu->set_input_line(11, value); }
 	void serial_tx_bit(int value) { if (m_phase >= 31 && m_phase <= 37) m_serial_tx_bits.push_back(value); }
 	void mcbsp_reg_w(u16 index, u16 value) { m_mcbsp->control_w(0, index); m_mcbsp->control_w(1, value); }
 	u16 mcbsp_status() { m_mcbsp->control_w(0, 1); return m_mcbsp->control_r(1); }
