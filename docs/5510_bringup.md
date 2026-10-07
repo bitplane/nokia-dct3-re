@@ -1640,6 +1640,19 @@ executed media-decode result. The parser's format contract and suffix
 provenance at that lifecycle remain to verify; do not force its subtype,
 the readiness bit or descriptor selection to claim decoder activation.
 
+`02:c824` is the LockStream header recognizer, with its real entry at that
+address (not a mid-routine tap). It expands packed bytes and fields using
+`02:c750/c7bf`, then compares the signature with uploaded data
+`be00 = "LockStream Embedded"`. It compares parsed double words at context
+offsets `14/1a` against uploaded constants `bdfc/bdfe` (100 and 2).
+Its explicit returns are `-3` for missing input/output pointers, `-1` for a
+signature mismatch, `-8/-10` for those two version mismatches, and zero
+after the recognition checks. All are static findings in original `aa22`.
+The subsequent initializer `02:c902` rechecks the signature/versions and
+performs additional processing through `02:cdf2/ccfa/cd28/cd34`; recognition
+success does not establish initialized stream state, decoder execution or
+audio output. Keep those as separate acceptance requirements.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
