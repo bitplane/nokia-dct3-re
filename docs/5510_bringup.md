@@ -1237,6 +1237,17 @@ Thus the open operation is downstream of directory search and these two
 transfer calls, not a stalled name lookup. Static `c404` code updates a
 directory-entry buffer and invokes further storage helpers; its metadata
 finalization/allocation contract and setting-record format remain unresolved.
+Within the outstanding `c404` invocation, `03:bd13`, `03:c57f`,
+`03:b91d` and `03:b9ae` return; `03:c44f -> 03:c4c7` remains active.
+Its observed calls to common `345c` and `2096` return. A first call at
+`03:c552 -> 03:c5b2` returns with input address `0001:e901`; the next
+call, with input `0001:e980`, has no observed return. The earlier,
+successfully completed `c404` invocation traverses the same helpers.
+Consequently neither `c404` nor `c4c7` is uniformly non-returning.
+Static `c5b2` uses buffer `b3f8`, cached address `b4f8`, read/flush helpers
+`c57f`/`b91d`/`b9ae`, and filesystem-mode-specific masked updates. Those
+observations do not yet prove which internal branch is active or that the
+storage operation is deadlocked.
 Return-site observations are pre-execution: AR2 is not a claimed result
 until the following instruction transfers the returned accumulator.
 
@@ -1256,7 +1267,7 @@ zero illegal-opcode requirement. Additional transfer counts are not validated
 music content. In both windows the candidate consumer has zero entries and
 `b633` has zero firmware reads. The storage reader remains active: do not
 describe an endpoint PC as a stuck instruction or assume a missing peer.
-Next decode `03:c404`'s active metadata/storage path before changing media
+Next resolve `03:c5b2`'s active cache/flush branch before changing media
 contents or extending observation time again.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`

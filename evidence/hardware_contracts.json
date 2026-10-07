@@ -23,6 +23,11 @@
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
     },
     {
+      "id": "npm5_mu4_settings_metadata_child_boundary", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "In the five-second original scan, outstanding c404 returns from bd13, c57f, b91d and b9ae before calling c4c7 at 03:c44f. In c4c7, common 345c and 2096 calls return. The first observed 03:c552 call to c5b2 with input address 0001:e901 returns; the next with 0001:e980 remains outstanding. An earlier c404 invocation completes through the same helpers, so no uniformly non-returning routine is established. Static c5b2 uses b3f8 as a block buffer and b4f8 as a cached address, invokes read/flush helpers and performs filesystem-mode-specific masked updates. The active internal branch and completion condition remain unresolved; a bounded observation is not a deadlock proof. All probes are side-effect-free and no media, firmware state or input is forced",
+      "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
+    },
+    {
       "id": "npm5_mu4_stream_selection_operands", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Original common code uses DP 017b with CPL clear: direct operand base bd80, not low peripherals. Worker observations give bdb8=0001, bdb9=0010, bde3=0000, bde4=8028 and bde7=3da6. At 3f5b A=-15 makes AGT false; at 3f5f A=0001000000 from bdbc=1 makes ALT false. Original TX ISR increments bdbc at 02:8b0d..8b0e and decrements it at 02:8b52..8b53; initialization leaves it zero. Common tail actually executes RET at 3da6. Paged epilogue probes observe TC clear after BITF 8000 at 02:8b54 and BC NTC at 02:8b56 taking ordinary epilogue 02:8b6d, not deferred return-word replacement 02:8b63. Static startup helper 6d44 calls 3f1d at 6d5e; entry calls that helper at 6dbf after far call 02:904b. Execution of that startup continuation is the next question, not a proven missing step. Official queue/priority identities and full consumer lifecycle remain unresolved; no firmware state or hardware event is injected",
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]

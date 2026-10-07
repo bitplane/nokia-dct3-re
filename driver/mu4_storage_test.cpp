@@ -118,6 +118,8 @@ private:
 	unsigned m_native_cache_traces[6] = {};
 	unsigned m_native_startup_subcall_traces = 0;
 	unsigned m_native_settings_call_traces = 0;
+	unsigned m_native_metadata_call_traces = 0;
+	unsigned m_native_allocation_call_traces = 0;
 	bool m_native_worker_window_started = false;
 	attotime m_native_worker_window_start;
 	std::vector<u16> m_native_tx_words;
@@ -376,6 +378,8 @@ private:
 		std::fill(std::begin(m_native_cache_traces), std::end(m_native_cache_traces), 0);
 		m_native_startup_subcall_traces = 0;
 		m_native_settings_call_traces = 0;
+		m_native_metadata_call_traces = 0;
+		m_native_allocation_call_traces = 0;
 		m_native_worker_window_started = false;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
@@ -1204,7 +1208,7 @@ private:
 				};
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x3f1d, 0x6dbf, "mu4_native_startup_common", startup_observer);
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x2904b, 0x29117, "mu4_native_startup_main", startup_observer);
-			m_cpu->space(AS_PROGRAM).install_read_tap(0x38c3e, 0x3bbe7, "mu4_native_startup_read",
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x38c3e, 0x3c580, "mu4_native_startup_read",
 				[this](offs_t address, u16 &opcode, u16)
 				{
 					if (m_phase != 30 || machine().side_effects_disabled() ||
@@ -1220,6 +1224,30 @@ private:
 							logerror("mu4_native_settings_call: site=%06x point=%s opcode=%04x ar2=%04x a=%010llx\n",
 								unsigned(site), address == site ? "call" : "return", opcode,
 								unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
+								static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
+						}
+					static constexpr offs_t metadata_calls[] = {0x3c414, 0x3c41f, 0x3c43e, 0x3c441, 0x3c44f};
+					for (offs_t site : metadata_calls)
+						if ((address == site || address == site + 2) && m_native_metadata_call_traces++ < 40)
+						{
+							auto const disable = machine().disable_side_effects();
+							logerror("mu4_native_metadata_call: site=%06x point=%s opcode=%04x sp=%04x ar2=%04x a=%010llx\n",
+								unsigned(site), address == site ? "call" : "return", opcode,
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
+								static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
+						}
+					static constexpr offs_t allocation_calls[] = {0x3c4e9, 0x3c4f0, 0x3c4f7, 0x3c518, 0x3c552};
+					for (offs_t site : allocation_calls)
+						if ((address == site || address == site + 2) && m_native_allocation_call_traces++ < 40)
+						{
+							auto const disable = machine().disable_side_effects();
+							logerror("mu4_native_allocation_call: site=%06x point=%s opcode=%04x sp=%04x ar1=%04x ar2=%04x ar6=%04x a=%010llx\n",
+								unsigned(site), address == site ? "call" : "return", opcode,
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)),
+								unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)),
 								static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
 						}
 					if ((address <= 0x392c2 || (address >= 0x3941d && address <= 0x3957f)) &&
