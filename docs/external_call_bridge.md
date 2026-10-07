@@ -331,7 +331,22 @@ The implemented mapping subset also covers 403/603 -> 21, 404/604 -> 1,
 408 -> 102 and 500/503 -> 41; these have pure mapping tests, not handset runtime
 gates. Unhandled statuses use an explicit cause-41 fallback policy. Warning and
 Reason headers, authentication retries and full RFC 3398 interoperability are
-not implemented. Cancellation and SIP-linked save/load remain separate targets.
+not implemented. SIP-linked save/load remains a separate target.
+
+### Incoming cancellation
+
+```sh
+make verify-radio-incoming-call-sip-cancel RUN_DIR=run_3210_sip_cancel
+```
+
+The real SIP caller cancels only after the handset reports alerting. The gate
+requires CANCEL/487, correlated GSM termination, firmware RELEASE COMPLETE and
+host `ended`, with no physical Answer, connection or bridge media. CC completion
+must survive the subsequent RR release whether it arrives before or after the
+DISCONNECT acknowledgement; both orderings represent an already completed CC
+transaction. Stopping the traffic channel alone is not the cancellation gate's
+completion criterion. This covers cancellation while alerting, not every SIP
+transaction race or cancellation before paging.
 
 ### Waveform probe
 

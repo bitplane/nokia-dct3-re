@@ -1588,6 +1588,9 @@ nokia_gsm_session_device::receive_layer3(
 		}
 		if (message_type == 0x2a)
 		{
+			// Remember CC completion across the subsequent RR release, just as
+			// when this response races the DISCONNECT acknowledgement.
+			m_release_complete_received = true;
 			return begin_channel_release();
 		}
 	}

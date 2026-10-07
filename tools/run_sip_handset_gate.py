@@ -57,7 +57,7 @@ async def run(args):
                 '--url', f'ws://127.0.0.1:{args.http_port}/nokia/dct3/calls',
                 '--destination', f'sip:probe@127.0.0.1:{args.sip_port}',
                 '--sip-port', str(args.sip_port + 1), '--once', '--require-frames',
-                '100' if args.sip_response == 200 else '0',
+                '100' if args.sip_response == 200 and not args.cancel_incoming else '0',
                 stdout=bridge_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(bridge)
             if args.incoming:
@@ -74,6 +74,17 @@ async def run(args):
                     f'sip:dct3@127.0.0.1:{args.sip_port + 1}',
                     stdin=asyncio.subprocess.PIPE, stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
                 processes.append(remote)
+                if args.cancel_incoming:
+                    for _ in range(400):
+                        if 'incoming state id=1 epoch=1 phase=alerting' in (root / 'error.log').read_text(errors='replace'):
+                            break
+                        if bridge.returncode is not None or remote.returncode is not None:
+                            raise RuntimeError('call ended before incoming alerting')
+                        await asyncio.sleep(0.05)
+                    else:
+                        raise RuntimeError('handset never alerted before SIP cancellation')
+                    remote.stdin.write(b'h\n')
+                    await remote.stdin.drain()
             if await asyncio.wait_for(bridge.wait(), 90):
                 raise RuntimeError('handset SIP bridge failed; inspect sip-bridge.log')
             if await asyncio.wait_for(handset.wait(), 90):
@@ -92,6 +103,9 @@ async def run(args):
                     process.kill()
                     await process.wait()
     remote_text = (root / 'sip-remote.log').read_text(errors='replace')
+    if args.cancel_incoming:
+        verify_cancel(root, remote_text)
+        return
     if args.sip_response != 200:
         verify_failure(root, remote_text, args.sip_response)
         return
@@ -176,6 +190,40 @@ def verify_failure(root, remote_text, status):
     print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
 
 
+def verify_cancel(root, remote_text):
+    bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
+    log = (root / 'error.log').read_text(errors='replace')
+    if ('Request msg CANCEL/' not in remote_text or 'Response msg 487/INVITE/' not in remote_text or
+            'SIP disconnected status=487 identity=(1, 1)' not in bridge_text):
+        raise RuntimeError('missing real SIP CANCEL/487 exchange')
+    if ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge_text or
+            'SIP physical answer' in bridge_text or
+            re.search(r'GSM service uplink sapi=0 pd=03 message=07', log)):
+        raise RuntimeError('cancelled incoming SIP call falsely answered')
+    match = re.search(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
+    if not match:
+        raise RuntimeError('cancelled incoming call never completed handset release')
+    counts = json.loads(match[1])
+    if any(counts.get(name) != 0 for name in ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received')):
+        raise RuntimeError('cancelled incoming SIP call falsely claimed media')
+    cursor = 0
+    for pattern in (
+            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging',
+            r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
+            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=alerting',
+            r'gsm_call_adapter: termination id=1 cause=16 result=accepted',
+            r'GSM service uplink sapi=0 pd=03 message=2a',
+            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=ended'):
+        match = re.search(pattern, log[cursor:])
+        if not match:
+            raise RuntimeError(f'missing cancelled incoming call checkpoint: {pattern}')
+        cursor += match.end()
+    (root / 'sip-result.json').write_text(json.dumps({
+        'scope': '3210 HLE incoming SIP CANCEL while alerting; no Answer/connection/media',
+        'sip_status': 487, 'media': counts, 'passed': True}, indent=2) + '\n')
+    print('OK - SIP CANCEL before Answer cleared the ringing handset without connection/media')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pjsua', type=Path, required=True)
@@ -183,11 +231,14 @@ def main():
     parser.add_argument('--sip-port', type=int, default=25100)
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
+    parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--sip-response', type=int, choices=(200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.incoming and args.sip_response != 200:
         parser.error('--sip-response failure fixtures are outgoing only')
+    if args.cancel_incoming and not args.incoming:
+        parser.error('--cancel-incoming requires --incoming')
     if args.command[:1] == ['--']:
         args.command = args.command[1:]
     if not args.command:
