@@ -1606,6 +1606,19 @@ do not establish shared routine ownership or a container parser. Resolve
 storage-call argument flow and the selected overlay before assigning the
 reported byte offset to an instruction.
 
+The resident direct-call census identifies 22 exact `FCALL 2086` file-read
+sites and 20 exact `FCALL 2092` seek sites; indirect calls and other encodings
+are outside that count. Entry `03:9fe9` is an ID3 metadata reader: it filters
+`REL/DGF/LSE` extensions, seeks to zero (`03:a035`), reads five words
+(`03:a040`), splits them into ten bytes and compares the first three with
+data `c0f0 = "ID3"`. Bytes 6..9 form a length with shifts 21/14/7/0.
+Its frame identifiers at `c0f4..c10d` are `TPE1`, `TIT2`, `TCOM`, `TALB`,
+`TYER` and `SYLT`. This establishes a metadata consumer, not decryption,
+decoder selection or the stream-start offset. Entry `02:8385` likewise
+inspects and can rewrite an ID3 header through the file-write path; do not
+classify it as a read-only LockStream parser merely because it reads the
+same file extensions.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
