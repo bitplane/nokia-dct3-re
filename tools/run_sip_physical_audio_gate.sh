@@ -5,6 +5,7 @@ product=${SIP_PRODUCT:-3210}
 direction=${SIP_DIRECTION:-outgoing}
 incoming_arg=
 seconds=45
+storage_args=()
 case "$product" in
     3210)
         machine=noki3210 bios=
@@ -15,6 +16,15 @@ case "$product" in
         machine=noki3310 bios=639
         keys='5,5,5,1,2,3,4,enter'
         key_delay=18000 key_duration=70 key_gap=200
+        ;;
+    3330)
+        machine=noki3330 bios=450e
+        keys='1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter'
+        key_delay=6000 key_duration=70 key_gap=200
+        # This product needs its own physical first-boot PMM setup, not donor NV.
+        : "${SIP_WAVEFORM_NVRAM_DIR:?3330 requires its separately provisioned NVRAM directory}"
+        [[ -f "$SIP_WAVEFORM_NVRAM_DIR/noki3330_1/flash" ]] || { echo 'missing 3330 provisioned storage' >&2; exit 1; }
+        storage_args=("SIP_HANDSET_NVRAM_DIR=$(realpath "$SIP_WAVEFORM_NVRAM_DIR")" SIP_HANDSET_PRESERVE_NVRAM=1)
         ;;
     3410)
         machine=noki3410 bios=546e
@@ -35,6 +45,9 @@ case "$direction" in
         seconds=48
         if [[ "$product" == 3210 ]]; then
             keys='1,2,3,4,5,enter,wait500,waitbuzzer,enter'
+        elif [[ "$product" == 3330 ]]; then
+            keys='1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter'
+            key_duration=220 key_gap=280
         elif [[ "$product" == 3410 ]]; then
             keys='end,waitalerting,send'
             key_delay=1000 key_duration=200 key_gap=300
@@ -91,7 +104,7 @@ make --no-print-directory verify-radio-outgoing-call-sip RUN_DIR="$run_dir" JOBS
     SIP_HANDSET_MACHINE="$machine" SIP_HANDSET_BIOS="$bios" SIP_HANDSET_KEYS="$keys" \
     SIP_HANDSET_KEY_DELAY_MS="$key_delay" SIP_HANDSET_KEY_DURATION_MS="$key_duration" \
     SIP_HANDSET_KEY_GAP_MS="$key_gap" \
-    SIP_HANDSET_CONFIG="$(realpath "$run_dir/audio_cfg")"
+    SIP_HANDSET_CONFIG="$(realpath "$run_dir/audio_cfg")" "${storage_args[@]}"
 kill -INT "$capture_pid"
 wait "$capture_pid" || true
 capture_pid=

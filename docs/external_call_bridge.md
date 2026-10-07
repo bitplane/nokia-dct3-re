@@ -585,6 +585,8 @@ through each product's physical Answer path:
 ```sh
 make verify-radio-incoming-call-sip-waveform RUN_DIR=run_3210_sip_incoming_waveform
 make verify-3310-radio-incoming-call-sip-waveform RUN_DIR=run_3310_sip_incoming_waveform
+make verify-3330-radio-incoming-call-sip-waveform RUN_DIR=run_3330_sip_incoming_waveform
+make verify-3330-radio-outgoing-call-sip-waveform RUN_DIR=run_3330_sip_outgoing_waveform
 make verify-3410-radio-incoming-call-sip-waveform RUN_DIR=run_3410_sip_incoming_waveform
 make verify-3410-radio-outgoing-call-sip-waveform RUN_DIR=run_3410_sip_outgoing_waveform
 make verify-5210-radio-incoming-call-sip-waveform RUN_DIR=run_5210_sip_incoming_waveform
@@ -596,7 +598,7 @@ and call direction. Incoming and outgoing gates preserve the same frequency,
 amplitude and duration thresholds; neither establishes native DSP speech or
 real-radio operation.
 
-These four products use the same 440 Hz source at 0.025 full-scale, avoiding clipping
+These five products use the same 440 Hz source at 0.025 full-scale, avoiding clipping
 in the 3210's +18 dB path while providing measurable input to the other products' neutral
 HLE gain. This is an external test level, not a calibration change. The common
 acceptance threshold remains two consecutive one-second windows with RMS at
@@ -608,7 +610,15 @@ keys. Both directions independently pass sustained microphone and earpiece
 tone checks without gain changes. This extends HLE endpoint waveform evidence,
 not native DSP speech evidence. The 5210 v5.40E independently passes the same
 incoming and outgoing waveform checks with its own physical Send key, fresh
-storage and host configuration. The 3330 SIP waveforms remain untested.
+storage and host configuration.
+
+The 3330 v4.50E waveform gates first perform the product's physical PMM setup
+in a fresh, separate run and check its boot summary. The call then preserves
+only that run's own `noki3330_1/flash` storage, with physical unlock and Navi
+Answer/dial sequences. Both directions pass the unchanged endpoint-tone checks.
+Direct use of the audio wrapper for this profile requires
+`SIP_WAVEFORM_NVRAM_DIR` naming that provisioned storage root; the named gates
+create it themselves. No donor PMM or firmware-state injection is used.
 
 The external bridge sends at most one queued downlink block per 20 ms, without
 catch-up bursts after a host stall. Its eight-block queue and the emulator's

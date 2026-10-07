@@ -1,8 +1,10 @@
 import array
 import json
 import math
+import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 import wave
@@ -11,6 +13,21 @@ from tools.sip_handset_waveform_check import inspect_tone, verify
 
 
 class SipHandsetWaveformTest(unittest.TestCase):
+    def test_3330_requires_own_provisioned_storage_before_audio_setup(self):
+        repository = Path(__file__).resolve().parents[1]
+        environment = dict(os.environ, SIP_PRODUCT='3330')
+        environment.pop('SIP_WAVEFORM_NVRAM_DIR', None)
+        result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
+                                cwd=repository, env=environment, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('3330 requires its separately provisioned NVRAM', result.stderr)
+        with tempfile.TemporaryDirectory() as directory:
+            environment['SIP_WAVEFORM_NVRAM_DIR'] = directory
+            result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
+                                    cwd=repository, env=environment, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('missing 3330 provisioned storage', result.stderr)
+
     def recording(self, root, seconds):
         samples = array.array('h')
         for frequency, amplitude in seconds:
@@ -57,7 +74,7 @@ class SipHandsetWaveformTest(unittest.TestCase):
             root = Path(directory)
             self.recording(root, [(440, 8000)] * 2).rename(root / 'sip-microphone.wav')
             self.recording(root, [(660, 8000)] * 2).rename(root / 'sip-earpiece.wav')
-            for product in ('3210', '3310', '3410', '5210'):
+            for product in ('3210', '3310', '3330', '3410', '5210'):
                 with self.subTest(product=product):
                     verify(root, product, 'incoming')
                     result = json.loads((root / 'sip-waveform-result.json').read_text())

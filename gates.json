@@ -13326,6 +13326,52 @@
       ]
     },
     {
+      "name": "verify-3330-radio-outgoing-call-sip-waveform",
+      "prerequisites": ["normalize-3330"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": false,
+          "target": "run",
+          "command": "$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+        },
+        {
+          "step": "shell",
+          "silent": false,
+          "command": "$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0"
+        },
+        {
+          "step": "shell",
+          "silent": false,
+          "command": "SIP_PRODUCT=3330 SIP_WAVEFORM_NVRAM_DIR=$(abspath $(RUN_DIR)_provision)/nvram RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh"
+        }
+      ]
+    },
+    {
+      "name": "verify-3330-radio-incoming-call-sip-waveform",
+      "prerequisites": ["normalize-3330"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": false,
+          "target": "run",
+          "command": "$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"
+        },
+        {
+          "step": "shell",
+          "silent": false,
+          "command": "$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0"
+        },
+        {
+          "step": "shell",
+          "silent": false,
+          "command": "SIP_PRODUCT=3330 SIP_DIRECTION=incoming SIP_WAVEFORM_NVRAM_DIR=$(abspath $(RUN_DIR)_provision)/nvram RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh"
+        }
+      ]
+    },
+    {
       "name": "verify-5210-radio-outgoing-call-sip-waveform",
       "prerequisites": ["normalize-5210"],
       "variables": {},
