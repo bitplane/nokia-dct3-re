@@ -1120,7 +1120,7 @@ check-mu4-bootstrap-original: build
 			echo 'Set MU4_BOOTSTRAP_SOURCE_RUN to a completed check-mu4-retained-original run directory' >&2; exit 1; fi; \
 		test "$$(wc -c < "$$source/nvram/mu4nand_13/nand")" -eq 69206016; \
 		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
-		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; \
+		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; \
 			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
 		tmp="$$(mktemp -d '$(abspath run_mu4-bootstrap).XXXXXX')"; \
 		mkdir -p "$$tmp/nvram/$$nvtag"; \
@@ -1145,13 +1145,15 @@ check-mu4-bootstrap-original: build
 			grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; \
 			grep -q 'mu4_native_codec_continuous: PASS' error.log; \
 			grep -q 'mu4_native_tone_dma: PASS' error.log; \
-		elif test "$$bios" = bootrecord || test "$$bios" = bootrecordram; then \
+		elif test "$$bios" = bootrecord || test "$$bios" = bootrecordram || test "$$bios" = bootreccontrol; then \
 			grep -q 'mu4_native_recorder_dispatch: PASS' error.log; \
 			grep -q 'mu4_native_recorder_overlay: PASS' error.log; \
-			if test "$$bios" = bootrecordram; then \
+			if test "$$bios" = bootrecordram || test "$$bios" = bootreccontrol; then \
 				grep -q 'mu4_native_recorder_startup: pc=0073f9 ' error.log; \
 				grep -q 'mu4_native_recorder_response: index=0 selector=5e words=11 token=80 class=1' error.log; \
 				grep -q 'mu4_native_recorder_response: index=1 selector=02 words=16 token=01 class=0' error.log; fi; \
+			if test "$$bios" = bootreccontrol; then \
+				grep -q 'mu4_native_recorder_control_negative: PASS pending_character=1 handler_entered=0 recording_complete=0 firmware_state_forcing=0' error.log; fi; \
 			grep -q 'mu4_native_recorder_request_ack: words=007f,0001,0055' error.log; \
 			grep -Eq 'mu4_original_bootstrap_loader: name=0052,0045,0052,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0002,aca2 .* index=1' error.log; \
 		elif test "$$bios" != bootstrap; then \

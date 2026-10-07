@@ -66,8 +66,11 @@ The separate `bootrecord` negative control reaches the original `RERSI16.BIN`
 loader but executes stale resident vectors because program/data RAM are separate.
 The provisional `bootrecordram` profile shares RAM at `2000..7fff`, verifies
 the overlay destinations, executes its original startup and begins NAND
-programming. It currently fails at an unsupported C54x instruction, not a
-verified recording endpoint. Neither profile proves a recorded track.
+programming through a clean 20-second execution window. The separate
+`bootreccontrol` negative diagnostic delivers a further control request's
+first byte, which remains unread in McBSP2; its handler is not reached.
+The current recorder frontier is continued receive/scheduling, not an
+unsupported instruction. None of these profiles proves a recorded track.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
 identifies separate MA4 and MU4 assemblies, including UI-module keypad,
@@ -2018,6 +2021,32 @@ values are `0f11d770bd6456ddcb613a9bf0823d73388bbb75ced9095d865d26cac5a5ec96`
 and `95437b37da97d1f0b85161d13b4af80f0a1fac7cb4d2af279bc0ed21698cd452`.
 These addresses are overlay-specific: the resident image has different
 instructions at the same addresses.
+
+`bootreccontrol` attempts the evidenced parameter-4 control packet
+`1e 03 aa 01 36 04 02 84 55` (sequence token 2) at emulated time
+10 seconds, after both startup replies and their acknowledgements.
+Only its first byte is delivered: McBSP2 asserts RX-ready, but firmware
+does not read DRR, so the backpressured peer does not send the rest.
+At the 20-second endpoint RX is ready/not busy, head and tail `f9de/f9df`
+are both 6, parser state `f9e8` is zero, the control handler has zero
+entries and no token-2 acknowledgement exists. Total receive events are
+16, versus the baseline's 15; native output remains 30 words.
+This falsifies continued command readiness in this provisional map, not
+the stop/save interpretation of a command that has not reached its parser.
+
+The endpoint is `03:9025`, immediately after IDLE1, with IMR zero and
+IFR `0c78`. Stack `6f06..6f09` contains `0000,0bb0,0000,1baa`.
+Original helper `02:1ba0..1bae` saves/aligns SP, calls idle routine
+`03:9013`, restores SP and returns. Its 32-word export SHA-256 is
+`c841ac8b8502a5992c15c8b55831b6c2c8ba8e6122e825300e6c5251d62b9ece`.
+The next investigation must reconcile this scheduler/interrupt continuation
+with the recorder RX vector, not force IMR or inject a software-ring byte.
+Retire the negative diagnostic when receive readiness is corrected and
+replace it with original control-handler and storage-completion evidence.
+Reproduce it with `make check-mu4-bootstrap-original
+MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootreccontrol`.
+Its PASS label means that the negative receive observation reproduces,
+not that the control command or recording succeeds.
 
 Resident command and loader addresses are reused by the recorder overlay;
 their resident trace counters must stop when that overlay takes ownership.

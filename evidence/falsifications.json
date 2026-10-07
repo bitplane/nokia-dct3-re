@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_recorder_post_startup_control_receive_ready",
+      "status": "disproven",
+      "hypothesis": "The provisional shared-RAM recorder remains ready to receive a further original selector-36 parameter-4 control command after both startup replies",
+      "conclusion": "At emulated time 10 seconds the peer delivers the first byte of a statically evidenced token-2 control packet through McBSP2 pins. RX-ready remains set at the 20-second endpoint, software ring head/tail remain 6/6, parser state is zero and the original control handler has no entries. Backpressure correctly prevents the remaining eight bytes; 16 receive events and 30 output words are observed. This identifies a continued receive/scheduler boundary, not a failed stop/save command or completed recording. No firmware masks or queues are modified.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "mu4_recorder_separate_ram_executes_selected_overlay",
       "status": "disproven",
       "hypothesis": "Separate program/data RAM allows the original aa88 recorder overlay to execute its selected startup, making the later NAND command-01 writes a recorder controller contract",
