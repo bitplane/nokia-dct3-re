@@ -859,8 +859,13 @@ post-release idle pixels also pass on the tracked-runner replay:
 The frame oracle is scoped to that caller and excludes only the advancing
 top-row clock. Focused tests reject wrong digits/length, unreviewed callers
 and blank pixels. This closes incoming foreground settlement on the declared
-GSM900 research-HLE composition; it does not promote native speech or inherit
-this presentation result for PCS1900.
+GSM900 research-HLE composition. An independent fresh run using
+`fixtures/noki8890_clock_incoming_pcs1900/nsb6hle.cfg` also passes the host
+phase runner and the same command with `--pcs1900`. That mode additionally
+requires organic PCS carrier/band registration and NSB-6's PCS-specific
+traffic/release configurations before accepting the caller and UI frames.
+Settled incoming presentation is therefore independently checked on both
+bands; native speech remains unproved.
 
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
