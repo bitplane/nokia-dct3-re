@@ -3,9 +3,11 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 _G.noki8890_security_only = true
 dofile(assert(source:match('^(.*[/])')) .. 'noki8890_security_input.lua')
 local machine = manager.machine
-local function press(column, name)
+local function press(column, name, call_action)
     local key = assert(machine.ioport.ports[':COL.' .. column].fields[name])
-    machine:logerror('8890_clock_physical: key=' .. name .. '\n')
+    machine:logerror(call_action and
+        ('8890_call_physical: action=' .. call_action .. '\n') or
+        ('8890_clock_physical: key=' .. name .. '\n'))
     key:set_value(1)
     if not emu.wait(0.15) then key:set_value(0); return false end
     key:set_value(0)
@@ -43,6 +45,14 @@ local input = coroutine.create(function()
         if not press(item[1], item[2]) then return end
     end
     machine.screens[':screen']:snapshot('8890_clock_dialed.png')
+    if _G.noki8890_clock_outgoing_call then
+        if not press(0, 'Call / Send', 'send') then return end
+        if not emu.wait(8) then return end
+        machine.screens[':screen']:snapshot('8890_clock_call_connected.png')
+        if not press(0, 'End', 'end') then return end
+        if not emu.wait(5) then return end
+        machine.screens[':screen']:snapshot('8890_clock_call_released.png')
+    end
 end)
 _G.noki8890_clock_input = input
 assert(coroutine.resume(input))

@@ -817,6 +817,22 @@ date/idle/dial pixels. Seven checker tests cover both valid and rejected-then-
 recovered sequences. This closes successful error recovery, not the separate
 cancel-after-rejection saved-position behavior.
 
+Outgoing calls also compose with valid clock settlement. Run
+`tools/noki8890_clock_call_input.lua` with fresh private cfg/NVRAM, verbose
+logging and 68 seconds. It completes physical time/date entry, dials
+`1234567`, presses Send and End, and returns to the ordinary registered idle
+frame rather than the clock notice. Both the original outgoing-call protocol
+checker and the clock checker with `--call` pass on the same run:
+
+```sh
+.venv/bin/python tools/noki8890_outgoing_call_check.py RUN/error.log
+.venv/bin/python tools/noki8890_clock_check.py --call RUN/error.log RUN/snap
+```
+
+The latter additionally pins post-release idle pixels, excluding only the
+advancing top-row clock. This closes outgoing presentation after CC/RR release;
+incoming-call foreground settlement and native speech remain separate.
+
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
 not the previously settled idle frame. Reproduce with

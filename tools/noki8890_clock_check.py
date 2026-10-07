@@ -32,9 +32,11 @@ def verify(text, invalid_first=False):
             raise ValueError(f'physical key did not decode at event {index}: {key}')
 
 
-def check_frames(directory, invalid_first=False):
+def check_frames(directory, invalid_first=False, call=False):
     # Exclude the advancing top-row clock; pin date text, idle and dial digits.
     frames = dict(FRAMES)
+    if call:
+        frames['8890_clock_call_released.png'] = FRAMES['8890_date_after.png']
     if invalid_first:
         frames['8890_clock_invalid.png'] = ((0, 0, 60, 32),
             '32605e346ad563b6acaaf460a41cb899a6e05498dfae2c1d47a82d405c10c743')
@@ -50,10 +52,12 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('frames', type=Path)
     parser.add_argument('--invalid-first', action='store_true')
+    parser.add_argument('--call', action='store_true',
+                        help='also require ordinary idle pixels after call release')
     args = parser.parse_args()
     try:
         verify(args.log.read_text(errors='replace'), args.invalid_first)
-        check_frames(args.frames, args.invalid_first)
+        check_frames(args.frames, args.invalid_first, args.call)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8890 clock lifecycle FAIL: {error}\n')
     print('8890 physical clock/date/idle/dial PASS; RTC persistence unproved')
