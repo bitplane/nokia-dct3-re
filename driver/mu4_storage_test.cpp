@@ -175,6 +175,9 @@ private:
 	unsigned m_recorder_dispatches = 0, m_recorder_loader_calls = 0;
 	bool m_recorder_overlay_checked = false;
 	unsigned m_recorder_startup_entries = 0;
+	unsigned m_recorder_idle_traces = 0;
+	u16 m_recorder_observed_imr = 0xffff;
+	unsigned m_recorder_mask_traces = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
 	u8 m_recorder_last_nand_command = 0;
 	unsigned m_command_ack_cursor = 0, m_command_wire_bit_count = 0;
@@ -1008,6 +1011,27 @@ private:
 			if (measurement_profile()) install_measurement_observers();
 			if (recorder_profile())
 			{
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x3ffff, "mu4_recorder_masks",
+					[this](offs_t address, u16 &, u16)
+					{
+						if (machine().side_effects_disabled() || !m_recorder_overlay_checked || m_cpu->pc() != address + 1) return;
+						u16 const imr = m_cpu->state_int(tms320c54x_device::STATE_IMR);
+						if (imr == m_recorder_observed_imr) return;
+						if (m_recorder_mask_traces++ < 32)
+							logerror("mu4_native_recorder_mask: next_pc=%06x previous=%04x current=%04x\n", unsigned(address), m_recorder_observed_imr, imr);
+						m_recorder_observed_imr = imr;
+					});
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x39013, 0x39024, "mu4_recorder_idle",
+					[this](offs_t address, u16 &, u16)
+					{
+						if (machine().side_effects_disabled() || !m_recorder_overlay_checked || m_cpu->pc() != address + 1 ||
+							(address != 0x39013 && address != 0x39019 && address != 0x39024) || m_recorder_idle_traces++ >= 12) return;
+						auto const disable = machine().disable_side_effects();
+						logerror("mu4_native_recorder_idle: pc=%06x initialized=%04x imr=%04x ifr=%04x st1=%04x ar1=%04x dma=%04x\n",
+							unsigned(m_cpu->pc()), m_cpu->space(AS_DATA).read_word(0xfda7),
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)), m_dma->read(0));
+					});
 				m_cpu->space(AS_PROGRAM).install_read_tap(0x73f8, 0x73f8, "mu4_recorder_startup",
 					[this](offs_t address, u16 &, u16)
 					{
@@ -1028,7 +1052,8 @@ private:
 				m_cpu->space(AS_PROGRAM).install_read_tap(0x29e90, 0x29fa8, "mu4_recorder_loader",
 					[this](offs_t address, u16 &, u16)
 					{
-						if (machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+						// These symbols belong to aa22; aa88 reuses their addresses for other code.
+						if (machine().side_effects_disabled() || m_cpu->pc() != address + 1 || m_recorder_overlay_checked) return;
 						if (address == 0x29e90) ++m_recorder_dispatches;
 						else if (address == 0x29fa8) ++m_recorder_loader_calls;
 						else return;
@@ -1102,6 +1127,8 @@ private:
 				save_item(NAME(m_recorder_dispatches)); save_item(NAME(m_recorder_loader_calls));
 				save_item(NAME(m_recorder_overlay_checked));
 				save_item(NAME(m_recorder_startup_entries));
+				save_item(NAME(m_recorder_idle_traces));
+				save_item(NAME(m_recorder_observed_imr)); save_item(NAME(m_recorder_mask_traces));
 				save_item(NAME(m_recorder_nand_controls)); save_item(NAME(m_recorder_nand_data));
 				save_item(NAME(m_recorder_last_nand_command));
 			}
@@ -1261,6 +1288,8 @@ private:
 		m_recorder_dispatches = m_recorder_loader_calls = 0;
 		m_recorder_overlay_checked = false;
 		m_recorder_startup_entries = 0;
+		m_recorder_idle_traces = 0;
+		m_recorder_observed_imr = 0xffff; m_recorder_mask_traces = 0;
 		m_serial_empty_reads = 0;
 		m_recorder_nand_controls = m_recorder_nand_data = 0;
 		m_recorder_last_nand_command = 0;
@@ -1590,6 +1619,14 @@ private:
 				data.read_word(0x3762), data.read_word(0x3768));
 			if (recorder_profile())
 			{
+				unsigned const programs = std::count(m_writes.begin(), m_writes.end(), u16(0x0180));
+				unsigned const confirms = std::count(m_writes.begin(), m_writes.end(), u16(0x0110));
+				logerror("mu4_native_recorder_storage: program_setups=%u program_confirms=%u data_writes=%u recorded_file_verified=0\n",
+					programs, confirms, m_recorder_nand_data);
+				logerror("mu4_native_recorder_common: program_1dd7=%04x data_1dd7=%04x program_1d62=%04x data_1d62=%04x idle=%u mask_changes=%u\n",
+					m_cpu->space(AS_PROGRAM).read_word(0x1dd7), data.read_word(0x1dd7),
+					m_cpu->space(AS_PROGRAM).read_word(0x1d62), data.read_word(0x1d62),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)), m_recorder_mask_traces);
 				logerror("mu4_native_recorder_observe: dispatches=%u loader_calls=%u responses=%u rx_words=%u tx_words=%u ack_pending=%u music_recording=0\n",
 					m_recorder_dispatches, m_recorder_loader_calls, m_recorder_responses, m_command_rx_irqs,
 					unsigned(m_command_tx_words.size()), m_command_ack_pending && m_command_ack_cursor != 3);
@@ -1598,6 +1635,9 @@ private:
 				if (!m_recorder_overlay_checked) fatalerror("MU4 recorder overlay destinations were not verified");
 				if (shared_daram_profile() && m_recorder_startup_entries != 1)
 					fatalerror("MU4 shared RAM probe did not execute the original recorder startup");
+				if (shared_daram_profile() && (m_recorder_responses != 2 || m_command_rx_irqs != 15 ||
+					m_command_tx_words.size() != 30 || (m_command_ack_pending && m_command_ack_cursor != 3)))
+					fatalerror("MU4 recorder startup did not complete both observed native reply handshakes");
 				logerror("mu4_native_recorder_dispatch: PASS pin_input=1 original_loader=1 firmware_state_forcing=0 music_recording=0\n");
 			}
 			else if (measurement_profile()) verify_native_measurement();

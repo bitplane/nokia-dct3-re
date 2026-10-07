@@ -1823,6 +1823,16 @@ void tms320c54x_device::execute_one(u16 op)
 		indirect_write(low, u16(saturated_store(m_b) >> 16));
 		m_icount -= low >= 0xe0;
 		return;
+	case 0x8400: case 0x8500: // STL src, ASM, Smem
+	case 0x8600: case 0x8700: // STH src, ASM, Smem
+	{
+		const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
+		const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
+		const u64 shifted = shift < 0 ? arithmetic_shift_right(source, -shift) : (source << shift) & ACC_MASK;
+		indirect_write(low, u16(saturated_store(shifted) >> (BIT(op, 9) ? 16 : 0)));
+		m_icount -= low >= 0xe0;
+		return;
+	}
 	case 0xe800: // LD #k, A
 		m_a = data_operand(low);
 		return;
@@ -2294,8 +2304,9 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
-	if ((op & 0xff80) == 0xf900) // CC pmad, condition
+	if ((op & 0xfd80) == 0xf900) // CC[D] pmad, condition (SPRU172C 4-29)
 	{
+		const bool delayed = BIT(op, 9);
 		const u8 condition = op;
 		const u16 destination = fetch();
 		bool take = false;
@@ -2315,9 +2326,9 @@ void tms320c54x_device::execute_one(u16 op)
 			default: take = true; break;
 			}
 			if ((condition & 0x70) == 0x70)
-				take = BIT(m_st0, b ? 9 : 10);
+				take = take && BIT(m_st0, b ? 9 : 10);
 			else if ((condition & 0x70) == 0x60)
-				take = !BIT(m_st0, b ? 9 : 10);
+				take = take && !BIT(m_st0, b ? 9 : 10);
 		}
 		else
 		{
@@ -2332,9 +2343,17 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= 2;
 		if (take)
 		{
-			push(m_pc);
-			m_pc = destination;
-			m_icount -= 2;
+			push(u16(m_pc + (delayed ? 2 : 0)));
+			if (delayed)
+			{
+				m_delayed_target = destination;
+				m_delayed_words = 2;
+			}
+			else
+			{
+				m_pc = destination;
+				m_icount -= 2;
+			}
 		}
 		return;
 	}
@@ -2493,22 +2512,30 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xfa45: // BCD pmad, AEQ
 	case 0xfa44: // BCD pmad, ANEQ
 	case 0xfa43: // BCD pmad, ALT
+	case 0xfa42: // BCD pmad, AGEQ
+	case 0xfa46: // BCD pmad, AGT
 	case 0xfa47: // BCD pmad, ALEQ
 	case 0xfa20: // BCD pmad, NTC
 	case 0xfa30: // BCD pmad, TC
 	case 0xfa4d: // BCD pmad, BEQ
 	case 0xfa4c: // BCD pmad, BNEQ
 	case 0xfa4a: // BCD pmad, BGEQ
+	case 0xfa4b: // BCD pmad, BLT
+	case 0xfa4e: // BCD pmad, BGT
 	case 0xfa4f: // BCD pmad, BLEQ
 	{
 		const u16 destination = fetch();
 		const bool condition = op == 0xfa45 ? (m_a & ACC_MASK) == 0 :
 				op == 0xfa44 ? (m_a & ACC_MASK) != 0 :
 				op == 0xfa43 ? (s64(m_a << 24) >> 24) < 0 :
+				op == 0xfa42 ? (s64(m_a << 24) >> 24) >= 0 :
+				op == 0xfa46 ? (s64(m_a << 24) >> 24) > 0 :
 				op == 0xfa47 ? (s64(m_a << 24) >> 24) <= 0 :
 				op == 0xfa4d ? (m_b & ACC_MASK) == 0 :
 				op == 0xfa4c ? (m_b & ACC_MASK) != 0 :
 				op == 0xfa4a ? (s64(m_b << 24) >> 24) >= 0 :
+				op == 0xfa4b ? (s64(m_b << 24) >> 24) < 0 :
+				op == 0xfa4e ? (s64(m_b << 24) >> 24) > 0 :
 				op == 0xfa4f ? (s64(m_b << 24) >> 24) <= 0 :
 				op == 0xfa30 ? bool(m_st0 & 0x1000) : !(m_st0 & 0x1000);
 		m_icount -= 2;

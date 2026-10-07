@@ -28,17 +28,56 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
-	void start_b_delayed_case(unsigned index)
+	void start_asm_store_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
-		program.write_word(0x0109d0, index < 2 ? 0xfa4c : 0xfa4a); program.write_word(0x0109d1, 0x09e0);
-		program.write_word(0x0109d2, 0xe900); // Change B after the condition is captured.
-		program.write_word(0x0109d3, 0xe801);
+		program.write_word(0x0109d0, 0x8493 | ((index / 32) << 8));
+		program.write_word(0x0109d1, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0507, 0xbeef);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900 | (index & 31));
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff87654321ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0507);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 3346 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+	void start_delayed_call_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109d0, index < 4 ? 0xfb44 : 0xfb76); program.write_word(0x0109d1, 0x09e0);
+		program.write_word(0x0109d2, 0xe800); // ANEQ must use A before this delay word.
+		program.write_word(0x0109d3, 0xe901);
 		program.write_word(0x0109d4, 0xf4e1);
+		program.write_word(0x0109e0, 0xe902); program.write_word(0x0109e1, 0xfc00);
+		m_cpu->space(AS_DATA).write_word(0x0fff, 0xbeef);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		static constexpr u64 values[] = {0, 1, 0xffffffffffULL, 0x0100000000ULL, 0, 1, 0xffffffffffULL, 1, 0x0100000000ULL};
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, values[index]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, index >= 4 && index != 7 ? 0x0400 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 3337 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+	void start_acc_delayed_case(unsigned index)
+	{
+		unsigned const predicate = index / 5;
+		static constexpr u64 values[] = {0xffffffffffULL, 0, 1, 0x0100000000ULL, 0x8000000000ULL};
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109d0, 0xfa42 + predicate % 6 + (predicate >= 6 ? 8 : 0)); program.write_word(0x0109d1, 0x09e0);
+		program.write_word(0x0109d2, 0xe900); // Both accumulators change after the condition is captured.
+		program.write_word(0x0109d3, 0xe800);
+		program.write_word(0x0109d4, 0xe801); program.write_word(0x0109d5, 0xf4e1);
 		program.write_word(0x0109e0, 0xe802); program.write_word(0x0109e1, 0xf4e1);
 		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
-		m_cpu->set_state_int(tms320c54x_device::STATE_B, index == 1 || index == 3 ? 0xffffffffffULL : index == 4 ? 1 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, predicate >= 6 ? values[index % 5] : 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, predicate < 6 ? values[index % 5] : 1);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = 3277 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
@@ -15007,22 +15046,66 @@ private:
 				"SPRU172C STL SHFT Xmem preserves accumulators/status and uses compact AR2-5 addressing");
 			if (index < 511) { start_compact_store_case(index + 1); return; }
 			osd_printf_info("TMS320C54x compact store conformance: PASS variants=512\n");
-			start_b_delayed_case(0);
+			start_acc_delayed_case(0);
 			return;
 		}
-		if (m_phase >= 3277 && m_phase < 3282)
+		if (m_phase >= 3277 && m_phase < 3337)
 		{
 			unsigned const index = m_phase - 3277;
-			bool const taken = index == 1 || index == 2 || index == 4;
+			static constexpr bool outcomes[6][5] = {
+				{false, true, true, true, false}, {true, false, false, false, true},
+				{true, false, true, true, true}, {false, true, false, false, false},
+				{false, false, true, true, false}, {true, true, false, false, true}
+			};
+			bool const taken = outcomes[(index / 5) % 6][index % 5];
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 2 : 1) &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
-				m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x09e2 : 0x09d5) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x09e2 : 0x09d6) &&
 				m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1,
-				"BCD BNEQ/BGEQ captures the full accumulator condition before both delay words");
-			if (index < 4) { start_b_delayed_case(index + 1); return; }
-			osd_printf_info("TMS320C54x delayed B predicates conformance: PASS variants=5\n");
+				"BCD tests all twelve signed/zero accumulator predicates before both delay words");
+			if (index < 59) { start_acc_delayed_case(index + 1); return; }
+			osd_printf_info("TMS320C54x delayed accumulator predicates conformance: PASS variants=60\n");
+			start_delayed_call_case(0);
+			return;
+		}
+		if (m_phase >= 3337 && m_phase < 3346)
+		{
+			unsigned const index = m_phase - 3337;
+			bool const taken = index == 1 || index == 2 || index == 3 || index == 5 || index == 8;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 2 : 1) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+				data.read_word(0x0fff) == (taken ? 0x09d4 : 0xbeef) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x09d5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1,
+				"CCD captures full-width A and combined overflow conditions, executes delay words and returns after them without changing XPC");
+			if (index < 8) { start_delayed_call_case(index + 1); return; }
+			osd_printf_info("TMS320C54x delayed conditional call conformance: PASS variants=9\n");
+			start_asm_store_case(0);
+			return;
+		}
+		if (m_phase >= 3346 && m_phase < 3474)
+		{
+			unsigned const index = m_phase - 3346;
+			unsigned const kind = index / 32;
+			int const shift = (index & 31) >= 16 ? int(index & 31) - 32 : int(index & 31);
+			s64 const value = kind & 1 ? -2023406815LL : 0x12345678;
+			u64 const shifted = shift < 0 ? u64(value >> -shift) : u64(value) << shift;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				data.read_word(0x0507) == u16(shifted >> (kind & 2 ? 16 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0508 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x0900 | (index & 31)),
+				"SPRU172C ASM STL/STH stores shifted low/high words without modifying either accumulator or status");
+			if (index < 127) { start_asm_store_case(index + 1); return; }
+			osd_printf_info("TMS320C54x ASM store conformance: PASS variants=128\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -1982,15 +1982,49 @@ bytes after NAND program command `80`, replacing the negative control's
 invalid command sequence. This is initial storage activity, not a complete
 recorded file or accepted media.
 
-The current 20-second probe fails on unsupported opcode `fa46` at `03:dff0`.
-Earlier reached instructions `9808` (`STL A,8,*AR2`), `fa4c` (`BCD BNEQ`)
-and `fa4a` (`BCD BGEQ`) are implemented, with 512 compact-store variants and
-five delayed-predicate tests in `check-c54x-core`. The store encoding and
+The provisional shared-RAM probe completes its 20-second execution window
+without an unsupported instruction. It observes 96 NAND program setups and
+96 confirms, with 50,688 data bytes (96 pages of 528 bytes). This does not
+verify a finalized recording. The native lifecycle remains state 9, mode 3,
+continuation 8, with zero accepted tracks.
+
+The CPU conformance suite covers 512 compact-store variants, all twelve
+signed/zero A/B delayed-branch predicates over five accumulator values,
+nine delayed-call cases and 128 ASM-controlled store cases. Combined
+accumulator/overflow call predicates use conjunction. ASM-store coverage
+uses SXM set and saturation disabled; it is not exhaustive saturation
+coverage. The store encoding and
 shift contract are documented in [TI SPRU172C](https://e2e.ti.com/cfs-file/__key/communityserver-discussions-components-files/81/6136.spru172c.pdf),
 pages 4-172--174; GNU tic54x disassembly independently identifies the original
-instruction stream. Next complete the instruction boundary, then verify
-recording/storage completion and the resulting media before claiming playback.
+instruction stream. Next derive the original recorder stop/save command
+from its receive parser, then verify storage completion and the resulting
+media before claiming playback.
 Do not inject file contexts, lifecycle state or a guessed media header.
+
+The AA88 receive path is separately mapped: McBSP2 RX vector `2058`
+targets `03:8543`, which queues bytes at `f7e9` using head `f9de`.
+Parser `02:82c0` is pumped by `02:8418`; dispatcher `02:84cd`
+obtains its request through `02:8457` into buffer `045f`.
+Its selector `36` branch at `02:85a8` tests parameter `0462`:
+`3` clears `045e` and calls `02:8805`, `6` sets it and calls the
+same routine, `5` rejects through the default response, and `4`
+clears `3750`, selects continuation `9` or `10` according to the
+old continuation, and calls `03:84fc` and `03:86ec`.
+This is an original control-command route, not yet proof that parameter
+`4` completes and saves a recording. Reconstruct the dispatcher range
+`284cd..28560` and control range `285a8..2877a` with the inventory tool
+and `--segment aa88 --disassembler-little-endian`; their output SHA-256
+values are `0f11d770bd6456ddcb613a9bf0823d73388bbb75ced9095d865d26cac5a5ec96`
+and `95437b37da97d1f0b85161d13b4af80f0a1fac7cb4d2af279bc0ed21698cd452`.
+These addresses are overlay-specific: the resident image has different
+instructions at the same addresses.
+
+Resident command and loader addresses are reused by the recorder overlay;
+their resident trace counters must stop when that overlay takes ownership.
+The recorder's idle routine and timer interrupt change IMR repeatedly
+(5,276 observed changes in this window). An endpoint with IMR zero is not
+by itself evidence of a deadlock: the timer handler temporarily masks and
+restores interrupts, and native storage activity continues.
 
 Reproduce with `make check-mu4-bootstrap-original
 MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootrecord`.
@@ -1998,8 +2032,8 @@ This runs in an isolated NAND copy, forbids NVRAM saving and verifies that
 the source disk file remains unchanged. `bootstatus` supplies the independent
 complete-startup lifecycle observation.
 Use `MU4_BOOTSTRAP_BIOS=bootrecordram` for the provisional shared-RAM probe;
-it currently returns failure because native execution stops on
-the unsupported opcode. It is not a passing recording acceptance gate.
+it passes startup, native response and execution checks. It is not a
+passing recording acceptance gate.
 
 Reproduce the command-table extraction with
 `tools/noki5510_a00_inventory.py --segment aa22 --extract-program-range
