@@ -1244,10 +1244,20 @@ Its observed calls to common `345c` and `2096` return. A first call at
 call, with input `0001:e980`, has no observed return. The earlier,
 successfully completed `c404` invocation traverses the same helpers.
 Consequently neither `c404` nor `c4c7` is uniformly non-returning.
-Static `c5b2` uses buffer `b3f8`, cached address `b4f8`, read/flush helpers
-`c57f`/`b91d`/`b9ae`, and filesystem-mode-specific masked updates. Those
-observations do not yet prove which internal branch is active or that the
-storage operation is deadlocked.
+`c5b2` uses buffer `b3f8`, cached address `b4f8`, read/flush helpers
+`c57f`/`b91d`/`b9ae`, and filesystem-mode-specific masked updates. Runtime
+captures establish mode 1: `c5f3` compares AR2=1 with AR0=4, then `c5f8`
+compares it with AR0=1 and takes the matching branch. No fetch of the
+invalid-mode loop at `c5fb` is observed. Initial cache reads at `c5ea`
+return for addresses `0001:e901` and `0001:e980`; execution then reaches
+the final section at `c6ad`. Earlier final calls to `b91d` at `c6ba` and
+`b9ae` at `c6bd` return. For the active settings operation, the last
+`03:c6ba -> 03:b91d` call receives cached address `0001:e980` and has no
+observed return. Thus the mode selector and initial cache read are not
+the open boundary. Resolve this last buffer/flush preparation call; a
+bounded observation alone does not establish a deadlock or failed write
+verification. Include the routine's final section when probing it:
+truncating observations at `c6ad` omits its load-bearing child calls.
 Return-site observations are pre-execution: AR2 is not a claimed result
 until the following instruction transfers the returned accumulator.
 
@@ -1267,7 +1277,7 @@ zero illegal-opcode requirement. Additional transfer counts are not validated
 music content. In both windows the candidate consumer has zero entries and
 `b633` has zero firmware reads. The storage reader remains active: do not
 describe an endpoint PC as a stuck instruction or assume a missing peer.
-Next resolve `03:c5b2`'s active cache/flush branch before changing media
+Next resolve the active `03:c6ba -> 03:b91d` buffer/flush path before changing media
 contents or extending observation time again.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
