@@ -13,7 +13,7 @@ class mu4_storage_test_state : public driver_device
 public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
 		: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
-		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit") { }
+		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers") { }
 	void test(machine_config &config)
 	{
 		// Test clock only; DA150 PLL/physical memory mapping is not claimed here.
@@ -30,7 +30,7 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	required_device<samsung_k9k1208u0a_device> m_nand;
 	required_region_ptr<u16> m_cinit;
-	required_region_ptr<u16> m_initdisk, m_disk_cinit;
+	required_region_ptr<u16> m_initdisk, m_disk_cinit, m_disk_helpers;
 	u8 m_direction = 0, m_gpio = 0;
 	bool m_ready = true;
 	unsigned m_bio_reads = 0, m_busy_reads = 0, m_data_reads = 0;
@@ -151,10 +151,11 @@ private:
 			u16 const recovery[] = {0xf020, 0x3aea, 0xf980, 0x0880, 0xf4e1};
 			for (unsigned i = 0; i < std::size(recovery); ++i) program.write_word(0x1809 + i, recovery[i]);
 		}
-		if (m_phase == 10 || m_phase == 12)
+		if (m_phase == 10 || m_phase == 12 || m_phase == 13)
 		{
 			// Replace the routine library with unchanged InitDisk code, not a flat overlay image.
 			program.install_rom(0x256d, 0x4aa8, &m_initdisk[0]);
+			program.install_rom(0x4aa9, 0x4abe, &m_disk_helpers[0]);
 			auto &data = m_cpu->space(AS_DATA);
 			unsigned cursor = 0;
 			while (cursor < m_disk_cinit.length())
@@ -170,11 +171,17 @@ private:
 			// Original ABI: block zero in A, original NAND geometry context on the stack.
 			u16 const marker[] = {0xf074, 0x377a, 0x7600, 0x0585, 0xf020, 0, 0xf074, 0x2889, 0xf4e1};
 			for (unsigned i = 0; i < std::size(marker); ++i) program.write_word(0x1809 + i, marker[i]);
+			if (m_phase == 13)
+			{
+				u16 const scan[] = {0xf074, 0x377a, 0x7600, 0x2000, 0x7601, 0x2100,
+					0xf020, 0x068c, 0xf074, 0x36b9, 0xf4e1};
+				for (unsigned i = 0; i < std::size(scan); ++i) program.write_word(0x1809 + i, scan[i]);
+			}
 		}
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
-		m_check->adjust(attotime::from_msec(m_phase == 7 ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
+		m_check->adjust(attotime::from_msec(m_phase == 13 ? 8000 : m_phase == 7 ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
 	}
 	void start_media_read()
 	{
@@ -254,7 +261,8 @@ private:
 			if (m_phase == 12)
 			{
 				logerror("mu4_initdisk_marker: PASS erased=ff bad_marker=00 original_spare_reader=1\n");
-				machine().schedule_exit();
+				m_phase = 13;
+				machine().schedule_soft_reset();
 				return;
 			}
 			// External bad-block fixture: program only spare byte 5 of physical page zero.
@@ -263,6 +271,20 @@ private:
 			m_nand->data_w(0); m_nand->command_w(0x10);
 			m_phase = 11;
 			m_check->adjust(attotime::from_usec(201));
+			return;
+		}
+		if (m_phase == 13)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 0 ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || data.read_word(0x2000))
+				fatalerror("MU4 InitDisk scan return/reserved bitmap mismatch");
+			for (unsigned i = 0; i < 256; ++i)
+				// 256d byte-swaps its source bitmap in place before NAND writeback.
+				if (data.read_word(0x2100 + i) != (i == 0 ? 0x0100 : 0))
+					fatalerror("MU4 InitDisk bitmap mismatch group=%u value=%04x", i, data.read_word(0x2100 + i));
+			logerror("mu4_initdisk_scan: PASS blocks=4096 bad_block=0 reserved_bad=0 reads=%u busy_reads=%u\n", m_data_reads, m_busy_reads);
+			machine().schedule_exit();
 			return;
 		}
 		if (m_phase == 6)
@@ -340,6 +362,8 @@ private:
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
 ROM_START(mu4nand)
+	ROM_REGION16_LE(44, "disk_helpers", 0)
+	ROM_LOAD16_WORD_SWAP("mu4_initdisk_helpers.bin", 0, 44, CRC(6e84f71a) SHA1(fa38ceaa537490d6d57c84a6406990aad5b869a6))
 	ROM_REGION16_LE(19064, "initdisk", 0)
 	ROM_LOAD16_WORD_SWAP("mu4_initdisk_library.bin", 0, 19064, CRC(e9ecd12c) SHA1(748672ed6cac0e864fe0e70a9026b8cafaf8a7bc))
 	ROM_REGION16_LE(2522, "disk_cinit", 0)

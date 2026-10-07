@@ -658,8 +658,8 @@ or music-DSP file has been produced by this fixture.
 
 ### InitDisk storage scan and receive boundary
 
-The complete scan is statically mapped from unchanged InitDisk R060's
-`256d` record; its block-reader predicate is also execution-tested. Startup
+The complete scan and block-reader predicate execute from unchanged InitDisk
+R060's `256d` and `4aa9` records in the isolated storage gate. Startup
 `3079` configures GPIO direction bits
 0..2 and calls `30de` with data pointer `057e`. That routine initializes
 the NAND GPIO through `377a -> 3781`, then calls `36b9` with context `068c`
@@ -696,13 +696,23 @@ page-zero spare byte 5 to zero; the same original code then returns zero
 after the first page, with balanced SP and timed status handling. The ABI
 uses near `CALL`, matching these routines' `RET`, rather than `FCALL`.
 
-A bounded full `36b9` experiment with stack output pointers `2000/2100`
-did not terminate: at eight test-clock seconds it had 426,125 NAND writes
-and 1,207,855 reads, beyond the expected scan traffic, without an illegal
-opcode. The unvalidated full-scan probe is not an acceptance gate. Audit
-its loop counters and ABI before extending serial ingress; do not interpret
-noncompletion as missing media. No received ring entries, successful scan
-return or filesystem records should be injected into RAM.
+The full `36b9` call uses context `068c` and stack output pointers
+`2000/2100`. It scans all 4,096 blocks, records the externally programmed
+block-zero marker, reports no bad reserved blocks, and returns zero with
+balanced SP. Metadata writer `256d` byte-swaps the 256-word source bitmap
+in place before its cache writeback; the final bitmap therefore begins
+`0100`, not `0001`. The complete gate observes 156,412 NAND reads and
+37,778 busy-pin reads. This checks routine execution, not a valid filesystem
+or preservation of factory markers through every provisioning path.
+
+The routine requires the separate original `4aa9` record: its metadata
+tail calls helper `4aaf`. Omitting that record causes execution into blank
+test program RAM and eventual wrapper re-entry, despite correct scan
+counters. All required code records must be loaded before attributing such
+noncompletion to the CPU or hardware. Temporary instruction/stack probes
+are removed. Next establish the serial ingress contract; no received ring
+entries, successful scan return or filesystem records should be injected
+into RAM.
 
 This exercises generic core contracts that matter beyond MU4: long-offset
 `BANZ/BANZD` tests the effective Sind value and consumes displacement before
