@@ -560,6 +560,16 @@ the expected attempt count and each attempt to reach `ended` after release.
 This differs from the 3310's independently observed two-attempt retry fixtures;
 it is not a general assertion about all retry settings or longer runs.
 
+The 5210 v5.40E independently passes the same busy and unavailable contracts
+with its own physical Send sequence and fresh product-local storage. Each
+45-second fixture observes one fully ended attempt, no redial, and no accepted
+media:
+
+```sh
+make verify-5210-radio-outgoing-call-sip-busy RUN_DIR=run_5210_sip_busy_gate
+make verify-5210-radio-outgoing-call-sip-unavailable RUN_DIR=run_5210_sip_unavailable_gate
+```
+
 The 3410 v5.46E also independently passes outgoing connected and pending
 save/load gates with fresh product-local storage and physical Send. Connected
 restoration observes SIP BYE; pending restoration observes CANCEL/487 without

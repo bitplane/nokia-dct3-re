@@ -50,6 +50,7 @@ class SipFailureCheckTest(unittest.TestCase):
 
     def test_3410_failure_scope(self):
         self.assertTrue(self.check(product='3410')['scope'].startswith('3410 HLE'))
+        self.assertTrue(self.check(product='5210')['scope'].startswith('5210 HLE'))
 
     def test_false_connection_is_rejected(self):
         for extra in ('state changed to CONFIRMED',):
