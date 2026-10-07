@@ -41,4 +41,4 @@ private:
 
 DECLARE_DEVICE_TYPE(TMS320C54X_DMA, tms320c54x_dma_device)
 
-#endif
+#endif // MAME_NOKIA_TMS320C54X_DMA_H

@@ -35,4 +35,4 @@ private:
 	devcb_write16 m_din_word_cb;
 };
 DECLARE_DEVICE_TYPE(TLV320AIC23, tlv320aic23_device)
-#endif
+#endif // MAME_NOKIA_TLV320AIC23_H

@@ -65,4 +65,4 @@ private:
 };
 
 DECLARE_DEVICE_TYPE(TMS320C54X_MCBSP, tms320c54x_mcbsp_device)
-#endif
+#endif // MAME_NOKIA_TMS320C54X_MCBSP_H
