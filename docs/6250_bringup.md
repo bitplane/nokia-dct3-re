@@ -18,10 +18,11 @@ phonebook save and cold-start retrieval from SIM NVRAM are verified below. Norma
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
-Research idle save/load separately verifies exact CPU/RAM/time restoration,
-ordered radio/SIM replay, identical 96x60 idle pixels and post-load physical
-Menu/Messages continuation. This does not resolve the original PMM or native
-DSP boundaries below.
+Research idle and active-call save/load separately verify exact CPU/RAM/time
+restoration, ordered radio/SIM replay, identical 96x60 pixels and post-load
+physical continuation. Idle uses Menu/Messages; the established call uses
+End and complete CC/RR release back to registered idle. Neither resolves the
+original PMM or native DSP boundaries below.
 
 ## Inputs
 
@@ -76,7 +77,17 @@ exact PC/SP/mapped-RAM digest/emulated-time restoration, nonempty ordered
 protocol replay with identical payloads, identical full idle pixels, reviewed
 `DCT3 LAB` text and Messages title, plus raw matrix key `06` after load.
 The initial-record PMM remains a diagnostic external-input comparison.
-Active-call and delivered-SMS restoration are not established by this gate.
+Active-call and delivered-SMS restoration are not established by the idle gate.
+
+`--scenario call-state` uses the same roundtrip harness after physical
+`123`/Send. Connect Acknowledge precedes the save at 25 seconds, with no
+Disconnect yet; the physical call fixture schedules no End while the state
+fixture owns continuation. Exact state/protocol/pixel replay and reviewed
+Call 1 presentation are required. After load, a physical End press completes
+the own outgoing release grammar, including request-derived confirmation and
+idle PCH, and returns to reviewed `DCT3 LAB`. Check with
+`noki6250_state_check.py LOG SNAP --call`. This is restored call signaling/UI,
+not speech, native DSP runtime or delivered-SMS restoration.
 
 ## Recovered hardware contracts
 

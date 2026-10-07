@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "idle-state"),
+                                              "phonebook", "registration", "idle-state", "call-state"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -72,6 +72,8 @@ def main():
             script = "noki6250_runtime_observe.lua"
         if args.scenario == "idle-state":
             script = "noki6250_state_idle.lua"
+        if args.scenario == "call-state":
+            script = "noki6250_state_call.lua"
         seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
@@ -84,6 +86,7 @@ def main():
         env = os.environ.copy()
         flags = {"calculator": "NOKIA_DCT3_6250_CALCULATOR",
                  "outgoing-call": "NOKIA_DCT3_6250_OUTGOING",
+                 "call-state": "NOKIA_DCT3_6250_OUTGOING",
                  "sms-delete": "NOKIA_DCT3_6250_SMS_DELETE",
                  "sms-reply": "NOKIA_DCT3_6250_SMS_REPLY"}
         for flag in flags.values():
@@ -120,9 +123,11 @@ def main():
                 raise ValueError(f"expected one save frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
                        "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
-        elif args.scenario == "idle-state":
+        elif args.scenario in ("idle-state", "call-state"):
             checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
                        str(run / "error.log"), str(run / "snap")]
+            if args.scenario == "call-state":
+                checker.append("--call")
         elif args.scenario == "registration":
             checker = [sys.executable, str(root / "tools/radio_registration_trace_check.py"),
                        str(run / "error.log"), "--profile", "nhm3"]

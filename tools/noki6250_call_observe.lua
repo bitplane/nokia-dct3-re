@@ -22,6 +22,10 @@ if os.getenv("NOKIA_DCT3_6250_OUTGOING") == "1" then
         {28, cell(0, 3), 1}, {28.2, cell(0, 3), 0}
     }
 end
+if _G.noki6250_call_hold then
+    table.remove(actions)
+    table.remove(actions)
+end
 local captures = {17, 21, 26, 32}
 local next_action, next_capture = 1, 1
 emu.register_periodic(function()
