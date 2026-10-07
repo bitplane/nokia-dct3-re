@@ -283,6 +283,16 @@ This verifies outgoing host signaling, not audio or a SIP call.
 
 ## Host SMS acceptance
 
+Named gates use the same isolated own-PMM runners and require new run
+directories. Execute them sequentially:
+
+```sh
+make verify-6210-host-incoming-sms RUN_DIR=run_6210_host_sms_incoming
+make verify-6210-host-outgoing-sms RUN_DIR=run_6210_host_sms_outgoing
+make verify-6210-host-rejected-sms RUN_DIR=run_6210_host_sms_rejected
+make verify-6210-host-silent-sms RUN_DIR=run_6210_host_sms_silent
+```
+
 The isolated runner's `host-incoming-sms` scenario enables only `CALLHOST`,
 waits for current-epoch adapter readiness and laboratory registration, and
 delivers host `hello` from `5551234`. Independent host correlation and NPE-3
