@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_recorder_polled_control", "owner": "native_music_dsp_bench", "status": "satisfied",
+      "predicate": "Original AA88 recorder firmware accepts a pin-level read-only status poll followed by selector 36 parameter 4 and returns through its own named loader to MCUSI16",
+      "current": "The isolated provisional shared-RAM bootrecpoll profile sends checksum-checked status token 2, acknowledges the native selector-71 reply, then sends control token 3. Application requests arrive at 10.667 and 10.722 seconds; the status query changes the previous selector from 36 to 49 through original dispatcher code, allowing one control-handler entry. Native processing completion becomes 8009; the original loader returns to MCUSI16 with lifecycle 2, mode 0 and continuation 0a. RX/TX totals are 35/47, three replies and two subsequent request ACKs, with drained RX and unchanged source NAND. There are 224 program setups/confirms and 118272 programmed bytes. This proves a bench protocol transition, not the ordinary handset sender sequence, finalized media, native music playback, physical shared-RAM extent or speech.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "nsm3d_original_record_acceptance", "owner": "dsp_staged_research", "status": "unresolved",
       "predicate": "8250 v5.02 runtime peer processes acquired product-local records using an evidenced identity and transformation accepted by the own-ROM consumer",
       "current": "Fresh isolated runtime comparison rejects the candidate family-83 decode before format selection. Startup deliberately sets validation-selector bit 7 at 13fdd9; the MCU sends the acquired 24-byte record directly. Forward and inverse operations under the declared nominal identity both fail the ordinary structural branch. The PMM initial record spans 32768 bytes, outside the existing single-sector journal replay contract. Public family tables and independently documented v6.02 HLE/provisioning success do not recover this PMM's original chip identity or missing ROM6 record processing. No fabricated verdict, donor PMM or unlocked record is supplied. Graphical boot and downstream phone capabilities remain unverified pending matched identity/transformation evidence, a physical exchange or resident ROM6 code.",

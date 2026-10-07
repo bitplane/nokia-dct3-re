@@ -68,9 +68,13 @@ The provisional `bootrecordram` profile shares RAM at `2000..7fff`, verifies
 the overlay destinations, executes its original startup and begins NAND
 programming through a clean 20-second execution window. The separate
 `bootreccontrol` profile completes native receipt and acknowledgement of a
-further control packet. Its application handler is not reached in the
-observation window. The current recorder frontier is processing/control
-dispatch, not serial receipt or an unsupported instruction.
+further control packet, but its previous-command filter rejects the repeated
+selector before parameter dispatch. `bootrecpoll` first issues the original
+read-only status query, then reaches the control handler and returns through
+the native loader to `MCUSI16`. The current recorder frontier is the resulting
+media and save/name transaction, not serial receipt, control dispatch or an
+unsupported instruction. The poll sequence is a bench protocol test, not a
+recovered handset sender trace.
 None of these profiles proves a recorded track.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -2037,6 +2041,28 @@ class/selector when the selector is greater than `28` hex (GNU's immediate
 `#40` is decimal), before parameter dispatch.
 The application control handler at `02:85dc` therefore has zero entries.
 Transport acknowledgement is not application completion or saved media.
+
+The separate `bootrecpoll` fixture retains that direct-repeat negative
+control and adds a read-only status query before parameter 4. AA88 selector
+`49` at `02:856b` packages mode/state into a class-1 selector-`71` reply;
+it does not write recorder lifecycle state. The query packet is
+`1e 02 aa 01 49 02 fc 55`, followed, after its native reply and pin-level
+acknowledgement, by control packet `1e 03 aa 01 36 04 03 87 55`.
+Both packet checksums are compile-time checked. The dispatcher receives
+the query at 10.667 seconds and the control at 10.722 seconds, with previous
+selector `49` rather than `36`. Handler `02:85dc` executes once; the native
+processing completion reaches `8009`, and the original named loader
+returns to `MCUSI16 .BIN`. At 20 seconds lifecycle is 2, mode 0,
+continuation `0a`, with zero tracks. Native NAND activity is 224 program
+setups/confirms and 118,272 bytes (224 pages of 528 bytes), versus the
+no-control baseline's 160 pages. RX/TX totals are 35/47 words, three
+checksum-valid replies and two subsequent request acknowledgements.
+This proves the control transition and native return, not a finalized
+recording or that the handset's ordinary sender uses this exact poll sequence.
+The next requirement is independent inspection of the resulting in-memory
+media and recovery of the original save/name transaction. Disk NAND stays
+unchanged because the fixture runs with NVRAM saving disabled.
+Reproduce with `MU4_BOOTSTRAP_BIOS=bootrecpoll` on the same isolated gate.
 
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
