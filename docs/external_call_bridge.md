@@ -472,3 +472,18 @@ audio path. It does not prove native DSP speech or real RF operation.
 
 Next boundaries are broader restoration/failure coverage and native DSP speech,
 which remains its independent hardware/backend milestone.
+# Cross-Product SIP Acceptance
+
+The 3310 NHM-5 v6.39 also completes a physical outgoing call through the local
+PJSIP bridge: handset SETUP, SIP confirmation, bidirectional host media, and
+normal CC/LAPDm release. Its SETUP bearer capability differs from the 3210;
+the checker retains separate exact product expectations. This establishes HLE
+signaling/media transport, not native DSP speech or physical waveform fidelity.
+
+```sh
+make verify-radio-outgoing-call-sip RUN_DIR=run_3310_sip_outgoing \
+  SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 \
+  SIP_HANDSET_KEYS=5,5,5,1,2,3,4,enter \
+  SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=70 \
+  SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--product 3310'
+```

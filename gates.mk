@@ -3650,15 +3650,15 @@ verify-radio-outgoing-call-sip:
 	$(DCT3_EEPROM_GUARD) \
 	test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) ERASED_IDENTITY_SECURITY_CODE=12345; \
-	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	$(call prepare_host_run,$(RUN_DIR),$(SIP_HANDSET_MACHINE),$(SIP_HANDSET_BIOS)); \
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS='$(SIP_HANDSET_KEYS)' \
-		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
-		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$(SIP_HANDSET_KEY_DELAY_MS) \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=$(SIP_HANDSET_KEY_DURATION_MS) NOKIA_DCT3_POST_READY_KEY_GAP_MS=$(SIP_HANDSET_KEY_GAP_MS) \
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		$(VENV)/bin/python tools/run_sip_handset_gate.py $(SIP_HANDSET_RUNNER_ARGS) --pjsua '$(SIP_PJSUA_BIN)' --run-dir $(RUN_DIR) -- \
 		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
-		noki3210 -rompath roms -log -video none -sound $(SIP_HANDSET_SOUND) -throttle \
+		$(SIP_HANDSET_MACHINE) $(if $(SIP_HANDSET_BIOS),-bios $(SIP_HANDSET_BIOS)) -rompath roms -log -video none -sound $(SIP_HANDSET_SOUND) -throttle \
 		-keyboardprovider none -mouseprovider none -lightgunprovider none -joystickprovider none -midiprovider none \
 		-skip_gameinfo -autoboot_script $(SIP_HANDSET_SCRIPT) -verbose \
 		-cfg_directory $(SIP_HANDSET_CONFIG) -http -http_port 18100 \

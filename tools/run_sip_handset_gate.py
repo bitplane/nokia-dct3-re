@@ -158,7 +158,9 @@ def verify_success(root, remote_text, args):
             r'GSM service uplink sapi=0 pd=03 message=2a .*data=032a0802e0d1',
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=ended',
     ) if args.incoming else (
-            r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101',
+            (r'GSM service uplink sapi=0 pd=03 message=05 length=19 data=03450404600200815e0581551532f4a2150101'
+             if getattr(args, 'product', '3210') == '3310' else
+             r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101'),
             r'GSM service downlink kind=12 sapi=0 pd=03 message=07',
             r'GSM service uplink sapi=0 pd=03 message=0f .*data=030f',
             r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
@@ -171,7 +173,7 @@ def verify_success(root, remote_text, args):
             raise RuntimeError(f'missing ordered firmware call checkpoint: {pattern}')
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
-        'scope': f'3210 research-HLE physical {"incoming" if args.incoming else "outgoing"} SIP signaling and media transport; not native DSP speech',
+        'scope': f'{getattr(args, "product", "3210")} research-HLE physical {"incoming" if args.incoming else "outgoing"} SIP signaling and media transport; not native DSP speech',
         ('caller' if args.incoming else 'dialed_digits'): '5551234',
         'media': counts, 'passed': True}, indent=2) + '\n')
     print('OK - physical handset call connected to SIP with bidirectional host media and release')
@@ -337,6 +339,7 @@ def main():
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--record-media', action='store_true')
+    parser.add_argument('--product', choices=('3210', '3310'), default='3210')
     parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--restore-call', action='store_true')
     parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
