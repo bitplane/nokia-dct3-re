@@ -1774,9 +1774,10 @@ instructions. This is literal coverage, not an absence proof for indirect
 stores or reset-ROM/BSS initialization. The nine candidate words are
 observed with read/write taps installed once across reset legs; each
 access class records at most 16 samples per word per leg. No candidate
-value is altered. Next recover the legitimate initialization/reset path
-for this one-time state and its dependent contexts; do not bypass it by
-clearing `374d` or invoking the skipped calls from the supervisor.
+value is altered. The legitimate initialization writer belongs to the
+separate serial-bootstrap overlay, not the resident's one-time tail;
+do not bypass it by clearing `374d` or invoking the skipped calls from
+the supervisor.
 
 The original resident C-runtime entry `02:6d62` sets INTM, clears IMR,
 establishes stack/status/vector-base state, and processes its own
@@ -1801,6 +1802,38 @@ C-table replay; zeroing BSS or the gate would require independent original
 startup/reset evidence. Recover the full serial-bootstrap/reset lifecycle
 and any implicit memory initialization separately from these explicit
 tables. Physical reset and resident control restart remain unvalidated.
+
+#### Original serial-bootstrap lifecycle
+
+Original `aa55` startup `0e41 -> 090f` mounts the medium, enumerates and
+selects its files, then calls `08d1` at `09b3` before handing off through
+`2080 -> 3538`. Routine `08d1` owns an explicit context initializer:
+it clears `3732/3733`, `373f`, `3740/3741/3742`, `3745..3749`,
+`374d`, `375c` and `375e/375f`, sets `373e=1` and `374a=25`.
+In particular, `08f5..08f7` is the legitimate `374d=0` store. The
+resident's `02:90ec` store sets this initialized gate to one later.
+The resident-only literal census is not a cross-overlay absence claim.
+
+The `bootstrap` BIOS enters the unchanged serial-bootstrap startup at
+`0e41` (the original `aa55` serial-boot header's entry) against a copy
+of the previously firmware-created NAND, with
+no routine wrapper, supervisor C-table replay, state snapshot or NAND
+erasure. It models the entry handoff, not execution of an unavailable
+mask ROM or physical DA150 reset wiring. Reproduce it with
+`make check-mu4-bootstrap-original MU4_BOOTSTRAP_SOURCE_RUN=<completed
+check-mu4-retained-original directory>`. Its working directory and NVRAM
+are isolated; saving is disabled and the copied NAND must remain identical.
+
+The 20-second observation executes the original bootstrap, returns from
+the initial mount and directory operations, and reaches its `09b3`
+initializer call, observes the `374d=0` store at post-instruction PC
+`0008f8`, returns to `09b5`, and reaches loader `3538`. It has not
+entered resident `6d62` at the endpoint:
+PC `00321e`, 5,186,338 NAND data reads and no stream words. An unmapped
+startup I/O write to port `0080` (`00df`) also remains a board-model
+boundary. These observations are not a successful boot or proof of a
+deadlock. Pin the active bootstrap/loader operation and its original
+inputs next; do not replace this lifecycle with a flag-clear shim.
 
 Next recover the accepted media container and storage layout before attempting
 native playback, and finish reset lifecycle and board attachment separately.

@@ -1112,6 +1112,25 @@ check-mu4-retained-original:
 		done; \
 		cmp "$$tmp/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_14/nand"
 
+.PHONY: check-mu4-bootstrap-original
+check-mu4-bootstrap-original: build
+	@set -eu; source="$(abspath $(MU4_BOOTSTRAP_SOURCE_RUN))"; \
+		if test -z "$(MU4_BOOTSTRAP_SOURCE_RUN)" || ! test -f "$$source/nvram/mu4nand_13/nand"; then \
+			echo 'Set MU4_BOOTSTRAP_SOURCE_RUN to a completed check-mu4-retained-original run directory' >&2; exit 1; fi; \
+		test "$$(wc -c < "$$source/nvram/mu4nand_13/nand")" -eq 69206016; \
+		tmp="$$(mktemp -d '$(abspath run_mu4-bootstrap).XXXXXX')"; \
+		mkdir -p "$$tmp/nvram/mu4nand_15"; \
+		cp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_15/nand"; \
+		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -bios bootstrap \
+			-rompath "$$source/seed/roms" -nvram_directory "$$tmp/nvram" \
+			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
+			-seconds_to_run 30 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
+		cat output.log; cat error.log; \
+		grep -q 'mu4_original_bootstrap_frontier:' error.log; \
+		grep -q 'mu4_original_bootstrap_gate_init: value=0000 pc=0008f8' error.log; \
+		grep -q 'mu4_original_bootstrap_path: address=3538 ' error.log; \
+		cmp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_15/nand"
+
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.
 	@set -eu; tmp="$$(mktemp -d /tmp/mu4-nand.XXXXXX)"; \

@@ -164,6 +164,8 @@ private:
 	// Test supervisor, not DUT state: survives the requested machine reset.
 	unsigned m_native_reset_leg = 0;
 	unsigned m_native_reset_settings_mask = 0;
+	unsigned m_native_bootstrap_entries = 0, m_native_bootstrap_resident_entries = 0;
+	unsigned m_native_bootstrap_paths[10] = {};
 	bool m_native_runtime_observers_installed = false;
 	unsigned m_native_runtime_reads[9] = {}, m_native_runtime_writes[9] = {};
 	std::stringstream m_native_checkpoint, m_native_reference;
@@ -201,6 +203,7 @@ private:
 	}
 	void finish_stream_if_ready()
 	{
+		if (system_bios() == 16) return; // Fixed-window bootstrap observation, not a routine gate.
 		if (m_phase == 30 && system_bios() >= 2 && m_stream_words >= native_stream_target() &&
 			m_native_din_words >= native_stream_target() && m_dma_completions >= native_stream_target() / 128 &&
 			m_rx_dma_completions >= native_stream_target() / 128)
@@ -741,6 +744,28 @@ private:
 	}
 	virtual void machine_start() override
 	{
+		if (system_bios() == 16)
+		{
+			m_phase = 74;
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x0e41, 0x0e41, "mu4_original_bootstrap_entry",
+				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1) ++m_native_bootstrap_entries; });
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_original_bootstrap_resident",
+				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && (m_cpu->pc() & 0xffff) == address + 1) ++m_native_bootstrap_resident_entries; });
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x090f, 0x3538, "mu4_original_bootstrap_calls",
+				[this](offs_t address, u16 &, u16)
+				{
+					if (machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+					static constexpr offs_t points[] = {0x090f, 0x0945, 0x094e, 0x0951, 0x095e, 0x096c, 0x0997, 0x09b3, 0x09b5, 0x3538};
+					auto const found = std::find(std::begin(points), std::end(points), address);
+					if (found == std::end(points)) return;
+					unsigned &count = m_native_bootstrap_paths[found - std::begin(points)];
+					if (count++ < 4)
+						logerror("mu4_original_bootstrap_path: address=%04x a=%010llx nand_reads=%u\n", unsigned(address),
+							static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL, m_data_reads);
+				});
+			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
+				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });
+		}
 		if (system_bios() == 15)
 		{
 			// Fresh-process routine bench: mount externally retained NAND, never
@@ -1125,6 +1150,15 @@ private:
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
 		m_check->adjust(m_phase >= 25 ? attotime::from_usec(1) : attotime::from_msec(m_phase == 24 ? 8000 : m_phase == 18 ? 60000 : m_phase == 13 ? 8000 : (m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
+		if (m_phase == 74)
+		{
+			// Original serial-boot entry handoff, not mask-ROM or DA150 reset wiring.
+			// Let the original startup execute its C table and choose its NAND file.
+			program.write_word(0xff81, 0x0e41);
+			m_phase = 30;
+			m_check->adjust(attotime::from_seconds(20));
+			logerror("mu4_original_bootstrap_start: entry=000e41 retained_nand=1 routine_wrapper=0 mask_rom=0\n");
+		}
 	}
 	void start_media_read()
 	{
@@ -1135,6 +1169,18 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (system_bios() == 16)
+		{
+			if (!m_native_bootstrap_entries || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+				fatalerror("MU4 original bootstrap entry did not execute cleanly");
+			auto const disable = machine().disable_side_effects();
+			logerror("mu4_original_bootstrap_frontier: entry_count=%u resident_count=%u pc=%06x st1=%04x imr=%04x ifr=%04x flag374d=%04x nand_reads=%u stream_words=%u tail_ms=20000 board_boot=0 music_decode=0\n",
+				m_native_bootstrap_entries, m_native_bootstrap_resident_entries, unsigned(m_cpu->state_int(STATE_GENPC)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
+			machine().schedule_exit();
+			return;
+		}
 		if (m_phase >= 58 && m_phase <= 65)
 		{
 			auto &data = m_cpu->space(AS_DATA);
@@ -2625,6 +2671,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(12, "measure", "Original pin-level sample measurement observation")
 	ROM_SYSTEM_BIOS(13, "reset", "Original mid-byte bench reset observation (incomplete)")
 	ROM_SYSTEM_BIOS(14, "retained", "Original fresh-process retained-media observation")
+	ROM_SYSTEM_BIOS(15, "bootstrap", "Original serial-bootstrap entry observation (incomplete)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
