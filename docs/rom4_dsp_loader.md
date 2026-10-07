@@ -624,6 +624,18 @@ it has not been built or run, and no code is imported into this core.
 interface, not instruction execution. Neither is a differential oracle for
 the short-period timer probe. The TI legacy simulator remains an acquisition
 lead, not evidence that the current outcome is correct.
+TI's public [CCS 3.3 service-release index](https://software-dl.ti.com/ccs/non-esd/releases/CCSv3/CCSv3.3/CCSv3.3ServiceReleases.htm)
+still serves the SR12 update archive
+`SR12_CCS_v3.3_SR_3.3.82.13.exe` (135,946,254 bytes; SHA-256
+`a05ce0fae2485869ac55aaeb00b3a466fbdde24fe599e9db8279cce4b036bd33`).
+The acquired archive is retained locally under ignored `run_ccs33_oracle/`.
+Static extraction of its outer CAB exposes an InstallShield `data1.cab` and
+`data1.hdr`; header filenames include `ccs5400sim.txt`, C54x GEL files and
+`bti5400.dll`. This establishes accessible C54x-related update content, not
+a complete simulator installation or a timer-capable executable. The index
+explicitly requires a previous CCS 3.3 installation. Next inspect the nested
+payload with an InstallShield-capable reader and establish its dependencies
+before considering execution. No installer has been run or license accepted.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
