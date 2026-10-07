@@ -32,7 +32,7 @@ u16 tms320c54x_dma_device::read(offs_t offset)
 	if (offset == 0) return m_control;
 	if (offset == 1) return m_index;
 	if (offset != 2 && offset != 3) return 0xffff;
-	u16 const value = m_index < std::size(m_regs) ? m_regs[m_index] : 0;
+	u16 const value = valid_index(m_index) ? m_regs[m_index] : 0;
 	if (offset == 2 && !machine().side_effects_disabled()) ++m_index;
 	return value;
 }
@@ -52,12 +52,15 @@ void tms320c54x_dma_device::write(offs_t offset, u16 value)
 	else if (offset == 1) m_index = value;
 	else if (offset == 2 || offset == 3)
 	{
-		if (m_index < std::size(m_regs))
+		if (valid_index(m_index))
 		{
 			if (m_index == 0x1e || m_index == 0x1f) value &= 0x7f;
 			else if (m_index < 0x1e && m_index % 5 == 4) value &= 0xf7df;
+			else if (m_index == 0x27 || (m_index >= 0x2a && (m_index - 0x2a) % 4 == 3)) value &= 0xff;
 			m_regs[m_index] = value;
 		}
+		else if (m_per_channel_reload && m_index == 0x3e && value)
+			fatalerror("C54x DMA channel-enable extension is not implemented");
 		if (offset == 2) ++m_index;
 	}
 }

@@ -29,6 +29,7 @@ public:
 		m_cpu->bio_in_cb().set(FUNC(mu4_storage_test_state::bio_r));
 		TMS320C54X_DMA(config, m_dma, 13'000'000);
 		m_dma->set_cpu(m_cpu);
+		m_dma->set_per_channel_reload(true);
 		TMS320C54X_MCBSP(config, m_mcbsp, 13'000'000);
 		m_mcbsp->tx_word_cb().set(FUNC(mu4_storage_test_state::serial_tx));
 		m_mcbsp->tx_bit_cb().set(FUNC(mu4_storage_test_state::serial_tx_bit));
@@ -81,6 +82,7 @@ private:
 	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
 	unsigned m_native_mcbsp_trace = 0, m_native_mcbsp_polls = 0;
 	unsigned m_native_adjacent_reads = 0;
+	unsigned m_native_dma_writes = 0;
 	u16 m_native_mcbsp_index = 0, m_native_mcbsp_status = 0;
 	unsigned m_page = 0;
 	static u16 pattern(unsigned index) { return u16(0x1234 + index * 37); }
@@ -101,7 +103,14 @@ private:
 		map(0x003c, 0x003d).rw(FUNC(mu4_storage_test_state::gpio_r), FUNC(mu4_storage_test_state::gpio_w));
 		map(0x0040, 0x0043).rw(m_mcbsp, FUNC(tms320c54x_mcbsp_device::data_r), FUNC(tms320c54x_mcbsp_device::data_w));
 		map(0x0048, 0x0049).rw(m_mcbsp, FUNC(tms320c54x_mcbsp_device::control_r), FUNC(tms320c54x_mcbsp_device::control_w));
-		map(0x0054, 0x0057).rw(m_dma, FUNC(tms320c54x_dma_device::read), FUNC(tms320c54x_dma_device::write));
+		map(0x0054, 0x0057).r(m_dma, FUNC(tms320c54x_dma_device::read)).w(FUNC(mu4_storage_test_state::dma_w));
+	}
+	void dma_w(offs_t offset, u16 value)
+	{
+		if (m_phase == 30 && m_native_far_reads && m_native_dma_writes++ < 128)
+			logerror("mu4_native_dma: offset=%u index=%04x value=%04x pc=%06x\n",
+				unsigned(offset), m_dma->read(1), value, unsigned(m_cpu->pc()));
+		m_dma->write(offset, value);
 	}
 	// Word-level receive fixture only; serial clocks/framing are not modeled here.
 	u16 serial_r()
@@ -444,6 +453,8 @@ private:
 				m_saved_dma.clear(); m_saved_dma.seekg(0);
 				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE || !(data.read_word(0x54) & 1) || data.read_word(0x6100) != 0xffff)
 					fatalerror("MU4 DMA pending save restore mismatch");
+				data.write_word(0x55, 0x32);
+				if (data.read_word(0x57) != 0x1032) fatalerror("MU4 DMA reload-bank save restore mismatch");
 				m_phase = 29;
 				m_check->adjust(attotime::from_usec(1));
 				return;
@@ -455,9 +466,24 @@ private:
 			if (m_phase == 27 && data.read_word(0x6100) != 0xffff) fatalerror("MU4 DMA canceled transfer wrote data");
 			if (m_phase == 27)
 			{
+				for (unsigned bank : {0x24U, 0x2aU, 0x2eU, 0x32U, 0x36U, 0x3aU})
+				{
+					data.write_word(0x55, bank);
+					for (unsigned field = 0; field < 4; ++field) data.write_word(0x56, 0x1000 + bank + field);
+					data.write_word(0x55, bank);
+					for (unsigned field = 0; field < 4; ++field)
+						if (data.read_word(0x56) != (field == 3 ? bank + field : 0x1000 + bank + field))
+							fatalerror("MU4 DMA reload bank masking mismatch bank=%02x field=%u", bank, field);
+				}
+				for (unsigned reserved : {0x28U, 0x29U})
+				{
+					data.write_word(0x55, reserved); data.write_word(0x57, 0xffff);
+					if (data.read_word(0x57)) fatalerror("MU4 DMA reserved bank not zero");
+				}
 				data.write_word(0x54, 1);
 				m_saved_dma.str(std::string()); m_saved_dma.clear();
 				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 DMA pending save failed");
+				data.write_word(0x55, 0x32); data.write_word(0x57, 0xffff);
 				m_phase = 28;
 				m_check->adjust(attotime::from_usec(1));
 				return;
@@ -466,7 +492,7 @@ private:
 			{
 				if (data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA restored transfer failed");
 				m_saved_dma.str(std::string());
-				logerror("mu4_dma_conformance: PASS deferred=1 page_wrap=1 zero_count=1 cancel=1 pending_restore=1\n");
+				logerror("mu4_dma_conformance: PASS deferred=1 page_wrap=1 zero_count=1 cancel=1 pending_restore=1 reload_banks=6 frame_mask=1 reserved=1\n");
 				m_phase = 0;
 			}
 			else ++m_phase;

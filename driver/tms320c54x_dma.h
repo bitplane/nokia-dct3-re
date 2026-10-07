@@ -10,6 +10,7 @@ class tms320c54x_dma_device : public device_t
 public:
 	tms320c54x_dma_device(machine_config const &config, char const *tag, device_t *owner, u32 clock);
 	template <typename T> void set_cpu(T &&tag) { m_cpu.set_tag(std::forward<T>(tag)); }
+	void set_per_channel_reload(bool value) { m_per_channel_reload = value; }
 	u16 read(offs_t offset);
 	void write(offs_t offset, u16 value);
 
@@ -22,7 +23,9 @@ private:
 	void enable(unsigned channel);
 	required_device<cpu_device> m_cpu;
 	u16 m_control = 0, m_index = 0;
-	u16 m_regs[0x28] = {};
+	bool m_per_channel_reload = false;
+	bool valid_index(u16 index) const { return index < 0x28 || (m_per_channel_reload && index >= 0x2a && index <= 0x3d); }
+	u16 m_regs[0x3e] = {};
 	emu_timer *m_timers[6] = {};
 };
 
