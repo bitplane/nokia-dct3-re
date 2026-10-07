@@ -537,7 +537,7 @@ private:
 		if (system_bios() == 12 && !m_native_replay_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
 			// Let synchronized input events settle without advancing to the next bit.
 			m_native_replay->adjust(attotime::from_nsec(1));
-		if (system_bios() == 14 && !m_native_reset_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
+		if ((system_bios() == 14 || system_bios() == 18) && !m_native_reset_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
 			m_native_replay->adjust(attotime::from_nsec(1));
 		// One delay cycle, eight data cycles, then RBR-to-DRR publication.
 		if (m_command_rx_phase == 10 && m_command_rx_clock) m_command_rx_busy = false;
@@ -545,18 +545,18 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(native_replay_checkpoint)
 	{
-		if (system_bios() == 14)
+		if (system_bios() == 14 || system_bios() == 18)
 		{
 			if (m_phase != 30 || m_native_reset_leg || !m_command_rx_busy || m_command_rx_phase != 4 || m_command_rx_clock ||
 				m_command_rx_irqs || !m_command_tx_words.empty() || !machine().scheduler().can_save())
 				fatalerror("MU4 reset fixture is not at the settled first-byte boundary");
 			m_native_replay->adjust(attotime::never);
 			m_native_reset_leg = 1;
-			// Retain the uploaded NAND medium; the erased-input prelude is not
-			// a reboot path. Re-enter original mount/read/load routine ABIs.
+			// Retain NAND. The full-startup profile replays the original upload
+			// and reset-vector software; the legacy diagnostic uses routine ABIs.
 			m_files_checked = 0;
 			m_verified_files.clear();
-			m_phase = 19;
+			m_phase = system_bios() == 18 ? 74 : 19;
 			logerror("mu4_native_reset_request: mid_rx_byte=1 data_bits=3 rx_irqs=0 tx_words=0\n");
 			machine().schedule_soft_reset();
 			return;
@@ -742,7 +742,7 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
-	bool original_bootstrap_profile() const { return system_bios() == 16 || system_bios() == 17; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 18; }
 	void verify_native_status()
 	{
 		auto const disable = machine().disable_side_effects();
@@ -868,7 +868,7 @@ private:
 	}
 	virtual void machine_reset() override
 	{
-		if (system_bios() == 14 && m_native_reset_leg == 1 && m_phase == 19)
+		if (((system_bios() == 14 && m_phase == 19) || (system_bios() == 18 && m_phase == 74)) && m_native_reset_leg == 1)
 		{
 			if (m_mcbsp2->control_r(1) || m_mcbsp2->control_r(0))
 				fatalerror("MU4 serial controller retained control state across reset");
@@ -1211,7 +1211,7 @@ private:
 				fatalerror("MU4 original bootstrap upload coverage changed records=%u words=%u", records, uploaded);
 			logerror("mu4_original_bootstrap_upload: records=%u words=%u program_only=1 data_alias=unvalidated\n", records, uploaded);
 			m_phase = 30;
-			if (system_bios() == 17) m_command->adjust(attotime::from_msec(1));
+			if (system_bios() >= 17) m_command->adjust(attotime::from_msec(1));
 			m_check->adjust(attotime::from_seconds(20));
 			logerror("mu4_original_bootstrap_start: reset_vector=00ff80 serial_entry=000e41 retained_nand=1 routine_wrapper=0 mask_rom=0\n");
 		}
@@ -1234,7 +1234,13 @@ private:
 				m_native_bootstrap_entries, m_native_bootstrap_resident_entries, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
-			if (system_bios() == 17) verify_native_status();
+			if (system_bios() >= 17) verify_native_status();
+			if (system_bios() == 18)
+			{
+				if (m_native_reset_leg != 2 || m_native_bootstrap_entries != 2 || m_native_bootstrap_resident_entries != 2)
+					fatalerror("MU4 full startup did not repeat after the mid-byte reset");
+				logerror("mu4_original_bootstrap_reset: PASS mid_rx_byte=1 controller_cleared=1 original_startup_legs=2 retained_nand=1 rx_words=11 tx_words=14 firmware_state_forcing=0 board_reset=0\n");
+			}
 			machine().schedule_exit();
 			return;
 		}
@@ -2716,8 +2722,9 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(12, "measure", "Original pin-level sample measurement observation")
 	ROM_SYSTEM_BIOS(13, "reset", "Original mid-byte bench reset observation (incomplete)")
 	ROM_SYSTEM_BIOS(14, "retained", "Original fresh-process retained-media observation")
-	ROM_SYSTEM_BIOS(15, "bootstrap", "Original serial-bootstrap entry observation (incomplete)")
+	ROM_SYSTEM_BIOS(15, "bootstrap", "Original uploaded startup observation (isolated bench)")
 	ROM_SYSTEM_BIOS(16, "bootstatus", "Original uploaded startup with pin-level status transaction")
+	ROM_SYSTEM_BIOS(17, "bootreset", "Original uploaded startup with mid-byte reset and status restart")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

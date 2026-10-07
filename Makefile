@@ -1119,7 +1119,7 @@ check-mu4-bootstrap-original: build
 			echo 'Set MU4_BOOTSTRAP_SOURCE_RUN to a completed check-mu4-retained-original run directory' >&2; exit 1; fi; \
 		test "$$(wc -c < "$$source/nvram/mu4nand_13/nand")" -eq 69206016; \
 		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
-		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; \
+		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; \
 			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
 		tmp="$$(mktemp -d '$(abspath run_mu4-bootstrap).XXXXXX')"; \
 		mkdir -p "$$tmp/nvram/$$nvtag"; \
@@ -1127,15 +1127,18 @@ check-mu4-bootstrap-original: build
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -bios "$$bios" \
 			-rompath "$$source/seed/roms" -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
-			-seconds_to_run 30 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
+			-seconds_to_run 60 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; \
 		grep -q 'mu4_original_bootstrap_upload: records=7 words=10760 program_only=1 ' error.log; \
-		grep -q 'mu4_original_bootstrap_frontier: entry_count=1 resident_count=1 ' error.log; \
+		if test "$$bios" = bootreset; then \
+			grep -q 'mu4_original_bootstrap_frontier: entry_count=2 resident_count=2 ' error.log; \
+			grep -q 'mu4_original_bootstrap_reset: PASS' error.log; \
+		else grep -q 'mu4_original_bootstrap_frontier: entry_count=1 resident_count=1 ' error.log; fi; \
 		grep -q 'mu4_original_bootstrap_gate_init: value=0000 pc=0008f8' error.log; \
 		grep -q 'mu4_original_bootstrap_gate_init: value=0001 pc=0290ef' error.log; \
 		grep -q 'mu4_original_bootstrap_path: address=3538 ' error.log; \
 		grep -q 'mu4_original_bootstrap_loader: name=004d,0043,0055,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0001,e1e8 ' error.log; \
-		if test "$$bios" = bootstatus; then \
+		if test "$$bios" != bootstrap; then \
 			grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; fi; \
 		cmp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/$$nvtag/nand"
 

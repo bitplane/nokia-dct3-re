@@ -48,9 +48,11 @@ The `bootstrap` profile loads the complete original `aa55` upload and
 executes its uploaded `ff80` reset-vector prelude, original context
 initializer, directory-selected resident loader and resident startup.
 The `bootstatus` variant completes the same pin-level status transaction
-after this full startup. Reset continuation on this path remains to be
-verified; its stream volume is not validated music output.
-The open boundary is native reset lifecycle and board attachment, processing command/data
+after this full startup. The `bootreset` variant repeats original startup
+after a mid-byte soft reset and completes that transaction again without
+clearing firmware RAM from the supervisor. Its stream volume is not
+validated music output.
+The open boundary is physical reset/board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
 claimed; only the initial 1,024 DIN words are independently compared.
@@ -1714,9 +1716,11 @@ This diagnostic does **not** establish successful restart. During the new
 no request bytes or response bytes complete. The gate checks that bounded
 frontier separately from storage/controller reset; it does not apply the
 erased-media boot's sustained-interrupt expectation to retained settings.
-Recover the firmware-owned initialization needed after retained-media reload
-before claiming control-loop or streaming equivalence. The ABI bench restart
-does not establish physical board reset wiring or reset-ROM behavior.
+This routine-level restart omits the original bootstrap's context
+initialization; it is a negative control, not the full-startup reset
+frontier. The complete uploaded software lifecycle below passes restart
+and native status service. Neither establishes physical board reset wiring
+or unavailable mask-ROM behavior.
 The paired `check-mu4-retained-original` gate runs the `reset` diagnostic
 and saves its stalled-endpoint medium through MAME's native NVRAM interface.
 It validates the complete 69,206,016-byte device image, copies
@@ -1731,9 +1735,9 @@ The fresh process rereads all six payloads and all four settings entries,
 passes sustained streaming/interrupt checks, and completes the exact
 11-byte receive/14-byte transmit native status transaction with no retries
 and empty queues. Thus persistent NAND contents alone are insufficient to cause
-the reset diagnostic's stall. Isolate runtime memory, peripheral state and
-the firmware-owned initialization sequence next; the comparison does not
-yet identify an individual missing initializer or prove board reset behavior.
+the routine-reset diagnostic's stall. The complete original startup
+preserves that medium and supplies its own initialization, as verified
+below; the comparison alone does not prove board reset behavior.
 
 The paired gate also captures side-effect-disabled data-RAM observations at
 the completed loader and settled endpoints. Each file contains 65,408
@@ -1806,8 +1810,9 @@ initialization for addresses absent from either table. Therefore the
 current routine-level reset diagnostic does not demonstrate a missing
 C-table replay; zeroing BSS or the gate would require independent original
 startup/reset evidence. Recover the full serial-bootstrap/reset lifecycle
-and any implicit memory initialization separately from these explicit
-tables. Physical reset and resident control restart remain unvalidated.
+and its explicit memory-copy prelude separately from these C tables.
+Physical board reset remains unvalidated; uploaded software restart and
+resident control service are verified below.
 
 #### Original serial-bootstrap lifecycle
 
@@ -1865,13 +1870,22 @@ with the routine-bench acceptance; no different response shape or relaxed
 queue condition is introduced. The passive `bootstrap` profile remains
 available without host request traffic.
 
+The `bootreset` variant interrupts the first request after three data
+bits, resets the controller and re-executes the complete original upload
+through its reset vector. Original startup code clears and rebuilds its
+contexts, enters the resident a second time and completes the same exact
+status transaction. Run with `MU4_BOOTSTRAP_BIOS=bootreset`. The gate
+requires two startup/resident entries, cleared controller state and
+retained NAND, without supervisor firmware-RAM clearing. This validates
+uploaded software restart, not the unavailable mask ROM or physical
+DA150/PURX/rails reset sequence.
+
 An unmapped startup I/O write to port `0080` (`00df`) remains a board-model
-boundary. Next validate the complete startup's same-process reset
-lifecycle, retaining the separate physical-reset and output-content
-limitations.
+boundary. Physical board attachment and independently verified output
+content remain unvalidated.
 
 Next recover the accepted media container and storage layout before attempting
-native playback, and finish reset lifecycle and board attachment separately.
+native playback, and investigate physical reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
 a mode.
 
