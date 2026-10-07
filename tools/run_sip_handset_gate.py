@@ -57,7 +57,8 @@ async def run(args):
                 '--url', f'ws://127.0.0.1:{args.http_port}/nokia/dct3/calls',
                 '--destination', f'sip:probe@127.0.0.1:{args.sip_port}',
                 '--sip-port', str(args.sip_port + 1), '--once', '--require-frames',
-                '100' if args.sip_response == 200 and not args.cancel_incoming else '0',
+                '100' if args.sip_response == 200 and not args.cancel_incoming and
+                not (args.restore_call and args.restore_phase == 'alerting') else '0',
                 stdout=bridge_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(bridge)
             if args.incoming:
@@ -106,7 +107,7 @@ async def run(args):
                     await process.wait()
     remote_text = (root / 'sip-remote.log').read_text(errors='replace')
     if args.restore_call:
-        verify_restore(root, remote_text)
+        verify_restore(root, remote_text, args.restore_phase)
         return
     if args.cancel_incoming:
         verify_cancel(root, remote_text)
@@ -207,12 +208,20 @@ def verify_failure(root, remote_text, status):
     print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
 
 
-def verify_restore(root, remote_text):
+def verify_restore(root, remote_text, phase='connected'):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
-    if ('state changed to CONFIRMED' not in remote_text or
-            'Request msg BYE/' not in remote_text):
-        raise RuntimeError('restoration did not close a real connected SIP dialog')
+    if phase == 'connected':
+        if ('state changed to CONFIRMED' not in remote_text or
+                'Request msg BYE/' not in remote_text):
+            raise RuntimeError('restoration did not close a real connected SIP dialog')
+    else:
+        if not re.search(r'Response msg [4-6][0-9]{2}/INVITE/', remote_text):
+            raise RuntimeError('restoration did not reject the real alerting SIP INVITE')
+        if ('state changed to CONFIRMED' in remote_text or 'SIP physical answer' in bridge or
+                'SIP confirmed' in bridge or
+                re.search(r'GSM service uplink sapi=0 pd=03 message=07', log)):
+            raise RuntimeError('alerting restoration falsely answered or connected')
     for marker in ('SIP epoch changed old=1 new=2',
                    'SIP restored call cleared identity=(2, 1)'):
         if marker not in bridge:
@@ -221,7 +230,7 @@ def verify_restore(root, remote_text):
         raise RuntimeError('restoration replayed the incoming SIP dialog')
     cursor = 0
     for pattern in (
-            r'incoming state id=1 epoch=1 phase=connected',
+            rf'incoming state id=1 epoch=1 phase={phase}',
             r'sip_state: saved', r'sip_state: restored',
             r'termination id=1 cause=41 result=accepted',
             r'incoming state id=1 epoch=2 phase=ended'):
@@ -230,7 +239,7 @@ def verify_restore(root, remote_text):
             raise RuntimeError(f'missing handset restoration checkpoint: {pattern}')
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
-        'scope': '3210 answered HLE SIP call save/load; external dialog cleared, not restored',
+        'scope': f'3210 {phase} HLE SIP call save/load; external dialog cleared, not restored',
         'passed': True}, indent=2) + '\n')
     print('OK - save/load cleared real SIP dialog and restored GSM call under new epoch')
 
@@ -278,6 +287,7 @@ def main():
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--restore-call', action='store_true')
+    parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
     parser.add_argument('--restore-idle', action='store_true')
     parser.add_argument('--sip-response', type=int, choices=(200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)

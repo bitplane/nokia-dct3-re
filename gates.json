@@ -13095,6 +13095,19 @@
       ]
     },
     {
+      "name": "verify-radio-incoming-call-sip-alerting-restore",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--incoming --restore-call --restore-phase alerting' SIP_HANDSET_KEYS='1,2,3,4,5,enter' SIP_HANDSET_SCRIPT=../tools/sip_call_state_roundtrip.lua SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
       "name": "verify-radio-incoming-call-sip-restore",
       "prerequisites": [],
       "variables": {},

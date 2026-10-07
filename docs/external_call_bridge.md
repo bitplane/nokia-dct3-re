@@ -374,6 +374,16 @@ profile, not native DSP speech, exact media continuity or all
 outgoing/alerting save-load races. The fixture's fixed save time is validated
 against the observed connected event rather than assumed to be connected.
 
+```sh
+make verify-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3210_sip_alerting_restore
+```
+
+The alerting variant omits physical Answer. Loading the ringing snapshot closes
+the outstanding real SIP INVITE (observed PJSIP response: 603 Decline) and clears
+the restored GSM transaction with cause 41 under epoch 2. Its checker requires
+alerting before save and rejects any SIP confirmation, physical Answer or
+firmware CC CONNECT. This is distinct from the caller-driven CANCEL gate.
+
 ### Idle restoration
 
 ```sh
