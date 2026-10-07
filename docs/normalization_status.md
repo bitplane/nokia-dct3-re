@@ -84,6 +84,10 @@ project-wide bootstrap blocker:
 
 - NSE-3's bounded MCU loader still needs a matching internal DSP ROM or an
   independently observed final completion publication; see
+  [6110 bring-up](6110_bringup.md).
+- NPE-3's normal 6210 remains fail-closed at native verification. Its separate
+  research-HLE composition validates graphical/input, SIM, persistent contacts,
+  laboratory registration, call signaling and SMS, not native speech. See
   [6210 bring-up](6210_bringup.md).
 - NSE-5's ROM4 compatibility instrument executes uploads and delivers DSP
   replies, but its original stored-data reply fails the MCU's validation.

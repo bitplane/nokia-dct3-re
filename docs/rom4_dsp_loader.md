@@ -644,6 +644,12 @@ The index explicitly requires a previous CCS 3.3 installation. This update
 therefore supplies useful capability/configuration evidence, not a standalone
 timing oracle; acquisition still targets the base installation and its C54x
 simulator component. No installer has been run or license accepted.
+The official base-package referral linked by TI's
+[CCS download support response](https://e2e.ti.com/support/processors-group/processors/f/processors-forum/1213508/ccstudio-ccs-compile-error)
+redirects an unauthenticated request to the myTI login page. Acquisition via
+that route requires user account access; no credentials or export/license
+forms have been submitted. This is an observed access boundary, not evidence
+that no legitimate independent copy exists.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
