@@ -28,6 +28,36 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_cmpm_offset_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109c0, (index & 2) ? 0x60e9 : 0x60e1);
+		program.write_word(0x0109c1, 4);
+		program.write_word(0x0109c2, (index & 1) ? 1 : 2);
+		program.write_word(0x0109c3, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x1004, 1);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109c0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x02a5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 1628 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+	void start_carry_branch_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		unsigned cursor = 0x0109a0;
+		program.write_word(cursor++, 0xf808 | ((index & 2) ? 4 : 0) | ((index & 4) ? 0x200 : 0));
+		program.write_word(cursor++, 0x09b0);
+		if (index & 4) { program.write_word(cursor++, 0xf495); program.write_word(cursor++, 0xf495); }
+		program.write_word(cursor++, 0xf020); program.write_word(cursor++, 0x1111); program.write_word(cursor, 0xf4e1);
+		program.write_word(0x0109b0, 0xf020); program.write_word(0x0109b1, 0x2222); program.write_word(0x0109b2, 0xf4e1);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109a0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x02a5 | ((index & 1) ? 0x800 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 1620 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	static constexpr u16 cmpr_values[][2] = {{0, 0}, {0, 1}, {1, 0}, {0xffff, 0x8000}, {0x8000, 0xffff}, {0xffff, 0xffff}};
 	void start_cmpr_case(unsigned index)
 	{
@@ -7594,8 +7624,8 @@ private:
 					m_middle_port_cycle - m_first_port_cycle == 3,
 					"long-offset PORTR consumes port before offset and takes three cycles");
 			program.write_word(0x05e3, 0x6fea); // LD *+AR2(5),0,A
-			program.write_word(0x05e4, 0x0c40);
-			program.write_word(0x05e5, 5);
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x0c40);
 			data.write_word(0x0f05, 0x2345);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
@@ -7611,7 +7641,7 @@ private:
 			expect_opcode(0x6fea, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x2345 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f05 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"long-offset shifted LD consumes shift before offset in three cycles");
+					"long-offset shifted LD consumes offset before shift in three cycles");
 			program.write_word(0x05e3, 0xe58b); // MVDD *AR2+,*AR5+
 			program.write_word(0x05e4, 0x75f8);
 			program.write_word(0x05e5, 0x0d00);
@@ -14552,6 +14582,29 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 				"RPTB publishes bit-15 BRAF while preserving independent bit-14 CPL on retirement");
 			osd_printf_info("TMS320C54x BRAF/CPL independence: PASS\n");
+			start_carry_branch_case(0);
+			return;
+		}
+		if (m_phase >= 1620 && m_phase < 1628)
+		{
+			unsigned const index = m_phase - 1620;
+			bool const taken = bool(index & 1) == bool(index & 2);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 0x2222 : 0x1111) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x02a5 | ((index & 1) ? 0x800 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE), "BC/BCD C/NC uses carry and preserves status");
+			if (index < 7) { start_carry_branch_case(index + 1); return; }
+			osd_printf_info("TMS320C54x carry branch conformance: PASS variants=8\n");
+			start_cmpm_offset_case(0);
+			return;
+		}
+		if (m_phase >= 1628 && m_phase < 1632)
+		{
+			unsigned const index = m_phase - 1628;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0x02a5 | ((index & 1) ? 0x1000 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR1) == ((index & 2) ? 0x1004 : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE), "CMPM consumes long displacement before immediate");
+			if (index < 3) { start_cmpm_offset_case(index + 1); return; }
+			osd_printf_info("TMS320C54x CMPM offset conformance: PASS variants=4\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

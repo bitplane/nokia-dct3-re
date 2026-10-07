@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_original_erased_provisioning", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Isolated mu4nand supplies independent erased NAND and clean test RAM, loads original InitDisk C globals, and executes unchanged 346a/30de(057e). Firmware scans and writes metadata then reaches its empty-ring receive loop with nine descriptors initialized, state/completion zero and no received words. After soft reset and original InitData library/global restoration, unchanged partition-aware 308e mount returns zero with balanced SP and NAND busy waits on the retained firmware-written medium. Original 6fe1/60e1 bytes independently correct long shifted Smem/CMPM extension ordering; carry C/NC branches have eight core fixtures. No disk image, BPB, directory or return success is injected. Firmware-file transfer, full MU4 boot, physical mapping/timing and native handset services remain unvalidated",
+      "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "driver/mu4_storage_test.cpp", "driver/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]
+    },
+    {
       "id": "npm5_mu4_initdisk_serial_ingress", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Original InitDisk 0080 vectors branch from 00d8 to ISR 2b03, which reads 0031. TI VC5410A mapping corroborates McBSP2 DRR1, indexed 0034/0035 and RINT2 bit 6. Isolated mu4nand executes original 346a initialization, delivers two word-level receive inputs with RRDY/interrupts, observes original ISR populate its own ring and original 34c0 consume 1234 with balanced SP. Serial clocks/framing/overrun/DMA and MCU forwarding remain unvalidated. Original 32dc maps nine segment markers to eight named file descriptors plus unnamed bbcc; successful provisioning/file-backed boot is not claimed",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile", "tools/noki5510_a00_inventory.py"]
@@ -24,7 +29,7 @@
     },
     {
       "id": "npm5_mu4_original_recovery_prerequisite", "subsystem": "mu4", "status": "partial", "confidence": "strong",
-      "boundary": "Original 0880 recovery writer, supplied only unchanged 0f33 C globals and routine ABI context, writes the exact 512-byte original template to logical sector 31/physical NAND row 32 through 069b/0725. Independent byte reads match it. Subsequent unchanged 051d remounts with flag zero, returns failure one and issues no erase/program on the still-missing boot record. Startup recovery is not erased-media provisioning; original InitDisk/media placement and file population remain unresolved",
+      "boundary": "Original 0880 recovery writer, supplied only unchanged 0f33 C globals and routine ABI context, writes the exact 512-byte original template to logical sector 31/physical NAND row 32 through 069b/0725. Independent byte reads match it. Subsequent unchanged 051d remounts with flag zero, returns failure one and issues no erase/program on the still-missing boot record. Startup recovery alone is not erased-media provisioning; original InitDisk provisioning and consumer mount are now separately covered by npm5_mu4_original_erased_provisioning, while firmware-file population remains unresolved",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
     },
     {

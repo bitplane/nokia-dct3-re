@@ -653,8 +653,8 @@ calling initializer `0454`. On this medium it returns `1` without erase or
 program commands: the missing boot record is still a prerequisite even after
 the row-32 template is written. Thus the startup recovery sequence alone
 does not provision erased NAND. A valid initial media/partition contract must
-come from the original InitDisk path or a genuine medium image; no directory
-or music-DSP file has been produced by this fixture.
+come from InitDisk or a genuine medium image. The original InitDisk path is
+now executed below; no music-DSP file has yet been transferred.
 
 ### InitDisk storage scan and receive boundary
 
@@ -760,8 +760,44 @@ The acquired repair-tool analysis describes a different, upstream layer:
 PC-to-phone blocks `80 12 length payload XOR-even XOR-odd` and byte `90`
 acknowledgements. Do not replay that envelope into McBSP2: the MCU forwarding
 path has not yet been reconciled with this DSP segment receiver. The next
-boundary is an original InitDisk receive/metadata-write fixture using the
-recovered descriptor contract, followed by file-backed InitData loading.
+boundary is segment receive/file-write execution using the recovered
+descriptor contract, followed by file-backed InitData loading.
+
+### Original erased-media provisioning
+
+The gate gives initialization an independent erased NAND medium and clean
+test RAM, loads only original InitDisk C globals, and near-calls original
+`346a` and `30de(057e)`. Firmware owns the block scan, metadata writes,
+filesystem setup and receive-descriptor initialization. It reaches the
+empty-ring receiver loop at `31f0..3203`, with state `01f6` and completion
+`01f5` both zero and no received words. The run observes 1,772,974 NAND
+write strobes and 10,177,113 reads. These are operation counts, not physical
+DA150 timing measurements; the 60-second fixture deadline is a test bound.
+
+After a soft reset, the fixture restores InitData's original program library
+and C globals, retains only the medium written by InitDisk, and calls the
+same unchanged partition-aware mount `308e(3aea)` used in the erased-medium
+negative control. It returns zero with balanced SP and live NAND busy waits.
+Thus original firmware provisions media that the original consumer mounts;
+no BPB, partition table, directory or successful return is supplied by the
+fixture. Transfer of the firmware files and full MU4 boot remain unverified.
+
+Three generic CPU contracts are independently exposed by this run:
+
+- `6fe1 0010 0c48` at `3ac3` consumes long Smem displacement before the
+  shifted-operation extension, not after it. The old synthetic `6fea`
+  encoding is corrected while retaining its result/preupdate/cycle checks.
+- `f808` in arithmetic helper `4a2c` is carry-clear conditional branch.
+  C/NC, including delayed forms, now have eight status-preserving fixtures.
+- `60e1 0002 0001` compares context field +2 with one. Long `CMPM` consumes
+  displacement before immediate; four fixtures check match/mismatch and
+  preupdate/no-update. The reversed decoder falsely reached trap `4330`
+  despite a valid context type. Do not record that trap as a media defect.
+
+The core suite and native ROM4 regression guard these corrections outside
+the MU4 routine fixture. Unrelated multi-extension opcodes still require
+independent evidence; a synthetic instruction stream is not an encoding
+authority.
 
 This exercises generic core contracts that matter beyond MU4: long-offset
 `BANZ/BANZD` tests the effective Sind value and consumes displacement before

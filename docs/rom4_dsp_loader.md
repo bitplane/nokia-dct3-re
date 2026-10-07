@@ -905,8 +905,21 @@ MVPD's long-offset destination decode and four-cycle cost. Absolute Smem
 forms retain their separately tested address-before-immediate ordering.
 Fixture-only `74ea` checks PORTR's port-before-offset order, port-read value,
 AR2 preupdate, and TI's three-cycle long-offset cost.
-Fixture-only `6fea` checks the shifted Smem decoder's shift-word-before-offset
+`6fea` checks the shifted Smem decoder's offset-before-extension-word
 order, accumulator result, AR2 preupdate, and three-cycle long-offset cost.
+Original MU4 InitDisk independently establishes this encoding with
+`6fe1 0010 0c48` at `3ac3`: `LD *AR1(0010),8,A`. The prior synthetic
+shift-before-offset encoding was wrong and is corrected. The generic `6f`
+decoder resolves long Smem before reading its opcode-extension word;
+absolute and short forms retain their existing regression coverage.
+Original InitDisk's arithmetic helper also uses `f808` (`BC NC`). The core
+implements carry-clear/set branches, including delayed forms, against TI's
+condition codes; eight fixtures cover both carry states and both delay
+forms while requiring status preservation.
+Original InitDisk also corroborates long `CMPM` displacement-before-immediate
+with `60e1 0002 0001` at `431f`. Four fixtures cover equal/unequal memory
+and preupdate/no-update addressing while requiring TC-only status changes.
+The previous decoder reversed these fields and rejected a valid context.
 Exact ROM4 `e58b` (`MVDD *AR2+,*AR5+`) asserts the copied word, both pointer
 increments, and its one-cycle cost; it was the most-used absent word in the
 captured boot (24 executions).

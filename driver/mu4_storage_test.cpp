@@ -159,8 +159,10 @@ private:
 			program.write_word(0x1809, 0xf980); program.write_word(0x180a, 0x0725);
 			program.write_word(0x180b, 0xf4e1);
 		}
-		if (m_phase == 6)
+		if (m_phase == 6 || m_phase == 19)
 		{
+			if (m_phase == 19)
+				program.install_rom(0x20ae, 0x3679, reinterpret_cast<u16 *>(memregion("library")->base()));
 			// Original startup's mount ABI: filesystem context and partition-aware flag.
 			u16 const mount[] = {0x7600, 1, 0xf020, 0x3aea, 0xf980, 0x308e, 0xf4e1};
 			for (unsigned i = 0; i < std::size(mount); ++i) program.write_word(0x1809 + i, mount[i]);
@@ -170,7 +172,7 @@ private:
 			u16 const format[] = {0xf020, 0x3aea, 0xf980, 0x051d, 0xf4e1};
 			for (unsigned i = 0; i < std::size(format); ++i) program.write_word(0x1809 + i, format[i]);
 		}
-		if (m_phase == 7)
+		if (m_phase == 7 || m_phase == 19)
 		{
 			// Original C globals are routine inputs, not an invented disk image.
 			auto &data = m_cpu->space(AS_DATA);
@@ -185,16 +187,25 @@ private:
 				for (unsigned i = 0; i < count; ++i) data.write_word(destination + i, m_cinit[cursor++]);
 			}
 			if (cursor != m_cinit.length()) fatalerror("MU4 fixture incomplete cinit");
-			u16 const recovery[] = {0xf020, 0x3aea, 0xf980, 0x0880, 0xf4e1};
-			for (unsigned i = 0; i < std::size(recovery); ++i) program.write_word(0x1809 + i, recovery[i]);
+			if (m_phase == 7)
+			{
+				u16 const recovery[] = {0xf020, 0x3aea, 0xf980, 0x0880, 0xf4e1};
+				for (unsigned i = 0; i < std::size(recovery); ++i) program.write_word(0x1809 + i, recovery[i]);
+			}
 		}
-		if (m_phase == 10 || m_phase == 12 || m_phase == 13 || m_phase == 14)
+		if (m_phase == 10 || m_phase == 12 || m_phase == 13 || m_phase == 14 || m_phase == 18)
 		{
 			// Replace the routine library with unchanged InitDisk code, not a flat overlay image.
 			program.install_rom(0x256d, 0x4aa8, &m_initdisk[0]);
 			program.install_rom(0x4aa9, 0x4abe, &m_disk_helpers[0]);
 			program.install_rom(0x0080, 0x00f7, &m_disk_vectors[0]);
 			auto &data = m_cpu->space(AS_DATA);
+			if (m_phase == 18)
+			{
+				// Independent factory-erased input, not media left by earlier routine tests.
+				m_nand->nvram_reset();
+				for (unsigned address = 0x80; address < 0x10000; ++address) data.write_word(address, 0);
+			}
 			unsigned cursor = 0;
 			while (cursor < m_disk_cinit.length())
 			{
@@ -221,6 +232,12 @@ private:
 					0xf6bb, 0xf4e1, 0xf073, 0x1810};
 				for (unsigned i = 0; i < std::size(receive); ++i) program.write_word(0x1809 + i, receive[i]);
 			}
+			if (m_phase == 18)
+			{
+				u16 const initialize[] = {0xf074, 0x346a, 0x771d, 0x00e8,
+					0xf020, 0x057e, 0xf074, 0x30de, 0xf4e1};
+				for (unsigned i = 0; i < std::size(initialize); ++i) program.write_word(0x1809 + i, initialize[i]);
+			}
 		}
 		if (m_phase == 17)
 		{
@@ -230,7 +247,7 @@ private:
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
-		m_check->adjust(attotime::from_msec(m_phase == 13 ? 8000 : (m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
+		m_check->adjust(attotime::from_msec(m_phase == 18 ? 60000 : m_phase == 13 ? 8000 : (m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
 	}
 	void start_media_read()
 	{
@@ -241,6 +258,21 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase == 18)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			unsigned const pc = m_cpu->state_int(tms320c54x_device::STATE_PC);
+			if (!((pc >= 0x31f0 && pc <= 0x3203) || (pc >= 0x3499 && pc <= 0x34a4)) ||
+				m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || data.read_word(0x1f6) || data.read_word(0x1f5) ||
+				data.read_word(0x4bbf) != 0xff || data.read_word(0x4bc0) != 0xff ||
+				data.read_word(0x10d) != 0xaa55 || data.read_word(0x19d) != 0xbbcc)
+				fatalerror("MU4 original initialization did not reach receive boundary pc=%04x", pc);
+			logerror("mu4_initdisk_initialize: PASS original_init=1 erased_input=1 receiver_wait=1 no_received_words=1 writes=%u reads=%u\n",
+				unsigned(m_writes.size()), m_data_reads);
+			m_phase = 19;
+			machine().schedule_soft_reset();
+			return;
+		}
 		if (m_phase == 14 || m_phase == 15 || m_phase == 16)
 		{
 			auto &data = m_cpu->space(AS_DATA);
@@ -377,7 +409,8 @@ private:
 				m_cpu->space(AS_DATA).read_word(0x4bc0) != 1)
 				fatalerror("MU4 original serial word consumer mismatch");
 			logerror("mu4_initdisk_serial: PASS vector=00d8 register=0031 words=2 value=1234 firmware_ring=1\n");
-			machine().schedule_exit();
+			m_phase = 18;
+			machine().schedule_soft_reset();
 			return;
 		}
 		if (m_phase == 6)
@@ -390,6 +423,17 @@ private:
 			logerror("mu4_storage_mount: PASS erased_boot_sector rejected=1 reads=%u busy_reads=%u\n", m_data_reads, m_busy_reads);
 			m_phase = 7;
 			machine().schedule_soft_reset();
+			return;
+		}
+		if (m_phase == 19)
+		{
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 0 ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_data_reads || !m_busy_reads)
+				fatalerror("MU4 InitData mount of original InitDisk medium failed a=%llx sp=%04x",
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
+			logerror("mu4_initdisk_mount: PASS original_initdata_mount=1 original_initdisk_media=1\n");
+			machine().schedule_exit();
 			return;
 		}
 		if (m_phase == 7)

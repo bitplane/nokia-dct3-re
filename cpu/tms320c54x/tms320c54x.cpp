@@ -805,6 +805,23 @@ void tms320c54x_device::execute_one(u16 op)
 		m_st0 = (m_st0 & ~u16(0x1000)) | (conditions[(op >> 8) & 3] ? 0x1000 : 0);
 		return;
 	}
+	if ((op & 0xfdfb) == 0xf808) // BC[D] pmad, C/NC (SPRU172C condition codes).
+	{
+		const u16 destination = fetch();
+		const bool take = BIT(m_st0, 11) == BIT(op, 2);
+		if (take)
+		{
+			if (BIT(op, 9))
+			{
+				m_delayed_target = destination;
+				m_delayed_words = 2;
+			}
+			else
+				m_pc = destination;
+		}
+		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
+		return;
+	}
 	if ((op & 0xfcff) == 0xf4e1) // IDLE 1/2/3
 	{
 		m_idle = true;
@@ -1032,8 +1049,9 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	if ((op & 0xff00) == 0x6f00)
 	{
-		const bool absolute = low == 0xf8;
-		const u16 address = absolute ? fetch() : 0;
+		// Long Smem's address extension precedes the opcode-extension word.
+		const bool extended = low >= 0xe0;
+		const u16 address = low >= 0xf8 ? fetch() : extended ? long_offset_address(low) : 0;
 		const u16 extension = fetch();
 		const int shift = s8((extension & 0x1f) << 3) >> 3;
 		auto shifted = [this, shift](u64 value)
@@ -1041,13 +1059,13 @@ void tms320c54x_device::execute_one(u16 op)
 			return shift < 0 ? arithmetic_shift_right(value, -shift) :
 					(value << shift) & ACC_MASK;
 		};
-		auto read_operand = [this, absolute, address, low]()
+		auto read_operand = [this, extended, address, low]()
 		{
-			return absolute ? data_read(address) : indirect_read(low);
+			return extended ? data_read(address) : indirect_read(low);
 		};
-		auto write_operand = [this, absolute, address, low](u16 value)
+		auto write_operand = [this, extended, address, low](u16 value)
 		{
-			if (absolute)
+			if (extended)
 				data_write(address, value);
 			else
 				indirect_write(low, value);
@@ -1571,18 +1589,8 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6000: // CMPM Smem, #lk
 	{
-		u16 value;
-		u16 immediate;
-		if (low >= 0xe0 && low < 0xf8)
-		{
-			immediate = fetch();
-			value = indirect_read(low);
-		}
-		else
-		{
-			value = indirect_read(low);
-			immediate = fetch();
-		}
+		const u16 value = indirect_read(low);
+		const u16 immediate = fetch();
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
