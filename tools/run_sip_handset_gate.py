@@ -62,7 +62,9 @@ async def run(args):
             processes.append(bridge)
             if args.incoming:
                 for _ in range(900):
-                    if 'SIP registration ready' in (root / 'sip-bridge.log').read_text(errors='replace'):
+                    ready = ('SIP registration ready epoch=2' if args.restore_idle
+                             else 'SIP registration ready')
+                    if ready in (root / 'sip-bridge.log').read_text(errors='replace'):
                         break
                     if bridge.returncode is not None:
                         raise RuntimeError('bridge exited before registration')
@@ -112,6 +114,10 @@ async def run(args):
     if args.sip_response != 200:
         verify_failure(root, remote_text, args.sip_response)
         return
+    verify_success(root, remote_text, args)
+
+
+def verify_success(root, remote_text, args):
     if 'state changed to CONFIRMED' not in remote_text or 'DISCONNECTED [reason=200 (OK)]' not in remote_text:
         raise RuntimeError('remote SIP call did not confirm and release normally')
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
@@ -128,22 +134,30 @@ async def run(args):
             'uplink', 'downlink', 'pcm_transmitted', 'pcm_received')) < 100:
         raise RuntimeError('insufficient executed bidirectional media')
     log = (root / 'error.log').read_text(errors='replace')
+    epoch = 2 if args.restore_idle else 1
+    if args.restore_idle:
+        if ('SIP idle snapshot accepted epoch=2' not in bridge_text or
+                bridge_text.count('SIP incoming identity=') != 1):
+            raise RuntimeError('idle restoration did not admit exactly one fresh SIP call')
     cursor = 0
     patterns = (
-            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging',
+            rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=paging',
             r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
-            r'input-press: t=[0-9.]+ name=enter',
+            (r'sip_state: physical Answer after idle restoration' if args.restore_idle
+             else r'input-press: t=[0-9.]+ name=enter'),
             r'GSM service uplink sapi=0 pd=03 message=07 length=2 data=8347',
-            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=connected',
+            rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=connected',
             r'gsm_call_adapter: termination id=1 cause=16 result=accepted',
             r'GSM service uplink sapi=0 pd=03 message=2a .*data=032a0802e0d1',
-            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=ended',
+            rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=ended',
     ) if args.incoming else (
             r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101',
             r'GSM service downlink kind=12 sapi=0 pd=03 message=07',
             r'GSM service uplink sapi=0 pd=03 message=0f .*data=030f',
             r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
             r'LAPDm service Channel Release acknowledged')
+    if args.restore_idle:
+        patterns = (r'sip_state: saved', r'sip_state: restored') + patterns
     for pattern in patterns:
         match = re.search(pattern, log[cursor:])
         if not match:
@@ -264,6 +278,7 @@ def main():
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--restore-call', action='store_true')
+    parser.add_argument('--restore-idle', action='store_true')
     parser.add_argument('--sip-response', type=int, choices=(200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -273,6 +288,8 @@ def main():
         parser.error('--cancel-incoming requires --incoming')
     if args.restore_call and (not args.incoming or args.cancel_incoming):
         parser.error('--restore-call requires an answered incoming call')
+    if args.restore_idle and (not args.incoming or args.cancel_incoming or args.restore_call):
+        parser.error('--restore-idle requires a fresh incoming call after idle restoration')
     if args.command[:1] == ['--']:
         args.command = args.command[1:]
     if not args.command:

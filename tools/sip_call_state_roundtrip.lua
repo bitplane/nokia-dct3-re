@@ -3,6 +3,7 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 dofile(directory .. '../mame_nokia_dct3_input_exerciser.lua')
 local machine = manager.machine
+local idle = _G.sip_state_scenario == 'idle'
 local saved, loaded = false, false
 local before = emu.add_machine_pre_save_notifier(function()
     saved = true
@@ -12,13 +13,25 @@ local after = emu.add_machine_post_load_notifier(function()
     assert(saved, 'SIP call snapshot was never saved')
     loaded = true
     machine:logerror('sip_state: restored\n')
+    if idle then
+        local answer = coroutine.create(function()
+            assert(emu.wait(5))
+            local key = assert(machine.ioport.ports[':COL.1'].fields['Navi / Left Softkey'])
+            machine:logerror('sip_state: physical Answer after idle restoration\n')
+            key:set_value(1)
+            assert(emu.wait(0.22))
+            key:set_value(0)
+        end)
+        _G.sip_idle_answer = answer
+        assert(coroutine.resume(answer))
+    end
 end)
 local runner = coroutine.create(function()
     assert(emu.wait(19))
-    machine:save('sip_connected')
+    machine:save(idle and 'sip_idle' or 'sip_connected')
     assert(emu.wait(1))
     assert(saved, 'SIP call save failed')
-    machine:load('sip_connected')
+    machine:load(idle and 'sip_idle' or 'sip_connected')
 end)
 _G.sip_call_state_fixture = {before, after, runner,
     emu.add_machine_stop_notifier(function()

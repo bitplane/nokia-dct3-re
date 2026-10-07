@@ -983,6 +983,14 @@ void nokia_gsm_call_adapter_device::publish_ready()
 	writer.String("call_adapter_ready");
 	writer.Key("protocol_version");
 	writer.Uint(1);
+	// Snapshot call ownership before republishing individual transactions.
+	// An external backend cannot distinguish idle restoration from a pending
+	// call merely by waiting for an event that idle deliberately never emits.
+	writer.Key("calls_idle");
+	writer.Bool(!m_incoming_request_id &&
+			!m_session->outgoing_request_pending() &&
+			!m_session->outgoing_call_connected() &&
+			!m_session->outgoing_call_alerting());
 	writer.Key("epoch");
 	writer.Uint(m_transport_epoch.load());
 	writer.Key("capabilities");

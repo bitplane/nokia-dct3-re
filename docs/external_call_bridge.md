@@ -41,12 +41,18 @@ The WebSocket endpoint speaks protocol version 1. On connection and after a
 save-state restore, MAME publishes:
 
 ```json
-{"type":"call_adapter_ready","protocol_version":1,"epoch":1,"capabilities":["network_state","calls","gsm_fr_media","sms","ussd"]}
+{"type":"call_adapter_ready","protocol_version":1,"epoch":1,"calls_idle":true,"capabilities":["network_state","calls","gsm_fr_media","sms","ussd"]}
 ```
 
 The additive `capabilities` array lets hosts discover the services implemented
 by this adapter without inferring them from the phone profile. Hosts written
 against the earlier version-1 ready message may ignore it.
+The additive `calls_idle` boolean snapshots adapter/session call ownership
+before individual transactions are republished. `true` means no incoming
+request, pending outgoing request, connected outgoing call or alerting outgoing
+call. It does not assert network registration or availability of other services.
+Hosts lacking this field must not infer idle from a temporary absence of call
+events.
 
 Every host-to-MAME message carries the current `epoch` and a positive
 `request_id`. A restore increments the epoch, invalidates queued host input and
@@ -364,9 +370,24 @@ clearing. Only the matching restored transaction's `ended` event releases that
 guard, not an unrelated completion message.
 
 This proves the connected incoming-call restoration boundary on the 3210 HLE
-profile, not native DSP speech, exact media continuity, idle restoration or all
+profile, not native DSP speech, exact media continuity or all
 outgoing/alerting save-load races. The fixture's fixed save time is validated
 against the observed connected event rather than assumed to be connected.
+
+### Idle restoration
+
+```sh
+make verify-radio-incoming-call-sip-idle-restore RUN_DIR=run_3210_sip_idle_restore
+```
+
+The external caller waits for registered epoch 2, after an idle save/load.
+An explicit `calls_idle: true` snapshot releases the bridge's epoch guard;
+missing or non-idle snapshots retain conservative call clearing. A fresh SIP
+INVITE is then paged to the handset, physically answered, connected with at
+least 100 frames in each bridge direction, and released through CC/RR. The
+checker requires paging after restoration and exactly one incoming SIP dialog.
+This tests usable call service after idle restoration, not continuity of an
+external SIP call through save/load.
 
 ### Waveform probe
 

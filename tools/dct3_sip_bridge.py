@@ -238,15 +238,18 @@ async def bridge(args, pj):
                                 raise RuntimeError('unsupported host protocol')
                             if epoch is not None and epoch != event.get('epoch'):
                                 endpoint.hangup()
-                                blocked_restore = True
+                                blocked_restore = event.get('calls_idle') is not True
                                 restored_identity = None
                                 connected = False
                                 identity = None
                                 decision = False
                                 uplink_sequence = -1
+                                counts = {'uplink': 0, 'downlink': 0}
                                 codec.close()
                                 codec = GsmFrCodec()
                                 print(f'SIP epoch changed old={epoch} new={event.get("epoch")}; clearing external dialog', flush=True)
+                                if not blocked_restore:
+                                    print(f'SIP idle snapshot accepted epoch={event.get("epoch")}', flush=True)
                             epoch = event.get('epoch')
                             endpoint.incoming_epoch = epoch
                             endpoint.incoming_enabled = False
