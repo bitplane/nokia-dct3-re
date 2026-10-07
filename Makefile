@@ -1055,17 +1055,18 @@ check-mu4-storage-original: build
 		grep -q 'mu4_mcbsp_receive_dma: PASS' error.log; \
 		if grep -q 'Exceeded pending input line event queue' error.log; then \
 			echo 'MU4 gate failed: synchronized CPU input queue overflow' >&2; exit 1; fi; \
-		case "$(MU4_STORAGE_BIOS)" in stream|sustain|worker|settle|scan|startup|command|wire|wireack) \
+		case "$(MU4_STORAGE_BIOS)" in stream|sustain|worker|settle|scan|startup|command|wire|wireack|pins) \
 			grep -q 'mu4_native_stream: PASS' error.log; grep -q 'mu4_native_receive: PASS' error.log;; esac; \
-		case "$(MU4_STORAGE_BIOS)" in sustain|worker|settle|scan|startup|command|wire|wireack) \
+		case "$(MU4_STORAGE_BIOS)" in sustain|worker|settle|scan|startup|command|wire|wireack|pins) \
 			grep -q 'mu4_native_sustained: PASS' error.log; grep -q 'mu4_native_interrupts: PASS' error.log;; esac; \
-		case "$(MU4_STORAGE_BIOS)" in worker|settle|scan|startup|command|wire|wireack) \
+		case "$(MU4_STORAGE_BIOS)" in worker|settle|scan|startup|command|wire|wireack|pins) \
 			grep -q 'mu4_native_worker_window: PASS' error.log; grep -q 'mu4_native_stream_binding: PASS' error.log;; esac; \
-		case "$(MU4_STORAGE_BIOS)" in startup|command|wire|wireack) grep -q 'mu4_native_worker_activation: PASS' error.log;; esac; \
+		case "$(MU4_STORAGE_BIOS)" in startup|command|wire|wireack|pins) grep -q 'mu4_native_worker_activation: PASS' error.log;; esac; \
 		case "$(MU4_STORAGE_BIOS)" in \
 			command) grep -q 'mu4_native_framed_request: PASS' error.log;; \
 			wire) grep -q 'mu4_native_status_noack: PASS' error.log;; \
-			wireack) grep -q 'mu4_native_status_transaction: PASS' error.log;; esac
+			wireack) grep -q 'mu4_native_status_transaction: PASS' error.log;; \
+			pins) grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log;; esac
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.

@@ -29,8 +29,9 @@ consumer entries/notification reads and 1,740 clears, but mode zero skips
 buffer processing. A separate framed
 command fixture reaches the original serial parser and queued acknowledgement.
 The `wireack` fixture completes a native status-query transaction using the
-shared McBSP2 TX model, a bench clock and register-level RX input. The open
-boundary is complete serial RX/board attachment, processing command/data
+shared McBSP2 TX model, a bench clock and register-level RX input; `pins`
+completes the same transaction with device-owned pin-level RX too. The open
+boundary is transport reset/save/replay and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
 claimed; only the initial 1,024 DIN words are independently compared.
@@ -1504,8 +1505,25 @@ traffic changes scheduling, so these counts do not replace the unchanged
 startup control's 1,739/1,740 oracle. No music processing, physical MA4-MU4
 attachment or full native boot follows from this status transaction.
 
-Next replace the register-level RX fixture with pin-level McBSP2 ingress,
-verify the recovered transport through reset/save/replay, and decode
+`MU4_STORAGE_BIOS=pins` drives McBSP2 frame/data/clock inputs instead of
+writing DRR/RRDY or pulsing the CPU's receive line. The device owns RSR,
+RBR, DRR, RRDY and IRQ6. Native `0031` reads and all indexed control reads
+are delegated to that controller. The bench uses one delay cycle, eight
+MSB-first data cycles and the subsequent receive-publication edges, with
+the same explicit 5 us half-clock interval. Each next byte waits until
+the preceding frame and RRDY have drained.
+
+The pin fixture reproduces all 11 received bytes and 14 transmitted bytes,
+with 11 device-owned receive interrupts, no overrun, both queues empty and
+no status-response retry. Its 20-second window observes the same
+1,779 worker entries and 1,780 clears as the register-RX `wireack` control.
+The firmware generates the parser/command/response transitions; only
+external signal inputs and peer acknowledgement are supplied. This does
+not yet prove native transport save/replay, other receive formats or the
+physical MA4-MU4 wiring/clock relation. The older loader preamble retains
+its separately declared register-level ingress.
+
+Next verify the recovered transport through reset/save/replay, and decode
 processing-command parameters and media inputs before attempting native
 playback. Do not write `bb80` or replay internal queue objects to select a
 mode.

@@ -47,6 +47,10 @@ public:
 			if (++m_command_wire_bit_count == 8) { m_command_wire_decoded.push_back(m_command_wire_byte); m_command_wire_bit_count = m_command_wire_byte = 0; }
 		});
 		m_mcbsp2->tx_word_cb().set(FUNC(mu4_storage_test_state::command_output));
+		m_mcbsp2->rx_event_cb().set([this](int state) { m_command_rx_ready = bool(state); });
+		m_mcbsp2->rx_irq_cb().set([this](int state) {
+			if (m_phase == 30 && system_bios() >= 11) { if (state) ++m_command_rx_irqs; m_cpu->set_input_line(6, state); }
+		});
 		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
 		m_mcbsp0->tx_bit_cb().set([this](int state) {
 			if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73)) m_external_bits.push_back(state);
@@ -140,6 +144,9 @@ private:
 	u8 m_command_ack_token = 0, m_command_wire_byte = 0;
 	u16 m_command_tx_register = 0;
 	std::vector<u16> m_command_tx_words, m_command_wire_decoded;
+	bool m_command_rx_ready = false, m_command_rx_busy = false, m_command_rx_clock = true;
+	u8 m_command_rx_byte = 0;
+	unsigned m_command_rx_phase = 0, m_command_rx_irqs = 0;
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
 	unsigned m_native_allocation_call_traces = 0;
@@ -348,6 +355,7 @@ private:
 	emu_timer *m_check = nullptr;
 	emu_timer *m_command = nullptr;
 	emu_timer *m_command_clock = nullptr;
+	emu_timer *m_command_receive_clock = nullptr;
 	unsigned m_phase = 54;
 	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
 	unsigned m_native_mcbsp_trace = 0, m_native_mcbsp_polls = 0;
@@ -385,9 +393,18 @@ private:
 				unsigned(offset), m_dma->read(1), value, unsigned(m_cpu->pc()));
 		m_dma->write(offset, value);
 	}
-	// Word-level receive fixture only; serial clocks/framing are not modeled here.
+	// Loader and legacy profiles use word ingress; the resident pins profile uses McBSP2.
 	u16 serial_r()
 	{
+		if (m_phase == 30 && system_bios() >= 11)
+		{
+			if (!machine().side_effects_disabled())
+			{
+				if (!m_command_rx_ready) fatalerror("MU4 native DRR read before RRDY");
+				++m_serial_reads;
+			}
+			return m_mcbsp2->data_r(1);
+		}
 		if (!m_serial_ready) fatalerror("MU4 serial read without delivered word");
 		m_serial_ready = false;
 		m_serial_regs[0][0] &= ~u16(2);
@@ -396,6 +413,7 @@ private:
 	}
 	u16 serial_config_r(offs_t offset)
 	{
+		if (m_phase == 30 && system_bios() >= 11) return m_mcbsp2->control_r(offset);
 		if (offset && m_phase == 30 && system_bios() >= 9 && m_serial_index[0] == 1) return m_mcbsp2->control_r(1);
 		return offset ? m_serial_regs[0][m_serial_index[0]] : m_serial_index[0];
 	}
@@ -419,7 +437,7 @@ private:
 		if (m_command_wire_decoded.size() != m_command_tx_words.size() + 1 || m_command_wire_decoded.back() != value)
 			fatalerror("MU4 serial pin decoder disagrees with McBSP transmit word");
 		m_command_tx_words.push_back(value);
-		if (system_bios() != 10 || m_command_tx_words.size() != 14) return;
+		if (system_bios() < 10 || m_command_tx_words.size() != 14) return;
 		static const std::vector<u16> expected = {0x7f, 1, 0x55, 0x1e, 5, 0xaa, 1, 0x71, 1, 0, 0, 0x80, 0x40, 0x55};
 		if (m_command_tx_words != expected) fatalerror("MU4 original status response differs from decoded contract");
 		m_command_ack_token = m_command_tx_words[11];
@@ -461,6 +479,28 @@ private:
 		m_cpu->set_input_line(6, ASSERT_LINE);
 		m_cpu->set_input_line(6, CLEAR_LINE);
 	}
+	void command_receive(u8 value)
+	{
+		if (system_bios() < 11) { deliver_serial(value); return; }
+		m_command_rx_byte = value;
+		m_command_rx_busy = true;
+		m_command_rx_phase = 0;
+		m_command_rx_clock = true;
+		m_mcbsp2->rx_data_w(0); m_mcbsp2->rx_frame_w(1); m_mcbsp2->rx_clock_w(1);
+		m_command_receive_clock->adjust(attotime::from_usec(5));
+	}
+	TIMER_CALLBACK_MEMBER(command_receive_clock)
+	{
+		m_command_rx_clock = !m_command_rx_clock;
+		if (!m_command_rx_clock && m_command_rx_phase >= 1 && m_command_rx_phase <= 8)
+			m_mcbsp2->rx_data_w(BIT(m_command_rx_byte, 8 - m_command_rx_phase));
+		if (m_command_rx_phase) m_mcbsp2->rx_frame_w(0);
+		m_mcbsp2->rx_clock_w(m_command_rx_clock);
+		if (!m_command_rx_clock) ++m_command_rx_phase;
+		// One delay cycle, eight data cycles, then RBR-to-DRR publication.
+		if (m_command_rx_phase == 10 && m_command_rx_clock) m_command_rx_busy = false;
+		else m_command_receive_clock->adjust(attotime::from_usec(5));
+	}
 	TIMER_CALLBACK_MEMBER(command_input)
 	{
 		if (m_phase != 30 || system_bios() < 8) return;
@@ -468,17 +508,17 @@ private:
 		static constexpr u8 packet[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
 		bool const ack = m_native_command_cursor == std::size(packet);
 		if (ack && (!m_command_ack_pending || m_command_ack_cursor == 3)) return;
-		if (m_native_command_paths[5] && !m_serial_ready && (m_serial_regs[0][0] & 1))
+		if (m_native_command_paths[5] && !m_serial_ready && !m_command_rx_busy && !m_command_rx_ready && (m_serial_regs[0][0] & 1))
 		{
 			if (ack)
 			{
 				u8 const reply[] = {0x7f, m_command_ack_token, 0x55};
-				deliver_serial(reply[m_command_ack_cursor++]);
+				command_receive(reply[m_command_ack_cursor++]);
 				logerror("mu4_native_command_ack_input: cursor=%u total=3\n", m_command_ack_cursor);
 			}
 			else
 			{
-				deliver_serial(packet[m_native_command_cursor++]);
+				command_receive(packet[m_native_command_cursor++]);
 				logerror("mu4_native_command_input: cursor=%u total=%u\n", m_native_command_cursor, unsigned(std::size(packet)));
 			}
 		}
@@ -527,6 +567,7 @@ private:
 		m_check = timer_alloc(FUNC(mu4_storage_test_state::check), this);
 		m_command = timer_alloc(FUNC(mu4_storage_test_state::command_input), this);
 		m_command_clock = timer_alloc(FUNC(mu4_storage_test_state::command_clock), this);
+		m_command_receive_clock = timer_alloc(FUNC(mu4_storage_test_state::command_receive_clock), this);
 	}
 	virtual void machine_reset() override
 	{
@@ -561,6 +602,9 @@ private:
 		m_native_command_cursor = m_native_command_waits = 0;
 		m_command->adjust(attotime::never);
 		m_command_clock->adjust(attotime::never);
+		m_command_receive_clock->adjust(attotime::never);
+		m_command_rx_ready = m_command_rx_busy = false; m_command_rx_clock = true;
+		m_command_rx_byte = 0; m_command_rx_phase = m_command_rx_irqs = 0;
 		m_command_tx_register = m_command_tx_irqs = m_command_wire_bits = 0;
 		m_command_wire_clock = false; m_command_tx_words.clear();
 		m_command_ack_cursor = m_command_wire_bit_count = 0;
@@ -1800,7 +1844,7 @@ private:
 						fatalerror("MU4 unacknowledged status response did not reproduce three complete wire copies");
 					logerror("mu4_native_status_noack: PASS tx_words=36 pin_decode=1 response_copies=3 peer_ack=0 processing=0\n");
 				}
-				if (system_bios() == 10)
+				if (system_bios() >= 10)
 				{
 					auto const disable = machine().disable_side_effects();
 					auto &data = m_cpu->space(AS_DATA);
@@ -1809,6 +1853,12 @@ private:
 						data.read_word(0x165a) != 14 || data.read_word(0x165e) || data.read_word(0x165d) || data.read_word(0xbb80))
 						fatalerror("MU4 framed status transaction did not settle after the physical peer acknowledgement");
 					logerror("mu4_native_status_transaction: PASS rx_words=11 tx_words=14 pin_decode=1 ack=1 retries=0 queue_empty=1 mode=0 full_boot=0\n");
+					if (system_bios() >= 11)
+					{
+						if (m_command_rx_irqs != 11 || m_command_rx_busy || m_command_rx_ready)
+							fatalerror("MU4 pin receive did not drain eleven device-owned RRDY interrupts");
+						logerror("mu4_native_receive_pins: PASS bytes=11 rx_irqs=11 frame=1 data=1 clock=1 drr_drained=1\n");
+					}
 				}
 			}
 			machine().schedule_exit();
@@ -2178,6 +2228,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(7, "command", "Original framed serial status request (20 second tail)")
 	ROM_SYSTEM_BIOS(8, "wire", "Original status request with externally clocked serial TX")
 	ROM_SYSTEM_BIOS(9, "wireack", "Original serial status transaction with peer acknowledgement")
+	ROM_SYSTEM_BIOS(10, "pins", "Original status transaction with McBSP2 RX and TX pins")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
