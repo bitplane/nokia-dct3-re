@@ -11,6 +11,7 @@
 #include <array>
 #include <vector>
 #include <sstream>
+#include <fstream>
 
 namespace {
 class mu4_storage_test_state : public driver_device
@@ -787,6 +788,24 @@ private:
 			fatalerror("MU4 command peer snapshot has invalid capture count");
 		m_command_tx_words.assign(m_saved_command_tx.begin(), m_saved_command_tx.begin() + m_saved_command_tx_count);
 		m_command_wire_decoded.assign(m_saved_command_decoded.begin(), m_saved_command_decoded.begin() + m_saved_command_decoded_count);
+	}
+	void capture_native_ram(char const *stage)
+	{
+		if (system_bios() != 14 && system_bios() != 15) return;
+		// Observation only: omit CPU/MMIO registers and encode words explicitly.
+		auto const disable = machine().disable_side_effects();
+		std::string const name = util::string_format("mu4_ram_%s_leg%u.bin", stage, m_native_reset_leg);
+		std::ofstream output(name, std::ios::binary | std::ios::trunc);
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned address = 0x80; address < 0x10000; ++address)
+		{
+			u16 const value = data.read_word(address);
+			output.put(value & 0xff);
+			output.put(value >> 8);
+		}
+		output.close();
+		if (!output) fatalerror("MU4 RAM observation could not be written");
+		logerror("mu4_native_ram_observation: stage=%s leg=%u first=0080 words=65408 encoding=le16 file=%s\n", stage, m_native_reset_leg, name.c_str());
 	}
 	virtual void machine_reset() override
 	{
@@ -1618,6 +1637,7 @@ private:
 			}
 			if (cursor + 2 != end || checked != 51921) fatalerror("MU4 loader coverage mismatch words=%u", checked);
 			logerror("mu4_loader: PASS original_loader=1 dma_complete=1 records=%u words=%u data_and_program=1\n", records, checked);
+			capture_native_ram("loaded");
 			// Observe unchanged 3538 -> loader -> 2000 -> page-2 common-window entry.
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x2000, "mu4_native_entry",
 				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_entry_reads; });
@@ -2176,6 +2196,7 @@ private:
 					fatalerror("MU4 reset frontier changed; re-evaluate the native control-loop restart contract");
 				logerror("mu4_native_reset_frontier: control_restart=0 dispatcher=0 rx_words=0 tx_words=0 tail_ms=%u stream_equivalence=0 board_reset=0 music_decode=0\n", native_worker_tail_ms());
 			}
+			capture_native_ram("settled");
 			if (system_bios() == 15)
 			{
 				if (m_files_checked != 6 || m_native_reset_settings_mask != 15)

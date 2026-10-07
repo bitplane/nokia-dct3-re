@@ -1101,6 +1101,12 @@ check-mu4-retained-original:
 		grep -q 'mu4_native_status_transaction: PASS' error.log; \
 		grep -q 'mu4_native_receive_pins: PASS' error.log; \
 		grep -q 'mu4_native_retained_control: active=1 rx_words=11 tx_words=14 tail_ms=20000 ' error.log; \
+		for snapshot in "$$tmp/seed/mu4_ram_loaded_leg0.bin" "$$tmp/seed/mu4_ram_loaded_leg2.bin" \
+			"$$tmp/seed/mu4_ram_settled_leg2.bin" "$$tmp/retained/mu4_ram_loaded_leg0.bin" \
+			"$$tmp/retained/mu4_ram_settled_leg0.bin"; do \
+			test -f "$$snapshot" && test "$$(wc -c < "$$snapshot")" -eq 130816 || \
+				{ echo "MU4 retained gate failed: incomplete RAM observation $$snapshot" >&2; exit 1; }; \
+		done; \
 		cmp "$$tmp/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_14/nand"
 
 check-mu4-nand: build

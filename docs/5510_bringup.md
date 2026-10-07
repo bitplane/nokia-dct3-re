@@ -1729,6 +1729,33 @@ the reset diagnostic's stall. Isolate runtime memory, peripheral state and
 the firmware-owned initialization sequence next; the comparison does not
 yet identify an individual missing initializer or prove board reset behavior.
 
+The paired gate also captures side-effect-disabled data-RAM observations at
+the completed loader and settled endpoints. Each file contains 65,408
+little-endian words for addresses `0080..ffff` (130,816 bytes); CPU/MMIO
+registers below `0080` are omitted. These are observations, never replay
+inputs. At the loaded boundary, the reset and fresh-process paths differ
+in 24,345 words. Within `2000..3fff`, only these nine differ:
+
+| Word | Reset | Fresh process |
+| --- | --- | --- |
+| `374a` | `000a` | `0000` |
+| `374d` | `0001` | `0000` |
+| `374e` | `0f36` | `0000` |
+| `3753` | `0005` | `0000` |
+| `3754` | `0005` | `0000` |
+| `3756` | `0001` | `0000` |
+| `3757` | `222e` | `0000` |
+| `3b12` | `0001` | `0000` |
+| `3b13` | `e980` | `0000` |
+
+The first seven converge to the reset values by the settled endpoint in
+the successful fresh run. The selection words `3732`, `3750`, `3768`,
+`b633` and `bb80` are zero in both observations at both boundaries.
+This bounds candidate startup-state differences but does not assign their
+semantics or establish causation. Trace the original readers and writers
+and compare peripheral/interrupt state before any corrective change;
+clearing retained RAM to imitate a fresh process is not a reset contract.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and finish reset lifecycle and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
