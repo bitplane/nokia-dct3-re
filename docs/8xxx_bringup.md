@@ -886,6 +886,19 @@ tests protect architectural and protocol mismatches, missing input and
 incomplete fixtures. This is idle/UI restoration, not active-call/SMS replay,
 battery-backed cold RTC continuity or native DSP speech validation.
 
+Active outgoing-call restoration is separately checked by
+`tools/noki8890_state_call.lua` (fresh private directories, verbose logging,
+70 seconds) and the same checker with `--call`. It physically provisions the
+clock/date, dials `1234567`, connects, and saves at 52 seconds. Exact
+CPU/RAM/time restoration and the nonempty one-second protocol replay pass;
+reference/restored connected-screen pixels are byte-identical. Only the
+host-side physical End schedule is restarted after load. The complete
+intended-number CC/RR checker requires clean release and resumed paging;
+reviewed ordinary idle pixels are required after release. Two independent
+fresh runs pass, including the shared round-trip fixture after extraction.
+This remains signaling/UI save-state evidence, not native speech or SMS
+restoration, and is currently scoped to GSM900.
+
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
 not the previously settled idle frame. Reproduce with
