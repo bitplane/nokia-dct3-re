@@ -13262,6 +13262,19 @@
       ]
     },
     {
+      "name": "verify-3310-radio-outgoing-call-sip-pending-restore",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 SIP_HANDSET_KEYS=5,5,5,1,2,3,4,enter SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=70 SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--restore-outgoing --sip-response 180 --product 3310' SIP_HANDSET_SCRIPT=../tools/sip_outgoing_state_roundtrip.lua SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
       "name": "verify-radio-outgoing-call-sip-pending-restore",
       "prerequisites": [],
       "variables": {},

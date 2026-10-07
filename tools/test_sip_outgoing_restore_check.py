@@ -61,6 +61,10 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check(remote=REMOTE.replace('Request msg CANCEL/', ''))
 
+    def test_reordered_sip_release_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            self.check(remote='\n'.join(reversed(REMOTE.splitlines())))
+
     def test_false_connection_or_redial_is_rejected(self):
         with self.assertRaises(RuntimeError):
             self.check(bridge=BRIDGE + 'SIP dial identity=(2, 1)\n')

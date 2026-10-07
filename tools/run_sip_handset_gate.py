@@ -262,9 +262,12 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210'):
     log = (root / 'error.log').read_text(errors='replace')
     markers = (('state changed to CONFIRMED', 'Request msg BYE/') if connected else
                ('Response msg 180/INVITE/', 'Request msg CANCEL/', 'Response msg 487/INVITE/'))
+    remote_cursor = 0
     for marker in markers:
-        if marker not in remote_text:
+        position = remote_text.find(marker, remote_cursor)
+        if position < 0:
             raise RuntimeError(f'missing real pending SIP release: {marker}')
+        remote_cursor = position + len(marker)
     if not connected and ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge or
             re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log)):
         raise RuntimeError('pending outgoing restoration falsely connected')
