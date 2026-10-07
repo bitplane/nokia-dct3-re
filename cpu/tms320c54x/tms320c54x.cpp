@@ -92,6 +92,9 @@ void tms320c54x_device::device_start()
 	state_add(STATE_BK, "BK", m_bk).formatstr("%04X");
 	state_add(STATE_IFR, "IFR", m_ifr).formatstr("%04X");
 	state_add(STATE_IMR, "IMR", m_imr).formatstr("%04X");
+	state_add(STATE_TIM, "TIM", m_debug_timer).callimport().callexport().formatstr("%04X");
+	state_add(STATE_PRD, "PRD", m_debug_timer).callimport().callexport().formatstr("%04X");
+	state_add(STATE_TCR, "TCR", m_debug_timer).callimport().callexport().formatstr("%04X");
 	state_add(STATE_IDLE, "IDLE", m_idle).formatstr("%1u");
 	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
 	state_add(STATE_GENPC, "GENPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
@@ -233,12 +236,16 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 		m_pc = u16(m_debug_pc);
 		m_xpc = m_extended_program ? (m_debug_pc >> 16) & 0x7f : 0;
 	}
+	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
+		data_write(0x24 + entry.index() - STATE_TIM, m_debug_timer);
 }
 
 void tms320c54x_device::state_export(const device_state_entry &entry)
 {
 	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
 		m_debug_pc = logical_program_address(m_pc);
+	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
+		m_debug_timer = data_read(0x24 + entry.index() - STATE_TIM);
 }
 
 void tms320c54x_device::far_transfer(u32 address, bool delayed)

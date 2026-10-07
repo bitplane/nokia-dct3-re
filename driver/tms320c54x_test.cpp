@@ -15196,6 +15196,18 @@ private:
 				"Bit-reversed traversal wraps after one complete FFT address cycle");
 			if (m_phase == 6162) { start_reverse_carry_sequence(true); return; }
 			osd_printf_info("TMS320C54x reverse carry sequences: PASS forward=16 inverse=16\n");
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TIM, 0x5678);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_TCR) == 0x10 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PRD) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_TIM) == 0x5678,
+				"Debugger timer registers retain independent values while stopped");
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x30);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_TCR) == 0x10 &&
+				m_cpu->state_int(tms320c54x_device::STATE_TIM) == 0x1234,
+				"Debugger TCR reload uses the same self-clearing TRB contract as MMR writes");
+			osd_printf_info("TMS320C54x timer debugger registers: PASS independent=1 reload=1\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

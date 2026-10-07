@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "mu4_native_recorder_warm_metadata_receive", "owner": "native_music_dsp_bench", "status": "unresolved",
+      "predicate": "Original recorder control return leaves resident firmware able to receive and execute the evidenced three-string metadata transaction without timer, mask or queue intervention",
+      "current": "The bootrecsave diagnostic fails before sending metadata: the first post-return status-query byte remains unread, cursor 27, RX/TX 36/47, three responses and two subsequent ACKs. Endpoint PC 02204e is the TINT vector; live folded vector and handler prologue match AA22. PMST 202c, ST1 6900, IMR 0ac9 and IFR 0c78 accompany TIM 0, PRD 1 and TCR 0, giving the present timer model a two-cycle period. The timer/interrupt configuration is a starvation candidate requiring its original writer and startup contract to be recovered, not a reason to override hardware state. No metadata failure reply, completed save or playback is observed. The existing bootrecpoll control-return gate remains passing.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]
+    },
+    {
       "id": "mu4_native_recorder_polled_control", "owner": "native_music_dsp_bench", "status": "satisfied",
       "predicate": "Original AA88 recorder firmware accepts a pin-level read-only status poll followed by selector 36 parameter 4 and returns through its own named loader to MCUSI16",
       "current": "The isolated provisional shared-RAM bootrecpoll profile sends checksum-checked status token 2, acknowledges the native selector-71 reply, then sends control token 3. Application requests arrive at 10.667 and 10.722 seconds; the status query changes the previous selector from 36 to 49 through original dispatcher code, allowing one control-handler entry. Native processing completion becomes 8009; the original loader returns to MCUSI16 with lifecycle 2, mode 0 and continuation 0a. RX/TX totals are 35/47, three replies and two subsequent request ACKs, with drained RX and unchanged source NAND. There are 224 program setups/confirms and 118272 programmed bytes. This proves a bench protocol transition, not the ordinary handset sender sequence, finalized media, native music playback, physical shared-RAM extent or speech.",

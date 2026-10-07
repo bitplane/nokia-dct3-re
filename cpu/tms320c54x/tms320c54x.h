@@ -39,7 +39,10 @@ public:
 		STATE_IMR,
 		STATE_IDLE,
 		STATE_ILLEGAL,
-		STATE_XPC
+		STATE_XPC,
+		STATE_TIM,
+		STATE_PRD,
+		STATE_TCR
 	};
 
 protected:
@@ -119,6 +122,7 @@ private:
 	u16 m_pc = 0;
 	u8 m_xpc = 0;
 	u32 m_debug_pc = 0;
+	u16 m_debug_timer = 0;
 	u16 m_op = 0;
 	u64 m_a = 0;
 	u64 m_b = 0;

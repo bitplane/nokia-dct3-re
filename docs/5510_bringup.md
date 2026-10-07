@@ -71,8 +71,9 @@ programming through a clean 20-second execution window. The separate
 further control packet, but its previous-command filter rejects the repeated
 selector before parameter dispatch. `bootrecpoll` first issues the original
 read-only status query, then reaches the control handler and returns through
-the native loader to `MCUSI16`. The current recorder frontier is the resulting
-media and save/name transaction, not serial receipt, control dispatch or an
+the native loader to `MCUSI16`. The current recorder frontier is warm resident
+timer/receive recovery before the save/name transaction, not initial serial
+receipt, control dispatch or an
 unsupported instruction. The poll sequence is a bench protocol test, not a
 recovered handset sender trace.
 None of these profiles proves a recorded track.
@@ -2109,6 +2110,26 @@ An exhaustive runtime write watch shows that the recorder overlay reuses
 this data range for codec work and resident initialization restores the
 prefix at 13.908 seconds. The broad watch is retired after harvesting that
 ownership observation; the small endpoint capture remains.
+
+The separate `bootrecsave` diagnostic schedules a resident status poll
+after the native return, then parameter `7` with title `TEST` and two empty
+secondary strings. Its checksummed candidate packets are
+`1e 02 aa 01 49 04 fa 55` and
+`1e 0a aa 01 36 07 04 54 45 53 54 00 00 05 99 55`.
+The gate currently fails before the metadata packet is sent: only the first
+resident poll byte arrives, remaining unread at the 20-second endpoint.
+Native RX/TX totals are 36/47, with three replies, two subsequent ACKs,
+cursor 27 and RX-ready set. Do not interpret this as a failed metadata command.
+
+Endpoint PC is `02:204e`, the TINT vector branch to `02:3d73`; the live
+OVLY-folded vector and handler prologue match the original AA22 upload.
+PMST is `202c`, ST1 `6900`, IMR `0ac9`, IFR `0c78`. Debugger-visible
+timer registers read TIM `0000`, PRD `0001`, TCR `0000`, giving the current
+model a two-CPU-cycle timer period. This identifies a timer/interrupt
+starvation candidate, not an established clock or timer fidelity correction.
+Recover the original writes and startup lifecycle that leave this timer
+configuration before changing interrupt masks, period values or CPU timing.
+The new diagnostic is intentionally not a passing save acceptance gate.
 
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),

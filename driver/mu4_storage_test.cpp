@@ -176,6 +176,7 @@ private:
 	bool m_recorder_overlay_checked = false;
 	unsigned m_recorder_startup_entries = 0;
 	unsigned m_recorder_control_entries = 0, m_recorder_control_acks = 0;
+	unsigned m_recorder_metadata_result = 0;
 	unsigned m_recorder_application_calls = 0, m_recorder_application_messages = 0;
 	unsigned m_recorder_processing_waits = 0, m_recorder_processing_returns = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
@@ -543,6 +544,14 @@ private:
 			}
 			if (m_command_ack_pending && m_command_ack_cursor != 3)
 				fatalerror("MU4 recorder response overlaps an unfinished peer acknowledgement");
+			if (recorder_save_profile() && m_command_tx_words[begin + 4] == 0x5e && end - begin == 11 &&
+				m_command_tx_words[begin + 6] == 7)
+			{
+				m_recorder_metadata_result = m_command_tx_words[begin + 5] == 1 && m_command_tx_words[begin + 7] == 12 ? 1 : 2;
+				logerror("mu4_native_recorder_metadata_reply: status=%02x parameter=%02x reason=%02x success=%u\n",
+					m_command_tx_words[begin + 5], m_command_tx_words[begin + 6], m_command_tx_words[begin + 7],
+					m_recorder_metadata_result == 1);
+			}
 			logerror("mu4_native_recorder_response: index=%u selector=%02x words=%u token=%02x class=%u\n",
 				m_recorder_responses++, m_command_tx_words[begin + 4], end - begin, m_command_tx_words[end - 3], m_command_tx_words[begin + 3]);
 			for (unsigned i = begin; i < end; ++i)
@@ -793,6 +802,9 @@ private:
 		// AA88 0x49 constructs a status reply without recorder-state writes.
 		static constexpr u8 recorder_poll[] = {0x1e, 2, 0xaa, 1, 0x49, 2, 0xfc, 0x55};
 		static constexpr u8 recorder_polled_control[] = {0x1e, 3, 0xaa, 1, 0x36, 4, 3, 0x87, 0x55};
+		static constexpr u8 recorder_resident_poll[] = {0x1e, 2, 0xaa, 1, 0x49, 4, 0xfa, 0x55};
+		// Original parameter-7 grammar: three length-prefixed strings, title TEST.
+		static constexpr u8 recorder_metadata[] = {0x1e, 10, 0xaa, 1, 0x36, 7, 4, 'T', 'E', 'S', 'T', 0, 0, 5, 0x99, 0x55};
 		constexpr auto valid_packet = [](auto const &bytes)
 		{
 			u8 checksum = 0;
@@ -801,11 +813,13 @@ private:
 				bytes[std::size(bytes) - 2] == checksum && bytes[std::size(bytes) - 1] == 0x55;
 		};
 		static_assert(valid_packet(status) && valid_packet(measurement) && valid_packet(recorder) && valid_packet(recorder_control) &&
-			valid_packet(recorder_poll) && valid_packet(recorder_polled_control));
+			valid_packet(recorder_poll) && valid_packet(recorder_polled_control) &&
+			valid_packet(recorder_resident_poll) && valid_packet(recorder_metadata));
 		u8 const *packet = recorder_profile() ? recorder : measurement_profile() ? measurement : status;
 		unsigned const first_size = recorder_profile() ? std::size(recorder) : std::size(status);
 		unsigned const packet_size = first_size + (recorder_control_profile() ? std::size(recorder_control) : 0) +
-			(recorder_poll_profile() ? std::size(recorder_poll) : 0);
+			(recorder_poll_profile() ? std::size(recorder_poll) : 0) +
+			(recorder_save_profile() ? std::size(recorder_resident_poll) + std::size(recorder_metadata) : 0);
 		unsigned packet_start = 0;
 		bool const ack = m_native_command_cursor >= first_size && m_command_ack_pending && m_command_ack_cursor != 3;
 		if (recorder_control_profile() && m_native_command_cursor >= first_size && !ack)
@@ -826,6 +840,19 @@ private:
 					if (m_recorder_responses < 3) { m_command->adjust(attotime::from_msec(1)); return; }
 					packet_start += std::size(recorder_poll);
 					packet = recorder_polled_control;
+					if (recorder_save_profile() && m_native_command_cursor >= packet_start + std::size(recorder_polled_control))
+					{
+						if (m_native_bootstrap_resident_entries < 2 || machine().time() < attotime::from_seconds(15))
+						{ m_command->adjust(attotime::from_msec(1)); return; }
+						packet_start += std::size(recorder_polled_control);
+						packet = recorder_resident_poll;
+						if (m_native_command_cursor >= packet_start + std::size(recorder_resident_poll))
+						{
+							if (m_recorder_responses < 4) { m_command->adjust(attotime::from_msec(1)); return; }
+							packet_start += std::size(recorder_resident_poll);
+							packet = recorder_metadata;
+						}
+					}
 				}
 			}
 		}
@@ -900,11 +927,12 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 24; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 25; }
 	bool recorder_profile() const { return system_bios() == 21 || shared_daram_profile(); }
 	bool shared_daram_profile() const { return system_bios() == 22 || recorder_control_profile(); }
 	bool recorder_control_profile() const { return system_bios() == 23 || recorder_poll_profile(); }
-	bool recorder_poll_profile() const { return system_bios() == 24; }
+	bool recorder_poll_profile() const { return system_bios() == 24 || recorder_save_profile(); }
+	bool recorder_save_profile() const { return system_bios() == 25; }
 	u16 shared_daram_r(offs_t offset)
 	{
 		return m_cpu->space(AS_DATA).read_word(0x2000 + offset);
@@ -1193,6 +1221,7 @@ private:
 				save_item(NAME(m_recorder_overlay_checked));
 				save_item(NAME(m_recorder_startup_entries));
 				save_item(NAME(m_recorder_control_entries)); save_item(NAME(m_recorder_control_acks));
+				save_item(NAME(m_recorder_metadata_result));
 				save_item(NAME(m_recorder_application_calls)); save_item(NAME(m_recorder_application_messages));
 				save_item(NAME(m_recorder_processing_waits)); save_item(NAME(m_recorder_processing_returns));
 				save_item(NAME(m_recorder_nand_controls)); save_item(NAME(m_recorder_nand_data));
@@ -1369,6 +1398,7 @@ private:
 		m_recorder_overlay_checked = false;
 		m_recorder_startup_entries = 0;
 		m_recorder_control_entries = m_recorder_control_acks = 0;
+		m_recorder_metadata_result = 0;
 		m_recorder_application_calls = m_recorder_application_messages = 0;
 		m_recorder_processing_waits = m_recorder_processing_returns = 0;
 		m_serial_empty_reads = 0;
@@ -1729,7 +1759,28 @@ private:
 						m_recorder_application_calls, m_recorder_application_messages, m_recorder_processing_waits, m_recorder_processing_returns,
 						data.read_word(0xfd85));
 					// Transport receipt is not proof of application dispatch or recording completion.
-					if (recorder_poll_profile())
+					if (recorder_save_profile())
+					{
+						auto &program = m_cpu->space(AS_PROGRAM);
+						logerror("mu4_native_recorder_warm_vector: low=%04x,%04x,%04x,%04x page2=%04x,%04x,%04x,%04x\n",
+							program.read_word(0x204c), program.read_word(0x204d), program.read_word(0x204e), program.read_word(0x204f),
+							program.read_word(0x2204c), program.read_word(0x2204d), program.read_word(0x2204e), program.read_word(0x2204f));
+						logerror("mu4_native_recorder_warm_handler: low=%04x,%04x,%04x,%04x page2=%04x,%04x,%04x,%04x pmst=%04x\n",
+							program.read_word(0x3d73), program.read_word(0x3d74), program.read_word(0x3d75), program.read_word(0x3d76),
+							program.read_word(0x23d73), program.read_word(0x23d74), program.read_word(0x23d75), program.read_word(0x23d76),
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+						logerror("mu4_native_recorder_warm_timer: tim=%04x prd=%04x tcr=%04x\n",
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)),
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_PRD)),
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_TCR)));
+						if (m_native_command_cursor != 50 || m_command_rx_ready || m_command_rx_busy ||
+							m_recorder_control_acks != 4 || !m_recorder_metadata_result)
+							fatalerror("MU4 recorder metadata transaction did not complete natively");
+						logerror("mu4_native_recorder_metadata: PASS native_reply=1 success=%u playback=0 firmware_state_forcing=0\n",
+							m_recorder_metadata_result == 1);
+						capture_recorder_media();
+					}
+					else if (recorder_poll_profile())
 					{
 						if (m_native_command_cursor != 26 || m_command_rx_ready || m_command_rx_busy ||
 							m_recorder_control_acks != 2 || m_recorder_responses != 3 || m_recorder_control_entries != 1 ||
@@ -3198,6 +3249,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(21, "bootrecordram", "Original recorder with provisional shared data/program RAM")
 	ROM_SYSTEM_BIOS(22, "bootreccontrol", "Original recorder subsequent control receive (provisional RAM)")
 	ROM_SYSTEM_BIOS(23, "bootrecpoll", "Original recorder status-poll/control sequence (provisional RAM)")
+	ROM_SYSTEM_BIOS(24, "bootrecsave", "Original recorder metadata transaction (provisional RAM)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
