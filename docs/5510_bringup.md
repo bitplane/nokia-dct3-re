@@ -1597,6 +1597,15 @@ documents MP3-to-LSE conversion but explicitly does not implement Nokia's
 encryption/decryption. Consequently, converter availability alone would not
 validate the encrypted-container path or all original media formats.
 
+An exact-word scan of each final uploaded extended-program image finds
+neither `0380` nor `01c0` in resident `aa22` (48,261 words). The three
+`0380` operands in `aa44` at `02:de9c/deaa/dfe2` are AR2/AR3 sample-buffer
+displacements in numerical loops, not file-offset evidence. Other overlays
+also contain these values; equal literals across different segment images
+do not establish shared routine ownership or a container parser. Resolve
+storage-call argument flow and the selected overlay before assigning the
+reported byte offset to an instruction.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
