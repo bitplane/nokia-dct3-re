@@ -786,6 +786,17 @@ Down and a shorter first-key pulse do not repair the invalid-input path.
 and restore sites. Clock-error cancellation behavior remains a separate
 UI lifecycle observation, not a missing keypad or radio contract.
 
+The valid clock/date path settles ordinarily: physical entry of `1200`,
+Menu/OK, `07102026`, Menu/OK accepts the time and date and returns to the
+registered `DCT3 LAB` idle frame showing `12:00`. Subsequent physical entry
+of `1234567` displays those digits in order. The diagnostic
+`tools/noki8890_clock_input.lua` reproduces this on fresh private cfg/NVRAM
+with the declared `nsb6hle` composition and a 55-second run; it captures
+each time digit, date entry, settled idle and subsequent dial editor.
+This is physical UI observation, not an exact-frame acceptance gate or proof
+of cold-restart clock persistence. It requires no PMM, cursor or firmware
+writes. Invalid-empty-input cancellation remains unresolved separately.
+
 Incoming-call signaling separately passes IMSI paging, Paging Response,
 contention UA, cipher/MM-information exchange, incoming SETUP, Call
 Confirmed/Alerting, own traffic configuration and Assignment Complete.
@@ -827,8 +838,9 @@ The SMS recipient editor preserves digit ordering; the direct-call editor's
 rotation is not a general keypad wiring or numeric-entry defect.
 
 GSM900 and PCS1900 laboratory registration are verified separately;
-clock-notice settlement and invalid-clock error cancellation remain
-presentation/lifecycle questions. Call signaling and SMS are verified on
+valid clock/date entry reaches ordinary idle; invalid-clock error cancellation
+and cold-restart clock persistence remain presentation/lifecycle questions.
+Call signaling and SMS are verified on
 both bands; speech/media remains unproved.
 
 ### 8890 PCS1900 Acquisition Contract
