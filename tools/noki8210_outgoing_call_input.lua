@@ -19,6 +19,7 @@ local input = coroutine.create(function()
     end
     machine.screens[':screen']:snapshot('8210_dialed_number.png')
     if not press(0, 'Call / Send', 'send') then return end
+    if _G.noki8210_call_hold then return end
     if not emu.wait(8) then return end
     machine.screens[':screen']:snapshot('8210_outgoing_call.png')
     if not press(0, 'End', 'end') then return end

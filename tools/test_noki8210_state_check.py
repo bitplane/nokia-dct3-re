@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from tools.noki8210_state_check import verify
 
@@ -18,6 +19,20 @@ state_replay: phase=restored event=end t=33.000000000
 
 
 class Nokia8210StateTest(unittest.TestCase):
+    def test_call_save_must_follow_connect(self):
+        call = GOOD + '8210_call_physical: action=end\n'
+        with patch('tools.noki8210_state_check.verify_call'):
+            with self.assertRaisesRegex(ValueError, 'established active call'):
+                verify(call, call=True)
+            verify('GSM service uplink sapi=0 pd=03 message=0f length=2 data=030f\n' + call,
+                   call=True)
+
+    def test_call_requires_post_load_release(self):
+        call = 'GSM service uplink sapi=0 pd=03 message=0f length=2 data=030f\n' + GOOD
+        with patch('tools.noki8210_state_check.verify_call'):
+            with self.assertRaisesRegex(ValueError, 'physical call release'):
+                verify(call, call=True)
+
     def test_exact_replay(self):
         verify(GOOD)
 

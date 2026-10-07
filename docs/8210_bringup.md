@@ -330,7 +330,8 @@ Run any focused scenario from a new directory:
 ```
 
 Available scenarios are `registration`, `incoming-call`, `outgoing-call`,
-`incoming-sms`, `outgoing-sms`, `calculator`, `phonebook` and `idle-state`. Each seeds
+`incoming-sms`, `outgoing-sms`, `calculator`, `phonebook`, `idle-state` and
+`call-state`. Each seeds
 only the unchanged acquired base-record snapshot into a fresh persistent
 flash image. Incoming events use copied external network configuration;
 all UI interaction uses physical key fields. `phonebook` executes save
@@ -358,6 +359,17 @@ Missing protocol logs are a failure; use the runner's verbose logging.
 This is research idle/UI restoration under the declared base-record PMM
 comparison, not active-call/SMS replay, factory provisioning or native DSP
 completion. No handset state or message is injected.
+
+`call-state` uses the same exact-state/replay harness after physically dialing
+`1234567` and Send. It saves at 34 seconds, after Connect Acknowledge and
+before any Disconnect, then requires the same nonempty one-second protocol
+replay and identical active-call pixels. After load, physical End completes
+the own NSM-3 CC/RR release grammar and returns to reviewed `DCT3 LAB` idle.
+The physical composer schedules no End while this restoration fixture owns
+the continuation. Check with `noki8210_state_check.py LOG SNAP --call`;
+ordinary outgoing-call and idle-state fixtures remain independent. This
+verifies active signaling/UI restoration, not native speech or delivered-SMS
+restoration.
 
 The shared observer retains staged-DSP/self-test, decoded-key and readiness
 acceptance records only. PMM copy/cache dump, column-mask and input-lifecycle

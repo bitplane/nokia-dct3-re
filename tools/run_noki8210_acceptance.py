@@ -20,6 +20,7 @@ SCENARIOS = {
     'calculator': ('calculator_input', 41, None),
     'phonebook': ('phonebook_input', 34, 'phonebook_check'),
     'idle-state': ('state_idle', 40, 'state_check'),
+    'call-state': ('state_call', 50, 'state_check'),
 }
 
 
@@ -77,8 +78,10 @@ def main():
             execute(cold, 'cold_console.log')
             check = [sys.executable, str(root / 'tools/noki8210_phonebook_check.py'),
                      str(run / 'write.log'), str(run / 'error.log'), storage]
-        elif args.scenario == 'idle-state':
+        elif args.scenario in ('idle-state', 'call-state'):
             check.append(str(run / 'snap'))
+            if args.scenario == 'call-state':
+                check.append('--call')
         elif args.scenario in ('registration', 'incoming-sms'):
             check.append(storage)
         if checker:
