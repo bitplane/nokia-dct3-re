@@ -1151,7 +1151,12 @@ failure text and physical End/Menu recovery. It rejects any RP-ACK/RP-ERROR
 or missing mobile DISC. A service-only trace is insufficient here: it omits
 the load-bearing LAPDm release. The reviewed timeout frame reads
 `Übertragungsfehler`, distinct from the explicit rejection's message-not-sent
-text. PCS silence is not yet tested.
+text. Independent fresh PCS1900 acceptance passes the same complete lifecycle;
+use the PCS host configuration and add `--pcs1900` to the checker, which
+requires the organic carrier-600 registration contract before timeout
+acceptance. The observed firmware-owned release behavior is shared across
+both bands; this does not establish a physical timer frequency or native DSP
+execution.
 
 Fresh strict-topology runs also complete incoming and outgoing call
 signaling and incoming/outgoing SMS. The network's existing assignment

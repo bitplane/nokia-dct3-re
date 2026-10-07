@@ -39,6 +39,11 @@ class Nokia8890SmsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'RP result'):
             verify_silence(SILENCE + 'GSM service downlink kind=18 sapi=3')
 
+    def test_pcs_silence_requires_registration(self):
+        verify_silence(PCS_LOG + '\n' + SILENCE, pcs1900=True)
+        with self.assertRaisesRegex(ValueError, 'candidate window'):
+            verify_silence(SILENCE, pcs1900=True)
+
     def test_recovery_requires_physical_navigation(self):
         with self.assertRaisesRegex(ValueError, 'physical recovery'):
             check_recovery(OUTGOING, Path('missing'))
