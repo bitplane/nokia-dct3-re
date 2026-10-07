@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_original_dma_interrupt_consumption", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Original TX vector 206c contains 4a1e,f495,f882,8afc and branches to logical 02:8afc. Read-only fetch observers exclude program-table/DMA/debugger reads; eight-block sustain acceptance requires at least seven original vector and handler entries, allowing the last completion still to be pending. Observed IMR 0ac1 enables source 11 but masks source 10: eight RX blocks complete without RX vector entry and IFR bit 10 remains pending. IMR/IFR observations use CPU state, not direct AS_DATA reads bypassing internal MMR access. This proves repeated native TX interrupt delivery, not complete application startup, RX interrupt ownership, analog conversion, music processing or playback",
+      "evidence": ["driver/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "docs/5510_bringup.md", "Makefile"]
+    },
+    {
       "id": "npm5_mu4_repeated_digital_streaming", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "The separate sustain BIOS executes unchanged original MCUSI16 beyond the first digital block. It verifies 1024 transmitted words against codec DIN channel/value ordering, eight TX DMA completions, eight RX DMA completions and the reloaded RX destination 1900/1940 containing explicitly converted fixture samples 1234/5678. Codec clocks and pins, not injected DRR/readiness or firmware-buffer writes, drive the run. Original six control words remain unchanged and CPU illegal=0 at PC 003080. Eight blocks cover 512 stereo frames (about 11.6 ms), not long-duration application behavior, analog conversion, meaningful music samples, playback or native telephony",
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]

@@ -103,6 +103,8 @@ private:
 	}
 	unsigned m_stream_words = 0, m_stream_config_writes = 0;
 	unsigned m_native_din_words = 0;
+	unsigned m_native_dma_rx_vectors = 0, m_native_dma_tx_vectors = 0;
+	unsigned m_native_dma_tx_handler = 0;
 	std::vector<u16> m_native_tx_words;
 	std::vector<u16> m_codec_din_words, m_codec_saved_din;
 	unsigned m_codec_rx_snapshot_count = 0;
@@ -318,6 +320,8 @@ private:
 		m_rx_dma_completions = m_rx_irqs = 0;
 		m_stream_words = m_stream_config_writes = 0;
 		m_native_din_words = 0;
+		m_native_dma_rx_vectors = m_native_dma_tx_vectors = 0;
+		m_native_dma_tx_handler = 0;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -1033,6 +1037,26 @@ private:
 				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_entry_reads; });
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_native_far_entry",
 				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_far_reads; });
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x028afc, 0x028afc, "mu4_native_dma_tx_handler",
+				[this](offs_t, u16 &, u16)
+				{
+					if (m_phase == 30 && !machine().side_effects_disabled() &&
+						m_cpu->state_int(STATE_GENPC) == 0x028afd) ++m_native_dma_tx_handler;
+				});
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x207f, "mu4_native_dma_vectors",
+				[this](offs_t address, u16 &value, u16)
+				{
+					// fetch() increments PC before reading. Exclude DMA/table/debug reads.
+					if (m_phase != 30 || machine().side_effects_disabled() ||
+						u16(m_cpu->state_int(tms320c54x_device::STATE_PC)) != address + 1) return;
+					u16 const base = m_cpu->state_int(tms320c54x_device::STATE_PMST) & 0xff80;
+					if (address != base + 0x68 && address != base + 0x6c) return;
+					unsigned &count = address == base + 0x68 ? m_native_dma_rx_vectors : m_native_dma_tx_vectors;
+					if (!count++) logerror("mu4_native_dma_vector: address=%04x words=%04x,%04x,%04x,%04x source=%u\n",
+						unsigned(address), value, m_cpu->space(AS_PROGRAM).read_word(address + 1),
+						m_cpu->space(AS_PROGRAM).read_word(address + 2), m_cpu->space(AS_PROGRAM).read_word(address + 3),
+						address == base + 0x68 ? 10 : 11);
+				});
 			m_cpu->space(AS_DATA).install_write_tap(0x48, 0x49, "mu4_native_mcbsp_config",
 				[this](offs_t offset, u16 &value, u16)
 				{
@@ -1081,17 +1105,26 @@ private:
 				logerror("mu4_native_receive: PASS converted_fixture=1 frames=64 din_words=%u rx_dma_completions=%u sorted_buffer=1980,19c0\n", m_native_din_words, m_rx_dma_completions);
 				if (system_bios() == 3)
 				{
+					if (m_native_dma_tx_vectors < 7 || m_native_dma_tx_handler < 7)
+						fatalerror("MU4 original TX interrupt delivery incomplete vectors=%u handler=%u",
+							m_native_dma_tx_vectors, m_native_dma_tx_handler);
 					for (unsigned i = 0; i < 64; ++i)
 						if (m_cpu->space(AS_DATA).read_word(0x1900 + i) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x1940 + i) != 0x5678)
 							fatalerror("MU4 native reloaded RX buffer mismatch at frame %u", i);
 					logerror("mu4_native_sustained: PASS words=%u din_words=%u tx_blocks=%u rx_blocks=%u reload_buffer=1900,1940\n",
 						m_stream_words, m_native_din_words, m_dma_completions, m_rx_dma_completions);
+					logerror("mu4_native_interrupts: PASS tx_vectors=%u tx_handler=%u rx_vectors=%u\n",
+						m_native_dma_tx_vectors, m_native_dma_tx_handler, m_native_dma_rx_vectors);
 				}
 			}
 			logerror("mu4_native_entry: PASS original_transfer=1 entry_reads=%u far_reads=%u pc=%06x illegal=%u idle=%u pmst=%04x\n",
 				m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+			logerror("mu4_native_dma_vector_counts: rx=%u tx=%u imr=%04x ifr=%04x st1=%04x\n",
+				m_native_dma_rx_vectors, m_native_dma_tx_vectors,
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
 			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u tx_words=%u tx_irqs=%u controller_modeled=partial\n",
 				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace,
 				unsigned(m_serial_tx_words.size()), m_serial_tx_irqs);

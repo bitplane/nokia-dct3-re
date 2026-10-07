@@ -1126,6 +1126,22 @@ with `illegal=0`; all six original codec controls remain unchanged. This is
 bounded repeated digital streaming (512 stereo frames, about 11.6 ms), not
 long-duration operation, analog conversion, meaningful music data or playback.
 
+Interrupt consumption is distinct from DMA completion. The original TX vector
+at `206c` contains `4a1e,f495,f882,8afc`: save XPC, NOP, then far branch to
+`02:8afc`. Read-only fetch observers distinguish execution from program-table,
+DMA and debugger reads. The eight-block acceptance requires at least seven TX
+vector and handler entries; the final completion may still be pending when the
+observation ends. The verified run observes eight of each. This proves repeated
+delivery into original firmware, not
+complete application startup or audio processing.
+
+The observed mask is IMR `0ac1`: DMA3/source 11 is enabled, DMA2/source 10 is
+masked. RX completes eight blocks without executing vector `2068`, and its
+pending IFR bit 10 remains set (`0438` at the observation endpoint). Thus lack
+of an RX ISR is not by itself a routing defect in this lifecycle. Read IMR/IFR
+through CPU state accessors: direct address-space reads at data `0/1` bypass
+the core's internally implemented register access and do not measure them.
+
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
 
