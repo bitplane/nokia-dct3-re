@@ -1118,10 +1118,13 @@ check-mu4-bootstrap-original: build
 		if test -z "$(MU4_BOOTSTRAP_SOURCE_RUN)" || ! test -f "$$source/nvram/mu4nand_13/nand"; then \
 			echo 'Set MU4_BOOTSTRAP_SOURCE_RUN to a completed check-mu4-retained-original run directory' >&2; exit 1; fi; \
 		test "$$(wc -c < "$$source/nvram/mu4nand_13/nand")" -eq 69206016; \
+		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
+		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; \
+			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
 		tmp="$$(mktemp -d '$(abspath run_mu4-bootstrap).XXXXXX')"; \
-		mkdir -p "$$tmp/nvram/mu4nand_15"; \
-		cp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_15/nand"; \
-		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -bios bootstrap \
+		mkdir -p "$$tmp/nvram/$$nvtag"; \
+		cp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/$$nvtag/nand"; \
+		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -bios "$$bios" \
 			-rompath "$$source/seed/roms" -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
 			-seconds_to_run 30 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
@@ -1132,7 +1135,9 @@ check-mu4-bootstrap-original: build
 		grep -q 'mu4_original_bootstrap_gate_init: value=0001 pc=0290ef' error.log; \
 		grep -q 'mu4_original_bootstrap_path: address=3538 ' error.log; \
 		grep -q 'mu4_original_bootstrap_loader: name=004d,0043,0055,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0001,e1e8 ' error.log; \
-		cmp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_15/nand"
+		if test "$$bios" = bootstatus; then \
+			grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; fi; \
+		cmp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/$$nvtag/nand"
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.

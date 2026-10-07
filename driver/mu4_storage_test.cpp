@@ -203,7 +203,7 @@ private:
 	}
 	void finish_stream_if_ready()
 	{
-		if (system_bios() == 16) return; // Fixed-window bootstrap observation, not a routine gate.
+		if (original_bootstrap_profile()) return; // Fixed-window bootstrap observation, not a routine gate.
 		if (m_phase == 30 && system_bios() >= 2 && m_stream_words >= native_stream_target() &&
 			m_native_din_words >= native_stream_target() && m_dma_completions >= native_stream_target() / 128 &&
 			m_rx_dma_completions >= native_stream_target() / 128)
@@ -687,7 +687,7 @@ private:
 		if (ack && (!m_command_ack_pending || m_command_ack_cursor == 3)) return;
 		// Replay starts after the separately checked streaming prefix, so both
 		// legs share the same scheduled worker-window endpoint.
-		if (system_bios() >= 12 && !m_native_worker_window_started) { m_command->adjust(attotime::from_msec(1)); return; }
+		if (system_bios() >= 12 && !original_bootstrap_profile() && !m_native_worker_window_started) { m_command->adjust(attotime::from_msec(1)); return; }
 		if (m_native_command_paths[5] && !m_serial_ready && !m_command_rx_busy && !m_command_rx_ready && (m_serial_regs[0][0] & 1))
 		{
 			if (ack)
@@ -742,9 +742,26 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
+	bool original_bootstrap_profile() const { return system_bios() == 16 || system_bios() == 17; }
+	void verify_native_status()
+	{
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		if (m_command_ack_cursor != 3 || m_command_tx_words.size() != 14 || m_command_wire_bit_count ||
+			data.read_word(0x1657) != 11 || data.read_word(0x1658) != 11 || data.read_word(0x1659) != 14 ||
+			data.read_word(0x165a) != 14 || data.read_word(0x165e) || data.read_word(0x165d) || data.read_word(0xbb80))
+			fatalerror("MU4 framed status transaction did not settle after the physical peer acknowledgement");
+		logerror("mu4_native_status_transaction: PASS rx_words=11 tx_words=14 pin_decode=1 ack=1 retries=0 queue_empty=1 mode=0 full_boot=0\n");
+		if (system_bios() >= 11)
+		{
+			if (m_command_rx_irqs != 11 || m_command_rx_busy || m_command_rx_ready)
+				fatalerror("MU4 pin receive did not drain eleven device-owned RRDY interrupts");
+			logerror("mu4_native_receive_pins: PASS bytes=11 rx_irqs=11 frame=1 data=1 clock=1 drr_drained=1\n");
+		}
+	}
 	virtual void machine_start() override
 	{
-		if (system_bios() == 16)
+		if (original_bootstrap_profile())
 		{
 			m_phase = 74;
 			m_cpu->space(AS_PROGRAM).install_ram(0, 0xffff, &m_program_ram[0]);
@@ -778,6 +795,8 @@ private:
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0x374d, 0x374d, "mu4_original_bootstrap_gate_init",
 				[this](offs_t, u16 &value, u16) { if (!machine().side_effects_disabled()) logerror("mu4_original_bootstrap_gate_init: value=%04x pc=%06x\n", value, unsigned(m_cpu->pc())); });
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x3acf2, 0x3acf2, "mu4_original_bootstrap_dispatch",
+				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1) ++m_native_command_paths[5]; });
 		}
 		if (system_bios() == 15)
 		{
@@ -1192,6 +1211,7 @@ private:
 				fatalerror("MU4 original bootstrap upload coverage changed records=%u words=%u", records, uploaded);
 			logerror("mu4_original_bootstrap_upload: records=%u words=%u program_only=1 data_alias=unvalidated\n", records, uploaded);
 			m_phase = 30;
+			if (system_bios() == 17) m_command->adjust(attotime::from_msec(1));
 			m_check->adjust(attotime::from_seconds(20));
 			logerror("mu4_original_bootstrap_start: reset_vector=00ff80 serial_entry=000e41 retained_nand=1 routine_wrapper=0 mask_rom=0\n");
 		}
@@ -1205,7 +1225,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
-		if (system_bios() == 16)
+		if (original_bootstrap_profile())
 		{
 			if (!m_native_bootstrap_entries || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
 				fatalerror("MU4 original bootstrap entry did not execute cleanly");
@@ -1214,6 +1234,7 @@ private:
 				m_native_bootstrap_entries, m_native_bootstrap_resident_entries, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
+			if (system_bios() == 17) verify_native_status();
 			machine().schedule_exit();
 			return;
 		}
@@ -2258,19 +2279,7 @@ private:
 				if (system_bios() >= 10 && system_bios() != 13 && system_bios() != 14 &&
 					(system_bios() != 15 || m_native_command_paths[5]))
 				{
-					auto const disable = machine().disable_side_effects();
-					auto &data = m_cpu->space(AS_DATA);
-					if (m_command_ack_cursor != 3 || m_command_tx_words.size() != 14 || m_command_wire_bit_count ||
-						data.read_word(0x1657) != 11 || data.read_word(0x1658) != 11 || data.read_word(0x1659) != 14 ||
-						data.read_word(0x165a) != 14 || data.read_word(0x165e) || data.read_word(0x165d) || data.read_word(0xbb80))
-						fatalerror("MU4 framed status transaction did not settle after the physical peer acknowledgement");
-					logerror("mu4_native_status_transaction: PASS rx_words=11 tx_words=14 pin_decode=1 ack=1 retries=0 queue_empty=1 mode=0 full_boot=0\n");
-					if (system_bios() >= 11)
-					{
-						if (m_command_rx_irqs != 11 || m_command_rx_busy || m_command_rx_ready)
-							fatalerror("MU4 pin receive did not drain eleven device-owned RRDY interrupts");
-						logerror("mu4_native_receive_pins: PASS bytes=11 rx_irqs=11 frame=1 data=1 clock=1 drr_drained=1\n");
-					}
+					verify_native_status();
 				}
 			}
 			if (system_bios() == 13)
@@ -2708,6 +2717,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(13, "reset", "Original mid-byte bench reset observation (incomplete)")
 	ROM_SYSTEM_BIOS(14, "retained", "Original fresh-process retained-media observation")
 	ROM_SYSTEM_BIOS(15, "bootstrap", "Original serial-bootstrap entry observation (incomplete)")
+	ROM_SYSTEM_BIOS(16, "bootstatus", "Original uploaded startup with pin-level status transaction")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

@@ -47,8 +47,9 @@ service. Persistent NAND contents alone do not explain the reset stall.
 The `bootstrap` profile loads the complete original `aa55` upload and
 executes its uploaded `ff80` reset-vector prelude, original context
 initializer, directory-selected resident loader and resident startup.
-Control transactions and reset continuation on this full-startup profile
-remain to be verified; its stream volume is not validated music output.
+The `bootstatus` variant completes the same pin-level status transaction
+after this full startup. Reset continuation on this path remains to be
+verified; its stream volume is not validated music output.
 The open boundary is native reset lifecycle and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
@@ -1852,10 +1853,22 @@ transactions on this profile. The routine bench's earlier omitted-section
 observation is superseded by the complete-upload gate, not a firmware
 deadlock.
 
+The `bootstatus` variant uses the identical complete upload and retained
+medium. The existing external peer waits for the original command
+dispatcher to run and for the firmware-owned receiver readiness state,
+then clocks the unchanged status request and response acknowledgement
+through McBSP2 pins. Run the same target with
+`MU4_BOOTSTRAP_BIOS=bootstatus`. The original parser/dispatcher/queues
+complete an exact 11-byte RX and 14-byte TX transaction, with no retries,
+empty RX/TX queues, drained RRDY and mode zero. Its verifier is shared
+with the routine-bench acceptance; no different response shape or relaxed
+queue condition is introduced. The passive `bootstrap` profile remains
+available without host request traffic.
+
 An unmapped startup I/O write to port `0080` (`00df`) remains a board-model
-boundary. Next validate this complete startup's control transaction and
-same-process reset lifecycle, retaining the separate physical-reset and
-output-content limitations.
+boundary. Next validate the complete startup's same-process reset
+lifecycle, retaining the separate physical-reset and output-content
+limitations.
 
 Next recover the accepted media container and storage layout before attempting
 native playback, and finish reset lifecycle and board attachment separately.
