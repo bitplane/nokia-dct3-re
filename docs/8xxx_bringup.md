@@ -797,6 +797,18 @@ This is physical UI observation, not an exact-frame acceptance gate or proof
 of cold-restart clock persistence. It requires no PMM, cursor or firmware
 writes. Invalid-empty-input cancellation remains unresolved separately.
 
+A separate process preserving that run's phone/SIM NVRAM still presents
+the security editor. Physical `12345` then reaches the empty time editor,
+not the previously settled idle frame. Reproduce with
+`tools/noki8890_clock_read.lua`, preserved NVRAM, fresh private cfg and
+32 seconds; it enters only the security code and captures at 12/21/30 seconds.
+CCONT's `device_reset()` deliberately resets its RTC to the fixed
+`12:00:00`, day-1 epoch and does not persist RTC registers in NVRAM.
+Therefore this experiment demonstrates repeatable cold clock provisioning,
+not battery-backed clock continuity. Save-state restoration and an emulated
+baseband rail cycle are distinct from a new process's CCONT reset and must
+be tested separately before assigning this behavior to physical silicon.
+
 Incoming-call signaling separately passes IMSI paging, Paging Response,
 contention UA, cipher/MM-information exchange, incoming SETUP, Call
 Confirmed/Alerting, own traffic configuration and Assignment Complete.
@@ -839,7 +851,8 @@ rotation is not a general keypad wiring or numeric-entry defect.
 
 GSM900 and PCS1900 laboratory registration are verified separately;
 valid clock/date entry reaches ordinary idle; invalid-clock error cancellation
-and cold-restart clock persistence remain presentation/lifecycle questions.
+and battery-backed RTC continuity remain separate presentation/reset-domain
+questions; preserved phone/SIM storage alone does not retain clock validity.
 Call signaling and SMS are verified on
 both bands; speech/media remains unproved.
 
