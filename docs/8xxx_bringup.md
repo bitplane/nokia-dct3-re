@@ -1480,6 +1480,24 @@ before dialing and `DCT3 LAB` after release, excluding animated indicators.
 The wire also contains `860b`/`840a` speech-control commands, but no NSM-2
 speech-media contract is selected; this acceptance does not prove audio.
 
+Active-call save/load is independently verified with
+`tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot
+directories, verbose logging and 60 seconds. The physical `5551234` call is
+saved at 40 seconds. R15/R13, the mapped RAM digest and emulated time restore
+exactly; a nonempty one-second ordered protocol interval and whole connected
+screen replay identically. Only the physical End schedule is resumed after
+load. Require:
+
+```sh
+.venv/bin/python tools/noki8850_state_check.py RUN/error.log RUN/snap
+```
+
+The checker additionally requires the complete own-product intended-number
+CC/RR lifecycle and reviewed operator pixels after release. Original NSM-2
+flash/PMM inputs and the declared research DSP composition are unchanged.
+This is active signaling/UI restoration, not native speech, idle/SMS
+restoration or cold clock continuity.
+
 #### Incoming Call Acceptance
 
 Copy `fixtures/noki8850_incoming_call/nsm2hle.cfg` into a private run's
