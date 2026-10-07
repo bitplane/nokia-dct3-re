@@ -39,7 +39,10 @@ public:
 		m_mcbsp->tx_event_cb().set([this](int state) { m_dma->sync_w(6, state); });
 		TMS320C54X_MCBSP(config, m_mcbsp0, 13'000'000);
 		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
-		m_mcbsp0->tx_bit_cb().set([this](int state) { if (m_phase >= 51 && m_phase <= 53) m_external_bits.push_back(state); });
+		m_mcbsp0->tx_bit_cb().set([this](int state) {
+			if (m_phase >= 51 && m_phase <= 53) m_external_bits.push_back(state);
+			subdevice<tlv320aic23_device>("codec")->din_w(state);
+		});
 		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
 		m_mcbsp0->tx_irq_cb().set([this](int state) { m_cpu->set_input_line(5, state); });
 		m_mcbsp0->rx_event_cb().set([this](int state) { m_dma->sync_w(1, state); });
@@ -47,11 +50,28 @@ public:
 		TLV320AIC23(config, "codec", 11'995'200);
 		subdevice<tlv320aic23_device>("codec")->bclk_cb().set([this](int state) {
 			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(state); if (state) ++m_codec_clocks; }
-			else m_mcbsp0->tx_clock_w(state);
+			m_mcbsp0->tx_clock_w(state); m_mcbsp0->rx_clock_w(state);
 		});
 		subdevice<tlv320aic23_device>("codec")->frame_cb().set([this](int state) {
 			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(2 + state); if (state) m_codec_frames.push_back(m_codec_clocks); }
-			else m_mcbsp0->tx_frame_w(state);
+			m_mcbsp0->tx_frame_w(state); m_mcbsp0->rx_frame_w(state);
+		});
+		// Explicit converted-sample bench input, not a modeled analog ADC.
+		subdevice<tlv320aic23_device>("codec")->converted_adc_cb().set([](offs_t channel) -> u16 { return channel ? 0x5678 : 0x1234; });
+		subdevice<tlv320aic23_device>("codec")->dout_cb().set([this](int state) { m_mcbsp0->rx_data_w(state); });
+		subdevice<tlv320aic23_device>("codec")->din_word_cb().set([this](offs_t channel, u16 value) {
+			if (m_phase >= 54 && m_phase <= 57)
+			{
+				if (channel != (m_codec_din_words.size() & 1)) fatalerror("MU4 codec DIN channel ordering mismatch");
+				m_codec_din_words.push_back(value);
+			}
+			if (m_phase == 30 && m_native_din_words < m_native_tx_words.size())
+			{
+				if (channel != (m_native_din_words & 1) || value != m_native_tx_words[m_native_din_words])
+					fatalerror("MU4 native codec DIN does not match transmitted word %u", m_native_din_words);
+				++m_native_din_words;
+				finish_stream_if_ready();
+			}
 		});
 		SAMSUNG_K9K1208U0A(config, m_nand);
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
@@ -79,8 +99,18 @@ private:
 			unsigned const line = channel == 2 ? 10 : 11;
 			m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
+		finish_stream_if_ready();
 	}
 	unsigned m_stream_words = 0, m_stream_config_writes = 0;
+	unsigned m_native_din_words = 0;
+	std::vector<u16> m_native_tx_words;
+	std::vector<u16> m_codec_din_words, m_codec_saved_din;
+	unsigned m_codec_rx_snapshot_count = 0;
+	void finish_stream_if_ready()
+	{
+		if (m_phase == 30 && system_bios() == 2 && m_stream_words >= 128 && m_native_din_words >= 128 && m_rx_dma_completions)
+			m_check->adjust(attotime::zero);
+	}
 	unsigned m_codec_clocks = 0;
 	std::vector<unsigned> m_codec_frames;
 	std::vector<int> m_codec_edges, m_codec_saved_edges;
@@ -115,9 +145,12 @@ private:
 	void stream_tx(u16 value)
 	{
 		++m_stream_words;
+		// TX reports the last launched bit before DIN samples it on the next rising edge.
+		// Idle-line DIN words before this observable transmission are not stream evidence.
+		if (m_phase == 30 && m_native_tx_words.size() < 128) m_native_tx_words.push_back(value);
 		if (m_phase >= 51 && m_phase <= 53) m_external_words.push_back(value);
 		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
-		if (m_phase == 30 && system_bios() == 2 && m_stream_words == 128) m_check->adjust(attotime::zero);
+		finish_stream_if_ready();
 	}
 	void dma_output_w(u16 value) { m_dma_sink[0] = value; if (m_phase >= 38 && m_phase <= 50) m_dma_output.push_back(value); }
 	void dma_reg_w(u16 index, u16 value) { m_dma->write(1, index); m_dma->write(3, value); }
@@ -281,6 +314,8 @@ private:
 		m_dma_output.clear(); m_dma_completions = 0;
 		m_rx_dma_completions = m_rx_irqs = 0;
 		m_stream_words = m_stream_config_writes = 0;
+		m_native_din_words = 0;
+		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
 		auto &program = m_cpu->space(AS_PROGRAM);
 		// Synthetic wrapper initializes the routine ABI, then calls untouched code.
@@ -298,6 +333,21 @@ private:
 			auto &codec = *subdevice<tlv320aic23_device>("codec");
 			for (u16 word : { 0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023 }) codec.control_word_w(word);
 			m_codec_edges.clear(); m_codec_frames.clear(); m_codec_clocks = 0;
+			m_codec_din_words.clear();
+			// Codec reset owns idle-low BCLK/FS. Do not override those pins with
+			// the inactive levels used by the independent receive waveform fixture.
+			external_reg_w(0, 0); external_reg_w(2, 0x140); external_reg_w(3, 0x44);
+			external_reg_w(14, 0x0e); external_reg_w(0, 1);
+			external_reg_w(4, 0x140); external_reg_w(5, 0x44); external_reg_w(1, 1);
+			auto &data = m_cpu->space(AS_DATA);
+			data.write_word(0x6000, 0x1357); data.write_word(0x6001, 0x9bdf);
+			data.write_word(0x6400, 0xffff); data.write_word(0x6401, 0xffff);
+			dma_reg_w(0xf, 0x6000); dma_reg_w(0x10, 0x23); dma_reg_w(0x11, 1); dma_reg_w(0x12, 0x2000); dma_reg_w(0x13, 0xc541);
+			dma_reg_w(0x32, 0x6000); dma_reg_w(0x33, 0x23); dma_reg_w(0x34, 1); dma_reg_w(0x35, 0x2000);
+			dma_reg_w(0xa, 0x21); dma_reg_w(0xb, 0x6400); dma_reg_w(0xc, 1); dma_reg_w(0xd, 0x1000); dma_reg_w(0xe, 0xc055);
+			dma_reg_w(0x2e, 0x21); dma_reg_w(0x2f, 0x6400); dma_reg_w(0x30, 1); dma_reg_w(0x31, 0x1000);
+			dma_reg_w(0x20, 1); dma_reg_w(0x22, 0xffff);
+			m_dma->write(0, 0x4c);
 		}
 		if (m_phase == 58 || m_phase == 59)
 		{
@@ -620,14 +670,17 @@ private:
 				if (!m_codec_edges.empty() || codec.reg(7) != 0x53 || codec.reg(8) != 0x23)
 					fatalerror("MU4 codec inactive/control mismatch");
 				codec.control_word_w(0x1201);
-				m_phase = 55; m_check->adjust(attotime::from_usec(100)); return;
+				m_phase = 55; m_check->adjust(attotime::from_usec(92)); return;
 			}
 			if (m_phase == 55)
 			{
-				if (m_codec_clocks != 1200 || m_codec_frames.size() != 5)
+				if (m_codec_clocks != 1104 || m_codec_frames.size() != 5)
 					fatalerror("MU4 codec clock rate mismatch clocks=%u frames=%u", m_codec_clocks, unsigned(m_codec_frames.size()));
 				for (unsigned i = 1; i < m_codec_frames.size(); ++i)
 					if (m_codec_frames[i] - m_codec_frames[i - 1] != 272) fatalerror("MU4 codec frame divider mismatch");
+				if (m_codec_din_words != std::vector<u16>({0x1357,0x9bdf,0x1357,0x9bdf,0x1357,0x9bdf,0x1357,0x9bdf}) ||
+					m_rx_dma_completions != 4 || !machine().scheduler().can_save()) fatalerror("MU4 codec duplex/checkpoint mismatch");
+				m_codec_rx_snapshot_count = m_rx_dma_completions;
 				m_saved_dma.str({}); m_saved_dma.clear();
 				m_codec_snapshot_time = machine().time();
 				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 codec save failed");
@@ -636,20 +689,28 @@ private:
 			if (m_phase == 56)
 			{
 				m_codec_saved_edges = m_codec_edges;
+				m_codec_saved_din.assign(m_codec_din_words.begin() + 8, m_codec_din_words.end());
+				if (m_codec_saved_din != std::vector<u16>({0x1357, 0x9bdf}) || m_rx_dma_completions != m_codec_rx_snapshot_count + 1 ||
+					m_cpu->space(AS_DATA).read_word(0x6400) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x6401) != 0x5678 || !machine().scheduler().can_save())
+					fatalerror("MU4 codec stereo/converted-sample delivery mismatch");
 				m_saved_dma.clear(); m_saved_dma.seekg(0);
 				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 codec restore failed");
 				// Loading inside a timer callback restores scheduler base time, but
 				// adjust() still uses this callback's old timestamp. Target the saved
 				// observation deadline, not ten microseconds after the old callback.
-				m_codec_edges.clear(); m_phase = 57;
+				m_codec_edges.clear(); m_codec_din_words.clear(); m_codec_rx_snapshot_count = m_rx_dma_completions; m_phase = 57;
 				m_check->adjust(m_codec_snapshot_time + attotime::from_usec(10) - machine().time()); return;
 			}
 			if (m_codec_edges != m_codec_saved_edges)
 				fatalerror("MU4 codec pending clock replay mismatch expected=%u actual=%u first=%d/%d", unsigned(m_codec_saved_edges.size()), unsigned(m_codec_edges.size()), m_codec_saved_edges.empty() ? -1 : m_codec_saved_edges.front(), m_codec_edges.empty() ? -1 : m_codec_edges.front());
+			if (m_codec_din_words != m_codec_saved_din || m_rx_dma_completions != m_codec_rx_snapshot_count + 1 ||
+				m_cpu->space(AS_DATA).read_word(0x6400) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x6401) != 0x5678)
+				fatalerror("MU4 codec mid-word duplex replay mismatch");
 			codec.control_word_w(0x1200);
 			codec.control_word_w(0x1e00);
 			if (codec.reg(7) != 1 || codec.reg(9)) fatalerror("MU4 codec reset defaults mismatch");
 			logerror("mu4_codec_clock: PASS inactive=1 controls=1 bclk_mclk=1 frame_divider=272 pending_restore=1 reset=1\n");
+			logerror("mu4_codec_duplex: PASS post_clock_pins=1 din_stereo=1 dout_converted_fixture=1 dma=2,3 mid_word_restore=1\n");
 			m_phase = 58; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 31 && m_phase <= 37)
@@ -1002,10 +1063,19 @@ private:
 				fatalerror("MU4 original program transfer missing entry=%u far=%u pc=%06x", m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)));
 			if (m_serial_tx_words != std::vector<u16>({0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023, 0x1201}))
 				fatalerror("MU4 original serial-setup sequence mismatch");
-			if (system_bios() == 2 && (m_stream_words < 128 || !m_dma_completions))
-				fatalerror("MU4 original streaming block incomplete words=%u completions=%u pc=%06x illegal=%u",
-					m_stream_words, m_dma_completions, unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) fatalerror("MU4 original native stream encountered an illegal instruction");
+			if (system_bios() == 2 && (m_stream_words < 128 || !m_dma_completions || m_native_din_words < 128 || !m_rx_dma_completions))
+				fatalerror("MU4 original streaming block incomplete tx=%u din=%u tx_dma=%u rx_dma=%u pc=%06x illegal=%u",
+					m_stream_words, m_native_din_words, m_dma_completions, m_rx_dma_completions,
+					unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
 			if (system_bios() == 2) logerror("mu4_native_stream: PASS words=%u dma_completions=%u\n", m_stream_words, m_dma_completions);
+			if (system_bios() == 2)
+			{
+				for (unsigned i = 0; i < 64; ++i)
+					if (m_cpu->space(AS_DATA).read_word(0x1980 + i) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x19c0 + i) != 0x5678)
+						fatalerror("MU4 native converted-ADC buffer mismatch at frame %u", i);
+				logerror("mu4_native_receive: PASS converted_fixture=1 frames=64 din_words=%u rx_dma_completions=%u sorted_buffer=1980,19c0\n", m_native_din_words, m_rx_dma_completions);
+			}
 			logerror("mu4_native_entry: PASS original_transfer=1 entry_reads=%u far_reads=%u pc=%06x illegal=%u idle=%u pmst=%04x\n",
 				m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),

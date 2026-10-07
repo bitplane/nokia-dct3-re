@@ -72,10 +72,13 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 	}
 	else if (m_index == 0)
 	{
+		bool const enabled = BIT(m_regs[0], 0);
 		if (BIT(value, 0) && ((value ^ m_regs[0]) & 0xe030) && (m_rx_frame_words || m_rx_shift_full || m_rx_buffer_full))
 			fatalerror("McBSP active receive control reconfiguration is not implemented");
 		m_regs[0] = value & 0xf8f9;
 		if (!BIT(value, 0)) reset_receiver();
+		else if (!enabled)
+			m_rx_frame_seen = m_rx_frame_input != BIT(m_regs[14], 2); // Require a new sampled frame transition after release.
 	}
 	else
 	{

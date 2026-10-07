@@ -17,8 +17,10 @@ The partial McBSP1 transmitter carries six original firmware control words.
 The default acceptance profile stops at serial setup. The separate `stream`
 profile uses those controls to activate a partial AIC23 master-clock source,
 then observes one 128-word McBSP0 TX block and DMA channel-3 completion.
-Original RX, codec conversion and sustained streaming are not validated.
-DMA/McBSP and codec clocks have isolated conformance
+The codec's digital DIN decoder verifies those transmitted words. Explicit
+already-converted stereo fixture samples also complete the original 64-frame
+RX DMA block. Analog codec conversion and sustained streaming are not validated.
+DMA/McBSP and codec digital interfaces have isolated conformance
 and save/replay tests.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
@@ -1024,8 +1026,19 @@ other active master formats fail explicitly. CLKIN halves the codec clock;
 CLKOUT does not divide BCLK. Output-amplifier power-down does not stop serial
 clocks. Registers, clock phase and pending timer state are saved. Isolated tests
 verify inactive silence, control decoding, 11.9952 MHz BCLK, the 272-clock frame
-divider, reset defaults and pending-edge replay. No ADC, DAC sample decoder,
-analog filters or sound output is implemented.
+divider, reset defaults and pending-edge replay. The digital DIN decoder samples
+on rising BCLK; DOUT serializes explicitly supplied, already-converted stereo
+samples. There is no analog ADC/DAC conversion, filtering or sound output.
+An enabled ADC requires an explicit converted-sample callback, not an implicit
+silence source. Related AIC23B figures 2-2 and 3-8 place master frame and DOUT
+changes after falling BCLK: the clock callback therefore precedes those pin
+updates. This preserves receiver sampling of the previous pin values without
+claiming a measured propagation delay or original-part electrical equivalence.
+
+The coupled digital fixture runs codec, McBSP0 and both DMA channels together.
+It checks alternating DIN words, converted-sample DOUT delivery, sorted RX
+destinations and a mid-word snapshot at 92 microseconds. The following ten
+microseconds replay identical clock edges, decoded DIN words and RX completion.
 
 Original McBSP0 configuration is PCR `000e`, XCR1 `0140`, XCR2 `0044`,
 SRGR1 `0f07`, SRGR2 `101f`, SPCR2 `0101`. It selects external clocks,
@@ -1074,6 +1087,9 @@ following sampling edge. An unread DRR does not overwrite the next buffered
 word. DRR1 reads clear RRDY/REVT; debugger peeks do not. RRST cancels pending
 shift/buffer state. RJUST selects zero fill, sign extension or left justification.
 RINT mode zero pulses on receive readiness; REVT is a separate saved level.
+Releasing RRST baselines the frame detector to the current physical pin level;
+an already-active idle level is not a new sampled frame transition. This matters
+for the original active-low receiver attached to the codec's idle-low frame pin.
 
 Pin fixtures verify frame gating, ignored early frames, handoff edges, two-word
 buffering, widths, zero/one/two-bit delays, both clock/frame polarities,
@@ -1091,9 +1107,14 @@ overrun and unexpected-frame recovery, active format changes, internal receive
 clocks and reset-activation timing remain unsupported or unvalidated. Unsupported
 active data formats and overrun/recovery fail explicitly.
 
-The native stream deliberately does not connect an invented codec ADC bitstream.
-Its actual receive block, codec DOUT timing/conversion and full-duplex execution
-remain the next boundary; TX acceptance alone does not promote them.
+The native stream explicitly supplies converted fixture samples `1234/5678`
+through the codec's DOUT pin, not DRR, DMA readiness or firmware-buffer writes.
+Original channel 2 completes 64 stereo frames and stores all 128 words at
+`1980..19bf` and `19c0..19ff`. DIN acceptance compares the first 128 actual
+transmitted words against the codec's decoded channel/value sequence; idle-line
+samples before transmission are excluded from this observation only.
+This verifies finite original RX/TX digital execution with a declared converted
+sample fixture, not analog ADC behavior, sustained duplex, music or speech.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.

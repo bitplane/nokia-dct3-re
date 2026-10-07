@@ -9,7 +9,8 @@
 DEFINE_DEVICE_TYPE(TLV320AIC23, tlv320aic23_device, "tlv320aic23", "TI TLV320AIC23 (partial)")
 
 tlv320aic23_device::tlv320aic23_device(machine_config const &config, char const *tag, device_t *owner, u32 clock)
-	: device_t(config, TLV320AIC23, tag, owner, clock), m_bclk_cb(*this), m_frame_cb(*this)
+	: device_t(config, TLV320AIC23, tag, owner, clock), m_bclk_cb(*this), m_frame_cb(*this),
+	  m_dout_cb(*this), m_converted_adc_cb(*this, 0), m_din_word_cb(*this)
 {
 }
 
@@ -18,6 +19,7 @@ void tlv320aic23_device::device_start()
 	m_timer = timer_alloc(FUNC(tlv320aic23_device::clock_tick), this);
 	save_item(NAME(m_regs)); save_item(NAME(m_cycle)); save_item(NAME(m_bclk));
 	save_item(NAME(m_frame)); save_item(NAME(m_running));
+	save_item(NAME(m_din)); save_item(NAME(m_dout)); save_item(NAME(m_adc_words)); save_item(NAME(m_din_shift));
 }
 
 void tlv320aic23_device::device_reset()
@@ -27,6 +29,8 @@ void tlv320aic23_device::device_reset()
 	m_cycle = 0; m_bclk = false; m_frame = false; m_running = false;
 	m_timer->adjust(attotime::never);
 	m_bclk_cb(0); m_frame_cb(0);
+	m_din = m_dout = false; m_adc_words[0] = m_adc_words[1] = m_din_shift = 0;
+	m_dout_cb(0);
 }
 
 void tlv320aic23_device::control_word_w(u16 value)
@@ -49,6 +53,8 @@ void tlv320aic23_device::update_clock()
 		// divider does not divide BCLK; CLKIN divides the entire codec instead.
 		if ((m_regs[7] & 0x7f) != 0x53 || (m_regs[8] & 0x3f) != 0x23 || !clock())
 			fatalerror("AIC23 unsupported active master format/rate %03x/%03x", m_regs[7], m_regs[8]);
+		if (!BIT(m_regs[6], 2) && m_converted_adc_cb.isunset())
+			fatalerror("AIC23 requires an explicit converted-ADC source; analog conversion is not implemented");
 		if (!m_running)
 		{
 			m_running = true; m_cycle = 0; m_bclk = false; m_frame = false;
@@ -65,14 +71,36 @@ void tlv320aic23_device::update_clock()
 TIMER_CALLBACK_MEMBER(tlv320aic23_device::clock_tick)
 {
 	m_bclk = !m_bclk;
+	if (m_bclk && m_cycle >= 2 && m_cycle <= 33)
+	{
+		// LRP=1 samples DIN on the second rising edge after frame assertion.
+		m_din_shift = (m_din_shift << 1) | m_din;
+		if (m_cycle == 17 || m_cycle == 33)
+		{
+			m_din_word_cb(m_cycle == 17 ? 0 : 1, m_din_shift);
+			m_din_shift = 0;
+		}
+	}
+	// SLWS106H Figure 2-2: FS and DOUT change AFTER falling BCLK. RX must
+	// sample the old pin levels at that edge; TX reacts asynchronously to FS.
+	m_bclk_cb(m_bclk);
 	if (!m_bclk)
 	{
-		// DSP LRP=1: one-bit frame pulse precedes the left MSB. Change FS
-		// before the falling BCLK edge, so DATDLY=0 presents that bit once.
 		bool const frame = m_cycle == 0;
 		if (frame != m_frame) { m_frame = frame; m_frame_cb(frame); }
+		if (m_cycle == 0)
+		{
+			m_din_shift = 0;
+			if (!BIT(m_regs[6], 2))
+				for (unsigned channel = 0; channel < 2; ++channel) m_adc_words[channel] = m_converted_adc_cb(channel);
+		}
+		else if (m_cycle <= 32 && !BIT(m_regs[6], 2))
+		{
+			unsigned const bit = m_cycle - 1;
+			m_dout = BIT(m_adc_words[bit / 16], 15 - (bit & 15));
+			m_dout_cb(m_dout);
+		}
 		m_cycle = (m_cycle + 1) % 272;
 	}
-	m_bclk_cb(m_bclk);
 	m_timer->adjust(attotime::from_hz(clock() * (BIT(m_regs[8], 6) ? 1 : 2)));
 }
