@@ -76,11 +76,29 @@ missing cold-boot entrances; MMI settlement is closed.
 
 The validated NSE-8/NHM-5 frontier includes deterministic menu traversal,
 user-data persistence, authenticated registration, call control and
-bidirectional physical speech. The active model frontier is NSE-3 bootstrap:
-its external firmware and MCU-side protocol are bounded, but executable work
-must wait for the physical DSP completion publication or matching internal
-ROMs. Other application work should begin only when an organic path reaches an
-unresolved hardware or protocol boundary.
+bidirectional physical speech on the declared research-HLE composition.
+This is not evidence of native DSP speech execution.
+
+Remaining native and product frontiers are independent, not a single
+project-wide bootstrap blocker:
+
+- NSE-3's bounded MCU loader still needs a matching internal DSP ROM or an
+  independently observed final completion publication; see
+  [6210 bring-up](6210_bringup.md).
+- NSE-5's ROM4 compatibility instrument executes uploads and delivers DSP
+  replies, but its original stored-data reply fails the MCU's validation.
+  Matching mask/product identity and COBBA inputs remain unresolved; the
+  compatibility instrument is not normal 7110 support. See
+  [7110 bring-up](7110_bringup.md).
+- NPM-5's isolated native MU4 recorder executes its original polled control
+  transaction and returns to the resident loader. The next resident receive
+  stalls at the C54x timer/interrupt pipeline boundary before metadata is
+  delivered. This neither validates metadata saving nor MA4 handset boot;
+  see [5510 bring-up](5510_bringup.md).
+
+Continue software-accessible work at an evidenced unresolved boundary while
+retaining these product and HLE/native distinctions. A missing capture or
+matching ROM for one branch does not prevent progress on another.
 
 ## Evidence coverage
 
