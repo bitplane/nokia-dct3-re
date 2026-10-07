@@ -2237,6 +2237,14 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xfe00) == 0x9800) // STL src, SHFT, Xmem (SPRU172C 4-172)
+	{
+		const u8 x = op >> 4;
+		const unsigned xar = 2 + (x & 3);
+		data_write(m_ar[xar], u16(saturated_store((accumulator(BIT(op, 8)) << (op & 15)) & ACC_MASK)));
+		dual_modify(x);
+		return;
+	}
 	if ((op & 0xfc00) == 0x9000) // ADD/SUB Xmem, SHFT, A/B
 	{
 		const u8 x = op >> 4;
@@ -2489,6 +2497,8 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xfa20: // BCD pmad, NTC
 	case 0xfa30: // BCD pmad, TC
 	case 0xfa4d: // BCD pmad, BEQ
+	case 0xfa4c: // BCD pmad, BNEQ
+	case 0xfa4a: // BCD pmad, BGEQ
 	case 0xfa4f: // BCD pmad, BLEQ
 	{
 		const u16 destination = fetch();
@@ -2497,6 +2507,8 @@ void tms320c54x_device::execute_one(u16 op)
 				op == 0xfa43 ? (s64(m_a << 24) >> 24) < 0 :
 				op == 0xfa47 ? (s64(m_a << 24) >> 24) <= 0 :
 				op == 0xfa4d ? (m_b & ACC_MASK) == 0 :
+				op == 0xfa4c ? (m_b & ACC_MASK) != 0 :
+				op == 0xfa4a ? (s64(m_b << 24) >> 24) >= 0 :
 				op == 0xfa4f ? (s64(m_b << 24) >> 24) <= 0 :
 				op == 0xfa30 ? bool(m_st0 & 0x1000) : !(m_st0 & 0x1000);
 		m_icount -= 2;

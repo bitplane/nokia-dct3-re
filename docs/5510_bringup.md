@@ -49,7 +49,7 @@ executes its uploaded `ff80` reset-vector prelude, original context
 initializer, directory-selected resident loader and resident startup.
 The `bootstatus` variant completes the same pin-level status transaction
 after this full startup; `bootreplay` verifies its mid-byte save-state
-continuation across all 1,039 registered emulation-state items. The
+continuation across all 1,040 registered emulation-state items. The
 `bootmeasure` variant verifies the original sample-energy and tone-buffer
 arithmetic after the same complete startup. The `bootreset` variant repeats original startup
 after a mid-byte soft reset and completes that transaction again without
@@ -62,10 +62,12 @@ claimed. Routine streaming profiles compare the initial 1,024 DIN words;
 `bootmeasure` continuously compares transmitter words with codec DIN
 throughout its complete observation window, including nonzero output.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
-The separate `bootrecord` probe reaches the original `RERSI16.BIN` loader
-through a pin-level command after complete startup. Its endpoint does not
-produce a recorded track or completion response; unexpected NAND-port
-writes remain to explain. This is dispatch evidence, not recording acceptance.
+The separate `bootrecord` negative control reaches the original `RERSI16.BIN`
+loader but executes stale resident vectors because program/data RAM are separate.
+The provisional `bootrecordram` profile shares RAM at `2000..7fff`, verifies
+the overlay destinations, executes its original startup and begins NAND
+programming. It currently fails at an unsupported C54x instruction, not a
+verified recording endpoint. Neither profile proves a recorded track.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
 identifies separate MA4 and MU4 assemblies, including UI-module keypad,
@@ -1945,26 +1947,59 @@ The separate `bootrecord` probe sends pin-level packet
 It enters `02:9e90` with state 2/capacity `0f36`/mode 3, reaches
 `02:9fa8` in state 8, and invokes the original loader with descriptor
 index one naming `RERSI16 .BIN`, length `0002:aca2` (175,266 bytes).
-The common uploaded runtime entry is observed twice, for initial resident
-startup and the subsequently selected overlay. No firmware state is written
-by the command peer.
+The resident runtime entry is observed twice. The second entry is stale code,
+not the selected overlay's startup: `aa88` writes its vector table through
+data space at `2000`, branching to `0073f8`, while the separate program view
+still branches to resident `02:6d62`. No firmware state is written by the
+command peer.
 
 The bounded 20-second endpoint remains state 8/mode 3/continuation 8,
 with zero tracks, nine received bytes and only the three-byte request
 acknowledgement transmitted. Ten data writes of byte `01` reach the NAND
 port after command byte `01`; the controller reports them as unexpected.
-This is an unresolved boundary, not evidence for a new NAND opcode or a
-recorded file. The dispatch gate proves command/loader reachability only;
-it explicitly reports `music_recording=0`. Next verify the newly loaded
-overlay's destinations and recover its startup/storage call arguments before
-changing controller behavior. Do not repair the observed command sequence
-by injecting file contexts, lifecycle state or a guessed media header.
+These writes follow stale-vector execution and are not evidence for a new
+NAND opcode or a recorded file. The negative-control dispatch gate proves
+command/loader reachability only; it explicitly reports `music_recording=0`.
+All 73,762 non-register overlay destination words match the original image
+before execution (4,622 records, 73,766 total words; four MMR writes excluded).
+
+`bootrecordram` tests static physical program/data sharing at `2000..7fff`.
+The DA150's exact shared-RAM extent is unvalidated: this is a separate
+diagnostic profile, not a promoted board configuration. PMST.OVLY's CPU
+extended-page folding is distinct from physical RAM sharing; making this
+alias conditional on OVLY breaks the original AA55 copy sequence when it
+temporarily clears OVLY.
+
+With the provisional map, the original recorder startup at `0073f8` executes.
+It reads DRR without RRDY at `03:8edb`; the bench now forwards this to the
+existing McBSP latched-register behavior and counts empty reads separately,
+rather than asserting that every DRR read consumes a fresh character.
+Native replies have class/selector pairs `1/5e` (11 words, token `80`) and
+`0/02` (16 words, token `01`), with independently checked framing and XOR
+checksums. The external peer acknowledges both through serial pins.
+At about 6.596 seconds, original code `02:891d` writes `REL_001 ` directory
+bytes after NAND program command `80`, replacing the negative control's
+invalid command sequence. This is initial storage activity, not a complete
+recorded file or accepted media.
+
+The current 20-second probe fails on unsupported opcode `fa46` at `03:dff0`.
+Earlier reached instructions `9808` (`STL A,8,*AR2`), `fa4c` (`BCD BNEQ`)
+and `fa4a` (`BCD BGEQ`) are implemented, with 512 compact-store variants and
+five delayed-predicate tests in `check-c54x-core`. The store encoding and
+shift contract are documented in [TI SPRU172C](https://e2e.ti.com/cfs-file/__key/communityserver-discussions-components-files/81/6136.spru172c.pdf),
+pages 4-172--174; GNU tic54x disassembly independently identifies the original
+instruction stream. Next complete the instruction boundary, then verify
+recording/storage completion and the resulting media before claiming playback.
+Do not inject file contexts, lifecycle state or a guessed media header.
 
 Reproduce with `make check-mu4-bootstrap-original
 MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootrecord`.
 This runs in an isolated NAND copy, forbids NVRAM saving and verifies that
 the source disk file remains unchanged. `bootstatus` supplies the independent
 complete-startup lifecycle observation.
+Use `MU4_BOOTSTRAP_BIOS=bootrecordram` for the provisional shared-RAM probe;
+it currently returns failure because native execution stops on
+the unsupported opcode. It is not a passing recording acceptance gate.
 
 Reproduce the command-table extraction with
 `tools/noki5510_a00_inventory.py --segment aa22 --extract-program-range
@@ -1985,7 +2020,7 @@ prefix completes, then checkpoints after three data bits of the first request
 byte. Both original-firmware continuations reach the same worker-window
 endpoint, consume the 11-byte request/acknowledgement stream, transmit the
 same 14 response bytes and drain the firmware queues without retry. The
-uncompressed terminal save streams match across all 1,039 registered
+uncompressed terminal save streams match across all registered
 emulation-state items: CPU, RAM, NAND, codec, DMA, McBSP, external peer and
 emulation timers. The only exclusions are nine fields of
 `timer/lua_engine::resume/`: MAME's Lua post-load callback deliberately resets
@@ -2000,7 +2035,7 @@ processing commands, physical board attachment or full MU4 boot.
 same settled mid-byte checkpoint and terminal-state comparison after
 the complete original uploaded startup, using retained NAND supplied by
 `MU4_BOOTSTRAP_SOURCE_RUN`. Both continuations satisfy the unchanged
-status and pin-receive checks, and all 1,039 registered emulation-state
+status and pin-receive checks, and all 1,040 registered emulation-state
 items match, with the same nine Lua frontend-timer exclusions. Original
 startup/resident entry counts remain one: restoration resumes the DSP,
 not the upload or reset sequence. Read/stream observation counters are

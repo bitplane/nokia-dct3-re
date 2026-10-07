@@ -12,6 +12,7 @@
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <map>
 
 namespace {
 class mu4_storage_test_state : public driver_device
@@ -172,6 +173,8 @@ private:
 	unsigned m_command_tx_irqs = 0, m_command_wire_bits = 0;
 	unsigned m_recorder_response_begin = 3, m_recorder_responses = 0;
 	unsigned m_recorder_dispatches = 0, m_recorder_loader_calls = 0;
+	bool m_recorder_overlay_checked = false;
+	unsigned m_recorder_startup_entries = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
 	u8 m_recorder_last_nand_command = 0;
 	unsigned m_command_ack_cursor = 0, m_command_wire_bit_count = 0;
@@ -407,6 +410,7 @@ private:
 	u16 m_serial_index[2] = {}, m_serial_regs[2][32] = {}, m_serial_word = 0;
 	bool m_serial_ready = false;
 	unsigned m_serial_reads = 0;
+	unsigned m_serial_empty_reads = 0;
 	u8 m_direction = 0, m_gpio = 0;
 	bool m_ready = true;
 	unsigned m_bio_reads = 0, m_busy_reads = 0, m_data_reads = 0;
@@ -461,8 +465,11 @@ private:
 		{
 			if (!machine().side_effects_disabled())
 			{
-				if (!m_command_rx_ready) fatalerror("MU4 native DRR read before RRDY");
-				++m_serial_reads;
+				if (m_command_rx_ready)
+					++m_serial_reads;
+				else if (m_serial_empty_reads++ < 16)
+					// DRR retains its latched value without RRDY; startup may read it to flush.
+					logerror("mu4_native_empty_drr: pc=%06x count=%u\n", unsigned(m_cpu->pc()), m_serial_empty_reads);
 			}
 			return m_mcbsp2->data_r(1);
 		}
@@ -515,12 +522,16 @@ private:
 			u8 checksum = 0;
 			for (unsigned i = begin; i < end - 2; ++i) checksum ^= m_command_tx_words[i];
 			if (m_command_tx_words[begin] != 0x1e || m_command_tx_words[begin + 2] != 0xaa ||
-				m_command_tx_words[begin + 3] != 1 || m_command_tx_words[end - 2] != checksum || m_command_tx_words[end - 1] != 0x55)
+				m_command_tx_words[begin + 3] > 1 || m_command_tx_words[end - 2] != checksum || m_command_tx_words[end - 1] != 0x55)
+			{
+				for (unsigned i = begin; i < end; ++i)
+					logerror("mu4_native_recorder_invalid_response: index=%u value=%04x\n", i - begin, m_command_tx_words[i]);
 				fatalerror("MU4 recorder response framing/checksum mismatch");
+			}
 			if (m_command_ack_pending && m_command_ack_cursor != 3)
 				fatalerror("MU4 recorder response overlaps an unfinished peer acknowledgement");
-			logerror("mu4_native_recorder_response: index=%u selector=%02x words=%u token=%02x\n",
-				m_recorder_responses++, m_command_tx_words[begin + 4], end - begin, m_command_tx_words[end - 3]);
+			logerror("mu4_native_recorder_response: index=%u selector=%02x words=%u token=%02x class=%u\n",
+				m_recorder_responses++, m_command_tx_words[begin + 4], end - begin, m_command_tx_words[end - 3], m_command_tx_words[begin + 3]);
 			for (unsigned i = begin; i < end; ++i)
 				logerror("mu4_native_recorder_response_word: index=%u value=%04x\n", i - begin, m_command_tx_words[i]);
 			m_recorder_response_begin = end;
@@ -835,8 +846,65 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 21; }
-	bool recorder_profile() const { return system_bios() == 21; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 22; }
+	bool recorder_profile() const { return system_bios() == 21 || shared_daram_profile(); }
+	bool shared_daram_profile() const { return system_bios() == 22; }
+	u16 shared_daram_r(offs_t offset)
+	{
+		return m_cpu->space(AS_DATA).read_word(0x2000 + offset);
+	}
+	void shared_daram_w(offs_t offset, u16 value)
+	{
+		m_cpu->space(AS_DATA).write_word(0x2000 + offset, value);
+	}
+	void verify_recorder_overlay()
+	{
+		auto const disable = machine().disable_side_effects();
+		auto word = [this](unsigned offset) -> u16
+		{
+			if (offset + 1 >= m_segment.length()) fatalerror("MU4 recorder source bounds");
+			return (u16(m_segment[offset]) << 8) | m_segment[offset + 1];
+		};
+		unsigned segment = 0;
+		while (word(segment) != 0xaa88)
+			segment += 10 + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
+		unsigned cursor = segment + 6, records = 0, total = 0, registers = 0;
+		unsigned const end = cursor + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
+		std::map<std::pair<bool, offs_t>, u16> expected;
+		while (word(cursor))
+		{
+			unsigned const count = word(cursor);
+			u32 const destination = (u32(word(cursor + 2)) << 16) | word(cursor + 4);
+			cursor += 6;
+			if (cursor + count * 2 > end) fatalerror("MU4 recorder section bounds");
+			bool const program = destination > 0xffff;
+			// Original loader 2f00..2f0e / 2f60..2f70: the common window aliases page zero.
+			u32 const address = (destination & 0x8000) ? destination : destination & 0xffff;
+			for (unsigned i = 0; i < count; ++i)
+			{
+				offs_t const target = (program ? address & 0x7f0000 : 0) | u16(address + i);
+				// Peripheral registers may change while later DMA records are loading.
+				if (!program && target < 0x80) { ++registers; continue; }
+				bool const shared = shared_daram_profile() && program && target >= 0x2000 && target < 0x8000;
+				expected[{program && !shared, target}] = word(cursor + i * 2);
+			}
+			cursor += count * 2;
+			total += count;
+			++records;
+		}
+		if (cursor + 2 != end || total != 73766) fatalerror("MU4 recorder loader coverage mismatch");
+		for (auto const &[location, value] : expected)
+		{
+			auto const &[program, address] = location;
+			u16 const actual = m_cpu->space(program ? AS_PROGRAM : AS_DATA).read_word(address);
+			if (actual != value)
+				fatalerror("MU4 recorder DMA destination mismatch space=%s address=%06x actual=%04x expected=%04x",
+					program ? "program" : "data", unsigned(address), actual, value);
+		}
+		m_recorder_overlay_checked = true;
+		logerror("mu4_native_recorder_overlay: PASS marker=aa88 records=%u words=%u checked_ram_words=%u excluded_register_words=%u before_execution=1\n",
+			records, total, unsigned(expected.size()), registers);
+	}
 	bool measurement_profile() const { return system_bios() == 13 || system_bios() == 20; }
 	void verify_native_status()
 	{
@@ -929,9 +997,34 @@ private:
 		{
 			m_phase = 74;
 			m_cpu->space(AS_PROGRAM).install_ram(0, 0xffff, &m_program_ram[0]);
+			if (shared_daram_profile())
+			{
+				// Firmware-derived executable data vectors/startup, not a verified DA150 RAM extent.
+				m_cpu->space(AS_PROGRAM).install_readwrite_handler(0x2000, 0x7fff,
+					read16sm_delegate(*this, FUNC(mu4_storage_test_state::shared_daram_r)),
+					write16sm_delegate(*this, FUNC(mu4_storage_test_state::shared_daram_w)));
+				logerror("mu4_shared_daram_probe: first=2000 last=7fff program_data_shared=1 physical_extent=unvalidated\n");
+			}
 			if (measurement_profile()) install_measurement_observers();
 			if (recorder_profile())
 			{
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x73f8, 0x73f8, "mu4_recorder_startup",
+					[this](offs_t address, u16 &, u16)
+					{
+						if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1 && m_recorder_loader_calls)
+						{
+							++m_recorder_startup_entries;
+							logerror("mu4_native_recorder_startup: pc=%06x pmst=%04x\n",
+								unsigned(m_cpu->pc()), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+						}
+					});
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x2000, "mu4_recorder_overlay_entry",
+					[this](offs_t address, u16 &, u16)
+					{
+						if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1 &&
+							m_recorder_loader_calls && !m_recorder_overlay_checked)
+							verify_recorder_overlay();
+					});
 				m_cpu->space(AS_PROGRAM).install_read_tap(0x29e90, 0x29fa8, "mu4_recorder_loader",
 					[this](offs_t address, u16 &, u16)
 					{
@@ -1000,12 +1093,15 @@ private:
 			save_item(NAME(m_direction)); save_item(NAME(m_gpio)); save_item(NAME(m_ready));
 			save_item(NAME(m_serial_index)); save_item(NAME(m_serial_regs));
 			save_item(NAME(m_serial_word)); save_item(NAME(m_serial_ready)); save_item(NAME(m_serial_reads));
+			save_item(NAME(m_serial_empty_reads));
 			save_item(NAME(m_native_command_cursor)); save_item(NAME(m_native_command_waits));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
 			if (recorder_profile())
 			{
 				save_item(NAME(m_recorder_response_begin)); save_item(NAME(m_recorder_responses));
 				save_item(NAME(m_recorder_dispatches)); save_item(NAME(m_recorder_loader_calls));
+				save_item(NAME(m_recorder_overlay_checked));
+				save_item(NAME(m_recorder_startup_entries));
 				save_item(NAME(m_recorder_nand_controls)); save_item(NAME(m_recorder_nand_data));
 				save_item(NAME(m_recorder_last_nand_command));
 			}
@@ -1163,6 +1259,9 @@ private:
 		m_command_tx_register = m_command_tx_irqs = m_command_wire_bits = 0;
 		m_recorder_response_begin = 3; m_recorder_responses = 0;
 		m_recorder_dispatches = m_recorder_loader_calls = 0;
+		m_recorder_overlay_checked = false;
+		m_recorder_startup_entries = 0;
+		m_serial_empty_reads = 0;
 		m_recorder_nand_controls = m_recorder_nand_data = 0;
 		m_recorder_last_nand_command = 0;
 		m_command_wire_clock = false; m_command_tx_words.clear();
@@ -1496,6 +1595,9 @@ private:
 					unsigned(m_command_tx_words.size()), m_command_ack_pending && m_command_ack_cursor != 3);
 				if (m_native_command_cursor != 9 || m_recorder_dispatches != 1 || m_recorder_loader_calls != 1)
 					fatalerror("MU4 original recorder command did not reach the native overlay loader");
+				if (!m_recorder_overlay_checked) fatalerror("MU4 recorder overlay destinations were not verified");
+				if (shared_daram_profile() && m_recorder_startup_entries != 1)
+					fatalerror("MU4 shared RAM probe did not execute the original recorder startup");
 				logerror("mu4_native_recorder_dispatch: PASS pin_input=1 original_loader=1 firmware_state_forcing=0 music_recording=0\n");
 			}
 			else if (measurement_profile()) verify_native_measurement();
@@ -2944,6 +3046,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(18, "bootreplay", "Original uploaded startup with mid-byte save-state replay")
 	ROM_SYSTEM_BIOS(19, "bootmeasure", "Original uploaded startup with pin-level sample measurement")
 	ROM_SYSTEM_BIOS(20, "bootrecord", "Original uploaded startup with pin-level recorder command probe")
+	ROM_SYSTEM_BIOS(21, "bootrecordram", "Original recorder with provisional shared data/program RAM")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

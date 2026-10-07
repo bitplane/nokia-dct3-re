@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_recorder_separate_ram_executes_selected_overlay",
+      "status": "disproven",
+      "hypothesis": "Separate program/data RAM allows the original aa88 recorder overlay to execute its selected startup, making the later NAND command-01 writes a recorder controller contract",
+      "conclusion": "All 73762 non-register overlay destination words match the original before entry, but aa88 writes its reset vector and 0073f8 startup through data space; separate program RAM retains the resident vector to 02:6d62. A separate provisional static shared-RAM profile at 2000..7fff executes the genuine recorder startup, emits two checksum-valid native responses and begins NAND program-command-80 writes of REL_001 directory bytes. Exact DA150 shared-RAM extent remains unvalidated and the probe stops at an unsupported CPU opcode; this is not completed recording or a promoted handset map.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp"]
+    },
+    {
       "id": "mu4_selector3a_param1_unconditional_reload",
       "status": "disproven",
       "hypothesis": "Resident MU4 selector 3a with parameter 01 unconditionally remounts and reloads the native program",

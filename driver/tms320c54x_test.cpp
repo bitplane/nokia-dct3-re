@@ -28,6 +28,40 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_b_delayed_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109d0, index < 2 ? 0xfa4c : 0xfa4a); program.write_word(0x0109d1, 0x09e0);
+		program.write_word(0x0109d2, 0xe900); // Change B after the condition is captured.
+		program.write_word(0x0109d3, 0xe801);
+		program.write_word(0x0109d4, 0xf4e1);
+		program.write_word(0x0109e0, 0xe802); program.write_word(0x0109e1, 0xf4e1);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, index == 1 || index == 3 ? 0xffffffffffULL : index == 4 ? 1 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 3277 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+	void start_compact_store_case(unsigned index)
+	{
+		unsigned const operand = (index >> 4) & 15;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109d0, 0x9800 | index);
+		program.write_word(0x0109d1, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0507, 0xbeef);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff87654321ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2 + (operand & 3), 0x0507);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 2765 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_software_interrupt_case(unsigned index)
 	{
 		unsigned const vector = index & 31;
@@ -14953,6 +14987,42 @@ private:
 				"INTR selects IPTR:K, ignores masks, saves next PC, sets INTM, clears only selected IFR and costs three cycles");
 			if (index < 63) { start_software_interrupt_case(index + 1); return; }
 			osd_printf_info("TMS320C54x software interrupt conformance: PASS variants=64\n");
+			start_compact_store_case(0);
+			return;
+		}
+		if (m_phase >= 2765 && m_phase < 3277)
+		{
+			unsigned const index = m_phase - 2765;
+			unsigned const operand = (index >> 4) & 15;
+			u64 const value = index & 256 ? 0xff87654321ULL : 0x12345678;
+			int const increments[] = {0, -1, 1, -5};
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				data.read_word(0x0507) == u16(value << (index & 15)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2 + (operand & 3)) == 0x0507 + increments[operand >> 2] &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0900,
+				"SPRU172C STL SHFT Xmem preserves accumulators/status and uses compact AR2-5 addressing");
+			if (index < 511) { start_compact_store_case(index + 1); return; }
+			osd_printf_info("TMS320C54x compact store conformance: PASS variants=512\n");
+			start_b_delayed_case(0);
+			return;
+		}
+		if (m_phase >= 3277 && m_phase < 3282)
+		{
+			unsigned const index = m_phase - 3277;
+			bool const taken = index == 1 || index == 2 || index == 4;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (taken ? 2 : 1) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x09e2 : 0x09d5) &&
+				m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1,
+				"BCD BNEQ/BGEQ captures the full accumulator condition before both delay words");
+			if (index < 4) { start_b_delayed_case(index + 1); return; }
+			osd_printf_info("TMS320C54x delayed B predicates conformance: PASS variants=5\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
