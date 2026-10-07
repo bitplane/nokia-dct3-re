@@ -37,6 +37,9 @@ verifies six stereo sample-energy blocks against independent arithmetic from
 the live input reads, followed by an acknowledged response and mode-zero
 cleanup. The same profile independently verifies generated tone buffers,
 including phase wraparound; analog audio and music decoding remain unvalidated.
+The `reset` diagnostic verifies mid-byte controller reset and retained-file
+reload, but the resident command service does not resume in its bounded
+window. It is not a successful reboot acceptance profile.
 The open boundary is native reset lifecycle and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
@@ -1686,8 +1689,30 @@ block at `02:c99e` and returns `-5` on mismatch. A native initialization
 gate must cover that comparison and final caller result, not merely the
 nonzero returns from local helpers; later stream decoding remains separate.
 
+The `reset` bench profile interrupts the first resident request after three
+data bits, before any RX interrupt or transmitted response. MAME soft reset
+clears McBSP2 control state. NAND is retained: unchanged firmware mount,
+directory and read routines verify all six original upload payloads again,
+then the original loader transfers the resident program. Enumeration also
+observes firmware-created `TRACKLST.BIN` (1,800 bytes) and
+`SETTING1/2/3.BIN` (56 bytes each); these are preserved, not replaced by
+fixture data. Reproduce with
+`make check-mu4-storage-original MU4_STORAGE_BIOS=reset`.
+
+This diagnostic does **not** establish successful restart. During the new
+20-second worker window, the resident command dispatcher is unobserved and
+no request bytes or response bytes complete. The gate checks that bounded
+frontier separately from storage/controller reset; it does not apply the
+erased-media boot's sustained-interrupt expectation to retained settings.
+Recover the firmware-owned initialization needed after retained-media reload
+before claiming control-loop or streaming equivalence. The ABI bench restart
+does not establish physical board reset wiring or reset-ROM behavior.
+Separate reset/runtime-memory effects from the now-present settings by testing
+a fresh process against an independently retained, firmware-created medium;
+this combined reset/reload observation does not identify which causes the stall.
+
 Next recover the accepted media container and storage layout before attempting
-native playback, and verify transport reset and board attachment separately.
+native playback, and finish reset lifecycle and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
 a mode.
 

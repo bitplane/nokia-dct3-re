@@ -160,6 +160,9 @@ private:
 	unsigned m_command_rx_phase = 0, m_command_rx_irqs = 0;
 	// The replay controller/reference deliberately survive restoration of the DUT.
 	unsigned m_native_replay_leg = 0;
+	// Test supervisor, not DUT state: survives the requested machine reset.
+	unsigned m_native_reset_leg = 0;
+	unsigned m_native_reset_settings_mask = 0;
 	std::stringstream m_native_checkpoint, m_native_reference;
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
@@ -528,12 +531,30 @@ private:
 		if (system_bios() == 12 && !m_native_replay_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
 			// Let synchronized input events settle without advancing to the next bit.
 			m_native_replay->adjust(attotime::from_nsec(1));
+		if (system_bios() == 14 && !m_native_reset_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
+			m_native_replay->adjust(attotime::from_nsec(1));
 		// One delay cycle, eight data cycles, then RBR-to-DRR publication.
 		if (m_command_rx_phase == 10 && m_command_rx_clock) m_command_rx_busy = false;
 		else m_command_receive_clock->adjust(attotime::from_usec(5));
 	}
 	TIMER_CALLBACK_MEMBER(native_replay_checkpoint)
 	{
+		if (system_bios() == 14)
+		{
+			if (m_phase != 30 || m_native_reset_leg || !m_command_rx_busy || m_command_rx_phase != 4 || m_command_rx_clock ||
+				m_command_rx_irqs || !m_command_tx_words.empty() || !machine().scheduler().can_save())
+				fatalerror("MU4 reset fixture is not at the settled first-byte boundary");
+			m_native_replay->adjust(attotime::never);
+			m_native_reset_leg = 1;
+			// Retain the uploaded NAND medium; the erased-input prelude is not
+			// a reboot path. Re-enter original mount/read/load routine ABIs.
+			m_files_checked = 0;
+			m_verified_files.clear();
+			m_phase = 19;
+			logerror("mu4_native_reset_request: mid_rx_byte=1 data_bits=3 rx_irqs=0 tx_words=0\n");
+			machine().schedule_soft_reset();
+			return;
+		}
 		if (m_native_replay_leg == 2)
 		{
 			if (!machine().scheduler().can_save()) fatalerror("MU4 native restore has pending synchronized inputs");
@@ -600,7 +621,7 @@ private:
 	}
 	bool finish_native_replay()
 	{
-		if (system_bios() < 12) return false;
+		if (system_bios() != 12) return false;
 		if (!machine().scheduler().can_save() || !m_native_replay_leg)
 			fatalerror("MU4 native replay has no restorable checkpoint");
 		if (m_native_replay_leg == 1)
@@ -762,6 +783,13 @@ private:
 	}
 	virtual void machine_reset() override
 	{
+		if (system_bios() == 14 && m_native_reset_leg == 1 && m_phase == 19)
+		{
+			if (m_mcbsp2->control_r(1) || m_mcbsp2->control_r(0))
+				fatalerror("MU4 serial controller retained control state across reset");
+			m_native_reset_leg = 2;
+			logerror("mu4_native_reset_controller: control_cleared=1 loader_restart=1\n");
+		}
 		m_direction = m_gpio = 0;
 		m_ready = true;
 		m_bio_reads = m_busy_reads = m_data_reads = 0;
@@ -1995,7 +2023,7 @@ private:
 					if (m_cpu->space(AS_DATA).read_word(0x1980 + i) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x19c0 + i) != 0x5678)
 						fatalerror("MU4 native converted-ADC buffer mismatch at frame %u", i);
 				logerror("mu4_native_receive: PASS converted_fixture=1 frames=64 din_words=%u rx_dma_completions=%u sorted_buffer=1980,19c0\n", m_native_din_words, m_rx_dma_completions);
-				if (system_bios() >= 3)
+				if (system_bios() >= 3 && system_bios() != 14)
 				{
 					if (m_native_dma_tx_vectors < 7 || m_native_dma_tx_handler < 7)
 						fatalerror("MU4 original TX interrupt delivery incomplete vectors=%u handler=%u",
@@ -2094,7 +2122,7 @@ private:
 						fatalerror("MU4 unacknowledged status response did not reproduce three complete wire copies");
 					logerror("mu4_native_status_noack: PASS tx_words=36 pin_decode=1 response_copies=3 peer_ack=0 processing=0\n");
 				}
-				if (system_bios() >= 10 && system_bios() != 13)
+				if (system_bios() >= 10 && system_bios() != 13 && system_bios() != 14)
 				{
 					auto const disable = machine().disable_side_effects();
 					auto &data = m_cpu->space(AS_DATA);
@@ -2131,6 +2159,15 @@ private:
 					m_tone_blocks, m_tone_blocks * 128, m_tone_phase_wraps);
 			}
 			else if (finish_native_replay()) return;
+			if (system_bios() == 14)
+			{
+				if (m_native_reset_leg != 2 || m_native_reset_settings_mask != 15)
+					fatalerror("MU4 native reset fixture missed its reset or firmware-created settings file");
+				logerror("mu4_native_reset_storage: PASS mid_rx_byte=1 controller_cleared=1 retained_payloads=6 settings_mask=f original_reload=1\n");
+				if (m_native_command_cursor || m_command_rx_irqs || !m_command_tx_words.empty() || m_native_command_paths[5])
+					fatalerror("MU4 reset frontier changed; re-evaluate the native control-loop restart contract");
+				logerror("mu4_native_reset_frontier: control_restart=0 dispatcher=0 rx_words=0 tx_words=0 tail_ms=%u stream_equivalence=0 board_reset=0 music_decode=0\n", native_worker_tail_ms());
+			}
 			machine().schedule_exit();
 			return;
 		}
@@ -2365,6 +2402,28 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200)
 				fatalerror("MU4 original directory reader failed pc=%04x", unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
 			m_file_size = (unsigned(data.read_word(0x36c2)) << 16) | data.read_word(0x36c3);
+			if (system_bios() == 14 && m_native_reset_leg == 2 && (m_file_size == 1800 || m_file_size == 56))
+			{
+				// Original startup creates these settings files. Preserve them and enumerate
+				// onward through the unchanged next-entry ABI, not a fabricated list.
+				static constexpr char const *settings[] = { "TRACKLST", "SETTING1", "SETTING2", "SETTING3" };
+				unsigned match = std::size(settings);
+				for (unsigned entry = 0; entry < std::size(settings); ++entry)
+				{
+					bool equal = true;
+					for (unsigned i = 0; i < 9; ++i) equal &= data.read_word(0x36b0 + i) == u8(settings[entry][i]);
+					if (equal) match = entry;
+				}
+				if (match == std::size(settings) || m_file_size != (match ? 56 : 1800))
+					fatalerror("MU4 reset encountered an unknown non-upload file");
+				if (data.read_word(0x36b9) != 'B' || data.read_word(0x36ba) != 'I' || data.read_word(0x36bb) != 'N' ||
+					BIT(m_native_reset_settings_mask, match)) fatalerror("MU4 reset settings entry is invalid or duplicated");
+				m_native_reset_settings_mask |= 1U << match;
+				logerror("mu4_native_reset_settings: name=%s.BIN bytes=%u retained=1\n", settings[match], m_file_size);
+				m_phase = 23;
+				machine().schedule_soft_reset();
+				return;
+			}
 			m_file_source = 0;
 			for (unsigned offset = 0; offset < m_segment.length(); )
 			{
@@ -2501,6 +2560,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(10, "pins", "Original status transaction with McBSP2 RX and TX pins")
 	ROM_SYSTEM_BIOS(11, "replay", "Original pin-level status transaction with mid-byte replay")
 	ROM_SYSTEM_BIOS(12, "measure", "Original pin-level sample measurement observation")
+	ROM_SYSTEM_BIOS(13, "reset", "Original mid-byte bench reset observation (incomplete)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
