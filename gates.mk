@@ -2271,7 +2271,7 @@ verify-3330-radio-outgoing-call-host-termination: normalize-3330
 		$(VENV)/bin/python tools/run_host_call_adapter_gate.py \
 			--port $(HOST_CALL_3330_PORT) --cwd . \
 			--decision connect --terminate -- \
-			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3330 -bios 450e -rompath roms -log \
+			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR)_call -- noki3330 -bios 450e -rompath roms -log \
 			-video none -sound none -keyboardprovider none \
 			-mouseprovider none -lightgunprovider none -joystickprovider none \
 			-midiprovider none -skip_gameinfo -nothrottle \

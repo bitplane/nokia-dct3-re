@@ -7620,7 +7620,7 @@
         "\t\t$(VENV)/bin/python tools/run_host_call_adapter_gate.py \\",
         "\t\t\t--port $(HOST_CALL_3330_PORT) --cwd . \\",
         "\t\t\t--decision connect --terminate -- \\",
-        "\t\t\t$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3330 -bios 450e -rompath roms -log \\",
+        "\t\t\t$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR)_call -- noki3330 -bios 450e -rompath roms -log \\",
         "\t\t\t-video none -sound none -keyboardprovider none \\",
         "\t\t\t-mouseprovider none -lightgunprovider none -joystickprovider none \\",
         "\t\t\t-midiprovider none -skip_gameinfo -nothrottle \\",

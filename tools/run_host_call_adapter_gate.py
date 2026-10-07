@@ -7,6 +7,17 @@ import json
 
 import websockets
 
+
+def verify_initial_request(event, number):
+    expected = {
+        "type": "outgoing_call", "request_id": 1,
+        "epoch": event.get("epoch"), "digits": number,
+        "decision_pending": True,
+    }
+    if event != expected:
+        raise RuntimeError(f"unexpected outgoing request {event!r}, expected {expected!r}")
+
+
 async def connect(port: int, process: asyncio.subprocess.Process):
     for _ in range(300):
         if process.returncode is not None:
@@ -66,16 +77,7 @@ async def run(args: argparse.Namespace) -> None:
                 if event.get("type") == "outgoing_call":
                     break
                 raise RuntimeError(f"unexpected pre-call event {event!r}")
-            expected = {
-                "type": "outgoing_call",
-                "request_id": 1,
-                "epoch": event.get("epoch"),
-                "digits": args.number,
-            }
-            if event != expected:
-                raise RuntimeError(
-                    f"unexpected outgoing request {event!r}, expected {expected!r}"
-                )
+            verify_initial_request(event, args.number)
             epoch = event["epoch"]
             if ready_epoch is not None and epoch != ready_epoch:
                 raise RuntimeError("outgoing call used a stale transport epoch")
