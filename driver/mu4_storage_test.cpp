@@ -738,6 +738,13 @@ private:
 	}
 	virtual void machine_start() override
 	{
+		if (system_bios() == 15)
+		{
+			// Fresh-process routine bench: mount externally retained NAND, never
+			// run the erased-media formatter or inject a resident state snapshot.
+			m_phase = 19;
+			logerror("mu4_native_retained_start: fresh_process=1 original_mount=1 erase=0 runtime_snapshot=0\n");
+		}
 		m_check = timer_alloc(FUNC(mu4_storage_test_state::check), this);
 		m_command = timer_alloc(FUNC(mu4_storage_test_state::command_input), this);
 		m_command_clock = timer_alloc(FUNC(mu4_storage_test_state::command_clock), this);
@@ -2122,7 +2129,8 @@ private:
 						fatalerror("MU4 unacknowledged status response did not reproduce three complete wire copies");
 					logerror("mu4_native_status_noack: PASS tx_words=36 pin_decode=1 response_copies=3 peer_ack=0 processing=0\n");
 				}
-				if (system_bios() >= 10 && system_bios() != 13 && system_bios() != 14)
+				if (system_bios() >= 10 && system_bios() != 13 && system_bios() != 14 &&
+					(system_bios() != 15 || m_native_command_paths[5]))
 				{
 					auto const disable = machine().disable_side_effects();
 					auto &data = m_cpu->space(AS_DATA);
@@ -2167,6 +2175,16 @@ private:
 				if (m_native_command_cursor || m_command_rx_irqs || !m_command_tx_words.empty() || m_native_command_paths[5])
 					fatalerror("MU4 reset frontier changed; re-evaluate the native control-loop restart contract");
 				logerror("mu4_native_reset_frontier: control_restart=0 dispatcher=0 rx_words=0 tx_words=0 tail_ms=%u stream_equivalence=0 board_reset=0 music_decode=0\n", native_worker_tail_ms());
+			}
+			if (system_bios() == 15)
+			{
+				if (m_files_checked != 6 || m_native_reset_settings_mask != 15)
+					fatalerror("MU4 fresh-process retained medium lacks original uploads or settings");
+				if (!m_native_command_paths[5] && (m_native_command_cursor || m_command_rx_irqs || !m_command_tx_words.empty()))
+					fatalerror("MU4 retained control frontier has partial unexplained traffic");
+				logerror("mu4_native_retained_storage: PASS fresh_process=1 original_payloads=6 settings_mask=f erase=0 runtime_snapshot=0\n");
+				logerror("mu4_native_retained_control: active=%u rx_words=%u tx_words=%u tail_ms=%u board_boot=0 music_decode=0\n",
+					m_native_command_paths[5] ? 1 : 0, m_command_rx_irqs, unsigned(m_command_tx_words.size()), native_worker_tail_ms());
 			}
 			machine().schedule_exit();
 			return;
@@ -2402,7 +2420,7 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200)
 				fatalerror("MU4 original directory reader failed pc=%04x", unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
 			m_file_size = (unsigned(data.read_word(0x36c2)) << 16) | data.read_word(0x36c3);
-			if (system_bios() == 14 && m_native_reset_leg == 2 && (m_file_size == 1800 || m_file_size == 56))
+			if (((system_bios() == 14 && m_native_reset_leg == 2) || system_bios() == 15) && (m_file_size == 1800 || m_file_size == 56))
 			{
 				// Original startup creates these settings files. Preserve them and enumerate
 				// onward through the unchanged next-entry ABI, not a fabricated list.
@@ -2561,6 +2579,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(11, "replay", "Original pin-level status transaction with mid-byte replay")
 	ROM_SYSTEM_BIOS(12, "measure", "Original pin-level sample measurement observation")
 	ROM_SYSTEM_BIOS(13, "reset", "Original mid-byte bench reset observation (incomplete)")
+	ROM_SYSTEM_BIOS(14, "retained", "Original fresh-process retained-media observation")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

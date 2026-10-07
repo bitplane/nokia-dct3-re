@@ -40,6 +40,10 @@ including phase wraparound; analog audio and music decoding remain unvalidated.
 The `reset` diagnostic verifies mid-byte controller reset and retained-file
 reload, but the resident command service does not resume in its bounded
 window. It is not a successful reboot acceptance profile.
+The paired `check-mu4-retained-original` test saves the reset diagnostic's
+stalled-endpoint NAND, then a fresh `retained` process mounts the identical
+image without erasure or a runtime snapshot and completes native status
+service. Persistent NAND contents alone do not explain the reset stall.
 The open boundary is native reset lifecycle and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
@@ -1707,9 +1711,23 @@ erased-media boot's sustained-interrupt expectation to retained settings.
 Recover the firmware-owned initialization needed after retained-media reload
 before claiming control-loop or streaming equivalence. The ABI bench restart
 does not establish physical board reset wiring or reset-ROM behavior.
-Separate reset/runtime-memory effects from the now-present settings by testing
-a fresh process against an independently retained, firmware-created medium;
-this combined reset/reload observation does not identify which causes the stall.
+The paired `check-mu4-retained-original` gate runs the `reset` diagnostic
+and saves its stalled-endpoint medium through MAME's native NVRAM interface.
+It validates the complete 69,206,016-byte device image, copies
+it unchanged to the fresh `retained` BIOS's NVRAM name, and disables saving
+in that second process. Separate working directories isolate the logs;
+the two stored images must remain byte-identical afterward. The source and
+copy in the verified fixture have SHA-256
+`75a523a9c1b6a0f6d98d47812b3082717e0764a79e0956b47b2de4fa7160d6c3`.
+The complete images remain ignored run artifacts, not redistributed ROMs.
+
+The fresh process rereads all six payloads and all four settings entries,
+passes sustained streaming/interrupt checks, and completes the exact
+11-byte receive/14-byte transmit native status transaction with no retries
+and empty queues. Thus persistent NAND contents alone are insufficient to cause
+the reset diagnostic's stall. Isolate runtime memory, peripheral state and
+the firmware-owned initialization sequence next; the comparison does not
+yet identify an individual missing initializer or prove board reset behavior.
 
 Next recover the accepted media container and storage layout before attempting
 native playback, and finish reset lifecycle and board attachment separately.

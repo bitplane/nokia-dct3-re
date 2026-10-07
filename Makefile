@@ -1012,7 +1012,7 @@ check-dsp-rom4-cosim:
 .PHONY: check-mu4-nand
 .PHONY: check-mu4-storage-original
 check-mu4-storage-original: build
-	@set -eu; tmp="$$(mktemp -d /tmp/mu4-storage.XXXXXX)"; \
+	@set -eu; tmp="$(if $(MU4_STORAGE_RUN_DIR),$(abspath $(MU4_STORAGE_RUN_DIR)),$$(mktemp -d /tmp/mu4-storage.XXXXXX))"; \
 		mkdir -p "$$tmp/roms/mu4nand"; \
 		$(PYTHON) tools/noki5510_a00_inventory.py roms/5510-mu4-reference/InitData_R060.a00 \
 			--extract-container --output "$$tmp/roms/mu4nand/mu4_initdata_container.bin"; \
@@ -1033,7 +1033,8 @@ check-mu4-storage-original: build
 		$(PYTHON) tools/noki5510_a00_inventory.py roms/5510-mu4-reference/initdisk_R060.a00 \
 			--extract-section 0x80 --output "$$tmp/roms/mu4nand/mu4_initdisk_vectors.bin"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -rompath "$$tmp/roms" \
-			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
+			-video none -sound none -nothrottle -debugger none -log \
+			$(if $(MU4_STORAGE_NVRAM_DIR),-nvram_directory "$(abspath $(MU4_STORAGE_NVRAM_DIR))" -nvram_save,-nonvram_save) \
 			-bios $(or $(MU4_STORAGE_BIOS),setup) -seconds_to_run 1200 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; grep -q 'mu4_storage_original: PASS' error.log; \
 		grep -q 'mu4_storage_flush: PASS' error.log; grep -q 'mu4_storage_mount: PASS' error.log; \
@@ -1055,6 +1056,8 @@ check-mu4-storage-original: build
 		grep -q 'mu4_mcbsp_receive_dma: PASS' error.log; \
 		if grep -q 'Exceeded pending input line event queue' error.log; then \
 			echo 'MU4 gate failed: synchronized CPU input queue overflow' >&2; exit 1; fi; \
+		if grep -q 'NAND NVRAM write failed' error.log; then \
+			echo 'MU4 gate failed: NAND persistence did not complete' >&2; exit 1; fi; \
 		case "$(MU4_STORAGE_BIOS)" in stream|sustain|worker|settle|scan|startup|command|wire|wireack|pins|replay|reset) \
 			grep -q 'mu4_native_stream: PASS' error.log; grep -q 'mu4_native_receive: PASS' error.log;; esac; \
 		case "$(MU4_STORAGE_BIOS)" in sustain|worker|settle|scan|startup|command|wire|wireack|pins|replay) \
@@ -1072,6 +1075,33 @@ check-mu4-storage-original: build
 				grep -q 'mu4_native_worker_activation: PASS' error.log; grep -q 'mu4_native_reset_request:' error.log; \
 				grep -q 'mu4_native_reset_controller:' error.log; grep -q 'mu4_native_reset_frontier: control_restart=0' error.log;; \
 			measure) grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; grep -q 'mu4_native_worker_activation: PASS' error.log;; esac
+
+.PHONY: check-mu4-retained-original
+check-mu4-retained-original:
+	# The complete 66 MiB NAND and its read-only copy exceed some /tmp quotas.
+	@set -eu; tmp="$$(mktemp -d '$(abspath run_mu4-retained).XXXXXX')"; \
+		$(MAKE) check-mu4-storage-original MU4_STORAGE_BIOS=reset \
+			MU4_STORAGE_RUN_DIR="$$tmp/seed" MU4_STORAGE_NVRAM_DIR="$$tmp/nvram"; \
+		mkdir -p "$$tmp/nvram/mu4nand_14" "$$tmp/retained"; \
+		if ! test -f "$$tmp/nvram/mu4nand_13/nand" || \
+			! test "$$(wc -c < "$$tmp/nvram/mu4nand_13/nand")" -eq 69206016; then \
+			echo 'MU4 retained gate failed: missing or incomplete firmware-created NAND' >&2; exit 1; fi; \
+		cp "$$tmp/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_14/nand"; \
+		cmp "$$tmp/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_14/nand"; \
+		cd "$$tmp/retained"; $(abspath $(MAME_DIR)/mame) mu4nand -bios retained \
+			-rompath "$$tmp/seed/roms" -nvram_directory "$$tmp/nvram" \
+			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
+			-seconds_to_run 1200 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
+		cat output.log; cat error.log; \
+		grep -q 'mu4_file_readback: PASS files=6' error.log; \
+		grep -q 'mu4_loader: PASS' error.log; grep -q 'mu4_native_entry: PASS' error.log; \
+		grep -q 'mu4_native_retained_storage: PASS' error.log; \
+		grep -q 'mu4_native_sustained: PASS' error.log; grep -q 'mu4_native_interrupts: PASS' error.log; \
+		grep -q 'mu4_native_worker_activation: PASS' error.log; \
+		grep -q 'mu4_native_status_transaction: PASS' error.log; \
+		grep -q 'mu4_native_receive_pins: PASS' error.log; \
+		grep -q 'mu4_native_retained_control: active=1 rx_words=11 tx_words=14 tail_ms=20000 ' error.log; \
+		cmp "$$tmp/nvram/mu4nand_13/nand" "$$tmp/nvram/mu4nand_14/nand"
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.
