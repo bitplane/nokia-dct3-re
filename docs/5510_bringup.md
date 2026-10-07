@@ -1653,6 +1653,16 @@ performs additional processing through `02:cdf2/ccfa/cd28/cd34`; recognition
 success does not establish initialized stream state, decoder execution or
 audio output. Keep those as separate acceptance requirements.
 
+Reproduce the initializer's direct-call inventory with
+`noki5510_a00_inventory.py <original-a00> --segment aa22 --program-call-census 0x2c902 0x2c9cb`.
+It covers 201/201 final uploaded words and reports eight immediate FCALL
+encoding candidates, with no missing extension words. The tool preserves
+per-segment ownership and final record writes; it does not infer instruction
+boundaries, indirect calls, page-end fetch wrapping or physical aliases.
+Review every candidate against a known routine-entry disassembly before
+promoting it to a call edge. Unit fixtures cover overwritten operands,
+conflicting overlays, holes and page-end candidates.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select

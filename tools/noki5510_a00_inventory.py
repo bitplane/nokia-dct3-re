@@ -209,10 +209,8 @@ def extract_section(image, address, marker=None):
     return data
 
 
-def extract_program_range(image, start, end, marker, little_endian=False):
-    """Reassemble logical uploaded words in record order; never infer aliases or fill gaps."""
-    if not 0x10000 <= start < end <= 0x800000:
-        raise ValueError('program range must be nonempty extended word addresses')
+def uploaded_word_image(image, marker):
+    """Final logical writes from one checked segment, without cross-overlay merging."""
     payload = extract_segment(image, marker)[6:-4]
     words = {}
     for section in section_inventory(payload)['sections']:
@@ -220,8 +218,43 @@ def extract_program_range(image, start, end, marker, little_endian=False):
         offset = section['offset'] + 6
         for index, (word,) in enumerate(struct.iter_unpack('>H', payload[offset:offset + section['words'] * 2])):
             target = address + index
-            if start <= target < end:
-                words[target] = word
+            words[target] = word
+    return words
+
+
+def program_call_census(image, start, end, marker):
+    """Find immediate FCALL encodings; instruction boundaries remain unproven."""
+    if not 0x10000 <= start < end <= 0x800000:
+        raise ValueError('program range must be nonempty extended word addresses')
+    words = uploaded_word_image(image, marker)
+    candidates = []
+    missing_extensions = page_end_candidates = 0
+    for address in sorted(a for a in words if start <= a < end):
+        opcode = words[address]
+        if opcode & 0xff80 != 0xf980:
+            continue
+        if address & 0xffff == 0xffff:
+            page_end_candidates += 1
+            continue
+        if address + 1 not in words or address + 1 >= end:
+            missing_extensions += 1
+            continue
+        candidates.append({'source_word_address': address,
+                           'target_word_address': ((opcode & 0x7f) << 16) | words[address + 1]})
+    return {'segment': marker, 'range_word_addresses': [start, end],
+            'covered_words': sum(start <= a < end for a in words),
+            'requested_words': end - start, 'candidates': candidates,
+            'missing_extensions': missing_extensions,
+            'page_end_candidates': page_end_candidates,
+            'scope': 'immediate FCALL encoding candidates only; data/operand false positives, '
+                     'indirect calls, other call encodings and physical aliasing unresolved'}
+
+
+def extract_program_range(image, start, end, marker, little_endian=False):
+    """Reassemble logical uploaded words in record order; never infer aliases or fill gaps."""
+    if not 0x10000 <= start < end <= 0x800000:
+        raise ValueError('program range must be nonempty extended word addresses')
+    words = {a: v for a, v in uploaded_word_image(image, marker).items() if start <= a < end}
     if len(words) != end - start:
         raise ValueError('program range contains missing words')
     return struct.pack(('<' if little_endian else '>') + f'{end - start}H',
@@ -241,9 +274,22 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--extract-program-range', nargs=2, type=lambda value: int(value, 0),
                         metavar=('START', 'END'), help='reassemble extended word range, end exclusive, last record wins')
+    parser.add_argument('--program-call-census', nargs=2, type=lambda value: int(value, 0),
+                        metavar=('START', 'END'), help='inspect immediate FCALL candidates in one segment, end exclusive')
     parser.add_argument('--disassembler-little-endian', action='store_true',
                         help='encode a reconstructed range for little-endian disassemblers, not an original wire export')
     args = parser.parse_args()
+    if args.program_call_census is not None:
+        if not args.segment or args.output or args.extract_program_range or args.extract_section is not None or args.extract_segment or args.extract_container or args.cinit_section is not None or args.disassembler_little_endian:
+            parser.error('--program-call-census requires --segment and excludes export operations')
+        try:
+            source = args.image.read_bytes()
+            report = program_call_census(bytes.fromhex(source.decode('ascii')), *args.program_call_census, args.segment)
+            report['source_sha256'] = hashlib.sha256(source).hexdigest()
+            print(json.dumps(report, indent=2))
+            return
+        except (OSError, ValueError) as error:
+            parser.exit(1, f'A00 call census: {error}\n')
     if args.extract_program_range is not None:
         if not args.segment or not args.output or args.extract_section is not None or args.extract_segment or args.extract_container or args.cinit_section is not None:
             parser.error('--extract-program-range requires --segment/--output and excludes other exports')

@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, extract_segment, cinit_inventory, extract_program_range
+from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, extract_segment, cinit_inventory, extract_program_range, program_call_census
 
 
 def segment(marker, payload):
@@ -8,6 +8,40 @@ def segment(marker, payload):
 
 
 class A00InventoryTest(unittest.TestCase):
+    def checked_overlay(self, marker, words):
+        payload = struct.pack(f'>{len(words)}H', *words)
+        checksum = 0
+        for byte in payload:
+            checksum ^= byte
+        return struct.pack('>HI', marker, len(payload)) + payload + struct.pack('>HH', checksum, 0x8888)
+
+    def test_call_census_preserves_overlay_and_final_write_ownership(self):
+        image = segment(0xaa55, self.boot_image())
+        image += self.checked_overlay(0xaa22, [4, 2, 0x9000, 0xf982, 0xc824, 0xf980, 0x2086,
+                                              1, 2, 0x9001, 0xc902, 0])
+        image += self.checked_overlay(0xaa44, [2, 2, 0x9000, 0xf983, 0x9186, 0])
+        report = program_call_census(image, 0x29000, 0x29004, 'aa22')
+        self.assertEqual(report['covered_words'], 4)
+        self.assertEqual(report['candidates'], [
+            {'source_word_address': 0x29000, 'target_word_address': 0x2c902},
+            {'source_word_address': 0x29002, 'target_word_address': 0x2086}])
+        self.assertEqual(program_call_census(image, 0x29000, 0x29004, 'aa44')['candidates'],
+                         [{'source_word_address': 0x29000, 'target_word_address': 0x39186}])
+
+    def test_call_census_reports_holes_and_does_not_infer_page_wrap(self):
+        image = segment(0xaa55, self.boot_image())
+        image += self.checked_overlay(0xaa22, [1, 2, 0xfffd, 0xf982,
+                                              1, 2, 0xffff, 0xf982,
+                                              1, 3, 0, 0xc824, 0])
+        report = program_call_census(image, 0x2fffd, 0x30001, 'aa22')
+        self.assertEqual(report['covered_words'], 3)
+        self.assertEqual(report['requested_words'], 4)
+        self.assertEqual(report['missing_extensions'], 1)
+        self.assertEqual(report['page_end_candidates'], 1)
+        self.assertEqual(report['candidates'], [])
+        with self.assertRaisesRegex(ValueError, 'nonempty'):
+            program_call_census(image, 0, 1, 'aa22')
+
     def test_program_range_preserves_final_writes_and_explicit_byte_order(self):
         payload = struct.pack('>12H', 3, 2, 0x9540, 0x1122, 0x3344, 0x5566, 2, 2, 0x9541, 0x7788, 0x99aa, 0)
         checksum = 0
