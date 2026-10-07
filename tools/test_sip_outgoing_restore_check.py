@@ -32,6 +32,9 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
         if product == '3310':
             log = log.replace('length=15 data=03450401a05e0581551532f4150101',
                               'length=19 data=03450404600200815e0581551532f4a2150101')
+        elif product == '3330':
+            log = log.replace('length=15 data=03450401a05e0581551532f4150101',
+                              'length=18 data=03450404600200815e0581551532f4150101')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log)
@@ -43,6 +46,7 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
         self.assertIn('3310 pending outgoing', self.check(product='3310'))
         self.assertIn('3410 pending outgoing', self.check(product='3410'))
         self.assertIn('5210 pending outgoing', self.check(product='5210'))
+        self.assertIn('3330 pending outgoing', self.check(product='3330'))
 
     def test_missing_or_malformed_product_setup_is_rejected(self):
         for log in (LOG.replace('message=05', 'message=06'),

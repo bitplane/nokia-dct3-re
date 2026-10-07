@@ -572,6 +572,21 @@ make verify-5210-radio-outgoing-call-sip-pending-restore RUN_DIR=run_5210_sip_ou
 The common pending checker also rejects accepted host media, not only CONNECT;
 an unanswered restored call must clear without starting an audio session.
 
+The 3330 v4.50E independently passes both outgoing restore contracts after
+fresh physical first-boot PMM setup in each gate. Its shared fixture saves at
+17 seconds and reloads one second later, inside the observed connected dialog
+window and after provisional progress in the pending case:
+
+```sh
+make verify-3330-radio-outgoing-call-sip-connected-restore RUN_DIR=run_3330_sip_outgoing_connected_restore
+make verify-3330-radio-outgoing-call-sip-pending-restore RUN_DIR=run_3330_sip_outgoing_pending_restore
+```
+
+Evidence is in each gate's `_call` directory; `_provision` contains only its
+own preceding PMM setup. Neither dialog nor provisioning is inherited from
+another product. All five SIP-tested HLE profiles now have independent
+incoming and outgoing restore evidence; native DSP speech remains unproven.
+
 The 3310 NHM-5 v6.39 also completes a physical outgoing call through the local
 PJSIP bridge: handset SETUP, SIP confirmation, bidirectional host media, and
 normal CC/LAPDm release. Its SETUP bearer capability differs from the 3210;
