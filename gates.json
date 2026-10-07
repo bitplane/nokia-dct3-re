@@ -13163,6 +13163,16 @@
       }]
     },
     {
+      "name": "verify-3410-radio-incoming-call-sip",
+      "prerequisites": ["normalize-3410"],
+      "variables": {},
+      "steps": [{
+        "step": "delegate", "silent": true,
+        "target": "verify-radio-outgoing-call-sip",
+        "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS=end,waitalerting,send SIP_HANDSET_KEY_DELAY_MS=1000 SIP_HANDSET_KEY_DURATION_MS=200 SIP_HANDSET_KEY_GAP_MS=300 SIP_HANDSET_RUNNER_ARGS='--incoming --product 3410' SIP_HANDSET_SECONDS=40"
+      }]
+    },
+    {
       "name": "verify-radio-incoming-call-sip",
       "prerequisites": [],
       "variables": {},

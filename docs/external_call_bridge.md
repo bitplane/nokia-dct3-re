@@ -273,8 +273,12 @@ and presses Send. Its captured 15-byte SETUP matches the NSE-8 fixture bytes,
 but its keypad, storage and DSP/PCM profile remain product-local. The gate
 requires actual SIP confirmation, sustained ordered accepted downlink frames,
 bidirectional HLE host media and firmware CC/RR release. Queue-drop counts are
-retained; neither lossless media nor native DSP speech is claimed. Incoming
-3410 SIP acceptance is not yet enabled.
+retained; neither lossless media nor native DSP speech is claimed.
+`verify-3410-radio-incoming-call-sip` independently cold-boots the same product,
+dismisses startup with End, observes firmware CC Alerting and physically presses
+Send. Its CONNECT (`8307`), remote-clearing RELEASE COMPLETE body, handset-owned
+answer decision, sustained accepted downlink and bidirectional HLE media must
+precede normal clearing. Navi/Enter is not accepted as its physical Send marker.
 
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps
