@@ -1067,6 +1067,11 @@ constexpr nokia_product_config PRODUCT_6210 = make_6210_config();
 constexpr nokia_product_config make_6250_config()
 {
 	nokia_product_config result = make_conservative_config();
+	// NHM-3 SM4v15 sheets A-2/A-6 connect HEADDET to CCONT EAD and
+	// pull it toward VBB through R213/R212 (47k/2k2). Own reader 4ae33e
+	// selects input 0; zero falsely enters accessory state 10/Headset.
+	// Use a nominal open-input high, not a measured voltage/ADC calibration.
+	result.ccont_board.channel_defaults[0] = 0x3ff;
 	// NHM-3 source 7 maps to selector 2 (0x288fa0). Its acquired PMM
 	// calibration and 1500/232 scale convert raw 0x230 to about 3.60 V;
 	// full scale exceeds the analog initialization's 1.8..5.5 V window.

@@ -16,7 +16,7 @@ class AccessoryContractTest(unittest.TestCase):
         contract = verify(path.read_bytes())
         self.assertEqual(contract['selector'], 0)
         self.assertEqual(contract['high_threshold'], 0x312)
-        self.assertEqual(contract['electrical_unattached_level'], 'not established')
+        self.assertEqual(contract['electrical_unattached_level'], 'VBB pull-up; raw scale unmeasured')
 
 
 if __name__ == '__main__':

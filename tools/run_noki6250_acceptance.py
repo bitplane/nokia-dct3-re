@@ -30,7 +30,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "idle-state", "call-state", "sms-state",
+                                              "phonebook", "registration", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-outgoing-sms",
                                               "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
@@ -92,7 +92,7 @@ def main():
             script = "noki6250_sms_observe.lua"
         if args.scenario == "phonebook":
             script = "noki6250_phonebook_observe.lua"
-        if args.scenario == "registration":
+        if args.scenario in ("registration", "accessory"):
             script = "noki6250_runtime_observe.lua"
         if args.scenario == "idle-state":
             script = "noki6250_state_idle.lua"
@@ -199,7 +199,7 @@ def main():
                 raise ValueError(f"expected one save frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
                        "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
-        elif args.scenario == "registration":
+        elif args.scenario in ("registration", "accessory"):
             checker = [sys.executable, str(root / "tools/radio_registration_trace_check.py"),
                        str(run / "error.log"), "--profile", "nhm3"]
         else:
@@ -209,6 +209,9 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        if args.scenario == "accessory":
+            subprocess.run([sys.executable, str(root / 'tools/noki6250_accessory_check.py'),
+                            str(run / 'error.log'), str(run / 'snap/6250_runtime20.png')], check=True)
         if args.scenario == "host-outgoing-call":
             from tools.radio_host_outgoing_connect_check import verify as check_host
             check_host((run / "error.log").read_text(errors="replace"), "123")

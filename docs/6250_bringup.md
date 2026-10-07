@@ -525,9 +525,9 @@ exchanges. The controller's existing FIQ route is sufficient for these
 firmware-owned exchanges. This is runtime validation of the path, not a
 complete static census of all SIM faults or electrical timing.
 
-The initial-record fixture reaches a `Headset` idle-style frame with Menu
-and Names at 20 seconds without late input. The literal label is an
-observation produced by the selector-0 accessory path described below. The physical
+The initial-record fixture reaches a registered idle-style frame with Menu
+and Names at 20 seconds without late input. Grounding accessory ADC input 0
+produces `Headset` through the selector-0 path described below. The physical
 probe at 16/16.15 seconds opens the Messages menu (Select/Exit), captured
 at 20 seconds by `noki6250_key_observe.lua`. The probe contains physical
 input only; it does not select callbacks, write RAM, or post UI messages.
@@ -551,12 +551,36 @@ then `state=10 sample=0000` at 3.577 s. Location Updating still completes.
 Thus the existing zero board input induces the observed indication;
 neither a UI-state override nor altered provisioning is required to explain it.
 
-The NHM-3 unattached electrical level and transfer units remain unestablished.
-The independently validated NPE-3 high-input profile is not evidence for
-changing this board. Next establish NHM-3 HEADDET/accessory wiring and its
-unattached polarity, then test one evidenced board fixture against this
-consumer, the idle frame, and call/SMS regressions. Do not sweep values to
-remove the label.
+Nokia's [NHM-3 SM4v15 schematics](https://altehandys.de/downloads/ser-no-6250-schematics.pdf)
+(Original 11/00) independently establish the board polarity. Sheet A-2
+connects `HEADDET` to CCONT N102's EAD input (A2); sheet A-6 connects
+`HEADDET` through R211 (220 kOhm) to the external-microphone network,
+which is pulled toward VBB by R213 (47 kOhm) through R212 (2.2 kOhm).
+The unloaded connector is high, not grounded. The archived PDF is
+`roms/research/nhm3/nhm3-sm4v15-schematics.pdf`, 903,711 bytes,
+SHA-256 `8f4c58ca5eb3d44229396f55a5a4c5e52a9579b14ca2b87d72ffe98497c6a62c`.
+
+`PRODUCT_6250` therefore supplies nominal open-input `03ff` on selector 0.
+The own firmware observes `state=0f sample=03ff` and retains that state at
+the 20-second endpoint; the reviewed idle accessory-label area is empty.
+This is an evidenced polarity correction with an explicitly nominal ADC
+value, not a measured transfer curve. It changes neither firmware nor PMM.
+The `accessory` acceptance scenario requires the own-ROM contract, runtime
+decision, settled state, reviewed label-area pixels and Location Updating:
+
+```sh
+.venv/bin/python tools/run_noki6250_acceptance.py run_6250_accessory --scenario accessory
+```
+
+The same board profile passes `idle-state`, `call-state`, `sms-state`,
+`host-outgoing-call`, `host-incoming-sms` and `host-outgoing-sms` acceptance.
+The save/load gates retain exact architecture, ordered protocol replay and
+screen-pixel equality. These are research-HLE signaling/storage regressions,
+not native DSP or headset audio validation.
+
+Attached-accessory identification, microphone bias switching, headset
+buttons and calibrated voltage/ADC units remain unvalidated. Do not infer
+those contracts from this unattached-input regression.
 
 ### Input layout and phonebook save
 

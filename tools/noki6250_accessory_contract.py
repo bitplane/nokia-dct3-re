@@ -31,9 +31,10 @@ def verify(image):
             raise ValueError(f'own accessory contract differs at {address:x}')
     def word(address):
         return int.from_bytes(image[address - 0x200000:address - 0x200000 + 4], 'big')
-    if word(0x3b2938) != 0x172d70 or word(0x3b2b48) != 0x312:
+    if (word(0x3b2938) != 0x172d70 or word(0x3b219c) != 0x172d70 or
+            word(0x4ae6b0) != 0x172cb4 or word(0x3b2b48) != 0x312):
         raise ValueError('accessory state/threshold literal differs')
     return {'selector': 0, 'reader': '4ae33e', 'decision': '3b27ca',
             'state_address': '172d70', 'high_threshold': 0x312,
             'headset_state': 0x10, 'ui_publisher': '40fde2',
-            'electrical_unattached_level': 'not established'}
+            'electrical_unattached_level': 'VBB pull-up; raw scale unmeasured'}

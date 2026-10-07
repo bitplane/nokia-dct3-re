@@ -320,6 +320,8 @@ emu.register_periodic(function()
     local deadline = captured == 0 and 8 or 20
     if captured >= 2 or machine.time:as_double() < deadline then return end
     captured = captured + 1
+    machine:logerror(string.format("6250_accessory_endpoint: state=%02x sample=%04x t=%.6f\n",
+        memory:read_u8(0x172d70), memory:read_u16(0x172cb4), machine.time:as_double()))
     local dsp = assert(machine.devices[":dsp_staged:cpu"])
     machine:logerror(string.format("6250_analog_endpoint: event=%04x state=%04x t=%.6f\n",
         memory:read_u16(0x1704c4), memory:read_u16(0x1704c6), machine.time:as_double()))
