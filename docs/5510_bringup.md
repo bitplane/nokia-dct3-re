@@ -1196,16 +1196,15 @@ The alternative path through `02:8b63` would replace a saved return word;
 it is not observed in this tail. Probes must cover the paged `02:8xxx`
 program window, not just the common lower window.
 
-The next boundary is scheduler activation, not another DMA completion.
+Startup is still performing file initialization before scheduler activation;
+the open operation is the first `SETTING1.BIN` write through `03:8c3e`.
 Static original code has a call to common `3f1d` at `6d5e`, inside the
 startup helper at `6d44`. Entry code calls that helper at `6dbf`, after the
 far call to `02:904b`. The 100 ms worker tail observes one main-entry fetch
 and zero fetches at `6dbf`, `6d44` or `3f1d`. Thus this startup continuation
 has not executed in the bounded fixture; that is not proof it can never
-execute. The next question is which call inside `02:904b` remains outstanding
-and what its actual input contract is, not a guessed scheduler-enabling
-event. Do not synthesize a worker callback, descriptor state or pending-word
-clear.
+execute. Do not synthesize a scheduler-enabling event, worker callback,
+descriptor state or pending-word clear.
 
 The outstanding main call is at `02:90f4`, targeting `03:9105`; earlier
 executed far calls have observed return-point fetches, but `02:90f6` does
@@ -1215,8 +1214,20 @@ with original directory names (`MCUSI16`, `MP3SI16`, and the other uploaded
 files). Later code at `03:9219..03:9221` supplies filename pointers to
 `03:bcb6`: the original upload's data at `c146` is `TRACKLST`, and `c131`
 is `BIN`. This is a concrete file lookup, not an inferred hardware request.
-It does not yet establish the track-list format, missing-file behavior,
-or why the lookup has not completed.
+That lookup returns: execution reaches `03:922c -> 03:941d`. The latter
+routine performs another `TRACKLST.BIN` lookup and takes its later path
+through `03:bb09`, `03:bfdb` and `03:c898`, then returns. Subsequent calls
+`03:90d6` and `03:8be6` also return. Thus an active parent `03:9105` does
+not mean its filename lookup is still outstanding.
+
+The last observed parent call is `03:9282 -> 03:8c3e`. Original C
+initialization supplies descriptor `16b8` with `SETTING ` and extension
+`BIN`; the caller writes ASCII `1` at descriptor +7 and passes a `001c`-word
+payload. This requests `SETTING1.BIN`. Later static calls select ASCII `2`
+and `3` for `SETTING2.BIN` and `SETTING3.BIN`. These are file operations,
+not recovered service-message tags. `03:8c3e` searches the directory and
+has file-handling paths through `03:c200`, `03:bb09` and `03:bfdb`.
+Its write/allocation completion and setting-record format remain unresolved.
 
 Separate observation profiles extend time without changing firmware or
 device inputs:
@@ -1234,8 +1245,8 @@ zero illegal-opcode requirement. Additional transfer counts are not validated
 music content. In both windows the candidate consumer has zero entries and
 `b633` has zero firmware reads. The storage reader remains active: do not
 describe an endpoint PC as a stuck instruction or assume a missing peer.
-Next decode the lookup's termination condition and media cursor progression
-before extending time again or supplying a track-list fixture.
+Next decode `03:8c3e`'s active write/allocation path before changing media
+contents or extending observation time again.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero
@@ -1243,16 +1254,15 @@ to six. Do not label either double-word pair as a byte cursor from this
 observation. The last NAND read-address sequence changes from column `00`,
 row bytes `02,e9,01` to column `00`, row bytes `98,e9,01` (rows `01e902`
 and `01e998` under the validated small-page address grammar). Thus the
-bounded lookup reaches later physical rows, rather than simply repeating
+bounded startup reaches later physical rows, rather than simply repeating
 one row. These two samples do not prove monotonic traversal, the directory
-extent, a termination time or successful lookup. Decode the iterator's row
-bounds and end predicate before treating the observation deadline as a
-deadlock or providing a guessed `TRACKLST.BIN`.
+extent or a termination time. In particular, these row samples must not be
+attributed to the earlier filename lookup once its return is observed.
 
 At index six, `03:bb7b` performs unsigned `CMPR` with AR2=`0006` and
 AR0=`0200`; `03:bb7c` sees TC set and takes the read path. The iterator
-limit here is 512 entries, not an inferred 4,095-entry count from an earlier
-return value. Address helper `03:bd13` receives ordinal six. Subsequent
+limit here is 512 entries, recovered directly from the comparison operands.
+Address helper `03:bd13` receives ordinal six. Subsequent
 byte-reader entries at `329d` receive A=`0001:e9ff` and stack arguments
 `00c0`, `00c1`, …, `00cb` with source descriptor `1422`; the later filename
 lookup uses copied descriptor `3aea` with the same address and offsets.
@@ -1260,11 +1270,15 @@ The ordinal-to-offset mapping is six times 32 bytes. Original `03:bbd6`
 reads eight name bytes, three extension bytes, then attributes and the later
 word/double-word fields of that fixed-size directory entry.
 
-This moves the unresolved boundary below the iterator: decode the common
-reader at `329d` and its NAND-backed address resolution for logical
-`0001:e9ff`, including cache/search termination. The observed physical-row
-samples are not evidence that the directory iterator itself advances once
-per NAND page. Do not alter the 512-entry limit or synthesize an end record.
+The common reader's cache works in this observed path: desired word index
+`0060` is preserved, the count rises from zero to `0060`, and later reads
+reuse cached row `0001:e9ff`. At branch opcode `327e`, measured differences
+are `005f`, `005e`, `005d`, `005c` as the count increases. The address builder
+at `3035` increments the requested row to `0001:ea00`; `3050` is `5700`
+(`DLD` into B), and subsequent masks/shifts emit the correct address bytes.
+The iterator and this cache are not the current stopping point. Read-tap
+register snapshots are pre-execution; probe opcode boundaries, not extension
+words, and do not treat a destination register's old value as a return result.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
