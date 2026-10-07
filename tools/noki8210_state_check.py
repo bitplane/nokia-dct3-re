@@ -13,6 +13,7 @@ from tools.radio_state_roundtrip import verify_roundtrip
 from tools.noki8210_outgoing_call_check import verify as verify_call
 from tools.radio_outgoing_call_trace_check import CONNECT_ACKNOWLEDGE, DISCONNECT
 from tools.noki8210_incoming_sms_check import verify as verify_sms
+from tools.noki8210_incoming_sms_check import verify_frame as verify_sms_frame
 
 
 def verify(text, *, call=False, sms=False, storage=None):
@@ -64,9 +65,7 @@ def check_frames(directory, *, call=False, sms=False):
     if reference.tobytes() != restored.tobytes():
         raise ValueError('saved-screen pixels did not replay exactly')
     if sms:
-        if hashlib.sha256(read('8210_sms_read_2.png').crop((0, 0, 84, 24)).tobytes()).hexdigest() != (
-                '426de6fc34ebd2112536e8f3245696c996f624abf6d6569ead2c8c0651b49635'):
-            raise ValueError('missing reviewed hello message body')
+        verify_sms_frame(directory / '8210_sms_read_2.png')
         return
     if call and hashlib.sha256(reference.crop((0, 0, 60, 16)).tobytes()).hexdigest() != (
             'cccb3b253638861cd041b9609851be0516cbde18e2118b625a2c34ad0cdd779e'):

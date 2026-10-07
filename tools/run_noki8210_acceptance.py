@@ -23,6 +23,8 @@ SCENARIOS = {
     'call-state': ('state_call', 50, 'state_check'),
     'sms-state': ('state_sms', 32, 'state_check'),
     'host-incoming-call': ('host_incoming_input', 60, 'incoming_call_check'),
+    'host-incoming-sms': ('incoming_sms_input', 32, 'incoming_sms_check'),
+    'host-outgoing-sms': ('outgoing_sms_input', 46, 'outgoing_sms_check'),
 }
 
 
@@ -56,8 +58,8 @@ def main():
         mcu = (root / 'roms/noki8210/8210_5.31ppm_c.fls').read_bytes()
         pmm = (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes()
         prepare_run(run, mcu, pmm)
-        config = {'incoming-call': 'radio_incoming_call_answered',
-                  'host-incoming-call': 'noki8210_host',
+        config = 'noki8210_host' if args.scenario.startswith('host-') else {
+                  'incoming-call': 'radio_incoming_call_answered',
                   'incoming-sms': 'radio_incoming_sms',
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
         if config:
@@ -73,12 +75,18 @@ def main():
             with (run / output).open('w') as console:
                 subprocess.run(cmd, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         host_command = None
-        if args.scenario == 'host-incoming-call':
+        if args.scenario.startswith('host-'):
             command.extend(['-http', '-http_port', str(args.port)])
-            host_command = [sys.executable, str(root / 'tools/run_host_incoming_signaling_gate.py'),
-                            '--port', str(args.port), '--caller', '5551234',
-                            '--cwd', str(run), '--ready-file',
-                            str(run / 'snap/8210_host_registered_idle.png'), '--'] + command
+            runner, options = {
+                'host-incoming-call': ('run_host_incoming_signaling_gate', [
+                    '--caller', '5551234', '--ready-file',
+                    str(run / 'snap/8210_host_registered_idle.png')]),
+                'host-incoming-sms': ('run_host_incoming_sms_gate', []),
+                'host-outgoing-sms': ('run_host_sms_gate', [
+                    '--user-data', '41', '--user-data-length', '1']),
+            }[args.scenario]
+            host_command = [sys.executable, str(root / f'tools/{runner}.py'),
+                            '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
             execute(host_command, 'console.log')
         else:
             execute(command, 'console.log')
@@ -100,10 +108,18 @@ def main():
                 check.append('--call')
             elif args.scenario == 'sms-state':
                 check.extend(['--sms', '--storage', storage])
-        elif args.scenario in ('registration', 'incoming-sms'):
+        elif args.scenario in ('registration', 'incoming-sms', 'host-incoming-sms'):
             check.append(storage)
+            if args.scenario == 'host-incoming-sms':
+                check.extend(['--frame', str(run / 'snap/8210_sms_read_2.png')])
         if checker:
             subprocess.run(check, cwd=root, check=True)
+            if args.scenario in ('host-incoming-sms', 'host-outgoing-sms'):
+                incoming = args.scenario == 'host-incoming-sms'
+                host_checker = 'radio_incoming_host_sms_trace_check' if incoming else 'radio_outgoing_host_sms_trace_check'
+                subprocess.run([sys.executable, str(root / f'tools/{host_checker}.py')] +
+                               ([] if incoming else ['--octets', '1']) + [str(run / 'error.log')],
+                               cwd=root, check=True)
         else:
             from PIL import Image
             frame = Image.open(run / 'snap/8210_calculator_result.png').convert('L')

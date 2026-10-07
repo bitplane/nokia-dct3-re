@@ -331,7 +331,8 @@ Run any focused scenario from a new directory:
 
 Available scenarios are `registration`, `incoming-call`, `outgoing-call`,
 `incoming-sms`, `outgoing-sms`, `calculator`, `phonebook`, `idle-state` and
-`call-state`, `sms-state` and `host-incoming-call`. Each seeds
+`call-state`, `sms-state`, `host-incoming-call`, `host-incoming-sms` and
+`host-outgoing-sms`. Each seeds
 only the unchanged acquired base-record snapshot into a fresh persistent
 flash image. Incoming events use copied external network configuration;
 all UI interaction uses physical key fields. `phonebook` executes save
@@ -395,6 +396,19 @@ directory with `run_noki8210_acceptance.py RUN --scenario host-incoming-call`
 (`--port` selects the private HTTP endpoint). The manifest records both MAME
 and host runner commands. This proves external host signaling through the
 research composition, not native speech or external-network calls.
+
+`host-incoming-sms` and `host-outgoing-sms` independently use the same
+host-only configuration and fresh storage. The incoming host supplies
+GSM-7 `hello` from `5551234`; acceptance requires queued/delivered request
+identity, handset CP/RP/RR closure, exactly one page, delivery/read-status
+SIM writes, persistent text and reviewed physical Read pixels. Outgoing
+physical Write/Send submits exact GSM-7 `A` to `5551234`; the host accepts
+the correlated request once while wrong-ID and duplicate decisions are
+rejected, and handset acknowledgement/release returns to paging. Each
+runner checks both the host protocol and the own-product handset contract.
+These tests establish external software SMS transport, not external carrier
+delivery or native DSP execution. `--port` and a new run directory isolate
+each case; the manifest retains the exact host command.
 
 The shared observer retains staged-DSP/self-test, decoded-key and readiness
 acceptance records only. PMM copy/cache dump, column-mask and input-lifecycle

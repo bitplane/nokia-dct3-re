@@ -1,8 +1,10 @@
 """Check NSM-3 incoming SMS closure, physical reading and persisted content."""
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import sys
+from PIL import Image
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -36,10 +38,19 @@ def verify(text, storage):
         raise ValueError('missing persistent read hello SMS')
 
 
+def verify_frame(path):
+    with Image.open(path) as source:
+        if source.size != (84, 48) or hashlib.sha256(
+                source.convert('L').crop((0, 0, 84, 24)).tobytes()).hexdigest() != (
+                '426de6fc34ebd2112536e8f3245696c996f624abf6d6569ead2c8c0651b49635'):
+            raise ValueError('missing reviewed hello message body')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('storage', type=Path)
+    parser.add_argument('--frame', type=Path)
     args = parser.parse_args()
     try:
         with args.log.open(errors='replace') as stream:
@@ -48,6 +59,9 @@ if __name__ == '__main__':
                            '8210_sms_physical' in line or '8210_keypad_decoded' in line or
                            '[LUA ERROR]' in line)
         verify(text, args.storage.read_bytes())
+        if args.frame:
+            verify_frame(args.frame)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 incoming SMS FAIL: {error}\n')
-    print('8210 incoming SMS transport, physical read and persistent hello PASS; inspect UI separately')
+    print('8210 incoming SMS transport, physical read and persistent hello PASS; ' +
+          ('reviewed body pixels verified' if args.frame else 'inspect UI separately'))
