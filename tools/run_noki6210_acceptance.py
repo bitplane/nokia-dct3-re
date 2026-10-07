@@ -31,7 +31,8 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'accessory': ('npe3hle', 'accessory_input', 25),
              'host-incoming-call': ('npe3hle', 'host_incoming_input', 60),
              'host-incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
-             'host-outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43)}
+             'host-outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
+             'host-rejected-sms': ('npe3hle', 'sms_reject_input', 50)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -199,6 +200,7 @@ def main():
                     '--caller', '5551234', '--ready-file', str(run / 'snap/6210_host_registered_idle.png')]),
                 'host-incoming-sms': ('run_host_incoming_sms_gate', []),
                 'host-outgoing-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1']),
+                'host-rejected-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
@@ -259,14 +261,18 @@ def main():
                             frame.convert('L').crop((0, 8, 96, 40)).tobytes()).hexdigest() != (
                             'edde96356123c9684d846f94418f1d2e6eedc7fd331a3dab41d92cd38f5006ca'):
                         raise ValueError('missing reviewed host caller 5551234')
-        elif args.scenario in ('outgoing-sms', 'host-outgoing-sms'):
+        elif args.scenario in ('outgoing-sms', 'host-outgoing-sms', 'host-rejected-sms'):
             from tools.noki6210_outgoing_sms_check import verify as check_submission
-            check_submission(text)
+            check_submission(text, rejected=args.scenario == 'host-rejected-sms')
             from PIL import Image
-            with Image.open(run / 'snap/6210_sms_sent.png') as frame:
-                if host:
+            if args.scenario == 'host-rejected-sms':
+                from tools.noki6210_sms_failure_check import verify as check_failure
+                check_failure((run / 'error.log').read_text(errors='replace'), run / 'snap')
+            elif host:
+                with Image.open(run / 'snap/6210_sms_sent.png') as frame:
                     check_host_sms_sent(frame)
-                else:
+            else:
+                with Image.open(run / 'snap/6210_sms_sent.png') as frame:
                     check_frame(frame, SMS_SENT_SHA256, 'Message sent')
         elif args.scenario in ('incoming-sms', 'host-incoming-sms'):
             from tools.noki6210_incoming_sms_check import verify as check_delivery

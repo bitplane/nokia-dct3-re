@@ -287,6 +287,15 @@ the animated envelope, unlike the unchanged ordinary full-frame gate). No automa
 SMS network fixture is enabled in either host scenario. The unchanged acquired
 PMM and research HLE/native distinction apply; these do not prove native DSP.
 
+`host-rejected-sms` uses the same physical `A` submission but requests an
+explicit RP error. The own NPE-3 checker requires CP acknowledgment, RP error,
+handset CP acknowledgment, release and resumed paging, forbidding a success
+RP-ACK. Correlated error acceptance, wrong-ID/duplicate rejection, physical
+End/End/Menu decoding and reviewed `Message not sent this time`/Messages
+frames are also required. The independently reviewed 96x60 failure/menu text
+regions share the 6250 frame checker; packet and input contracts remain NPE-3.
+This does not establish RP-silence timeout recovery.
+
 ## Save-state acceptance
 
 `verify-6210-state-idle`, `verify-6210-state-call` and

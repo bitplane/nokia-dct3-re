@@ -47,7 +47,7 @@ def verify(text, *, rp_silence=False):
         raise ValueError('RP error appeared during silence')
 
 
-def check_frames(directory, *, rp_silence=False):
+def check_frames(directory, *, rp_silence=False, product='6250'):
     def digest(path, crop):
         with Image.open(path) as image:
             if image.size != (96, 60):
@@ -57,9 +57,9 @@ def check_frames(directory, *, rp_silence=False):
     failure_hash = ('d3600f56eb6f1027a571d0a17681f9aab9975f5f4a51bf1ab91076a17553a1fd' if rp_silence else
                     'a12e293440c8b5e0bb81df8ae96602d710e200042c720594ae664f93658b5a14')
     if not any(digest(path, (0, 0, 72, 60)) == failure_hash
-               for path in directory.glob('6250_sms_reject_*.png')):
+               for path in directory.glob(product + '_sms_reject_*.png')):
         raise ValueError('missing reviewed SMS failure presentation')
-    if digest(directory / '6250_sms_recovery_menu.png', (0, 0, 84, 16)) != (
+    if digest(directory / (product + '_sms_recovery_menu.png'), (0, 0, 84, 16)) != (
             '91f4829ae667137ccc27fa2e3a266161d4b6518d2ed6f10470abf7de6ce7e372'):
         raise ValueError('missing reviewed Messages recovery menu')
 
