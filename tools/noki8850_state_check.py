@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import re
 import sys
+import hashlib
 from PIL import Image
 
 if __package__ in (None, ''):
@@ -12,7 +13,7 @@ from tools.noki8850_outgoing_call_check import verify as verify_call, verify_fra
 from tools.noki8850_sms_check import verify as verify_sms, verify_frame as verify_sms_frame
 
 
-def verify(text, *, sms=False, storage=None):
+def verify(text, *, sms=False, idle=False, storage=None):
     if '[LUA ERROR]' in text or '8850_state: FAIL' in text:
         raise ValueError('state fixture did not complete')
     states = re.findall(r'8850_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
@@ -33,16 +34,24 @@ def verify(text, *, sms=False, storage=None):
                          r'8850_sms_physical: action=read_4', text):
             raise ValueError('missing post-load physical SMS read')
         return
+    if idle:
+        if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
+                         r'8850_state_physical: key=Menu[\s\S]*'
+                         r'8850_keypad_decoded key=19\b', text):
+            raise ValueError('missing post-load physical Menu input')
+        if '8850_call_physical: action=send' in text:
+            raise ValueError('idle fixture unexpectedly initiated a call')
+        return
     verify_call(text)
     if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
                      r'8850_call_physical: action=end', text):
         raise ValueError('missing post-load physical call release')
 
 
-def check_frames(directory, *, sms=False):
+def check_frames(directory, *, sms=False, idle=False):
     if sms:
         verify_sms_frame(directory / '8850_sms_read_4.png')
-    else:
+    elif not idle:
         verify_frames(directory)
     with Image.open(directory / '8850_state_call_reference.png') as source:
         reference = source.convert('L')
@@ -50,20 +59,32 @@ def check_frames(directory, *, sms=False):
         restored = source.convert('L')
     if reference.size != (84, 48) or restored.size != reference.size or (
             reference.tobytes() != restored.tobytes()):
-        raise ValueError('connected-screen pixels did not replay exactly')
+        raise ValueError('saved-screen pixels did not replay exactly')
+    if idle:
+        if hashlib.sha256(reference.crop((15, 0, 69, 16)).tobytes()).hexdigest() != (
+                '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'):
+            raise ValueError('missing reviewed idle operator text')
+        with Image.open(directory / '8850_state_idle_menu.png') as source:
+            menu = source.convert('L')
+        if menu.size != (84, 48) or hashlib.sha256(
+                menu.crop((0, 0, 72, 16)).tobytes()).hexdigest() != (
+                '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'):
+            raise ValueError('missing reviewed Messages menu')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('frames', type=Path)
-    parser.add_argument('--sms', action='store_true')
+    scenario = parser.add_mutually_exclusive_group()
+    scenario.add_argument('--sms', action='store_true')
+    scenario.add_argument('--idle', action='store_true')
     parser.add_argument('--storage', type=Path)
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'), sms=args.sms,
+        verify(args.log.read_text(errors='replace'), sms=args.sms, idle=args.idle,
                storage=args.storage.read_bytes() if args.storage else None)
-        check_frames(args.frames, sms=args.sms)
+        check_frames(args.frames, sms=args.sms, idle=args.idle)
     except (OSError, ValueError) as error:
-        parser.exit(1, f'8850 call restoration FAIL: {error}\n')
+        parser.exit(1, f'8850 restoration FAIL: {error}\n')
     print('8850 exact restoration/protocol replay/physical continuation PASS; native speech unproved')

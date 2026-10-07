@@ -15,6 +15,7 @@ local input = coroutine.create(function()
     if not emu.wait(29) then return end
     if not press(1, 'Names / C', 'idle') then return end
     machine.screens[':screen']:snapshot('8850_registered_idle.png')
+    if _G.noki8850_call_idle_only then return end
     for _, digit in ipairs({5, 5, 5, 1, 2, 3, 4}) do
         local column = ({[1]=2, [2]=3, [3]=4, [4]=2, [5]=3})[digit]
         if not press(column, 'Keypad ' .. digit, 'digit_' .. digit) then return end

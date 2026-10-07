@@ -1,7 +1,10 @@
--- Active-call emulator restoration; physical inputs and read-only observations.
+-- Emulator restoration; physical inputs and read-only observations.
 local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local sms = _G.noki8850_state_sms == true
+local idle = _G.noki8850_state_idle == true
+local scenario = sms and 'sms' or idle and 'idle' or 'call'
+_G.noki8850_call_idle_only = idle
 dofile(directory .. (sms and 'noki8850_incoming_sms_input.lua' or 'noki8850_outgoing_call_input.lua'))
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
@@ -26,7 +29,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     local restored = snapshot('restored')
     assert(saved, 'save observation absent')
     for index = 1, 4 do assert(restored[index] == saved[index], 'architectural state mismatch') end
-    machine:logerror(string.format('state_roundtrip: result=pass scenario=8850_%s requested_at=%.9f t=%.9f\n', sms and 'sms' or 'call', saved[1], restored[1]))
+    machine:logerror(string.format('state_roundtrip: result=pass scenario=8850_%s requested_at=%.9f t=%.9f\n', scenario, saved[1], restored[1]))
     machine:logerror(string.format('state_replay: phase=restored event=begin t=%.9f\n', restored[1]))
     local replay = coroutine.create(function()
         assert(emu.wait(1))
@@ -35,6 +38,17 @@ local post_load = emu.add_machine_post_load_notifier(function()
         if sms then
             dofile(directory .. 'noki8850_sms_read.lua')
             assert(emu.wait(10))
+            completed = true
+            return
+        end
+        if idle then
+            local key = assert(machine.ioport.ports[':COL.1'].fields['Menu'])
+            machine:logerror('8850_state_physical: key=Menu\n')
+            key:set_value(1)
+            assert(emu.wait(0.15))
+            key:set_value(0)
+            assert(emu.wait(2))
+            machine.screens[':screen']:snapshot('8850_state_idle_menu.png')
             completed = true
             return
         end
@@ -52,7 +66,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(replay))
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(sms and 19 or 40))
+    assert(emu.wait(sms and 19 or idle and 32 or 40))
     machine:save('8850_call')
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

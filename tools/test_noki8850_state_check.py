@@ -17,6 +17,17 @@ state_replay: phase=restored event=end t=41.000000000
 
 
 class StateTest(unittest.TestCase):
+    def test_idle_requires_postload_menu(self):
+        idle = GOOD + '8850_state_physical: key=Menu\n8850_keypad_decoded key=19\n'
+        verify(idle, idle=True)
+        with self.assertRaisesRegex(ValueError, 'Menu input'):
+            verify(idle.replace('key=19', 'key=0f'), idle=True)
+
+    def test_idle_forbids_call_start(self):
+        idle = GOOD + '8850_state_physical: key=Menu\n8850_keypad_decoded key=19\n'
+        with self.assertRaisesRegex(ValueError, 'initiated a call'):
+            verify(idle + '8850_call_physical: action=send', idle=True)
+
     def test_sms_continuation_forbids_redelivery(self):
         text = GOOD + 'PCH IMSI page transmitted channel=60\n'
         text += ('sim_device: update fid=6f3c record=1 length=176\n' * 2)

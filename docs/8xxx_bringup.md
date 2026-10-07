@@ -1495,8 +1495,23 @@ load. Require:
 The checker additionally requires the complete own-product intended-number
 CC/RR lifecycle and reviewed operator pixels after release. Original NSM-2
 flash/PMM inputs and the declared research DSP composition are unchanged.
-This is active signaling/UI restoration, not native speech, idle restoration
-or cold clock continuity.
+This is active signaling/UI restoration, not native speech or cold clock
+continuity.
+
+Settled-idle restoration is independently verified with
+`tools/noki8850_state_idle.lua`, fresh private cfg/NVRAM/state/snapshot
+directories, verbose logging and 45 seconds. The ordinary physical startup
+returns to idle without dialing; the fixture saves at 32 seconds. Exact
+CPU/RAM/time, nonempty ordered protocol replay and whole-screen pixel equality
+pass. Reviewed operator text is `DCT3 LAB`; a post-load physical Menu press
+decodes `19` and opens the reviewed English Messages menu. Require:
+
+```sh
+.venv/bin/python tools/noki8850_state_check.py --idle RUN/error.log RUN/snap
+```
+
+The idle checker rejects an accidental physical call start. This verifies
+interactive continuation, not cold RTC persistence or native speech.
 
 Delivered-SMS restoration is independently verified by
 `tools/noki8850_state_sms.lua` with a private copy of
