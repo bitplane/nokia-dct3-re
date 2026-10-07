@@ -14655,13 +14655,45 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 751)
+		if (m_phase == 60040)
 		{
-			expect_opcode(0xfe44,
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 3 &&
+			expect_opcode(0xfe4c,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0301 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+				"RCD BNEQ captures B before delay words change it");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 60041;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 751 || m_phase == 60041)
+		{
+			expect_opcode(m_phase == 751 ? 0xfe44 : 0xfe4c,
+				m_cpu->state_int(m_phase == 751 ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 3 &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-					"RCD ANEQ false path preserves the stack and falls through");
+					m_phase == 751 ? "RCD ANEQ false path preserves the stack and falls through" :
+					"RCD BNEQ false path preserves the stack and falls through");
+			if (m_phase == 751)
+			{
+				program.write_word(0x05e2, 0xfe4c);
+				program.write_word(0x05e3, 0xe900);
+				program.write_word(0x05e4, 0xe902);
+				program.write_word(0x05e5, 0xe903);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 60040;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			// 0x60/0x61 belong to this fixture's interrupting read peripheral.
 			program.write_word(0x05e2, 0x4a62); // PSHM MMR 0x62
 			program.write_word(0x05e3, 0x4a63); // PSHM MMR 0x63

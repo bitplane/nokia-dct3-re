@@ -2043,8 +2043,12 @@ is nonzero, and charge three cycles on either path. This follows
 [TI SPRU172C, RC[D], pages 4-133/4-134](https://www.ti.com/lit/ug/spru172c/spru172c.pdf).
 The executable core fixture tests both paths, including a delay-word write
 that changes A after the decision, stack preservation on a false condition,
-and port-to-port cycle counts. Other conditional delayed-return encodings
-are not implied to be implemented by this one opcode.
+and port-to-port cycle counts. Separately tested `0xfe4c` (`RCD BNEQ`) uses
+the same documented three-cycle contract for accumulator B. Both paths test B
+before delay words overwrite it and preserve or pop the stack as appropriate.
+This is manual-derived core conformance, not an observed handset requirement
+or interrupt-pipeline timing evidence. Other conditional delayed-return
+encodings are not implied by these two words.
 
 ROM4 uses this instruction at `0x90eb` when additional demand-load
 continuations are delivered through BSCR.HINT. The bounded NSE-5 investigation
