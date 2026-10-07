@@ -443,13 +443,14 @@ VC5410A DMA feature or its timing.
 Do not conflate the file stream with the serial-boot table: this consumer
 reads all three header words before testing the count, and its destination
 space/page handling has additional rules in `2f00..2f0e` and `2f60..2f70`.
-Those rules and the file's placement are not yet a validated loader model.
+Those rules are now covered by original-loader execution and complete
+destination checks below; physical DA150 memory mapping remains separate.
 The resident `36b0` record contains placeholder `beef` words; startup fills
 its file descriptors by directory traversal. Original InitDisk now populates
 the medium and original InitData directory/read routines validate every
-stored file, as described below. Next recover and execute the DMA contract
-before attaching this loader to a full MU4 profile; never replace its
-completion poll with unconditional success.
+stored file, as described below. DMA-backed loading is also validated in the
+isolated fixture; attaching it to a full MU4 profile still requires the
+program-entry and physical-memory contracts. Completion is never forced.
 
 For reproduction, `noki5510_a00_inventory.py --segment aa55
 --extract-section 0x200 --output <new-file>` exports only the exact original
@@ -772,15 +773,15 @@ comparison remain firmware-owned. The gate observes seven selected segments,
 741,916 consumed wire bytes, final checksum `0040`, state zero and a drained
 ring, then successfully mounts the retained medium with original InitData.
 This covers the raw first-segment and subsequent file-write receiver paths.
-Independent original-consumer file readback is validated below; file-backed
-DMA load remains unverified.
+Independent original-consumer file readback and DMA-backed loading are
+validated below; native program-entry execution remains unverified.
 
 The acquired repair-tool analysis describes a different, upstream layer:
 PC-to-phone blocks `80 12 length payload XOR-even XOR-odd` and byte `90`
 acknowledgements. Do not replay that envelope into McBSP2: the MCU forwarding
 path has not yet been reconciled with this DSP segment receiver. The next
-boundary is file-backed InitData loading through modeled DMA, using the
-firmware-populated and independently read-back medium.
+boundary is native program-entry execution after original InitData loading
+through modeled DMA.
 
 ### Original erased-media provisioning
 
@@ -800,7 +801,7 @@ negative control. It returns zero with balanced SP and live NAND busy waits.
 Thus original firmware provisions media that the original consumer mounts;
 no BPB, partition table, directory or successful return is supplied by the
 fixture. The same gate then transfers the original segments as described
-above; loader execution and full MU4 boot remain unverified.
+above; full MU4 boot remains unverified.
 
 ### Original file-consumer readback
 
@@ -831,9 +832,49 @@ header `08aa` of `aa55`.
 
 The fixture uses routine ABI wrappers and retained in-memory NAND across
 soft resets. This does not establish host NVRAM persistence, physical DA150
-DMA mapping/timing or native music-DSP boot. The next execution boundary is
-`2ed4 -> 2f56`: original file reads followed by actual DMA transfer and
-completion, then the original program transfer to `2000`.
+DMA mapping/timing or native music-DSP boot. The original `2ed4 -> 2f56`
+load is executed below; program-entry execution remains the next boundary.
+
+### Original DMA-backed loader
+
+The fixture attaches a separate `tms320c54x_dma_device` at data `54..57`.
+[TI SPRU302B](https://www.ti.com/lit/ug/spru302b/spru302b.pdf), sections 3.2/3.3,
+documents the subbank, count-minus-one, space/index fields and fixed seven-bit
+program-page registers. The ignored reference copy is
+`roms/reference-docs/npm5/ti_tms320c54x_spru302b.pdf`, SHA-256
+`daf74902629c8d3f54b12e0af57e95679fe172ddd581f5817aeac32b5503ec22`.
+
+Supported transfers are polled, nonsynchronized, single-frame/single-word
+blocks, with constant/increment/decrement addressing across program, data
+and I/O spaces. `0144` increments data source and program destination;
+`0145` selects data destination instead. Each timer event actually reads and
+writes a word, updates addresses/count and clears DE only after the last
+word. Low-address wrap does not modify the program-page register. Registers
+and pending timers are saved. Serial synchronization, interrupt generation,
+autoinitialization, ABU, indexed/frame transfers and arbitration are not
+implemented; unsupported active modes fail explicitly. The two-clock cadence
+at the fixture's 13 MHz is an assumption, not measured DA150 latency.
+
+MMIO conformance checks exercise deferred completion, program-page wrap,
+zero-count one-word transfer, cancellation and pending save/restore replay.
+The original consumer then mounts and enumerates `MCUSI16 .BIN`, uses a
+loader-safe stack at `3aea` matching `3538`, and calls unchanged `2ed4` before
+the final program branch. Original file reads and `2f56` drive the device;
+no DMA destination, enable completion or loader return is synthesized.
+Every loaded destination from all 3,254 records is checked against the source:
+51,921 words across data and program spaces, with DE clear and balanced SP.
+InitDisk-only ROM mappings above `3679` are removed when restoring InitData,
+so they cannot silently discard DMA writes to program `3d00`.
+
+Original `2f00..2f0e` selects data space for destinations at most `ffff`;
+larger destinations select program space. `2f60..2f70` clears the page for
+low addresses below `8000`. These are executed firmware rules, not a flat
+replay of outer container records. The final original `3538` branch to `2000`
+and subsequent native execution remain unverified. TI SPRU131G section 3.2.5
+documents a common lower 32K program window when PMST.OVLY is set; `3538`
+writes PMST `2028`, so that mapping must be resolved before interpreting
+far-branch targets in the loaded program as missing data. Full DA150 silicon
+memory extents, PLL, bus contention and full MU4/handset boot are not claimed.
 
 Three generic CPU contracts are independently exposed by this run:
 

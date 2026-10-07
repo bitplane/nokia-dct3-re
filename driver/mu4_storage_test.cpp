@@ -5,14 +5,16 @@
 #include "emu.h"
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "machine/nandflash.h"
+#include "tms320c54x_dma.h"
 #include <vector>
+#include <sstream>
 
 namespace {
 class mu4_storage_test_state : public driver_device
 {
 public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
-		: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
+				: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_dma(*this, "dma"), m_program_ram(*this, "program_ram"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
 		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers"),
 		  m_disk_vectors(*this, "disk_vectors"), m_segment(*this, "segment") { }
 	void test(machine_config &config)
@@ -24,11 +26,15 @@ public:
 		m_cpu->set_addrmap(AS_DATA, &mu4_storage_test_state::data_map);
 		m_cpu->set_addrmap(AS_IO, &mu4_storage_test_state::io_map);
 		m_cpu->bio_in_cb().set(FUNC(mu4_storage_test_state::bio_r));
+		TMS320C54X_DMA(config, m_dma, 13'000'000);
+		m_dma->set_cpu(m_cpu);
 		SAMSUNG_K9K1208U0A(config, m_nand);
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
 	}
 private:
 	required_device<tms320c54x_device> m_cpu;
+	required_device<tms320c54x_dma_device> m_dma;
+	required_shared_ptr<u16> m_program_ram;
 	required_device<samsung_k9k1208u0a_device> m_nand;
 	required_region_ptr<u16> m_cinit;
 	required_region_ptr<u16> m_initdisk, m_disk_cinit, m_disk_helpers, m_disk_vectors;
@@ -38,6 +44,7 @@ private:
 	u16 m_file_marker = 0;
 	std::vector<u16> m_verified_files;
 	unsigned m_read_words = 0;
+	std::stringstream m_saved_dma;
 	u16 m_serial_index[2] = {}, m_serial_regs[2][32] = {}, m_serial_word = 0;
 	bool m_serial_ready = false;
 	unsigned m_serial_reads = 0;
@@ -47,13 +54,13 @@ private:
 	attotime m_read_started, m_first_data;
 	std::vector<u16> m_writes;
 	emu_timer *m_check = nullptr;
-	unsigned m_phase = 0;
+	unsigned m_phase = 25;
 	unsigned m_page = 0;
 	static u16 pattern(unsigned index) { return u16(0x1234 + index * 37); }
 	void program_map(address_map &map)
 	{
 		// This is a routine-test address space, not the unknown DA150 silicon map.
-		map(0, 0xffff).ram();
+		map(0, 0x7fffff).ram().share("program_ram");
 		map(0x0200, 0x0f32).rom().region("entry", 0);
 		map(0x2080, 0x20ad).rom().region("trampolines", 0);
 		map(0x20ae, 0x3679).rom().region("library", 0);
@@ -65,6 +72,7 @@ private:
 		map(0x0034, 0x0035).rw(FUNC(mu4_storage_test_state::serial_config_r), FUNC(mu4_storage_test_state::serial_config_w));
 		map(0x0038, 0x0039).rw(FUNC(mu4_storage_test_state::serial_config0_r), FUNC(mu4_storage_test_state::serial_config0_w));
 		map(0x003c, 0x003d).rw(FUNC(mu4_storage_test_state::gpio_r), FUNC(mu4_storage_test_state::gpio_w));
+		map(0x0054, 0x0057).rw(m_dma, FUNC(tms320c54x_dma_device::read), FUNC(tms320c54x_dma_device::write));
 	}
 	// Word-level receive fixture only; serial clocks/framing are not modeled here.
 	u16 serial_r()
@@ -153,6 +161,28 @@ private:
 			0xf980, 0x3035, 0xf980, 0x306c, 0xf4e1
 		};
 		for (unsigned i = 0; i < std::size(wrapper); ++i) program.write_word(0x1800 + i, wrapper[i]);
+		if (m_phase >= 25)
+		{
+			program.write_word(0x1809, 0xf4e1);
+			auto &data = m_cpu->space(AS_DATA);
+			data.write_word(0x6000, 0x1234); data.write_word(0x6001, 0xabcd);
+			program.write_word(0x2ffff, 0xffff); program.write_word(0x20000, 0xffff);
+			data.write_word(0x6100, 0xffff);
+			data.write_word(0x55, 0);
+			data.write_word(0x56, 0x6000);
+			data.write_word(0x56, m_phase == 25 ? 0xffff : 0x6100);
+			data.write_word(0x56, m_phase == 25 ? 1 : 0);
+			data.write_word(0x56, 0);
+			data.write_word(0x56, m_phase == 25 ? 0x0144 : 0x0145);
+			if (data.read_word(0x55) != 5) fatalerror("MU4 DMA autoincrement mismatch");
+			data.write_word(0x55, 0x1e); data.write_word(0x56, 0); data.write_word(0x56, 0xff82);
+			data.write_word(0x55, 0x1f);
+			if (data.read_word(0x57) != 2 || data.read_word(0x55) != 0x1f) fatalerror("MU4 DMA page/nonincrement mismatch");
+			data.write_word(0x54, 1);
+			if (!(data.read_word(0x54) & 1) || data.read_word(0x6100) != 0xffff || program.read_word(0x2ffff) != 0xffff)
+				fatalerror("MU4 DMA completed synchronously");
+			if (m_phase == 27) data.write_word(0x54, 0);
+		}
 		if (m_phase == 4)
 		{
 			// Flush is called with NAND already selected by the storage reader.
@@ -165,19 +195,29 @@ private:
 			program.write_word(0x1809, 0xf980); program.write_word(0x180a, 0x0725);
 			program.write_word(0x180b, 0xf4e1);
 		}
-		if (m_phase == 6 || m_phase == 19 || m_phase == 21)
+		if (m_phase == 6 || m_phase == 19 || m_phase == 21 || m_phase == 24)
 		{
-			if (m_phase == 19 || m_phase == 21)
+			if (m_phase == 19 || m_phase == 21 || m_phase == 24)
+			{
 				program.install_rom(0x20ae, 0x3679, reinterpret_cast<u16 *>(memregion("library")->base()));
+				// Remove InitDisk-only ROM mappings before the consumer DMA writes these addresses.
+				program.install_ram(0x367a, 0x4abe, &m_program_ram[0x367a]);
+			}
 			// Original startup's mount ABI: filesystem context and partition-aware flag.
 			u16 const mount[] = {0x7600, 1, 0xf020, 0x3aea, 0xf980, 0x308e, 0xf4e1};
 			for (unsigned i = 0; i < std::size(mount); ++i) program.write_word(0x1809 + i, mount[i]);
-			if (m_phase == 21)
+			if (m_phase == 21 || m_phase == 24)
 			{
 				// Same directory ABI as startup 0960..096b; no descriptor/file-state injection.
 				u16 const directory[] = {0x7600, 0x3aea, 0xf020, 0x36b0, 0xf980, 0x09c6,
 					0x7600, 0x3aea, 0xf020, 0x36b0, 0xf980, 0x09fa, 0xf4e1};
 				for (unsigned i = 0; i < std::size(directory); ++i) program.write_word(0x180f + i, directory[i]);
+				if (m_phase == 24)
+				{
+					// Loader-safe stack matches original 3538; isolate 2ed4 before its program transfer.
+					u16 const load[] = {0x7718, 0x3aea, 0xe800, 0xf980, 0x2ed4, 0xf4e1};
+					for (unsigned i = 0; i < std::size(load); ++i) program.write_word(0x181b + i, load[i]);
+				}
 			}
 		}
 		if (m_phase == 9)
@@ -203,7 +243,7 @@ private:
 			u16 const next[] = {0x7600, 0x3aea, 0xf020, 0x36b0, 0xf980, 0x0a0b, 0xf4e1};
 			for (unsigned i = 0; i < std::size(next); ++i) program.write_word(0x1809 + i, next[i]);
 		}
-		if (m_phase == 7 || m_phase == 19 || m_phase == 21)
+		if (m_phase == 7 || m_phase == 19 || m_phase == 21 || m_phase == 24)
 		{
 			// Original C globals are routine inputs, not an invented disk image.
 			auto &data = m_cpu->space(AS_DATA);
@@ -278,7 +318,7 @@ private:
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
-		m_check->adjust(attotime::from_msec(m_phase == 18 ? 60000 : m_phase == 13 ? 8000 : (m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
+		m_check->adjust(m_phase >= 25 ? attotime::from_usec(1) : attotime::from_msec(m_phase == 24 ? 8000 : m_phase == 18 ? 60000 : m_phase == 13 ? 8000 : (m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
 	}
 	void start_media_read()
 	{
@@ -289,6 +329,86 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase >= 25)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			auto &program = m_cpu->space(AS_PROGRAM);
+			if (m_phase == 28)
+			{
+				if ((data.read_word(0x54) & 1) || data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA pre-restore transfer failed");
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE || !(data.read_word(0x54) & 1) || data.read_word(0x6100) != 0xffff)
+					fatalerror("MU4 DMA pending save restore mismatch");
+				m_phase = 29;
+				m_check->adjust(attotime::from_usec(1));
+				return;
+			}
+			if (data.read_word(0x54) & 1) fatalerror("MU4 DMA completion bit remains set");
+			if (m_phase == 25 && (program.read_word(0x2ffff) != 0x1234 || program.read_word(0x20000) != 0xabcd))
+				fatalerror("MU4 DMA program page wrap mismatch");
+			if (m_phase == 26 && data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA zero-count single-word mismatch");
+			if (m_phase == 27 && data.read_word(0x6100) != 0xffff) fatalerror("MU4 DMA canceled transfer wrote data");
+			if (m_phase == 27)
+			{
+				data.write_word(0x54, 1);
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 DMA pending save failed");
+				m_phase = 28;
+				m_check->adjust(attotime::from_usec(1));
+				return;
+			}
+			if (m_phase == 29)
+			{
+				if (data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA restored transfer failed");
+				m_saved_dma.str(std::string());
+				logerror("mu4_dma_conformance: PASS deferred=1 page_wrap=1 zero_count=1 cancel=1 pending_restore=1\n");
+				m_phase = 0;
+			}
+			else ++m_phase;
+			machine().schedule_soft_reset();
+			return;
+		}
+		if (m_phase == 24)
+		{
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x3aea)
+				fatalerror("MU4 original loader failed pc=%04x sp=%04x", unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
+			if (m_cpu->space(AS_DATA).read_word(0x54) & 1) fatalerror("MU4 loader returned before DMA completion");
+			auto word = [this](unsigned offset) -> u16
+			{
+				if (offset + 1 >= m_segment.length()) fatalerror("MU4 loader source bounds");
+				return (u16(m_segment[offset]) << 8) | m_segment[offset + 1];
+			};
+			unsigned segment = 0;
+			while (word(segment) != 0xaa22)
+				segment += 10 + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
+			unsigned cursor = segment + 6, records = 0, checked = 0;
+			unsigned const end = cursor + (unsigned(word(segment + 2)) << 16) + word(segment + 4);
+			while (word(cursor))
+			{
+				unsigned const count = word(cursor);
+				u32 const destination = (u32(word(cursor + 2)) << 16) | word(cursor + 4);
+				cursor += 6;
+				if (cursor + count * 2 > end) fatalerror("MU4 loader section bounds");
+				bool const program = destination > 0xffff;
+				// Independent expected rule from original 2f00..2f0e and 2f60..2f70.
+				u32 const address = (destination & 0x8000) ? destination : destination & 0xffff;
+				for (unsigned i = 0; i < count; ++i)
+				{
+					u32 const target = (program ? address & 0x7f0000 : 0) | u16(address + i);
+					u16 const actual = m_cpu->space(program ? AS_PROGRAM : AS_DATA).read_word(target);
+					if (actual != word(cursor + i * 2))
+						fatalerror("MU4 DMA destination mismatch space=%s address=%06x actual=%04x expected=%04x", program ? "program" : "data", target, actual, word(cursor + i * 2));
+				}
+				cursor += count * 2;
+				checked += count;
+				++records;
+			}
+			if (cursor + 2 != end || checked != 51921) fatalerror("MU4 loader coverage mismatch words=%u", checked);
+			logerror("mu4_loader: PASS original_loader=1 dma_complete=1 records=%u words=%u data_and_program=1\n", records, checked);
+			machine().schedule_exit();
+			return;
+		}
 		if (m_phase == 20)
 		{
 			auto &data = m_cpu->space(AS_DATA);
@@ -512,7 +632,8 @@ private:
 			{
 				if (m_files_checked != 6) fatalerror("MU4 file count mismatch files=%u", m_files_checked);
 				logerror("mu4_file_readback: PASS files=6 original_readers=1 complete_payloads=1\n");
-				machine().schedule_exit();
+				m_phase = 24;
+				machine().schedule_soft_reset();
 				return;
 			}
 			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_A) ||
