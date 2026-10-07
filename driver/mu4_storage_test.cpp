@@ -1075,7 +1075,7 @@ private:
 							if (m_recorder_application_messages++ >= 12) return;
 							auto const disable = machine().disable_side_effects();
 							auto &data = m_cpu->space(AS_DATA);
-								logerror("mu4_native_recorder_application_message: length=%04x class=%04x selector=%04x parameter=%04x token=%04x previous_class=%04x previous_selector=%04x time_ms=%lld\n",
+							logerror("mu4_native_recorder_application_message: length=%04x class=%04x selector=%04x parameter=%04x token=%04x previous_class=%04x previous_selector=%04x time_ms=%lld\n",
 								data.read_word(0x45f), data.read_word(0x460), data.read_word(0x461), data.read_word(0x462), data.read_word(0x463),
 								data.read_word(0x3766), data.read_word(0x3767),
 								static_cast<long long>(machine().time().as_ticks(1000)));

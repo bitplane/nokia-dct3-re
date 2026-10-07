@@ -2092,14 +2092,23 @@ routine `03:8dc3..8f0d` has
 
 The observation-only endpoint context capture reads `bf1c..bf2b`.
 Its name is `REL_    `, terminated at `bf24`, with extension `REL`
-at `bf25..bf27`. This differs from the new NAND literal `REL_001 `.
-Before issuing a metadata fixture, recover how the original firmware
-selects or reconstructs the current recorded-file context and whether
-the named lookup treats this padded prefix specially. Do not fill its
-digits by RAM intervention or infer a failed save merely from this
-unexecuted static path. A scan of 48,261 AA22 extended words finds only
+at `bf25..bf27`. This is a prefix selector, not an incomplete selected
+filename: `03:8e01..8e18` compares only four name bytes using `02:e3a7`
+(a bounded character comparison), then compares the extension using
+`02:e36f`. The entry scan independently tests suffix bytes 4--6 for
+ASCII digits and ranks their numeric value. The NAND name `REL_001 `
+therefore is not excluded merely because the context contains padding.
+The comparison extraction `02:e300..e420` has SHA-256
+`0c867e27045d0684472c883a12bab4dbf10ffac27caab0244d3c0fbeeca2f7c3`.
+No filename digits need to be injected. The next fixture can send the
+mapped length-prefixed metadata through serial pins and inspect the
+original reply and NAND delta. A scan of 48,261 AA22 extended words finds only
 the two direct `bf1c` operands in these callers; indirect writes and
 initialization/data references remain outside that literal census.
+An exhaustive runtime write watch shows that the recorder overlay reuses
+this data range for codec work and resident initialization restores the
+prefix at 13.908 seconds. The broad watch is retired after harvesting that
+ownership observation; the small endpoint capture remains.
 
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),

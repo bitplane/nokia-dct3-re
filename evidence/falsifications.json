@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_recorder_padded_context_requires_filename_injection",
+      "status": "disproven",
+      "hypothesis": "The resident recorder metadata operation cannot select REL_001 because its returned filename context contains REL_ followed by padding",
+      "conclusion": "Original AA22 routine 03:8dc3 scans file entries using a four-byte name comparison at 03:8e04..8e06, followed by extension comparison. It separately validates ASCII digits in entry-name bytes 4--6 and compares the resulting numeric suffix. The context is therefore an intentional prefix selector rather than a missing exact filename. Runtime writes show AA88 codec use of the same data range and resident initialization restoring the prefix at 13.908 seconds. No filename or context is patched; metadata reply and persistence remain separate unverified requirements.",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "tools/noki5510_a00_inventory.py"]
+    },
+    {
       "id": "mu4_recorder_pending_receive_requires_firmware_interrupt_override",
       "status": "disproven",
       "hypothesis": "The recorder's post-startup unread serial byte requires an injected interrupt mask, scheduler event or software queue byte",
