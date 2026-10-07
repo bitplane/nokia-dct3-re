@@ -1586,6 +1586,17 @@ The final uploaded program contains 26 exact literal operands for `3768`
 across 48,261 words; this is not closure over DP-relative or dynamic writers.
 A plain MP3 file is not an evidenced fixture for this original firmware.
 
+External format evidence: the [repair-tool author's analysis](https://retrohack.eu/gsm/nokia-5510-dsp-repair-tool/)
+reports 384 metadata bytes followed by a 512-byte LockStream header, with
+MP3 data starting at byte `0380` (word offset `01c0`). These are independent
+claims to check against the original R060 parser, not yet an accepted fixture
+layout. Its modified MP3 firmware bypasses those reads and the parser; it is
+not a substitute for validating the original firmware.
+The [Nokryptia 1.3 author manual](https://man.freebsd.org/cgi/man.cgi?apropos=0&manpath=FreeBSD+6.0-RELEASE+and+Ports&query=nokryptia&sektion=1)
+documents MP3-to-LSE conversion but explicitly does not implement Nokia's
+encryption/decryption. Consequently, converter availability alone would not
+validate the encrypted-container path or all original media formats.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
