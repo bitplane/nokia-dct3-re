@@ -860,15 +860,16 @@ program-page registers. The ignored reference copy is
 `roms/reference-docs/npm5/ti_tms320c54x_spru302b.pdf`, SHA-256
 `daf74902629c8d3f54b12e0af57e95679fe172ddd581f5817aeac32b5503ec22`.
 
-Supported transfers are polled, nonsynchronized, single-frame/single-word
+The loader acceptance covers polled, nonsynchronized, single-frame/single-word
 blocks, with constant/increment/decrement addressing across program, data
 and I/O spaces. `0144` increments data source and program destination;
 `0145` selects data destination instead. Each timer event actually reads and
 writes a word, updates addresses/count and clears DE only after the last
 word. Low-address wrap does not modify the program-page register. Registers
-and pending timers are saved. Serial synchronization, interrupt generation,
-autoinitialization, ABU, indexed/frame transfers and arbitration are not
-implemented; unsupported active modes fail explicitly. The two-clock cadence
+and pending timers are saved. Subsequent serial synchronization, interrupt,
+autoinitialization and multiframe extensions are documented under the
+streaming boundary below. ABU, indexed addressing and overlapping arbitration
+remain outside the validated subset; unsupported active modes fail explicitly. The two-clock cadence
 at the fixture's 13 MHz is an assumption, not measured DA150 latency.
 
 MMIO conformance checks exercise deferred completion, program-page wrap,
@@ -1198,10 +1199,43 @@ program window, not just the common lower window.
 The next boundary is scheduler activation, not another DMA completion.
 Static original code has a call to common `3f1d` at `6d5e`, inside the
 startup helper at `6d44`. Entry code calls that helper at `6dbf`, after the
-far call to `02:904b`. Whether that call returns and the helper executes
-must be measured; these call sites alone are not proof of a missed startup
-step or an absent peer. Do not synthesize a worker callback, descriptor
-state or pending-word clear.
+far call to `02:904b`. The 100 ms worker tail observes one main-entry fetch
+and zero fetches at `6dbf`, `6d44` or `3f1d`. Thus this startup continuation
+has not executed in the bounded fixture; that is not proof it can never
+execute. The next question is which call inside `02:904b` remains outstanding
+and what its actual input contract is, not a guessed scheduler-enabling
+event. Do not synthesize a worker callback, descriptor state or pending-word
+clear.
+
+The outstanding main call is at `02:90f4`, targeting `03:9105`; earlier
+executed far calls have observed return-point fetches, but `02:90f6` does
+not execute in these windows. This routine resets an iterator through
+`03:bb09`, reads through `03:bb3d/03:bb5f/03:bbd6`, and fills buffer `1444`
+with original directory names (`MCUSI16`, `MP3SI16`, and the other uploaded
+files). Later code at `03:9219..03:9221` supplies filename pointers to
+`03:bcb6`: the original upload's data at `c146` is `TRACKLST`, and `c131`
+is `BIN`. This is a concrete file lookup, not an inferred hardware request.
+It does not yet establish the track-list format, missing-file behavior,
+or why the lookup has not completed.
+
+Separate observation profiles extend time without changing firmware or
+device inputs:
+
+| BIOS | Tail | TX/RX DMA completions | NAND reads during tail | Startup continuation/helper/selection-start fetches |
+| --- | --- | --- | --- | --- |
+| `worker` | 100 ms | 77/76 | 25,434 | 0/0/0 |
+| `settle` | 1 second | 697/697 | 134,969 | 0/0/0 |
+| `scan` | 5 seconds | 3,453/3,453 | 905,143 | 0/0/0 |
+
+Run them with `make check-mu4-storage-original MU4_STORAGE_BIOS=settle`
+or `MU4_STORAGE_BIOS=scan`. Both retain the first 1,024-word independent
+DIN comparison, original descriptor binding, digital conformance gates and
+zero illegal-opcode requirement. Additional transfer counts are not validated
+music content. In both windows the candidate consumer has zero entries and
+`b633` has zero firmware reads. The storage reader remains active: do not
+describe an endpoint PC as a stuck instruction or assume a missing peer.
+Next decode the lookup's termination condition and media cursor progression
+before extending time again or supplying a track-list fixture.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
