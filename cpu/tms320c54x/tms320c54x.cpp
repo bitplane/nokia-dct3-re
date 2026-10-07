@@ -96,6 +96,9 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_b));
 	save_item(NAME(m_t));
 	save_item(NAME(m_sp));
+	save_item(NAME(m_sp_address_base));
+	save_item(NAME(m_sp_address_pending));
+	save_item(NAME(m_sp_address_late));
 	save_item(NAME(m_st0));
 	save_item(NAME(m_st1));
 	save_item(NAME(m_pmst));
@@ -167,6 +170,8 @@ void tms320c54x_device::device_reset()
 	m_delayed_far = false;
 	m_delayed_words = 0;
 	m_xc_guard = 0;
+	m_sp_address_base = 0;
+	m_sp_address_pending = m_sp_address_late = false;
 	m_ifr = 0;
 	// Hardware reset sets INTM and clears IFR, but does not initialise IMR.
 	// Preserve the mask written by the ROM loader across MAD2 DSP reset pulses.
@@ -552,7 +557,10 @@ u16 tms320c54x_device::mmr_address(u8 mode)
 
 u16 tms320c54x_device::direct_address(u8 mode) const
 {
-	return BIT(m_st1, 14) ? u16(m_sp + (mode & 0x7f)) :
+	// SPRU131G 7.5.5.1: compiler-mode DAGEN can precede the
+	// previous stack operation's SP update. Extended-shift operands are later.
+	u16 const sp = m_sp_address_pending && !m_sp_address_late ? m_sp_address_base : m_sp;
+	return BIT(m_st1, 14) ? u16(sp + (mode & 0x7f)) :
 			u16(((m_st0 & 0x01ff) << 7) | (mode & 0x7f));
 }
 
@@ -2362,6 +2370,9 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xfc45: // RETC AEQ
 		return_if((m_a & ACC_MASK) == 0);
 		return;
+	case 0xfc43: // RC ALT (signed 40-bit accumulator)
+		return_if((s64(m_a << 24) >> 24) < 0);
+		return;
 	case 0xfc47: // RETC ALEQ
 		return_if((s64(m_a << 24) >> 24) <= 0);
 		return;
@@ -2684,12 +2695,20 @@ void tms320c54x_device::execute_run()
 		const bool delayed = m_delayed_words != 0;
 		const bool xc_guarded = m_xc_guard != 0;
 		const u16 instruction_pc = m_pc;
+		const u16 previous_sp = m_sp;
 		const bool repeat_was_armed = m_rpt_armed;
 		m_op = fetch();
+		m_sp_address_late = (m_op & 0xff00) == 0x6f00;
 		if (m_opcode_first_pc[m_op] == 0xffff)
 			m_opcode_first_pc[m_op] = instruction_pc;
 		++m_opcode_count[m_op];
 		execute_one(m_op);
+		// One-cycle stack-operation group from SPRU131G table 7-9.
+		// Calls/returns use the architectural SP, not this DAGEN snapshot.
+		m_sp_address_pending = (m_op & 0xff00) == 0xee00 ||
+			((m_op & 0xff80) == 0x4a00) ||
+			((m_op & 0xff80) == 0x8a00 && (m_op & 0x7f) != 0x18);
+		if (m_sp_address_pending) m_sp_address_base = previous_sp;
 		if (!m_illegal)
 		{
 			// RPT/RPTZ arms the next instruction; its own retirement must not

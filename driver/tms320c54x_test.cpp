@@ -28,6 +28,48 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_return_alt_case(unsigned index)
+	{
+		static constexpr u64 values[] = {0xffffffffffULL, 0x8000000000ULL, 0, 1, 0x7fffffffffULL};
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109d0, 0xfc43); program.write_word(0x0109d1, 0xf4e1);
+		program.write_word(0x0109e0, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x09e0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, values[index]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 2696 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+	void start_stack_address_latency_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		unsigned const producer = index / 8;
+		unsigned cursor = 0x0109d0;
+		program.write_word(cursor++, producer == 0 ? 0x8a0b : producer == 1 ? 0x4a0b : 0xeeff);
+		if (index & 1) program.write_word(cursor++, 0xf495);
+		if (index & 4)
+		{
+			program.write_word(cursor++, 0x6f06);
+			program.write_word(cursor++, 0x0c80); // Extended-shift STL A,0,6 (category II).
+		}
+		else program.write_word(cursor++, 0x8006);
+		program.write_word(cursor, 0xf4e1);
+		for (unsigned address = 0x0fff; address <= 0x1007; ++address) data.write_word(address, 0xcccc);
+		data.write_word(0x1000, 0x5566); data.write_word(0x1806, 0xcccc);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0030);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 2) ? 0x0800 : 0x4800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x4044);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 2672 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_immediate_dp_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -14839,6 +14881,35 @@ private:
 				"LD #k9,DP replaces only the nine DP bits in one cycle, independent of CPL and SXM");
 			if (index < 1023) { start_immediate_dp_case(index + 1); return; }
 			osd_printf_info("TMS320C54x immediate DP conformance: PASS variants=1024\n");
+			start_stack_address_latency_case(0);
+			return;
+		}
+		if (m_phase >= 2672 && m_phase < 2696)
+		{
+			unsigned const index = m_phase - 2672;
+			u16 const final_sp = index / 8 == 0 ? 0x1001 : 0x0fff;
+			u16 const address = (index & 2) ? 0x1806 : ((index & 5) ? final_sp : 0x1000) + 6;
+			expect(data.read_word(address) == 0x4044 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == final_sp &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"SPRU131G table 7-9: POPM/PSHM/FRAME to CPL store has category-I latency and category-II forwarding");
+			if (index < 23) { start_stack_address_latency_case(index + 1); return; }
+			osd_printf_info("TMS320C54x stack address latency conformance: PASS variants=24\n");
+			start_return_alt_case(0);
+			return;
+		}
+		if (m_phase >= 2696 && m_phase < 2701)
+		{
+			unsigned const index = m_phase - 2696;
+			bool const taken = index < 2;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (taken ? 0x1001 : 0x1000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x09e1 : 0x09d2) &&
+				m_cpu->state_int(tms320c54x_device::STATE_XPC) == 1,
+				"RC ALT tests signed 40-bit A, consumes only a taken return and preserves XPC");
+			if (index < 4) { start_return_alt_case(index + 1); return; }
+			osd_printf_info("TMS320C54x RC ALT conformance: PASS variants=5\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -1061,7 +1061,7 @@ check-mu4-storage-original: build
 			grep -q 'mu4_native_sustained: PASS' error.log; grep -q 'mu4_native_interrupts: PASS' error.log; fi; \
 		if [ "$(MU4_STORAGE_BIOS)" = worker ] || [ "$(MU4_STORAGE_BIOS)" = settle ] || [ "$(MU4_STORAGE_BIOS)" = scan ] || [ "$(MU4_STORAGE_BIOS)" = startup ]; then \
 			grep -q 'mu4_native_worker_window: PASS' error.log; grep -q 'mu4_native_stream_binding: PASS' error.log; fi; \
-		if [ "$(MU4_STORAGE_BIOS)" = startup ]; then grep -q 'mu4_native_startup_return: PASS' error.log; fi
+		if [ "$(MU4_STORAGE_BIOS)" = startup ]; then grep -q 'mu4_native_worker_activation: PASS' error.log; fi
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.
@@ -1074,6 +1074,8 @@ check-c54x-core: build
 	@$(MAME_DIR)/mame tms54test -rompath $(MAME_DIR)/roms -video none -sound none -nothrottle -seconds_to_run 1 2>&1 | \
 		tee /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x core conformance: PASS" /tmp/tms320c54x-core-check.log
+	@grep -q "TMS320C54x stack address latency conformance: PASS" /tmp/tms320c54x-core-check.log
+	@grep -q "TMS320C54x RC ALT conformance: PASS" /tmp/tms320c54x-core-check.log
 
 prepare-c54x-rom4-fixture:
 	@test -f roms/research/nse1-rom4/working/transform_entry_prog.bin

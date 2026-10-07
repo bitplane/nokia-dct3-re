@@ -1612,11 +1612,11 @@ private:
 					m_native_startup_fetches[0], m_native_startup_fetches[1], m_native_startup_fetches[2], m_native_startup_fetches[3]);
 				if (system_bios() == 7)
 				{
-					// 1820 is this harness's loader-call return sentinel, not a firmware idle loop.
 					if (!m_native_startup_fetches[1] || !m_native_startup_fetches[2] ||
-						m_cpu->state_int(tms320c54x_device::STATE_PC) != 0x1821 || !m_cpu->state_int(tms320c54x_device::STATE_IDLE))
-						fatalerror("MU4 longer startup did not reach the observed loader-return boundary");
-					logerror("mu4_native_startup_return: PASS continuation=1 helper=1 fixture_sentinel=1820 full_boot=0\n");
+						!m_native_stream_consumer_entries || !m_native_stream_pending_reads || m_native_stream_pending_clears < 2)
+						fatalerror("MU4 longer startup did not activate its original streaming consumer");
+					logerror("mu4_native_worker_activation: PASS consumer_entries=%u reads=%u clears=%u full_boot=0\n",
+						m_native_stream_consumer_entries, m_native_stream_pending_reads, m_native_stream_pending_clears);
 				}
 				for (unsigned i = 0; i < std::size(buffer_calls); ++i)
 					logerror("mu4_native_buffer_counts: site=%06x calls=%u returns=%u\n",

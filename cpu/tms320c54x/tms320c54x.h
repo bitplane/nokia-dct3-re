@@ -124,6 +124,9 @@ private:
 	u64 m_b = 0;
 	u16 m_t = 0;
 	u16 m_sp = 0;
+	u16 m_sp_address_base = 0;
+	bool m_sp_address_pending = false;
+	bool m_sp_address_late = false;
 	u16 m_st0 = 0;
 	u16 m_st1 = 0;
 	u16 m_pmst = 0;
