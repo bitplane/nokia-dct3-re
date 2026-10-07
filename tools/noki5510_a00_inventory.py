@@ -250,6 +250,35 @@ def program_call_census(image, start, end, marker):
                      'indirect calls, other call encodings and physical aliasing unresolved'}
 
 
+def program_cinit_inventory(image, start, marker):
+    """Decode an original count/destination table inside one uploaded overlay."""
+    if not 0x10000 <= start < 0x800000:
+        raise ValueError('C initialization table requires an extended word address')
+    words = uploaded_word_image(image, marker)
+    cursor = start
+    table = []
+    while True:
+        if cursor not in words:
+            raise ValueError('C initialization table contains missing words or no terminator')
+        count = words[cursor]
+        length = count + 2 if count else 1
+        for address in range(cursor, cursor + length):
+            if address not in words:
+                raise ValueError('C initialization table contains missing words')
+            table.append(words[address])
+        cursor += length
+        if not count:
+            break
+    report = cinit_inventory(struct.pack(f'>{len(table)}H', *table))
+    destinations = {address for record in report['records']
+                    for address in range(record['destination_data_word_address'],
+                                         record['destination_data_word_address'] + record['words'])}
+    report.update(segment=marker, range_word_addresses=[start, cursor],
+                  initialized_words=sum(record['words'] for record in report['records']),
+                  unique_initialized_words=len(destinations))
+    return report
+
+
 def extract_program_range(image, start, end, marker, little_endian=False):
     """Reassemble logical uploaded words in record order; never infer aliases or fill gaps."""
     if not 0x10000 <= start < end <= 0x800000:
@@ -268,6 +297,8 @@ def main():
                         help='exact destination word address; export original big-endian bytes')
     parser.add_argument('--cinit-section', type=lambda value: int(value, 0),
                         help='inspect one exact section as a recovered C initialization table')
+    parser.add_argument('--program-cinit-address', type=lambda value: int(value, 0),
+                        help='inspect an embedded C initialization table in one uploaded segment')
     parser.add_argument('--segment', help='container marker, e.g. aa55; omit for InitDisk')
     parser.add_argument('--extract-segment', action='store_true', help='export exact original wire segment')
     parser.add_argument('--extract-container', action='store_true', help='export decoded original segment container')
@@ -279,6 +310,17 @@ def main():
     parser.add_argument('--disassembler-little-endian', action='store_true',
                         help='encode a reconstructed range for little-endian disassemblers, not an original wire export')
     args = parser.parse_args()
+    if args.program_cinit_address is not None:
+        if not args.segment or args.output or args.extract_program_range or args.program_call_census or args.extract_section is not None or args.extract_segment or args.extract_container or args.cinit_section is not None or args.disassembler_little_endian:
+            parser.error('--program-cinit-address requires --segment and excludes export operations')
+        try:
+            source = args.image.read_bytes()
+            report = program_cinit_inventory(bytes.fromhex(source.decode('ascii')), args.program_cinit_address, args.segment)
+            report['source_sha256'] = hashlib.sha256(source).hexdigest()
+            print(json.dumps(report, indent=2))
+            return
+        except (OSError, ValueError) as error:
+            parser.exit(1, f'A00 C initialization inventory: {error}\n')
     if args.program_call_census is not None:
         if not args.segment or args.output or args.extract_program_range or args.extract_section is not None or args.extract_segment or args.extract_container or args.cinit_section is not None or args.disassembler_little_endian:
             parser.error('--program-call-census requires --segment and excludes export operations')

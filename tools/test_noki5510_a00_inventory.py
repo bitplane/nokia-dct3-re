@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, extract_segment, cinit_inventory, extract_program_range, program_call_census
+from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, extract_segment, cinit_inventory, extract_program_range, program_call_census, program_cinit_inventory
 
 
 def segment(marker, payload):
@@ -8,6 +8,28 @@ def segment(marker, payload):
 
 
 class A00InventoryTest(unittest.TestCase):
+    def test_embedded_cinit_preserves_overlay_and_counts_rewrites(self):
+        image = segment(0xaa55, self.boot_image())
+        image += self.checked_overlay(0xaa22, [8, 2, 0x8000, 2, 0x374c, 9, 10, 1, 0x374d, 11, 0, 0])
+        image += self.checked_overlay(0xaa44, [4, 2, 0x8000, 1, 0x3750, 12, 0, 0])
+        report = program_cinit_inventory(image, 0x28000, 'aa22')
+        self.assertEqual(report['range_word_addresses'], [0x28000, 0x28008])
+        self.assertEqual(report['initialized_words'], 3)
+        self.assertEqual(report['unique_initialized_words'], 2)
+        self.assertEqual(report['records'][1]['values'], ['000b'])
+        self.assertEqual(program_cinit_inventory(image, 0x28000, 'aa44')['initialized_words'], 1)
+
+    def test_embedded_cinit_rejects_missing_words_and_wrapped_data(self):
+        image = segment(0xaa55, self.boot_image())
+        missing = image + self.checked_overlay(0xaa22, [3, 2, 0x8000, 2, 0x374d, 1, 0])
+        with self.assertRaisesRegex(ValueError, 'missing'):
+            program_cinit_inventory(missing, 0x28000, 'aa22')
+        wrapped = image + self.checked_overlay(0xaa22, [5, 2, 0x8000, 2, 0xffff, 1, 2, 0, 0])
+        with self.assertRaisesRegex(ValueError, 'wraps'):
+            program_cinit_inventory(wrapped, 0x28000, 'aa22')
+        with self.assertRaisesRegex(ValueError, 'extended'):
+            program_cinit_inventory(wrapped, 0x8000, 'aa22')
+
     def checked_overlay(self, marker, words):
         payload = struct.pack(f'>{len(words)}H', *words)
         checksum = 0

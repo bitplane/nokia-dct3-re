@@ -1778,6 +1778,30 @@ value is altered. Next recover the legitimate initialization/reset path
 for this one-time state and its dependent contexts; do not bypass it by
 clearing `374d` or invoking the skipped calls from the supervisor.
 
+The original resident C-runtime entry `02:6d62` sets INTM, clears IMR,
+establishes stack/status/vector-base state, and processes its own
+count/destination/data table at `02:6dc7` before calling main
+`02:904b`. This is distinct from the supervisor's replay of the serial
+bootstrap's C initialization. The read-only command
+`tools/noki5510_a00_inventory.py InitData_R060.a00 --segment aa22
+--program-cinit-address 0x26dc7` accounts for the complete resident table:
+240 records, 1,293 distinct data-word destinations, and a terminating zero
+at `02:74b4` (exclusive end `02:74b5`, 3,548 encoded bytes).
+It initializes the file contexts at `1444` and `16b8`, but none of the
+nine differing words above, including `374d`. The separate `aa55` table
+at `0f33` has five records writing `1700`, `1849`, `1746`, `1742` and
+`1744`; it also does not cover those nine words.
+
+The embedded-table decoder preserves overlay/final-write ownership,
+rejects holes, missing terminators and wrapped data destinations, and
+reports total versus unique initialized words. It does not invent zero
+initialization for addresses absent from either table. Therefore the
+current routine-level reset diagnostic does not demonstrate a missing
+C-table replay; zeroing BSS or the gate would require independent original
+startup/reset evidence. Recover the full serial-bootstrap/reset lifecycle
+and any implicit memory initialization separately from these explicit
+tables. Physical reset and resident control restart remain unvalidated.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and finish reset lifecycle and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
