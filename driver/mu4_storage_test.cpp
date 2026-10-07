@@ -15,7 +15,7 @@ class mu4_storage_test_state : public driver_device
 {
 public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
-				: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_dma(*this, "dma"), m_mcbsp(*this, "mcbsp1"), m_program_ram(*this, "program_ram"), m_dma_sink(*this, "dma_sink"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
+				: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_dma(*this, "dma"), m_mcbsp(*this, "mcbsp1"), m_mcbsp0(*this, "mcbsp0"), m_program_ram(*this, "program_ram"), m_dma_sink(*this, "dma_sink"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
 		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers"),
 		  m_disk_vectors(*this, "disk_vectors"), m_segment(*this, "segment") { }
 	void test(machine_config &config)
@@ -35,6 +35,11 @@ public:
 		m_mcbsp->tx_word_cb().set(FUNC(mu4_storage_test_state::serial_tx));
 		m_mcbsp->tx_bit_cb().set(FUNC(mu4_storage_test_state::serial_tx_bit));
 		m_mcbsp->tx_irq_cb().set(FUNC(mu4_storage_test_state::serial_tx_irq));
+		m_mcbsp->tx_event_cb().set([this](int state) { m_dma->sync_w(6, state); });
+		TMS320C54X_MCBSP(config, m_mcbsp0, 13'000'000);
+		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
+		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
+		m_mcbsp0->tx_irq_cb().set([this](int state) { m_cpu->set_input_line(5, state); });
 		SAMSUNG_K9K1208U0A(config, m_nand);
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
 	}
@@ -42,18 +47,39 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	required_device<tms320c54x_dma_device> m_dma;
 	required_device<tms320c54x_mcbsp_device> m_mcbsp;
+	required_device<tms320c54x_mcbsp_device> m_mcbsp0;
 	std::vector<u16> m_serial_tx_words;
 	std::vector<int> m_serial_tx_bits;
 	unsigned m_serial_saved_bits = 0;
 	unsigned m_serial_tx_irqs = 0;
 	std::vector<u16> m_dma_output;
 	unsigned m_dma_completions = 0;
-	void dma_complete(u8 channel) { if (channel != 3) fatalerror("MU4 unexpected DMA completion channel"); ++m_dma_completions; }
-	void dma_output_w(u16 value) { m_dma_sink[0] = value; if (m_phase >= 38 && m_phase <= 48) m_dma_output.push_back(value); }
+	void dma_complete(u8 channel)
+	{
+		if (channel != 3) fatalerror("MU4 unexpected DMA completion channel");
+		++m_dma_completions;
+		unsigned const selection = (m_dma->read(0) >> 6) & 3;
+		if (selection == 1 || selection == 2)
+		{
+			m_cpu->set_input_line(11, ASSERT_LINE); m_cpu->set_input_line(11, CLEAR_LINE);
+		}
+	}
+	unsigned m_stream_words = 0, m_stream_config_writes = 0;
+	void stream_tx(u16 value)
+	{
+		++m_stream_words;
+		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
+		if (m_phase == 30 && system_bios() == 2 && m_stream_words == 128) m_check->adjust(attotime::zero);
+	}
+	void dma_output_w(u16 value) { m_dma_sink[0] = value; if (m_phase >= 38 && m_phase <= 50) m_dma_output.push_back(value); }
 	void dma_reg_w(u16 index, u16 value) { m_dma->write(1, index); m_dma->write(3, value); }
 	u16 dma_reg_r(u16 index) { m_dma->write(1, index); return m_dma->read(3); }
 	// VC5410A IFR bit 11 is XINT1; its priority rank 14 is not a bit index.
-	void serial_tx_irq(int value) { if (value) ++m_serial_tx_irqs; m_cpu->set_input_line(11, value); }
+	void serial_tx_irq(int value)
+	{
+		if (value) ++m_serial_tx_irqs;
+		if (!(m_dma->read(0) & 0xc0)) m_cpu->set_input_line(11, value);
+	}
 	void serial_tx_bit(int value) { if (m_phase >= 31 && m_phase <= 37) m_serial_tx_bits.push_back(value); }
 	void mcbsp_reg_w(u16 index, u16 value) { m_mcbsp->control_w(0, index); m_mcbsp->control_w(1, value); }
 	u16 mcbsp_status() { m_mcbsp->control_w(0, 1); return m_mcbsp->control_r(1); }
@@ -63,7 +89,7 @@ private:
 		if (m_phase == 30 && m_serial_tx_words.size() <= 16) logerror("mu4_native_tx: word=%04x\n", value);
 		// End the serial-setup fixture at its observed complete control stream,
 		// before the separate streaming-DMA contract (not implemented here).
-		if (m_phase == 30 && m_serial_tx_words.size() == 6) m_check->adjust(attotime::zero);
+		if (m_phase == 30 && system_bios() != 2 && m_serial_tx_words.size() == 6) m_check->adjust(attotime::zero);
 	}
 	required_shared_ptr<u16> m_program_ram;
 	required_shared_ptr<u16> m_dma_sink;
@@ -105,6 +131,7 @@ private:
 	void data_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
+		map(0x0020, 0x0023).rw(m_mcbsp0, FUNC(tms320c54x_mcbsp_device::data_r), FUNC(tms320c54x_mcbsp_device::data_w));
 		map(0x0031, 0x0031).r(FUNC(mu4_storage_test_state::serial_r));
 		map(0x0034, 0x0035).rw(FUNC(mu4_storage_test_state::serial_config_r), FUNC(mu4_storage_test_state::serial_config_w));
 		map(0x0038, 0x0039).rw(FUNC(mu4_storage_test_state::serial_config0_r), FUNC(mu4_storage_test_state::serial_config0_w));
@@ -136,11 +163,13 @@ private:
 		if (offset) m_serial_regs[0][m_serial_index[0]] = value;
 		else m_serial_index[0] = value & 31;
 	}
-	u16 serial_config0_r(offs_t offset) { return offset ? m_serial_regs[1][m_serial_index[1]] : m_serial_index[1]; }
+	u16 serial_config0_r(offs_t offset) { return m_mcbsp0->control_r(offset); }
 	void serial_config0_w(offs_t offset, u16 value)
 	{
-		if (offset) m_serial_regs[1][m_serial_index[1]] = value;
-		else m_serial_index[1] = value & 31;
+		if (m_phase == 30 && m_native_far_reads && m_stream_config_writes++ < 64)
+			logerror("mu4_native_stream_config: offset=%u index=%04x value=%04x pc=%06x\n",
+				unsigned(offset), m_mcbsp0->control_r(0), value, unsigned(m_cpu->pc()));
+		m_mcbsp0->control_w(offset, value);
 	}
 	void deliver_serial(u8 value)
 	{
@@ -201,6 +230,7 @@ private:
 		m_serial_tx_words.clear(); m_serial_tx_bits.clear();
 		m_serial_tx_irqs = 0;
 		m_dma_output.clear(); m_dma_completions = 0;
+		m_stream_words = m_stream_config_writes = 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		// Synthetic wrapper initializes the routine ABI, then calls untouched code.
 		u16 const wrapper[] = {
@@ -233,7 +263,22 @@ private:
 			dma_reg_w(0x20, 0x40); dma_reg_w(0x22, 0xffc1);
 			dma_reg_w(0x32, 0x6000); dma_reg_w(0x33, 0x6200);
 			dma_reg_w(0x34, 1); dma_reg_w(0x35, 0x2001);
+			m_dma->write(0, m_phase == 44 ? 0x48 : 8);
+			if (m_phase == 44)
+			{
+				mcbsp_reg_w(1, 1); // XINT1 must be suppressed while INTOSEL selects DMA3.
+			}
+		}
+		if (m_phase == 49)
+		{
+			program.write_word(0x1800, 0xf4e1);
+			m_cpu->space(AS_DATA).write_word(0x6000, 0x1234);
+			m_cpu->space(AS_DATA).write_word(0x6001, 0xabcd);
+			dma_reg_w(0xf, 0x6000); dma_reg_w(0x10, 0x6200);
+			dma_reg_w(0x11, 0); dma_reg_w(0x12, 0x2000); dma_reg_w(0x13, 0x4141);
+			m_dma->sync_w(2, ASSERT_LINE);
 			m_dma->write(0, 8);
+			m_dma->sync_w(2, ASSERT_LINE); // Held level is not a second event.
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
@@ -510,13 +555,28 @@ private:
 			std::vector<u16> const expected = {0x1234, 0x5678, 0xabcd, 0x9abc};
 			if (m_dma_output != std::vector<u16>(expected.begin(), expected.begin() + words) || m_dma_completions != words / 2)
 				fatalerror("MU4 DMA frame interrupt/transfer ordering mismatch step=%u", words);
+			if (bool(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x0800) != (words >= 2))
+				fatalerror("MU4 DMA/McBSP interrupt mux mismatch step=%u", words);
 			if (words == 4)
 			{
 				if (m_dma->read(0) & 8) fatalerror("MU4 non-reloading DMA remains enabled");
 				logerror("mu4_dma_sync_conformance: PASS event_gate=1 sorting=1 multiframe=1 auto_reload=1 block_interrupt=1 frame_interrupt=1 no_reload=1 pending_restore=1\n");
-				m_phase = 25; machine().schedule_soft_reset(); return;
+				m_phase = 49; machine().schedule_soft_reset(); return;
 			}
 			m_dma->sync_event(2); ++m_phase; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase == 49 || m_phase == 50)
+		{
+			std::vector<u16> const expected = m_phase == 49 ? std::vector<u16>({0x1234}) : std::vector<u16>({0x1234, 0xabcd});
+			if (m_dma_output != expected || m_dma_completions != m_phase - 48 || (m_dma->read(0) & 8))
+				fatalerror("MU4 DMA held synchronization level mismatch");
+			if (m_phase == 49)
+			{
+				m_dma->write(0, 8); ++m_phase; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			m_dma->sync_w(2, CLEAR_LINE);
+			logerror("mu4_dma_sync_level: PASS ready_before_enable=1 held_level=1 reenable=1\n");
+			m_phase = 25; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
@@ -650,6 +710,10 @@ private:
 				fatalerror("MU4 original program transfer missing entry=%u far=%u pc=%06x", m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)));
 			if (m_serial_tx_words != std::vector<u16>({0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023, 0x1201}))
 				fatalerror("MU4 original serial-setup sequence mismatch");
+			if (system_bios() == 2 && (m_stream_words < 128 || !m_dma_completions))
+				fatalerror("MU4 original streaming block incomplete words=%u completions=%u pc=%06x illegal=%u",
+					m_stream_words, m_dma_completions, unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			if (system_bios() == 2) logerror("mu4_native_stream: PASS words=%u dma_completions=%u\n", m_stream_words, m_dma_completions);
 			logerror("mu4_native_entry: PASS original_transfer=1 entry_reads=%u far_reads=%u pc=%06x illegal=%u idle=%u pmst=%04x\n",
 				m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
@@ -1014,6 +1078,8 @@ private:
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
 ROM_START(mu4nand)
+	ROM_SYSTEM_BIOS(0, "setup", "Original storage, loader and serial setup")
+	ROM_SYSTEM_BIOS(1, "stream", "Original streaming frontier (incomplete)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

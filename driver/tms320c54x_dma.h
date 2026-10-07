@@ -13,6 +13,7 @@ public:
 	void set_per_channel_reload(bool value) { m_per_channel_reload = value; }
 	auto completion_cb() { return m_completion_cb.bind(); }
 	void sync_event(unsigned event);
+	void sync_w(unsigned event, int state);
 	u16 read(offs_t offset);
 	void write(offs_t offset, u16 value);
 
@@ -32,6 +33,7 @@ private:
 	bool valid_index(u16 index) const { return index < 0x28 || (m_per_channel_reload && index >= 0x2a && index <= 0x3d); }
 	u16 m_regs[0x3e] = {};
 	u16 m_frame_elements[6] = {};
+	u16 m_sync_levels = 0;
 	emu_timer *m_timers[6] = {};
 };
 

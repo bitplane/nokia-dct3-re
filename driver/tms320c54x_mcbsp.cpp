@@ -6,7 +6,7 @@
 DEFINE_DEVICE_TYPE(TMS320C54X_MCBSP, tms320c54x_mcbsp_device, "tms54mcbsp", "TMS320C54x McBSP (partial)")
 
 tms320c54x_mcbsp_device::tms320c54x_mcbsp_device(machine_config const &config, char const *tag, device_t *owner, u32 clock)
-	: device_t(config, TMS320C54X_MCBSP, tag, owner, clock), m_tx_word_cb(*this), m_tx_bit_cb(*this), m_tx_irq_cb(*this)
+	: device_t(config, TMS320C54X_MCBSP, tag, owner, clock), m_tx_word_cb(*this), m_tx_bit_cb(*this), m_tx_irq_cb(*this), m_tx_event_cb(*this)
 {
 }
 
@@ -28,6 +28,7 @@ void tms320c54x_mcbsp_device::device_reset()
 	m_bits = m_delay = 0;
 	m_buffer_full = m_shift_active = m_ready = false;
 	m_bit_timer->adjust(attotime::never);
+	m_tx_event_cb(CLEAR_LINE);
 }
 
 u16 tms320c54x_mcbsp_device::control_r(offs_t offset)
@@ -48,7 +49,8 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 		m_regs[1] = value & 0x03f9; // XRDY/XEMPTY are hardware-owned; reserved bits read zero.
 		if (!BIT(value, 0))
 		{
-			m_ready = m_buffer_full = m_shift_active = false;
+			set_ready(false);
+			m_buffer_full = m_shift_active = false;
 			m_bits = m_delay = 0;
 			m_bit_timer->adjust(attotime::never);
 		}
@@ -84,7 +86,9 @@ void tms320c54x_mcbsp_device::arm_clock()
 void tms320c54x_mcbsp_device::set_ready(bool ready)
 {
 	bool const rising = ready && !m_ready;
+	bool const changed = ready != m_ready;
 	m_ready = ready;
+	if (changed) m_tx_event_cb(ready ? ASSERT_LINE : CLEAR_LINE);
 	if (rising && !(m_regs[1] & 0x0030))
 	{
 		m_tx_irq_cb(ASSERT_LINE);

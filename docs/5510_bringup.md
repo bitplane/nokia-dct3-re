@@ -16,7 +16,8 @@ complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
 The partial McBSP1 transmitter now carries six original firmware control
 words. The acceptance run stops at that observed serial-setup boundary.
 The subsequent DMA channel-3 configuration is mapped and its transfer mechanics
-have isolated conformance tests; McBSP0 event/data attachment remains pending.
+have isolated conformance tests. McBSP0 is attached, but the streaming profile
+fails explicitly on its externally clocked, framed transmit format.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -962,8 +963,8 @@ VC5410A table 3-20 identifies exactly this per-channel bank; the frame reload
 has only eight writable bits, so its stored value is `003f`. DA150 therefore
 uses the extended per-channel reload layout for this path, not shared `24..27`.
 The original-firmware stream has not yet executed through its endpoint.
-Next work requires a separately configured McBSP0 data
-transmitter; forwarding it into McBSP1 would conflate different ports.
+McBSP0 now has its own mapped data/control device and XRDY-to-DMA event line;
+forwarding it into McBSP1 would conflate different ports.
 The VC5410A datasheet's IFR diagram puts XINT1 at bit 11; table 3-21's
 priority rank 14 is not an interrupt-bit number. The fixture uses bit 11.
 The DMA device now has an explicit per-channel reload configuration, selected
@@ -971,8 +972,9 @@ by this fixture. Conformance checks all six reload banks, eight-bit frame masks,
 reserved `28/29`, indexed access and extended-bank save/restore. The
 channel-enable extension remains unsupported.
 At captured DMPREC `4848`, INTOSEL is 1; VC5410A table 3-16 assigns IFR
-bit 11 to DMA channel 3 rather than XINT1. Streaming work must model that
-interrupt mux, not let the two devices independently drive the same CPU line.
+bit 11 to DMA channel 3 rather than XINT1. The fixture routes these sources
+according to INTOSEL. This is a partial mux (the attached transmit sources
+and channel 3), not a complete ASIC interrupt-controller implementation.
 
 The DMA device now accepts single-word multiframe transfers, all nonreserved
 sorting/index modes, shared or per-channel auto-reload, and block/frame completion
@@ -984,6 +986,36 @@ save/replay. Completion callbacks identify the channel; the surrounding ASIC
 owns the CPU interrupt mux. ABU, double-word transfers and overlapping sync/bus
 arbitration still fail explicitly. These tests do not prove original streaming,
 physical clock/arbitration timing, codec operation or playback.
+
+XRDY also has a level callback independent of CPU interrupts. DMA remembers
+asserted ready lines, including readiness preceding channel enable. Tests cover
+that ordering, a held level not becoming a duplicate edge, and channel re-enable.
+Both line levels and pending transfers are saved. Pulse-event conformance remains
+separate from this peripheral-ready wiring.
+
+### Codec-controlled streaming clocks
+
+NPM-5 schematic sheet 2 identifies U601 as TLV320AIC23PW, with `DSP_CLKOUT`
+at 11.9952 MHz. McBSP1 carries codec controls; McBSP0 carries digital audio.
+Original controls decode as power `10`, analog path `18`, digital path `01`,
+format `53`, sample-rate `23`, active `01`. The related
+[TI AIC23B datasheet](https://www.ti.com/lit/ds/symlink/tlv320aic23b.pdf)
+corroborates master, DSP-format, 16-bit stereo and USB/272 oversampling;
+11,995,200 / 272 gives 44,100 frames/s. B-revision timing still needs comparison
+with the original part before implementation.
+
+Original McBSP0 configuration is PCR `000e`, XCR1 `0140`, XCR2 `0044`,
+SRGR1 `0f07`, SRGR2 `101f`, SPCR2 `0101`. It selects external clocks,
+two 16-bit words per frame and frame-ignore behavior. The current transmitter
+rejects that active format; no clock or frame edge is fabricated.
+
+`make check-mu4-storage-original` uses BIOS `setup`, preserving storage,
+loader, DMA/McBSP conformance and six-word original control setup.
+`make check-mu4-storage-original MU4_STORAGE_BIOS=stream` selects the same
+original bytes but requires a complete 128-word streaming block and DMA
+completion. It currently fails at the unsupported format. Next work is the
+codec control/clock boundary and externally framed McBSP transmit lifecycle,
+not a fixed-rate ready pulse or a claim of audio playback.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.

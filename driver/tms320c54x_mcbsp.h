@@ -15,6 +15,7 @@ public:
 	auto tx_word_cb() { return m_tx_word_cb.bind(); }
 	auto tx_bit_cb() { return m_tx_bit_cb.bind(); }
 	auto tx_irq_cb() { return m_tx_irq_cb.bind(); }
+	auto tx_event_cb() { return m_tx_event_cb.bind(); }
 protected:
 	void device_start() override ATTR_COLD;
 	void device_reset() override ATTR_COLD;
@@ -33,6 +34,7 @@ private:
 	devcb_write16 m_tx_word_cb;
 	devcb_write_line m_tx_bit_cb;
 	devcb_write_line m_tx_irq_cb;
+	devcb_write_line m_tx_event_cb;
 };
 
 DECLARE_DEVICE_TYPE(TMS320C54X_MCBSP, tms320c54x_mcbsp_device)

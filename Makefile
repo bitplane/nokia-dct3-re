@@ -1033,7 +1033,7 @@ check-mu4-storage-original: build
 			--extract-section 0x80 --output "$$tmp/roms/mu4nand/mu4_initdisk_vectors.bin"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -rompath "$$tmp/roms" \
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
-			-seconds_to_run 1200 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
+			-bios $(or $(MU4_STORAGE_BIOS),setup) -seconds_to_run 1200 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; grep -q 'mu4_storage_original: PASS' error.log; \
 		grep -q 'mu4_storage_flush: PASS' error.log; grep -q 'mu4_storage_mount: PASS' error.log; \
 		grep -q 'mu4_storage_template: PASS' error.log; grep -q 'mu4_storage_format: PASS' error.log; \
@@ -1043,7 +1043,9 @@ check-mu4-storage-original: build
 		grep -q 'mu4_file_readback: PASS files=6' error.log; \
 		grep -q 'mu4_dma_conformance: PASS' error.log; grep -q 'mu4_loader: PASS' error.log; \
 		grep -q 'mu4_native_entry: PASS' error.log; grep -q 'mu4_mcbsp_conformance: PASS' error.log; \
-		grep -q 'mu4_dma_sync_conformance: PASS' error.log
+		grep -q 'mu4_dma_sync_conformance: PASS' error.log; \
+		grep -q 'mu4_dma_sync_level: PASS' error.log; \
+		if [ "$(MU4_STORAGE_BIOS)" = stream ]; then grep -q 'mu4_native_stream: PASS' error.log; fi
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.

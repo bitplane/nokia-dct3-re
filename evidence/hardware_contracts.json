@@ -3,8 +3,18 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_codec_clock_frontier", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
+      "boundary": "NPM-5 MU4 schematic sheet 2 identifies U601 TLV320AIC23PW and 11.9952 MHz DSP_CLKOUT. Original six McBSP1 control words decode to power 10, analog 18, digital 01, format 53, sample-rate 23 and active 01. Related TI AIC23B register definitions corroborate master/DSP/16-bit stereo and USB/272 clock selection; 11995200/272=44100. Original McBSP0 PCR=000e XCR=0140/0044 SRGR=0f07/101f SPCR2=0101 selects external framed transmission, two words/frame and frame-ignore. Attached stream profile explicitly fails unsupported format; setup profile remains separately verified. No fabricated codec clocks, complete original block or audio playback is claimed. Original-versus-B timing comparison and external frame/clock lifecycle are next",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "driver/tms320c54x_mcbsp.cpp", "Makefile"]
+    },
+    {
+      "id": "c54x_mcbsp_dma_ready_line", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "McBSP XRDY publishes a saved-state-backed level callback separate from CPU interrupt pulses. DMA retains asserted sync levels and services readiness already high when DE is enabled. Executable conformance verifies pre-enable ready, held level without duplicate edge and re-enable. MU4 fixture attaches separate McBSP0/1 data/control ports and maps XEVT0/1 to DMA events 2/6. Partial INTOSEL mux suppresses XINT1 while DMA3 owns IFR bit 11; synthetic frame-transfer conformance checks CPU IFR ordering. Full RX/mux coverage, overlapping arbitration, external clock/frame transmission and codec output are not validated",
+      "evidence": ["driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "driver/tms320c54x_mcbsp.cpp", "driver/tms320c54x_mcbsp.h", "driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]
+    },
+    {
       "id": "c54x_dma_synchronized_multiframe_subset", "subsystem": "mu4", "status": "partial", "confidence": "strong",
-      "boundary": "Generic enhanced DMA implements event-gated single-word multiframe transfers, constant/increment/decrement and signed element/frame sorting indices, shared or per-channel auto-reload and channel-identified block/frame completion callbacks. TI SPRU302B and VC5410A define count, index, reload and event fields. Isolated MMIO tests verify mismatched/no-event stalls, deferred transfer, sorted two-frame output, block/frame notification order, reload or DE clearance and pending synchronized save/replay. Two-clock cadence is assumed; ABU, double-word and overlapping sync arbitration explicitly fail. Original MU4 McBSP0 streaming is not attached; ASIC interrupt mux and physical serial clocks remain separate work",
+      "boundary": "Generic enhanced DMA implements event-gated single-word multiframe transfers, signed element/frame sorting indices, shared/per-channel auto-reload and block/frame callbacks. TI defines count/index/reload/event fields. MMIO tests verify event stalls, deferred sorted two-frame output, notification order, reload or DE clearance and pending save/replay. Two-clock cadence is assumed; ABU, double-word and overlapping arbitration fail explicitly. MU4 McBSP0 is attached but its external framed format remains unsupported. Partial interrupt mux and ready-level wiring have separate coverage; original stream and physical clocks remain unvalidated",
       "evidence": ["driver/tms320c54x_dma.cpp", "driver/tms320c54x_dma.h", "driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]
     },
     {
@@ -14,12 +24,12 @@
     },
     {
       "id": "npm5_mu4_streaming_dma_configuration", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
-      "boundary": "Unchanged MCUSI16 configures channel 3 source 1300 destination 0023 count 0001 sync 203f mode c541 DMPREC 4848, DMIDX0=0040 DMFRI0=ffc1. TI definitions identify McBSP0 transmit sync, two 16-bit elements per frame, 64 frames, data spaces, fixed destination, sorting, block IRQ and auto-reload, not ABU. Source sequence is 1300,1340,1301,1341 through 133f,137f. VC5410A maps 0023 to McBSP0 DXR1 and INTOSEL=1 to DMA3 on IFR bit 11 replacing XINT1. Original writes confirm channel-3 reload bank 32..35. Isolated DMA mechanics now have conformance coverage; original McBSP0 stream and ASIC interrupt routing remain unattached and unvalidated",
+      "boundary": "Original MCUSI16 configures channel 3 source 1300 destination 0023 count 0001 sync 203f mode c541 DMPREC 4848, DMIDX0=0040 DMFRI0=ffc1. TI identifies McBSP0 transmit sync, two 16-bit elements/frame, 64 frames, fixed destination, sorting, block IRQ and auto-reload, not ABU. Source sequence is 1300,1340,1301,1341 through 133f,137f. VC5410A maps 0023 to McBSP0 DXR1 and INTOSEL=1 to DMA3 on IFR bit 11. Original reload writes select 32..35. DMA mechanics, attached ready lines and partial interrupt mux have separate conformance coverage. Original stream fails at the unsupported external framed McBSP format; its block execution remains unvalidated",
       "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_dma.cpp", "driver/mu4_storage_test.cpp"]
     },
     {
       "id": "npm5_mu4_native_mcbsp1_transmit_boundary", "subsystem": "mu4", "status": "partial", "confidence": "strong",
-      "boundary": "Original MCUSI16 configures McBSP1 48/49 and transmits six words 0c10 0818 0a01 0e53 1023 1201 through a partial generic transmitter. TI defines XRST/XRDY/DXR/XSR and CPU/2 clock division. Fixtures cover 8/12/16-bit MSB-first output, absent external-clock stall, buffering, reset cancellation, XRDY IRQ and pending save/restore. Original BITF displacement-before-mask is independently tested. Native acceptance stops after the sixth word. Subsequent McBSP0 DMA stream is mapped, not attached. No receiver, external clock, physical PLL, endpoint or playback completion is claimed",
+      "boundary": "Original MCUSI16 configures McBSP1 48/49 and transmits six words 0c10 0818 0a01 0e53 1023 1201 through a partial generic transmitter. TI defines XRST/XRDY/DXR/XSR and CPU/2 clock division. Fixtures cover 8/12/16-bit output, external-clock stall, buffering, cancellation, IRQ and pending save/restore. BITF displacement-before-mask is tested independently. Setup BIOS stops after the sixth word. Separate stream BIOS requires 128 words plus DMA completion, currently failing the attached McBSP0 external framed format. No RX, external clock, physical PLL or playback completion is claimed",
       "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_mcbsp.cpp", "driver/tms320c54x_mcbsp.h", "driver/mu4_storage_test.cpp", "docs/rom4_dsp_loader.md", "Makefile"]
     },
     {

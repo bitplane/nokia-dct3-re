@@ -19,11 +19,13 @@ void tms320c54x_dma_device::device_start()
 	save_item(NAME(m_index));
 	save_item(NAME(m_regs));
 	save_item(NAME(m_frame_elements));
+	save_item(NAME(m_sync_levels));
 }
 
 void tms320c54x_dma_device::device_reset()
 {
 	m_control = m_index = 0;
+	m_sync_levels = 0;
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
 	std::fill(std::begin(m_frame_elements), std::end(m_frame_elements), 0);
 	for (auto *timer : m_timers) timer->adjust(attotime::never);
@@ -74,7 +76,8 @@ void tms320c54x_dma_device::enable(unsigned channel)
 	validate(channel);
 	m_frame_elements[channel] = m_regs[channel * 5 + 2];
 	// Synchronized channels remain enabled but transfer nothing without their event.
-	if (!(m_regs[channel * 5 + 3] >> 12))
+	unsigned const event = m_regs[channel * 5 + 3] >> 12;
+	if (!event || BIT(m_sync_levels, event))
 		m_timers[channel]->adjust(attotime::from_ticks(2, clock()), channel);
 }
 
@@ -102,6 +105,15 @@ void tms320c54x_dma_device::sync_event(unsigned event)
 			// Two-clock bus cadence is an assumption, not measured DA150 arbitration.
 			m_timers[channel]->adjust(attotime::from_ticks(2, clock()), channel);
 		}
+}
+
+void tms320c54x_dma_device::sync_w(unsigned event, int state)
+{
+	if (!event || event > 15) fatalerror("C54x DMA invalid synchronization line %u", event);
+	bool const previous = BIT(m_sync_levels, event);
+	if (state) m_sync_levels |= u16(1 << event);
+	else m_sync_levels &= ~u16(1 << event);
+	if (state && !previous) sync_event(event);
 }
 
 s16 tms320c54x_dma_device::address_step(unsigned index, bool frame_end) const
