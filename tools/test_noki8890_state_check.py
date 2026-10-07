@@ -18,6 +18,10 @@ state_replay: phase=restored event=end t=43.000000000
 
 
 class StateTest(unittest.TestCase):
+    def test_pcs_requires_independent_registration(self):
+        with self.assertRaisesRegex(ValueError, 'candidate window'):
+            verify(sample(), pcs1900=True)
+
     def test_sms_requires_storage(self):
         with self.assertRaisesRegex(ValueError, 'persistent SIM storage'):
             verify(sample(), sms=True)

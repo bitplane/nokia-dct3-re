@@ -11,11 +11,14 @@ if __package__ in (None, ''):
 from tools.radio_state_roundtrip import verify_roundtrip
 from tools.noki8890_outgoing_call_check import verify as verify_call
 from tools.noki8890_incoming_sms_check import verify as verify_sms
+from tools.noki8890_registration_check import verify as verify_registration
 
 
-def verify(text, call=False, sms=False, storage=None):
+def verify(text, call=False, sms=False, storage=None, pcs1900=False):
     if '[LUA ERROR]' in text or '8890_state: FAIL' in text:
         raise ValueError('state fixture did not complete')
+    if pcs1900:
+        verify_registration(text, pcs1900=True)
     states = re.findall(r'8890_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
     if len(states) != 2 or [state[0] for state in states] != ['saved', 'restored']:
         raise ValueError('missing exact save/load snapshots')
@@ -25,12 +28,12 @@ def verify(text, call=False, sms=False, storage=None):
     if sms:
         if storage is None:
             raise ValueError('SMS restoration requires persistent SIM storage')
-        verify_sms(text, storage)
+        verify_sms(text, storage, pcs1900=pcs1900)
         if not re.search(r'state_replay: phase=restored event=end[\s\S]*8890_sms_physical: action=read_2', text):
             raise ValueError('missing post-load physical SMS read')
         return
     if call:
-        verify_call(text)
+        verify_call(text, pcs1900=pcs1900)
         return
     if not re.search(r'state_replay: phase=restored event=end[^\n]*\n[\s\S]*'
                      r'8890_state_physical: key=Menu[\s\S]*8890_keypad_decoded: key=19\b', text):
@@ -67,10 +70,11 @@ if __name__ == '__main__':
     scenario.add_argument('--call', action='store_true')
     scenario.add_argument('--sms', action='store_true')
     parser.add_argument('--storage', type=Path, help='persistent SIM image required for SMS')
+    parser.add_argument('--pcs1900', action='store_true')
     args = parser.parse_args()
     try:
         verify(args.log.read_text(errors='replace'), args.call, args.sms,
-               args.storage.read_bytes() if args.storage else None)
+               args.storage.read_bytes() if args.storage else None, args.pcs1900)
         check_frames(args.frames, args.call, args.sms)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8890 idle state FAIL: {error}\n')

@@ -896,8 +896,11 @@ host-side physical End schedule is restarted after load. The complete
 intended-number CC/RR checker requires clean release and resumed paging;
 reviewed ordinary idle pixels are required after release. Two independent
 fresh runs pass, including the shared round-trip fixture after extraction.
-This remains signaling/UI save-state evidence, not native speech or SMS
-restoration, and is currently scoped to GSM900.
+This remains signaling/UI save-state evidence, not native speech. Independent
+fresh PCS1900 acceptance also passes with `fixtures/noki8890_pcs1900` and
+`--call --pcs1900`; the checker requires the full organic carrier-600
+registration sequence and PCS-specific call/release grammar, not just replay
+equality. Each run needs an empty private NVRAM directory.
 
 Delivered SMS restoration is independently checked by
 `tools/noki8890_state_sms.lua` with a private copy of the ordinary incoming-SMS
@@ -915,8 +918,11 @@ only the physical read schedule on the restored timeline. The original SMS
 checker requires one page, exactly the delivery/read-status SIM writes,
 persistent read `hello` and reviewed body pixels after load. This proves
 delivered-message storage/UI restoration, not a save within an unfinished
-CP/RP transaction or inherited PCS1900 acceptance. No redelivery or SIM-record
-rewrite is used to recover the message.
+CP/RP transaction. An independent fresh PCS1900 run also passes using
+`fixtures/noki8890_pcs1900_incoming_sms` and `--sms --pcs1900`; full PCS
+registration and the band-specific SMS lifecycle are required before replay
+and storage acceptance. No redelivery or SIM-record rewrite is used to recover
+the message.
 
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
