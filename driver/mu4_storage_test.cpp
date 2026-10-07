@@ -40,11 +40,11 @@ public:
 		TMS320C54X_MCBSP(config, m_mcbsp0, 13'000'000);
 		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
 		m_mcbsp0->tx_bit_cb().set([this](int state) {
-			if (m_phase >= 51 && m_phase <= 53) m_external_bits.push_back(state);
+			if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73)) m_external_bits.push_back(state);
 			subdevice<tlv320aic23_device>("codec")->din_w(state);
 		});
 		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
-		m_mcbsp0->tx_irq_cb().set([this](int state) { m_cpu->set_input_line(5, state); });
+		m_mcbsp0->tx_irq_cb().set([this](int state) { if (state) ++m_external_tx_irqs; m_cpu->set_input_line(5, state); });
 		m_mcbsp0->rx_event_cb().set([this](int state) { m_dma->sync_w(1, state); });
 		m_mcbsp0->rx_irq_cb().set([this](int state) { if (state) ++m_rx_irqs; m_cpu->set_input_line(4, state); });
 		TLV320AIC23(config, "codec", 11'995'200);
@@ -175,6 +175,7 @@ private:
 	attotime m_codec_snapshot_time;
 	std::vector<u16> m_external_words;
 	std::vector<int> m_external_bits;
+	unsigned m_external_tx_irqs = 0;
 	bool m_external_checkpoint_pending = false;
 	void external_reg_w(u16 index, u16 value) { m_mcbsp0->control_w(0, index); m_mcbsp0->control_w(1, value); }
 	u16 receive_status() { m_mcbsp0->control_w(0, 0); return m_mcbsp0->control_r(1); }
@@ -200,13 +201,83 @@ private:
 	{
 		while (count--) { m_mcbsp0->tx_clock_w(!inverted); m_mcbsp0->tx_clock_w(inverted); }
 	}
+	void check_external_underrun(unsigned i)
+	{
+		static constexpr unsigned widths[] = {8, 12, 16};
+		if (i < std::size(widths))
+		{
+			external_reg_w(1, 0); external_reg_w(4, i << 5); external_reg_w(5, 1); external_reg_w(14, 0);
+			m_mcbsp0->tx_clock_w(0); m_mcbsp0->tx_frame_w(0);
+			m_external_words.clear(); m_external_bits.clear(); external_reg_w(1, 1);
+			unsigned const empty_irq = m_external_tx_irqs;
+			m_mcbsp0->tx_frame_w(1); external_clocks(widths[i], false);
+			m_mcbsp0->control_w(0, 1);
+			if (m_external_words != std::vector<u16>({0}) || (m_mcbsp0->control_r(1) & 7) != 3 || m_external_tx_irqs != empty_irq)
+				fatalerror("MU4 McBSP empty frame must transmit zeros without fabricating ready edges");
+			m_mcbsp0->tx_frame_w(0); m_mcbsp0->data_w(3, 0xa55a); m_mcbsp0->tx_frame_w(1);
+			if ((m_mcbsp0->control_r(1) & 7) != 5) fatalerror("MU4 McBSP fresh transfer must deactivate XEMPTY");
+			external_clocks(widths[i], false);
+			unsigned const repeat_irq = m_external_tx_irqs;
+			m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1);
+			if ((m_mcbsp0->control_r(1) & 7) != 3) fatalerror("MU4 McBSP repeated DXR must retain empty status while shifting");
+			external_clocks(widths[i], false);
+			u16 const mask = (1U << widths[i]) - 1;
+			if (m_external_words != std::vector<u16>({0, u16(0xa55a & mask), u16(0xa55a & mask)}) || m_external_tx_irqs != repeat_irq)
+				fatalerror("MU4 McBSP underrun did not repeat old DXR without new ready events");
+			for (unsigned bit = 0; bit < widths[i]; ++bit)
+				if (m_external_bits[widths[i] * 2 + bit] != BIT(0xa55a, widths[i] - 1 - bit))
+					fatalerror("MU4 McBSP underrun repeat bit order mismatch");
+			m_mcbsp0->tx_frame_w(0); m_mcbsp0->data_w(3, 0x1234);
+			if ((m_mcbsp0->control_r(1) & 7) != 1) fatalerror("MU4 McBSP refill must not clear underflow before XSR transfer");
+			m_mcbsp0->tx_frame_w(1); external_clocks(widths[i], false);
+			if (m_external_words.back() != (0x1234 & mask) || m_external_tx_irqs != repeat_irq + 1)
+				fatalerror("MU4 McBSP underrun recovery mismatch");
+			return;
+		}
+		external_reg_w(1, 0); external_reg_w(4, 0x140);
+		m_mcbsp0->tx_frame_w(0); external_reg_w(1, 1);
+		m_external_words.clear(); m_external_bits.clear();
+		m_mcbsp0->data_w(3, 0xa55a); m_mcbsp0->tx_frame_w(1); external_clocks(32, false);
+		if (m_external_words != std::vector<u16>({0xa55a}) || m_external_bits.size() != 16 || (m_mcbsp0->control_r(1) & 7) != 3)
+			fatalerror("MU4 McBSP mid-frame underflow must stop shifting until the next frame");
+		m_mcbsp0->data_w(3, 0x1234); external_clocks(16, false);
+		if (m_external_words.size() != 1) fatalerror("MU4 McBSP underrun refill resumed without frame sync");
+		m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1); external_clocks(1, false);
+		m_mcbsp0->data_w(3, 0xabcd); external_clocks(31, false);
+		if (m_external_words != std::vector<u16>({0xa55a, 0x1234, 0xabcd})) fatalerror("MU4 McBSP mid-frame underflow recovery mismatch");
+		// The following save fixture repeats one complete 16-bit word.
+		external_reg_w(4, 0x40);
+		m_mcbsp0->data_w(3, 0x1234); m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1); external_clocks(16, false);
+		logerror("mu4_mcbsp_underrun: PASS widths=8,12,16 empty_zero=1 repeat_dxr=1 xempty=1 ready_edges=1 recovery=1 midframe_wait=1\n");
+	}
+	void check_receive_overrun()
+	{
+		receive_setup(0, 0);
+		unsigned const irqs = m_rx_irqs;
+		receive_word(0x11, 8); receive_word(0x22, 8);
+		if ((receive_status() & 7) != 3) fatalerror("MU4 McBSP RFULL asserted before three unread words");
+		receive_word(0x33, 8); receive_word(0x44, 8);
+		if ((receive_status() & 7) != 7 || m_rx_irqs != irqs + 1) fatalerror("MU4 McBSP overrun flag/ready edge mismatch");
+		{ auto const disable = machine().disable_side_effects(); if (m_mcbsp0->data_r(1) != 0x11) fatalerror("MU4 McBSP overrun overwrote unread DRR"); }
+		if ((receive_status() & 7) != 7 || m_mcbsp0->data_r(1) != 0x11 || (receive_status() & 7) != 1)
+			fatalerror("MU4 McBSP overrun peek/clear mismatch");
+		receive_bit(0);
+		if (m_mcbsp0->data_r(1) != 0x22) fatalerror("MU4 McBSP overrun discarded buffered RBR");
+		for (unsigned bit = 0; bit < 16; ++bit) receive_bit(0);
+		if (receive_status() & 6) fatalerror("MU4 McBSP overrun recovered without a new frame");
+		receive_word(0x55, 8);
+		if (m_mcbsp0->data_r(1) != 0x55 || m_rx_irqs != irqs + 3) fatalerror("MU4 McBSP overrun frame recovery mismatch");
+		receive_word(0x66, 8); receive_word(0x77, 8); receive_word(0x88, 8); external_reg_w(0, 0);
+		if (receive_status() & 6) fatalerror("MU4 McBSP receiver reset did not clear RFULL/RRDY");
+		logerror("mu4_mcbsp_overrun: PASS three_word_threshold=1 drr_retained=1 rbr_retained=1 rsr_loss=1 peek=1 read_clear=1 frame_recovery=1 reset=1\n");
+	}
 	void stream_tx(u16 value)
 	{
 		++m_stream_words;
 		// TX reports the last launched bit before DIN samples it on the next rising edge.
 		// Idle-line DIN words before this observable transmission are not stream evidence.
 		if (m_phase == 30 && m_native_tx_words.size() < native_stream_target()) m_native_tx_words.push_back(value);
-		if (m_phase >= 51 && m_phase <= 53) m_external_words.push_back(value);
+		if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73)) m_external_words.push_back(value);
 		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
 		finish_stream_if_ready();
 	}
@@ -710,6 +781,7 @@ private:
 				for (unsigned i = 0; i < 32; ++i) receive_bit(1);
 				if (receive_status() & 2) fatalerror("MU4 receive reset did not cancel pending word");
 				logerror("mu4_mcbsp_receive: PASS edge_handoff=1 buffering=1 widths=8,12,16 delays=0,1,2 polarity=1 justification=1 peek=1 pending_restore=1 irq=1 reset=1\n");
+				check_receive_overrun();
 				receive_setup(0x140, 0x44, 0x000e);
 				data.write_word(0x6300, 0xffff); data.write_word(0x6340, 0xffff);
 				dma_reg_w(0xa, 0x21); dma_reg_w(0xb, 0x6300); dma_reg_w(0xc, 1);
@@ -1007,10 +1079,64 @@ private:
 					if (m_external_words != std::vector<u16>({0x055a}) || m_external_bits.size() != 12)
 						fatalerror("MU4 external two-bit delay mismatch");
 					logerror("mu4_mcbsp_external: PASS frame_gate=1 stereo=1 bit_order=1 ignore=1 asynchronous=1 delay=1 polarity=1 cancel=1 pending_restore=1 synchronized_inputs=1\n");
-					m_saved_dma.str(std::string()); m_phase = 25; machine().schedule_soft_reset(); return;
+					m_phase = 70; m_check->adjust(attotime::from_usec(1)); return;
 				}
 			}
 			++m_phase; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase >= 70 && m_phase <= 73)
+		{
+			// Each physical-input variant yields so synchronized IRQ events can drain.
+			check_external_underrun(m_phase - 70);
+			if (m_phase < 73) { ++m_phase; m_check->adjust(attotime::from_usec(1)); return; }
+			m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1); external_clocks(7, false);
+			m_phase = 66; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase == 66 || m_phase == 67)
+		{
+			if (!machine().scheduler().can_save()) fatalerror("MU4 underrun checkpoint has pending synchronized inputs");
+			if (m_phase == 66)
+			{
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 underrun save failed");
+			}
+			else
+			{
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 underrun restore failed");
+			}
+			m_mcbsp0->control_w(0, 1);
+			if ((m_mcbsp0->control_r(1) & 7) != 3) fatalerror("MU4 underrun save/restore lost XEMPTY or XRDY");
+			m_external_words.clear(); m_external_bits.clear(); external_clocks(9, false);
+			if (m_external_words != std::vector<u16>({0x1234}) || m_external_bits.size() != 9)
+				fatalerror("MU4 underrun save/restore shifted word mismatch");
+			for (unsigned bit = 0; bit < 9; ++bit)
+				if (m_external_bits[bit] != BIT(0x1234, 8 - bit)) fatalerror("MU4 underrun save/restore bit mismatch");
+			if (m_phase == 66) { m_phase = 67; m_check->adjust(attotime::from_usec(1)); return; }
+			logerror("mu4_mcbsp_underrun_restore: PASS partial_word=1 xempty=1 ready=1 bits=9\n");
+			receive_setup(0, 0); receive_word(0x11, 8); receive_word(0x22, 8); receive_word(0x33, 8);
+			m_phase = 68; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase == 68 || m_phase == 69)
+		{
+			if (!machine().scheduler().can_save()) fatalerror("MU4 overrun checkpoint has pending synchronized inputs");
+			if (m_phase == 68)
+			{
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 overrun save failed");
+			}
+			else
+			{
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 overrun restore failed");
+			}
+			if ((receive_status() & 7) != 7 || m_mcbsp0->data_r(1) != 0x11 || (receive_status() & 7) != 1)
+				fatalerror("MU4 overrun save/restore lost unread DRR or RFULL");
+			receive_bit(0);
+			if (m_mcbsp0->data_r(1) != 0x22 || (receive_status() & 6)) fatalerror("MU4 overrun save/restore lost buffered RBR");
+			if (m_phase == 68) { m_phase = 69; m_check->adjust(attotime::from_usec(1)); return; }
+			logerror("mu4_mcbsp_overrun_restore: PASS rfull=1 drr=1 rbr=1 read_clear=1\n");
+			m_saved_dma.str(std::string()); m_phase = 25; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
@@ -1466,6 +1592,14 @@ private:
 				logerror("mu4_native_stream_binding: PASS descriptor=806e entry=029545 consumer_entries=%u\n", m_native_stream_consumer_entries);
 				logerror("mu4_native_startup_counts: main=%u continuation=%u helper=%u selection_start=%u\n",
 					m_native_startup_fetches[0], m_native_startup_fetches[1], m_native_startup_fetches[2], m_native_startup_fetches[3]);
+				if (system_bios() == 7)
+				{
+					// 1820 is this harness's loader-call return sentinel, not a firmware idle loop.
+					if (!m_native_startup_fetches[1] || !m_native_startup_fetches[2] ||
+						m_cpu->state_int(tms320c54x_device::STATE_PC) != 0x1821 || !m_cpu->state_int(tms320c54x_device::STATE_IDLE))
+						fatalerror("MU4 longer startup did not reach the observed loader-return boundary");
+					logerror("mu4_native_startup_return: PASS continuation=1 helper=1 fixture_sentinel=1820 full_boot=0\n");
+				}
 				for (unsigned i = 0; i < std::size(buffer_calls); ++i)
 					logerror("mu4_native_buffer_counts: site=%06x calls=%u returns=%u\n",
 						unsigned(buffer_calls[i]), m_native_buffer_calls[i], m_native_buffer_returns[i]);

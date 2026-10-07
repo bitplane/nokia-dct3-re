@@ -42,7 +42,7 @@ private:
 	u8 m_index = 0;
 	u16 m_buffer = 0, m_shift = 0;
 	u8 m_bits = 0, m_delay = 0;
-	bool m_buffer_full = false, m_shift_active = false, m_ready = false;
+	bool m_buffer_full = false, m_shift_active = false, m_ready = false, m_xempty = false;
 	bool m_clock_input = false, m_frame_input = false, m_ready_pending = false;
 	bool m_async_bit = false;
 	u16 m_frame_words = 0;
@@ -51,7 +51,7 @@ private:
 	u16 m_rx_frame_words = 0;
 	u8 m_rx_bits = 0, m_rx_delay = 0, m_rx_buffer_width = 0;
 	bool m_rx_clock_input = false, m_rx_frame_input = false, m_rx_data_input = false;
-	bool m_rx_frame_seen = false, m_rx_shift_full = false, m_rx_buffer_full = false, m_rx_ready = false;
+	bool m_rx_frame_seen = false, m_rx_shift_full = false, m_rx_buffer_full = false, m_rx_ready = false, m_rx_overrun = false;
 	emu_timer *m_bit_timer = nullptr;
 	devcb_write16 m_tx_word_cb;
 	devcb_write_line m_tx_bit_cb;

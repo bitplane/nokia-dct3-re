@@ -18,6 +18,7 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_buffer)); save_item(NAME(m_shift));
 	save_item(NAME(m_bits)); save_item(NAME(m_delay));
 	save_item(NAME(m_buffer_full)); save_item(NAME(m_shift_active)); save_item(NAME(m_ready));
+	save_item(NAME(m_xempty));
 	save_item(NAME(m_clock_input)); save_item(NAME(m_frame_input)); save_item(NAME(m_ready_pending));
 	save_item(NAME(m_async_bit)); save_item(NAME(m_frame_words)); save_item(NAME(m_async_time));
 	save_item(NAME(m_rx_shift)); save_item(NAME(m_rx_completed)); save_item(NAME(m_rx_buffer));
@@ -25,6 +26,7 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_rx_bits)); save_item(NAME(m_rx_delay)); save_item(NAME(m_rx_buffer_width));
 	save_item(NAME(m_rx_clock_input)); save_item(NAME(m_rx_frame_input)); save_item(NAME(m_rx_data_input));
 	save_item(NAME(m_rx_frame_seen)); save_item(NAME(m_rx_shift_full)); save_item(NAME(m_rx_buffer_full)); save_item(NAME(m_rx_ready));
+	save_item(NAME(m_rx_overrun));
 }
 
 void tms320c54x_mcbsp_device::device_reset()
@@ -34,6 +36,7 @@ void tms320c54x_mcbsp_device::device_reset()
 	m_buffer = m_shift = 0;
 	m_bits = m_delay = 0;
 	m_buffer_full = m_shift_active = m_ready = false;
+	m_xempty = false;
 	m_clock_input = m_frame_input = m_ready_pending = m_async_bit = false;
 	m_frame_words = 0; m_async_time = attotime::zero;
 	m_bit_timer->adjust(attotime::never);
@@ -46,9 +49,9 @@ void tms320c54x_mcbsp_device::device_reset()
 u16 tms320c54x_mcbsp_device::control_r(offs_t offset)
 {
 	if (!offset) return m_index;
-	if (m_index == 0) return (m_regs[0] & ~u16(6)) | (m_rx_ready ? 2 : 0);
+	if (m_index == 0) return (m_regs[0] & ~u16(6)) | (m_rx_ready ? 2 : 0) | (m_rx_overrun ? 4 : 0);
 	if (m_index == 1)
-		return (m_regs[1] & ~u16(6)) | (m_ready ? 2 : 0) | (m_shift_active ? 4 : 0);
+		return (m_regs[1] & ~u16(6)) | (m_ready ? 2 : 0) | (m_xempty ? 4 : 0);
 	return m_regs[m_index];
 }
 
@@ -63,6 +66,7 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 		{
 			set_ready(false);
 			m_buffer_full = m_shift_active = false;
+			m_buffer = 0; m_xempty = false;
 			m_ready_pending = m_async_bit = false; m_frame_words = 0;
 			m_bits = m_delay = 0;
 			m_bit_timer->adjust(attotime::never);
@@ -126,7 +130,17 @@ u16 tms320c54x_mcbsp_device::data_r(offs_t offset)
 	if (offset == 0) return m_rx_high;
 	if (offset == 1)
 	{
-		if (!machine().side_effects_disabled()) set_rx_ready(false);
+		if (!machine().side_effects_disabled())
+		{
+			set_rx_ready(false);
+			if (m_rx_overrun)
+			{
+				// SPRU302B 2.3.7.1: DRR read clears RFULL; RBR is retained,
+				// the overwritten RSR word is lost and a new frame is required.
+				m_rx_overrun = m_rx_shift_full = false;
+				m_rx_frame_words = m_rx_bits = m_rx_delay = 0;
+			}
+		}
 		return m_rx_word;
 	}
 	return 0;
@@ -137,6 +151,7 @@ void tms320c54x_mcbsp_device::reset_receiver()
 	m_rx_shift = m_rx_completed = m_rx_buffer = 0;
 	m_rx_frame_words = m_rx_bits = m_rx_delay = m_rx_buffer_width = 0;
 	m_rx_frame_seen = m_rx_shift_full = m_rx_buffer_full = false;
+	m_rx_overrun = false;
 	set_rx_ready(false);
 }
 
@@ -182,10 +197,16 @@ void tms320c54x_mcbsp_device::rx_clock_w(int state)
 		// SPRU302B 2.3.5.1: RSR -> RBR on the edge opposite sampling.
 		if (m_rx_shift_full)
 		{
-			if (m_rx_buffer_full) fatalerror("McBSP receive overrun recovery is not implemented");
-			m_rx_buffer = m_rx_completed;
-			m_rx_buffer_width = (m_regs[2] >> 5 & 7) == 0 ? 8 : (m_regs[2] >> 5 & 7) == 1 ? 12 : 16;
-			m_rx_buffer_full = true; m_rx_shift_full = false;
+			if (m_rx_buffer_full)
+			{
+				if (m_rx_ready) m_rx_overrun = true; // All three receive stages are full.
+			}
+			else
+			{
+				m_rx_buffer = m_rx_completed;
+				m_rx_buffer_width = (m_regs[2] >> 5 & 7) == 0 ? 8 : (m_regs[2] >> 5 & 7) == 1 ? 12 : 16;
+				m_rx_buffer_full = true; m_rx_shift_full = false;
+			}
 		}
 		return;
 	}
@@ -256,12 +277,19 @@ void tms320c54x_mcbsp_device::load_shift(bool external, bool first)
 	unsigned const widths[] = {8, 12, 16};
 	unsigned const width = (m_regs[4] >> 5) & 7;
 	if (width > 2) fatalerror("McBSP wider transmit configuration changed while buffered");
+	bool const fresh = m_buffer_full;
 	m_bits = widths[width];
 	m_shift = m_buffer & ((1U << m_bits) - 1);
 	m_delay = first ? m_regs[5] & 3 : 0;
 	m_shift_active = true; m_buffer_full = false;
-	if (external) m_ready_pending = true; // XRDY follows the opposite internal clock edge.
-	else set_ready(true);
+	// SPRU302B 2.3.7.4: old DXR repeats at frame sync on underflow,
+	// but XEMPTY stays low and an already-ready DXR generates no new event.
+	m_xempty = fresh;
+	if (fresh)
+	{
+		if (external) m_ready_pending = true; // XRDY follows the opposite internal clock edge.
+		else set_ready(true);
+	}
 }
 
 void tms320c54x_mcbsp_device::shift_bit()
@@ -270,6 +298,7 @@ void tms320c54x_mcbsp_device::shift_bit()
 	if (!--m_bits)
 	{
 		m_shift_active = false;
+		if (!m_buffer_full) m_xempty = false;
 		if (m_frame_words) --m_frame_words;
 		m_tx_word_cb(m_shift);
 	}
@@ -286,7 +315,6 @@ void tms320c54x_mcbsp_device::tx_frame_w(int state)
 		if (BIT(m_regs[5], 2)) return;
 		fatalerror("McBSP unexpected frame recovery is not implemented");
 	}
-	if (!m_buffer_full) fatalerror("McBSP framed transmit underrun is not implemented");
 	m_frame_words = ((m_regs[4] >> 8) & 0x7f) + 1;
 	load_shift(true, true);
 	// SPRU302B: zero-delay first bit is asynchronous to the bit clock.
@@ -315,7 +343,14 @@ void tms320c54x_mcbsp_device::tx_clock_w(int state)
 	if (!m_frame_words) return;
 	if (!m_shift_active)
 	{
-		if (!m_buffer_full) fatalerror("McBSP framed transmit underrun is not implemented");
+		if (!m_buffer_full)
+		{
+			// An external-clock underflow waits for the next frame sync
+			// (SPRU302B 2.3.7.4), even if DXR is refilled before that sync.
+			m_xempty = false;
+			m_frame_words = 0;
+			return;
+		}
 		load_shift(true, false);
 	}
 	if (m_delay && --m_delay) return;

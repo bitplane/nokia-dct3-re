@@ -23,6 +23,11 @@ RX DMA block. The `sustain` profile checks eight reloaded blocks in each
 direction; analog conversion and longer application operation are not validated.
 DMA/McBSP and codec digital interfaces have isolated conformance
 and save/replay tests.
+The `startup` profile passes a 20-second observation tail after storage
+initialization and startup-helper entry, with zero illegal instructions.
+Its endpoint is the fixture's loader-return IDLE sentinel; the streaming
+consumer remains unentered. The open question is the original startup return
+ABI and enclosing resident-worker lifecycle, not a missing synthetic event.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -1199,9 +1204,9 @@ program window, not just the common lower window.
 Startup is still performing file initialization before scheduler activation;
 the five-second window ends during the first `SETTING1.BIN` write through
 `03:8c3e`. This is a bounded-window result, not the current execution ceiling:
-the longer `startup` profile completes storage initialization and enters the
-startup continuation before encountering unimplemented McBSP transmit
-underrun behavior. Resolve that peripheral contract next.
+the longer `startup` profile completes storage initialization, enters the
+startup continuation and passes its 20-second endpoint checks. Its endpoint
+is the harness's loader-return sentinel, not a proven firmware idle loop.
 Static original code has a call to common `3f1d` at `6d5e`, inside the
 startup helper at `6d44`. Entry code calls that helper at `6dbf`, after the
 far call to `02:904b`. The 100 ms worker tail observes one main-entry fetch
@@ -1297,15 +1302,26 @@ and helper `02:6d44`. The first longer run exposed opcode `ea00` at
 it, with 1,024 executable cases covering all immediate values, CPL/SXM
 configurations, untouched accumulator/status fields and cycle timing.
 
-With that instruction implemented, the longer profile progresses into later
-startup and stops on `McBSP framed transmit underrun is not implemented`.
-It does **not** pass the endpoint acceptance checks or prove a complete
-20-second run, consumer activation, decoded music or full native boot.
-`scan` remains the shorter acceptance profile. The next contract is McBSP
-SPCR2/XEMPTY and DX behavior under underrun; SPRU302B section 2.3.7.4
-defines repeated old DXR data at subsequent frame syncs and an empty-status
-indication, not a fatal stop. Validate the applicable framing cases before
-changing the peripheral.
+The longer profile passes a 20-second tail with zero illegal instructions,
+one continuation entry and one helper entry. Selection start `3f1d` and the
+streaming consumer remain unentered; `b633` remains set with zero firmware
+reads. Logical PC `05:1821` with overlay enabled follows the harness's
+physical `1820` IDLE instruction, installed as the isolated loader-call
+return sentinel. It is not evidence of a firmware idle loop or full native
+boot. The next question is the original loader/startup return ABI and the
+enclosing lifecycle that legitimately enters the resident worker.
+
+McBSP error recovery is modeled for the supported externally framed,
+single-phase 8/12/16-bit modes. SPRU302B section 2.3.7.4 specifies that TX
+underflow lowers XEMPTY and repeats old DXR at subsequent frame syncs;
+fresh DXR raises XEMPTY only when transferred to the shifter. A mid-frame
+underflow waits for a new frame sync, even after refill. Section 2.3.7.1
+defines receive overrun after three unread words: DRR and RBR survive,
+incoming RSR data may be lost, and a side-effectful DRR read clears RFULL.
+Executable gates check framing, status, ready edges, reset and save/restore
+of both error states. Wider, internally clocked and multichannel modes are
+not established by these tests. Only the first 1,024 DIN words in the native
+run are independently checked; later transfer counts do not prove music.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero

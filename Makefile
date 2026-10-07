@@ -1044,6 +1044,8 @@ check-mu4-storage-original: build
 		grep -q 'mu4_file_readback: PASS files=6' error.log; \
 		grep -q 'mu4_dma_conformance: PASS' error.log; grep -q 'mu4_loader: PASS' error.log; \
 		grep -q 'mu4_native_entry: PASS' error.log; grep -q 'mu4_mcbsp_conformance: PASS' error.log; \
+		grep -q 'mu4_mcbsp_underrun: PASS' error.log; grep -q 'mu4_mcbsp_underrun_restore: PASS' error.log; \
+		grep -q 'mu4_mcbsp_overrun: PASS' error.log; grep -q 'mu4_mcbsp_overrun_restore: PASS' error.log; \
 		grep -q 'mu4_dma_sync_conformance: PASS' error.log; \
 		grep -q 'mu4_dma_sync_level: PASS' error.log; \
 		grep -q 'mu4_mcbsp_external: PASS' error.log; \
@@ -1058,7 +1060,8 @@ check-mu4-storage-original: build
 		if [ "$(MU4_STORAGE_BIOS)" = sustain ] || [ "$(MU4_STORAGE_BIOS)" = worker ] || [ "$(MU4_STORAGE_BIOS)" = settle ] || [ "$(MU4_STORAGE_BIOS)" = scan ] || [ "$(MU4_STORAGE_BIOS)" = startup ]; then \
 			grep -q 'mu4_native_sustained: PASS' error.log; grep -q 'mu4_native_interrupts: PASS' error.log; fi; \
 		if [ "$(MU4_STORAGE_BIOS)" = worker ] || [ "$(MU4_STORAGE_BIOS)" = settle ] || [ "$(MU4_STORAGE_BIOS)" = scan ] || [ "$(MU4_STORAGE_BIOS)" = startup ]; then \
-			grep -q 'mu4_native_worker_window: PASS' error.log; grep -q 'mu4_native_stream_binding: PASS' error.log; fi
+			grep -q 'mu4_native_worker_window: PASS' error.log; grep -q 'mu4_native_stream_binding: PASS' error.log; fi; \
+		if [ "$(MU4_STORAGE_BIOS)" = startup ]; then grep -q 'mu4_native_startup_return: PASS' error.log; fi
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.
