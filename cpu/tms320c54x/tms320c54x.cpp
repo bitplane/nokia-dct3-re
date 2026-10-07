@@ -137,6 +137,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_tcr));
 	save_item(NAME(m_block_repeat_active));
 	save_item(NAME(m_idle));
+	save_item(NAME(m_intm_guard));
 	save_item(NAME(m_illegal));
 }
 
@@ -181,6 +182,7 @@ void tms320c54x_device::device_reset()
 	m_delayed_far = false;
 	m_delayed_words = 0;
 	m_xc_guard = 0;
+	m_intm_guard = 0;
 	m_sp_address_base = 0;
 	m_sp_address_pending = m_sp_address_late = false;
 	m_ifr = 0;
@@ -738,7 +740,7 @@ bool tms320c54x_device::service_interrupt()
 	// instruction boundary. Taking it inside either atomic sequence can skip a
 	// vector prologue's context-save slots and corrupt the return stack.
 	const bool single_repeat_active = m_rpt_armed || m_rptc || m_rpt_end != 0xffff;
-	if (BIT(m_st1, 11) || !pending || m_delayed_words || m_xc_guard ||
+	if (BIT(m_st1, 11) || !pending || m_delayed_words || m_xc_guard || m_intm_guard ||
 			single_repeat_active)
 		return false;
 
@@ -870,12 +872,18 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
 		status |= u16(1) << (low & 0x0f);
+		// SPRU131G 6.10.7 protects this instruction and the following
+		// complete instruction (not merely one program word).
+		if (BIT(op, 9) && (low & 0x0f) == 11)
+			m_intm_guard = 2;
 		return;
 	}
 	if ((op & 0xfdf0) == 0xf4b0) // RSBX bit, ST0/ST1
 	{
 		u16 &status = BIT(op, 9) ? m_st1 : m_st0;
 		status &= ~(u16(1) << (low & 0x0f));
+		if (BIT(op, 9) && (low & 0x0f) == 11)
+			m_intm_guard = 2;
 		return;
 	}
 	if ((op & 0xfcff) == 0xf485) // ABS src, dst
@@ -2775,6 +2783,8 @@ void tms320c54x_device::execute_run()
 		if (m_sp_address_pending) m_sp_address_base = previous_sp;
 		if (!m_illegal)
 		{
+			if (m_intm_guard)
+				--m_intm_guard;
 			// RPT/RPTZ arms the next instruction; its own retirement must not
 			// consume one of the requested body executions.
 			if (repeat_was_armed || !m_rpt_armed)

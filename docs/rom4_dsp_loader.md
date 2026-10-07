@@ -559,6 +559,14 @@ cycle apart. A separate BD fixture raises IRQ inside the first delay slot;
 both slots complete before service, and cycle stamps establish BD's documented
 two-cycle cost (SPRU172C B, page 4-14). This corrects a previous four-cycle
 charge. These fixtures do not claim full pipeline/wait-state timing coverage.
+SPRU131G section 6.10.7 also protects the complete instruction following
+`RSBX INTM` or `SSBX INTM`. The core retires this separate guard by
+instructions, not program words, and saves/resets its pending state.
+Three pending-interrupt fixtures distinguish a one-word load, a three-word
+store and an interrupt-return sequence: the ISR's stacked PC proves the
+following instruction completed before entry. These fixtures failed before
+the guard was implemented. They do not establish general six-stage pipeline
+drain timing or protect arbitrary writes to ST1.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their

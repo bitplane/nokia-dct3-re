@@ -2050,7 +2050,7 @@ it does not write recorder lifecycle state. The query packet is
 `1e 02 aa 01 49 02 fc 55`, followed, after its native reply and pin-level
 acknowledgement, by control packet `1e 03 aa 01 36 04 03 87 55`.
 Both packet checksums are compile-time checked. The dispatcher receives
-the query at 10.667 seconds and the control at 10.722 seconds, with previous
+the query at 11.154 seconds and the control at 11.201 seconds, with previous
 selector `49` rather than `36`. Handler `02:85dc` executes once; the native
 processing completion reaches `8009`, and the original named loader
 returns to `MCUSI16 .BIN`. At 20 seconds lifecycle is 2, mode 0,
@@ -2060,16 +2060,20 @@ no-control baseline's 160 pages. RX/TX totals are 35/47 words, three
 checksum-valid replies and two subsequent request acknowledgements.
 This proves the control transition and native return, not a finalized
 recording or that the handset's ordinary sender uses this exact poll sequence.
-The next requirement is independent inspection of the resulting in-memory
-media and recovery of the original save/name transaction. Disk NAND stays
-unchanged because the fixture runs with NVRAM saving disabled.
+The raw media inventory and save/name grammar are recovered below; native
+warm-return receipt remains unresolved before that transaction can execute.
+Disk NAND stays unchanged because NVRAM saving is disabled.
 Reproduce with `MU4_BOOTSTRAP_BIOS=bootrecpoll` on the same isolated gate.
 The profile exports `mu4_recorder_endpoint.nand` using the NAND device's
 storage serialization without issuing commands or changing CPU state.
 `tools/mu4_recorder_media_inventory.py` compares it with the source and
 the gate records `media_inventory.json`. The 69,206,016-byte endpoint has
-SHA-256 `6c97a0c6a2281fb3006cd7abe91fd3d5688380f4dc008371e8fa05cbe5cd62af`.
-Only pages 34, 161, 288 and 352--369 differ; spare bytes are unchanged.
+SHA-256 `c16305685f2690767232ec9db9b8fefc9c85efe30315b3d7268b056e879da300`.
+Only pages 34, 161, 288 and 352--372 differ; spare bytes are unchanged.
+This observation is re-banked after the generic INTM-following-instruction
+guard correction; the old scheduling profile changed only through page 369.
+The upload/control counts remain unchanged. The endpoint hash is an
+observation, not an acceptance constant or codec-validity oracle.
 Page 288 begins with literal `REL_001 `; page 352 begins with `ID3` and
 contains literal `POCP` at data offset 110. These are raw signature
 observations, not proof of a valid filesystem entry, decoded codec,
@@ -2121,7 +2125,7 @@ resident poll byte arrives, remaining unread at the 20-second endpoint.
 Native RX/TX totals are 36/47, with three replies, two subsequent ACKs,
 cursor 27 and RX-ready set. Do not interpret this as a failed metadata command.
 
-Endpoint PC is `02:204e`, the TINT vector branch to `02:3d73`; the live
+Endpoint PC is `02:3d73` in the TINT handler; the live
 OVLY-folded vector and handler prologue match the original AA22 upload.
 PMST is `202c`, ST1 `6900`, IMR `0ac9`, IFR `0c78`. Debugger-visible
 timer registers read TIM `0000`, PRD `0001`, TCR `0000`, giving the current
@@ -2133,8 +2137,9 @@ at `02:98e4`, and executes IDLE1 at `02:98e9`. Thus the short timer is
 firmware-owned and is immediately followed by an intentional TINT mask;
 it is not an unexplained final configuration to replace with a slower rate.
 
-A read-only write/interrupt trace observes this warm setup at 14.001318
-seconds, then repeated TINT entry with return PC `02:98de`, IMR `0ac9`
+A read-only write/interrupt trace before the INTM guard correction observes
+this warm setup at 14.001318 seconds, then repeated TINT entry with return
+PC `02:98de`, IMR `0ac9`
 and IFR `0c78`. The CPU never reaches the following mask instruction.
 This establishes interrupt starvation before masking, rather than a
 metadata-parser rejection. The temporary CPU probes are retired.
@@ -2150,6 +2155,10 @@ the timer rate as CPU clock divided by `(TDDR+1)*(PRD+1)`, consistent with
 the short period. The next target is generic interrupt recognition/drain
 timing and its interaction with memory-mapped timer writes and IMR updates.
 The new diagnostic is intentionally not a passing save acceptance gate.
+The independent INTM-change protection fix passes pending-interrupt load,
+multiword-store and return fixtures, but the metadata diagnostic still has
+cursor 27, RX/TX 36/47 and no metadata delivery. It does not close this
+general timer/write/pipeline boundary.
 
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),

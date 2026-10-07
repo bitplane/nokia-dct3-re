@@ -28,6 +28,37 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_intm_protection_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		program.write_word(0x0109d0, 0xf6bb); // RSBX ST1, INTM
+		if (index == 0)
+			program.write_word(0x0109d1, 0xe807); // One-word LD #7,A
+		else if (index == 1)
+		{
+			program.write_word(0x0109d1, 0x76f8); // Three-word ST #7,*(0501)
+			program.write_word(0x0109d2, 0x0501);
+			program.write_word(0x0109d3, 7);
+		}
+		else
+		{
+			program.write_word(0x0109d1, 0xfc00); // RET must precede the pending interrupt.
+			data.write_word(0x1000, 0x09e0);
+		}
+		program.write_word(0x010040, 0xf4e1); // Observe interrupt entry without returning.
+		data.write_word(0x0501, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 6164 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	static u16 reverse_carry_reference(u16 address, u16 offset, bool subtract)
 	{
 		unsigned carry = 0;
@@ -15208,6 +15239,24 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_TIM) == 0x1234,
 				"Debugger TCR reload uses the same self-clearing TRB contract as MMR writes");
 			osd_printf_info("TMS320C54x timer debugger registers: PASS independent=1 reload=1\n");
+			start_intm_protection_case(0);
+			return;
+		}
+		if (m_phase >= 6164 && m_phase <= 6166)
+		{
+			unsigned const index = m_phase - 6164;
+			u16 const expected_sp = index == 2 ? 0x1000 : 0x0fff;
+			u16 const expected_pc = index == 0 ? 0x09d2 : index == 1 ? 0x09d4 : 0x09e0;
+			expect(m_cpu->state_int(STATE_GENPC) == 0x010041 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == expected_sp &&
+				data.read_word(expected_sp) == expected_pc &&
+				(index != 0 || m_cpu->state_int(tms320c54x_device::STATE_A) == 7) &&
+				(index != 1 || data.read_word(0x0501) == 7),
+				"SPRU131G INTM change protects the complete following instruction, including RET");
+			if (index < 2) { start_intm_protection_case(index + 1); return; }
+			osd_printf_info("TMS320C54x INTM protection: PASS one_word=1 three_words=1 return=1\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
