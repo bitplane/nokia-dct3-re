@@ -13326,6 +13326,32 @@
       ]
     },
     {
+      "name": "verify-3330-radio-outgoing-call-sip-busy",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-3330-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-3330-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3330_OUTGOING_RUNNER_ARGS='--product 3330 --sip-response 486'"
+        }
+      ]
+    },
+    {
+      "name": "verify-3330-radio-outgoing-call-sip-unavailable",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-3330-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-3330-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3330_OUTGOING_RUNNER_ARGS='--product 3330 --sip-response 480'"
+        }
+      ]
+    },
+    {
       "name": "verify-5210-radio-outgoing-call-sip-busy",
       "prerequisites": ["normalize-5210"],
       "variables": {},

@@ -570,6 +570,20 @@ make verify-5210-radio-outgoing-call-sip-busy RUN_DIR=run_5210_sip_busy_gate
 make verify-5210-radio-outgoing-call-sip-unavailable RUN_DIR=run_5210_sip_unavailable_gate
 ```
 
+The 3330 v4.50E independently passes both failure contracts after fresh
+physical PMM provisioning for each gate. Its 40-second call run observes one
+ended attempt with no redial or accepted media; the normal product SETUP,
+busy decision or cause 18, and full CC/RR release remain required:
+
+```sh
+make verify-3330-radio-outgoing-call-sip-busy RUN_DIR=run_3330_sip_busy_gate
+make verify-3330-radio-outgoing-call-sip-unavailable RUN_DIR=run_3330_sip_unavailable_gate
+```
+
+As with its other SIP gates, `_provision` owns first-boot PMM evidence and
+`_call` owns the call logs/results. These checks close failure parity for the
+five SIP-tested HLE profiles, not native DSP speech or other firmware versions.
+
 The 3410 v5.46E also independently passes outgoing connected and pending
 save/load gates with fresh product-local storage and physical Send. Connected
 restoration observes SIP BYE; pending restoration observes CANCEL/487 without

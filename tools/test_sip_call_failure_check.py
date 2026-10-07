@@ -52,6 +52,13 @@ class SipFailureCheckTest(unittest.TestCase):
         self.assertTrue(self.check(product='3410')['scope'].startswith('3410 HLE'))
         self.assertTrue(self.check(product='5210')['scope'].startswith('5210 HLE'))
 
+    def test_3330_failure_requires_own_setup(self):
+        with self.assertRaises(RuntimeError):
+            self.check(product='3330')
+        log = LOG.replace('length=15 data=03450401a05e0581551532f4150101',
+                          'length=18 data=03450404600200815e0581551532f4150101')
+        self.assertTrue(self.check(product='3330', log=log)['scope'].startswith('3330 HLE'))
+
     def test_false_connection_is_rejected(self):
         for extra in ('state changed to CONFIRMED',):
             with self.assertRaises(RuntimeError):
