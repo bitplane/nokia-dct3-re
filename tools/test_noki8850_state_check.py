@@ -17,6 +17,20 @@ state_replay: phase=restored event=end t=41.000000000
 
 
 class StateTest(unittest.TestCase):
+    def test_sms_continuation_forbids_redelivery(self):
+        text = GOOD + 'PCH IMSI page transmitted channel=60\n'
+        text += ('sim_device: update fid=6f3c record=1 length=176\n' * 2)
+        text += '8850_sms_physical: action=read_4\n'
+        with patch('tools.noki8850_state_check.verify_sms'):
+            verify(text, sms=True, storage=b'fixture')
+            with self.assertRaisesRegex(ValueError, 'redelivered'):
+                verify(text + 'PCH IMSI page transmitted channel=60',
+                       sms=True, storage=b'fixture')
+
+    def test_sms_requires_persistent_storage(self):
+        with self.assertRaisesRegex(ValueError, 'persistent SIM storage'):
+            verify(GOOD, sms=True)
+
     def check(self, text):
         # The product-specific call grammar has its own executable checker tests.
         with patch('tools.noki8850_state_check.verify_call') as call:

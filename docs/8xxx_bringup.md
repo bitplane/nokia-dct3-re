@@ -1495,8 +1495,28 @@ load. Require:
 The checker additionally requires the complete own-product intended-number
 CC/RR lifecycle and reviewed operator pixels after release. Original NSM-2
 flash/PMM inputs and the declared research DSP composition are unchanged.
-This is active signaling/UI restoration, not native speech, idle/SMS
-restoration or cold clock continuity.
+This is active signaling/UI restoration, not native speech, idle restoration
+or cold clock continuity.
+
+Delivered-SMS restoration is independently verified by
+`tools/noki8850_state_sms.lua` with a private copy of
+`fixtures/noki8850_incoming_sms/nsm2hle.cfg`, fresh cfg/NVRAM/state/snapshot
+directories, verbose logging and 36 seconds. The shared replay fixture saves
+at 19 seconds, before the physical read schedule. Exact CPU/RAM/time,
+nonempty ordered protocol replay and identical reference/restored pixels
+pass; only physical reading resumes after load. Require:
+
+```sh
+.venv/bin/python tools/noki8850_state_check.py --sms \
+  --storage RUN/nvram/nsm2hle/sim_card RUN/error.log RUN/snap
+```
+
+Exactly one page and two SIM writes (delivery and read-status), persistent
+read `hello`, CP/RP closure and reviewed body pixels are required. No
+redelivery or record rewrite repairs restoration. The ordinary non-restored
+SMS fixture and active-call restoration also pass after sharing the replay
+and physical-read helpers. This is delivered-message restoration, not replay
+during an unfinished CP/RP exchange.
 
 #### Incoming Call Acceptance
 
