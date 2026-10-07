@@ -629,13 +629,21 @@ still serves the SR12 update archive
 `SR12_CCS_v3.3_SR_3.3.82.13.exe` (135,946,254 bytes; SHA-256
 `a05ce0fae2485869ac55aaeb00b3a466fbdde24fe599e9db8279cce4b036bd33`).
 The acquired archive is retained locally under ignored `run_ccs33_oracle/`.
-Static extraction of its outer CAB exposes an InstallShield `data1.cab` and
-`data1.hdr`; header filenames include `ccs5400sim.txt`, C54x GEL files and
-`bti5400.dll`. This establishes accessible C54x-related update content, not
-a complete simulator installation or a timer-capable executable. The index
-explicitly requires a previous CCS 3.3 installation. Next inspect the nested
-payload with an InstallShield-capable reader and establish its dependencies
-before considering execution. No installer has been run or license accepted.
+Static extraction with 7-Zip and the distribution's `unshield` reader exposes
+1,677 nested payload files. `drivers/import/ccs5400sim.txt` describes C5402
+and C5410 device simulators with cycle-accurate CPU and Timer0 support;
+C5402 additionally lists Timer1. These are vendor capability declarations,
+not measurements of the short-period probe. The manifest contains C54x GEL
+files, compiler interface `bti5400.dll` and hardware-emulator drivers, but
+none of the C54x `.ccs` simulator configurations named by that table and no
+identifiable C54x simulator driver. Do not mistake the XDS drivers or the
+compiler interface for the simulator engine. Static PE inspection of the
+included `cc_app.exe` also identifies vendor runtime dependencies, including
+`CWDLL32.dll`, `CWSTART.dll` and `TISCC.dll`.
+The index explicitly requires a previous CCS 3.3 installation. This update
+therefore supplies useful capability/configuration evidence, not a standalone
+timing oracle; acquisition still targets the base installation and its C54x
+simulator component. No installer has been run or license accepted.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
