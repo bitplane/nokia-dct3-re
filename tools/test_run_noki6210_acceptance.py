@@ -34,6 +34,11 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_host_sms_frame_rejects_blank_or_wrong_geometry(self):
+        for size in ((96, 60), (84, 48)):
+            with self.assertRaisesRegex(ValueError, 'Message sent'):
+                runner.check_host_sms_sent(Image.new('L', size, 255))
+
     def test_accessory_requires_observed_high_unattached_decision(self):
         frame = Image.new('L', (96, 60), 255)
         with patch.object(runner, 'OPERATOR_SHA256', hashlib.sha256(frame.tobytes()).hexdigest()):

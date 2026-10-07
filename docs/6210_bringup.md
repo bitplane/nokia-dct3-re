@@ -270,6 +270,23 @@ traffic/release contracts. Reviewed caller text and exact registered idle
 before/after the call are required. `--port` selects the unused HTTP port
 (default 16210). This is HLE signaling acceptance, not speech or native DSP.
 
+## Host SMS acceptance
+
+The isolated runner's `host-incoming-sms` scenario enables only `CALLHOST`,
+waits for current-epoch adapter readiness and laboratory registration, and
+delivers host `hello` from `5551234`. Independent host correlation and NPE-3
+handset checks require CP/RP/RR closure, exactly one page, delivery/read-status
+writes, persistent read content and the reviewed full message screen.
+
+`host-outgoing-sms` uses the ordinary physical composer to submit `A` to
+`5551234`. The host runner requires exactly GSM7 `41`/one septet, rejects an
+unrelated request ID and rejects a duplicate success decision. The handset
+must independently satisfy its own relative-validity `ff` SMS-SUBMIT grammar,
+channel release, paging recovery and reviewed Message sent text (excluding
+the animated envelope, unlike the unchanged ordinary full-frame gate). No automatic
+SMS network fixture is enabled in either host scenario. The unchanged acquired
+PMM and research HLE/native distinction apply; these do not prove native DSP.
+
 ## Save-state acceptance
 
 `verify-6210-state-idle`, `verify-6210-state-call` and

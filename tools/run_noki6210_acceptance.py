@@ -29,7 +29,9 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'state-call': ('npe3hle', 'state_call', 48),
              'state-sms': ('npe3hle', 'state_sms', 30),
              'accessory': ('npe3hle', 'accessory_input', 25),
-             'host-incoming-call': ('npe3hle', 'host_incoming_input', 60)}
+             'host-incoming-call': ('npe3hle', 'host_incoming_input', 60),
+             'host-incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
+             'host-outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -89,6 +91,14 @@ def check_accessory(text, frame):
 def check_frame(frame, digest, description):
     if frame.size != (96, 60) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
         raise ValueError(f'frame differs from reviewed {description}')
+
+
+def check_host_sms_sent(frame):
+    # Host response timing may change the animated envelope at the right.
+    if frame.size != (96, 60) or hashlib.sha256(
+            frame.convert('L').crop((0, 0, 72, 60)).tobytes()).hexdigest() != (
+            '83ec6b273d52bc1b98af2a0ca31602acf43066fd21337536b7b72b4d65c53ae7'):
+        raise ValueError('missing reviewed host Message sent text')
 
 
 def check_output(text):
@@ -164,13 +174,14 @@ def main():
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
-        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'host-incoming-call'):
+        host = args.scenario.startswith('host-')
+        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms') or host:
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
             ports = ET.SubElement(system, 'input')
-            mask = '1' if args.scenario == 'host-incoming-call' else '2' if args.scenario == 'incoming-call' else '4'
-            tag = ':CALLHOST' if args.scenario == 'host-incoming-call' else ':NETCFG'
+            mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
+            tag = ':CALLHOST' if host else ':NETCFG'
             ET.SubElement(ports, 'port', tag=tag, type='CONFIG',
                           mask=mask, defvalue='0', value=mask)
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
@@ -181,12 +192,16 @@ def main():
                    '-autoboot_delay', '0', '-seconds_to_run', str(seconds),
                    '-video', 'none', '-sound', 'none', '-nothrottle', '-log', '-verbose']
         host_command = None
-        if args.scenario == 'host-incoming-call':
+        if host:
             command.extend(['-http', '-http_port', str(args.port)])
-            host_command = [sys.executable, str(root / 'tools/run_host_incoming_signaling_gate.py'),
-                            '--port', str(args.port), '--cwd', str(run), '--caller', '5551234',
-                            '--ready-file', str(run / 'snap/6210_host_registered_idle.png'),
-                            '--'] + command
+            runner, options = {
+                'host-incoming-call': ('run_host_incoming_signaling_gate', [
+                    '--caller', '5551234', '--ready-file', str(run / 'snap/6210_host_registered_idle.png')]),
+                'host-incoming-sms': ('run_host_incoming_sms_gate', []),
+                'host-outgoing-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1']),
+            }[args.scenario]
+            host_command = [sys.executable, str(root / f'tools/{runner}.py'),
+                            '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
         with (run / 'console.log').open('w') as output:
             subprocess.run(host_command or command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
@@ -244,13 +259,16 @@ def main():
                             frame.convert('L').crop((0, 8, 96, 40)).tobytes()).hexdigest() != (
                             'edde96356123c9684d846f94418f1d2e6eedc7fd331a3dab41d92cd38f5006ca'):
                         raise ValueError('missing reviewed host caller 5551234')
-        elif args.scenario == 'outgoing-sms':
+        elif args.scenario in ('outgoing-sms', 'host-outgoing-sms'):
             from tools.noki6210_outgoing_sms_check import verify as check_submission
             check_submission(text)
             from PIL import Image
             with Image.open(run / 'snap/6210_sms_sent.png') as frame:
-                check_frame(frame, SMS_SENT_SHA256, 'Message sent')
-        elif args.scenario == 'incoming-sms':
+                if host:
+                    check_host_sms_sent(frame)
+                else:
+                    check_frame(frame, SMS_SENT_SHA256, 'Message sent')
+        elif args.scenario in ('incoming-sms', 'host-incoming-sms'):
             from tools.noki6210_incoming_sms_check import verify as check_delivery
             check_delivery(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
             from PIL import Image
@@ -283,6 +301,11 @@ def main():
                 from PIL import Image
                 with Image.open(run / 'snap/6210_state_sms_read_1.png') as frame:
                     check_frame(frame, SMS_READ_SHA256, 'restored received hello SMS')
+        if args.scenario in ('host-incoming-sms', 'host-outgoing-sms'):
+            name = 'radio_incoming_host_sms_trace_check' if args.scenario == 'host-incoming-sms' else 'radio_outgoing_host_sms_trace_check'
+            options = [] if args.scenario == 'host-incoming-sms' else ['--octets', '1']
+            subprocess.run([sys.executable, str(root / f'tools/{name}.py'),
+                            str(run / 'error.log')] + options, check=True)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
