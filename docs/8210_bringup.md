@@ -331,7 +331,7 @@ Run any focused scenario from a new directory:
 
 Available scenarios are `registration`, `incoming-call`, `outgoing-call`,
 `incoming-sms`, `outgoing-sms`, `calculator`, `phonebook`, `idle-state` and
-`call-state`. Each seeds
+`call-state` and `sms-state`. Each seeds
 only the unchanged acquired base-record snapshot into a fresh persistent
 flash image. Incoming events use copied external network configuration;
 all UI interaction uses physical key fields. `phonebook` executes save
@@ -370,6 +370,19 @@ the continuation. Check with `noki8210_state_check.py LOG SNAP --call`;
 ordinary outgoing-call and idle-state fixtures remain independent. This
 verifies active signaling/UI restoration, not native speech or delivered-SMS
 restoration.
+
+`sms-state` delivers the laboratory `hello` once, stores it and closes
+CP/RP/RR before saving at 21 seconds. It requires exact architectural
+restoration, identical saved-screen pixels and nonempty one-second ordered
+radio/SIM replay; only after load does the shared physical Read fixture
+open the message. Acceptance requires exact persistent read-status content,
+reviewed `hello` body pixels, exactly one page and exactly the delivery plus
+read-status writes. Redelivery or rewriting the message cannot repair a
+restore. Run `run_noki8210_acceptance.py RUN --scenario sms-state`, or check
+`noki8210_state_check.py LOG SNAP --sms --storage SIM_NVRAM`. This completes
+the independently executed idle, active-call and delivered-message
+restoration set for the research composition; it does not prove save/load
+within an unfinished SMS transaction or native DSP runtime.
 
 The shared observer retains staged-DSP/self-test, decoded-key and readiness
 acceptance records only. PMM copy/cache dump, column-mask and input-lifecycle

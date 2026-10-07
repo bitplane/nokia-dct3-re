@@ -19,6 +19,22 @@ state_replay: phase=restored event=end t=33.000000000
 
 
 class Nokia8210StateTest(unittest.TestCase):
+    def test_sms_requires_storage_and_delivered_save_boundary(self):
+        with self.assertRaisesRegex(ValueError, 'persistent SIM storage'):
+            verify(GOOD, sms=True)
+        with patch('tools.noki8210_state_check.verify_sms'):
+            with self.assertRaisesRegex(ValueError, 'after delivered SMS'):
+                verify(GOOD, sms=True, storage=b'fixture')
+
+    def test_sms_requires_read_after_load(self):
+        delivered = ('sim_device: update fid=6f3c record=1 length=176\n'
+                     'LAPDm service Channel Release acknowledged\n')
+        with patch('tools.noki8210_state_check.verify_sms'):
+            with self.assertRaisesRegex(ValueError, 'post-load physical SMS read'):
+                verify(delivered + GOOD, sms=True, storage=b'fixture')
+            verify(delivered + GOOD + '8210_sms_physical: action=read_2\n',
+                   sms=True, storage=b'fixture')
+
     def test_call_save_must_follow_connect(self):
         call = GOOD + '8210_call_physical: action=end\n'
         with patch('tools.noki8210_state_check.verify_call'):
