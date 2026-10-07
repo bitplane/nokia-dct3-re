@@ -111,6 +111,28 @@ For a text-only command-line ingress test, the standalone endpoint packs GSM
 The generic wire message also admits `8bit` and `ucs2`; callers must supply the
 already encoded TP user data and its alphabet-specific logical length. The
 network constructs SMS-DELIVER and owns only the external network side.
+
+CLI text uses the GSM default and extension alphabets, not ASCII byte values.
+`@` and `_` have their GSM code points; braces, brackets, backslash, caret,
+tilde, pipe, form feed and the euro sign use ESC-prefixed extension codes.
+Each extension character counts as two septets in SMS `user_data_length`.
+Single-message CLI ingress is limited to 160 septets and rejects unmappable
+text rather than silently substituting or changing the alphabet. The shared
+`tools/gsm7_text.py` implements the tables and packing rules from
+[TS 23.038 v3.3.0, sections 6.1.2.3/6.2.1/6.2.1.1](https://www.etsi.org/deliver/etsi_ts/123000_123099/123038/03.03.00_60/ts_123038v030300p.pdf).
+
+The 6250 `host-incoming-sms-text` acceptance scenario sends `@_{}` from
+the external host. It requires CP/RP/RR closure, exact six-septet SMS-DELIVER
+storage, physical Read and the reviewed four-character handset frame:
+
+```sh
+.venv/bin/python tools/run_noki6250_acceptance.py run_host_text --scenario host-incoming-sms-text
+```
+
+This proves that specific handset text path, not glyph coverage for every
+alphabet character or national-language tables. `run_host_incoming_sms_gate.py`
+also accepts `--text` for independently reviewed fixtures; its default remains
+`hello` for the existing acceptance gates.
 `verify-radio-incoming-sms-host-adapter` requires paging, firmware CP/RP
 acknowledgement and SIM-backed storage before reporting `delivered`.
 `verify-radio-incoming-sms-host-restore` saves during that admitted delivery;
@@ -130,6 +152,11 @@ paging and is reported `delivered` only after the handset ReturnResult and
 channel release. The standalone bridge can exercise it with
 `--incoming-ussd 'Host notice' --once`; the generic wire contract accepts
 already packed data rather than assuming a text alphabet.
+CLI USSD text uses the same GSM tables but its own padding: a spare septet is
+CR rather than zero (`@`), and an intended final CR on an octet boundary is
+protected by another CR. USSD does not carry an SMS TP-UDL. These boundary
+cases have executable packing tests; ordinary host USSD lifecycle acceptance
+remains separate from handset acceptance of every such string.
 `verify-radio-incoming-ussd-host-restore` saves after admission and requires
 the queued state to be republished under a new epoch before the one organic
 firmware completion is reported.

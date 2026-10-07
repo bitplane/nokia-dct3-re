@@ -11,31 +11,18 @@ import sys
 import time
 from typing import Any
 
+try:
+    from tools.gsm7_text import encode_text
+except ModuleNotFoundError:
+    from gsm7_text import encode_text
 
 FRAME_HEX_LENGTH = 66
 PROTOCOL_VERSION = 1
 
 
-def pack_gsm7(text: str) -> str | None:
-    try:
-        septets = text.encode("ascii")
-    except UnicodeEncodeError:
-        return None
-    if any(value > 0x7f for value in septets):
-        return None
-    accumulator = 0
-    bits = 0
-    packed = bytearray()
-    for value in septets:
-        accumulator |= value << bits
-        bits += 7
-        while bits >= 8:
-            packed.append(accumulator & 0xff)
-            accumulator >>= 8
-            bits -= 8
-    if bits:
-        packed.append(accumulator & 0xff)
-    return packed.hex()
+def pack_gsm7(text: str, *, ussd: bool = False) -> str | None:
+    encoded = encode_text(text, ussd=ussd)
+    return encoded[0] if encoded is not None else None
 
 
 @dataclass
@@ -106,7 +93,7 @@ class LoopbackProtocol:
             }]
         if kind == "outgoing_ussd":
             identity = self._identity(message)
-            response = pack_gsm7("Host network")
+            response = pack_gsm7("Host network", ussd=True)
             if identity is None or response is None:
                 return []
             return [{
@@ -155,18 +142,17 @@ class LoopbackProtocol:
     ) -> dict[str, Any] | None:
         if self.epoch is None:
             return None
-        # CLI text is deliberately ASCII/GSM-basic for now. The wire protocol
-        # itself accepts packed GSM7, 8-bit and UCS-2 payloads.
-        packed = pack_gsm7(text)
-        if packed is None:
+        encoded = encode_text(text)
+        if encoded is None or not 1 <= encoded[1] <= 160:
             return None
+        packed, septet_count = encoded
         return {
             "type": "incoming_sms",
             "epoch": self.epoch,
             "request_id": request_id,
             "sender": sender,
             "alphabet": "gsm7",
-            "user_data_length": len(text),
+            "user_data_length": septet_count,
             "user_data": packed,
         }
 
@@ -175,9 +161,10 @@ class LoopbackProtocol:
     ) -> dict[str, Any] | None:
         if self.epoch is None:
             return None
-        packed = pack_gsm7(text)
-        if packed is None:
+        encoded = encode_text(text, ussd=True)
+        if encoded is None or not encoded[1] or len(encoded[0]) > 320:
             return None
+        packed = encoded[0]
         return {
             "type": "incoming_ussd",
             "epoch": self.epoch,
@@ -389,6 +376,14 @@ def main() -> int:
     if sum(value is not None for value in (
             args.incoming_caller, args.incoming_sms, args.incoming_ussd)) > 1:
         parser.error("choose one incoming call, SMS or USSD request")
+    if args.incoming_sms is not None:
+        encoded = encode_text(args.incoming_sms)
+        if encoded is None or not 1 <= encoded[1] <= 160:
+            parser.error('--incoming-sms must fit 1..160 GSM default/extension septets')
+    if args.incoming_ussd is not None:
+        encoded = encode_text(args.incoming_ussd, ussd=True)
+        if encoded is None or not encoded[1] or len(encoded[0]) > 320:
+            parser.error('--incoming-ussd must fit a nonempty GSM 7-bit string in 160 octets')
     if (args.incoming_sms_sender is not None and
             (not args.incoming_sms_sender.isdigit() or
              not 1 <= len(args.incoming_sms_sender) <= 20)):

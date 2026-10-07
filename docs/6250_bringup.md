@@ -578,6 +578,11 @@ The save/load gates retain exact architecture, ordered protocol replay and
 screen-pixel equality. These are research-HLE signaling/storage regressions,
 not native DSP or headset audio validation.
 
+The separate `host-incoming-sms-text` scenario additionally proves the host
+GSM alphabet boundary with `@_{}`: six encoded septets persist exactly in
+EF_SMS and physical Read renders the four characters. Its reviewed frame
+and storage check do not replace the existing `hello` SMS oracle.
+
 Attached-accessory identification, microphone bias switching, headset
 buttons and calibrated voltage/ADC units remain unvalidated. Do not infer
 those contracts from this unattached-input regression.

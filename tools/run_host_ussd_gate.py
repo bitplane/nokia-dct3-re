@@ -7,24 +7,17 @@ import json
 
 try:
     from tools.run_host_call_adapter_gate import connect
+    from tools.gsm7_text import encode_text
 except ModuleNotFoundError:
     from run_host_call_adapter_gate import connect
+    from gsm7_text import encode_text
 
 
 def pack_gsm7(text: str) -> str:
-    accumulator = 0
-    bits = 0
-    packed = bytearray()
-    for value in text.encode("ascii"):
-        accumulator |= value << bits
-        bits += 7
-        while bits >= 8:
-            packed.append(accumulator & 0xff)
-            accumulator >>= 8
-            bits -= 8
-    if bits:
-        packed.append(accumulator & 0xff)
-    return packed.hex()
+    encoded = encode_text(text, ussd=True)
+    if encoded is None:
+        raise ValueError('text is outside the GSM default/extension alphabet')
+    return encoded[0]
 
 
 async def run(args: argparse.Namespace) -> None:

@@ -1,9 +1,26 @@
+import contextlib
+import io
 import unittest
+from unittest.mock import patch
 
-from tools.dct3_call_bridge import LoopbackProtocol
+from tools.dct3_call_bridge import LoopbackProtocol, main
 
 
 class Dct3CallBridgeTest(unittest.TestCase):
+    def test_invalid_cli_text_is_rejected_before_connection(self):
+        for option, text in (
+                ('--incoming-sms', ''),
+                ('--incoming-sms', '^' * 81),
+                ('--incoming-sms', '`'),
+                ('--incoming-ussd', ''),
+                ('--incoming-ussd', '`')):
+            with self.subTest(option=option, text=text):
+                with patch('sys.argv', ['bridge', option, text]):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        with self.assertRaises(SystemExit) as error:
+                            main()
+                self.assertEqual(error.exception.code, 2)
+
     def setUp(self):
         self.protocol = LoopbackProtocol()
         replies = self.protocol.handle({
@@ -144,6 +161,22 @@ class Dct3CallBridgeTest(unittest.TestCase):
             "sender": "5551234", "alphabet": "gsm7",
             "user_data_length": 5, "user_data": "e8329bfd06",
         })
+
+    def test_sms_extension_characters_count_as_two_septets(self):
+        protocol = LoopbackProtocol()
+        protocol.epoch = 9
+        request = protocol.incoming_sms_request('5551234', '@_{}')
+        self.assertEqual(request['user_data_length'], 6)
+        self.assertEqual(request['user_data'], '80c806b54901')
+        self.assertIsNotNone(protocol.incoming_sms_request('5551234', '^' * 80))
+        self.assertIsNone(protocol.incoming_sms_request('5551234', '^' * 81))
+        self.assertIsNone(protocol.incoming_sms_request('5551234', ''))
+
+    def test_ussd_padding_is_not_an_extra_at_character(self):
+        protocol = LoopbackProtocol()
+        protocol.epoch = 9
+        self.assertEqual(protocol.incoming_ussd_request('1234567')['data'],
+                         '31d98c56b3dd1a')
 
     def test_network_state_tracks_only_the_current_epoch(self):
         protocol = LoopbackProtocol()

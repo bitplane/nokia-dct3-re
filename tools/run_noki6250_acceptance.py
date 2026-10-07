@@ -31,7 +31,7 @@ def main():
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "accessory", "idle-state", "call-state", "sms-state",
-                                              "host-incoming-call", "host-incoming-sms", "host-outgoing-sms",
+                                              "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
                                               "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
@@ -67,13 +67,14 @@ def main():
         (run / "nvram").mkdir()
         host_call = args.scenario == "host-incoming-call"
         host = args.scenario.startswith("host-")
-        host_sms = args.scenario in ("host-incoming-sms", "host-outgoing-sms", "host-rejected-sms", "host-silent-sms")
+        host_incoming_sms = args.scenario in ("host-incoming-sms", "host-incoming-sms-text")
+        host_sms = host_incoming_sms or args.scenario in ("host-outgoing-sms", "host-rejected-sms", "host-silent-sms")
         call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call", "host-outgoing-call")
         sms = args.scenario.startswith("sms-") or host_sms
         if args.scenario == "incoming-call":
             shutil.copyfile(root / "fixtures/radio_incoming_call_answered/nhm3hle.cfg",
                             run / "cfg/nhm3hle.cfg")
-        if sms and args.scenario != "host-incoming-sms":
+        if sms and not host_incoming_sms:
             shutil.copyfile(root / "fixtures/radio_incoming_sms/nhm3hle.cfg",
                             run / "cfg/nhm3hle.cfg")
         if host:
@@ -132,8 +133,10 @@ def main():
                             "--port", str(args.port), "--cwd", str(run),
                             "--number", "123", "--decision", "connect", "--"] + command
         if host_sms:
-            runner = "run_host_incoming_sms_gate.py" if args.scenario == "host-incoming-sms" else "run_host_sms_gate.py"
-            options = [] if args.scenario == "host-incoming-sms" else ["--user-data", "c834", "--user-data-length", "2"]
+            runner = "run_host_incoming_sms_gate.py" if host_incoming_sms else "run_host_sms_gate.py"
+            options = [] if host_incoming_sms else ["--user-data", "c834", "--user-data-length", "2"]
+            if args.scenario == "host-incoming-sms-text":
+                options.extend(["--text", "@_{}"])
             if args.scenario == "host-rejected-sms":
                 options.extend(["--decision", "rp_error"])
             if args.scenario == "host-silent-sms":
@@ -184,14 +187,16 @@ def main():
                 checker.append("--rp-silence")
         elif sms:
             frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8,
-                           "host-incoming-sms": 2, "host-outgoing-sms": 8}[args.scenario]
+                           "host-incoming-sms": 2, "host-incoming-sms-text": 2, "host-outgoing-sms": 8}[args.scenario]
             frames = list((run / "snap").rglob(f"6250_sms_{frame_index}.png"))
             if len(frames) != 1:
                 raise ValueError(f"expected one SMS frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_sms_check.py"),
                        str(run / "error.log"), str(run / "nvram/nhm3hle/sim_card"),
                        str(frames[0])]
-            if args.scenario not in ("sms-read", "host-incoming-sms"):
+            if args.scenario == "host-incoming-sms-text":
+                checker.append("--text-fixture")
+            elif args.scenario != "sms-read" and not host_incoming_sms:
                 checker.append("--deleted" if args.scenario == "sms-delete" else "--sent")
         elif args.scenario == "phonebook":
             frames = list((run / "snap").rglob("6250_phonebook_7.png"))
@@ -216,7 +221,7 @@ def main():
             from tools.radio_host_outgoing_connect_check import verify as check_host
             check_host((run / "error.log").read_text(errors="replace"), "123")
         if host_sms and args.scenario not in ("host-rejected-sms", "host-silent-sms"):
-            name = "radio_incoming_host_sms_trace_check.py" if args.scenario == "host-incoming-sms" else "radio_outgoing_host_sms_trace_check.py"
+            name = "radio_incoming_host_sms_trace_check.py" if host_incoming_sms else "radio_outgoing_host_sms_trace_check.py"
             subprocess.run([sys.executable, str(root / "tools" / name), str(run / "error.log")], check=True)
         if args.scenario == "phonebook":
             shutil.copyfile(run / "error.log", run / "phonebook-save.log")

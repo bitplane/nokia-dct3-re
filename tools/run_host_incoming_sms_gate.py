@@ -8,8 +8,10 @@ from websockets.exceptions import ConnectionClosed
 
 try:
     from tools.run_host_call_adapter_gate import connect
+    from tools.dct3_call_bridge import LoopbackProtocol
 except ModuleNotFoundError:
     from run_host_call_adapter_gate import connect
+    from dct3_call_bridge import LoopbackProtocol
 
 
 async def run(args: argparse.Namespace) -> None:
@@ -28,15 +30,12 @@ async def run(args: argparse.Namespace) -> None:
                         event.get("epoch") == epoch and
                         event.get("registered") is True):
                     break
-            await websocket.send(json.dumps({
-                "type": "incoming_sms",
-                "epoch": epoch,
-                "request_id": 1,
-                "sender": "5551234",
-                "alphabet": "gsm7",
-                "user_data_length": 5,
-                "user_data": "e8329bfd06",
-            }))
+            protocol = LoopbackProtocol()
+            protocol.epoch = epoch
+            request = protocol.incoming_sms_request('5551234', getattr(args, 'text', 'hello'))
+            if request is None:
+                raise RuntimeError('SMS text must fit 1..160 GSM default/extension septets')
+            await websocket.send(json.dumps(request))
             phases = []
             initial_epoch = epoch
             restored = False
@@ -79,6 +78,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cwd")
     parser.add_argument("--require-restore", action="store_true")
+    parser.add_argument("--text", default="hello", help="GSM default/extension alphabet text")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:
