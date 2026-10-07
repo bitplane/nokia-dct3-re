@@ -1112,6 +1112,23 @@ The latter requires independent PCS acquisition before accepting its transport
 lifecycle. This establishes a software host decision boundary, not SMS delivery
 to a real subscriber or a native DSP radio backend.
 
+Explicit host RP rejection is separately verified on GSM900. Use the same
+host-enabled configuration and expected `A` payload, add `--decision rp_error`
+to the runner and use `tools/noki8890_sms_reject_input.lua` for 52 seconds.
+The handset receives RP-ERROR, sends CP-ACK, releases the channel and resumes
+paging without any success RP-ACK. The reviewed transient German frame reads
+`Kurzmitt. nicht gesendet`; subsequent physical End (`0f`) and Menu (`19`)
+open `Mitteilungen`. Require:
+
+```sh
+.venv/bin/python tools/noki8890_outgoing_sms_check.py --rejected \
+  --recovery-frames RUN/snap RUN/error.log
+```
+
+This checks exact physical submission, rejection signaling, reviewed failure
+text and post-release input/menu recovery. It does not inherit PCS rejection,
+silent-peer timeout/retry or external-SMSC failure acceptance.
+
 Fresh strict-topology runs also complete incoming and outgoing call
 signaling and incoming/outgoing SMS. The network's existing assignment
 encoder derives the non-hopping traffic carrier from the serving ARFCN;

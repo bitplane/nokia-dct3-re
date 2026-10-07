@@ -2,6 +2,8 @@ import unittest
 
 from tools.noki8890_incoming_sms_check import verify as verify_incoming
 from tools.noki8890_outgoing_sms_check import verify as verify_outgoing
+from tools.noki8890_outgoing_sms_check import check_recovery
+from pathlib import Path
 from tools.test_noki8850_sms_check import FRESH, storage
 from tools.test_noki8850_outgoing_sms_check import GOOD
 from tools.test_noki8890_registration_check import PCS_LOG
@@ -14,6 +16,20 @@ OUTGOING = GOOD.replace('8850_', '8890_').replace(
 
 
 class Nokia8890SmsTest(unittest.TestCase):
+    def test_recovery_requires_physical_navigation(self):
+        with self.assertRaisesRegex(ValueError, 'physical recovery'):
+            check_recovery(OUTGOING, Path('missing'))
+
+    def test_rejected_outgoing(self):
+        verify_outgoing(OUTGOING.replace('kind=18', 'kind=19').replace(
+            'message=01 length=5', 'message=01 length=7'), rejected=True)
+
+    def test_rejected_cannot_contain_success(self):
+        rejected = OUTGOING.replace('kind=18', 'kind=19').replace(
+            'message=01 length=5', 'message=01 length=7')
+        with self.assertRaisesRegex(ValueError, 'success RP-ACK'):
+            verify_outgoing(rejected + '\nGSM service downlink kind=18 sapi=3', rejected=True)
+
     def test_incoming(self):
         verify_incoming(INCOMING, storage())
 
