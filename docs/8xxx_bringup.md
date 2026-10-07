@@ -1132,6 +1132,21 @@ submission, rejection signaling, reviewed failure text and post-release
 input/menu recovery. It does not establish silent-peer timeout/retry or
 external-SMSC failure acceptance.
 
+RP-silence remains an open handset/session boundary. A fresh GSM900 host run
+with `--decision rp_silence`, the ordinary outgoing-input fixture and 150
+emulated seconds produces one exact `A/5551234` submission at 39.964 seconds
+and network CP-ACK at 39.969 seconds. The host's correlated silence decision
+is accepted; no RP response is synthesized. No further SMS uplink, retry or
+service-channel release is observed before the run ends. CCONT watchdog kicks
+and DSP RX traffic continue through the observation window, so this is not
+evidence of a stopped emulator. The host runner must report incomplete
+lifecycle when its socket closes, not success or an uncaught traceback.
+`nokia_gsm_session` explicitly parks in `awaiting_mobile_sms_timeout` without
+an RP reply; next evidence needed is the handset's RP timer/abort path and its
+radio-layer output. The bounded absence does not establish that no timer
+exists, that 150 seconds is a standards-derived timeout, or that forcing a
+peer release would be faithful. PCS silence is not yet tested.
+
 Fresh strict-topology runs also complete incoming and outgoing call
 signaling and incoming/outgoing SMS. The network's existing assignment
 encoder derives the non-hopping traffic carrier from the serving ARFCN;
