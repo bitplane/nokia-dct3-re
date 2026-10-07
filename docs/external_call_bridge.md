@@ -157,6 +157,18 @@ CR rather than zero (`@`), and an intended final CR on an octet boundary is
 protected by another CR. USSD does not carry an SMS TP-UDL. These boundary
 cases have executable packing tests; ordinary host USSD lifecycle acceptance
 remains separate from handset acceptance of every such string.
+The 3210 seven-septet boundary is independently verified: `1234567` displays
+without a spurious trailing `@` and completes the notification/RR lifecycle.
+Reproduce this text-specific check sequentially:
+
+```sh
+make verify-radio-incoming-ussd-host-adapter RUN_DIR=run_host_ussd_seven HOST_INCOMING_USSD_TEXT=1234567
+.venv/bin/python tools/radio_host_incoming_ussd_trace_check.py run_host_ussd_seven/error.log --seven-text-frame run_host_ussd_seven/snap/noki3210/0000.png
+```
+
+This exact frame covers that one text vector, not all alphabet glyphs or
+trailing-CR presentation. The incoming runner's `--text` option rejects empty,
+unmappable and over-160-octet text before launching MAME.
 `verify-radio-incoming-ussd-host-restore` saves after admission and requires
 the queued state to be republished under a new epoch before the one organic
 firmware completion is reported.

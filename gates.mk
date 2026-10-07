@@ -2617,7 +2617,7 @@ verify-radio-incoming-ussd-host-adapter:
 	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env NOKIA_DCT3_LUA_QUIET=1 NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
 		$(VENV)/bin/python tools/run_host_incoming_ussd_gate.py \
-			--port $(HOST_INCOMING_USSD_PORT) --cwd . -- \
+			--port $(HOST_INCOMING_USSD_PORT) --text '$(HOST_INCOMING_USSD_TEXT)' --cwd . -- \
 			$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \
 			-keyboardprovider none -mouseprovider none -lightgunprovider none \
 			-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \

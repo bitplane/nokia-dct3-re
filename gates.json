@@ -8733,7 +8733,7 @@
         "\t$(call prepare_host_run,$(RUN_DIR),noki3210,); \\",
         "\tenv NOKIA_DCT3_LUA_QUIET=1 NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \\",
         "\t\t$(VENV)/bin/python tools/run_host_incoming_ussd_gate.py \\",
-        "\t\t\t--port $(HOST_INCOMING_USSD_PORT) --cwd . -- \\",
+        "\t\t\t--port $(HOST_INCOMING_USSD_PORT) --text '$(HOST_INCOMING_USSD_TEXT)' --cwd . -- \\",
         "\t\t\t$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- noki3210 -rompath roms -log -video none -sound none \\",
         "\t\t\t-keyboardprovider none -mouseprovider none -lightgunprovider none \\",
         "\t\t\t-joystickprovider none -midiprovider none -skip_gameinfo -nothrottle \\",

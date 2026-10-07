@@ -32,7 +32,7 @@ async def run(args: argparse.Namespace) -> None:
                 "epoch": epoch,
                 "request_id": 1,
                 "dcs": 0x0f,
-                "data": pack_gsm7("Host notice"),
+                "data": pack_gsm7(args.text),
             }))
             phases = []
             initial_epoch = epoch
@@ -72,8 +72,17 @@ def main() -> int:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cwd")
     parser.add_argument("--require-restore", action="store_true")
+    parser.add_argument("--text", default="Host notice")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if not args.text:
+        parser.error('--text must not be empty')
+    try:
+        encoded = pack_gsm7(args.text)
+    except ValueError as error:
+        parser.error(str(error))
+    if len(encoded) > 320:
+        parser.error('--text must fit in 160 packed octets')
     if args.command[:1] == ["--"]:
         args.command = args.command[1:]
     try:
