@@ -150,6 +150,9 @@ private:
 	bool m_command_rx_ready = false, m_command_rx_busy = false, m_command_rx_clock = true;
 	u8 m_command_rx_byte = 0;
 	unsigned m_command_rx_phase = 0, m_command_rx_irqs = 0;
+	// The replay controller/reference deliberately survive restoration of the DUT.
+	unsigned m_native_replay_leg = 0;
+	std::stringstream m_native_checkpoint, m_native_reference;
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
 	unsigned m_native_allocation_call_traces = 0;
@@ -359,6 +362,7 @@ private:
 	emu_timer *m_command = nullptr;
 	emu_timer *m_command_clock = nullptr;
 	emu_timer *m_command_receive_clock = nullptr;
+	emu_timer *m_native_replay = nullptr;
 	unsigned m_phase = 54;
 	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
 	unsigned m_native_mcbsp_trace = 0, m_native_mcbsp_polls = 0;
@@ -500,9 +504,87 @@ private:
 		if (m_command_rx_phase) m_mcbsp2->rx_frame_w(0);
 		m_mcbsp2->rx_clock_w(m_command_rx_clock);
 		if (!m_command_rx_clock) ++m_command_rx_phase;
+		if (system_bios() >= 12 && !m_native_replay_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
+			// Let synchronized input events settle without advancing to the next bit.
+			m_native_replay->adjust(attotime::from_nsec(1));
 		// One delay cycle, eight data cycles, then RBR-to-DRR publication.
 		if (m_command_rx_phase == 10 && m_command_rx_clock) m_command_rx_busy = false;
 		else m_command_receive_clock->adjust(attotime::from_usec(5));
+	}
+	TIMER_CALLBACK_MEMBER(native_replay_checkpoint)
+	{
+		if (m_native_replay_leg == 2)
+		{
+			if (!machine().scheduler().can_save()) fatalerror("MU4 native restore has pending synchronized inputs");
+			// Mark this callback modified before restoration. The restored timer
+			// state then survives callback cleanup without rearming the DUT timer.
+			m_native_replay->adjust(attotime::never);
+			m_native_checkpoint.clear(); m_native_checkpoint.seekg(0);
+			if (machine().save().read_stream(m_native_checkpoint) != STATERR_NONE)
+				fatalerror("MU4 native checkpoint restore failed");
+			m_native_replay_leg = 3;
+			logerror("mu4_native_replay_restore: mid_byte=1 original_end_timer=1\n");
+			return;
+		}
+		if (m_phase != 30 || m_native_replay_leg || !m_command_rx_busy || m_command_rx_phase != 4 || m_command_rx_clock || !machine().scheduler().can_save())
+			fatalerror("MU4 native replay checkpoint is not a settled mid-byte boundary");
+		m_native_replay->adjust(attotime::never);
+		m_native_checkpoint.str(""); m_native_checkpoint.clear();
+		if (machine().save().write_stream(m_native_checkpoint) != STATERR_NONE)
+			fatalerror("MU4 native mid-byte checkpoint failed");
+		m_native_replay_leg = 1;
+		logerror("mu4_native_replay_checkpoint: rx_phase=4 data_bits=3 rx_irqs=%u request_cursor=%u\n", m_command_rx_irqs, m_native_command_cursor);
+	}
+	bool finish_native_replay()
+	{
+		if (system_bios() < 12) return false;
+		if (!machine().scheduler().can_save() || !m_native_replay_leg)
+			fatalerror("MU4 native replay has no restorable checkpoint");
+		if (m_native_replay_leg == 1)
+		{
+			m_native_reference.str(""); m_native_reference.clear();
+			if (machine().save().write_stream(m_native_reference) != STATERR_NONE)
+				fatalerror("MU4 native first-leg snapshot failed");
+			m_native_replay_leg = 2;
+			m_native_replay->adjust(attotime::from_nsec(1));
+			return true;
+		}
+		std::stringstream replay;
+		if (m_native_replay_leg != 3) fatalerror("MU4 native replay comparison precedes restoration");
+		if (machine().save().write_stream(replay) != STATERR_NONE)
+			fatalerror("MU4 native second-leg snapshot failed");
+		auto const expected = m_native_reference.str(), actual = replay.str();
+		if (expected.size() != actual.size()) fatalerror("MU4 native replay snapshot size changed");
+		// MAME's uncompressed stream has a 32-byte version/system/signature header.
+		if (actual.size() < 32 || !std::equal(expected.begin(), expected.begin() + 32, actual.begin()))
+			fatalerror("MU4 native replay snapshot header changed");
+		size_t position = 32;
+		unsigned differences = 0, compared = 0, frontend = 0;
+		for (int index = 0; index < machine().save().registration_count(); ++index)
+		{
+			void *base; u32 size, count, blocks, stride;
+			char const *name = machine().save().indexed_item(index, base, size, count, blocks, stride);
+			size_t const length = size_t(size) * count * blocks;
+			if (position + length > actual.size()) fatalerror("MU4 native replay registry extent exceeds snapshot");
+			// lua_engine::on_machine_postload resets its frontend resume timer.
+			// No Lua script runs here; that timer is not emulated hardware state.
+			if (std::string_view(name).starts_with("timer/lua_engine::resume/")) ++frontend;
+			else
+			{
+				++compared;
+				auto const mismatch = std::mismatch(expected.begin() + position, expected.begin() + position + length, actual.begin() + position);
+				if (mismatch.first != expected.begin() + position + length)
+				{
+					++differences;
+					logerror("mu4_native_replay_mismatch: item=%s item_byte=%u expected=%02x actual=%02x\n", name,
+						unsigned(mismatch.first - expected.begin() - position), u8(*mismatch.first), u8(*mismatch.second));
+				}
+			}
+			position += length;
+		}
+		if (position != actual.size() || differences) fatalerror("MU4 native replay differs in %u registered emulation state items", differences);
+		logerror("mu4_native_replay: PASS mid_rx_byte=1 complete_legs=2 emulation_state_equal=1 compared_items=%u frontend_timer_items=%u rx_words=11 tx_words=14 processing=0\n", compared, frontend);
+		return false;
 	}
 	TIMER_CALLBACK_MEMBER(command_input)
 	{
@@ -511,6 +593,9 @@ private:
 		static constexpr u8 packet[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
 		bool const ack = m_native_command_cursor == std::size(packet);
 		if (ack && (!m_command_ack_pending || m_command_ack_cursor == 3)) return;
+		// Replay starts after the separately checked streaming prefix, so both
+		// legs share the same scheduled worker-window endpoint.
+		if (system_bios() >= 12 && !m_native_worker_window_started) { m_command->adjust(attotime::from_msec(1)); return; }
 		if (m_native_command_paths[5] && !m_serial_ready && !m_command_rx_busy && !m_command_rx_ready && (m_serial_regs[0][0] & 1))
 		{
 			if (ack)
@@ -571,6 +656,7 @@ private:
 		m_command = timer_alloc(FUNC(mu4_storage_test_state::command_input), this);
 		m_command_clock = timer_alloc(FUNC(mu4_storage_test_state::command_clock), this);
 		m_command_receive_clock = timer_alloc(FUNC(mu4_storage_test_state::command_receive_clock), this);
+		m_native_replay = timer_alloc(FUNC(mu4_storage_test_state::native_replay_checkpoint), this);
 		if (system_bios() >= 11)
 		{
 			// Save the external peer alongside McBSP2. Growing observation vectors
@@ -643,6 +729,8 @@ private:
 		m_command->adjust(attotime::never);
 		m_command_clock->adjust(attotime::never);
 		m_command_receive_clock->adjust(attotime::never);
+		m_native_replay->adjust(attotime::never);
+		m_native_replay_leg = 0;
 		m_command_rx_ready = m_command_rx_busy = false; m_command_rx_clock = true;
 		m_command_rx_byte = 0; m_command_rx_phase = m_command_rx_irqs = 0;
 		m_command_tx_register = m_command_tx_irqs = m_command_wire_bits = 0;
@@ -1901,6 +1989,7 @@ private:
 					}
 				}
 			}
+			if (finish_native_replay()) return;
 			machine().schedule_exit();
 			return;
 		}
@@ -2269,6 +2358,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(8, "wire", "Original status request with externally clocked serial TX")
 	ROM_SYSTEM_BIOS(9, "wireack", "Original serial status transaction with peer acknowledgement")
 	ROM_SYSTEM_BIOS(10, "pins", "Original status transaction with McBSP2 RX and TX pins")
+	ROM_SYSTEM_BIOS(11, "replay", "Original pin-level status transaction with mid-byte replay")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

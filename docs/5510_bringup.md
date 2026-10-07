@@ -30,8 +30,9 @@ buffer processing. A separate framed
 command fixture reaches the original serial parser and queued acknowledgement.
 The `wireack` fixture completes a native status-query transaction using the
 shared McBSP2 TX model, a bench clock and register-level RX input; `pins`
-completes the same transaction with device-owned pin-level RX too. The open
-boundary is transport reset/save/replay and board attachment, processing command/data
+completes the same transaction with device-owned pin-level RX too. The
+`replay` profile also verifies native continuation across a mid-byte checkpoint.
+The open boundary is native reset lifecycle and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
 claimed; only the initial 1,024 DIN words are independently compared.
@@ -1427,9 +1428,9 @@ A literal far-call scan over the 48,261 uploaded program words finds four
 calls to the queue append helper (`03:9d0f`, `9da9`, `9e13`, `9fb7`) and
 one to the processing reader (`03:acfe`). These sites are independently
 disassembled; this is literal-call coverage, not proof excluding indirect
-calls or another overlay. Hardware ingress and original framing are now
-identified, but connecting MU4 firmware-generated commands, implementing
-the transmitter and verifying processing output remain separate contracts.
+calls or another overlay. Original framing and transmit/status completion
+are verified by the profiles below. Physical board attachment and
+processing output remain separate contracts.
 
 The unchanged 20-second `startup` fixture executes the parser, processing
 reader and dispatcher 174 times each, and the typed dequeue helper 348
@@ -1438,9 +1439,9 @@ ring index pairs, queue word count and parser state end at zero. Thus the
 command service is scheduled but has no received packet in this fixture;
 the dormant mode is not evidence of a missing software worker. The native
 gate still passes with 1,739 notification services and zero illegal
-instructions. Next validate a non-processing packet at the recovered
-register ingress and its original response path before selecting a music
-mode or asserting playback.
+instructions. The non-processing packet controls below distinguish
+command ingress from transmit completion; neither selects a music mode
+or asserts playback.
 
 `MU4_STORAGE_BIOS=command` supplies the non-processing selector `0x49`
 status request through `0031` and receive IRQ6, one byte per 1 ms bench
@@ -1519,11 +1520,11 @@ no status-response retry. Its 20-second window observes the same
 1,779 worker entries and 1,780 clears as the register-RX `wireack` control.
 The firmware generates the parser/command/response transitions; only
 external signal inputs and peer acknowledgement are supplied. This does
-not yet prove native transport save/replay, other receive formats or the
+not alone prove native transport save/replay, other receive formats or the
 physical MA4-MU4 wiring/clock relation. The older loader preamble retains
 its separately declared register-level ingress.
 
-Next verify the recovered transport through reset/save/replay, and decode
+Next verify the native transport reset lifecycle and board attachment, and decode
 processing-command parameters and media inputs before attempting native
 playback. Do not write `bb80` or replay internal queue objects to select a
 mode.
@@ -1532,11 +1533,23 @@ The pin bench registers its external receive/transmit waveform state,
 request/acknowledgement cursors, serial shadows and NAND GPIO latches for
 save states. Its growing TX observation vectors use bounded 64-word
 snapshot storage with checked counts, rather than registering an empty
-vector's fixed initial address and length. This is preparation, not a
-native continuation proof: the remaining acceptance test must checkpoint
-mid-frame and compare two complete original-firmware continuations,
-including response bytes and queue state. Observation-only worker counters
-and the test-phase sequencer are not a restored lifecycle oracle.
+vector's fixed initial address and length.
+
+`MU4_STORAGE_BIOS=replay` waits until the independently checked streaming
+prefix completes, then checkpoints after three data bits of the first request
+byte. Both original-firmware continuations reach the same worker-window
+endpoint, consume the 11-byte request/acknowledgement stream, transmit the
+same 14 response bytes and drain the firmware queues without retry. The
+uncompressed terminal save streams match across all 1,039 registered
+emulation-state items: CPU, RAM, NAND, codec, DMA, McBSP, external peer and
+emulation timers. The only exclusions are nine fields of
+`timer/lua_engine::resume/`: MAME's Lua post-load callback deliberately resets
+that frontend timer, and this fixture runs no Lua script. Restore runs in
+a separate control callback so the terminal-check timer retains its saved
+start/expiry state. Observer counters and the test-phase sequencer are not
+a restored lifecycle oracle. This proves the recovered status transaction's
+native continuation, not arbitrary mid-boot checkpoints, native reset,
+processing commands, physical board attachment or full MU4 boot.
 
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects

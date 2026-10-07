@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "mu4_native_mcbsp2_transaction_replay", "subsystem": "5510_mu4", "status": "partial", "confidence": "strong",
+      "boundary": "The replay profile checkpoints the original R060 resident status transaction after three data bits of its first request byte, after the independently checked streaming prefix completes. Two complete original-firmware continuations consume eleven RX bytes, emit the same fourteen TX bytes and empty the transaction queues without retry. At the identical worker-window endpoint all 1039 registered emulation-state items match byte-for-byte, including CPU, RAM, NAND, DMA, codec, McBSP, external peer and emulation timers. Nine Lua frontend resume-timer fields are explicitly excluded because MAME's Lua post-load callback resets that timer; no Lua script runs in this fixture. This establishes native status-transaction continuation, not arbitrary boot checkpoints, a native reset lifecycle, physical board attachment, processing or music playback",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "mu4_native_mcbsp2_pin_receive", "subsystem": "5510_mu4", "status": "partial", "confidence": "strong",
       "boundary": "The pins profile drives original R060 status-request and acknowledgement bytes through McBSP2 frame, data and clock inputs with explicit 5us bench half-clock edges. It delegates native DRR and indexed control reads to the shared device rather than writing RRDY or pulsing CPU IRQ6. Device-owned RSR/RBR/DRR publication generates eleven receive interrupts, after which original firmware drains all eleven bytes and transmits the same fourteen-byte acknowledged status transaction without retry or queued residue. The 20-second window observes 1779 worker entries and 1780 clears with mode zero and no illegal instruction. Coverage is externally framed single-phase 8-bit delay-one ingress in this original resident lifecycle, not native transport save/replay, physical board clock/wiring, other formats, loader ingress replacement, music processing or full MU4 boot",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "driver/tms320c54x_mcbsp.cpp", "Makefile"]
