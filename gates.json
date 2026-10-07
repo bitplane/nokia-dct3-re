@@ -13210,6 +13210,16 @@
       }]
     },
     {
+      "name": "verify-5210-radio-incoming-call-sip",
+      "prerequisites": ["normalize-5210"],
+      "variables": {},
+      "steps": [{
+        "step": "delegate", "silent": true,
+        "target": "verify-radio-outgoing-call-sip",
+        "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki5210 SIP_HANDSET_BIOS=540e SIP_HANDSET_KEYS=send SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=220 SIP_HANDSET_KEY_GAP_MS=280 SIP_HANDSET_RUNNER_ARGS='--incoming --product 5210' SIP_HANDSET_SECONDS=40"
+      }]
+    },
+    {
       "name": "verify-radio-incoming-call-sip",
       "prerequisites": [],
       "variables": {},

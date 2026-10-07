@@ -169,10 +169,10 @@ def verify_success(root, remote_text, args):
     product = getattr(args, 'product', '3210')
     # Exact encodings from these acceptance fixtures, including their observed
     # CC sequence bit; not a claim that the bit is a fixed product property.
-    connect_data = '8307' if product in ('3310', '3330', '3410') else '8347'
-    answer_key = 'send' if product == '3410' else 'enter'
-    # NHM-6/NHM-2 release checks the message body independently of CC sequence bit 6.
-    release_complete_data = ('03(?:2a|6a)0802e0d1' if product in ('3330', '3410') else
+    connect_data = '8307' if product in ('3310', '3330', '3410', '5210') else '8347'
+    answer_key = 'send' if product in ('3410', '5210') else 'enter'
+    # These release checks treat CC sequence bit 6 independently of the message body.
+    release_complete_data = ('03(?:2a|6a)0802e0d1' if product in ('3330', '3410', '5210') else
                              '036a0802e0d1' if product == '3310' else '032a0802e0d1')
     patterns = (
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=paging',
@@ -413,8 +413,6 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
-    if args.product == '5210' and args.incoming:
-        parser.error('5210 incoming SIP acceptance has not been established')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:

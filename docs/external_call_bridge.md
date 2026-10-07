@@ -287,8 +287,12 @@ substitute another product's DSP, PCM, storage or keypad profile. Its own
 `noki5210.cfg` enables the laboratory `CALLHOST` configuration. Actual SIP
 confirmation, sustained ordered accepted downlink, bidirectional HLE host media
 and firmware CC/RR release are required. Queue drops remain visible, and no
-native DSP speech or new physical-waveform claim is made. Incoming 5210 SIP is
-not yet enabled.
+native DSP speech or new physical-waveform claim is made.
+`verify-5210-radio-incoming-call-sip` independently cold-boots NSM-5, physically
+presses Send at its evidenced 18-second startup point, and requires the
+handset-owned SIP Answer decision, CONNECT `8307`, sustained accepted downlink
+and bidirectional HLE media before complete remote CC/RR clearing. The fixture
+uses its own enabled `CALLHOST` configuration; Navi is not a substitute for Send.
 
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps

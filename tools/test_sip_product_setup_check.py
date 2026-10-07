@@ -63,10 +63,11 @@ class SipProductSetupCheckTest(unittest.TestCase):
                 '3310': ('8307', '036a0802e0d1'),
                 '3330': ('8307', '032a0802e0d1'),
                 '3410': ('8307', '036a0802e0d1'),
+                '5210': ('8307', '036a0802e0d1'),
             }[wire_product]
             if release_override is not None:
                 release = release_override
-            answer_key = answer_override or ('send' if wire_product == '3410' else 'enter')
+            answer_key = answer_override or ('send' if wire_product in ('3410', '5210') else 'enter')
             (root / 'error.log').write_text(
                 'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging\n'
                 'GSM service downlink kind=9 sapi=0 pd=03 message=05\n'
@@ -86,7 +87,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
                            SimpleNamespace(incoming=True, restore_idle=False, product=product))
 
     def test_own_incoming_connect_and_release_are_accepted(self):
-        for product in ('3210', '3310', '3330', '3410'):
+        for product in SETUP:
             with self.subTest(product=product):
                 self.check_incoming(product, product)
 
@@ -95,10 +96,11 @@ class SipProductSetupCheckTest(unittest.TestCase):
             with self.subTest(product=product), self.assertRaises(RuntimeError):
                 self.check_incoming(product, other)
 
-    def test_3410_requires_physical_send_not_navi(self):
-        for key in ('enter', 'send_extra'):
-            with self.assertRaises(RuntimeError):
-                self.check_incoming('3410', '3410', answer_override=key)
+    def test_send_products_require_physical_send_not_navi(self):
+        for product in ('3410', '5210'):
+            for key in ('enter', 'send_extra'):
+                with self.assertRaises(RuntimeError):
+                    self.check_incoming(product, product, answer_override=key)
 
     def test_3330_release_accepts_sequence_bit_not_wrong_payload(self):
         for release in ('032a0802e0d1', '036a0802e0d1'):
