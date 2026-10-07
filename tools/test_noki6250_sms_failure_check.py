@@ -20,6 +20,27 @@ LAPDm service Channel Release acknowledged
 
 
 class FailureCheckTest(unittest.TestCase):
+    def silence_trace(self):
+        return GOOD.split('gsm_call_adapter: sms decision', 1)[0] + '''GSM service downlink kind=17 sapi=3 pd=09 message=04
+gsm_call_adapter: sms decision id=1 outcome=3 result=accepted
+TX packet type=1b data=0080015301
+RX enqueue type=80 data=80000000000000000000017301
+TX packet type=02 radio_phase=release_channel_change
+gsm_call_adapter: sms state id=1 epoch=1 phase=ended
+PCH no-identity fill
+''' + '6250_sms_recovery_physical:' + GOOD.split('6250_sms_recovery_physical:', 1)[1]
+
+    def test_silence_recovery(self):
+        verify(self.silence_trace(), rp_silence=True)
+
+    def test_silence_forbids_rp_result(self):
+        with self.assertRaisesRegex(ValueError, 'RP error'):
+            verify(self.silence_trace() + 'GSM service downlink kind=19 sapi=3\n', rp_silence=True)
+
+    def test_silence_requires_host_closure(self):
+        with self.assertRaisesRegex(ValueError, 'correlated host end'):
+            verify(self.silence_trace().replace('phase=ended', 'phase=queued'), rp_silence=True)
+
     def test_rejection_and_recovery(self):
         verify(GOOD)
 

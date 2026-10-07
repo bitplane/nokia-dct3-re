@@ -138,6 +138,14 @@ then Menu opens Messages. `noki6250_sms_failure_check.py LOG SNAP` requires
 that protocol/key order and reviewed failure/menu pixels, forbidding a success
 RP-ACK. This establishes explicit rejection recovery, not RP-silence timeout.
 
+`--scenario host-silent-sms` instead requests CP acknowledgment without any
+RP result. The unchanged firmware reports `Message sending failed`, initiates
+main-link DISC, receives UA, deconfigures the channel and closes the correlated
+host request (observed near 110.6 seconds). The checker requires resumed paging,
+no RP success/error, the distinct reviewed timeout text and the same physical
+End/End/Menu recovery. The run lasts 135 emulated seconds; no firmware timeout
+is shortened. This is a separate failure contract from RP rejection.
+
 ## Recovered hardware contracts
 
 The CTSI base literal at `4e7f70` is `00020000`. The release routine
