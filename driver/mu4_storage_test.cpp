@@ -8,6 +8,7 @@
 #include "tms320c54x_dma.h"
 #include "tms320c54x_mcbsp.h"
 #include "tlv320aic23.h"
+#include <array>
 #include <vector>
 #include <sstream>
 
@@ -144,6 +145,8 @@ private:
 	u8 m_command_ack_token = 0, m_command_wire_byte = 0;
 	u16 m_command_tx_register = 0;
 	std::vector<u16> m_command_tx_words, m_command_wire_decoded;
+	std::array<u16, 64> m_saved_command_tx{}, m_saved_command_decoded{};
+	unsigned m_saved_command_tx_count = 0, m_saved_command_decoded_count = 0;
 	bool m_command_rx_ready = false, m_command_rx_busy = false, m_command_rx_clock = true;
 	u8 m_command_rx_byte = 0;
 	unsigned m_command_rx_phase = 0, m_command_rx_irqs = 0;
@@ -568,6 +571,43 @@ private:
 		m_command = timer_alloc(FUNC(mu4_storage_test_state::command_input), this);
 		m_command_clock = timer_alloc(FUNC(mu4_storage_test_state::command_clock), this);
 		m_command_receive_clock = timer_alloc(FUNC(mu4_storage_test_state::command_receive_clock), this);
+		if (system_bios() >= 11)
+		{
+			// Save the external peer alongside McBSP2. Growing observation vectors
+			// need bounded backing storage; save_item(vector) fixes its initial size.
+			save_item(NAME(m_direction)); save_item(NAME(m_gpio)); save_item(NAME(m_ready));
+			save_item(NAME(m_serial_index)); save_item(NAME(m_serial_regs));
+			save_item(NAME(m_serial_word)); save_item(NAME(m_serial_ready)); save_item(NAME(m_serial_reads));
+			save_item(NAME(m_native_command_cursor)); save_item(NAME(m_native_command_waits));
+			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
+			save_item(NAME(m_command_ack_cursor)); save_item(NAME(m_command_wire_bit_count));
+			save_item(NAME(m_command_wire_clock)); save_item(NAME(m_command_ack_pending));
+			save_item(NAME(m_command_ack_token)); save_item(NAME(m_command_wire_byte));
+			save_item(NAME(m_command_tx_register));
+			save_item(NAME(m_command_rx_ready)); save_item(NAME(m_command_rx_busy));
+			save_item(NAME(m_command_rx_clock)); save_item(NAME(m_command_rx_byte));
+			save_item(NAME(m_command_rx_phase)); save_item(NAME(m_command_rx_irqs));
+			save_item(NAME(m_saved_command_tx)); save_item(NAME(m_saved_command_decoded));
+			save_item(NAME(m_saved_command_tx_count)); save_item(NAME(m_saved_command_decoded_count));
+			machine().save().register_presave(save_prepost_delegate(FUNC(mu4_storage_test_state::save_command_peer), this));
+			machine().save().register_postload(save_prepost_delegate(FUNC(mu4_storage_test_state::restore_command_peer), this));
+		}
+	}
+	void save_command_peer()
+	{
+		if (m_command_tx_words.size() > m_saved_command_tx.size() || m_command_wire_decoded.size() > m_saved_command_decoded.size())
+			fatalerror("MU4 command peer snapshot capture capacity exceeded");
+		m_saved_command_tx_count = m_command_tx_words.size();
+		m_saved_command_decoded_count = m_command_wire_decoded.size();
+		std::copy(m_command_tx_words.begin(), m_command_tx_words.end(), m_saved_command_tx.begin());
+		std::copy(m_command_wire_decoded.begin(), m_command_wire_decoded.end(), m_saved_command_decoded.begin());
+	}
+	void restore_command_peer()
+	{
+		if (m_saved_command_tx_count > m_saved_command_tx.size() || m_saved_command_decoded_count > m_saved_command_decoded.size())
+			fatalerror("MU4 command peer snapshot has invalid capture count");
+		m_command_tx_words.assign(m_saved_command_tx.begin(), m_saved_command_tx.begin() + m_saved_command_tx_count);
+		m_command_wire_decoded.assign(m_saved_command_decoded.begin(), m_saved_command_decoded.begin() + m_saved_command_decoded_count);
 	}
 	virtual void machine_reset() override
 	{

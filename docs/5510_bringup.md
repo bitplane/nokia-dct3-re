@@ -1528,6 +1528,16 @@ processing-command parameters and media inputs before attempting native
 playback. Do not write `bb80` or replay internal queue objects to select a
 mode.
 
+The pin bench registers its external receive/transmit waveform state,
+request/acknowledgement cursors, serial shadows and NAND GPIO latches for
+save states. Its growing TX observation vectors use bounded 64-word
+snapshot storage with checked counts, rather than registering an empty
+vector's fixed initial address and length. This is preparation, not a
+native continuation proof: the remaining acceptance test must checkpoint
+mid-frame and compare two complete original-firmware continuations,
+including response bytes and queue state. Observation-only worker counters
+and the test-phase sequencer are not a restored lifecycle oracle.
+
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects
 holes and verifies the selected wire checksum. Optional
