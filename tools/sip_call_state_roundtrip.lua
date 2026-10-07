@@ -28,7 +28,7 @@ local after = emu.add_machine_post_load_notifier(function()
     end
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(outgoing and 25 or 19))
+    assert(emu.wait(_G.sip_state_save_time or (outgoing and 25 or 19)))
     local name = idle and 'sip_idle' or outgoing and 'sip_outgoing' or 'sip_connected'
     machine:save(name)
     assert(emu.wait(1))

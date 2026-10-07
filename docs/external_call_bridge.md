@@ -61,7 +61,7 @@ it must not resend an `incoming_call` that MAME has already accepted.
 
 | Direction | Message | Required payload |
 |---|---|---|
-| MAME to host | `outgoing_call` | `epoch`, `request_id`, decimal `digits` |
+| MAME to host | `outgoing_call` | `epoch`, `request_id`, decimal `digits`; additive `decision_pending` boolean snapshots whether the session still needs a host decision |
 | Host to MAME | `outgoing_call_decision` | identity plus `decision`: `connect`, `busy`, or `no_answer` |
 | Host to MAME | `incoming_call` | identity plus 1..20 decimal `caller` digits |
 | MAME to host | `*_call_state` | identity and `phase`; an incoming request may terminate as `expired` before paging; connected snapshots also carry both media cursors; a `forwarded` incoming state carries `forwarding_reason` and the decoded decimal `forwarding_destination` |
@@ -398,6 +398,20 @@ and firmware DISCONNECT/RELEASE/RELEASE COMPLETE plus LAPDm release before
 epoch-2 `ended`. An unrelated request cannot replace the transaction being
 cleared. This does not claim coverage of every outgoing connected-call or
 pre-SETUP restoration race.
+
+```sh
+make verify-radio-outgoing-call-sip-connected-restore RUN_DIR=run_3210_sip_outgoing_connected_restore
+```
+
+The connected variant saves at 27 seconds after SIP/GSM connection. The real
+SIP dialog closes with BYE on load, and the restored GSM call clears with cause
+41 through the complete firmware CC/RR release sequence. A false
+`decision_pending` suppresses a redundant `no_answer` decision; restoration clearing is
+one-shot even when the adapter republishes both a request and its connected
+state. The checker rejects redial and rejected/duplicate termination. Connected
+termination is applied synchronously inside submission, so its consumed trace
+precedes adapter acceptance; pending termination consumes later. Neither
+ordering implies that an external dialog was restored.
 
 ### Idle restoration
 

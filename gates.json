@@ -13095,6 +13095,19 @@
       ]
     },
     {
+      "name": "verify-radio-outgoing-call-sip-connected-restore",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--restore-outgoing SIP_HANDSET_SCRIPT=../tools/sip_outgoing_connected_state_roundtrip.lua SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
       "name": "verify-radio-outgoing-call-sip-pending-restore",
       "prerequisites": [],
       "variables": {},

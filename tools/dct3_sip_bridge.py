@@ -264,13 +264,16 @@ async def bridge(args, pj):
                                     print(f'SIP registration ready epoch={epoch}', flush=True)
                             elif kind == 'outgoing_call':
                                 if blocked_restore:
-                                    if restored_identity not in (None, incoming_identity):
+                                    if restored_identity is not None:
                                         continue
                                     restored_identity = incoming_identity
                                     # A pending outgoing request has no call-state
                                     # event yet. Supply the ordinary non-connecting
                                     # decision before its correlated termination.
-                                    for reply in failure_messages(incoming_identity, 503):
+                                    replies = failure_messages(incoming_identity, 503)
+                                    if event.get('decision_pending') is False:
+                                        replies = replies[1:]
+                                    for reply in replies:
                                         await websocket.send(json.dumps(reply))
                                 elif identity is None:
                                     digits = event.get('digits')
@@ -283,7 +286,8 @@ async def bridge(args, pj):
                                     print(f'SIP dial identity={identity} digits={digits}', flush=True)
                             elif kind in ('outgoing_call_state', 'incoming_call_state'):
                                 if blocked_restore and event.get('phase') != 'ended':
-                                    if restored_identity not in (None, incoming_identity):
+                                    # Clear once, not once per republished phase.
+                                    if restored_identity is not None:
                                         continue
                                     restored_identity = incoming_identity
                                     await websocket.send(json.dumps({

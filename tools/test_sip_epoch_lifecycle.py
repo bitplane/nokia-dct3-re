@@ -41,6 +41,12 @@ class Codec:
 
 class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
     async def test_pending_restored_request_clears_without_redial(self):
+        await self.check_restored_request()
+
+    async def test_accepted_restored_request_needs_only_termination(self):
+        await self.check_restored_request(False)
+
+    async def check_restored_request(self, decision_pending=None):
         async def host(socket):
             async def send(kind, **fields):
                 await socket.send(json.dumps({'type': kind, **fields}))
@@ -49,10 +55,18 @@ class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
             await send('outgoing_call', epoch=1, request_id=1, digits='123')
             await asyncio.wait_for(socket.recv(), 2)
             await send('call_adapter_ready', protocol_version=1, epoch=2, calls_idle=False)
-            await send('outgoing_call', epoch=2, request_id=1, digits='123')
-            replies = [json.loads(await asyncio.wait_for(socket.recv(), 2)) for _ in range(2)]
-            self.assertEqual(replies, sip.failure_messages((2, 1), 503))
+            await send('outgoing_call', epoch=2, request_id=1, digits='123',
+                       decision_pending=decision_pending)
+            expected = sip.failure_messages((2, 1), 503)
+            if decision_pending is False:
+                expected = expected[1:]
+            replies = [json.loads(await asyncio.wait_for(socket.recv(), 2)) for _ in expected]
+            self.assertEqual(replies, expected)
             self.assertEqual(Endpoint.instances[-1].dials, [(1, 1)])
+            await send('outgoing_call_state', epoch=2, request_id=1,
+                       phase='connected', media_downlink_sequence=0)
+            with self.assertRaises(asyncio.TimeoutError):
+                await asyncio.wait_for(socket.recv(), 0.04)
             await send('outgoing_call_state', epoch=2, request_id=1, phase='ended')
             await socket.wait_closed()
 

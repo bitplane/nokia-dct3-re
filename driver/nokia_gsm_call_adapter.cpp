@@ -1370,6 +1370,8 @@ void nokia_gsm_call_adapter_device::publish_request()
 			index < m_session->outgoing_called_digits_length(); ++index)
 		digits += char('0' + m_session->outgoing_called_digits()[index]);
 	writer.String(digits.c_str(), digits.size());
+	writer.Key("decision_pending");
+	writer.Bool(m_session->outgoing_decision_pending());
 	writer.EndObject();
 
 	unsigned clients = 0;

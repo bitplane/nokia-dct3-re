@@ -27,15 +27,27 @@ REMOTE = 'Response msg 180/INVITE/\nRequest msg CANCEL/\nResponse msg 487/INVITE
 
 
 class SipOutgoingRestoreCheckTest(unittest.TestCase):
-    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE):
+    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, connected=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log)
             (root / 'sip-bridge.log').write_text(bridge)
-            verify_outgoing_restore(root, remote)
+            verify_outgoing_restore(root, remote, connected)
 
     def test_pending_call_clears_without_redial(self):
         self.check()
+
+    def test_connected_call_requires_connection_before_save(self):
+        log = LOG.replace('sip_state: saved',
+            'gsm_call_adapter: state id=1 epoch=1 phase=connected\nsip_state: saved')
+        log = log.replace('termination id=1 cause=41 result=accepted\noutgoing termination consumed id=1 cause=41',
+            'outgoing termination consumed id=1 cause=41\ntermination id=1 cause=41 result=accepted')
+        remote = 'state changed to CONFIRMED\nRequest msg BYE/\n'
+        self.check(log=log, remote=remote, connected=True)
+        with self.assertRaises(RuntimeError):
+            self.check(remote=remote, connected=True)
+        with self.assertRaises(RuntimeError):
+            self.check(log=log, remote='state changed to CONFIRMED\n', connected=True)
 
     def test_missing_real_cancel_is_rejected(self):
         with self.assertRaises(RuntimeError):
@@ -46,6 +58,8 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
             self.check(bridge=BRIDGE + 'SIP dial identity=(2, 1)\n')
         with self.assertRaises(RuntimeError):
             self.check(remote=REMOTE + 'state changed to CONFIRMED\n')
+        with self.assertRaises(RuntimeError):
+            self.check(log=LOG + 'termination id=1 cause=41 result=rejected\n')
 
     def test_missing_rr_release_or_wrong_epoch_is_rejected(self):
         for log in (LOG.replace('LAPDm service Channel Release acknowledged', ''),

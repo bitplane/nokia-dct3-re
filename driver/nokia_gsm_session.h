@@ -156,6 +156,10 @@ public:
 		return m_registered_mobile_identity_length;
 	}
 	bool outgoing_request_pending() const { return m_outgoing_request_pending; }
+	bool outgoing_decision_pending() const
+	{
+		return m_outgoing_request_pending && !m_outgoing_decision_accepted;
+	}
 	u32 outgoing_request_id() const { return m_outgoing_request_id; }
 	const std::array<u8, 32> &outgoing_called_digits() const
 	{
