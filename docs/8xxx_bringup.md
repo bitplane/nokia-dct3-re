@@ -1645,6 +1645,18 @@ closes CP/RP and RR, displays **Message not sent this time**, then physically
 decoded End and Menu reopen Messages. The reviewed error-text crop excludes
 the result icon. This proves failure handling, not successful delivery.
 
+For an unanswered request use `--decision rp_silence` and
+`noki8850_sms_silence_input.lua` for 125 seconds, again with fresh storage.
+The host supplies CP-ACK but no RP result. At about 103.5 seconds the
+handset sends main-link DISC; the peer responds UA, physical channel
+deconfiguration ends the correlated host request, and idle paging resumes.
+The transient error says **Message sending failed**, distinct from explicit
+RP rejection. Physical End and Menu run only after this release. Validate
+with `noki8850_outgoing_sms_check.py --rp-silence --recovery-frames RUN/snap
+RUN/error.log`; an RP-ACK or RP-ERROR makes the silence test fail. The common
+8850/8890 protocol checker is shared, while presentation and band checks
+remain product-specific. No handset timeout or release event is injected.
+
 ### Capability acceptance boundary
 
 On the final radio-enabled `nsm2hle` composition, fresh physical-input runs

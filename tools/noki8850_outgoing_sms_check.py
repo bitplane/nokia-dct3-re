@@ -39,9 +39,28 @@ def verify(text: str, product: str = '8850', key_separator: str = '',
         raise ValueError('success RP-ACK appeared in rejected transaction')
 
 
-def check_recovery(text: str, frames: Path) -> None:
+def verify_silence(text: str, product: str = '8850') -> None:
     require_ordered(text, (
-        ('release', re.compile(r'LAPDm service Channel Release acknowledged')),
+        ('physical Send', re.compile(re.escape(product) + r'_sms_send_physical: action=confirm_send')),
+        ('exact submission', re.compile(r'GSM service uplink sapi=3 pd=09 message=01 length=27 data=' + SUBMIT + r'\b')),
+        ('network CP-ACK', re.compile(r'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2')),
+        ('host silence accepted', re.compile(r'gsm_call_adapter: sms decision id=1 outcome=3 result=accepted')),
+        ('mobile main-link DISC', re.compile(r'TX packet type=1b .*data=0080015301')),
+        ('network UA', re.compile(r'RX enqueue type=80 .*data=80[0-9a-f]{18}017301')),
+        ('physical deconfiguration', re.compile(r'TX packet type=02 .*radio_phase=release_channel_change')),
+        ('correlated host end', re.compile(r'gsm_call_adapter: sms state id=1 epoch=1 phase=ended')),
+        ('resumed paging', re.compile(r'PCH no-identity fill')),
+    ), product + ' RP silence')
+    if text.count('gsm_sms_submit:') != 1:
+        raise ValueError('expected one silent SMS submission')
+    if re.search(r'GSM service downlink kind=(?:18|19) sapi=3', text):
+        raise ValueError('RP result appeared in silent transaction')
+
+
+def check_recovery(text: str, frames: Path, *, rp_silence: bool = False) -> None:
+    require_ordered(text, (
+        ('release', re.compile(r'TX packet type=02 .*radio_phase=release_channel_change'
+                              if rp_silence else r'LAPDm service Channel Release acknowledged')),
         ('physical End', re.compile(r'8850_sms_recovery_physical: key=End')),
         ('End decode', re.compile(r'8850_keypad_decoded key=0f\b')),
         ('physical Menu', re.compile(r'8850_sms_recovery_physical: key=Menu')),
@@ -54,9 +73,11 @@ def check_recovery(text: str, frames: Path) -> None:
                 raise ValueError('unexpected handset frame geometry')
             return hashlib.sha256(source.convert('L').crop(crop).tobytes()).hexdigest()
 
-    # Exclude the result icon; retain the reviewed English error text.
-    if not any(digest(path, (0, 0, 60, 48)) ==
-               '24aea298f2e0de336ee3fb10a5c767f912a07ec6eb14ca190e426b5c6320226a'
+    # Exclude the result icon; rejection and timeout have distinct text.
+    failure_hash = ('cfcf7ce3d4d46e96949742863df35d03a4ea62c021e3e8e19493ec83be92f2a9'
+                    if rp_silence else
+                    '24aea298f2e0de336ee3fb10a5c767f912a07ec6eb14ca190e426b5c6320226a')
+    if not any(digest(path, (0, 0, 60, 48)) == failure_hash
                for path in frames.glob('8850_sms_reject_*.png')):
         raise ValueError('missing reviewed message-not-sent presentation')
     if digest(frames / '8850_sms_recovery_menu.png', (0, 0, 72, 16)) != (
@@ -68,20 +89,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--rejected', action='store_true')
+    parser.add_argument('--rp-silence', action='store_true')
     parser.add_argument('--recovery-frames', type=Path)
     args = parser.parse_args()
     try:
         text = args.log.read_text(errors='replace')
-        verify(text, rejected=args.rejected)
+        if args.rp_silence:
+            if args.rejected:
+                raise ValueError('RP silence and rejection are distinct outcomes')
+            verify_silence(text)
+        else:
+            verify(text, rejected=args.rejected)
         if args.recovery_frames:
-            if not args.rejected:
-                raise ValueError('recovery frames require a rejected transaction')
-            check_recovery(text, args.recovery_frames)
+            if not (args.rejected or args.rp_silence):
+                raise ValueError('recovery frames require a failed transaction')
+            check_recovery(text, args.recovery_frames, rp_silence=args.rp_silence)
     except (OSError, ValueError) as error:
         print(f'FAIL - {error}', file=sys.stderr)
         return 1
     print('8850 outgoing SMS PASS: physical input, exact A/5551234, ' +
-          ('RP rejection' if args.rejected else 'RP acceptance') + ', closure and paging')
+          ('RP silence' if args.rp_silence else 'RP rejection' if args.rejected else 'RP acceptance') + ', closure and paging')
     return 0
 
 

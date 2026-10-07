@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 import tempfile
 from PIL import Image
-from tools.noki8850_outgoing_sms_check import SUBMIT, verify, check_recovery
+from tools.noki8850_outgoing_sms_check import SUBMIT, verify, verify_silence, check_recovery
 
 GOOD = '\n'.join((
     '8850_sms_send_physical: action=text_A',
@@ -17,8 +17,31 @@ GOOD = '\n'.join((
     'PCH no-identity fill',
 ))
 
+SILENCE = '\n'.join((
+    '8850_sms_send_physical: action=confirm_send',
+    f'GSM service uplink sapi=3 pd=09 message=01 length=27 data={SUBMIT}',
+    'gsm_sms_submit:',
+    'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2',
+    'gsm_call_adapter: sms decision id=1 outcome=3 result=accepted',
+    'TX packet type=1b data=0080015301',
+    'RX enqueue type=80 data=800000005b0100010000017301',
+    'TX packet type=02 radio_phase=release_channel_change',
+    'gsm_call_adapter: sms state id=1 epoch=1 phase=ended',
+    'PCH no-identity fill',
+))
+
 
 class OutgoingSmsTest(unittest.TestCase):
+    def test_silence_requires_handset_release(self):
+        verify_silence(SILENCE)
+        with self.assertRaisesRegex(ValueError, 'DISC'):
+            verify_silence(SILENCE.replace('0080015301', '0080010301'))
+
+    def test_silence_forbids_result_and_duplicate_submit(self):
+        for extra in ('GSM service downlink kind=19 sapi=3', 'gsm_sms_submit:'):
+            with self.assertRaises(ValueError):
+                verify_silence(SILENCE + '\n' + extra)
+
     def test_complete(self):
         verify(GOOD)
 

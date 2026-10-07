@@ -11,9 +11,8 @@ if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.noki8850_outgoing_sms_check import verify as verify_submission
-from tools.noki8850_outgoing_sms_check import SUBMIT
+from tools.noki8850_outgoing_sms_check import verify_silence as verify_silent_submission
 from tools.noki8890_registration_check import verify as verify_registration
-from tools.radio_call_lifecycle_common import require_ordered
 
 
 def verify(text, *, pcs1900=False, rejected=False):
@@ -50,21 +49,7 @@ def check_recovery(text, frames, *, rp_silence=False):
 def verify_silence(text, *, pcs1900=False):
     if pcs1900:
         verify_registration(text, pcs1900=True)
-    require_ordered(text, (
-        ('physical Send', re.compile(r'8890_sms_send_physical: action=confirm_send')),
-        ('exact submission', re.compile(r'GSM service uplink sapi=3 pd=09 message=01 length=27 data=' + SUBMIT)),
-        ('network CP-ACK', re.compile(r'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2')),
-        ('host silence accepted', re.compile(r'gsm_call_adapter: sms decision id=1 outcome=3 result=accepted')),
-        ('mobile main-link DISC', re.compile(r'TX packet type=1b .*data=0080015301')),
-        ('network UA', re.compile(r'RX enqueue type=80 .*data=80[0-9a-f]{18}017301')),
-        ('physical deconfiguration', re.compile(r'TX packet type=02 .*radio_phase=release_channel_change')),
-        ('correlated host end', re.compile(r'gsm_call_adapter: sms state id=1 epoch=1 phase=ended')),
-        ('resumed paging', re.compile(r'PCH no-identity fill')),
-    ), '8890 RP silence')
-    if text.count('gsm_sms_submit:') != 1:
-        raise ValueError('expected one silent SMS submission')
-    if re.search(r'GSM service downlink kind=(?:18|19) sapi=3', text):
-        raise ValueError('RP result appeared in silent transaction')
+    verify_silent_submission(text, product='8890')
 
 
 def main():
