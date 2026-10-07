@@ -950,6 +950,13 @@ Original InitDisk also corroborates long `CMPM` displacement-before-immediate
 with `60e1 0002 0001` at `431f`. Four fixtures cover equal/unequal memory
 and preupdate/no-update addressing while requiring TC-only status changes.
 The previous decoder reversed these fields and rejected a valid context.
+Original MCUSI16 `61e1 0001 0002` at logical `02:9521` likewise requires
+BITF displacement-before-mask, selecting McBSP1 status `0049` and mask 2.
+The reversed decoder read adjacent `004a`; the corrected native run reads
+`0049` only. Four executable long-BITF fixtures cover set/clear TC,
+preupdate/no-update, wrong-address sentinels and preserved unrelated status.
+The earlier synthetic preupdate BITF encoding is corrected without changing
+its expected result or cycle cost.
 Original InitDisk's file-write path uses `9488` at `3be7`, the compact
 `LD *AR2+,8,A` form documented by TI SPRU172C LD syntax 5 (pages 4-66/68).
 The core implements `94/95` Xmem loads through the existing shifted-load

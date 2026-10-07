@@ -46,6 +46,26 @@ private:
 		m_phase = 1632 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_bitf_offset_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0600, 0x75d6); program.write_word(0x0601, 0x0124);
+		program.write_word(0x0602, (index & 2) ? 0x61e9 : 0x61e1);
+		program.write_word(0x0603, 4);
+		program.write_word(0x0604, (index & 1) ? 2 : 1);
+		program.write_word(0x0605, 0x75d6); program.write_word(0x0606, 0x0124);
+		program.write_word(0x0607, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x1004, 2);
+		m_cpu->space(AS_DATA).write_word(0x1001, 4); // Reversed-field sentinels.
+		m_cpu->space(AS_DATA).write_word(0x1002, 4);
+		m_port_writes = 0;
+		m_cpu->set_state_int(STATE_GENPC, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 60030 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_cmpm_offset_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -7003,8 +7023,8 @@ private:
 					m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
 					"PORTW *AR2 emits memory word without modifying AR2 in two cycles");
 			program.write_word(0x05e3, 0x61ea); // BITF *+AR2(5),#8000
-			program.write_word(0x05e4, 0x8000);
-			program.write_word(0x05e5, 5);
+			program.write_word(0x05e4, 5);
+			program.write_word(0x05e5, 0x8000);
 			program.write_word(0x05e6, 0x75f8);
 			program.write_word(0x05e7, 0x0d00);
 			program.write_word(0x05e8, 0x0124);
@@ -14601,6 +14621,25 @@ private:
 				return;
 			}
 			osd_printf_info("TMS320C54x delayed ALEQ conformance: PASS variants=5\n");
+			m_phase = 60030;
+			start_bitf_offset_case(0);
+			return;
+		}
+		if (m_phase >= 60030 && m_phase <= 60033)
+		{
+			unsigned const index = m_phase - 60030;
+			expect_opcode((index & 2) ? 0x61e9 : 0x61e1,
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == ((index & 1) ? 0x1aa5 : 0x0aa5) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR1) == ((index & 2) ? 0x1004 : 0x1000) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"long BITF consumes displacement before mask, changes only TC and preserves update/cycle semantics");
+			if (index != 3)
+			{
+				start_bitf_offset_case(index + 1);
+				return;
+			}
+			osd_printf_info("TMS320C54x BITF offset conformance: PASS variants=4\n");
 			start_bio_case(0);
 			return;
 		}

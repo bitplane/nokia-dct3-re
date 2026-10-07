@@ -420,7 +420,7 @@ private:
 				{
 					if (machine().side_effects_disabled()) return;
 					if (offset == 0x48) m_native_mcbsp_index = value;
-					if (m_native_mcbsp_trace++ < 24)
+					if (m_native_mcbsp_trace++ < 64)
 						logerror("mu4_native_mcbsp: write address=%04x index=%04x value=%04x pc=%06x\n", unsigned(offset), m_native_mcbsp_index, value, unsigned(m_cpu->state_int(STATE_GENPC)));
 				});
 			m_cpu->space(AS_DATA).install_read_tap(0x49, 0x49, "mu4_native_mcbsp_status",

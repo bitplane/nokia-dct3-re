@@ -1591,18 +1591,8 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6100: // BITF Smem, #lk
 	{
-		u16 value;
-		u16 mask;
-		if (low >= 0xe0 && low < 0xf8)
-		{
-			mask = fetch();
-			value = indirect_read(low);
-		}
-		else
-		{
-			value = indirect_read(low);
-			mask = fetch();
-		}
+		const u16 value = indirect_read(low);
+		const u16 mask = fetch();
 		m_st0 = (m_st0 & ~0x1000) | ((value & mask) ? 0x1000 : 0);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;

@@ -13,9 +13,9 @@ The independent MU4 `mu4nand` fixture executes original erased-media
 provisioning, receives all seven original R060 segments, reads back six
 complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
 `3538` then reaches the loaded entry and its page-2 common-window branch.
-Native execution currently loops at logical `02:9524` after McBSP1
-initialization. The long-offset BITF operand order must be reconciled before
-classifying this as a transmitter-readiness wait; McBSP1 is not yet modeled.
+Native execution currently loops at logical `02:9524`, waiting for McBSP1
+transmit readiness after initialization. McBSP1 is not yet modeled in the
+isolated fixture.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -913,19 +913,26 @@ selects index 1, and `9521` executes long-offset BITF `61e1 0001 0002`;
 `9524` repeats on NTC. TI's related VC5410A register map identifies
 `48/49` as McBSP1's control window, index 1 as SPCR2. SPRU302B identifies bit 1
 as XRDY. These addresses still map to plain test RAM, not a serial controller.
-Read-only taps count 42 control writes (the first 24 are printed), zero reads
-at `0049` and 10,719,960 reads at adjacent `004a` in this eight-second run.
-Thus no SPCR2 read at the related-part address is observed: the current
-decoder takes raw `61e1 0001 0002` as mask 1, displacement 2, addressing
-`004a`. GNU's disassembly treats it as displacement 1, mask 2, addressing
-`0049`. The test's old long-offset BITF fixture follows the current decoder;
-it is not independent evidence for that order. SPRU131G 5.5.3.2 explicitly
-places the offset last for the premodifying form; it does not justify changing
-this non-updating form solely to agree with GNU. The DA150 read-side window
-may also differ from the related VC5410A map. Reconcile the original accesses,
-addressing form and read-side decode before implementing a transmitter or
-changing BITF. Configuration
-writes and status reads are observed only; no ready value is supplied.
+Original `61e1 0001 0002` consumes displacement 1 before mask 2. It agrees
+with original InitDisk's independently executed long CMPM and GNU's decoding;
+SPRU172C places BITF and CMPM in the same Smem-plus-immediate class. The old
+mask-before-offset BITF fixture was self-confirming and is corrected. Four
+executable fixtures cover both TC outcomes, updating/non-updating addresses,
+wrong-address sentinels, TC-only status changes and the three-cycle cost.
+SPRU131G's generic offset-last note must not override the recovered three-word
+Smem-plus-constant encodings.
+
+Read-only taps count 42 control writes, 10,719,960 SPCR2 reads at `0049`
+and no adjacent `004a` reads in the eight-second run. SPCR2 reads `0341`:
+XRST is enabled but XRDY is absent. The configuration trace covers all writes
+(cap 64), including SRGR1 `00fa`, SRGR2 `2000`, PCR `1f0b`, and final SPCR2
+`0341`. No peripheral readiness or completion is supplied.
+
+SPRU302B 2.3.2.2 specifies XRDY becoming one on XRST's zero-to-one transition,
+clearing when DXR is written, and returning when DXR transfers into XSR.
+The next device work is that transmit-buffer lifecycle plus configured
+serial clocks and output, not a constant-ready register. Physical DA150
+timing and attached endpoint behavior still require separate validation.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
