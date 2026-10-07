@@ -2125,10 +2125,30 @@ Endpoint PC is `02:204e`, the TINT vector branch to `02:3d73`; the live
 OVLY-folded vector and handler prologue match the original AA22 upload.
 PMST is `202c`, ST1 `6900`, IMR `0ac9`, IFR `0c78`. Debugger-visible
 timer registers read TIM `0000`, PRD `0001`, TCR `0000`, giving the current
-model a two-CPU-cycle timer period. This identifies a timer/interrupt
-starvation candidate, not an established clock or timer fidelity correction.
-Recover the original writes and startup lifecycle that leave this timer
-configuration before changing interrupt masks, period values or CPU timing.
+model a two-CPU-cycle timer period. The original AA22 idle routine at
+`02:98d0`, called by the wrapper at `02:3d37`, writes PRD `1` at
+`02:98d8` and TCR `0020` at `02:98dc`. It then clears IMR bit 3 with
+`ANDM #fff7` at `02:98e0`, enables other wake sources with `ORM #08c0`
+at `02:98e4`, and executes IDLE1 at `02:98e9`. Thus the short timer is
+firmware-owned and is immediately followed by an intentional TINT mask;
+it is not an unexplained final configuration to replace with a slower rate.
+
+A read-only write/interrupt trace observes this warm setup at 14.001318
+seconds, then repeated TINT entry with return PC `02:98de`, IMR `0ac9`
+and IFR `0c78`. The CPU never reaches the following mask instruction.
+This establishes interrupt starvation before masking, rather than a
+metadata-parser rejection. The temporary CPU probes are retired.
+
+[TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf), sections
+6.10.7 and 7.2, requires already-decoded instructions to drain before
+interrupt-vector execution. The current atomic-instruction core instead
+enters immediately at an instruction boundary. This is an evidenced model
+gap, but its exact correction still requires a standalone timing fixture:
+do not simply defer an arbitrary number of instructions, change the timer
+divisor, or suppress interrupts at firmware PCs. Section 8.4.2 specifies
+the timer rate as CPU clock divided by `(TDDR+1)*(PRD+1)`, consistent with
+the short period. The next target is generic interrupt recognition/drain
+timing and its interaction with memory-mapped timer writes and IMR updates.
 The new diagnostic is intentionally not a passing save acceptance gate.
 
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
