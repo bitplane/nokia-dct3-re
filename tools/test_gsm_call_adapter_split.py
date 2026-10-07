@@ -43,6 +43,16 @@ class GsmCallAdapterSplitTest(unittest.TestCase):
         self.assertEqual(callback.count("m_host->queued_events() <"), 8)
         self.assertIn("unsigned queued_events() const", self.source)
 
+    def test_reset_reannounces_epoch_to_already_connected_clients(self):
+        reset = self.source.split(
+            "void nokia_gsm_call_adapter_device::device_reset()", 1
+        )[1].split(
+            "void nokia_gsm_call_adapter_device::postload()", 1
+        )[0]
+        self.assertIn("m_host->republish = !m_host->connections.empty()", reset)
+        self.assertIn("m_host->ready_pending = !m_host->connections.empty()", reset)
+        self.assertNotIn("m_host->connections.clear()", reset)
+
     def test_admitted_host_services_have_saved_emulation_time_deadlines(self):
         for field in (
             "m_incoming_call_queue_ticks",

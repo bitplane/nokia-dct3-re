@@ -4,6 +4,7 @@
 import argparse
 import asyncio
 import json
+from websockets.exceptions import ConnectionClosed
 
 try:
     from tools.run_host_call_adapter_gate import connect
@@ -63,6 +64,10 @@ async def run(args: argparse.Namespace) -> None:
         result = await asyncio.wait_for(process.wait(), 90)
         if result:
             raise RuntimeError(f"MAME exited with status {result}")
+    except ConnectionClosed as error:
+        raise RuntimeError(
+            "host SMS connection closed before lifecycle completion"
+        ) from error
     finally:
         if process.returncode is None:
             process.terminate()

@@ -532,8 +532,10 @@ void nokia_gsm_call_adapter_device::device_reset()
 	m_host->incoming.clear();
 	m_host->incoming_sms.clear();
 	m_host->incoming_ussd.clear();
-	m_host->republish = false;
-	m_host->ready_pending = false;
+	// HTTP clients can attach before the first machine reset.  They survive
+	// reset, so announce the reset epoch instead of losing their handshake.
+	m_host->republish = !m_host->connections.empty();
+	m_host->ready_pending = !m_host->connections.empty();
 	m_host->dropped_events = 0;
 }
 
