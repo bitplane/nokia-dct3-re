@@ -27,12 +27,20 @@ REMOTE = 'Response msg 180/INVITE/\nRequest msg CANCEL/\nResponse msg 487/INVITE
 
 
 class SipOutgoingRestoreCheckTest(unittest.TestCase):
-    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, connected=False):
+    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, connected=False, product='3210'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log)
             (root / 'sip-bridge.log').write_text(bridge)
-            verify_outgoing_restore(root, remote, connected)
+            verify_outgoing_restore(root, remote, connected, product)
+            return (root / 'sip-result.json').read_text()
+
+    def test_product_scope(self):
+        self.assertIn('3310 pending outgoing', self.check(product='3310'))
+
+    def test_duplicate_accepted_clear_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            self.check(log=LOG + 'termination id=1 cause=41 result=accepted\n')
 
     def test_pending_call_clears_without_redial(self):
         self.check()

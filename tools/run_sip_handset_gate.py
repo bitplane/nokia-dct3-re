@@ -121,7 +121,7 @@ async def run(args):
                     await process.wait()
     remote_text = (root / 'sip-remote.log').read_text(errors='replace')
     if args.restore_outgoing:
-        verify_outgoing_restore(root, remote_text, args.sip_response == 200)
+        verify_outgoing_restore(root, remote_text, args.sip_response == 200, args.product)
         return
     if args.restore_call:
         verify_restore(root, remote_text, args.restore_phase, args.product)
@@ -257,7 +257,7 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
     print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
 
 
-def verify_outgoing_restore(root, remote_text, connected=False):
+def verify_outgoing_restore(root, remote_text, connected=False, product='3210'):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
     markers = (('state changed to CONFIRMED', 'Request msg BYE/') if connected else
@@ -274,6 +274,8 @@ def verify_outgoing_restore(root, remote_text, connected=False):
         raise RuntimeError('restored outgoing request replayed SIP or failed to clear')
     if 'termination id=1 cause=41 result=rejected' in log:
         raise RuntimeError('restored outgoing call submitted duplicate or invalid termination')
+    if len(re.findall(r'termination id=1 cause=41 result=accepted', log)) != 1:
+        raise RuntimeError('restored outgoing call did not clear exactly once')
     cursor = 0
     patterns = (r'gsm_call_adapter: request id=1 epoch=1 digits=5551234',)
     if connected:
@@ -296,8 +298,8 @@ def verify_outgoing_restore(root, remote_text, connected=False):
             raise RuntimeError(f'missing outgoing restoration checkpoint: {pattern}')
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
-        'scope': ('3210 connected outgoing HLE SIP save/load; BYE, no redial' if connected else
-                  '3210 pending outgoing HLE SIP save/load; CANCEL/487, no redial/CONNECT'),
+        'scope': (f'{product} connected outgoing HLE SIP save/load; BYE, no redial' if connected else
+                  f'{product} pending outgoing HLE SIP save/load; CANCEL/487, no redial/CONNECT'),
         'passed': True}, indent=2) + '\n')
     print('OK - outgoing restoration cleared SIP and GSM without redial')
 

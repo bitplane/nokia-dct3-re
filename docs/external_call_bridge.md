@@ -409,9 +409,10 @@ pre-SETUP restoration race.
 
 ```sh
 make verify-radio-outgoing-call-sip-connected-restore RUN_DIR=run_3210_sip_outgoing_connected_restore
+make verify-3310-radio-outgoing-call-sip-connected-restore RUN_DIR=run_3310_sip_outgoing_connected_restore
 ```
 
-The connected variant saves at 27 seconds after SIP/GSM connection. The real
+Both products' connected variants save at 27 seconds after SIP/GSM connection. The real
 SIP dialog closes with BYE on load, and the restored GSM call clears with cause
 41 through the complete firmware CC/RR release sequence. A false
 `decision_pending` suppresses a redundant `no_answer` decision; restoration clearing is
