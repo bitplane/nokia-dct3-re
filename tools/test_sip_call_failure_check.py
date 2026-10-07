@@ -7,12 +7,14 @@ from tools.run_sip_handset_gate import verify_failure
 
 
 LOG = '''
-outgoing decision consumed id=1 outcome=1
 GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101
+gsm_call_adapter: request id=1 epoch=1 digits=5551234
+outgoing decision consumed id=1 outcome=1
 GSM service downlink kind=13 sapi=0 pd=03 message=25 length=5
 GSM service uplink sapi=0 pd=03 message=2d length=2 data=036d
 GSM service downlink kind=26 sapi=0 pd=03 message=2a length=2
 LAPDm service Channel Release acknowledged nr=5
+gsm_call_adapter: state id=1 epoch=1 phase=ended
 '''
 COUNTS = {'uplink': 0, 'downlink': 0, 'pcm_transmitted': 0, 'pcm_received': 0, 'dropped': 0}
 
@@ -38,6 +40,16 @@ class SipFailureCheckTest(unittest.TestCase):
     def test_unavailable_without_cause_is_rejected(self):
         with self.assertRaises(RuntimeError):
             self.check(status=480)
+
+    def test_unhandled_attempt_and_missing_ended_state_are_rejected(self):
+        for log in (LOG + 'gsm_call_adapter: request id=2 epoch=1 digits=5551234\n',
+                    LOG.replace('phase=ended', 'phase=disconnecting'),
+                    LOG + 'gsm_call_adapter: media direction=downlink id=1 epoch=1 result=accepted\n'):
+            with self.assertRaises(RuntimeError):
+                self.check(log=log, product='3410')
+
+    def test_3410_failure_scope(self):
+        self.assertTrue(self.check(product='3410')['scope'].startswith('3410 HLE'))
 
     def test_false_connection_is_rejected(self):
         for extra in ('state changed to CONFIRMED',):

@@ -220,8 +220,12 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
             f'SIP disconnected status={status} identity=(1, 1)' not in bridge_text):
         raise RuntimeError('missing actual SIP failure response and correlated bridge result')
     if ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge_text or
-            re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log)):
+            re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log) or
+            re.search(r'gsm_call_adapter: media direction=\w+ id=\d+ .*result=accepted', log)):
         raise RuntimeError('failed SIP call falsely connected')
+    requests = re.findall(r'gsm_call_adapter: request id=(\d+) epoch=1 digits=5551234', log)
+    if requests != [str(number) for number in range(1, calls + 1)]:
+        raise RuntimeError('SIP failure left an unexpected or unhandled handset attempt')
     summaries = re.findall(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
     if len(summaries) != calls:
         raise RuntimeError('failed SIP call never completed handset release')
@@ -233,10 +237,10 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
     for request_id in range(1, calls + 1):
         if f'SIP disconnected status={status} identity=(1, {request_id})' not in bridge_text:
             raise RuntimeError('missing correlated SIP failure for each handset attempt')
-        patterns = [outgoing_setup_pattern(product)]
+        patterns = [outgoing_setup_pattern(product),
+                    rf'gsm_call_adapter: request id={request_id} epoch=1 digits=5551234']
         if calls > 1:
-            patterns += [rf'gsm_call_adapter: request id={request_id} epoch=1 digits=5551234',
-                         rf'outgoing decision consumed id={request_id} outcome={1 if status == 486 else 2}']
+            patterns += [rf'outgoing decision consumed id={request_id} outcome={1 if status == 486 else 2}']
             if status == 480:
                 patterns += [rf'outgoing termination consumed id={request_id} cause=18']
         patterns += [
@@ -245,8 +249,7 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
             r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
             r'GSM service downlink kind=26 sapi=0 pd=03 message=2a',
             r'LAPDm service Channel Release acknowledged']
-        if calls > 1:
-            patterns += [rf'gsm_call_adapter: state id={request_id} epoch=1 phase=ended']
+        patterns += [rf'gsm_call_adapter: state id={request_id} epoch=1 phase=ended']
         for pattern in patterns:
             match = re.search(pattern, log[cursor:])
             if not match:

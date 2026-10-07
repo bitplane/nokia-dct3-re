@@ -74,6 +74,13 @@ accepted media. Named gates, protocol details and waveform limits are maintained
 in `external_call_bridge.md`. Signaling-only research products have not inherited
 this media promotion.
 
+SIP failure coverage is separate: busy (486) and unavailable (480) are verified
+for 3210 v6.00, 3310 v6.39 and 3410 v5.46E. The 3310 fixtures cover two organic
+attempts; the 3410 fixtures observe one attempt and no redial in the 45-second
+run. The 3330 and 5210 have not yet inherited this failure coverage. Checkers
+require every observed host request to end and reject unhandled retry attempts
+or accepted media.
+
 ## Product-boundary cautions
 
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not
