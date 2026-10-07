@@ -330,7 +330,7 @@ Run any focused scenario from a new directory:
 ```
 
 Available scenarios are `registration`, `incoming-call`, `outgoing-call`,
-`incoming-sms`, `outgoing-sms`, `calculator` and `phonebook`. Each seeds
+`incoming-sms`, `outgoing-sms`, `calculator`, `phonebook` and `idle-state`. Each seeds
 only the unchanged acquired base-record snapshot into a fresh persistent
 flash image. Incoming events use copied external network configuration;
 all UI interaction uses physical key fields. `phonebook` executes save
@@ -339,13 +339,25 @@ Successful checks produce `acceptance.json`, console/log evidence and
 captures. Existing directories are refused. The normal machine remains
 unchanged; native DSP completion and speech are explicitly not claimed.
 
-The same scenarios are standard gates: `make verify-8210-registration
+The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
 `outgoing-call`, `incoming-sms`, `outgoing-sms`, `calculator` and `phonebook`
 suffixes. Use a distinct, nonexistent `RUN_DIR` for every gate. The runner
 pins both acquired input hashes before creating storage; wrong-product inputs
 are rejected rather than silently provisioned. Incoming configuration is
 copied into the run, never modified in the tracked fixtures.
+
+`idle-state` uses `noki8210_state_idle.lua` after physical security-code
+acceptance and laboratory registration. At 32 seconds it saves registered
+idle, compares a one-second reference interval with the restored interval,
+then presses physical Menu and captures Messages. `noki8210_state_check.py`
+requires exact PC/SP/mapped-RAM digest/emulated-time restoration, a nonempty
+ordered radio/SIM replay with identical payloads, identical full idle pixels,
+reviewed `DCT3 LAB` text, and post-load decoded Menu/Messages presentation.
+Missing protocol logs are a failure; use the runner's verbose logging.
+This is research idle/UI restoration under the declared base-record PMM
+comparison, not active-call/SMS replay, factory provisioning or native DSP
+completion. No handset state or message is injected.
 
 The shared observer retains staged-DSP/self-test, decoded-key and readiness
 acceptance records only. PMM copy/cache dump, column-mask and input-lifecycle

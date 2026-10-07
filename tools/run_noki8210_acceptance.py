@@ -19,6 +19,7 @@ SCENARIOS = {
     'outgoing-sms': ('outgoing_sms_input', 46, 'outgoing_sms_check'),
     'calculator': ('calculator_input', 41, None),
     'phonebook': ('phonebook_input', 34, 'phonebook_check'),
+    'idle-state': ('state_idle', 40, 'state_check'),
 }
 
 
@@ -76,6 +77,8 @@ def main():
             execute(cold, 'cold_console.log')
             check = [sys.executable, str(root / 'tools/noki8210_phonebook_check.py'),
                      str(run / 'write.log'), str(run / 'error.log'), storage]
+        elif args.scenario == 'idle-state':
+            check.append(str(run / 'snap'))
         elif args.scenario in ('registration', 'incoming-sms'):
             check.append(storage)
         if checker:
