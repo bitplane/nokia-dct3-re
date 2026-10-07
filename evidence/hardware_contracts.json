@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_directory_iterator_limit_and_address", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "At ordinal six, original 03:bb7b CMPR compares AR2=0006 unsigned against AR0=0200; 03:bb7c observes TC set and takes the read path. The bound is 512 entries, not 4095 inferred from an earlier status. Original bd13 receives ordinal six; common byte-reader 329d receives A=0001:e9ff and argument offsets 00c0 through 00cb, initially with descriptor 1422 and later copied descriptor 3aea during filename lookup. This matches six times a 32-byte entry; bbd6 statically reads eight name bytes, three extension bytes, attributes and later word/double-word fields. The remaining boundary is common reader/cache/NAND address resolution for logical 0001:e9ff, not a proven unbounded iterator or missing peer. Physical row advancement is not equivalent to iterator advancement. No index limit, end record, filename content or firmware state is injected",
+      "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "tools/noki5510_a00_inventory.py"]
+    },
+    {
       "id": "npm5_mu4_tracklist_scan_row_progression", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Side-effect-free five-second scan snapshots leave raw pairs 142c/142d and 145c/145d at 0001,e9ff; 145e changes from zero to six. Last NAND strobes show column 00 and row bytes 02,e9,01 at the start, then column 00 and row bytes 98,e9,01 at the end: rows 01e902 and 01e998 in the existing validated small-page controller grammar. Reads increase from 259188 to 1164331. This proves later rows are reached within the bounded observation, not monotonic traversal, byte-cursor semantics, directory extent, termination time or lookup completion. Decode iterator bounds/end predicate rather than treating a five-second deadline as a deadlock or generating unverified track-list data",
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "patches/mame-nandflash-mu4.patch"]

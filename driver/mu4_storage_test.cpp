@@ -114,6 +114,7 @@ private:
 	unsigned m_native_main_call_traces = 0;
 	unsigned m_native_config_call_traces = 0;
 	unsigned m_native_tail_data_reads = 0;
+	unsigned m_native_lookup_operand_traces = 0;
 	bool m_native_worker_window_started = false;
 	attotime m_native_worker_window_start;
 	std::vector<u16> m_native_tx_words;
@@ -368,6 +369,7 @@ private:
 		m_native_main_call_traces = 0;
 		m_native_config_call_traces = 0;
 		m_native_tail_data_reads = 0;
+		m_native_lookup_operand_traces = 0;
 		m_native_worker_window_started = false;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
@@ -1212,6 +1214,24 @@ private:
 						data.read_word(0x1444), data.read_word(0x1445), data.read_word(0x1446),
 						data.read_word(0x1447), data.read_word(0x1448), data.read_word(0x1449));
 				});
+			auto const lookup_observer = [this](offs_t address, u16 &opcode, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled() ||
+						u16(m_cpu->state_int(tms320c54x_device::STATE_PC)) != u16(address + 1)) return;
+					auto const disable = machine().disable_side_effects();
+					auto &data = m_cpu->space(AS_DATA);
+					if (data.read_word(0x145e) != 6 || m_native_lookup_operand_traces++ >= 20) return;
+					u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+					logerror("mu4_native_lookup_operand: pc=%06x opcode=%04x ar0=%04x ar2=%04x ar6=%04x a=%010llx b=%010llx stack=%04x,%04x,%04x,%04x\n",
+						unsigned(m_cpu->state_int(STATE_GENPC)), opcode, unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR0)),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR2)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR6)),
+						static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL,
+						static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)) & 0xffffffffffULL,
+						data.read_word(sp), data.read_word(u16(sp+1)), data.read_word(u16(sp+2)), data.read_word(u16(sp+3)));
+				};
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x3bb7c, 0x3bb7c, "mu4_native_lookup_limit", lookup_observer);
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x3bd13, 0x3bd13, "mu4_native_lookup_address", lookup_observer);
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x329d, 0x329d, "mu4_native_lookup_byte", lookup_observer);
 			m_cpu->space(AS_DATA).install_write_tap(0x48, 0x49, "mu4_native_mcbsp_config",
 				[this](offs_t offset, u16 &value, u16)
 				{

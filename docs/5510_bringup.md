@@ -1249,6 +1249,23 @@ extent, a termination time or successful lookup. Decode the iterator's row
 bounds and end predicate before treating the observation deadline as a
 deadlock or providing a guessed `TRACKLST.BIN`.
 
+At index six, `03:bb7b` performs unsigned `CMPR` with AR2=`0006` and
+AR0=`0200`; `03:bb7c` sees TC set and takes the read path. The iterator
+limit here is 512 entries, not an inferred 4,095-entry count from an earlier
+return value. Address helper `03:bd13` receives ordinal six. Subsequent
+byte-reader entries at `329d` receive A=`0001:e9ff` and stack arguments
+`00c0`, `00c1`, …, `00cb` with source descriptor `1422`; the later filename
+lookup uses copied descriptor `3aea` with the same address and offsets.
+The ordinal-to-offset mapping is six times 32 bytes. Original `03:bbd6`
+reads eight name bytes, three extension bytes, then attributes and the later
+word/double-word fields of that fixed-size directory entry.
+
+This moves the unresolved boundary below the iterator: decode the common
+reader at `329d` and its NAND-backed address resolution for logical
+`0001:e9ff`, including cache/search termination. The observed physical-row
+samples are not evidence that the directory iterator itself advances once
+per NAND page. Do not alter the 512-entry limit or synthesize an end record.
+
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
 
