@@ -23,12 +23,12 @@ RX DMA block. The `sustain` profile checks eight reloaded blocks in each
 direction; analog conversion and longer application operation are not validated.
 DMA/McBSP and codec digital interfaces have isolated conformance
 and save/replay tests.
-The `startup` profile reaches storage completion, startup-helper execution
-and the original streaming consumer, which reads and clears its notification.
-It currently stops on unsupported C54x opcode `f7d9` at `02:9c74`, before
-its requested 20-second endpoint. No full native boot or music decoding is
-claimed. Its worker-activation gate remains failing until that boundary is
-resolved and the complete observation window passes.
+The `startup` profile passes its 20-second window with zero illegal
+instructions and an active original streaming consumer. It observes 1,739
+consumer entries/notification reads and 1,740 clears. The open boundary is
+the consumer's host-command/data contract and independently verified output,
+not a missing worker activation. No full native boot or music decoding is
+claimed; only the initial 1,024 DIN words are independently compared.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -1206,8 +1206,8 @@ Startup is still performing file initialization before scheduler activation;
 the five-second window ends during the first `SETTING1.BIN` write through
 `03:8c3e`. This is a bounded-window result, not the current execution ceiling:
 the longer `startup` profile completes storage initialization, enters the
-startup continuation and activates the original consumer before an unsupported
-instruction stops execution. It does not pass its 20-second endpoint gate.
+startup continuation and passes its 20-second original-consumer activation
+gate. Consumer activity alone does not establish decoded audio.
 Static original code has a call to common `3f1d` at `6d5e`, inside the
 startup helper at `6d44`. Entry code calls that helper at `6dbf`, after the
 far call to `02:904b`. The 100 ms worker tail observes one main-entry fetch
@@ -1279,6 +1279,7 @@ device inputs:
 | `worker` | 100 ms | 77/76 | 25,434 | 0/0/0 |
 | `settle` | 1 second | 697/697 | 134,969 | 0/0/0 |
 | `scan` | 5 seconds | 3,453/3,453 | 905,143 | 0/0/0 |
+| `startup` | 20 seconds | 13,789/13,789 | 1,870,113 | 1/1/7 |
 
 Run them with `make check-mu4-storage-original MU4_STORAGE_BIOS=settle`
 or `MU4_STORAGE_BIOS=scan`. Both retain the first 1,024-word independent
@@ -1297,16 +1298,20 @@ altering the firmware, media or hardware inputs.
 
 `MU4_STORAGE_BIOS=startup` requests a 20-second tail. It observes return
 from main's `02:90f4 -> 03:9105` call, then reaches continuation `02:6dbf`
-and helper `02:6d44`. The first longer run exposed opcode `ea00` at
-`02:3d7e`. TI SPRU172C pp. 4-70--4-71 identifies `ea00..ebff` as
+and helper `02:6d44`. Original `02:3d7e` uses `ea00`.
+TI SPRU172C pp. 4-70--4-71 identifies `ea00..ebff` as
 `LD #k9,DP`, replacing only ST0 bits 8--0 in one cycle. The core now implements
 it, with 1,024 executable cases covering all immediate values, CPL/SXM
 configurations, untouched accumulator/status fields and cycle timing.
 
 The longer profile reaches the original streaming consumer and observes
-repeated `b633` reads at `02:9549` and clears at `02:9641`. Its current stop
-is unsupported opcode `f7d9` at `02:9c74`. The requested 20-second tail is
-not complete and no decoded music is established. Physical `1820` is the
+repeated `b633` reads at `02:9549` and clears at `02:9641`. The 20-second
+gate requires actual consumer entries, reads and non-initialization clears,
+not an endpoint IDLE or a fabricated callback. It observes 1,739 entries,
+1,739 reads, 1,740 clears and final `b633=0`, with zero illegal instructions.
+Two independent fresh runs reproduce the endpoint and these counts exactly.
+The endpoint is logical `02:3d9f`, not a claimed stuck instruction; no decoded
+music is established. Physical `1820` is the
 harness's loader-call IDLE sentinel, not a firmware idle loop; reaching it
 cannot establish successful resident-worker execution.
 
@@ -1314,8 +1319,8 @@ The startup-helper audit narrows this boundary further. Original `6d4b`
 enables IMR bit 3 (`0ac1 -> 0ac9`) while IFR is `0438`; the next instruction
 is interrupted through vector `204c -> 02:3d73`. Its context-save routine
 reaches `POPM BL` at `3d9e`, immediately followed by stack-relative
-`STL A,6` at `3d9f`. The core exposes the incremented SP `1275` to that
-store in a zero-latency model would place `4044` at `127b`, one slot above
+`STL A,6` at `3d9f`. Exposing the incremented SP `1275` immediately to that
+store would place `4044` at `127b`, one slot above
 the reserved return slot `127a`. No loader caller or worker event needs to
 be synthesized to repair this CPU/context boundary.
 
@@ -1336,6 +1341,18 @@ SPRU172C pp. 4-133--4-134. It is implemented with five executable signed
 40-bit boundary cases checking exact PC/SP outcomes and XPC preservation.
 Core and ROM4 warm/cold regressions pass; these ISA checks do not establish
 complete native audio execution.
+
+Original `f7d9` at `02:9c74` is `INTR 25`, under SPRU172C p. 4-65.
+It saves the following PC, selects IPTR plus four times K, clears the
+corresponding maskable IFR bit and sets INTM independently of IMR and
+prior INTM, in three cycles. The core implements all 32 encodings; 64
+red/green cases cover INTM clear/set, two vector bases, stack/status/IFR
+outcomes, page preservation and port-measured timing. VC5410A SPRS139I
+table 3-21 names K=25 as HPI interrupt/SINT9. Original vector `2064`
+branches to `02:9a32`. This software invocation is not proof of a physical
+host transaction. The next acceptance contract must identify the original
+consumer's command/data inputs and verify its output beyond the initial DIN
+prefix; traffic volume alone is not audio correctness.
 
 McBSP error recovery is modeled for the supported externally framed,
 single-phase 8/12/16-bit modes. SPRU302B section 2.3.7.4 specifies that TX

@@ -743,6 +743,16 @@ bool tms320c54x_device::service_interrupt()
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	if ((op & 0xffe0) == 0xf7c0) // INTR K, independent of IMR/INTM (SPRU172C 4-65).
+	{
+		unsigned const vector = op & 31;
+		push(m_pc);
+		if (vector >= 16) m_ifr &= ~u16(1U << (vector - 16));
+		m_st1 |= 0x0800;
+		m_pc = (m_pmst & 0xff80) | (vector << 2);
+		m_icount -= 2;
+		return;
+	}
 	// SPRU172C: far calls push PC then XPC; delayed transfers retain the
 	// caller's page while the two delay words execute.
 	if (m_extended_program && (op & 0xfc80) == 0xf880) // FB[D] / FCALL[D] extpmad

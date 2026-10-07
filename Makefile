@@ -1076,6 +1076,7 @@ check-c54x-core: build
 	@grep -q "TMS320C54x core conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x stack address latency conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x RC ALT conformance: PASS" /tmp/tms320c54x-core-check.log
+	@grep -q "TMS320C54x software interrupt conformance: PASS" /tmp/tms320c54x-core-check.log
 
 prepare-c54x-rom4-fixture:
 	@test -f roms/research/nse1-rom4/working/transform_entry_prog.bin
