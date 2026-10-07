@@ -232,6 +232,8 @@ SIP_HANDSET_SCRIPT ?= ../mame_nokia_dct3_input_exerciser.lua
 SIP_HANDSET_SOUND ?= none
 SIP_HANDSET_MACHINE ?= noki3210
 SIP_HANDSET_BIOS ?=
+SIP_HANDSET_NVRAM_DIR ?= $(abspath $(RUN_DIR))/nvram
+SIP_HANDSET_PRESERVE_NVRAM ?= 0
 SIP_HANDSET_KEY_DELAY_MS ?= 12000
 SIP_HANDSET_KEY_DURATION_MS ?= 220
 SIP_HANDSET_KEY_GAP_MS ?= 280
@@ -249,7 +251,7 @@ NOKI3210_OUTGOING_NO_ANSWER_KEYS := $(NOKI3210_OUTGOING_DIAL_KEYS),waitalerting,
 define prepare_host_run
 $(MAKE) --no-print-directory prepare-run-files \
 	PHONE=$(2) BIOS=$(3) RUN_DIR="$(1)" \
-	RUN_NVRAM_DIR="$(abspath $(1))/nvram" PRESERVE_NVRAM=0
+	RUN_NVRAM_DIR="$(if $(4),$(4),$(abspath $(1))/nvram)" PRESERVE_NVRAM=$(if $(5),$(5),0)
 endef
 
 RADIO_PCM_MISSING_ARGS := -cfg_directory ../fixtures/radio_pcm_missing

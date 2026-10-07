@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 374 gates: 230 generated from typed steps, 144 copied verbatim (shell).
+# 375 gates: 230 generated from typed steps, 145 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -223,8 +223,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure \
-	verify-radio-outgoing-call-sip verify-radio-incoming-call-sip \
-	verify-radio-incoming-call-sip-idle-restore \
+	verify-radio-outgoing-call-sip verify-3330-radio-outgoing-call-sip \
+	verify-radio-incoming-call-sip verify-radio-incoming-call-sip-idle-restore \
 	verify-3310-radio-incoming-call-sip-connected-restore \
 	verify-3310-radio-incoming-call-sip-alerting-restore \
 	verify-3310-radio-outgoing-call-sip-busy-redial \
@@ -3674,7 +3674,7 @@ verify-radio-outgoing-call-sip:
 	$(if $(filter noki3210,$(SIP_HANDSET_MACHINE)),$(DCT3_EEPROM_GUARD)) \
 	test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }; \
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) PHONE=$(SIP_HANDSET_MACHINE) BIOS=$(SIP_HANDSET_BIOS) $(if $(filter noki3210,$(SIP_HANDSET_MACHINE)),ERASED_IDENTITY_SECURITY_CODE=12345); \
-	$(call prepare_host_run,$(RUN_DIR),$(SIP_HANDSET_MACHINE),$(SIP_HANDSET_BIOS)); \
+	$(call prepare_host_run,$(RUN_DIR),$(SIP_HANDSET_MACHINE),$(SIP_HANDSET_BIOS),$(SIP_HANDSET_NVRAM_DIR),$(SIP_HANDSET_PRESERVE_NVRAM)); \
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS='$(SIP_HANDSET_KEYS)' \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$(SIP_HANDSET_KEY_DELAY_MS) \
@@ -3686,7 +3686,14 @@ verify-radio-outgoing-call-sip:
 		-keyboardprovider none -mouseprovider none -lightgunprovider none -joystickprovider none -midiprovider none \
 		-skip_gameinfo -autoboot_script $(SIP_HANDSET_SCRIPT) -verbose \
 		-cfg_directory $(SIP_HANDSET_CONFIG) -http -http_port 18100 \
-		-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run $(SIP_HANDSET_SECONDS)
+		-nvram_directory $(SIP_HANDSET_NVRAM_DIR) -seconds_to_run $(SIP_HANDSET_SECONDS)
+
+# shell: own-product physical PMM provisioning before isolated SIP call
+verify-3330-radio-outgoing-call-sip: normalize-3330
+	@set -e; \
+	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \
+	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0; \
+	$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR)_call JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3330 SIP_HANDSET_BIOS=450e SIP_HANDSET_PRESERVE_NVRAM=1 SIP_HANDSET_NVRAM_DIR=$(abspath $(RUN_DIR)_provision)/nvram SIP_HANDSET_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,5,5,5,1,2,3,4,enter SIP_HANDSET_KEY_DELAY_MS=6000 SIP_HANDSET_KEY_DURATION_MS=70 SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--product 3330' SIP_HANDSET_SECONDS=40
 
 verify-radio-incoming-call-sip:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48

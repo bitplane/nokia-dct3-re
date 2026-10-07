@@ -253,6 +253,14 @@ The handset runner builds and prepares the selected machine and BIOS. Only
 restore guard; sibling gates neither provision nor restore that fixture. All
 products retain isolated run-local NVRAM and logs.
 
+`verify-3330-radio-outgoing-call-sip` first completes the NHM-6 physical
+security/time setup with its own PMM, then boots a separate call process using
+that product-local NVRAM. It verifies the captured 18-byte SETUP, real SIP
+confirmation, sustained ordered GSM-FR downlink and bidirectional host media,
+then ordinary CC/RR release. Queue-drop counts remain visible in the result;
+this is HLE media transport, not native DSP speech or an analogue-waveform gate.
+3330 incoming SIP acceptance remains separate and unvalidated.
+
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps
 486/600 to busy and other pre-confirmation failures to no-answer plus explicit

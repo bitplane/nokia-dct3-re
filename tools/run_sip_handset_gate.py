@@ -19,6 +19,7 @@ def outgoing_setup_pattern(product):
     frame = {
         '3210': '03450401a05e0581551532f4150101',
         '3310': '03450404600200815e0581551532f4a2150101',
+        '3330': '03450404600200815e0581551532f4150101',
     }[product]
     return (rf'GSM service uplink sapi=0 pd=03 message=05 length={len(frame) // 2} '
             rf'data={frame}(?:\s|$)')
@@ -396,7 +397,7 @@ def main():
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--record-media', action='store_true')
-    parser.add_argument('--product', choices=('3210', '3310'), default='3210')
+    parser.add_argument('--product', choices=('3210', '3310', '3330'), default='3210')
     parser.add_argument('--calls', type=int, choices=(1, 2), default=1)
     parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--restore-call', action='store_true')
@@ -406,6 +407,8 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.product == '3330' and args.incoming:
+        parser.error('3330 incoming SIP acceptance has not been established')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:

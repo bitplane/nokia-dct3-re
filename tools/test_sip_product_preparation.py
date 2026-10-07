@@ -1,14 +1,24 @@
 import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+
+from tools.run_sip_handset_gate import outgoing_setup_pattern
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class SipProductPreparationTest(unittest.TestCase):
+    def test_3330_setup_uses_own_captured_encoding(self):
+        line = ('GSM service uplink sapi=0 pd=03 message=05 length=18 '
+                'data=03450404600200815e0581551532f4150101')
+        self.assertIsNotNone(re.search(outgoing_setup_pattern('3330'), line))
+        self.assertIsNone(re.search(outgoing_setup_pattern('3310'), line))
+        self.assertIsNone(re.search(outgoing_setup_pattern('3210'), line))
+
     def expand(self, product, bios=''):
         data = json.loads((ROOT / 'gates.json').read_text())
         gate = next(item for item in data['gates']
