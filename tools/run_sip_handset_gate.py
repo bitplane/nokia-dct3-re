@@ -322,7 +322,8 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
             raise RuntimeError('restoration did not reject the real alerting SIP INVITE')
         if ('state changed to CONFIRMED' in remote_text or 'SIP physical answer' in bridge or
                 'SIP confirmed' in bridge or
-                re.search(r'GSM service uplink sapi=0 pd=03 message=07', log)):
+                re.search(r'GSM service uplink sapi=0 pd=03 message=07', log) or
+                re.search(r'gsm_call_adapter: media direction=\w+ id=1 .*result=accepted', log)):
             raise RuntimeError('alerting restoration falsely answered or connected')
     for marker in ('SIP epoch changed old=1 new=2',
                    'SIP restored call cleared identity=(2, 1)'):

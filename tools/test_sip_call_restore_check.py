@@ -74,6 +74,7 @@ class SipRestoreCheckTest(unittest.TestCase):
     def test_alerting_restore_requires_rejected_invite(self):
         log = LOG.replace('phase=connected', 'phase=alerting')
         self.check(log=log, remote='Response msg 603/INVITE/\n', phase='alerting')
+        self.check(log=log, remote='Response msg 603/INVITE/\n', phase='alerting', product='3330')
         with self.assertRaises(RuntimeError):
             self.check(log=log, remote='Response msg 180/INVITE/\n', phase='alerting')
 
@@ -87,6 +88,9 @@ class SipRestoreCheckTest(unittest.TestCase):
                 remote='Response msg 603/INVITE/\n', phase='alerting')
         with self.assertRaises(RuntimeError):
             self.check(log=log, bridge=BRIDGE + 'SIP physical answer\n',
+                remote='Response msg 603/INVITE/\n', phase='alerting')
+        with self.assertRaises(RuntimeError):
+            self.check(log=log + 'gsm_call_adapter: media direction=downlink id=1 sequence=0 result=accepted\n',
                 remote='Response msg 603/INVITE/\n', phase='alerting')
 
 

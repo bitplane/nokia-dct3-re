@@ -35,8 +35,9 @@ class SipCancelCheckTest(unittest.TestCase):
     def test_cancel_completes_without_answer(self):
         self.check()
 
-    def test_3310_scope(self):
-        self.assertTrue(self.check(product='3310')['scope'].startswith('3310 HLE'))
+    def test_sibling_scopes(self):
+        for product in ('3310', '3330'):
+            self.assertTrue(self.check(product=product)['scope'].startswith(product + ' HLE'))
 
     def test_incomplete_radio_release_is_rejected(self):
         for line in ('GSM service downlink kind=13 sapi=0 pd=03 message=25',

@@ -363,12 +363,13 @@ not implemented.
 ```sh
 make verify-radio-incoming-call-sip-cancel RUN_DIR=run_3210_sip_cancel
 make verify-3310-radio-incoming-call-sip-cancel RUN_DIR=run_3310_sip_cancel
+make verify-3330-radio-incoming-call-sip-cancel RUN_DIR=run_3330_sip_cancel
 ```
 
 The real SIP caller cancels only after the handset reports alerting. The gate
 requires CANCEL/487, exactly one correlated GSM termination, network DISCONNECT,
 firmware RELEASE COMPLETE, acknowledged LAPDm Channel Release and host `ended`,
-with no physical Answer, connection or bridge media on either product. CC completion
+with no physical Answer, connection or bridge media on each product. CC completion
 must survive the subsequent RR release whether it arrives before or after the
 DISCONNECT acknowledgement; both orderings represent an already completed CC
 transaction. Stopping the traffic channel alone is not the cancellation gate's
@@ -404,13 +405,17 @@ against the observed connected event rather than assumed to be connected.
 ```sh
 make verify-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3210_sip_alerting_restore
 make verify-3310-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3310_sip_alerting_restore
+make verify-3330-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3330_sip_alerting_restore
 ```
 
 The alerting variant omits physical Answer. Loading the ringing snapshot closes
 the outstanding real SIP INVITE (observed PJSIP response: 603 Decline) and clears
 the restored GSM transaction with cause 41 under epoch 2. Its checker requires
-alerting before save and rejects any SIP confirmation, physical Answer or
-firmware CC CONNECT. This is distinct from the caller-driven CANCEL gate.
+alerting before save and rejects any SIP confirmation, physical Answer,
+firmware CC CONNECT or accepted host media. This is distinct from the
+caller-driven CANCEL gate. The 3330 variants share the same incoming gate's
+physical PMM preparation, with explicit no-Answer keys and a restore script
+only for the save/load scenario.
 Run all handset gates sequentially. Each product's fixture must independently
 reach the requested call phase before its fixed save time.
 

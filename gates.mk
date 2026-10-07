@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 377 gates: 230 generated from typed steps, 147 copied verbatim (shell).
+# 379 gates: 232 generated from typed steps, 147 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -226,6 +226,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-outgoing-call-sip verify-3330-radio-outgoing-call-sip \
 	verify-3330-radio-incoming-call-sip \
 	verify-3330-radio-incoming-call-sip-connected-restore \
+	verify-3330-radio-incoming-call-sip-cancel \
+	verify-3330-radio-incoming-call-sip-alerting-restore \
 	verify-radio-incoming-call-sip verify-radio-incoming-call-sip-idle-restore \
 	verify-3310-radio-incoming-call-sip-connected-restore \
 	verify-3310-radio-incoming-call-sip-alerting-restore \
@@ -3702,7 +3704,7 @@ verify-3330-radio-incoming-call-sip: normalize-3330
 	@set -e; \
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \
 	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0; \
-	$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR)_call JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3330 SIP_HANDSET_BIOS=450e SIP_HANDSET_PRESERVE_NVRAM=1 SIP_HANDSET_NVRAM_DIR=$(abspath $(RUN_DIR)_provision)/nvram SIP_HANDSET_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter SIP_HANDSET_KEY_DELAY_MS=6000 SIP_HANDSET_KEY_DURATION_MS=220 SIP_HANDSET_KEY_GAP_MS=280 SIP_HANDSET_RUNNER_ARGS='--incoming --product 3330' SIP_HANDSET_SECONDS=40
+	$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR)_call JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3330 SIP_HANDSET_BIOS=450e SIP_HANDSET_PRESERVE_NVRAM=1 SIP_HANDSET_NVRAM_DIR=$(abspath $(RUN_DIR)_provision)/nvram SIP_HANDSET_KEYS='$(SIP_3330_INCOMING_KEYS)' SIP_HANDSET_KEY_DELAY_MS=6000 SIP_HANDSET_KEY_DURATION_MS=220 SIP_HANDSET_KEY_GAP_MS=280 SIP_HANDSET_RUNNER_ARGS='$(SIP_3330_INCOMING_RUNNER_ARGS)' SIP_HANDSET_SCRIPT=$(SIP_3330_INCOMING_SCRIPT) SIP_HANDSET_SECONDS=40
 
 # shell: own-product physical PMM provisioning before connected SIP restoration
 verify-3330-radio-incoming-call-sip-connected-restore: normalize-3330
@@ -3710,6 +3712,12 @@ verify-3330-radio-incoming-call-sip-connected-restore: normalize-3330
 	$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'; \
 	$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0; \
 	$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR)_call JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3330 SIP_HANDSET_BIOS=450e SIP_HANDSET_PRESERVE_NVRAM=1 SIP_HANDSET_NVRAM_DIR=$(abspath $(RUN_DIR)_provision)/nvram SIP_HANDSET_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter SIP_HANDSET_KEY_DELAY_MS=6000 SIP_HANDSET_KEY_DURATION_MS=220 SIP_HANDSET_KEY_GAP_MS=280 SIP_HANDSET_RUNNER_ARGS='--incoming --restore-call --product 3330' SIP_HANDSET_SCRIPT=../tools/sip_3330_call_state_roundtrip.lua SIP_HANDSET_SECONDS=40
+
+verify-3330-radio-incoming-call-sip-cancel:
+	@$(MAKE) --no-print-directory verify-3330-radio-incoming-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3330_INCOMING_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c SIP_3330_INCOMING_RUNNER_ARGS='--incoming --cancel-incoming --product 3330'
+
+verify-3330-radio-incoming-call-sip-alerting-restore:
+	@$(MAKE) --no-print-directory verify-3330-radio-incoming-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3330_INCOMING_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c SIP_3330_INCOMING_RUNNER_ARGS='--incoming --restore-call --restore-phase alerting --product 3330' SIP_3330_INCOMING_SCRIPT=../tools/sip_3330_call_state_roundtrip.lua
 
 verify-radio-incoming-call-sip:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48
