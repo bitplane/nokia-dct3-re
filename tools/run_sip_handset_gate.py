@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run an isolated handset command with the real outgoing SIP host backend."""
+"""Run an isolated handset command with the real SIP host backend."""
 
 import argparse
 import asyncio
@@ -21,21 +21,23 @@ async def run(args):
     processes = []
     try:
         with (root / 'sip-remote.log').open('w') as remote_log, (root / 'sip-bridge.log').open('w') as bridge_log:
-            remote = await asyncio.create_subprocess_exec(str(args.pjsua.resolve()),
+            remote_command = [str(args.pjsua.resolve()),
                 '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
                 '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
                 '--auto-answer=200', '--duration=8', f'--play-file={root / "sip-source.wav"}',
-                '--auto-play', stdin=asyncio.subprocess.PIPE,
-                stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
-            processes.append(remote)
-            for _ in range(100):
-                if 'pjsua version' in (root / 'sip-remote.log').read_text(errors='replace'):
-                    break
-                if remote.returncode is not None:
-                    raise RuntimeError('remote SIP endpoint failed')
-                await asyncio.sleep(0.05)
-            else:
-                raise RuntimeError('SIP endpoint did not become ready')
+                '--auto-play']
+            if not args.incoming:
+                remote = await asyncio.create_subprocess_exec(*remote_command,
+                    stdin=asyncio.subprocess.PIPE, stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
+                processes.append(remote)
+                for _ in range(100):
+                    if 'pjsua version' in (root / 'sip-remote.log').read_text(errors='replace'):
+                        break
+                    if remote.returncode is not None:
+                        raise RuntimeError('remote SIP endpoint failed')
+                    await asyncio.sleep(0.05)
+                else:
+                    raise RuntimeError('SIP endpoint did not become ready')
             handset = await asyncio.create_subprocess_exec(*args.command)
             processes.append(handset)
             for _ in range(300):
@@ -57,6 +59,20 @@ async def run(args):
                 '--sip-port', str(args.sip_port + 1), '--once', '--require-frames', '100',
                 stdout=bridge_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(bridge)
+            if args.incoming:
+                for _ in range(900):
+                    if 'SIP registration ready' in (root / 'sip-bridge.log').read_text(errors='replace'):
+                        break
+                    if bridge.returncode is not None:
+                        raise RuntimeError('bridge exited before registration')
+                    await asyncio.sleep(0.05)
+                else:
+                    raise RuntimeError('incoming SIP lacks registered handset')
+                remote = await asyncio.create_subprocess_exec(*remote_command,
+                    '--id', f'sip:5551234@127.0.0.1:{args.sip_port}',
+                    f'sip:dct3@127.0.0.1:{args.sip_port + 1}',
+                    stdin=asyncio.subprocess.PIPE, stdout=remote_log, stderr=asyncio.subprocess.STDOUT)
+                processes.append(remote)
             if await asyncio.wait_for(bridge.wait(), 90):
                 raise RuntimeError('handset SIP bridge failed; inspect sip-bridge.log')
             if await asyncio.wait_for(handset.wait(), 90):
@@ -78,8 +94,11 @@ async def run(args):
     if 'state changed to CONFIRMED' not in remote_text or 'DISCONNECTED [reason=200 (OK)]' not in remote_text:
         raise RuntimeError('remote SIP call did not confirm and release normally')
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
-    if 'digits=5551234' not in bridge_text or 'SIP confirmed status=200' not in bridge_text:
+    identity_marker = 'caller=5551234' if args.incoming else 'digits=5551234'
+    if identity_marker not in bridge_text or 'SIP confirmed status=200' not in bridge_text:
         raise RuntimeError('missing reviewed physical dial/SIP acceptance')
+    if args.incoming and 'SIP physical answer identity=' not in bridge_text:
+        raise RuntimeError('incoming SIP lacked handset-owned Answer')
     match = re.search(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
     if not match:
         raise RuntimeError('missing bridge media/release summary')
@@ -89,20 +108,31 @@ async def run(args):
         raise RuntimeError('insufficient executed bidirectional media')
     log = (root / 'error.log').read_text(errors='replace')
     cursor = 0
-    for pattern in (
+    patterns = (
+            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging',
+            r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
+            r'input-press: t=[0-9.]+ name=enter',
+            r'GSM service uplink sapi=0 pd=03 message=07 length=2 data=8347',
+            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=connected',
+            r'gsm_call_adapter: termination id=1 cause=16 result=accepted',
+            r'GSM service uplink sapi=0 pd=03 message=2a .*data=032a0802e0d1',
+            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=ended',
+    ) if args.incoming else (
             r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101',
             r'GSM service downlink kind=12 sapi=0 pd=03 message=07',
             r'GSM service uplink sapi=0 pd=03 message=0f .*data=030f',
             r'GSM service uplink sapi=0 pd=03 message=2d .*data=036d',
-            r'LAPDm service Channel Release acknowledged'):
+            r'LAPDm service Channel Release acknowledged')
+    for pattern in patterns:
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing ordered firmware call checkpoint: {pattern}')
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
-        'scope': '3210 research-HLE physical outgoing SIP signaling and media transport; not native DSP speech',
-        'dialed_digits': '5551234', 'media': counts, 'passed': True}, indent=2) + '\n')
-    print('OK - physical handset outgoing call connected to SIP with bidirectional host media and release')
+        'scope': f'3210 research-HLE physical {"incoming" if args.incoming else "outgoing"} SIP signaling and media transport; not native DSP speech',
+        ('caller' if args.incoming else 'dialed_digits'): '5551234',
+        'media': counts, 'passed': True}, indent=2) + '\n')
+    print('OK - physical handset call connected to SIP with bidirectional host media and release')
 
 
 def main():
@@ -111,6 +141,7 @@ def main():
     parser.add_argument('--run-dir', type=Path, required=True)
     parser.add_argument('--sip-port', type=int, default=25100)
     parser.add_argument('--http-port', type=int, default=18100)
+    parser.add_argument('--incoming', action='store_true')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ['--']:

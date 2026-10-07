@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Outgoing MAME host calls to an external PJSUA2 SIP endpoint.
+"""MAME host calls to an external PJSUA2 SIP endpoint.
 
-SIP/RTP and wall-clock audio stay outside MAME. Incoming SIP, SMS and USSD
-are not implemented by this backend; use the existing laboratory endpoints.
+SIP/RTP and wall-clock audio stay outside MAME. SMS and USSD are not implemented
+by this backend; use the existing laboratory endpoints.
 """
 
 import argparse
@@ -10,6 +10,7 @@ import asyncio
 from collections import deque
 import json
 import queue
+import re
 import time
 
 try:
@@ -35,13 +36,27 @@ class MediaQueues:
             self.dropped += 1
 
 
+def incoming_caller(remote_uri):
+    # PJSUA2 supplies a parsed dialog's serialized name-address. A display name
+    # may itself contain angle brackets, so inspect the final URI, not its text.
+    uri = remote_uri.strip()
+    if uri.endswith('>') and '<' in uri:
+        uri = uri.rsplit('<', 1)[1][:-1]
+    match = re.fullmatch(r'sip:([0-9]{1,20})@[^<>\s]+', uri)
+    return match[1] if match else None
+
+
 class SipEndpoint:
     def __init__(self, pj, port):
         self.pj = pj
         self.events = deque()
         self.call = None
+        self.call_identity = None
         self.media_port = None
         self.media = MediaQueues()
+        self.incoming_epoch = None
+        self.incoming_enabled = False
+        self.next_incoming_request = 1
         self.endpoint = pj.Endpoint()
         self.endpoint.libCreate()
         config = pj.EpConfig()
@@ -62,19 +77,38 @@ class SipEndpoint:
 
         class Account(pj.Account):
             def onIncomingCall(account, parameter):
-                call = pj.Call(account, parameter.callId)
                 response = pj.CallOpParam()
-                response.statusCode = 486
-                call.answer(response)
+                if (not self.incoming_enabled or self.incoming_epoch is None or
+                        (self.call and self.call.isActive())):
+                    call = pj.Call(account, parameter.callId)
+                    response.statusCode = 486
+                    call.answer(response)
+                    return
+                identity = (self.incoming_epoch, self.next_incoming_request)
+                # Call destruction hangs up the native dialog. Construct the
+                # owned callback object once; never inspect via a temporary Call.
+                self._new_call(identity, parameter.callId)
+                caller = incoming_caller(self.call.getInfo().remoteUri)
+                if caller is None:
+                    response.statusCode = 484
+                    self.call.answer(response)
+                    return
+                self.next_incoming_request += 1
+                self.incoming_enabled = False
+                response.statusCode = 180
+                self.call.answer(response)
+                self.events.append((identity, 'invite', caller))
 
         self.account = Account()
         account_config = pj.AccountConfig()
         account_config.idUri = f'sip:dct3@127.0.0.1:{port}'
         self.account.create(account_config)
 
-    def dial(self, destination, identity):
+    def _new_call(self, identity, call_id=-1):
         pj = self.pj
         owner = self
+        self.call = None
+        self.call_identity = identity
         self.media = MediaQueues()
         media = self.media
 
@@ -121,8 +155,23 @@ class SipEndpoint:
                         owner.media_port.startTransmit(audio)
 
         self.media_port = None
-        self.call = Call(self.account)
+        self.call = Call(self.account, call_id)
+
+    def dial(self, destination, identity):
+        self._new_call(identity)
+        pj = self.pj
         self.call.makeCall(destination, pj.CallOpParam(True))
+
+    def answer(self, status):
+        parameter = self.pj.CallOpParam()
+        parameter.statusCode = status
+        self.call.answer(parameter)
+
+    def release(self, identity):
+        if identity == self.call_identity:
+            self.call = None
+            self.media_port = None
+            self.call_identity = None
 
     def hangup(self):
         if self.call and self.call.isActive():
@@ -147,10 +196,12 @@ async def bridge(args, pj):
     import websockets
     endpoint = SipEndpoint(pj, args.sip_port)
     identity = None
+    direction = 'outgoing'
     epoch = None
     decision = False
     connected = False
     blocked_restore = False
+    registered = False
     downlink_sequence = 0
     uplink_sequence = -1
     counts = {'uplink': 0, 'downlink': 0}
@@ -177,26 +228,41 @@ async def bridge(args, pj):
                                 codec.close()
                                 codec = GsmFrCodec()
                             epoch = event.get('epoch')
+                            endpoint.incoming_epoch = epoch
+                            endpoint.incoming_enabled = False
+                            registered = False
                         elif event.get('epoch') == epoch:
                             incoming_identity = (epoch, event.get('request_id'))
-                            if kind == 'outgoing_call':
+                            if kind == 'network_state':
+                                registered = event.get('registered') is True
+                                endpoint.incoming_enabled = (
+                                    registered and identity is None and not blocked_restore)
+                                if endpoint.incoming_enabled:
+                                    print(f'SIP registration ready epoch={epoch}', flush=True)
+                            elif kind == 'outgoing_call':
                                 if identity is None and not blocked_restore:
                                     digits = event.get('digits')
                                     if not isinstance(digits, str) or not digits.isascii() or not digits.isdigit():
                                         raise RuntimeError('invalid outgoing digits')
                                     identity = incoming_identity
+                                    direction = 'outgoing'
+                                    endpoint.incoming_enabled = False
                                     endpoint.dial(args.destination, identity)
                                     print(f'SIP dial identity={identity} digits={digits}', flush=True)
-                            elif kind == 'outgoing_call_state':
+                            elif kind in ('outgoing_call_state', 'incoming_call_state'):
                                 if blocked_restore and event.get('phase') != 'ended':
                                     await websocket.send(json.dumps({
-                                        'type': 'outgoing_call_terminate', 'epoch': epoch,
+                                        'type': kind.replace('_state', '_terminate'), 'epoch': epoch,
                                         'request_id': event['request_id'], 'cause': 41}))
-                                elif incoming_identity == identity:
+                                elif incoming_identity == identity and kind == f'{direction}_call_state':
                                     if event.get('phase') == 'connected':
                                         connected = True
                                         downlink_sequence = event['media_downlink_sequence']
-                                    elif event.get('phase') == 'ended':
+                                        if direction == 'incoming' and not decision:
+                                            endpoint.answer(200)
+                                            decision = True
+                                            print(f'SIP physical answer identity={identity}', flush=True)
+                                    elif event.get('phase') in ('ended', 'expired'):
                                         endpoint.hangup()
                                         counts.update(pcm_transmitted=endpoint.media.transmitted,
                                                       pcm_received=endpoint.media.received,
@@ -214,9 +280,11 @@ async def bridge(args, pj):
                                         counts = {'uplink': 0, 'downlink': 0}
                                         codec.close()
                                         codec = GsmFrCodec()
+                                        endpoint.incoming_enabled = registered and not blocked_restore
                                 if event.get('phase') == 'ended':
                                     blocked_restore = False
-                            elif (kind == 'outgoing_call_media_uplink' and connected and
+                                    endpoint.incoming_enabled = registered and identity is None
+                            elif (kind == f'{direction}_call_media_uplink' and connected and
                                   incoming_identity == identity):
                                 sequence = event.get('sequence')
                                 if isinstance(sequence, int) and sequence > uplink_sequence:
@@ -226,16 +294,31 @@ async def bridge(args, pj):
                                         counts['uplink'] += 1
                     while endpoint.events:
                         call_identity, phase, status = endpoint.events.popleft()
+                        if phase == 'disconnected':
+                            endpoint.release(call_identity)
+                            if identity is None:
+                                endpoint.incoming_enabled = registered and not blocked_restore
+                        if phase == 'invite' and identity is None and not blocked_restore:
+                            identity = call_identity
+                            direction = 'incoming'
+                            await websocket.send(json.dumps({
+                                'type': 'incoming_call', 'epoch': identity[0],
+                                'request_id': identity[1], 'caller': status}))
+                            print(f'SIP incoming identity={identity} caller={status}', flush=True)
+                            continue
                         if call_identity != identity or blocked_restore:
                             continue
                         response = {'epoch': identity[0], 'request_id': identity[1]}
+                        if phase == 'confirmed' and direction == 'incoming':
+                            print(f'SIP confirmed status={status} identity={identity}', flush=True)
+                            continue
                         if phase == 'confirmed' and not decision:
-                            response.update(type='outgoing_call_decision', decision='connect')
+                            response.update(type=f'{direction}_call_decision', decision='connect')
                             decision = True
                         elif phase == 'disconnected':
                             connected = False
-                            if decision:
-                                response.update(type='outgoing_call_terminate', cause=16)
+                            if decision or direction == 'incoming':
+                                response.update(type=f'{direction}_call_terminate', cause=16)
                             else:
                                 response.update(type='outgoing_call_decision',
                                                 decision='busy' if status in (486, 600) else 'no_answer')
@@ -250,7 +333,7 @@ async def bridge(args, pj):
                         except queue.Empty:
                             break
                         await websocket.send(json.dumps({
-                            'type': 'outgoing_call_media_downlink',
+                            'type': f'{direction}_call_media_downlink',
                             'epoch': identity[0], 'request_id': identity[1],
                             'sequence': downlink_sequence,
                             'source_time_us': int((time.monotonic() - started) * 1000000),

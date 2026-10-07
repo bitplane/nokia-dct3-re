@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 349 gates: 205 generated from typed steps, 144 copied verbatim (shell).
+# 350 gates: 206 generated from typed steps, 144 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -221,7 +221,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure \
-	verify-radio-outgoing-call-sip
+	verify-radio-outgoing-call-sip verify-radio-incoming-call-sip
 
 verify-5510-package:
 	$(PYTHON) tools/noki5510_package_check.py roms/archive-dct3-packages/NPM5_353_mcu.exe --output-dir roms/5510-npm5-v353
@@ -3644,14 +3644,17 @@ verify-radio-outgoing-call-sip:
 	$(MAKE) --no-print-directory build JOBS=$(JOBS) ERASED_IDENTITY_SECURITY_CODE=12345; \
 	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' NOKIA_DCT3_LUA_QUIET=1 \
-		NOKIA_DCT3_POST_READY_KEYS='$(NOKI3210_OUTGOING_DIAL_KEYS)' \
+		NOKIA_DCT3_POST_READY_KEYS='$(SIP_HANDSET_KEYS)' \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
 		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
 		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
-		$(VENV)/bin/python tools/run_sip_handset_gate.py --pjsua '$(SIP_PJSUA_BIN)' --run-dir $(RUN_DIR) -- \
+		$(VENV)/bin/python tools/run_sip_handset_gate.py $(SIP_HANDSET_RUNNER_ARGS) --pjsua '$(SIP_PJSUA_BIN)' --run-dir $(RUN_DIR) -- \
 		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
 		noki3210 -rompath roms -log -video none -sound none -throttle \
 		-keyboardprovider none -mouseprovider none -lightgunprovider none -joystickprovider none -midiprovider none \
 		-skip_gameinfo -autoboot_script ../mame_nokia_dct3_input_exerciser.lua -verbose \
-		-cfg_directory ../fixtures/radio_outgoing_host_adapter -http -http_port 18100 \
-		-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45
+		-cfg_directory $(SIP_HANDSET_CONFIG) -http -http_port 18100 \
+		-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run $(SIP_HANDSET_SECONDS)
+
+verify-radio-incoming-call-sip:
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48

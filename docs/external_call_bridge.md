@@ -232,7 +232,7 @@ evidence includes both endpoint logs, original/received WAV files and a result
 manifest. The reviewed 440/660 Hz recordings exceed 0.999 tone-energy fraction.
 
 [PJSUA2 AudioMediaPort](https://docs.pjsip.org/en/latest/specific-guides/audio/audio_frame_manipulation.html)
-provides application-owned PCM callbacks. The standalone outgoing backend now
+provides application-owned PCM callbacks. The standalone call backend now
 maps SIP decisions to existing call identities; GSM-FR decode/encode connects
 bounded 8 kHz PCM queues to that port.
 Neither SIP nor host wall-clock scheduling belongs in the emulated GSM/device
@@ -240,16 +240,24 @@ state. Restoration must invalidate the old SIP call identity instead of
 replaying an already accepted incoming call. Python SWIG bindings require a
 separate local build; no installed PJSUA2 binding is assumed by the stack probe.
 
-## Outgoing SIP bridge
+## SIP call bridge
 
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps
 486/600 to busy and other pre-confirmation failures to no-answer, and maps
 remote release to GSM normal clearing. Handset completion hangs up the SIP leg.
-The bridge does not auto-accept SMS/USSD or implement incoming SIP; unsupported
-incoming SIP receives busy. No registrar, credentials or destination-number
+The bridge does not auto-accept SMS/USSD. No registrar, credentials or destination-number
 routing policy is claimed. The explicit destination is independent of the
 physically dialed number, which is logged for acceptance evidence.
+
+Incoming SIP requires a registered idle host connection and a numeric SIP user
+of 1..20 digits; unavailable/busy ingress receives 486 and an unsupported caller
+identity receives 484. A retained PJSUA2 Call owns the dialog throughout:
+destroying a temporary Call would hang up that dialog. The bridge sends 180
+while ordinary MAME paging/ringing proceeds, and sends SIP 200 only after the
+handset publishes connected following physical Answer. SIP release requests
+GSM clearing; handset end hangs up the SIP dialog. There is no host-generated
+key press, paging shortcut or firmware-state change.
 
 Each call owns independent libgsm encoder/decoder state. Media callbacks only
 exchange 160-sample, native-endian signed PCM blocks through bounded eight-frame
@@ -278,6 +286,7 @@ Both have local-build defaults in Makefile, but remain optional dependencies.
 
 ```sh
 make verify-radio-outgoing-call-sip RUN_DIR=run_3210_sip_gate
+make verify-radio-incoming-call-sip RUN_DIR=run_3210_sip_incoming_gate
 ```
 
 The gate builds the erased-identity security-code fixture before preparing a
@@ -287,6 +296,12 @@ firmware's exact SETUP/CONNECT ACK/RELEASE and final LAPDm release. The remote
 endpoint supplies a 660 Hz WAV source and clears the call after eight seconds.
 The own 3210 HLE gate proves signaling and media transport, not native speech,
 sound perception or a public-network end-to-end call.
+The incoming gate waits for registration before originating a numeric SIP
+caller, physically unlocks and answers after the firmware's ringing output,
+then requires the ordered paging/SETUP/physical key/CONNECT/media/remote
+termination/RELEASE COMPLETE/host-ended chain. Its remote caller uses null
+audio: this gate proves incoming signaling and media transport, not an incoming
+non-silent waveform. The independent waveform probe remains separate evidence.
 
 `tools/run_dct3_sip_backend_probe.py` independently tests the same bridge with
 a synthetic version-1 host endpoint: uplink 440 Hz and remote 660 Hz must survive
@@ -297,6 +312,5 @@ not inject anything into a phone or establish handset coverage:
 PYTHONPATH="$SIP_PYTHON_PATH" .venv/bin/python tools/run_dct3_sip_backend_probe.py --pjsua "$SIP_PJSUA_BIN" --run-dir run_sip_backend_probe
 ```
 
-Next boundaries are incoming SIP through ordinary paging/physical Answer,
-executable restoration/failure coverage, and microphone/earpiece waveform
+Next boundaries are executable restoration/failure coverage and microphone/earpiece waveform
 acceptance. Native DSP speech remains its independent hardware/backend milestone.

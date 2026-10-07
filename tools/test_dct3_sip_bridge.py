@@ -1,10 +1,19 @@
 import queue
 import unittest
 
-from tools.dct3_sip_bridge import MediaQueues
+from tools.dct3_sip_bridge import MediaQueues, incoming_caller
 
 
 class SipMediaQueuesTest(unittest.TestCase):
+    def test_numeric_sip_identity_is_required_for_incoming_cli(self):
+        self.assertEqual(incoming_caller('sip:5551234@127.0.0.1:25100'), '5551234')
+        self.assertEqual(incoming_caller('"Caller" <sip:123@localhost>'), '123')
+        self.assertEqual(incoming_caller('"<sip:999@fake>" <sip:123@localhost>'), '123')
+        for uri in ('sip:alice@localhost', 'sip:12x@localhost',
+                    'sip:' + '1' * 21 + '@localhost', 'tel:123',
+                    '"sip:123@fake" <sip:alice@localhost>'):
+            self.assertIsNone(incoming_caller(uri))
+
     def test_bounded_media_queue_does_not_block(self):
         media = MediaQueues()
         for index in range(12):

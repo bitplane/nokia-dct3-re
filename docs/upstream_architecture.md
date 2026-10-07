@@ -171,9 +171,12 @@ machine compositions.
 
 The handset model ends at an explicit DSP/radio attachment. The deterministic
 GSM network is useful for regression and interactive emulation, but it is not a
-simulation of the analogue RF board. A future external GSM or SIP bridge should
-attach beyond the network/call adapter and must not add telephony policy to
-MAD2, DSPIF or COBBA.
+simulation of the analogue RF board. The optional standalone
+[SIP bridge](external_call_bridge.md#sip-call-bridge) attaches beyond the host
+call adapter; physical 3210 incoming/outgoing HLE gates verify its signaling
+and media transport, not native DSP speech. SIP policy and wall-clock media
+remain outside MAD2, DSPIF and COBBA. An external GSM backend must preserve
+the same boundary.
 
 ## Upstream series
 

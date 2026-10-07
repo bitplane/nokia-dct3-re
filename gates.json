@@ -13055,17 +13055,30 @@
         "\t$(MAKE) --no-print-directory build JOBS=$(JOBS) ERASED_IDENTITY_SECURITY_CODE=12345; \\",
         "\t$(call prepare_host_run,$(RUN_DIR),noki3210,); \\",
         "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' NOKIA_DCT3_LUA_QUIET=1 \\",
-        "\t\tNOKIA_DCT3_POST_READY_KEYS='$(NOKI3210_OUTGOING_DIAL_KEYS)' \\",
+        "\t\tNOKIA_DCT3_POST_READY_KEYS='$(SIP_HANDSET_KEYS)' \\",
         "\t\tNOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \\",
         "\t\tNOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \\",
         "\t\tNOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \\",
-        "\t\t$(VENV)/bin/python tools/run_sip_handset_gate.py --pjsua '$(SIP_PJSUA_BIN)' --run-dir $(RUN_DIR) -- \\",
+        "\t\t$(VENV)/bin/python tools/run_sip_handset_gate.py $(SIP_HANDSET_RUNNER_ARGS) --pjsua '$(SIP_PJSUA_BIN)' --run-dir $(RUN_DIR) -- \\",
         "\t\t$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \\",
         "\t\tnoki3210 -rompath roms -log -video none -sound none -throttle \\",
         "\t\t-keyboardprovider none -mouseprovider none -lightgunprovider none -joystickprovider none -midiprovider none \\",
         "\t\t-skip_gameinfo -autoboot_script ../mame_nokia_dct3_input_exerciser.lua -verbose \\",
-        "\t\t-cfg_directory ../fixtures/radio_outgoing_host_adapter -http -http_port 18100 \\",
-        "\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45"
+        "\t\t-cfg_directory $(SIP_HANDSET_CONFIG) -http -http_port 18100 \\",
+        "\t\t-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run $(SIP_HANDSET_SECONDS)"
+      ]
+    },
+    {
+      "name": "verify-radio-incoming-call-sip",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48"
+        }
       ]
     }
   ]
