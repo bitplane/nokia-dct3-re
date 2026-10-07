@@ -42,13 +42,15 @@ public:
 		m_mcbsp0->tx_bit_cb().set([this](int state) { if (m_phase >= 51 && m_phase <= 53) m_external_bits.push_back(state); });
 		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
 		m_mcbsp0->tx_irq_cb().set([this](int state) { m_cpu->set_input_line(5, state); });
+		m_mcbsp0->rx_event_cb().set([this](int state) { m_dma->sync_w(1, state); });
+		m_mcbsp0->rx_irq_cb().set([this](int state) { if (state) ++m_rx_irqs; m_cpu->set_input_line(4, state); });
 		TLV320AIC23(config, "codec", 11'995'200);
 		subdevice<tlv320aic23_device>("codec")->bclk_cb().set([this](int state) {
-			if (m_phase >= 54) { m_codec_edges.push_back(state); if (state) ++m_codec_clocks; }
+			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(state); if (state) ++m_codec_clocks; }
 			else m_mcbsp0->tx_clock_w(state);
 		});
 		subdevice<tlv320aic23_device>("codec")->frame_cb().set([this](int state) {
-			if (m_phase >= 54) { m_codec_edges.push_back(2 + state); if (state) m_codec_frames.push_back(m_codec_clocks); }
+			if (m_phase >= 54 && m_phase <= 57) { m_codec_edges.push_back(2 + state); if (state) m_codec_frames.push_back(m_codec_clocks); }
 			else m_mcbsp0->tx_frame_w(state);
 		});
 		SAMSUNG_K9K1208U0A(config, m_nand);
@@ -65,14 +67,17 @@ private:
 	unsigned m_serial_tx_irqs = 0;
 	std::vector<u16> m_dma_output;
 	unsigned m_dma_completions = 0;
+	unsigned m_rx_dma_completions = 0, m_rx_irqs = 0;
 	void dma_complete(u8 channel)
 	{
-		if (channel != 3) fatalerror("MU4 unexpected DMA completion channel");
-		++m_dma_completions;
+		if (channel != 2 && channel != 3) fatalerror("MU4 unexpected DMA completion channel");
+		if (channel == 3) ++m_dma_completions;
+		else ++m_rx_dma_completions;
 		unsigned const selection = (m_dma->read(0) >> 6) & 3;
 		if (selection == 1 || selection == 2)
 		{
-			m_cpu->set_input_line(11, ASSERT_LINE); m_cpu->set_input_line(11, CLEAR_LINE);
+			unsigned const line = channel == 2 ? 10 : 11;
+			m_cpu->set_input_line(line, ASSERT_LINE); m_cpu->set_input_line(line, CLEAR_LINE);
 		}
 	}
 	unsigned m_stream_words = 0, m_stream_config_writes = 0;
@@ -84,6 +89,25 @@ private:
 	std::vector<int> m_external_bits;
 	bool m_external_checkpoint_pending = false;
 	void external_reg_w(u16 index, u16 value) { m_mcbsp0->control_w(0, index); m_mcbsp0->control_w(1, value); }
+	u16 receive_status() { m_mcbsp0->control_w(0, 0); return m_mcbsp0->control_r(1); }
+	void receive_setup(u16 rcr1, u16 rcr2, u16 pcr = 0, u16 spcr1 = 1)
+	{
+		external_reg_w(0, 0); external_reg_w(2, rcr1); external_reg_w(3, rcr2); external_reg_w(14, pcr);
+		m_mcbsp0->rx_clock_w(!BIT(pcr, 0)); m_mcbsp0->rx_frame_w(BIT(pcr, 2));
+		external_reg_w(0, spcr1);
+	}
+	void receive_bit(int bit, bool rising = false)
+	{
+		m_mcbsp0->rx_data_w(bit); m_mcbsp0->rx_clock_w(rising); m_mcbsp0->rx_clock_w(!rising);
+	}
+	void receive_word(u16 value, unsigned bits, unsigned delay = 0, bool inverted = false)
+	{
+		m_mcbsp0->rx_frame_w(!inverted);
+		for (unsigned i = 0; i < delay; ++i) receive_bit(0, inverted);
+		if (delay) m_mcbsp0->rx_frame_w(inverted);
+		for (unsigned i = bits; i-- > 0; ) { receive_bit(BIT(value, i), inverted); m_mcbsp0->rx_frame_w(inverted); }
+		receive_bit(0, inverted); // RBR -> DRR at the next sampling edge.
+	}
 	void external_clocks(unsigned count, bool inverted = true)
 	{
 		while (count--) { m_mcbsp0->tx_clock_w(!inverted); m_mcbsp0->tx_clock_w(inverted); }
@@ -255,6 +279,7 @@ private:
 		m_serial_tx_words.clear(); m_serial_tx_bits.clear();
 		m_serial_tx_irqs = 0;
 		m_dma_output.clear(); m_dma_completions = 0;
+		m_rx_dma_completions = m_rx_irqs = 0;
 		m_stream_words = m_stream_config_writes = 0;
 		m_external_words.clear(); m_external_bits.clear();
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -273,6 +298,16 @@ private:
 			auto &codec = *subdevice<tlv320aic23_device>("codec");
 			for (u16 word : { 0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023 }) codec.control_word_w(word);
 			m_codec_edges.clear(); m_codec_frames.clear(); m_codec_clocks = 0;
+		}
+		if (m_phase == 58 || m_phase == 59)
+		{
+			program.write_word(0x1800, 0xf4e1);
+			receive_setup(0x0140, 4);
+			if (m_phase == 59)
+			{
+				m_mcbsp0->rx_frame_w(1);
+				for (int bit = 15; bit >= 9; --bit) { receive_bit(BIT(0xa55a, bit)); m_mcbsp0->rx_frame_w(0); }
+			}
 		}
 		if (m_phase == 31)
 		{
@@ -489,7 +524,95 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
-		if (m_phase >= 54)
+		if (m_phase >= 58 && m_phase <= 65)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			if (m_phase == 58)
+			{
+				for (unsigned i = 0; i < 4; ++i) receive_bit(1);
+				if (receive_status() & 2) fatalerror("MU4 receive shifted without a frame");
+				m_mcbsp0->rx_frame_w(1);
+				for (int bit = 15; bit >= 0; --bit)
+				{
+					if (bit == 7) m_mcbsp0->rx_frame_w(1); // RFIG must ignore this early frame.
+					receive_bit(BIT(0xa55a, bit)); m_mcbsp0->rx_frame_w(0);
+				}
+				if (receive_status() & 2) fatalerror("MU4 receive ready before RBR handoff edge");
+				for (int bit = 15; bit >= 0; --bit) receive_bit(BIT(0x5aa5, bit));
+				if (!(receive_status() & 2)) fatalerror("MU4 receive first word never ready");
+				{ auto const disable = machine().disable_side_effects(); if (m_mcbsp0->data_r(1) != 0xa55a) fatalerror("MU4 receive peek mismatch"); }
+				if (!(receive_status() & 2) || m_mcbsp0->data_r(1) != 0xa55a || (receive_status() & 2)) fatalerror("MU4 DRR read readiness mismatch");
+				receive_bit(0);
+				if (!(receive_status() & 2) || m_mcbsp0->data_r(1) != 0x5aa5 || m_rx_irqs != 2) fatalerror("MU4 receive buffered second word mismatch");
+				m_phase = 59; machine().schedule_soft_reset(); return;
+			}
+			if (m_phase == 59)
+			{
+				if (!machine().scheduler().can_save() || (receive_status() & 2)) fatalerror("MU4 receive partial save is not quiescent");
+				m_saved_dma.str({}); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 receive save failed");
+				++m_phase; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 61)
+			{
+				if (!machine().scheduler().can_save()) fatalerror("MU4 receive restore has synchronized inputs pending");
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE || (receive_status() & 2)) fatalerror("MU4 receive restore mismatch");
+			}
+			if (m_phase == 60 || m_phase == 61)
+			{
+				for (int bit = 8; bit >= 0; --bit) receive_bit(BIT(0xa55a, bit));
+				receive_bit(0);
+				if (!(receive_status() & 2) || m_mcbsp0->data_r(1) != 0xa55a) fatalerror("MU4 receive pending bit replay mismatch");
+				++m_phase; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 62)
+			{
+				if (m_rx_irqs != 2 || !(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x10)) fatalerror("MU4 receive interrupt replay mismatch");
+				receive_setup(0, 5); receive_word(0xfa, 8, 1);
+				if (m_mcbsp0->data_r(1) != 0xfa) fatalerror("MU4 8-bit receive delay mismatch");
+				receive_setup(0x20, 6, 5, 0x2001); receive_word(0xabc, 12, 2, true);
+				if (m_mcbsp0->data_r(0) != 0xffff || m_mcbsp0->data_r(1) != 0xfabc) fatalerror("MU4 signed receive/polarity mismatch");
+				receive_setup(0x20, 4, 0, 0x4001); receive_word(0xabc, 12);
+				if (m_mcbsp0->data_r(0) || m_mcbsp0->data_r(1) != 0xabc0) fatalerror("MU4 left-justified receive mismatch");
+				m_mcbsp0->rx_frame_w(1); receive_bit(1); external_reg_w(0, 0);
+				for (unsigned i = 0; i < 32; ++i) receive_bit(1);
+				if (receive_status() & 2) fatalerror("MU4 receive reset did not cancel pending word");
+				logerror("mu4_mcbsp_receive: PASS edge_handoff=1 buffering=1 widths=8,12,16 delays=0,1,2 polarity=1 justification=1 peek=1 pending_restore=1 irq=1 reset=1\n");
+				receive_setup(0x140, 0x44, 0x000e);
+				data.write_word(0x6300, 0xffff); data.write_word(0x6340, 0xffff);
+				dma_reg_w(0xa, 0x21); dma_reg_w(0xb, 0x6300); dma_reg_w(0xc, 1);
+				dma_reg_w(0xd, 0x1000); dma_reg_w(0xe, 0xc055);
+				dma_reg_w(0x20, 0x40); dma_reg_w(0x22, 0xffc1);
+				dma_reg_w(0x2e, 0x21); dma_reg_w(0x2f, 0x6300); dma_reg_w(0x30, 1); dma_reg_w(0x31, 0x1000);
+				m_dma->write(0, 0x44);
+				m_phase = 63; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 63)
+			{
+				if (data.read_word(0x6300) != 0xffff || m_rx_dma_completions) fatalerror("MU4 receive DMA advanced without REVT0");
+				m_mcbsp0->rx_frame_w(0);
+				for (int bit = 15; bit >= 0; --bit) { receive_bit(BIT(0x1234, bit)); m_mcbsp0->rx_frame_w(1); }
+				receive_bit(BIT(0x5678, 15));
+				m_phase = 64; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 64)
+			{
+				if (data.read_word(0x6300) != 0x1234 || data.read_word(0x6340) != 0xffff || (receive_status() & 2) || m_rx_dma_completions)
+					fatalerror("MU4 receive DMA first-word/readiness mismatch");
+				for (int bit = 14; bit >= 0; --bit) receive_bit(BIT(0x5678, bit));
+				receive_bit(0);
+				m_phase = 65; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			if (data.read_word(0x6300) != 0x1234 || data.read_word(0x6340) != 0x5678 || m_rx_dma_completions != 1 ||
+				!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x400) || (receive_status() & 2) ||
+				dma_reg_r(0xb) != 0x6300 || dma_reg_r(0xc) != 1 || !(m_dma->read(0) & 4))
+				fatalerror("MU4 receive DMA completion/sort/reload/IRQ mismatch");
+			m_dma->write(0, 0);
+			logerror("mu4_mcbsp_receive_dma: PASS event=REVT0 channel=2 deferred=1 sorted=1 auto_reload=1 irq=10\n");
+			m_phase = 31; machine().schedule_soft_reset(); return;
+		}
+		if (m_phase >= 54 && m_phase <= 57)
 		{
 			auto &codec = *subdevice<tlv320aic23_device>("codec");
 			if (m_phase == 54)
@@ -527,7 +650,7 @@ private:
 			codec.control_word_w(0x1e00);
 			if (codec.reg(7) != 1 || codec.reg(9)) fatalerror("MU4 codec reset defaults mismatch");
 			logerror("mu4_codec_clock: PASS inactive=1 controls=1 bclk_mclk=1 frame_divider=272 pending_restore=1 reset=1\n");
-			m_phase = 31; machine_reset(); return;
+			m_phase = 58; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 31 && m_phase <= 37)
 		{

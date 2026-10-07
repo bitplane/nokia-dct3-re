@@ -17,7 +17,7 @@ The partial McBSP1 transmitter carries six original firmware control words.
 The default acceptance profile stops at serial setup. The separate `stream`
 profile uses those controls to activate a partial AIC23 master-clock source,
 then observes one 128-word McBSP0 TX block and DMA channel-3 completion.
-RX, codec conversion and sustained streaming are not validated.
+Original RX, codec conversion and sustained streaming are not validated.
 DMA/McBSP and codec clocks have isolated conformance
 and save/replay tests.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
@@ -1066,8 +1066,34 @@ The same run programs RX DMA channel 2: source McBSP0 DRR1 `0021`,
 destination `1980`, count `0001`, sync `103f`, mode `c055`, reload bank
 `2e..31` = `0021,1900,0001,103f`. This is the corresponding two-element,
 64-frame receive path with fixed peripheral source and sorted destination.
-McBSP receive shifting, RRDY/REVT0 and the channel-2 interrupt mux remain
-unimplemented; TX clock generation alone is not full-duplex acceptance.
+The generic controller now implements external single-phase 8/12/16-bit receive
+through separate `rx_data_w`, `rx_clock_w` and `rx_frame_w` inputs. FSR is detected
+on the configured sampling edge, not immediately on a pin write. SPRU302B
+2.3.5.1 requires RSR-to-RBR on the opposite edge, then RBR-to-DRR/RRDY on the
+following sampling edge. An unread DRR does not overwrite the next buffered
+word. DRR1 reads clear RRDY/REVT; debugger peeks do not. RRST cancels pending
+shift/buffer state. RJUST selects zero fill, sign extension or left justification.
+RINT mode zero pulses on receive readiness; REVT is a separate saved level.
+
+Pin fixtures verify frame gating, ignored early frames, handoff edges, two-word
+buffering, widths, zero/one/two-bit delays, both clock/frame polarities,
+justification, nondestructive peeks, reset, CPU RINT0 and exact partial-word
+save/replay after synchronized inputs drain. A composition fixture uses the
+original RCR `0140/0044` and PCR `000e`, delivers two known pin-level words
+through DRR1/REVT0 to channel 2, and checks deferred sorted destination writes,
+readiness clearance, per-channel auto-reload and INTOSEL-1 IRQ10. It uses one
+two-word frame, not the original 64-frame receive block. It does not inject a
+receive register, readiness event or firmware buffer.
+
+RX registers, pin levels, partial shifts and buffering are saved. Dual phase,
+words wider than 16 bits, companding, loopback/SPI/A-bis receive, nonzero RINTM,
+overrun and unexpected-frame recovery, active format changes, internal receive
+clocks and reset-activation timing remain unsupported or unvalidated. Unsupported
+active data formats and overrun/recovery fail explicitly.
+
+The native stream deliberately does not connect an invented codec ADC bitstream.
+Its actual receive block, codec DOUT timing/conversion and full-duplex execution
+remain the next boundary; TX acceptance alone does not promote them.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
