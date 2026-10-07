@@ -4,6 +4,8 @@ from tools.noki8890_incoming_sms_check import verify as verify_incoming
 from tools.noki8890_outgoing_sms_check import verify as verify_outgoing
 from tools.noki8890_outgoing_sms_check import check_recovery
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from PIL import Image
 from tools.test_noki8850_sms_check import FRESH, storage
 from tools.test_noki8850_outgoing_sms_check import GOOD
 from tools.test_noki8890_registration_check import PCS_LOG
@@ -19,6 +21,25 @@ class Nokia8890SmsTest(unittest.TestCase):
     def test_recovery_requires_physical_navigation(self):
         with self.assertRaisesRegex(ValueError, 'physical recovery'):
             check_recovery(OUTGOING, Path('missing'))
+
+    def test_recovery_rejects_blank_presentation(self):
+        text = ('LAPDm service Channel Release acknowledged\n'
+                '8890_sms_recovery_physical: key=End\n'
+                '8890_keypad_decoded: key=0f\n'
+                '8890_sms_recovery_physical: key=Menu\n'
+                '8890_keypad_decoded: key=19\n')
+        with TemporaryDirectory() as directory:
+            frames = Path(directory)
+            Image.new('L', (84, 48)).save(frames / '8890_sms_reject_1.png')
+            with self.assertRaisesRegex(ValueError, 'message-not-sent'):
+                check_recovery(text, frames)
+
+    def test_pcs_rejection_requires_own_registration(self):
+        rejected = OUTGOING.replace('kind=18', 'kind=19').replace(
+            'message=01 length=5', 'message=01 length=7')
+        verify_outgoing(PCS_LOG + '\n' + rejected, rejected=True, pcs1900=True)
+        with self.assertRaisesRegex(ValueError, 'candidate window'):
+            verify_outgoing(rejected, rejected=True, pcs1900=True)
 
     def test_rejected_outgoing(self):
         verify_outgoing(OUTGOING.replace('kind=18', 'kind=19').replace(

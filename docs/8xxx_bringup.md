@@ -1112,7 +1112,7 @@ The latter requires independent PCS acquisition before accepting its transport
 lifecycle. This establishes a software host decision boundary, not SMS delivery
 to a real subscriber or a native DSP radio backend.
 
-Explicit host RP rejection is separately verified on GSM900. Use the same
+Explicit host RP rejection is independently verified on GSM900 and PCS1900. Use the same
 host-enabled configuration and expected `A` payload, add `--decision rp_error`
 to the runner and use `tools/noki8890_sms_reject_input.lua` for 52 seconds.
 The handset receives RP-ERROR, sends CP-ACK, releases the channel and resumes
@@ -1125,9 +1125,12 @@ open `Mitteilungen`. Require:
   --recovery-frames RUN/snap RUN/error.log
 ```
 
-This checks exact physical submission, rejection signaling, reviewed failure
-text and post-release input/menu recovery. It does not inherit PCS rejection,
-silent-peer timeout/retry or external-SMSC failure acceptance.
+For PCS1900 use the PCS host configuration and add `--pcs1900` to the checker;
+the independent fresh run passes the same reviewed text and recovery checks
+after its strict carrier/band registration. This checks exact physical
+submission, rejection signaling, reviewed failure text and post-release
+input/menu recovery. It does not establish silent-peer timeout/retry or
+external-SMSC failure acceptance.
 
 Fresh strict-topology runs also complete incoming and outgoing call
 signaling and incoming/outgoing SMS. The network's existing assignment
