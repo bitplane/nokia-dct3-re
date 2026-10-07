@@ -15,7 +15,7 @@ class mu4_storage_test_state : public driver_device
 {
 public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
-				: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_dma(*this, "dma"), m_mcbsp(*this, "mcbsp1"), m_program_ram(*this, "program_ram"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
+				: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_dma(*this, "dma"), m_mcbsp(*this, "mcbsp1"), m_program_ram(*this, "program_ram"), m_dma_sink(*this, "dma_sink"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
 		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers"),
 		  m_disk_vectors(*this, "disk_vectors"), m_segment(*this, "segment") { }
 	void test(machine_config &config)
@@ -30,6 +30,7 @@ public:
 		TMS320C54X_DMA(config, m_dma, 13'000'000);
 		m_dma->set_cpu(m_cpu);
 		m_dma->set_per_channel_reload(true);
+		m_dma->completion_cb().set(FUNC(mu4_storage_test_state::dma_complete));
 		TMS320C54X_MCBSP(config, m_mcbsp, 13'000'000);
 		m_mcbsp->tx_word_cb().set(FUNC(mu4_storage_test_state::serial_tx));
 		m_mcbsp->tx_bit_cb().set(FUNC(mu4_storage_test_state::serial_tx_bit));
@@ -45,6 +46,12 @@ private:
 	std::vector<int> m_serial_tx_bits;
 	unsigned m_serial_saved_bits = 0;
 	unsigned m_serial_tx_irqs = 0;
+	std::vector<u16> m_dma_output;
+	unsigned m_dma_completions = 0;
+	void dma_complete(u8 channel) { if (channel != 3) fatalerror("MU4 unexpected DMA completion channel"); ++m_dma_completions; }
+	void dma_output_w(u16 value) { m_dma_sink[0] = value; if (m_phase >= 38 && m_phase <= 48) m_dma_output.push_back(value); }
+	void dma_reg_w(u16 index, u16 value) { m_dma->write(1, index); m_dma->write(3, value); }
+	u16 dma_reg_r(u16 index) { m_dma->write(1, index); return m_dma->read(3); }
 	// VC5410A IFR bit 11 is XINT1; its priority rank 14 is not a bit index.
 	void serial_tx_irq(int value) { if (value) ++m_serial_tx_irqs; m_cpu->set_input_line(11, value); }
 	void serial_tx_bit(int value) { if (m_phase >= 31 && m_phase <= 37) m_serial_tx_bits.push_back(value); }
@@ -59,6 +66,7 @@ private:
 		if (m_phase == 30 && m_serial_tx_words.size() == 6) m_check->adjust(attotime::zero);
 	}
 	required_shared_ptr<u16> m_program_ram;
+	required_shared_ptr<u16> m_dma_sink;
 	required_device<samsung_k9k1208u0a_device> m_nand;
 	required_region_ptr<u16> m_cinit;
 	required_region_ptr<u16> m_initdisk, m_disk_cinit, m_disk_helpers, m_disk_vectors;
@@ -104,6 +112,7 @@ private:
 		map(0x0040, 0x0043).rw(m_mcbsp, FUNC(tms320c54x_mcbsp_device::data_r), FUNC(tms320c54x_mcbsp_device::data_w));
 		map(0x0048, 0x0049).rw(m_mcbsp, FUNC(tms320c54x_mcbsp_device::control_r), FUNC(tms320c54x_mcbsp_device::control_w));
 		map(0x0054, 0x0057).r(m_dma, FUNC(tms320c54x_dma_device::read)).w(FUNC(mu4_storage_test_state::dma_w));
+		map(0x6200, 0x6200).ram().w(FUNC(mu4_storage_test_state::dma_output_w)).share("dma_sink");
 	}
 	void dma_w(offs_t offset, u16 value)
 	{
@@ -191,6 +200,7 @@ private:
 		m_writes.clear();
 		m_serial_tx_words.clear(); m_serial_tx_bits.clear();
 		m_serial_tx_irqs = 0;
+		m_dma_output.clear(); m_dma_completions = 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		// Synthetic wrapper initializes the routine ABI, then calls untouched code.
 		u16 const wrapper[] = {
@@ -211,6 +221,19 @@ private:
 			if ((mcbsp_status() & 7) != 3) fatalerror("MU4 McBSP reset-release readiness mismatch");
 			m_mcbsp->data_w(3, 0xa55a);
 			if (mcbsp_status() & 2) fatalerror("MU4 McBSP DXR write did not clear readiness");
+		}
+		if (m_phase == 38 || m_phase == 44)
+		{
+			program.write_word(0x1800, 0xf4e1);
+			auto &data = m_cpu->space(AS_DATA);
+			data.write_word(0x6000, 0x1234); data.write_word(0x6040, 0x5678);
+			data.write_word(0x6001, 0xabcd); data.write_word(0x6041, 0x9abc);
+			dma_reg_w(0x0f, 0x6000); dma_reg_w(0x10, 0x6200); dma_reg_w(0x11, 1);
+			dma_reg_w(0x12, 0x2001); dma_reg_w(0x13, m_phase == 44 ? 0x6541 : 0xc541);
+			dma_reg_w(0x20, 0x40); dma_reg_w(0x22, 0xffc1);
+			dma_reg_w(0x32, 0x6000); dma_reg_w(0x33, 0x6200);
+			dma_reg_w(0x34, 1); dma_reg_w(0x35, 0x2001);
+			m_dma->write(0, 8);
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
@@ -441,7 +464,59 @@ private:
 			if (m_serial_tx_irqs != 8) fatalerror("MU4 McBSP short-word interrupt mismatch");
 			m_saved_dma.str(std::string());
 			logerror("mu4_mcbsp_conformance: PASS reset_ready=1 busy=1 external_stall=1 bit_order=1 pending_restore=1 cancel=1 widths=8,12,16 tx_irqs=8\n");
-			m_phase = 25; machine().schedule_soft_reset(); return;
+			m_phase = 38; machine().schedule_soft_reset(); return;
+		}
+		if (m_phase >= 38 && m_phase <= 43)
+		{
+			if (m_phase == 38)
+			{
+				if (!m_dma_output.empty() || m_dma->read(0) != 8) fatalerror("MU4 synchronized DMA advanced without event");
+				m_dma->sync_event(3);
+				if (!m_dma_output.empty()) fatalerror("MU4 mismatched DMA event advanced transfer");
+				m_dma->sync_event(2);
+				if (!m_dma_output.empty()) fatalerror("MU4 synchronized DMA completed synchronously");
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 synchronized DMA save failed");
+			}
+			else if (m_phase <= 42)
+			{
+				unsigned const words = m_phase - 38;
+				std::vector<u16> const expected = {0x1234, 0x5678, 0xabcd, 0x9abc};
+				if (m_dma_output != std::vector<u16>(expected.begin(), expected.begin() + words))
+					fatalerror("MU4 synchronized DMA sorting mismatch step=%u", words);
+				if (m_dma_completions != (words == 4 ? 1U : 0U)) fatalerror("MU4 DMA block interrupt ordering mismatch");
+				if (words == 4)
+				{
+					if (m_dma->read(0) != 8 || dma_reg_r(0xf) != 0x6000 || dma_reg_r(0x10) != 0x6200 ||
+						dma_reg_r(0x11) != 1 || dma_reg_r(0x12) != 0x2001) fatalerror("MU4 DMA auto-reload mismatch");
+					m_saved_dma.clear(); m_saved_dma.seekg(0);
+					if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 synchronized DMA restore failed");
+					m_dma_output.clear(); m_dma_completions = 0;
+				}
+				else m_dma->sync_event(2);
+			}
+			else
+			{
+				if (m_dma_output != std::vector<u16>({0x1234}) || m_dma_completions || dma_reg_r(0xf) != 0x6040)
+					fatalerror("MU4 synchronized DMA pending replay mismatch");
+				m_dma->write(0, 0); m_saved_dma.str(std::string());
+				m_phase = 44; machine().schedule_soft_reset(); return;
+			}
+			++m_phase; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase >= 44 && m_phase <= 48)
+		{
+			unsigned const words = m_phase - 44;
+			std::vector<u16> const expected = {0x1234, 0x5678, 0xabcd, 0x9abc};
+			if (m_dma_output != std::vector<u16>(expected.begin(), expected.begin() + words) || m_dma_completions != words / 2)
+				fatalerror("MU4 DMA frame interrupt/transfer ordering mismatch step=%u", words);
+			if (words == 4)
+			{
+				if (m_dma->read(0) & 8) fatalerror("MU4 non-reloading DMA remains enabled");
+				logerror("mu4_dma_sync_conformance: PASS event_gate=1 sorting=1 multiframe=1 auto_reload=1 block_interrupt=1 frame_interrupt=1 no_reload=1 pending_restore=1\n");
+				m_phase = 25; machine().schedule_soft_reset(); return;
+			}
+			m_dma->sync_event(2); ++m_phase; m_check->adjust(attotime::from_usec(1)); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{

@@ -14,8 +14,9 @@ provisioning, receives all seven original R060 segments, reads back six
 complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
 `3538` then reaches the loaded entry and its page-2 common-window branch.
 The partial McBSP1 transmitter now carries six original firmware control
-words. The acceptance run stops at that observed serial-setup boundary;
-continuing reaches unsupported DMA channel 3 mode `c541`, sync `203f`.
+words. The acceptance run stops at that observed serial-setup boundary.
+The subsequent DMA channel-3 configuration is mapped and its transfer mechanics
+have isolated conformance tests; McBSP0 event/data attachment remains pending.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -937,8 +938,8 @@ The fixture's 13 MHz source is not a validated DA150 PLL configuration.
 
 Original MCUSI16 transmits `0c10 0818 0a01 0e53 1023 1201` without illegal
 instructions. The gate ends when the sixth word completes, not after a full
-startup interval. A longer run reaches the DMA device's explicit unsupported
-channel-3 mode `c541`, sync `203f` guard. Decode that streaming contract next;
+startup interval. The subsequent channel-3 mode `c541`, sync `203f` configuration
+selects a separate streaming port, described below;
 neither its endpoint nor music playback is established by these control words.
 
 ### Streaming DMA boundary
@@ -960,19 +961,29 @@ the final element. Initial source addresses therefore alternate
 VC5410A table 3-20 identifies exactly this per-channel bank; the frame reload
 has only eight writable bits, so its stored value is `003f`. DA150 therefore
 uses the extended per-channel reload layout for this path, not shared `24..27`.
-The guard stops at enable, so
-neither this first block nor its interrupt/reload behavior has executed yet.
-Next work requires event-driven DMA and a separately configured McBSP0 data
+The original-firmware stream has not yet executed through its endpoint.
+Next work requires a separately configured McBSP0 data
 transmitter; forwarding it into McBSP1 would conflate different ports.
 The VC5410A datasheet's IFR diagram puts XINT1 at bit 11; table 3-21's
 priority rank 14 is not an interrupt-bit number. The fixture uses bit 11.
 The DMA device now has an explicit per-channel reload configuration, selected
 by this fixture. Conformance checks all six reload banks, eight-bit frame masks,
-reserved `28/29`, indexed access and extended-bank save/restore. Register storage
-does not yet implement auto-initialization or the channel-enable extension.
+reserved `28/29`, indexed access and extended-bank save/restore. The
+channel-enable extension remains unsupported.
 At captured DMPREC `4848`, INTOSEL is 1; VC5410A table 3-16 assigns IFR
 bit 11 to DMA channel 3 rather than XINT1. Streaming work must model that
 interrupt mux, not let the two devices independently drive the same CPU line.
+
+The DMA device now accepts single-word multiframe transfers, all nonreserved
+sorting/index modes, shared or per-channel auto-reload, and block/frame completion
+callbacks. Each selected sync event schedules one element after the assumed
+two-clock bus delay; mismatched events do nothing. A synchronized channel does
+not advance merely because DE is set. Isolated tests verify a two-frame sorted
+stream, exact completion order, reload, non-reloading DE clearance and pending
+save/replay. Completion callbacks identify the channel; the surrounding ASIC
+owns the CPU interrupt mux. ABU, double-word transfers and overlapping sync/bus
+arbitration still fail explicitly. These tests do not prove original streaming,
+physical clock/arbitration timing, codec operation or playback.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
