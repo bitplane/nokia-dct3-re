@@ -1,8 +1,10 @@
 """Verify NSM-3 incoming paging, physical Answer/End and release."""
 import argparse
+import hashlib
 from pathlib import Path
 import re
 import sys
+from PIL import Image
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -46,9 +48,25 @@ def verify(text):
         require_count(text, pattern, 1, f'exactly one {label}')
 
 
+def check_frames(directory):
+    def digest(name, crop):
+        with Image.open(directory / name) as source:
+            if source.size != (84, 48):
+                raise ValueError('unexpected handset frame geometry')
+            return hashlib.sha256(source.convert('L').crop(crop).tobytes()).hexdigest()
+    # Static caller text: exclude icons and softkey rows.
+    if digest('8210_incoming_ringing.png', (0, 8, 84, 32)) != (
+            'cf1063a9a4b3d131613ffc53861064245cf734f82bbc2387f598912007eb5180'):
+        raise ValueError('missing reviewed caller 5551234')
+    if digest('8210_after_incoming_call.png', (15, 0, 69, 16)) != (
+            '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'):
+        raise ValueError('missing reviewed registered idle after release')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
+    parser.add_argument('--frames', type=Path)
     args = parser.parse_args()
     try:
         with args.log.open(errors='replace') as stream:
@@ -56,6 +74,8 @@ if __name__ == '__main__':
                            'RX enqueue' in line or '8210_incoming_physical' in line or
                            '8210_keypad_decoded' in line or '[LUA ERROR]' in line)
         verify(text)
+        if args.frames:
+            check_frames(args.frames)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 incoming FAIL: {error}\n')
     print('8210 incoming physical Answer/End and CC/RR signaling PASS; speech unproved')

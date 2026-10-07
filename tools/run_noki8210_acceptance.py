@@ -22,6 +22,7 @@ SCENARIOS = {
     'idle-state': ('state_idle', 40, 'state_check'),
     'call-state': ('state_call', 50, 'state_check'),
     'sms-state': ('state_sms', 32, 'state_check'),
+    'host-incoming-call': ('host_incoming_input', 60, 'incoming_call_check'),
 }
 
 
@@ -47,6 +48,7 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--scenario', choices=SCENARIOS, default='registration')
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--port', type=int, default=18991)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -55,6 +57,7 @@ def main():
         pmm = (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes()
         prepare_run(run, mcu, pmm)
         config = {'incoming-call': 'radio_incoming_call_answered',
+                  'host-incoming-call': 'noki8210_host',
                   'incoming-sms': 'radio_incoming_sms',
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
         if config:
@@ -69,10 +72,21 @@ def main():
         def execute(cmd, output):
             with (run / output).open('w') as console:
                 subprocess.run(cmd, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
-        execute(command, 'console.log')
+        host_command = None
+        if args.scenario == 'host-incoming-call':
+            command.extend(['-http', '-http_port', str(args.port)])
+            host_command = [sys.executable, str(root / 'tools/run_host_incoming_signaling_gate.py'),
+                            '--port', str(args.port), '--caller', '5551234',
+                            '--cwd', str(run), '--ready-file',
+                            str(run / 'snap/8210_host_registered_idle.png'), '--'] + command
+            execute(host_command, 'console.log')
+        else:
+            execute(command, 'console.log')
         check = [sys.executable, str(root / f'tools/noki8210_{checker}.py'), str(run / 'error.log')]
         storage = str(run / 'nvram/nsm3hle/sim_card')
-        if args.scenario == 'phonebook':
+        if args.scenario == 'host-incoming-call':
+            check.extend(['--frames', str(run / 'snap')])
+        elif args.scenario == 'phonebook':
             shutil.copyfile(run / 'error.log', run / 'write.log')
             cold = command.copy()
             cold[cold.index('-autoboot_script') + 1] = str(root / 'tools/noki8210_phonebook_read.lua')
@@ -101,6 +115,7 @@ def main():
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
             'command': command,
+            'host_command': host_command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f'8210 acceptance FAIL: {error}\n')

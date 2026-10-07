@@ -4,7 +4,11 @@ _G.noki8210_security_only = true
 dofile(assert(source:match('^(.*[/])')) .. 'noki8210_security_input.lua')
 local machine = manager.machine
 local input = coroutine.create(function()
-    if not emu.wait(24) then return end
+    if _G.noki8210_host_incoming then
+        if not emu.wait(32) then return end
+        machine.screens[':screen']:snapshot('8210_host_registered_idle.png')
+        if not emu.wait(6) then return end
+    elseif not emu.wait(24) then return end
     machine.screens[':screen']:snapshot('8210_incoming_ringing.png')
     for index, name in ipairs({'Call / Send', 'End'}) do
         local key = assert(machine.ioport.ports[':COL.0'].fields[name])

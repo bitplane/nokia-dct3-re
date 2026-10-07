@@ -331,7 +331,7 @@ Run any focused scenario from a new directory:
 
 Available scenarios are `registration`, `incoming-call`, `outgoing-call`,
 `incoming-sms`, `outgoing-sms`, `calculator`, `phonebook`, `idle-state` and
-`call-state` and `sms-state`. Each seeds
+`call-state`, `sms-state` and `host-incoming-call`. Each seeds
 only the unchanged acquired base-record snapshot into a fresh persistent
 flash image. Incoming events use copied external network configuration;
 all UI interaction uses physical key fields. `phonebook` executes save
@@ -383,6 +383,18 @@ restore. Run `run_noki8210_acceptance.py RUN --scenario sms-state`, or check
 the independently executed idle, active-call and delivered-message
 restoration set for the research composition; it does not prove save/load
 within an unfinished SMS transaction or native DSP runtime.
+
+`host-incoming-call` uses `fixtures/noki8210_host/nsm3hle.cfg`, which enables
+only the host adapter, not automatic incoming calls. The physical startup
+fixture produces registered idle at 32 seconds; only then does
+`run_host_incoming_signaling_gate.py` queue caller `5551234`. Physical Send
+and End complete the own NSM-3 CC/RR lifecycle. The runner requires matching
+epoch/request identity and all five host phases; handset acceptance also
+requires reviewed caller and post-release `DCT3 LAB` pixels. Run from a new
+directory with `run_noki8210_acceptance.py RUN --scenario host-incoming-call`
+(`--port` selects the private HTTP endpoint). The manifest records both MAME
+and host runner commands. This proves external host signaling through the
+research composition, not native speech or external-network calls.
 
 The shared observer retains staged-DSP/self-test, decoded-key and readiness
 acceptance records only. PMM copy/cache dump, column-mask and input-lifecycle
