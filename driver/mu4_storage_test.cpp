@@ -118,6 +118,9 @@ private:
 	unsigned m_native_cache_traces[6] = {};
 	unsigned m_native_startup_subcall_traces = 0;
 	unsigned m_native_startup_return_traces = 0;
+	unsigned m_native_consumer_state_traces = 0;
+	unsigned m_native_consumer_paths[6] = {};
+	unsigned m_native_consumer_mode_writes = 0;
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
 	unsigned m_native_allocation_call_traces = 0;
@@ -460,6 +463,8 @@ private:
 		std::fill(std::begin(m_native_cache_traces), std::end(m_native_cache_traces), 0);
 		m_native_startup_subcall_traces = 0;
 		m_native_startup_return_traces = 0;
+		m_native_consumer_state_traces = m_native_consumer_mode_writes = 0;
+		std::fill(std::begin(m_native_consumer_paths), std::end(m_native_consumer_paths), 0);
 		m_native_settings_call_traces = 0;
 		m_native_metadata_call_traces = 0;
 		m_native_allocation_call_traces = 0;
@@ -1249,7 +1254,32 @@ private:
 				[this](offs_t, u16 &, u16)
 				{
 					if (m_phase == 30 && !machine().side_effects_disabled() &&
-						m_cpu->state_int(STATE_GENPC) == 0x029546) ++m_native_stream_consumer_entries;
+						m_cpu->state_int(STATE_GENPC) == 0x029546)
+					{
+						++m_native_stream_consumer_entries;
+						if (m_native_consumer_state_traces++ < 8)
+						{
+							auto const disable = machine().disable_side_effects();
+							auto &data = m_cpu->space(AS_DATA);
+							logerror("mu4_native_consumer_state: mode_bb80=%04x flag94de=%04x flag0062=%04x phase_bb86=%04x phase_bb91=%04x b66d=%04x b64e=%04x count_b650=%04x,%04x\n",
+								data.read_word(0xbb80), data.read_word(0x94de), data.read_word(0x62), data.read_word(0xbb86),
+								data.read_word(0xbb91), data.read_word(0xb66d), data.read_word(0xb64e), data.read_word(0xb650), data.read_word(0xb651));
+						}
+					}
+				});
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x2954f, 0x2963f, "mu4_native_consumer_paths",
+				[this](offs_t address, u16 &, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled() || m_cpu->state_int(STATE_GENPC) != address + 1) return;
+					static constexpr offs_t points[] = {0x2954f, 0x29553, 0x29557, 0x29559, 0x295b2, 0x2963f};
+					for (unsigned i = 0; i < std::size(points); ++i)
+						if (address == points[i]) ++m_native_consumer_paths[i];
+				});
+			m_cpu->space(AS_DATA).install_write_tap(0xbb80, 0xbb80, "mu4_native_consumer_mode",
+				[this](offs_t, u16 &value, u16)
+				{
+					if (m_phase == 30 && !machine().side_effects_disabled() && m_native_consumer_mode_writes++ < 16)
+						logerror("mu4_native_consumer_mode: value=%04x pc=%06x\n", value, unsigned(m_cpu->state_int(STATE_GENPC)));
 				});
 			m_cpu->space(AS_DATA).install_write_tap(0xb633, 0xb633, "mu4_native_stream_pending_write",
 				[this](offs_t, u16 &value, u16)
@@ -1595,6 +1625,9 @@ private:
 			}
 			logerror("mu4_native_stream_pending_counts: sets=%u clears=%u reads=%u final=%04x\n",
 				m_native_stream_pending_sets, m_native_stream_pending_clears, m_native_stream_pending_reads, pending);
+			logerror("mu4_native_consumer_path_counts: mode_gate=%u flag94de_gate=%u flag0062_gate=%u transfer_entry=%u mode1_test=%u transfer_exit=%u mode_writes=%u\n",
+				m_native_consumer_paths[0], m_native_consumer_paths[1], m_native_consumer_paths[2], m_native_consumer_paths[3],
+				m_native_consumer_paths[4], m_native_consumer_paths[5], m_native_consumer_mode_writes);
 			if (system_bios() >= 4)
 			{
 				{

@@ -209,6 +209,25 @@ def extract_section(image, address, marker=None):
     return data
 
 
+def extract_program_range(image, start, end, marker, little_endian=False):
+    """Reassemble logical uploaded words in record order; never infer aliases or fill gaps."""
+    if not 0x10000 <= start < end <= 0x800000:
+        raise ValueError('program range must be nonempty extended word addresses')
+    payload = extract_segment(image, marker)[6:-4]
+    words = {}
+    for section in section_inventory(payload)['sections']:
+        address = section['destination_word_address']
+        offset = section['offset'] + 6
+        for index, (word,) in enumerate(struct.iter_unpack('>H', payload[offset:offset + section['words'] * 2])):
+            target = address + index
+            if start <= target < end:
+                words[target] = word
+    if len(words) != end - start:
+        raise ValueError('program range contains missing words')
+    return struct.pack(('<' if little_endian else '>') + f'{end - start}H',
+                       *(words[address] for address in range(start, end)))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
@@ -220,7 +239,27 @@ def main():
     parser.add_argument('--extract-segment', action='store_true', help='export exact original wire segment')
     parser.add_argument('--extract-container', action='store_true', help='export decoded original segment container')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--extract-program-range', nargs=2, type=lambda value: int(value, 0),
+                        metavar=('START', 'END'), help='reassemble extended word range, end exclusive, last record wins')
+    parser.add_argument('--disassembler-little-endian', action='store_true',
+                        help='encode a reconstructed range for little-endian disassemblers, not an original wire export')
     args = parser.parse_args()
+    if args.extract_program_range is not None:
+        if not args.segment or not args.output or args.extract_section is not None or args.extract_segment or args.extract_container or args.cinit_section is not None:
+            parser.error('--extract-program-range requires --segment/--output and excludes other exports')
+        try:
+            image = bytes.fromhex(args.image.read_text(encoding='ascii'))
+            data = extract_program_range(image, *args.extract_program_range, args.segment, args.disassembler_little_endian)
+            with args.output.open('xb') as output:
+                output.write(data)
+            print(json.dumps({'range_word_addresses': args.extract_program_range, 'bytes': len(data),
+                              'encoding': 'little-endian' if args.disassembler_little_endian else 'big-endian',
+                              'sha256': hashlib.sha256(data).hexdigest(), 'scope': 'logical final record writes, no physical alias inference'}))
+            return
+        except (OSError, ValueError) as error:
+            parser.exit(1, f'{error}\n')
+    if args.disassembler_little_endian:
+        parser.error('--disassembler-little-endian requires --extract-program-range')
     if args.extract_container and (args.segment is not None or args.extract_segment or args.extract_section is not None or args.cinit_section is not None):
         parser.error('--extract-container excludes segment and section operations')
     if args.extract_segment and (args.segment is None or args.extract_section is not None or args.cinit_section is not None):

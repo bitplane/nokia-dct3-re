@@ -26,7 +26,7 @@ and save/replay tests.
 The `startup` profile passes its 20-second window with zero illegal
 instructions and an active original streaming consumer. It observes 1,739
 consumer entries/notification reads and 1,740 clears. The open boundary is
-the consumer's host-command/data contract and independently verified output,
+the consumer's software-command/data contract and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
 claimed; only the initial 1,024 DIN words are independently compared.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
@@ -1353,6 +1353,48 @@ branches to `02:9a32`. This software invocation is not proof of a physical
 host transaction. The next acceptance contract must identify the original
 consumer's command/data inputs and verify its output beyond the initial DIN
 prefix; traffic volume alone is not audio correctness.
+
+### Streaming worker mode and software dispatch
+
+Passive instruction-boundary probes in the unchanged 20-second `startup`
+fixture record 1,739 visits to the mode gate at `02:954f`, zero visits to
+the subsequent flag gates (`9553`, `9557`) and zero visits to the buffer
+processing entry (`9559`). The sole observed `bb80` write is initialization
+to zero at `02:9099` (post-store PC `02909c`). All eight bounded entry
+snapshots show `bb80=0`, `94de=0` and `0062=0`. The worker therefore services
+notifications without performing its gated buffer-processing work; this is
+not music playback. The static branch skips processing when `bb80==0`,
+`94de!=0` or `0062!=0`, then clears `b633` at `02:9641`.
+
+The final `aa22` section stream contains 48,261 unique extended program
+words. A literal `bb80` census finds 17 matches, including eight clear
+immediate-store candidates; this does not close dynamic or DP-relative
+writers. The independently disassembled software dispatcher `03:acf2`
+calls queue helper `03:9f5e` with destination `b9d2`, then dispatches the
+selector at `b9d4`. Its program tables are `02:40f5` (selectors 41--60)
+and `02:4109` (64--73). The latter selects these processing branches:
+
+| Selector | Branch | Mode contract |
+|---|---|---|
+| `0x40` | `03:afcd` | Writes `bb80=1` at `afe2`, clears six paired counters and the RX buffers, then waits on `b64e` before its response and cleanup. |
+| `0x42` | `03:af98` | Initializes `b66d/b66b/b66c/b64e` and writes `bb80=3` at `afbf`. |
+| `0x43` | `03:aee8` | Parameter `b9d5=2` selects `bb80=2` at `af79`; parameter 4 selects cleanup ending with `bb80=0` at `b05e`. |
+
+These are numeric software selectors, not established public command names
+or physical HPI packets. Queue helper `03:9f5e` checks state `165d` and
+indices `1659/165a`, calls `03:9bc2` with selector 2 to fill the supplied
+buffer, and returns `0ff0` or `0ff2`. Recover that queue's producer and
+framing before introducing external commands. The separately mapped
+software `INTR 25` handler uses `02:a15b/a16d`; equivalence between those
+helpers and this queue is not established. No mode, queue, callback or
+command memory is injected by this fixture.
+
+`noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
+reconstructs final logical words in record order (last write wins), rejects
+holes and verifies the selected wire checksum. Optional
+`--disassembler-little-endian` exports GNU tic54x disassembly input, not
+wire bytes or inferred physical aliases. Unit tests cover overlap, byte
+order, holes, range rejection and checksum corruption.
 
 McBSP error recovery is modeled for the supported externally framed,
 single-phase 8/12/16-bit modes. SPRU302B section 2.3.7.4 specifies that TX

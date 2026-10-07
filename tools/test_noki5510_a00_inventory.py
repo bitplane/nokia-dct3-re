@@ -1,6 +1,6 @@
 import struct
 import unittest
-from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, extract_segment, cinit_inventory
+from tools.noki5510_a00_inventory import inventory, serial_boot_inventory, section_inventory, extract_section, extract_segment, cinit_inventory, extract_program_range
 
 
 def segment(marker, payload):
@@ -8,6 +8,20 @@ def segment(marker, payload):
 
 
 class A00InventoryTest(unittest.TestCase):
+    def test_program_range_preserves_final_writes_and_explicit_byte_order(self):
+        payload = struct.pack('>12H', 3, 2, 0x9540, 0x1122, 0x3344, 0x5566, 2, 2, 0x9541, 0x7788, 0x99aa, 0)
+        checksum = 0
+        for byte in payload:
+            checksum ^= byte
+        image = segment(0xaa55, self.boot_image()) + struct.pack('>HI', 0xaa22, len(payload)) + payload + struct.pack('>HH', checksum, 0x8888)
+        self.assertEqual(extract_program_range(image, 0x29540, 0x29543, 'aa22'), bytes.fromhex('1122778899aa'))
+        self.assertEqual(extract_program_range(image, 0x29540, 0x29543, 'aa22', True), bytes.fromhex('22118877aa99'))
+        with self.assertRaisesRegex(ValueError, 'missing'):
+            extract_program_range(image, 0x29540, 0x29544, 'aa22')
+        with self.assertRaisesRegex(ValueError, 'nonempty'):
+            extract_program_range(image, 0x9540, 0x9543, 'aa22')
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            extract_program_range(image[:-4] + b'\x12\x34\x88\x88', 0x29540, 0x29543, 'aa22')
     def test_receiver_checksum_is_payload_only_and_export_preserves_trailer(self):
         payload = self.boot_image()
         checksum = 0
