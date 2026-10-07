@@ -11,6 +11,9 @@ incoming state id=1 epoch=1 phase=connected
 sip_state: saved
 sip_state: restored
 termination id=1 cause=41 result=accepted
+GSM service downlink kind=13 sapi=0 pd=03 message=25
+GSM service uplink sapi=0 pd=03 message=2a
+LAPDm service Channel Release acknowledged
 incoming state id=1 epoch=2 phase=ended
 '''
 BRIDGE = '''
@@ -22,16 +25,32 @@ REMOTE = 'state changed to CONFIRMED\nRequest msg BYE/\n'
 
 
 class SipRestoreCheckTest(unittest.TestCase):
-    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, phase='connected'):
+    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, phase='connected', product='3210'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log)
             (root / 'sip-bridge.log').write_text(bridge)
-            verify_restore(root, remote, phase)
-            self.assertTrue(json.loads((root / 'sip-result.json').read_text())['passed'])
+            verify_restore(root, remote, phase, product)
+            result = json.loads((root / 'sip-result.json').read_text())
+            self.assertTrue(result['passed'])
+            self.assertTrue(result['scope'].startswith(product + ' '))
 
     def test_connected_restore_clears_both_sides(self):
         self.check()
+        self.check(product='3310')
+
+    def test_end_flag_without_radio_release_is_rejected(self):
+        for checkpoint in ('GSM service downlink kind=13',
+                           'GSM service uplink sapi=0 pd=03 message=2a',
+                           'LAPDm service Channel Release acknowledged'):
+            with self.assertRaises(RuntimeError):
+                self.check(log=LOG.replace(checkpoint, 'missing'))
+
+    def test_duplicate_clear_or_rejected_repeat_is_rejected(self):
+        for extra in ('termination id=1 cause=41 result=accepted\n',
+                      'termination id=1 cause=41 result=rejected\n'):
+            with self.assertRaises(RuntimeError):
+                self.check(log=LOG + extra)
 
     def test_missing_external_clear_is_rejected(self):
         with self.assertRaises(RuntimeError):

@@ -124,7 +124,7 @@ async def run(args):
         verify_outgoing_restore(root, remote_text, args.sip_response == 200)
         return
     if args.restore_call:
-        verify_restore(root, remote_text, args.restore_phase)
+        verify_restore(root, remote_text, args.restore_phase, args.product)
         return
     if args.cancel_incoming:
         verify_cancel(root, remote_text)
@@ -302,7 +302,7 @@ def verify_outgoing_restore(root, remote_text, connected=False):
     print('OK - outgoing restoration cleared SIP and GSM without redial')
 
 
-def verify_restore(root, remote_text, phase='connected'):
+def verify_restore(root, remote_text, phase='connected', product='3210'):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
     if phase == 'connected':
@@ -322,18 +322,24 @@ def verify_restore(root, remote_text, phase='connected'):
             raise RuntimeError(f'missing SIP restoration checkpoint: {marker}')
     if bridge.count('SIP incoming identity=') != 1:
         raise RuntimeError('restoration replayed the incoming SIP dialog')
+    if (len(re.findall(r'termination id=1 cause=41 result=accepted', log)) != 1 or
+            re.search(r'termination id=1 .*result=rejected', log)):
+        raise RuntimeError('restoration did not clear the handset call exactly once')
     cursor = 0
     for pattern in (
             rf'incoming state id=1 epoch=1 phase={phase}',
             r'sip_state: saved', r'sip_state: restored',
             r'termination id=1 cause=41 result=accepted',
+            r'GSM service downlink kind=13 sapi=0 pd=03 message=25',
+            r'GSM service uplink sapi=0 pd=03 message=2a',
+            r'LAPDm service Channel Release acknowledged',
             r'incoming state id=1 epoch=2 phase=ended'):
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing handset restoration checkpoint: {pattern}')
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
-        'scope': f'3210 {phase} HLE SIP call save/load; external dialog cleared, not restored',
+        'scope': f'{product} {phase} HLE SIP call save/load; external dialog cleared, not restored',
         'passed': True}, indent=2) + '\n')
     print('OK - save/load cleared real SIP dialog and restored GSM call under new epoch')
 

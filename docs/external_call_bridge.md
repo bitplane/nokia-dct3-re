@@ -358,24 +358,28 @@ transaction race or cancellation before paging.
 
 ```sh
 make verify-radio-incoming-call-sip-restore RUN_DIR=run_3210_sip_restore
+make verify-3310-radio-incoming-call-sip-connected-restore RUN_DIR=run_3310_sip_restore
 ```
 
 The fixture physically answers an incoming SIP call, saves at 19 seconds and
 loads one second later. The checker requires that connection precede the save,
 the real external SIP dialog close with BYE, and the restored GSM transaction
-clear with cause 41 under epoch 2. External dialogs are not part of MAME save
+clear exactly once with cause 41 under epoch 2, ordered CC clearing and LAPDm
+release. An `ended` flag without that protocol closure is insufficient.
+External dialogs are not part of MAME save
 states and are never replayed. Codec state and uplink sequence tracking reset
 at the epoch boundary; media delivery remains disabled during restored-call
 clearing. Only the matching restored transaction's `ended` event releases that
 guard, not an unrelated completion message.
 
-This proves the connected incoming-call restoration boundary on the 3210 HLE
-profile, not native DSP speech, exact media continuity or all
+This proves the connected incoming-call restoration boundary on the 3210 and
+3310 HLE profiles, not native DSP speech, exact media continuity or all
 outgoing/alerting save-load races. The fixture's fixed save time is validated
 against the observed connected event rather than assumed to be connected.
 
 ```sh
 make verify-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3210_sip_alerting_restore
+make verify-3310-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3310_sip_alerting_restore
 ```
 
 The alerting variant omits physical Answer. Loading the ringing snapshot closes
@@ -383,6 +387,8 @@ the outstanding real SIP INVITE (observed PJSIP response: 603 Decline) and clear
 the restored GSM transaction with cause 41 under epoch 2. Its checker requires
 alerting before save and rejects any SIP confirmation, physical Answer or
 firmware CC CONNECT. This is distinct from the caller-driven CANCEL gate.
+Run all handset gates sequentially. Each product's fixture must independently
+reach the requested call phase before its fixed save time.
 
 ```sh
 make verify-radio-outgoing-call-sip-pending-restore RUN_DIR=run_3210_sip_pending_restore
