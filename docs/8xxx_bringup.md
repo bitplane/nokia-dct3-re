@@ -899,6 +899,25 @@ fresh runs pass, including the shared round-trip fixture after extraction.
 This remains signaling/UI save-state evidence, not native speech or SMS
 restoration, and is currently scoped to GSM900.
 
+Delivered SMS restoration is independently checked by
+`tools/noki8890_state_sms.lua` with a private copy of the ordinary incoming-SMS
+cfg, fresh cfg/NVRAM/state/snapshot directories, verbose logging and 36 seconds:
+
+```sh
+.venv/bin/python tools/noki8890_state_check.py --sms \
+  --storage RUN/nvram/nsb6hle/sim_card RUN/error.log RUN/snap
+```
+
+The save point at 19 seconds follows organic delivery and security input.
+CPU/RAM/time restore exactly, the nonempty one-second ordered protocol interval
+replays identically and reference/restored screen pixels match. Lua restarts
+only the physical read schedule on the restored timeline. The original SMS
+checker requires one page, exactly the delivery/read-status SIM writes,
+persistent read `hello` and reviewed body pixels after load. This proves
+delivered-message storage/UI restoration, not a save within an unfinished
+CP/RP transaction or inherited PCS1900 acceptance. No redelivery or SIM-record
+rewrite is used to recover the message.
+
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
 not the previously settled idle frame. Reproduce with
