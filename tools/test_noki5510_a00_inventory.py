@@ -8,6 +8,14 @@ def segment(marker, payload):
 
 
 class A00InventoryTest(unittest.TestCase):
+    def test_cinit_exposes_short_word_strings_without_decoding_long_payloads(self):
+        words = [ord(c) for c in 'MCUSI16 '] + [0]
+        image = struct.pack('>11H', 9, 0x1fd, *words) + struct.pack('>35H', 33, 0x200, *range(33)) + b'\0\0'
+        report = cinit_inventory(image)
+        self.assertEqual(report['records'][0]['values'], [f'{word:04x}' for word in words])
+        self.assertNotIn('values', report['records'][1])
+        self.assertEqual(report['coverage_bytes'], len(image))
+
     def test_cinit_accounts_for_records_and_zero_values(self):
         image = struct.pack('>8H', 2, 0x1700, 0xffff, 0xffff, 1, 0x1742, 0, 0)
         report = cinit_inventory(image)

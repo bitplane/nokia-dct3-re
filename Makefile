@@ -1025,13 +1025,16 @@ check-mu4-storage-original: build
 			--extract-section 0x2080 --output "$$tmp/roms/mu4nand/mu4_initdisk_cinit.bin"; \
 		$(PYTHON) tools/noki5510_a00_inventory.py roms/5510-mu4-reference/initdisk_R060.a00 \
 			--extract-section 0x4aa9 --output "$$tmp/roms/mu4nand/mu4_initdisk_helpers.bin"; \
+		$(PYTHON) tools/noki5510_a00_inventory.py roms/5510-mu4-reference/initdisk_R060.a00 \
+			--extract-section 0x80 --output "$$tmp/roms/mu4nand/mu4_initdisk_vectors.bin"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -rompath "$$tmp/roms" \
 			-video none -sound none -nothrottle -debugger none -log -nonvram_save \
 			-seconds_to_run 12 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; grep -q 'mu4_storage_original: PASS' error.log; \
 		grep -q 'mu4_storage_flush: PASS' error.log; grep -q 'mu4_storage_mount: PASS' error.log; \
 		grep -q 'mu4_storage_template: PASS' error.log; grep -q 'mu4_storage_format: PASS' error.log; \
-		grep -q 'mu4_initdisk_marker: PASS' error.log; grep -q 'mu4_initdisk_scan: PASS' error.log
+		grep -q 'mu4_initdisk_marker: PASS' error.log; grep -q 'mu4_initdisk_scan: PASS' error.log; \
+		grep -q 'mu4_initdisk_serial: PASS' error.log
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.

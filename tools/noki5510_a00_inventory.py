@@ -33,7 +33,7 @@ def cinit_inventory(image):
         payload = image[offset:offset + count * 2]
         record = {'offset': start, 'words': count, 'destination_data_word_address': destination,
                   'payload_sha256': hashlib.sha256(payload).hexdigest()}
-        if count <= 8:
+        if count <= 32:
             record['values'] = [f'{word:04x}' for word in struct.unpack(f'>{count}H', payload)]
         records.append(record)
         offset += count * 2

@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_initdisk_serial_ingress", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Original InitDisk 0080 vectors branch from 00d8 to ISR 2b03, which reads 0031. TI VC5410A mapping corroborates McBSP2 DRR1, indexed 0034/0035 and RINT2 bit 6. Isolated mu4nand executes original 346a initialization, delivers two word-level receive inputs with RRDY/interrupts, observes original ISR populate its own ring and original 34c0 consume 1234 with balanced SP. Serial clocks/framing/overrun/DMA and MCU forwarding remain unvalidated. Original 32dc maps nine segment markers to eight named file descriptors plus unnamed bbcc; successful provisioning/file-backed boot is not claimed",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile", "tools/noki5510_a00_inventory.py"]
+    },
+    {
       "id": "npm5_mu4_initdisk_scan_execution", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Isolated mu4nand near-calls unchanged InitDisk 36b9 with original C globals, context 068c and stack output pointers 2000/2100. Both original code records 256d and 4aa9 are loaded; helper 4aaf is required by metadata writeback. The call scans 4096 blocks, records the external block-zero bad marker, reports no bad reserved blocks, returns zero with balanced SP and leaves its 256-word bitmap byte-swapped by original writer 256d. The gate observes 156412 NAND reads and 37778 busy-pin reads. Missing 4aa9 explains prior wrapper re-entry, not a CPU loop defect. Full DA150 memory/timing, provisioning marker preservation, filesystem validity and serial host delivery remain unvalidated",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]

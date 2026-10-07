@@ -13,7 +13,8 @@ class mu4_storage_test_state : public driver_device
 public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
 		: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
-		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers") { }
+		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers"),
+		  m_disk_vectors(*this, "disk_vectors") { }
 	void test(machine_config &config)
 	{
 		// Test clock only; DA150 PLL/physical memory mapping is not claimed here.
@@ -30,7 +31,10 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	required_device<samsung_k9k1208u0a_device> m_nand;
 	required_region_ptr<u16> m_cinit;
-	required_region_ptr<u16> m_initdisk, m_disk_cinit, m_disk_helpers;
+	required_region_ptr<u16> m_initdisk, m_disk_cinit, m_disk_helpers, m_disk_vectors;
+	u16 m_serial_index[2] = {}, m_serial_regs[2][32] = {}, m_serial_word = 0;
+	bool m_serial_ready = false;
+	unsigned m_serial_reads = 0;
 	u8 m_direction = 0, m_gpio = 0;
 	bool m_ready = true;
 	unsigned m_bio_reads = 0, m_busy_reads = 0, m_data_reads = 0;
@@ -51,7 +55,40 @@ private:
 	void data_map(address_map &map)
 	{
 		map(0, 0xffff).ram();
+		map(0x0031, 0x0031).r(FUNC(mu4_storage_test_state::serial_r));
+		map(0x0034, 0x0035).rw(FUNC(mu4_storage_test_state::serial_config_r), FUNC(mu4_storage_test_state::serial_config_w));
+		map(0x0038, 0x0039).rw(FUNC(mu4_storage_test_state::serial_config0_r), FUNC(mu4_storage_test_state::serial_config0_w));
 		map(0x003c, 0x003d).rw(FUNC(mu4_storage_test_state::gpio_r), FUNC(mu4_storage_test_state::gpio_w));
+	}
+	// Word-level receive fixture only; serial clocks/framing are not modeled here.
+	u16 serial_r()
+	{
+		if (!m_serial_ready) fatalerror("MU4 serial read without delivered word");
+		m_serial_ready = false;
+		m_serial_regs[0][0] &= ~u16(2);
+		++m_serial_reads;
+		return m_serial_word;
+	}
+	u16 serial_config_r(offs_t offset) { return offset ? m_serial_regs[0][m_serial_index[0]] : m_serial_index[0]; }
+	void serial_config_w(offs_t offset, u16 value)
+	{
+		if (offset) m_serial_regs[0][m_serial_index[0]] = value;
+		else m_serial_index[0] = value & 31;
+	}
+	u16 serial_config0_r(offs_t offset) { return offset ? m_serial_regs[1][m_serial_index[1]] : m_serial_index[1]; }
+	void serial_config0_w(offs_t offset, u16 value)
+	{
+		if (offset) m_serial_regs[1][m_serial_index[1]] = value;
+		else m_serial_index[1] = value & 31;
+	}
+	void deliver_serial(u8 value)
+	{
+		if (m_serial_ready || !(m_serial_regs[0][0] & 1)) fatalerror("MU4 serial fixture not receive-ready");
+		m_serial_word = value;
+		m_serial_ready = true;
+		m_serial_regs[0][0] |= 2;
+		m_cpu->set_input_line(6, ASSERT_LINE);
+		m_cpu->set_input_line(6, CLEAR_LINE);
 	}
 	void io_map(address_map &map)
 	{
@@ -151,11 +188,12 @@ private:
 			u16 const recovery[] = {0xf020, 0x3aea, 0xf980, 0x0880, 0xf4e1};
 			for (unsigned i = 0; i < std::size(recovery); ++i) program.write_word(0x1809 + i, recovery[i]);
 		}
-		if (m_phase == 10 || m_phase == 12 || m_phase == 13)
+		if (m_phase == 10 || m_phase == 12 || m_phase == 13 || m_phase == 14)
 		{
 			// Replace the routine library with unchanged InitDisk code, not a flat overlay image.
 			program.install_rom(0x256d, 0x4aa8, &m_initdisk[0]);
 			program.install_rom(0x4aa9, 0x4abe, &m_disk_helpers[0]);
+			program.install_rom(0x0080, 0x00f7, &m_disk_vectors[0]);
 			auto &data = m_cpu->space(AS_DATA);
 			unsigned cursor = 0;
 			while (cursor < m_disk_cinit.length())
@@ -177,11 +215,22 @@ private:
 					0xf020, 0x068c, 0xf074, 0x36b9, 0xf4e1};
 				for (unsigned i = 0; i < std::size(scan); ++i) program.write_word(0x1809 + i, scan[i]);
 			}
+			if (m_phase == 14)
+			{
+				u16 const receive[] = {0xf074, 0x346a, 0x771d, 0x00e8, 0x7700, 0x0040,
+					0xf6bb, 0xf4e1, 0xf073, 0x1810};
+				for (unsigned i = 0; i < std::size(receive); ++i) program.write_word(0x1809 + i, receive[i]);
+			}
+		}
+		if (m_phase == 17)
+		{
+			u16 const consume[] = {0xf074, 0x34c0, 0xf4e1};
+			for (unsigned i = 0; i < std::size(consume); ++i) program.write_word(0x1809 + i, consume[i]);
 		}
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
-		m_check->adjust(attotime::from_msec(m_phase == 13 ? 8000 : m_phase == 7 ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
+		m_check->adjust(attotime::from_msec(m_phase == 13 ? 8000 : (m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
 	}
 	void start_media_read()
 	{
@@ -192,6 +241,39 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase == 14 || m_phase == 15 || m_phase == 16)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200)
+				fatalerror("MU4 serial ISR did not return to idle phase=%u pc=%04x sp=%04x illegal=%u", m_phase,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			if (m_phase == 14)
+			{
+				if (data.read_word(0x4bbf) != 0xff || data.read_word(0x4bc0) != 0xff)
+					fatalerror("MU4 original serial ring initialization mismatch");
+				deliver_serial(0x12);
+			}
+			else
+			{
+				unsigned const index = m_phase - 15;
+				if (m_serial_ready || m_serial_reads != index + 1 || data.read_word(0x4bbf) != index ||
+					data.read_word(0x4abf + index) != (index ? 0x34 : 0x12))
+					fatalerror("MU4 original serial ISR ring delivery mismatch");
+				if (m_phase == 16)
+				{
+					m_phase = 17;
+					machine().schedule_soft_reset();
+					return;
+				}
+				deliver_serial(0x34);
+			}
+			++m_phase;
+			m_check->adjust(attotime::from_msec(1));
+			return;
+		}
 		if (m_phase == 8)
 		{
 			auto &data = m_cpu->space(AS_DATA);
@@ -284,6 +366,17 @@ private:
 				if (data.read_word(0x2100 + i) != (i == 0 ? 0x0100 : 0))
 					fatalerror("MU4 InitDisk bitmap mismatch group=%u value=%04x", i, data.read_word(0x2100 + i));
 			logerror("mu4_initdisk_scan: PASS blocks=4096 bad_block=0 reserved_bad=0 reads=%u busy_reads=%u\n", m_data_reads, m_busy_reads);
+			m_phase = 14;
+			machine().schedule_soft_reset();
+			return;
+		}
+		if (m_phase == 17)
+		{
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 0x1234 ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 ||
+				m_cpu->space(AS_DATA).read_word(0x4bc0) != 1)
+				fatalerror("MU4 original serial word consumer mismatch");
+			logerror("mu4_initdisk_serial: PASS vector=00d8 register=0031 words=2 value=1234 firmware_ring=1\n");
 			machine().schedule_exit();
 			return;
 		}
@@ -362,6 +455,8 @@ private:
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
 ROM_START(mu4nand)
+	ROM_REGION16_LE(240, "disk_vectors", 0)
+	ROM_LOAD16_WORD_SWAP("mu4_initdisk_vectors.bin", 0, 240, CRC(2f1b5de4) SHA1(145048a918768dbee2d5fce5213a6e26ece50edf))
 	ROM_REGION16_LE(44, "disk_helpers", 0)
 	ROM_LOAD16_WORD_SWAP("mu4_initdisk_helpers.bin", 0, 44, CRC(6e84f71a) SHA1(fa38ceaa537490d6d57c84a6406990aad5b869a6))
 	ROM_REGION16_LE(19064, "initdisk", 0)

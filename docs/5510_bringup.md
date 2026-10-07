@@ -714,6 +714,55 @@ are removed. Next establish the serial ingress contract; no received ring
 entries, successful scan return or filesystem records should be injected
 into RAM.
 
+### InitDisk serial ingress and file selection
+
+The original `0080` vector record branches from `00d8` to handler `2b03`.
+Together with its read of `0031` and indexed configuration at `0034/0035`,
+this matches TI VC5410A's McBSP2 DRR1, SPSA/SPSD and RINT2 vector (IFR/IMR
+bit 6). This corroborates that peripheral subset; it does not establish
+complete DA150 equivalence or physical serial-clock timing.
+
+The isolated gate loads that original vector record and executes port
+initializer `346a -> 35c7`. A word-level fixture delivers bytes `12/34`
+at receive register `0031` with RRDY and receive interrupts. Original code
+alone increments producer `4bbf` and writes ring storage. After two ISR
+returns to idle, original consumer `34c0` returns `1234`, advances consumer
+`4bc0` to one and preserves SP. The fixture neither posts ring entries nor
+models serial framing, overrun, DMA or the MCU-to-MU4 sender.
+
+`32dc` creates nine 18-word segment descriptors. Their marker fields are
+at `010d + index * 18`; eight names come from the original `2080` C globals
+and are copied into descriptor name fields by `491e`:
+
+| Marker | Original name | Name source |
+| --- | --- | --- |
+| `aa55` | `MCUSI16 ` | `01fd` |
+| `aa22` | `MP3SI16 ` | `020f` |
+| `aa44` | `RERSI16 ` | `0221` |
+| `aa88` | `AACSI16 ` | `0218` |
+| `aabb` | `USBSI16 ` | `0206` |
+| `aadd` | `RELSI16 ` | `022a` |
+| `aa99` | `PRODINFO` | `0233` |
+| `bb77` | `TESTINFO` | `023c` |
+| `bbcc` | No name copy recovered | None |
+
+Receiver state `01f6` selects marker acquisition (0), 32-bit length (1),
+payload words (2), and checksum (3). `3348` matches the marker against the
+nine descriptors. `339d` combines two high-first words into byte length
+`01f2` and rejects odd lengths. Payload buffering uses data `c000` and
+512-byte chunks. `33fd` distinguishes `aa55`'s raw-storage path from the
+file-write path `342e -> 2cb1`; the latter uses the selected descriptor.
+Checksum state `32a7` disables accumulation, reads a word and compares it
+with the accumulated byte XOR at `01f9`. Runtime file creation, exact
+trailer handling and successful mount/load still need execution evidence.
+
+The acquired repair-tool analysis describes a different, upstream layer:
+PC-to-phone blocks `80 12 length payload XOR-even XOR-odd` and byte `90`
+acknowledgements. Do not replay that envelope into McBSP2: the MCU forwarding
+path has not yet been reconciled with this DSP segment receiver. The next
+boundary is an original InitDisk receive/metadata-write fixture using the
+recovered descriptor contract, followed by file-backed InitData loading.
+
 This exercises generic core contracts that matter beyond MU4: long-offset
 `BANZ/BANZD` tests the effective Sind value and consumes displacement before
 target (96 cases); `CMPR` compares unsigned ARx against AR0 (192 cases);
