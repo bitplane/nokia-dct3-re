@@ -25,10 +25,13 @@ DMA/McBSP and codec digital interfaces have isolated conformance
 and save/replay tests.
 The `startup` profile passes its 20-second window with zero illegal
 instructions and an active original streaming consumer. It observes 1,739
-consumer entries/notification reads and 1,740 clears. A separate framed
-command fixture reaches the original serial parser and queued acknowledgement,
-but transmit completion is missing at register `0033`. The open boundary is
-that serial transport, processing command/data semantics and independently verified output,
+consumer entries/notification reads and 1,740 clears, but mode zero skips
+buffer processing. A separate framed
+command fixture reaches the original serial parser and queued acknowledgement.
+The `wireack` fixture completes a native status-query transaction using the
+shared McBSP2 TX model, a bench clock and register-level RX input. The open
+boundary is complete serial RX/board attachment, processing command/data
+semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
 claimed; only the initial 1,024 DIN words are independently compared.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
@@ -1416,7 +1419,8 @@ the record. The processing reader requests type 2. The response helper
 through the separate 80-word TX ring `14b2` (`1659/165a`). Helper
 `03:9c5b` writes its next word to register `0033` and updates GPIO `003d`
 bit 4. The isolated fixture currently provides simplified receive ingress
-at `0031`; `0033` remains plain RAM, not a verified serial transmitter.
+at `0031`; default and `command` profiles retain storage-only TX register
+history at `0033`. The separate wire profiles attach the shared TX device.
 
 A literal far-call scan over the 48,261 uploaded program words finds four
 calls to the queue append helper (`03:9d0f`, `9da9`, `9e13`, `9fb7`) and
@@ -1453,6 +1457,58 @@ serial transmit completion, not proof of an absent firmware producer.
 The bench interval is not a measured physical baud rate, and no TX wire or
 music processing is verified. A packet without the sequence token drains
 through the ISR but produces no queued command or acknowledgement.
+
+#### McBSP2 transmit and acknowledged status query
+
+Original initializer `03:9b07` configures McBSP2 through `0034/0035`:
+SRGR1=`0080`, SRGR2=`2020`, PCR=`0000`, RCR1/XCR1=`0000`,
+RCR2/XCR2=`0005`, then releases the receive and transmit resets.
+The resulting SPCR2 is `0341`. This selects the supported externally
+clocked, single-phase 8-bit format with data delay one; it does not establish
+the board's clock source or baud rate. TX-ready uses XINT2 (IFR/IMR bit 7).
+Original handler `02:8bfe` writes successive TX-ring words to `0033` at
+`02:8c41`, advances `165a`, and clears busy flag `165b` and GPIO bit 4
+when the ring is empty.
+
+`MU4_STORAGE_BIOS=wire` connects those native TX writes and indexed control
+operations to the shared McBSP device. The bench supplies 5 us half-clock
+edges, with an 8-bit frame while the original GPIO bit 4 requests work.
+These are explicit external test inputs, not calibrated board behavior.
+The device generates XRDY and IRQ7 from DXR-to-shifter handoff; no firmware
+TX index, mask, busy flag or completion is written. A separate consumer
+reassembles TX callback bits and compares each byte with the reported word.
+RX remains the previously bounded register/IRQ fixture, not pin-level RX.
+The `0033` read helper is bench write history, not a claimed silicon DXR
+readback contract.
+
+The status selector `0x49` now reaches original branch `03:ada7`. Firmware
+first emits `7f 01 55`, then the complete response
+`1e 05 aa 01 71 01 00 00 80 40 55` through the TX pin callback.
+The `80` sequence token is independent of the payload and yields XOR
+`40`. Do not normalize that initial token to zero: the sender wraps its
+next token modulo eight and the acknowledgement matcher masks three bits,
+but the wire token and XOR retain the original `80`. Without a peer
+acknowledgement, the original protocol emits three
+identical copies (36 total wire bytes including the initial acknowledgement),
+then clears its queue through its own retry lifecycle. This is not successful
+peer delivery.
+
+`MU4_STORAGE_BIOS=wireack` checks the complete response and supplies
+`7f 80 55` through the existing receive-register/IRQ path. Firmware then
+settles both ring pairs at `11/11` RX and `14/14` TX, empties the typed
+queue, clears response-pending `165d`, and emits no duplicate response.
+The gate verifies 11 input bytes, 14 output bytes, independent bit decoding,
+mode zero and zero illegal instructions. Its 20-second worker window
+observes 1,779 entries and 1,780 clears; changing the legitimate command
+traffic changes scheduling, so these counts do not replace the unchanged
+startup control's 1,739/1,740 oracle. No music processing, physical MA4-MU4
+attachment or full native boot follows from this status transaction.
+
+Next replace the register-level RX fixture with pin-level McBSP2 ingress,
+verify the recovered transport through reset/save/replay, and decode
+processing-command parameters and media inputs before attempting native
+playback. Do not write `bb80` or replay internal queue objects to select a
+mode.
 
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects
