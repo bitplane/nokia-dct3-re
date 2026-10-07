@@ -13,8 +13,9 @@ The independent MU4 `mu4nand` fixture executes original erased-media
 provisioning, receives all seven original R060 segments, reads back six
 complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
 `3538` then reaches the loaded entry and its page-2 common-window branch.
-Native execution currently stops on unsupported opcode `fa47` at logical
-`02:dfa4`; this is a software-core continuation target, not a missing-ROM proof.
+Native execution currently loops at logical `02:9524` after McBSP1
+initialization. The long-offset BITF operand order must be reconciled before
+classifying this as a transmitter-readiness wait; McBSP1 is not yet modeled.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -901,12 +902,33 @@ this loaded entry is not proof of the full startup, music playback or
 handset boot. DA150 silicon memory extents, data/program RAM aliases, PLL
 and bus contention remain unresolved.
 
-With these instruction forms implemented, the eight-second entry run reaches
-logical `02:dfa4` and stops on unsupported `fa47`, with PMST `202c`, not idle.
-`mu4_native_entry: PASS` establishes the two observed entry reads only; its
-explicit `illegal=1` result is not a complete-startup acceptance criterion.
-The next software task is to decode that opcode against the TI instruction
-contract, add independent conformance tests, then continue unchanged code.
+The loaded code also uses `fa47` (`BCD ...,ALEQ`) at logical `02:dfa4`.
+TI SPRU172C identifies condition `47` as signed A less than or equal to zero.
+Five core fixtures cover negative extremes, zero and positive values, predicate
+capture before two delay words, and the three-cycle branch cost.
+
+The eight-second entry run now reaches logical `02:9524`, with PMST `202c`,
+`illegal=0` and not idle. Original `02:951d` sets AR1 to `0048`, `951f`
+selects index 1, and `9521` executes long-offset BITF `61e1 0001 0002`;
+`9524` repeats on NTC. TI's related VC5410A register map identifies
+`48/49` as McBSP1's control window, index 1 as SPCR2. SPRU302B identifies bit 1
+as XRDY. These addresses still map to plain test RAM, not a serial controller.
+Read-only taps count 42 control writes (the first 24 are printed), zero reads
+at `0049` and 10,719,960 reads at adjacent `004a` in this eight-second run.
+Thus no SPCR2 read at the related-part address is observed: the current
+decoder takes raw `61e1 0001 0002` as mask 1, displacement 2, addressing
+`004a`. GNU's disassembly treats it as displacement 1, mask 2, addressing
+`0049`. The test's old long-offset BITF fixture follows the current decoder;
+it is not independent evidence for that order. SPRU131G 5.5.3.2 explicitly
+places the offset last for the premodifying form; it does not justify changing
+this non-updating form solely to agree with GNU. The DA150 read-side window
+may also differ from the related VC5410A map. Reconcile the original accesses,
+addressing form and read-side decode before implementing a transmitter or
+changing BITF. Configuration
+writes and status reads are observed only; no ready value is supplied.
+
+`mu4_native_entry: PASS` establishes the two observed entry reads only;
+absence of an illegal opcode is not a complete-startup acceptance criterion.
 
 Three generic CPU contracts are independently exposed by this run:
 

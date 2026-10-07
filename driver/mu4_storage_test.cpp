@@ -56,6 +56,9 @@ private:
 	emu_timer *m_check = nullptr;
 	unsigned m_phase = 25;
 	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
+	unsigned m_native_mcbsp_trace = 0, m_native_mcbsp_polls = 0;
+	unsigned m_native_adjacent_reads = 0;
+	u16 m_native_mcbsp_index = 0, m_native_mcbsp_status = 0;
 	unsigned m_page = 0;
 	static u16 pattern(unsigned index) { return u16(0x1234 + index * 37); }
 	void program_map(address_map &map)
@@ -412,6 +415,26 @@ private:
 				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_entry_reads; });
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_native_far_entry",
 				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_far_reads; });
+			m_cpu->space(AS_DATA).install_write_tap(0x48, 0x49, "mu4_native_mcbsp_config",
+				[this](offs_t offset, u16 &value, u16)
+				{
+					if (machine().side_effects_disabled()) return;
+					if (offset == 0x48) m_native_mcbsp_index = value;
+					if (m_native_mcbsp_trace++ < 24)
+						logerror("mu4_native_mcbsp: write address=%04x index=%04x value=%04x pc=%06x\n", unsigned(offset), m_native_mcbsp_index, value, unsigned(m_cpu->state_int(STATE_GENPC)));
+				});
+			m_cpu->space(AS_DATA).install_read_tap(0x49, 0x49, "mu4_native_mcbsp_status",
+				[this](offs_t, u16 &value, u16)
+				{
+					if (machine().side_effects_disabled()) return;
+					if (m_native_mcbsp_index == 1)
+					{
+						++m_native_mcbsp_polls;
+						m_native_mcbsp_status = value;
+					}
+				});
+			m_cpu->space(AS_DATA).install_read_tap(0x4a, 0x4a, "mu4_native_adjacent_status",
+				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_adjacent_reads; });
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x3538);
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
@@ -427,6 +450,8 @@ private:
 				m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
+			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u controller_modeled=0\n",
+				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace);
 			machine().schedule_exit();
 			return;
 		}

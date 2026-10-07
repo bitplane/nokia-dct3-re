@@ -14559,6 +14559,48 @@ private:
 				return;
 			}
 			osd_printf_info("TMS320C54x memory DP conformance: PASS variants=3\n");
+			program.write_word(0x0600, 0x75d6);
+			program.write_word(0x0601, 0x0124);
+			program.write_word(0x0602, 0xfa47);
+			program.write_word(0x0603, 0x060c);
+			program.write_word(0x0604, 0xe801); // Changes A after the branch predicate is captured.
+			program.write_word(0x0605, 0xe902);
+			program.write_word(0x0606, 0xe903);
+			program.write_word(0x0607, 0x75d6);
+			program.write_word(0x0608, 0x0124);
+			program.write_word(0x0609, 0xf4e1);
+			program.write_word(0x060c, 0x75d6);
+			program.write_word(0x060d, 0x0124);
+			program.write_word(0x060e, 0xf4e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8000000000ULL);
+			m_cpu->set_state_int(STATE_GENPC, 0x0600);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 60020;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 60020 && m_phase <= 60024)
+		{
+			u64 const values[] = {0x8000000000ULL, 0xffffffffffULL, 0, 1, 0x7fffffffffULL};
+			unsigned const index = m_phase - 60020;
+			bool const taken = index < 3;
+			expect_opcode(0xfa47, m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (taken ? 2 : 3) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (taken ? 7 : 8) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"BCD ALEQ tests signed 40-bit A with two delay words and three-cycle branch cost");
+			if (index != 4)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, values[index + 1]);
+				m_cpu->set_state_int(STATE_GENPC, 0x0600);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			osd_printf_info("TMS320C54x delayed ALEQ conformance: PASS variants=5\n");
 			start_bio_case(0);
 			return;
 		}

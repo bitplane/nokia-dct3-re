@@ -36,6 +36,13 @@ plus the long-address extension cost. Eight ARP immediates and three absolute
 DP values check field masking, unrelated ST0 preservation and extension
 consumption in the core gate.
 
+MU4 opcode `fa47` is delayed conditional branch ALEQ (SPRU172C condition
+`47`): signed 40-bit A less than or equal to zero. Its three-cycle branch
+decision precedes two delay words. Five executable fixtures test both signed
+extremes, zero and positive values; changing A in the first delay word must
+not change the captured decision. Both paths retain the expected delay-word
+effects and measured port-to-port cycle intervals.
+
 ## Descriptor fields
 
 The six halfwords in each recovered catalogue record are:
