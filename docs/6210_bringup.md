@@ -259,6 +259,17 @@ mask routine `2c75` remain research assumptions. Native mask execution,
 measured DSP self-test values, speech/audio parity and electrical ADC units
 remain separate work, not implied by the phone-service gates.
 
+## Host incoming call
+
+`tools/run_noki6210_acceptance.py RUN --scenario host-incoming-call` enables
+only `CALLHOST` in private configuration, leaving acquired PMM unchanged.
+An idle frame at 32 seconds releases a host request for caller `5551234`;
+the runner requires correlated queued/paging/alerting/connected/ended phases.
+Physical Send and End must satisfy NPE-3's own Call Confirmed and 24-byte
+traffic/release contracts. Reviewed caller text and exact registered idle
+before/after the call are required. `--port` selects the unused HTTP port
+(default 16210). This is HLE signaling acceptance, not speech or native DSP.
+
 ## Save-state acceptance
 
 `verify-6210-state-idle`, `verify-6210-state-call` and

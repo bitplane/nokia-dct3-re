@@ -28,7 +28,8 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'state-idle': ('npe3hle', 'state_idle', 24),
              'state-call': ('npe3hle', 'state_call', 48),
              'state-sms': ('npe3hle', 'state_sms', 30),
-             'accessory': ('npe3hle', 'accessory_input', 25)}
+             'accessory': ('npe3hle', 'accessory_input', 25),
+             'host-incoming-call': ('npe3hle', 'host_incoming_input', 60)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -148,6 +149,7 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--scenario', choices=SCENARIOS, default='menu')
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--port', type=int, default=16210)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
@@ -162,13 +164,14 @@ def main():
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
-        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms'):
+        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'host-incoming-call'):
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
             ports = ET.SubElement(system, 'input')
-            mask = '2' if args.scenario == 'incoming-call' else '4'
-            ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
+            mask = '1' if args.scenario == 'host-incoming-call' else '2' if args.scenario == 'incoming-call' else '4'
+            tag = ':CALLHOST' if args.scenario == 'host-incoming-call' else ':NETCFG'
+            ET.SubElement(ports, 'port', tag=tag, type='CONFIG',
                           mask=mask, defvalue='0', value=mask)
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
@@ -177,8 +180,15 @@ def main():
                    '-autoboot_script', str(root / f'tools/noki6210_{script}.lua'),
                    '-autoboot_delay', '0', '-seconds_to_run', str(seconds),
                    '-video', 'none', '-sound', 'none', '-nothrottle', '-log', '-verbose']
+        host_command = None
+        if args.scenario == 'host-incoming-call':
+            command.extend(['-http', '-http_port', str(args.port)])
+            host_command = [sys.executable, str(root / 'tools/run_host_incoming_signaling_gate.py'),
+                            '--port', str(args.port), '--cwd', str(run), '--caller', '5551234',
+                            '--ready-file', str(run / 'snap/6210_host_registered_idle.png'),
+                            '--'] + command
         with (run / 'console.log').open('w') as output:
-            subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
+            subprocess.run(host_command or command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
         check_output((run / 'console.log').read_text(errors='replace'))
         text = events(run / 'error.log')
@@ -220,9 +230,20 @@ def main():
         elif args.scenario == 'outgoing-call':
             from tools.noki6210_outgoing_call_check import verify as check_call
             check_call(text)
-        elif args.scenario == 'incoming-call':
+        elif args.scenario in ('incoming-call', 'host-incoming-call'):
             from tools.noki6210_incoming_call_check import verify as check_call
             check_call(text)
+            if args.scenario == 'host-incoming-call':
+                from PIL import Image
+                with Image.open(run / 'snap/6210_host_registered_idle.png') as frame:
+                    check_frame(frame, OPERATOR_SHA256, 'registered idle before host call')
+                with Image.open(run / 'snap/6210_after_incoming_call.png') as frame:
+                    check_frame(frame, OPERATOR_SHA256, 'registered idle after host call')
+                with Image.open(run / 'snap/6210_incoming_ringing.png') as frame:
+                    if frame.size != (96, 60) or hashlib.sha256(
+                            frame.convert('L').crop((0, 8, 96, 40)).tobytes()).hexdigest() != (
+                            'edde96356123c9684d846f94418f1d2e6eedc7fd331a3dab41d92cd38f5006ca'):
+                        raise ValueError('missing reviewed host caller 5551234')
         elif args.scenario == 'outgoing-sms':
             from tools.noki6210_outgoing_sms_check import verify as check_submission
             check_submission(text)
@@ -267,6 +288,7 @@ def main():
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
             'sim_profile': 'PIN-enabled laboratory card' if args.scenario == 'security' else 'default laboratory card',
             'native_dsp_complete': False, 'speech_tested': False, 'command': command,
+            'host_command': host_command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6210 acceptance FAIL: {error}\n')
