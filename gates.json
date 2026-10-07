@@ -13288,6 +13288,19 @@
       ]
     },
     {
+      "name": "verify-3310-radio-incoming-call-sip-cancel",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 SIP_HANDSET_KEYS= SIP_HANDSET_RUNNER_ARGS='--incoming --cancel-incoming --product 3310' SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
       "name": "verify-radio-incoming-call-sip-cancel",
       "prerequisites": [],
       "variables": {},

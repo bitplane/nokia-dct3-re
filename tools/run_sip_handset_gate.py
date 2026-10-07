@@ -127,7 +127,7 @@ async def run(args):
         verify_restore(root, remote_text, args.restore_phase, args.product)
         return
     if args.cancel_incoming:
-        verify_cancel(root, remote_text)
+        verify_cancel(root, remote_text, args.product)
         return
     if args.sip_response != 200:
         verify_failure(root, remote_text, args.sip_response, args.product, args.calls)
@@ -344,7 +344,7 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
     print('OK - save/load cleared real SIP dialog and restored GSM call under new epoch')
 
 
-def verify_cancel(root, remote_text):
+def verify_cancel(root, remote_text, product='3210'):
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
     if ('Request msg CANCEL/' not in remote_text or 'Response msg 487/INVITE/' not in remote_text or
@@ -361,19 +361,24 @@ def verify_cancel(root, remote_text):
     if any(counts.get(name) != 0 for name in ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received')):
         raise RuntimeError('cancelled incoming SIP call falsely claimed media')
     cursor = 0
+    if (len(re.findall(r'gsm_call_adapter: termination id=1 cause=16 result=accepted', log)) != 1 or
+            re.search(r'gsm_call_adapter: termination id=1 .*result=rejected', log)):
+        raise RuntimeError('cancelled incoming call did not clear exactly once')
     for pattern in (
             r'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging',
             r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
             r'gsm_call_adapter: incoming state id=1 epoch=1 phase=alerting',
             r'gsm_call_adapter: termination id=1 cause=16 result=accepted',
+            r'GSM service downlink kind=13 sapi=0 pd=03 message=25',
             r'GSM service uplink sapi=0 pd=03 message=2a',
+            r'LAPDm service Channel Release acknowledged',
             r'gsm_call_adapter: incoming state id=1 epoch=1 phase=ended'):
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing cancelled incoming call checkpoint: {pattern}')
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
-        'scope': '3210 HLE incoming SIP CANCEL while alerting; no Answer/connection/media',
+        'scope': f'{product} HLE incoming SIP CANCEL while alerting; no Answer/connection/media',
         'sip_status': 487, 'media': counts, 'passed': True}, indent=2) + '\n')
     print('OK - SIP CANCEL before Answer cleared the ringing handset without connection/media')
 

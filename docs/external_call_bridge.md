@@ -343,11 +343,13 @@ not implemented.
 
 ```sh
 make verify-radio-incoming-call-sip-cancel RUN_DIR=run_3210_sip_cancel
+make verify-3310-radio-incoming-call-sip-cancel RUN_DIR=run_3310_sip_cancel
 ```
 
 The real SIP caller cancels only after the handset reports alerting. The gate
-requires CANCEL/487, correlated GSM termination, firmware RELEASE COMPLETE and
-host `ended`, with no physical Answer, connection or bridge media. CC completion
+requires CANCEL/487, exactly one correlated GSM termination, network DISCONNECT,
+firmware RELEASE COMPLETE, acknowledged LAPDm Channel Release and host `ended`,
+with no physical Answer, connection or bridge media on either product. CC completion
 must survive the subsequent RR release whether it arrives before or after the
 DISCONNECT acknowledgement; both orderings represent an already completed CC
 transaction. Stopping the traffic channel alone is not the cancellation gate's

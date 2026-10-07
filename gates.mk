@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 371 gates: 227 generated from typed steps, 144 copied verbatim (shell).
+# 372 gates: 228 generated from typed steps, 144 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -236,8 +236,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-outgoing-call-sip-connected-restore \
 	verify-radio-outgoing-call-sip-pending-restore \
 	verify-radio-incoming-call-sip-alerting-restore \
-	verify-radio-incoming-call-sip-restore verify-radio-incoming-call-sip-cancel \
-	verify-radio-outgoing-call-sip-busy \
+	verify-radio-incoming-call-sip-restore \
+	verify-3310-radio-incoming-call-sip-cancel \
+	verify-radio-incoming-call-sip-cancel verify-radio-outgoing-call-sip-busy \
 	verify-radio-outgoing-call-sip-unavailable
 
 verify-5510-package:
@@ -3729,6 +3730,9 @@ verify-radio-incoming-call-sip-alerting-restore:
 
 verify-radio-incoming-call-sip-restore:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--incoming --restore-call' SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_SCRIPT=../tools/sip_call_state_roundtrip.lua SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48
+
+verify-3310-radio-incoming-call-sip-cancel:
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 SIP_HANDSET_KEYS= SIP_HANDSET_RUNNER_ARGS='--incoming --cancel-incoming --product 3310' SIP_HANDSET_SECONDS=48
 
 verify-radio-incoming-call-sip-cancel:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--incoming --cancel-incoming' SIP_HANDSET_KEYS='1,2,3,4,5,enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48
