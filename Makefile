@@ -1045,6 +1045,7 @@ check-mu4-storage-original: build
 		grep -q 'mu4_native_entry: PASS' error.log; grep -q 'mu4_mcbsp_conformance: PASS' error.log; \
 		grep -q 'mu4_dma_sync_conformance: PASS' error.log; \
 		grep -q 'mu4_dma_sync_level: PASS' error.log; \
+		grep -q 'mu4_mcbsp_external: PASS' error.log; \
 		if [ "$(MU4_STORAGE_BIOS)" = stream ]; then grep -q 'mu4_native_stream: PASS' error.log; fi
 
 check-mu4-nand: build

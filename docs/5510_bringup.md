@@ -16,8 +16,8 @@ complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
 The partial McBSP1 transmitter now carries six original firmware control
 words. The acceptance run stops at that observed serial-setup boundary.
 The subsequent DMA channel-3 configuration is mapped and its transfer mechanics
-have isolated conformance tests. McBSP0 is attached, but the streaming profile
-fails explicitly on its externally clocked, framed transmit format.
+have isolated conformance tests. McBSP0 is attached and accepts its external
+framed transmit format; the codec clock/frame source is not yet modeled.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -933,8 +933,9 @@ clearing when DXR is written, and returning when DXR transfers into XSR.
 shift register, CPU/2-derived internal bit clock, and MSB-first 8/12/16-bit
 output. Executable conformance covers absent external-clock stalling,
 queued words, reset cancellation, XRDY interrupts and pending save/restore.
-Receiver, wider/multiphase formats, external clock inputs and DMA events
-remain unsupported; active unsupported transmit formats fail explicitly.
+Receiver and wider/multiphase formats remain unsupported; active unsupported
+transmit formats fail explicitly. External framed clocks and DMA-ready lines
+have separate conformance coverage below.
 The fixture's 13 MHz source is not a validated DA150 PLL configuration.
 
 Original MCUSI16 transmits `0c10 0818 0a01 0e53 1023 1201` without illegal
@@ -1006,16 +1007,36 @@ with the original part before implementation.
 
 Original McBSP0 configuration is PCR `000e`, XCR1 `0140`, XCR2 `0044`,
 SRGR1 `0f07`, SRGR2 `101f`, SPCR2 `0101`. It selects external clocks,
-two 16-bit words per frame and frame-ignore behavior. The current transmitter
-rejects that active format; no clock or frame edge is fabricated.
+two 16-bit words per frame and frame-ignore behavior. The transmitter now
+accepts that format but receives no fabricated clock or frame edges.
+
+Generic `tx_clock_w`/`tx_frame_w` inputs model external single-phase frames.
+SPRU302B 2.3.4.1 and 2.3.5.2 define polarity and opposite-edge XRDY;
+zero-delay first bits are asynchronous to CLKX. The device avoids double
+shifting when frame and clock edges share an emulated timestamp. Isolated
+pin-transition tests cover two-word frames, no-frame stalls, MSB-first data,
+XFIG early-frame suppression, zero/one/two-bit delays, both polarities,
+opposite-edge readiness, cancellation and mid-word save/replay. These are
+ordered-edge conformance tests, not measurements of electrical setup/hold.
+Underrun and unexpected-frame recovery without XFIG fail explicitly;
+active format changes and full reset-activation timing remain unvalidated.
 
 `make check-mu4-storage-original` uses BIOS `setup`, preserving storage,
 loader, DMA/McBSP conformance and six-word original control setup.
 `make check-mu4-storage-original MU4_STORAGE_BIOS=stream` selects the same
 original bytes but requires a complete 128-word streaming block and DMA
-completion. It currently fails at the unsupported format. Next work is the
+completion. Its eight-second observation reports zero words/completions and
+`illegal=0` (sampled PC `002fc8`), with no external codec edges supplied.
+That PC sample is not proof of a particular wait-loop owner. Next work is the
 codec control/clock boundary and externally framed McBSP transmit lifecycle,
 not a fixed-rate ready pulse or a claim of audio playback.
+
+The same run programs RX DMA channel 2: source McBSP0 DRR1 `0021`,
+destination `1980`, count `0001`, sync `103f`, mode `c055`, reload bank
+`2e..31` = `0021,1900,0001,103f`. This is the corresponding two-element,
+64-frame receive path with fixed peripheral source and sorted destination.
+McBSP receive shifting, RRDY/REVT0 and the channel-2 interrupt mux remain
+unimplemented; TX clock generation alone is not full-duplex acceptance.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.

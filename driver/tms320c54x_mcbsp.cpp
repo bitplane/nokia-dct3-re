@@ -18,6 +18,8 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_buffer)); save_item(NAME(m_shift));
 	save_item(NAME(m_bits)); save_item(NAME(m_delay));
 	save_item(NAME(m_buffer_full)); save_item(NAME(m_shift_active)); save_item(NAME(m_ready));
+	save_item(NAME(m_clock_input)); save_item(NAME(m_frame_input)); save_item(NAME(m_ready_pending));
+	save_item(NAME(m_async_bit)); save_item(NAME(m_frame_words)); save_item(NAME(m_async_time));
 }
 
 void tms320c54x_mcbsp_device::device_reset()
@@ -27,6 +29,8 @@ void tms320c54x_mcbsp_device::device_reset()
 	m_buffer = m_shift = 0;
 	m_bits = m_delay = 0;
 	m_buffer_full = m_shift_active = m_ready = false;
+	m_clock_input = m_frame_input = m_ready_pending = m_async_bit = false;
+	m_frame_words = 0; m_async_time = attotime::zero;
 	m_bit_timer->adjust(attotime::never);
 	m_tx_event_cb(CLEAR_LINE);
 }
@@ -51,6 +55,7 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 		{
 			set_ready(false);
 			m_buffer_full = m_shift_active = false;
+			m_ready_pending = m_async_bit = false; m_frame_words = 0;
 			m_bits = m_delay = 0;
 			m_bit_timer->adjust(attotime::never);
 		}
@@ -112,8 +117,9 @@ void tms320c54x_mcbsp_device::data_w(offs_t offset, u16 value)
 	}
 	if (offset != 3) return;
 	if (!BIT(m_regs[1], 0)) return; // Writes while transmitter is held in reset do not start it.
-	if (BIT(m_regs[5], 15) || (m_regs[4] & 0x7f00) || BIT(m_regs[7], 12) ||
-		((m_regs[4] >> 5) & 7) > 2 || (m_regs[5] & 0x001c) ||
+	bool const external = !BIT(m_regs[14], 9) && !BIT(m_regs[14], 11);
+	if (BIT(m_regs[5], 15) || (!external && ((m_regs[4] & 0x7f00) || BIT(m_regs[7], 12) || BIT(m_regs[5], 2))) ||
+		((m_regs[4] >> 5) & 7) > 2 || (m_regs[5] & 0x0018) ||
 		(m_regs[5] & 3) == 3 || (m_regs[1] & 0x0030) || BIT(m_regs[0], 15))
 		fatalerror("McBSP unsupported active transmit format xcr=%04x/%04x srgr2=%04x", m_regs[4], m_regs[5], m_regs[7]);
 	if (m_buffer_full) fatalerror("McBSP DXR overwritten before ready");
@@ -127,27 +133,85 @@ TIMER_CALLBACK_MEMBER(tms320c54x_mcbsp_device::bit_tick)
 {
 	if (!internal_clock() || !BIT(m_regs[1], 0)) return;
 	if (!m_shift_active && m_buffer_full)
-	{
-		unsigned const widths[] = {8, 12, 16};
-		m_bits = widths[(m_regs[4] >> 5) & 7];
-		m_shift = m_buffer & ((1U << m_bits) - 1);
-		m_delay = m_regs[5] & 3;
-		m_shift_active = true;
-		m_buffer_full = false;
-		set_ready(true);
-	}
+		load_shift(false, true);
 	if (m_shift_active)
 	{
 		if (m_delay) --m_delay;
 		else
 		{
-			m_tx_bit_cb(BIT(m_shift, m_bits - 1));
-			if (!--m_bits)
-			{
-				m_shift_active = false;
-				m_tx_word_cb(m_shift);
-			}
+			shift_bit();
 		}
 	}
 	if (m_buffer_full || m_shift_active) m_bit_timer->adjust(bit_period());
+}
+
+void tms320c54x_mcbsp_device::load_shift(bool external, bool first)
+{
+	unsigned const widths[] = {8, 12, 16};
+	unsigned const width = (m_regs[4] >> 5) & 7;
+	if (width > 2) fatalerror("McBSP wider transmit configuration changed while buffered");
+	m_bits = widths[width];
+	m_shift = m_buffer & ((1U << m_bits) - 1);
+	m_delay = first ? m_regs[5] & 3 : 0;
+	m_shift_active = true; m_buffer_full = false;
+	if (external) m_ready_pending = true; // XRDY follows the opposite internal clock edge.
+	else set_ready(true);
+}
+
+void tms320c54x_mcbsp_device::shift_bit()
+{
+	m_tx_bit_cb(BIT(m_shift, m_bits - 1));
+	if (!--m_bits)
+	{
+		m_shift_active = false;
+		if (m_frame_words) --m_frame_words;
+		m_tx_word_cb(m_shift);
+	}
+}
+
+void tms320c54x_mcbsp_device::tx_frame_w(int state)
+{
+	bool const changed = bool(state) != m_frame_input;
+	m_frame_input = bool(state);
+	if (!changed || bool(state) == BIT(m_regs[14], 3) || !BIT(m_regs[1], 0) || BIT(m_regs[14], 11)) return;
+	if (BIT(m_regs[14], 9)) fatalerror("McBSP external frame with internal clock is not implemented");
+	if (m_frame_words)
+	{
+		if (BIT(m_regs[5], 2)) return;
+		fatalerror("McBSP unexpected frame recovery is not implemented");
+	}
+	if (!m_buffer_full) fatalerror("McBSP framed transmit underrun is not implemented");
+	m_frame_words = ((m_regs[4] >> 8) & 0x7f) + 1;
+	load_shift(true, true);
+	// SPRU302B: zero-delay first bit is asynchronous to the bit clock.
+	if (!m_delay)
+	{
+		shift_bit(); m_async_bit = true; m_async_time = machine().time();
+	}
+}
+
+void tms320c54x_mcbsp_device::tx_clock_w(int state)
+{
+	bool const changed = bool(state) != m_clock_input;
+	m_clock_input = bool(state);
+	if (!changed || BIT(m_regs[14], 9) || !BIT(m_regs[1], 0)) return;
+	bool const shift_edge = bool(state) != BIT(m_regs[14], 1);
+	if (!shift_edge)
+	{
+		if (m_ready_pending) { m_ready_pending = false; set_ready(true); }
+		return;
+	}
+	if (m_async_bit)
+	{
+		m_async_bit = false;
+		if (m_async_time == machine().time()) return; // Same physical edge must not shift twice.
+	}
+	if (!m_frame_words) return;
+	if (!m_shift_active)
+	{
+		if (!m_buffer_full) fatalerror("McBSP framed transmit underrun is not implemented");
+		load_shift(true, false);
+	}
+	if (m_delay && --m_delay) return;
+	shift_bit();
 }

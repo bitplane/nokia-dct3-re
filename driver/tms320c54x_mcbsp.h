@@ -3,7 +3,7 @@
 #ifndef MAME_NOKIA_TMS320C54X_MCBSP_H
 #define MAME_NOKIA_TMS320C54X_MCBSP_H
 
-// Partial indexed McBSP: internally clocked, single-phase 8/12/16-bit transmitter.
+// Partial indexed McBSP: single-phase 8/12/16-bit transmit, internal or external framed clocks.
 class tms320c54x_mcbsp_device : public device_t
 {
 public:
@@ -12,6 +12,8 @@ public:
 	void control_w(offs_t offset, u16 value);
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 value);
+	void tx_clock_w(int state);
+	void tx_frame_w(int state);
 	auto tx_word_cb() { return m_tx_word_cb.bind(); }
 	auto tx_bit_cb() { return m_tx_bit_cb.bind(); }
 	auto tx_irq_cb() { return m_tx_irq_cb.bind(); }
@@ -25,11 +27,17 @@ private:
 	attotime bit_period() const;
 	void arm_clock();
 	void set_ready(bool ready);
+	void load_shift(bool external, bool first);
+	void shift_bit();
 	u16 m_regs[32] = {};
 	u8 m_index = 0;
 	u16 m_buffer = 0, m_shift = 0;
 	u8 m_bits = 0, m_delay = 0;
 	bool m_buffer_full = false, m_shift_active = false, m_ready = false;
+	bool m_clock_input = false, m_frame_input = false, m_ready_pending = false;
+	bool m_async_bit = false;
+	u16 m_frame_words = 0;
+	attotime m_async_time;
 	emu_timer *m_bit_timer = nullptr;
 	devcb_write16 m_tx_word_cb;
 	devcb_write_line m_tx_bit_cb;

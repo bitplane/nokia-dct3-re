@@ -38,6 +38,7 @@ public:
 		m_mcbsp->tx_event_cb().set([this](int state) { m_dma->sync_w(6, state); });
 		TMS320C54X_MCBSP(config, m_mcbsp0, 13'000'000);
 		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
+		m_mcbsp0->tx_bit_cb().set([this](int state) { if (m_phase >= 51 && m_phase <= 53) m_external_bits.push_back(state); });
 		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
 		m_mcbsp0->tx_irq_cb().set([this](int state) { m_cpu->set_input_line(5, state); });
 		SAMSUNG_K9K1208U0A(config, m_nand);
@@ -65,9 +66,17 @@ private:
 		}
 	}
 	unsigned m_stream_words = 0, m_stream_config_writes = 0;
+	std::vector<u16> m_external_words;
+	std::vector<int> m_external_bits;
+	void external_reg_w(u16 index, u16 value) { m_mcbsp0->control_w(0, index); m_mcbsp0->control_w(1, value); }
+	void external_clocks(unsigned count, bool inverted = true)
+	{
+		while (count--) { m_mcbsp0->tx_clock_w(!inverted); m_mcbsp0->tx_clock_w(inverted); }
+	}
 	void stream_tx(u16 value)
 	{
 		++m_stream_words;
+		if (m_phase >= 51 && m_phase <= 53) m_external_words.push_back(value);
 		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
 		if (m_phase == 30 && system_bios() == 2 && m_stream_words == 128) m_check->adjust(attotime::zero);
 	}
@@ -231,6 +240,7 @@ private:
 		m_serial_tx_irqs = 0;
 		m_dma_output.clear(); m_dma_completions = 0;
 		m_stream_words = m_stream_config_writes = 0;
+		m_external_words.clear(); m_external_bits.clear();
 		auto &program = m_cpu->space(AS_PROGRAM);
 		// Synthetic wrapper initializes the routine ABI, then calls untouched code.
 		u16 const wrapper[] = {
@@ -279,6 +289,14 @@ private:
 			m_dma->sync_w(2, ASSERT_LINE);
 			m_dma->write(0, 8);
 			m_dma->sync_w(2, ASSERT_LINE); // Held level is not a second event.
+		}
+		if (m_phase == 51)
+		{
+			program.write_word(0x1800, 0xf4e1);
+			external_reg_w(4, 0x0140); external_reg_w(5, 0x0044);
+			external_reg_w(14, 0x000e); external_reg_w(1, 1);
+			m_mcbsp0->tx_frame_w(1); m_mcbsp0->tx_clock_w(1);
+			m_mcbsp0->data_w(3, 0xa55a);
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
@@ -576,7 +594,72 @@ private:
 			}
 			m_dma->sync_w(2, CLEAR_LINE);
 			logerror("mu4_dma_sync_level: PASS ready_before_enable=1 held_level=1 reenable=1\n");
-			m_phase = 25; machine().schedule_soft_reset(); return;
+			m_phase = 51; machine().schedule_soft_reset(); return;
+		}
+		if (m_phase >= 51 && m_phase <= 53)
+		{
+			if (m_phase == 51)
+			{
+				external_clocks(4);
+				if (!m_external_bits.empty()) fatalerror("MU4 external McBSP shifted without a frame");
+				m_mcbsp0->tx_frame_w(0);
+				if (m_external_bits != std::vector<int>({1})) fatalerror("MU4 zero-delay frame first bit not asynchronous");
+				m_mcbsp0->control_w(0, 1);
+				if ((m_mcbsp0->control_r(1) & 7) != 5) fatalerror("MU4 external XRDY asserted before opposite edge");
+				external_clocks(1); // Same edge as the asynchronous first bit cannot shift twice.
+				if (m_external_bits.size() != 1) fatalerror("MU4 external McBSP double-shifted first bit");
+				if ((m_mcbsp0->control_r(1) & 7) != 7) fatalerror("MU4 external XRDY missing after opposite edge");
+				m_mcbsp0->data_w(3, 0x5aa5);
+				m_mcbsp0->tx_frame_w(1); m_mcbsp0->tx_frame_w(0); // XFIG ignores this early frame.
+				external_clocks(6);
+				if (m_external_bits.size() != 7 || !m_external_words.empty()) fatalerror("MU4 external frame progress mismatch");
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 external McBSP save failed");
+			}
+			else
+			{
+				external_clocks(9 + 16);
+				unsigned const first = m_phase == 52 ? 0 : 7;
+				if (m_external_words != std::vector<u16>({0xa55a, 0x5aa5}) || m_external_bits.size() != 32 - first)
+					fatalerror("MU4 external framed word/save replay mismatch");
+				for (unsigned bit = first; bit < 32; ++bit)
+					if (m_external_bits[bit - first] != BIT(bit < 16 ? 0xa55a : 0x5aa5, 15 - (bit & 15)))
+						fatalerror("MU4 external framed bit order mismatch");
+				external_clocks(8);
+				if (m_external_words.size() != 2) fatalerror("MU4 external McBSP advanced beyond frame length");
+				if (m_phase == 52)
+				{
+					m_saved_dma.clear(); m_saved_dma.seekg(0);
+					if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 external McBSP restore failed");
+					m_external_words.clear(); m_external_bits.clear();
+				}
+				else
+				{
+					m_mcbsp0->data_w(3, 0x1234); m_mcbsp0->tx_frame_w(1); m_mcbsp0->tx_frame_w(0);
+					external_reg_w(1, 0); external_clocks(32);
+					if (m_external_words.size() != 2) fatalerror("MU4 external reset failed to cancel frame");
+					m_external_words.clear(); m_external_bits.clear();
+					external_reg_w(14, 0); external_reg_w(4, 0); external_reg_w(5, 1);
+					m_mcbsp0->tx_clock_w(0); m_mcbsp0->tx_frame_w(0); external_reg_w(1, 1);
+					m_mcbsp0->data_w(3, 0xa55a); m_mcbsp0->tx_frame_w(1);
+					if (!m_external_bits.empty()) fatalerror("MU4 delayed frame shifted before clock");
+					external_clocks(8, false);
+					if (m_external_words != std::vector<u16>({0x005a}) || m_external_bits.size() != 8)
+						fatalerror("MU4 external polarity/data delay mismatch");
+					m_external_words.clear(); m_external_bits.clear();
+					external_reg_w(1, 0); external_reg_w(4, 0x20); external_reg_w(5, 2);
+					m_mcbsp0->tx_frame_w(0); external_reg_w(1, 1);
+					m_mcbsp0->data_w(3, 0xa55a); m_mcbsp0->tx_frame_w(1);
+					external_clocks(1, false);
+					if (!m_external_bits.empty()) fatalerror("MU4 two-bit delay emitted on first clock");
+					external_clocks(12, false);
+					if (m_external_words != std::vector<u16>({0x055a}) || m_external_bits.size() != 12)
+						fatalerror("MU4 external two-bit delay mismatch");
+					logerror("mu4_mcbsp_external: PASS frame_gate=1 stereo=1 bit_order=1 ignore=1 asynchronous=1 delay=1 polarity=1 cancel=1 pending_restore=1\n");
+					m_saved_dma.str(std::string()); m_phase = 25; machine().schedule_soft_reset(); return;
+				}
+			}
+			++m_phase; m_check->adjust(attotime::from_usec(1)); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
