@@ -3,6 +3,7 @@
 
 import argparse
 import asyncio
+from email.parser import HeaderParser
 import json
 from pathlib import Path
 import re
@@ -12,6 +13,15 @@ try:
     from tools.run_sip_stack_probe import write_tone
 except ModuleNotFoundError:
     from run_sip_stack_probe import write_tone
+
+
+def outgoing_setup_pattern(product):
+    frame = {
+        '3210': '03450401a05e0581551532f4150101',
+        '3310': '03450404600200815e0581551532f4a2150101',
+    }[product]
+    return (rf'GSM service uplink sapi=0 pd=03 message=05 length={len(frame) // 2} '
+            rf'data={frame}(?:\s|$)')
 
 
 async def run(args):
@@ -58,7 +68,8 @@ async def run(args):
                 str(Path(__file__).with_name('dct3_sip_bridge.py')),
                 '--url', f'ws://127.0.0.1:{args.http_port}/nokia/dct3/calls',
                 '--destination', f'sip:probe@127.0.0.1:{args.sip_port}',
-                '--sip-port', str(args.sip_port + 1), '--once', '--require-frames',
+                '--sip-port', str(args.sip_port + 1),
+                *(['--once'] if args.calls == 1 else ['--calls', str(args.calls)]), '--require-frames',
                 '100' if args.sip_response == 200 and not args.cancel_incoming and
                 not (args.restore_call and args.restore_phase == 'alerting') else '0',
                 *(['--record-pcm', str(root)] if args.record_media else []),
@@ -119,7 +130,7 @@ async def run(args):
         verify_cancel(root, remote_text)
         return
     if args.sip_response != 200:
-        verify_failure(root, remote_text, args.sip_response)
+        verify_failure(root, remote_text, args.sip_response, args.product, args.calls)
         return
     verify_success(root, remote_text, args)
 
@@ -168,9 +179,7 @@ def verify_success(root, remote_text, args):
             rf'GSM service uplink sapi=0 pd=03 message=2a .*data={release_complete_data}',
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=ended',
     ) if args.incoming else (
-            (r'GSM service uplink sapi=0 pd=03 message=05 length=19 data=03450404600200815e0581551532f4a2150101'
-             if product == '3310' else
-             r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101'),
+            outgoing_setup_pattern(product),
             r'GSM service downlink kind=12 sapi=0 pd=03 message=07',
             r'GSM service uplink sapi=0 pd=03 message=0f .*data=030f',
             r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
@@ -189,40 +198,62 @@ def verify_success(root, remote_text, args):
     print('OK - physical handset call connected to SIP with bidirectional host media and release')
 
 
-def verify_failure(root, remote_text, status):
+def verify_failure(root, remote_text, status, product='3210', calls=1):
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
+    dialogs = set()
+    for response in re.finditer(
+            rf'^SIP/2.0 {status}[^\r\n]*\r?\n((?:[^\r\n]+\r?\n)*)', remote_text, re.MULTILINE):
+        headers = HeaderParser().parsestr(response[1])
+        call_ids = headers.get_all('Call-ID', [])
+        if len(call_ids) == 1 and headers.get('CSeq', '').split()[-1:] == ['INVITE']:
+            dialogs.add(call_ids[0])
+    if len(dialogs) != calls:
+        raise RuntimeError('missing distinct actual SIP failure dialogs')
     if (f'SIP/2.0 {status} ' not in remote_text or
             f'SIP disconnected status={status} identity=(1, 1)' not in bridge_text):
         raise RuntimeError('missing actual SIP failure response and correlated bridge result')
     if ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge_text or
             re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log)):
         raise RuntimeError('failed SIP call falsely connected')
-    match = re.search(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
-    if not match:
+    summaries = re.findall(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
+    if len(summaries) != calls:
         raise RuntimeError('failed SIP call never completed handset release')
-    counts = json.loads(match[1])
-    if any(counts.get(name) != 0 for name in ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received')):
+    media = [json.loads(summary) for summary in summaries]
+    if any(counts.get(name) != 0 for counts in media
+           for name in ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received')):
         raise RuntimeError('failed SIP call falsely claimed media')
     cursor = 0
-    for pattern in (
-            r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101',
+    for request_id in range(1, calls + 1):
+        if f'SIP disconnected status={status} identity=(1, {request_id})' not in bridge_text:
+            raise RuntimeError('missing correlated SIP failure for each handset attempt')
+        patterns = [outgoing_setup_pattern(product)]
+        if calls > 1:
+            patterns += [rf'gsm_call_adapter: request id={request_id} epoch=1 digits=5551234',
+                         rf'outgoing decision consumed id={request_id} outcome={1 if status == 486 else 2}']
+            if status == 480:
+                patterns += [rf'outgoing termination consumed id={request_id} cause=18']
+        patterns += [
             r'GSM service downlink kind=13 sapi=0 pd=03 message=25 length=5',
             # Bit 6 is the CC send-sequence flag; it is not another primitive.
             r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
             r'GSM service downlink kind=26 sapi=0 pd=03 message=2a',
-            r'LAPDm service Channel Release acknowledged'):
-        match = re.search(pattern, log[cursor:])
-        if not match:
-            raise RuntimeError(f'missing SIP-failure firmware checkpoint: {pattern}')
-        cursor += match.end()
+            r'LAPDm service Channel Release acknowledged']
+        if calls > 1:
+            patterns += [rf'gsm_call_adapter: state id={request_id} epoch=1 phase=ended']
+        for pattern in patterns:
+            match = re.search(pattern, log[cursor:])
+            if not match:
+                raise RuntimeError(f'missing SIP-failure firmware checkpoint: {pattern}')
+            cursor += match.end()
     if status == 480 and 'outgoing termination consumed id=1 cause=18' not in log:
         raise RuntimeError('SIP 480 did not deliver cause 18 through the GSM session')
     if status == 486 and 'outgoing decision consumed id=1 outcome=1' not in log:
         raise RuntimeError('SIP 486 did not deliver the GSM busy decision')
     (root / 'sip-result.json').write_text(json.dumps({
-        'scope': '3210 HLE physical outgoing SIP failure and firmware release; no connection/media',
-        'sip_status': status, 'media': counts, 'passed': True}, indent=2) + '\n')
+        'scope': f'{product} HLE physical outgoing SIP failure and firmware release; no connection/media',
+        'sip_status': status, 'completed_calls': calls,
+        'media': media[0] if calls == 1 else media, 'passed': True}, indent=2) + '\n')
     print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
 
 
@@ -350,6 +381,7 @@ def main():
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--product', choices=('3210', '3310'), default='3210')
+    parser.add_argument('--calls', type=int, choices=(1, 2), default=1)
     parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--restore-call', action='store_true')
     parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
@@ -358,6 +390,8 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
+        parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:
         parser.error('--sip-response failure fixtures are outgoing only')
     if args.cancel_incoming and not args.incoming:

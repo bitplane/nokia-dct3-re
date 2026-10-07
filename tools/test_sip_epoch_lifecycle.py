@@ -40,6 +40,47 @@ class Codec:
 
 
 class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
+    async def test_bounded_repeated_calls_do_not_stop_after_first_release(self):
+        async def host(socket):
+            await socket.send(json.dumps({'type': 'call_adapter_ready',
+                'protocol_version': 1, 'epoch': 1}))
+            for request_id in (1, 2):
+                await socket.send(json.dumps({'type': 'outgoing_call',
+                    'epoch': 1, 'request_id': request_id, 'digits': '5551234'}))
+                decision = json.loads(await asyncio.wait_for(socket.recv(), 2))
+                self.assertEqual(decision, {'type': 'outgoing_call_decision',
+                    'epoch': 1, 'request_id': request_id, 'decision': 'connect'})
+                await socket.send(json.dumps({'type': 'outgoing_call_state',
+                    'epoch': 1, 'request_id': request_id, 'phase': 'ended'}))
+            await socket.wait_closed()
+
+        with patch.object(sip, 'SipEndpoint', Endpoint), patch.object(sip, 'GsmFrCodec', Codec):
+            async with websockets.serve(host, '127.0.0.1', 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                args = SimpleNamespace(url=f'ws://127.0.0.1:{port}', sip_port=0,
+                    destination='sip:probe@localhost', once=False, calls=2, require_frames=0)
+                await asyncio.wait_for(sip.bridge(args, None), 3)
+        self.assertEqual(Endpoint.instances[-1].dials, [(1, 1), (1, 2)])
+
+    async def test_media_requirement_applies_to_the_first_bounded_call(self):
+        async def host(socket):
+            await socket.send(json.dumps({'type': 'call_adapter_ready',
+                'protocol_version': 1, 'epoch': 1}))
+            await socket.send(json.dumps({'type': 'outgoing_call',
+                'epoch': 1, 'request_id': 1, 'digits': '5551234'}))
+            await asyncio.wait_for(socket.recv(), 2)
+            await socket.send(json.dumps({'type': 'outgoing_call_state',
+                'epoch': 1, 'request_id': 1, 'phase': 'ended'}))
+            await socket.wait_closed()
+
+        with patch.object(sip, 'SipEndpoint', Endpoint), patch.object(sip, 'GsmFrCodec', Codec):
+            async with websockets.serve(host, '127.0.0.1', 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                args = SimpleNamespace(url=f'ws://127.0.0.1:{port}', sip_port=0,
+                    destination='sip:probe@localhost', once=False, calls=2, require_frames=1)
+                with self.assertRaisesRegex(RuntimeError, 'required bidirectional media'):
+                    await asyncio.wait_for(sip.bridge(args, None), 3)
+
     async def test_pending_restored_request_clears_without_redial(self):
         await self.check_restored_request()
 

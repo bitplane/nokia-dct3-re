@@ -240,6 +240,7 @@ async def bridge(args, pj):
     blocked_restore = False
     restored_identity = None
     registered = False
+    completed_calls = 0
     downlink_sequence = 0
     uplink_sequence = -1
     counts = {'uplink': 0, 'downlink': 0}
@@ -337,11 +338,13 @@ async def bridge(args, pj):
                                                       pcm_received=endpoint.media.received,
                                                       dropped=endpoint.media.dropped)
                                         print(f'SIP bridge ended {json.dumps(counts)}', flush=True)
-                                        if args.once:
-                                            if min(counts[name] for name in (
-                                                    'uplink', 'downlink', 'pcm_transmitted',
-                                                    'pcm_received')) < args.require_frames:
-                                                raise RuntimeError('call ended without required bidirectional media')
+                                        completed_calls += 1
+                                        if min(counts[name] for name in (
+                                                'uplink', 'downlink', 'pcm_transmitted',
+                                                'pcm_received')) < args.require_frames:
+                                            raise RuntimeError('call ended without required bidirectional media')
+                                        if args.once or (getattr(args, 'calls', 0) and
+                                                completed_calls >= args.calls):
                                             return
                                         identity = None
                                         connected = decision = False
@@ -437,7 +440,9 @@ def main():
     parser.add_argument('--url', default='ws://127.0.0.1:18080/nokia/dct3/calls')
     parser.add_argument('--destination', required=True, help='explicit SIP destination; handset digits are logged, not rewritten into a URI')
     parser.add_argument('--sip-port', type=int, default=25070)
-    parser.add_argument('--once', action='store_true')
+    limit = parser.add_mutually_exclusive_group()
+    limit.add_argument('--once', action='store_true')
+    limit.add_argument('--calls', type=int, default=0, help='stop after this many completed calls; zero runs continuously')
     parser.add_argument('--require-frames', type=int, default=0)
     parser.add_argument('--record-pcm', type=Path, help='optional host-boundary PCM WAV recordings')
     args = parser.parse_args()
@@ -445,6 +450,8 @@ def main():
         parser.error('--destination must be a SIP URI without line breaks')
     if args.require_frames < 0:
         parser.error('--require-frames must be nonnegative')
+    if args.calls < 0:
+        parser.error('--calls must be nonnegative')
     try:
         import pjsua2 as pj
         asyncio.run(bridge(args, pj))

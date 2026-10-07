@@ -534,3 +534,24 @@ catch-up bursts after a host stall. Its eight-block queue and the emulator's
 independent radio clock remain unchanged. Normal-call acceptance also requires
 at least 100 consecutive, handset-accepted downlink sequence numbers and no
 rejected frames: sent-frame counts alone cannot establish downlink delivery.
+
+### Failed calls and automatic redial
+
+The tested NHM-5 v6.39 profile automatically retries a rejected outgoing call
+without another physical keypress. The 3310 failure gates keep the SIP endpoint
+attached through two complete attempts rather than leaving that retry pending:
+
+```sh
+make verify-3310-radio-outgoing-call-sip-busy-redial RUN_DIR=run_3310_sip_busy
+make verify-3310-radio-outgoing-call-sip-unavailable-redial RUN_DIR=run_3310_sip_unavailable
+```
+
+Each requires two distinct actual SIP INVITE dialogs and correlated handset
+request IDs, zero CONNECT/media, and ordered CC/LAPDm release for both attempts.
+SIP 486 consumes the busy decision; SIP 480 consumes `no_answer` followed by
+cause 18 for each attempt. This proves the tested profile's retry lifecycle,
+not a universal factory redial setting or native DSP operation.
+
+The optional bridge `--calls N` stops after N normally completed handset calls;
+zero retains continuous operation. It is mutually exclusive with `--once`.
+`--require-frames` applies to every normally completed call, not just the last.
