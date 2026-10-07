@@ -35,7 +35,8 @@ completes the same transaction with device-owned pin-level RX too. The
 The `measure` profile sends original selector `40` through serial pins and
 verifies six stereo sample-energy blocks against independent arithmetic from
 the live input reads, followed by an acknowledged response and mode-zero
-cleanup. Generated tone output is not yet independently verified.
+cleanup. The same profile independently verifies generated tone buffers,
+including phase wraparound; analog audio and music decoding remain unvalidated.
 The open boundary is native reset lifecycle and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
@@ -1563,11 +1564,31 @@ and the block count is six. No illegal instruction occurs. Cleanup clears
 the RX buffers, so this profile does not reuse the idle profile's final
 constant-buffer assertions; the independently checked startup prefix and
 the untouched status/replay controls retain their own acceptance checks.
-Neither music decoding nor tone waveform accuracy follows from this result.
+This alone does not validate tone generation or music decoding.
 
-Next verify the native transport reset lifecycle and board attachment, and
-processing-command arithmetic and media inputs before attempting native
-playback. Do not write `bb80`, `3750` or replay internal queue objects to select
+The same original command calls generator `02:876a` 90 times. Its two
+64-word channels use phase words `bb79/bb7a`, increments `bb7b/bb7c`,
+ROM lookup base `17fd` and amplitudes `bb7d/bb7e`. A separate integer model
+folds the signed phase into the table index and applies the fractional
+amplitude product with high-word truncation. Both ping-pong buffers and
+final phase words match on every call: 11,520 sample words, including 26
+signed phase wraps. The model explicitly rejects product saturation outside
+this fixture's supported range. These are verified generated buffer values,
+not yet continuous post-prefix codec-DIN evidence, analog sound, music or
+speech decoding.
+
+The original directory scanner at `03:941d` accepts extensions `REL` and
+`LSE` (strings at data `bff3/bff7`), excludes directory entries and caps its
+catalogue at 150. Settings lookup uses `TRACKLST.BIN`; valid settings can
+restore word `3768`, and the scanner publishes its count there. Selector
+`30`, parameter `2`, rejects an empty `3768` before its media-state path.
+The final uploaded program contains 26 exact literal operands for `3768`
+across 48,261 words; this is not closure over DP-relative or dynamic writers.
+A plain MP3 file is not an evidenced fixture for this original firmware.
+
+Next recover the accepted media container and storage layout before attempting
+native playback, and verify transport reset and board attachment separately.
+Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
 a mode.
 
 The pin bench registers its external receive/transmit waveform state,

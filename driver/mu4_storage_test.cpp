@@ -141,6 +141,10 @@ private:
 	std::array<u32, 2> m_measurement_expected{};
 	std::array<unsigned, 2> m_measurement_samples{};
 	unsigned m_measurement_factor = 1;
+	std::array<u16, 128> m_tone_expected{};
+	std::array<u16, 2> m_tone_phase{};
+	u16 m_tone_buffer = 0;
+	unsigned m_tone_blocks = 0, m_tone_phase_wraps = 0;
 	unsigned m_native_command_cursor = 0, m_native_command_waits = 0;
 	unsigned m_command_tx_irqs = 0, m_command_wire_bits = 0;
 	unsigned m_command_ack_cursor = 0, m_command_wire_bit_count = 0;
@@ -552,6 +556,48 @@ private:
 		m_native_replay_leg = 1;
 		logerror("mu4_native_replay_checkpoint: rx_phase=4 data_bits=3 rx_irqs=%u request_cursor=%u\n", m_command_rx_irqs, m_native_command_cursor);
 	}
+	void observe_native_tone(offs_t address)
+	{
+		if (m_phase != 30 || machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		if (address == 0x2876a)
+		{
+			m_tone_buffer = data.read_word(0xbb86) ? 0xbaf9 : 0xba79;
+			for (unsigned channel = 0; channel < 2; ++channel)
+			{
+				u16 phase = data.read_word(0xbb79 + channel);
+				s32 const step = s16(data.read_word(0xbb7b + channel));
+				s32 const amplitude = s16(data.read_word(0xbb7d + channel));
+				for (unsigned i = 0; i < 64; ++i)
+				{
+					// Independent phase folding and signed fixed-point scaling, not CPU results.
+					s32 const sum = s16(phase) + step;
+					if (sum > 32767 || sum < -32768) ++m_tone_phase_wraps;
+					phase = u16(sum);
+					s32 const distance = sum - 0x4000;
+					s32 const folded = s16(u16(distance < 0 ? -distance : distance));
+					s32 const index = folded >= 0 ? folded / 128 : -((-folded + 127) / 128);
+					u16 const table = data.read_word(0x17fd + (index < 0 ? -index : index));
+					s64 const product = s64(s16(table)) * amplitude * 2;
+					if (product < -0x80000000LL || product > 0x7fffffffLL)
+						fatalerror("MU4 tone fixture exceeds independently modeled nonsaturating scale range");
+					s64 const scaled = product >= 0 ? product / 65536 : -((-product + 65535) / 65536);
+					m_tone_expected[channel * 64 + i] = u16(scaled);
+				}
+				m_tone_phase[channel] = phase;
+			}
+			return;
+		}
+		for (unsigned i = 0; i < m_tone_expected.size(); ++i)
+			if (data.read_word(m_tone_buffer + i) != m_tone_expected[i])
+				fatalerror("MU4 native tone mismatch block=%u sample=%u actual=%04x expected=%04x", m_tone_blocks,
+					i, data.read_word(m_tone_buffer + i), m_tone_expected[i]);
+		for (unsigned channel = 0; channel < 2; ++channel)
+			if (data.read_word(0xbb79 + channel) != m_tone_phase[channel])
+				fatalerror("MU4 native tone phase disagrees with independent block model");
+		++m_tone_blocks;
+	}
 	bool finish_native_replay()
 	{
 		if (system_bios() < 12) return false;
@@ -749,6 +795,9 @@ private:
 		m_measurement_expected.fill(0);
 		m_measurement_samples.fill(0);
 		m_measurement_factor = 1;
+		m_tone_expected.fill(0); m_tone_phase.fill(0);
+		m_tone_buffer = 0;
+		m_tone_blocks = m_tone_phase_wraps = 0;
 		m_command->adjust(attotime::never);
 		m_command_clock->adjust(attotime::never);
 		m_command_receive_clock->adjust(attotime::never);
@@ -1851,6 +1900,9 @@ private:
 				});
 			if (system_bios() == 13)
 			{
+				for (offs_t address : {0x2876a, 0x287ad})
+					m_cpu->space(AS_PROGRAM).install_read_tap(address, address, "mu4_native_tone",
+						[this](offs_t address, u16 &, u16) { observe_native_tone(address); });
 				m_cpu->space(AS_DATA).install_read_tap(0x1900, 0x19ff, "mu4_measurement_input",
 					[this](offs_t, u16 &value, u16)
 					{
@@ -2073,6 +2125,10 @@ private:
 					data.read_word(0xbb80) || data.read_word(0x165d) || data.read_word(0x165e))
 					fatalerror("MU4 original measurement command did not complete six blocks and settle its acknowledged response");
 				logerror("mu4_native_measurement: PASS blocks=6 stereo=1 independent_arithmetic=1 pin_request=1 ack=1 tx_words=12 mode=0 music_decode=0 full_boot=0\n");
+				if (m_tone_blocks < 6 || !m_tone_phase_wraps)
+					fatalerror("MU4 native tone observation did not cover repeated blocks and signed phase wraparound");
+				logerror("mu4_native_tone: PASS blocks=%u samples=%u stereo=1 independent_table_scale=1 phase_wraps=%u music_decode=0 analog_audio=0\n",
+					m_tone_blocks, m_tone_blocks * 128, m_tone_phase_wraps);
 			}
 			else if (finish_native_replay()) return;
 			machine().schedule_exit();

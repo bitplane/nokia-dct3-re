@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "mu4_native_tone_buffer_arithmetic", "subsystem": "5510_mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Original selector 40 invokes generator 02:876a ninety times in the external-pin measurement fixture. An independent integer model uses the entry phase/increment, original data table at 17fd and amplitude words to calculate phase folding, signed fractional product and high-word truncation. All 11520 stereo sample words in both ping-pong buffers and the final phase words match, including 26 signed phase wraps. The checker rejects saturation outside its modeled fixture range. This establishes native buffer generation, not continuous post-prefix codec-DIN delivery, analog audio, music/speech decoding, board clocks or full MU4 boot",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "mu4_native_stereo_energy_measurement", "subsystem": "5510_mu4", "status": "partial", "confidence": "strong",
       "boundary": "The measure profile delivers original R060 selector 40 through McBSP2 pins after the checked streaming prefix. Original firmware activates mode one and helper 02:87ea processes six 64-sample blocks per channel. A passive live-operand observer independently applies signed absolute-value/divide-by-16 scaling, square, entry-time fractional multiplier and previous aggregate; all twelve stored nonsaturating results match. Firmware emits acknowledgement 7f0155 and response 1e03aa016820807e55, accepts peer acknowledgement 7f8055, drains eleven receive and twelve transmit bytes, empties its queue and returns mode bb80 to zero with completion b64e one and block count six. Status 20 is the native numerical result, not an assumed success. No firmware memory or mode is injected. Tone-output accuracy, music decoding, board timing, native reset and full handset/MU4 boot remain unvalidated",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]

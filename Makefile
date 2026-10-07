@@ -1068,7 +1068,7 @@ check-mu4-storage-original: build
 			wireack) grep -q 'mu4_native_status_transaction: PASS' error.log;; \
 			pins) grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log;; \
 			replay) grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; grep -q 'mu4_native_replay: PASS' error.log;; \
-			measure) grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_worker_activation: PASS' error.log;; esac
+			measure) grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; grep -q 'mu4_native_worker_activation: PASS' error.log;; esac
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.
