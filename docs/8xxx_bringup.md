@@ -833,6 +833,24 @@ The latter additionally pins post-release idle pixels, excluding only the
 advancing top-row clock. This closes outgoing presentation after CC/RR release;
 incoming-call foreground settlement and native speech remain separate.
 
+Host-originated incoming calls can also start after valid clock/date entry.
+`noki8890_clock_incoming_input.lua` settles the editors without dialing,
+then physically answers at 48 seconds and ends at 56 seconds. Use fresh
+private cfg/NVRAM, a private copy of
+`fixtures/noki8890_clock_incoming/nsb6hle.cfg`, verbose logging, HTTP enabled
+and 70 seconds. `tools/run_host_incoming_signaling_gate.py` launches MAME,
+waits for a fresh `8890_date_after.png` readiness artifact, then submits the
+typed WebSocket call with caller `447700900123`. It validates the correlated
+host phases queued/paging/alerting/connected/ended and rejects stale readiness
+artifacts. Both exploratory and tracked-runner replays show that caller on
+the ringing screen and ordinary `DCT3 LAB` idle after physical End.
+
+The fixed laboratory `noki8890_incoming_call_check.py` is **not** green for
+this composition: its SETUP pattern pins a different calling-number payload.
+The host-phase proof and reviewed screenshots do not replace a full
+caller-aware CC/RR packet checker or exact-frame incoming acceptance. Those
+checks remain the next acceptance task; native speech remains unproved.
+
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
 not the previously settled idle frame. Reproduce with

@@ -39,6 +39,7 @@ local input = coroutine.create(function()
     if not press(1, 'Menu') then return end
     if not emu.wait(3) then return end
     machine.screens[':screen']:snapshot('8890_date_after.png')
+    if _G.noki8890_clock_settlement_only then return end
     for _, item in ipairs({{2, 'Keypad 1'}, {3, 'Keypad 2'},
             {4, 'Keypad 3'}, {2, 'Keypad 4'}, {3, 'Keypad 5'},
             {4, 'Keypad 6'}, {2, 'Keypad 7'}}) do
