@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 379 gates: 232 generated from typed steps, 147 copied verbatim (shell).
+# 380 gates: 233 generated from typed steps, 147 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -228,7 +228,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3330-radio-incoming-call-sip-connected-restore \
 	verify-3330-radio-incoming-call-sip-cancel \
 	verify-3330-radio-incoming-call-sip-alerting-restore \
-	verify-radio-incoming-call-sip verify-radio-incoming-call-sip-idle-restore \
+	verify-3410-radio-outgoing-call-sip verify-radio-incoming-call-sip \
+	verify-radio-incoming-call-sip-idle-restore \
 	verify-3310-radio-incoming-call-sip-connected-restore \
 	verify-3310-radio-incoming-call-sip-alerting-restore \
 	verify-3310-radio-outgoing-call-sip-busy-redial \
@@ -3718,6 +3719,9 @@ verify-3330-radio-incoming-call-sip-cancel:
 
 verify-3330-radio-incoming-call-sip-alerting-restore:
 	@$(MAKE) --no-print-directory verify-3330-radio-incoming-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3330_INCOMING_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c SIP_3330_INCOMING_RUNNER_ARGS='--incoming --restore-call --restore-phase alerting --product 3330' SIP_3330_INCOMING_SCRIPT=../tools/sip_3330_call_state_roundtrip.lua
+
+verify-3410-radio-outgoing-call-sip: normalize-3410
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS=end,wait1000,5,5,5,1,2,3,4,send SIP_HANDSET_KEY_DELAY_MS=16000 SIP_HANDSET_KEY_DURATION_MS=120 SIP_HANDSET_KEY_GAP_MS=240 SIP_HANDSET_RUNNER_ARGS='--product 3410' SIP_HANDSET_SECONDS=45
 
 verify-radio-incoming-call-sip:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48

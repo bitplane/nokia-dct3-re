@@ -267,6 +267,15 @@ Physical Answer, bidirectional HLE transport and normal clearing are required.
 PUP buzzer readiness is not used as its Answer trigger: the measured incoming
 call reaches Alerting without asserting that bit in this composition.
 
+`verify-3410-radio-outgoing-call-sip` cold-boots NHM-2 v5.46E with its own
+product inputs, dismisses the startup UI with End, physically dials `5551234`
+and presses Send. Its captured 15-byte SETUP matches the NSE-8 fixture bytes,
+but its keypad, storage and DSP/PCM profile remain product-local. The gate
+requires actual SIP confirmation, sustained ordered accepted downlink frames,
+bidirectional HLE host media and firmware CC/RR release. Queue-drop counts are
+retained; neither lossless media nor native DSP speech is claimed. Incoming
+3410 SIP acceptance is not yet enabled.
+
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps
 486/600 to busy and other pre-confirmation failures to no-answer plus explicit
