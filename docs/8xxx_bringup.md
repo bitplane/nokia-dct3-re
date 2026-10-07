@@ -793,8 +793,18 @@ of `1234567` displays those digits in order. The diagnostic
 `tools/noki8890_clock_input.lua` reproduces this on fresh private cfg/NVRAM
 with the declared `nsb6hle` composition and a 55-second run; it captures
 each time digit, date entry, settled idle and subsequent dial editor.
-This is physical UI observation, not an exact-frame acceptance gate or proof
-of cold-restart clock persistence. It requires no PMM, cursor or firmware
+The checker requires all 21 ordered physical events and their own decoded-key
+windows, plus reviewed date, registered-idle and dial pixels. It excludes the
+advancing top-row clock, not the user-entered date or number:
+
+```sh
+.venv/bin/python tools/noki8890_clock_check.py RUN/error.log RUN/snap
+```
+
+A fresh replay passes independently of the exploratory run. Five tool tests
+protect event ordering, wrong/missing decodes, cross-event leakage and blank
+frame rejection. This validates the ordinary editor/UI lifecycle, not network
+registration itself or cold-restart RTC persistence. It requires no PMM, cursor or firmware
 writes. Invalid-empty-input cancellation remains unresolved separately.
 
 A separate process preserving that run's phone/SIM NVRAM still presents
