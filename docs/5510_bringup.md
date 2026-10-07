@@ -54,7 +54,8 @@ executes its uploaded `ff80` reset-vector prelude, original context
 initializer, directory-selected resident loader and resident startup.
 The `bootstatus` variant completes the same pin-level status transaction
 after this full startup; `bootreplay` verifies its mid-byte save-state
-continuation across all 1,040 registered emulation-state items. The
+continuation across the registered emulation-state items selected by its
+replay checker. The
 `bootmeasure` variant verifies the original sample-energy and tone-buffer
 arithmetic after the same complete startup. The `bootreset` variant repeats original startup
 after a mid-byte soft reset and completes that transaction again without
