@@ -1132,20 +1132,26 @@ submission, rejection signaling, reviewed failure text and post-release
 input/menu recovery. It does not establish silent-peer timeout/retry or
 external-SMSC failure acceptance.
 
-RP-silence remains an open handset/session boundary. A fresh GSM900 host run
-with `--decision rp_silence`, the ordinary outgoing-input fixture and 150
-emulated seconds produces one exact `A/5551234` submission at 39.964 seconds
-and network CP-ACK at 39.969 seconds. The host's correlated silence decision
-is accepted; no RP response is synthesized. No further SMS uplink, retry or
-service-channel release is observed before the run ends. CCONT watchdog kicks
-and DSP RX traffic continue through the observation window, so this is not
-evidence of a stopped emulator. The host runner must report incomplete
-lifecycle when its socket closes, not success or an uncaught traceback.
-`nokia_gsm_session` explicitly parks in `awaiting_mobile_sms_timeout` without
-an RP reply; next evidence needed is the handset's RP timer/abort path and its
-radio-layer output. The bounded absence does not establish that no timer
-exists, that 150 seconds is a standards-derived timeout, or that forcing a
-peer release would be faithful. PCS silence is not yet tested.
+RP-silence completion uses mobile LAPDm release rather than another SMS
+Layer-3 message. In the GSM900 fixture, one exact `A/5551234` submission occurs
+at 39.964 seconds and network CP-ACK at 39.969 seconds. With no RP reply,
+handset firmware sends main-link DISC (`01 53 01`) at 107.505 seconds; the
+network sends UA and the handset deconfigures its assigned channel. The
+session retires the silent request only after that link UA, then the host
+publishes correlated `ended` and idle paging is rearmed. Neither a timeout
+timer nor a handset event is synthesized by the peer. The observed interval
+is not a measured physical timer specification.
+
+Use `--decision rp_silence` with `tools/noki8890_sms_silence_input.lua` and
+125 seconds, fresh private storage and the GSM900 host configuration. Require
+`noki8890_outgoing_sms_check.py --rp-silence --recovery-frames RUN/snap
+RUN/error.log`: it checks exact submission, CP-ACK, silence decision, DISC/UA,
+physical deconfiguration, correlated host completion, resumed paging, reviewed
+failure text and physical End/Menu recovery. It rejects any RP-ACK/RP-ERROR
+or missing mobile DISC. A service-only trace is insufficient here: it omits
+the load-bearing LAPDm release. The reviewed timeout frame reads
+`Übertragungsfehler`, distinct from the explicit rejection's message-not-sent
+text. PCS silence is not yet tested.
 
 Fresh strict-topology runs also complete incoming and outgoing call
 signaling and incoming/outgoing SMS. The network's existing assignment

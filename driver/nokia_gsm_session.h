@@ -218,6 +218,7 @@ public:
 		return m_state == u8(state::awaiting_mobile_sms_sapi3_establishment);
 	}
 	void mobile_sms_sapi3_established();
+	bool mobile_link_release_acknowledged(u8 sapi);
 	bool call_connected() const
 	{
 		return m_state == u8(state::incoming_call_active);

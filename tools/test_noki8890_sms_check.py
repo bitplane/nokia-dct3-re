@@ -3,6 +3,7 @@ import unittest
 from tools.noki8890_incoming_sms_check import verify as verify_incoming
 from tools.noki8890_outgoing_sms_check import verify as verify_outgoing
 from tools.noki8890_outgoing_sms_check import check_recovery
+from tools.noki8890_outgoing_sms_check import verify_silence
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from PIL import Image
@@ -15,9 +16,29 @@ INCOMING = FRESH.replace('0080ffffffff', '0076ffffffff').replace(
     '8850_keypad_decoded key=19', '8890_keypad_decoded: key=19')
 OUTGOING = GOOD.replace('8850_', '8890_').replace(
     '8890_keypad_decoded key=', '8890_keypad_decoded: key=')
+SILENCE = '''8890_sms_send_physical: action=confirm_send
+GSM service uplink sapi=3 pd=09 message=01 length=27 data=390118000100069121436587090d11010781551532f40000a70141
+gsm_sms_submit:
+GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2
+gsm_call_adapter: sms decision id=1 outcome=3 result=accepted
+TX packet type=1b data=0080015301
+RX enqueue type=80 data=800000005b0100010000017301
+TX packet type=02 radio_phase=release_channel_change
+gsm_call_adapter: sms state id=1 epoch=1 phase=ended
+PCH no-identity fill
+'''
 
 
 class Nokia8890SmsTest(unittest.TestCase):
+    def test_silence_requires_mobile_release(self):
+        verify_silence(SILENCE)
+        with self.assertRaisesRegex(ValueError, 'DISC'):
+            verify_silence(SILENCE.replace('0080015301', '0080010301'))
+
+    def test_silence_rejects_rp_result(self):
+        with self.assertRaisesRegex(ValueError, 'RP result'):
+            verify_silence(SILENCE + 'GSM service downlink kind=18 sapi=3')
+
     def test_recovery_requires_physical_navigation(self):
         with self.assertRaisesRegex(ValueError, 'physical recovery'):
             check_recovery(OUTGOING, Path('missing'))

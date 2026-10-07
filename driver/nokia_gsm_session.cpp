@@ -1773,6 +1773,30 @@ nokia_gsm_session_device::receive_layer3(
 	return downlink_kind::none;
 }
 
+bool nokia_gsm_session_device::mobile_link_release_acknowledged(u8 sapi)
+{
+	// A silent RP transaction can end with mobile main-link DISC rather than
+	// a network Layer-3 Channel Release. Retire it only after the link UA.
+	if (sapi != 0 || !m_mobile_originated_sms ||
+			m_state != u8(state::awaiting_mobile_sms_timeout))
+		return false;
+	clear_pending_downlink();
+	m_established_layer3.fill(0);
+	m_established_layer3_length = 0;
+	m_mobile_originated_sms = false;
+	m_outgoing_sms_request_pending = false;
+	m_outgoing_sms_decision_accepted = false;
+	m_sms_cp_transaction = 0;
+	m_sms_rp_reference = 0;
+	m_sms_cp_data_acknowledged = false;
+	m_sms_rp_acknowledged = false;
+	m_sms_status_report_requested = false;
+	m_sms_submit_recipient_length = 0;
+	m_state = u8(state::idle);
+	clear_dedicated_cipher();
+	return true;
+}
+
 void nokia_gsm_session_device::mobile_sms_sapi3_established()
 {
 	if (m_state == u8(state::awaiting_mobile_sms_sapi3_establishment))

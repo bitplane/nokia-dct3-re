@@ -3096,6 +3096,8 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 	else if (current_phase() == phase::traffic_release_acknowledgement &&
 			report_type == 0x80)
 	{
+		if (m_gsm_session->mobile_link_release_acknowledged(m_lapdm_link->layer3_sapi()))
+			m_pch_fill_delivered = false;
 		set_phase(phase::release_deconfigure);
 		m_reports_remaining = 0;
 	}
