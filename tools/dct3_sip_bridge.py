@@ -30,6 +30,7 @@ class MediaQueues:
         self.dropped = 0
         self.transmitted = 0
         self.received = 0
+        self.next_downlink_at = 0.0
 
     def put(self, destination, pcm):
         if len(pcm) != 320:
@@ -38,6 +39,15 @@ class MediaQueues:
             destination.put_nowait(pcm)
         except queue.Full:
             self.dropped += 1
+
+    def take_downlink(self, now):
+        # Never burst buffered SIP audio into the emulator's bounded queue or
+        # catch up after a stall. The radio keeps its independent air clock.
+        if now < self.next_downlink_at:
+            raise queue.Empty
+        pcm = self.downlink.get_nowait()
+        self.next_downlink_at = now + 0.020
+        return pcm
 
 
 def record_pcm(output, pcm):
@@ -398,7 +408,7 @@ async def bridge(args, pj):
                         print(f'SIP {phase} status={status} identity={identity}', flush=True)
                     while connected:
                         try:
-                            pcm = endpoint.media.downlink.get_nowait()
+                            pcm = endpoint.media.take_downlink(time.monotonic())
                         except queue.Empty:
                             break
                         if 'downlink' in recordings:

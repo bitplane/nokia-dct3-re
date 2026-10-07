@@ -33,7 +33,9 @@ class SipIdleRestoreCheckTest(unittest.TestCase):
     def check(self, log=LOG, bridge=BRIDGE, counts=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / 'error.log').write_text(log)
+            (root / 'error.log').write_text(log + ''.join(
+                f'gsm_call_adapter: media direction=downlink id=1 sequence={i} result=accepted\n'
+                for i in range(100)))
             (root / 'sip-bridge.log').write_text(bridge + 'SIP bridge ended '
                 + json.dumps(COUNTS if counts is None else counts) + '\n')
             verify_success(root, REMOTE, SimpleNamespace(incoming=True, restore_idle=True))

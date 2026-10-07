@@ -1,4 +1,5 @@
 import array
+import json
 import math
 from pathlib import Path
 import sys
@@ -6,7 +7,7 @@ import tempfile
 import unittest
 import wave
 
-from tools.sip_handset_waveform_check import inspect_tone
+from tools.sip_handset_waveform_check import inspect_tone, verify
 
 
 class SipHandsetWaveformTest(unittest.TestCase):
@@ -50,6 +51,16 @@ class SipHandsetWaveformTest(unittest.TestCase):
                 output.writeframes(bytes(64000))
             with self.assertRaises(ValueError):
                 inspect_tone(path, 660)
+
+    def test_result_names_the_tested_product(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.recording(root, [(440, 8000)] * 2).rename(root / 'sip-microphone.wav')
+            self.recording(root, [(660, 8000)] * 2).rename(root / 'sip-earpiece.wav')
+            verify(root, '3310')
+            result = json.loads((root / 'sip-waveform-result.json').read_text())
+            self.assertTrue(result['scope'].startswith('3310 HLE'))
+            self.assertIn('not native DSP speech', result['scope'])
 
 
 if __name__ == '__main__':

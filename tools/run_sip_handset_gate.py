@@ -141,6 +141,11 @@ def verify_success(root, remote_text, args):
             'uplink', 'downlink', 'pcm_transmitted', 'pcm_received')) < 100:
         raise RuntimeError('insufficient executed bidirectional media')
     log = (root / 'error.log').read_text(errors='replace')
+    downlink = re.findall(
+        r'gsm_call_adapter: media direction=downlink id=1 sequence=(\d+) result=(accepted|rejected)', log)
+    if (len(downlink) < 100 or any(result != 'accepted' for _, result in downlink) or
+            [int(sequence) for sequence, _ in downlink] != list(range(len(downlink)))):
+        raise RuntimeError('handset did not accept a sustained ordered SIP downlink')
     epoch = 2 if args.restore_idle else 1
     if args.restore_idle:
         if ('SIP idle snapshot accepted epoch=2' not in bridge_text or

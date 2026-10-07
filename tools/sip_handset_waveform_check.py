@@ -38,9 +38,9 @@ def inspect_tone(path, frequency, minimum_seconds=2):
     return {'frequency': frequency, 'longest_seconds': longest, 'windows': accepted}
 
 
-def verify(root):
+def verify(root, product='3210'):
     root = Path(root)
-    result = {'scope': '3210 HLE microphone/earpiece through real SIP; not native DSP speech',
+    result = {'scope': f'{product} HLE microphone/earpiece through real SIP; not native DSP speech',
               'microphone_to_remote': inspect_tone(root / 'sip-microphone.wav', 440),
               'remote_to_earpiece': inspect_tone(root / 'sip-earpiece.wav', 660),
               'passed': True}
@@ -51,8 +51,9 @@ def verify(root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_dir', type=Path)
+    parser.add_argument('--product', choices=('3210', '3310'), default='3210')
     args = parser.parse_args()
     try:
-        verify(args.run_dir)
+        verify(args.run_dir, args.product)
     except (OSError, ValueError, wave.Error) as error:
         parser.exit(1, f'FAIL - {error}\n')

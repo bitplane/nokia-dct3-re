@@ -472,13 +472,16 @@ audio path. It does not prove native DSP speech or real RF operation.
 
 Next boundaries are broader restoration/failure coverage and native DSP speech,
 which remains its independent hardware/backend milestone.
-# Cross-Product SIP Acceptance
+
+## Cross-product SIP acceptance
 
 The 3310 NHM-5 v6.39 also completes a physical outgoing call through the local
 PJSIP bridge: handset SETUP, SIP confirmation, bidirectional host media, and
 normal CC/LAPDm release. Its SETUP bearer capability differs from the 3210;
-the checker retains separate exact product expectations. This establishes HLE
-signaling/media transport, not native DSP speech or physical waveform fidelity.
+the checker retains separate exact product expectations. The outgoing waveform
+gate additionally proves sustained microphone-to-SIP and SIP-to-earpiece tones
+through its own 1 MHz/125-clock PCM profile. This is research-HLE audio, not
+native DSP speech or evidence for its unresolved analogue gain programming.
 
 ```sh
 make verify-radio-outgoing-call-sip RUN_DIR=run_3310_sip_outgoing \
@@ -487,3 +490,20 @@ make verify-radio-outgoing-call-sip RUN_DIR=run_3310_sip_outgoing \
   SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=70 \
   SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--product 3310'
 ```
+
+```sh
+make verify-3310-radio-outgoing-call-sip-waveform RUN_DIR=run_3310_sip_waveform
+```
+
+Both products use the same 440 Hz source at 0.025 full-scale, avoiding clipping
+in the 3210's +18 dB path while providing measurable input to the 3310's neutral
+HLE gain. This is an external test level, not a calibration change. The common
+acceptance threshold remains two consecutive one-second windows with RMS at
+least 500 and at least half their energy at the expected frequency. Results
+identify the tested product; another product's SETUP encoding is rejected.
+
+The external bridge sends at most one queued downlink block per 20 ms, without
+catch-up bursts after a host stall. Its eight-block queue and the emulator's
+independent radio clock remain unchanged. Normal-call acceptance also requires
+at least 100 consecutive, handset-accepted downlink sequence numbers and no
+rejected frames: sent-frame counts alone cannot establish downlink delivery.

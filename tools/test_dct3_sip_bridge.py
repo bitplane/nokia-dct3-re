@@ -50,6 +50,27 @@ class SipMediaQueuesTest(unittest.TestCase):
         media.put(media.downlink, bytes(320))
         self.assertEqual(media.downlink.qsize(), 1)
 
+    def test_downlink_backlog_is_paced_without_catchup_bursts(self):
+        media = MediaQueues()
+        for index in range(8):
+            media.put(media.downlink, bytes([index]) * 320)
+        self.assertEqual(media.take_downlink(1.0)[0], 0)
+        for now in (1.0, 1.005, 1.019):
+            with self.assertRaises(queue.Empty):
+                media.take_downlink(now)
+        self.assertEqual(media.take_downlink(1.021)[0], 1)
+        self.assertEqual(media.take_downlink(2.0)[0], 2)
+        with self.assertRaises(queue.Empty):
+            media.take_downlink(2.0)
+        self.assertEqual(media.take_downlink(2.021)[0], 3)
+
+    def test_empty_downlink_does_not_delay_the_next_arrival(self):
+        media = MediaQueues()
+        with self.assertRaises(queue.Empty):
+            media.take_downlink(3.0)
+        media.put(media.downlink, bytes(320))
+        self.assertEqual(media.take_downlink(3.001), bytes(320))
+
 
 if __name__ == '__main__':
     unittest.main()

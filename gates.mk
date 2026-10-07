@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 359 gates: 215 generated from typed steps, 144 copied verbatim (shell).
+# 360 gates: 216 generated from typed steps, 144 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -223,6 +223,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-frontier-stability verify-structure-subset verify-structure \
 	verify-radio-outgoing-call-sip verify-radio-incoming-call-sip \
 	verify-radio-incoming-call-sip-idle-restore \
+	verify-3310-radio-outgoing-call-sip-waveform \
 	verify-radio-outgoing-call-sip-waveform \
 	verify-radio-outgoing-call-sip-connected-restore \
 	verify-radio-outgoing-call-sip-pending-restore \
@@ -3669,6 +3670,9 @@ verify-radio-incoming-call-sip:
 
 verify-radio-incoming-call-sip-idle-restore:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--incoming --restore-idle' SIP_HANDSET_KEYS='1,2,3,4,5,enter' SIP_HANDSET_SCRIPT=../tools/sip_idle_state_roundtrip.lua SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48
+
+verify-3310-radio-outgoing-call-sip-waveform:
+	SIP_PRODUCT=3310 RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh
 
 verify-radio-outgoing-call-sip-waveform:
 	RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh
