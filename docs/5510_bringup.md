@@ -62,6 +62,10 @@ claimed. Routine streaming profiles compare the initial 1,024 DIN words;
 `bootmeasure` continuously compares transmitter words with codec DIN
 throughout its complete observation window, including nonzero output.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
+The separate `bootrecord` probe reaches the original `RERSI16.BIN` loader
+through a pin-level command after complete startup. Its endpoint does not
+produce a recorded track or completion response; unexpected NAND-port
+writes remain to explain. This is dispatch evidence, not recording acceptance.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
 identifies separate MA4 and MU4 assemblies, including UI-module keypad,
@@ -1655,7 +1659,8 @@ Resident entry `02:9186` performs a named-file load: it mounts context
 the supplied name and extension, and invokes unchanged `2080` with index
 one only on a matching directory entry. Its exact direct callers are
 `02:9fa8`, `03:a90f` and `03:a9c3`, using runtime name/extension buffers
-`b54a/b553`. Initialization `02:8d0f` copies the active descriptor's name
+`b54a/b553`. Descriptor stride is 44 decimal (`2c` words), independently
+visible in original `aa55` loader `2eda`. Initialization `02:8d0f` copies the active descriptor's name
 and extension. Entry `02:9e90` replaces them with `RERSI16 .BIN` before
 its `02:9fa8` load. The separate `03:a90f` path explicitly copies
 `USBSI16 ` from data `c1a6`; it is not music-decoder selection evidence.
@@ -1928,15 +1933,38 @@ at `9d0e`, and reaches the original `02:9186` named loader at
 context setup and the original overlay selection, not proof that the
 overlay encodes audio or emits an accepted playback file.
 
-The retained-startup RAM observation in
-`run_mu4-retained.Yh686K/retained/mu4_ram_settled_leg0.bin` has
-`373e = 0`, `374e = 0f36`, `3750 = 0`, `3762 = 0`, and `3768 = 0`.
-That snapshot belongs to the retained routine-startup profile, not a
-full-startup recorder run. Nonzero capacity alone does not satisfy the
-recorder lifecycle. The concrete next question is which external command
-or board condition lets original firmware establish `373e = 2` after
-complete uploaded startup. Observe that transition before testing selector
-`36/5`; never set the lifecycle or invoke the overlay loader from the bench.
+Complete uploaded startup with the read-only status command has
+`373e = 2`, `374e = 0f36`, `3750 = 0`, `3762 = 0`, and `3768 = 0`.
+The original main-loop state-1 branch at `03:aac9` advances `373e` to 2.
+The older retained routine-startup snapshot has state zero; it must not be
+used to infer a missing prerequisite in complete startup.
+
+The separate `bootrecord` probe sends pin-level packet
+`1e 03 aa 01 36 05 01 84 55`: payload class 1, selector `36`, parameter
+5, then distinct sequence token 1. Native acknowledgement is `7f 01 55`.
+It enters `02:9e90` with state 2/capacity `0f36`/mode 3, reaches
+`02:9fa8` in state 8, and invokes the original loader with descriptor
+index one naming `RERSI16 .BIN`, length `0002:aca2` (175,266 bytes).
+The common uploaded runtime entry is observed twice, for initial resident
+startup and the subsequently selected overlay. No firmware state is written
+by the command peer.
+
+The bounded 20-second endpoint remains state 8/mode 3/continuation 8,
+with zero tracks, nine received bytes and only the three-byte request
+acknowledgement transmitted. Ten data writes of byte `01` reach the NAND
+port after command byte `01`; the controller reports them as unexpected.
+This is an unresolved boundary, not evidence for a new NAND opcode or a
+recorded file. The dispatch gate proves command/loader reachability only;
+it explicitly reports `music_recording=0`. Next verify the newly loaded
+overlay's destinations and recover its startup/storage call arguments before
+changing controller behavior. Do not repair the observed command sequence
+by injecting file contexts, lifecycle state or a guessed media header.
+
+Reproduce with `make check-mu4-bootstrap-original
+MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootrecord`.
+This runs in an isolated NAND copy, forbids NVRAM saving and verifies that
+the source disk file remains unchanged. `bootstatus` supplies the independent
+complete-startup lifecycle observation.
 
 Reproduce the command-table extraction with
 `tools/noki5510_a00_inventory.py --segment aa22 --extract-program-range

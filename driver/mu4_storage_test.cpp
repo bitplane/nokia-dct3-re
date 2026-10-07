@@ -170,6 +170,10 @@ private:
 	unsigned m_tone_blocks = 0, m_tone_phase_wraps = 0;
 	unsigned m_native_command_cursor = 0, m_native_command_waits = 0;
 	unsigned m_command_tx_irqs = 0, m_command_wire_bits = 0;
+	unsigned m_recorder_response_begin = 3, m_recorder_responses = 0;
+	unsigned m_recorder_dispatches = 0, m_recorder_loader_calls = 0;
+	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
+	u8 m_recorder_last_nand_command = 0;
 	unsigned m_command_ack_cursor = 0, m_command_wire_bit_count = 0;
 	bool m_command_wire_clock = false;
 	bool m_command_ack_pending = false;
@@ -494,6 +498,38 @@ private:
 		if (m_command_wire_decoded.size() != m_command_tx_words.size() + 1 || m_command_wire_decoded.back() != value)
 			fatalerror("MU4 serial pin decoder disagrees with McBSP transmit word");
 		m_command_tx_words.push_back(value);
+		if (recorder_profile())
+		{
+			if (m_command_tx_words.size() == 3)
+			{
+				logerror("mu4_native_recorder_request_ack: words=%04x,%04x,%04x\n",
+					m_command_tx_words[0], m_command_tx_words[1], m_command_tx_words[2]);
+				if (m_command_tx_words != std::vector<u16>({0x7f, 1, 0x55}))
+					fatalerror("MU4 recorder request acknowledgement differs from native framing");
+			}
+			unsigned const begin = m_recorder_response_begin;
+			if (m_command_tx_words.size() < begin + 2) return;
+			unsigned const end = begin + m_command_tx_words[begin + 1] + 6;
+			if (end > begin + 64) fatalerror("MU4 recorder response exceeds observation bound");
+			if (m_command_tx_words.size() != end) return;
+			u8 checksum = 0;
+			for (unsigned i = begin; i < end - 2; ++i) checksum ^= m_command_tx_words[i];
+			if (m_command_tx_words[begin] != 0x1e || m_command_tx_words[begin + 2] != 0xaa ||
+				m_command_tx_words[begin + 3] != 1 || m_command_tx_words[end - 2] != checksum || m_command_tx_words[end - 1] != 0x55)
+				fatalerror("MU4 recorder response framing/checksum mismatch");
+			if (m_command_ack_pending && m_command_ack_cursor != 3)
+				fatalerror("MU4 recorder response overlaps an unfinished peer acknowledgement");
+			logerror("mu4_native_recorder_response: index=%u selector=%02x words=%u token=%02x\n",
+				m_recorder_responses++, m_command_tx_words[begin + 4], end - begin, m_command_tx_words[end - 3]);
+			for (unsigned i = begin; i < end; ++i)
+				logerror("mu4_native_recorder_response_word: index=%u value=%04x\n", i - begin, m_command_tx_words[i]);
+			m_recorder_response_begin = end;
+			m_command_ack_token = m_command_tx_words[end - 3];
+			m_command_ack_cursor = 0;
+			m_command_ack_pending = true;
+			m_command->adjust(attotime::from_msec(1));
+			return;
+		}
 		if (measurement_profile())
 		{
 			if (m_command_tx_words.size() != 12) return;
@@ -725,8 +761,11 @@ private:
 		// Original parser framing and selector 0x49: read-only software status query.
 		static constexpr u8 status[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
 		static constexpr u8 measurement[] = {0x1e, 2, 0xaa, 1, 0x40, 1, 0xf6, 0x55};
-		auto const &packet = measurement_profile() ? measurement : status;
-		bool const ack = m_native_command_cursor == std::size(packet);
+		// Payload class, selector and parameter are distinct from sequence token 1.
+		static constexpr u8 recorder[] = {0x1e, 3, 0xaa, 1, 0x36, 5, 1, 0x84, 0x55};
+		u8 const *packet = recorder_profile() ? recorder : measurement_profile() ? measurement : status;
+		unsigned const packet_size = recorder_profile() ? std::size(recorder) : std::size(status);
+		bool const ack = m_native_command_cursor == packet_size;
 		if (ack && (!m_command_ack_pending || m_command_ack_cursor == 3)) return;
 		// Replay starts after the separately checked streaming prefix, so both
 		// legs share the same scheduled worker-window endpoint.
@@ -742,7 +781,7 @@ private:
 			else
 			{
 				command_receive(packet[m_native_command_cursor++]);
-				logerror("mu4_native_command_input: cursor=%u total=%u\n", m_native_command_cursor, unsigned(std::size(packet)));
+				logerror("mu4_native_command_input: cursor=%u total=%u\n", m_native_command_cursor, packet_size);
 			}
 		}
 		else if (++m_native_command_waits > 20000) fatalerror("MU4 native serial command ingress timeout");
@@ -775,6 +814,17 @@ private:
 		if ((m_direction & 7) != 7) fatalerror("MU4 storage: strobe before GPIO outputs enabled");
 		m_writes.push_back((u16(m_gpio & 7) << 8) | (value & 0xff));
 		if (BIT(m_gpio, 2)) return;
+		if (recorder_profile() && m_recorder_loader_calls)
+		{
+			bool const control = BIT(m_gpio, 0) || BIT(m_gpio, 1);
+			if (BIT(m_gpio, 0)) m_recorder_last_nand_command = value;
+			unsigned &count = control ? m_recorder_nand_controls : m_recorder_nand_data;
+			++count;
+			if ((!control && count <= 16) || (BIT(m_gpio, 0) && value != 0 && value != 0x50 && value != 0x30 && count <= 4096))
+				logerror("mu4_native_recorder_nand_write: kind=%s value=%02x last_command=%02x pc=%06x time_us=%lld\n",
+					BIT(m_gpio, 0) ? "command" : BIT(m_gpio, 1) ? "address" : "data", value & 0xff,
+					m_recorder_last_nand_command, unsigned(m_cpu->pc()), static_cast<long long>(machine().time().as_ticks(1000000)));
+		}
 		if (BIT(m_gpio, 0)) m_nand->command_w(value);
 		else if (BIT(m_gpio, 1)) m_nand->address_w(value);
 		else m_nand->data_w(value);
@@ -785,7 +835,8 @@ private:
 		++m_data_reads;
 		return m_nand->data_r();
 	}
-	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 20; }
+	bool original_bootstrap_profile() const { return system_bios() >= 16 && system_bios() <= 21; }
+	bool recorder_profile() const { return system_bios() == 21; }
 	bool measurement_profile() const { return system_bios() == 13 || system_bios() == 20; }
 	void verify_native_status()
 	{
@@ -879,6 +930,21 @@ private:
 			m_phase = 74;
 			m_cpu->space(AS_PROGRAM).install_ram(0, 0xffff, &m_program_ram[0]);
 			if (measurement_profile()) install_measurement_observers();
+			if (recorder_profile())
+			{
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x29e90, 0x29fa8, "mu4_recorder_loader",
+					[this](offs_t address, u16 &, u16)
+					{
+						if (machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+						if (address == 0x29e90) ++m_recorder_dispatches;
+						else if (address == 0x29fa8) ++m_recorder_loader_calls;
+						else return;
+						auto const disable = machine().disable_side_effects();
+						auto &data = m_cpu->space(AS_DATA);
+						logerror("mu4_native_recorder_path: address=%06x lifecycle=%04x capacity=%04x mode=%04x\n",
+							unsigned(address), data.read_word(0x373e), data.read_word(0x374e), data.read_word(0x3750));
+					});
+			}
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x0e41, 0x0e41, "mu4_original_bootstrap_entry",
 				[this](offs_t address, u16 &, u16) { if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1) ++m_native_bootstrap_entries; });
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_original_bootstrap_resident",
@@ -899,11 +965,14 @@ private:
 						{
 							auto const disable = machine().disable_side_effects();
 							auto &data = m_cpu->space(AS_DATA);
-							logerror("mu4_original_bootstrap_loader: name=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x ext=%04x,%04x,%04x length=%04x,%04x vector=%04x,%04x\n",
-								data.read_word(0x36b0), data.read_word(0x36b1), data.read_word(0x36b2), data.read_word(0x36b3),
-								data.read_word(0x36b4), data.read_word(0x36b5), data.read_word(0x36b6), data.read_word(0x36b7),
-								data.read_word(0x36b9), data.read_word(0x36ba), data.read_word(0x36bb), data.read_word(0x36c2), data.read_word(0x36c3),
-								m_cpu->space(AS_PROGRAM).read_word(0x2000), m_cpu->space(AS_PROGRAM).read_word(0x2001));
+							unsigned const index = u16(m_cpu->state_int(tms320c54x_device::STATE_A));
+							// Original aa55 loader 2eda multiplies the index by 44 decimal.
+							unsigned const descriptor = 0x36b0 + index * 0x2c;
+							logerror("mu4_original_bootstrap_loader: name=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x ext=%04x,%04x,%04x length=%04x,%04x vector=%04x,%04x index=%u\n",
+								data.read_word(descriptor), data.read_word(descriptor + 1), data.read_word(descriptor + 2), data.read_word(descriptor + 3),
+								data.read_word(descriptor + 4), data.read_word(descriptor + 5), data.read_word(descriptor + 6), data.read_word(descriptor + 7),
+								data.read_word(descriptor + 9), data.read_word(descriptor + 10), data.read_word(descriptor + 11), data.read_word(descriptor + 18), data.read_word(descriptor + 19),
+								m_cpu->space(AS_PROGRAM).read_word(0x2000), m_cpu->space(AS_PROGRAM).read_word(0x2001), index);
 						}
 					}
 				});
@@ -933,6 +1002,13 @@ private:
 			save_item(NAME(m_serial_word)); save_item(NAME(m_serial_ready)); save_item(NAME(m_serial_reads));
 			save_item(NAME(m_native_command_cursor)); save_item(NAME(m_native_command_waits));
 			save_item(NAME(m_command_tx_irqs)); save_item(NAME(m_command_wire_bits));
+			if (recorder_profile())
+			{
+				save_item(NAME(m_recorder_response_begin)); save_item(NAME(m_recorder_responses));
+				save_item(NAME(m_recorder_dispatches)); save_item(NAME(m_recorder_loader_calls));
+				save_item(NAME(m_recorder_nand_controls)); save_item(NAME(m_recorder_nand_data));
+				save_item(NAME(m_recorder_last_nand_command));
+			}
 			save_item(NAME(m_command_ack_cursor)); save_item(NAME(m_command_wire_bit_count));
 			save_item(NAME(m_command_wire_clock)); save_item(NAME(m_command_ack_pending));
 			save_item(NAME(m_command_ack_token)); save_item(NAME(m_command_wire_byte));
@@ -1085,6 +1161,10 @@ private:
 		m_command_rx_ready = m_command_rx_busy = false; m_command_rx_clock = true;
 		m_command_rx_byte = 0; m_command_rx_phase = m_command_rx_irqs = 0;
 		m_command_tx_register = m_command_tx_irqs = m_command_wire_bits = 0;
+		m_recorder_response_begin = 3; m_recorder_responses = 0;
+		m_recorder_dispatches = m_recorder_loader_calls = 0;
+		m_recorder_nand_controls = m_recorder_nand_data = 0;
+		m_recorder_last_nand_command = 0;
 		m_command_wire_clock = false; m_command_tx_words.clear();
 		m_command_ack_cursor = m_command_wire_bit_count = 0;
 		m_command_ack_pending = false; m_command_ack_token = m_command_wire_byte = 0; m_command_wire_decoded.clear();
@@ -1405,7 +1485,20 @@ private:
 				m_native_bootstrap_entries, m_native_bootstrap_resident_entries, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_cpu->space(AS_DATA).read_word(0x374d), m_data_reads, m_stream_words);
-			if (measurement_profile()) verify_native_measurement();
+			auto &data = m_cpu->space(AS_DATA);
+			logerror("mu4_original_bootstrap_media_context: lifecycle=%04x capacity=%04x mode=%04x continuation=%04x tracks=%04x firmware_state_forcing=0\n",
+				data.read_word(0x373e), data.read_word(0x374e), data.read_word(0x3750),
+				data.read_word(0x3762), data.read_word(0x3768));
+			if (recorder_profile())
+			{
+				logerror("mu4_native_recorder_observe: dispatches=%u loader_calls=%u responses=%u rx_words=%u tx_words=%u ack_pending=%u music_recording=0\n",
+					m_recorder_dispatches, m_recorder_loader_calls, m_recorder_responses, m_command_rx_irqs,
+					unsigned(m_command_tx_words.size()), m_command_ack_pending && m_command_ack_cursor != 3);
+				if (m_native_command_cursor != 9 || m_recorder_dispatches != 1 || m_recorder_loader_calls != 1)
+					fatalerror("MU4 original recorder command did not reach the native overlay loader");
+				logerror("mu4_native_recorder_dispatch: PASS pin_input=1 original_loader=1 firmware_state_forcing=0 music_recording=0\n");
+			}
+			else if (measurement_profile()) verify_native_measurement();
 			else if (system_bios() >= 17) verify_native_status();
 			if (system_bios() == 20)
 			{
@@ -2850,6 +2943,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(17, "bootreset", "Original uploaded startup with mid-byte reset and status restart")
 	ROM_SYSTEM_BIOS(18, "bootreplay", "Original uploaded startup with mid-byte save-state replay")
 	ROM_SYSTEM_BIOS(19, "bootmeasure", "Original uploaded startup with pin-level sample measurement")
+	ROM_SYSTEM_BIOS(20, "bootrecord", "Original uploaded startup with pin-level recorder command probe")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
