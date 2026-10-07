@@ -19,7 +19,8 @@ profile uses those controls to activate a partial AIC23 master-clock source,
 then observes one 128-word McBSP0 TX block and DMA channel-3 completion.
 The codec's digital DIN decoder verifies those transmitted words. Explicit
 already-converted stereo fixture samples also complete the original 64-frame
-RX DMA block. Analog codec conversion and sustained streaming are not validated.
+RX DMA block. The `sustain` profile checks eight reloaded blocks in each
+direction; analog conversion and longer application operation are not validated.
 DMA/McBSP and codec digital interfaces have isolated conformance
 and save/replay tests.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
@@ -1115,6 +1116,15 @@ transmitted words against the codec's decoded channel/value sequence; idle-line
 samples before transmission are excluded from this observation only.
 This verifies finite original RX/TX digital execution with a declared converted
 sample fixture, not analog ADC behavior, sustained duplex, music or speech.
+
+`make check-mu4-storage-original MU4_STORAGE_BIOS=sustain` extends the same
+unchanged program to eight blocks: 1,024 TX words match decoded DIN, TX and RX
+each complete eight DMA blocks, and the RX reload destination `1900..193f` /
+`1940..197f` contains the declared converted stereo fixture. No readiness,
+interrupt result or firmware buffer is injected. The run reaches PC `003080`
+with `illegal=0`; all six original codec controls remain unchanged. This is
+bounded repeated digital streaming (512 stereo frames, about 11.6 ms), not
+long-duration operation, analog conversion, meaningful music data or playback.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.

@@ -106,9 +106,12 @@ private:
 	std::vector<u16> m_native_tx_words;
 	std::vector<u16> m_codec_din_words, m_codec_saved_din;
 	unsigned m_codec_rx_snapshot_count = 0;
+	unsigned native_stream_target() const { return system_bios() == 3 ? 1024 : 128; }
 	void finish_stream_if_ready()
 	{
-		if (m_phase == 30 && system_bios() == 2 && m_stream_words >= 128 && m_native_din_words >= 128 && m_rx_dma_completions)
+		if (m_phase == 30 && system_bios() >= 2 && m_stream_words >= native_stream_target() &&
+			m_native_din_words >= native_stream_target() && m_dma_completions >= native_stream_target() / 128 &&
+			m_rx_dma_completions >= native_stream_target() / 128)
 			m_check->adjust(attotime::zero);
 	}
 	unsigned m_codec_clocks = 0;
@@ -147,7 +150,7 @@ private:
 		++m_stream_words;
 		// TX reports the last launched bit before DIN samples it on the next rising edge.
 		// Idle-line DIN words before this observable transmission are not stream evidence.
-		if (m_phase == 30 && m_native_tx_words.size() < 128) m_native_tx_words.push_back(value);
+		if (m_phase == 30 && m_native_tx_words.size() < native_stream_target()) m_native_tx_words.push_back(value);
 		if (m_phase >= 51 && m_phase <= 53) m_external_words.push_back(value);
 		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
 		finish_stream_if_ready();
@@ -166,12 +169,12 @@ private:
 	u16 mcbsp_status() { m_mcbsp->control_w(0, 1); return m_mcbsp->control_r(1); }
 	void serial_tx(u16 value)
 	{
-		if (m_phase == 30 && system_bios() == 2) subdevice<tlv320aic23_device>("codec")->control_word_w(value);
+		if (m_phase == 30 && system_bios() >= 2) subdevice<tlv320aic23_device>("codec")->control_word_w(value);
 		m_serial_tx_words.push_back(value);
 		if (m_phase == 30 && m_serial_tx_words.size() <= 16) logerror("mu4_native_tx: word=%04x\n", value);
 		// End the serial-setup fixture at its observed complete control stream,
 		// before the separate streaming-profile acceptance.
-		if (m_phase == 30 && system_bios() != 2 && m_serial_tx_words.size() == 6) m_check->adjust(attotime::zero);
+		if (m_phase == 30 && system_bios() < 2 && m_serial_tx_words.size() == 6) m_check->adjust(attotime::zero);
 	}
 	required_shared_ptr<u16> m_program_ram;
 	required_shared_ptr<u16> m_dma_sink;
@@ -1064,17 +1067,26 @@ private:
 			if (m_serial_tx_words != std::vector<u16>({0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023, 0x1201}))
 				fatalerror("MU4 original serial-setup sequence mismatch");
 			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) fatalerror("MU4 original native stream encountered an illegal instruction");
-			if (system_bios() == 2 && (m_stream_words < 128 || !m_dma_completions || m_native_din_words < 128 || !m_rx_dma_completions))
+			if (system_bios() >= 2 && (m_stream_words < native_stream_target() || m_dma_completions < native_stream_target() / 128 ||
+				m_native_din_words < native_stream_target() || m_rx_dma_completions < native_stream_target() / 128))
 				fatalerror("MU4 original streaming block incomplete tx=%u din=%u tx_dma=%u rx_dma=%u pc=%06x illegal=%u",
 					m_stream_words, m_native_din_words, m_dma_completions, m_rx_dma_completions,
 					unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
-			if (system_bios() == 2) logerror("mu4_native_stream: PASS words=%u dma_completions=%u\n", m_stream_words, m_dma_completions);
-			if (system_bios() == 2)
+			if (system_bios() >= 2) logerror("mu4_native_stream: PASS words=%u dma_completions=%u\n", m_stream_words, m_dma_completions);
+			if (system_bios() >= 2)
 			{
 				for (unsigned i = 0; i < 64; ++i)
 					if (m_cpu->space(AS_DATA).read_word(0x1980 + i) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x19c0 + i) != 0x5678)
 						fatalerror("MU4 native converted-ADC buffer mismatch at frame %u", i);
 				logerror("mu4_native_receive: PASS converted_fixture=1 frames=64 din_words=%u rx_dma_completions=%u sorted_buffer=1980,19c0\n", m_native_din_words, m_rx_dma_completions);
+				if (system_bios() == 3)
+				{
+					for (unsigned i = 0; i < 64; ++i)
+						if (m_cpu->space(AS_DATA).read_word(0x1900 + i) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x1940 + i) != 0x5678)
+							fatalerror("MU4 native reloaded RX buffer mismatch at frame %u", i);
+					logerror("mu4_native_sustained: PASS words=%u din_words=%u tx_blocks=%u rx_blocks=%u reload_buffer=1900,1940\n",
+						m_stream_words, m_native_din_words, m_dma_completions, m_rx_dma_completions);
+				}
 			}
 			logerror("mu4_native_entry: PASS original_transfer=1 entry_reads=%u far_reads=%u pc=%06x illegal=%u idle=%u pmst=%04x\n",
 				m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)),
@@ -1442,6 +1454,7 @@ static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
 ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(0, "setup", "Original storage, loader and serial setup")
 	ROM_SYSTEM_BIOS(1, "stream", "Original streaming frontier (incomplete)")
+	ROM_SYSTEM_BIOS(2, "sustain", "Original eight-block digital streaming fixture")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

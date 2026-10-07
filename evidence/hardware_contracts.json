@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_repeated_digital_streaming", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "The separate sustain BIOS executes unchanged original MCUSI16 beyond the first digital block. It verifies 1024 transmitted words against codec DIN channel/value ordering, eight TX DMA completions, eight RX DMA completions and the reloaded RX destination 1900/1940 containing explicitly converted fixture samples 1234/5678. Codec clocks and pins, not injected DRR/readiness or firmware-buffer writes, drive the run. Original six control words remain unchanged and CPU illegal=0 at PC 003080. Eight blocks cover 512 stereo frames (about 11.6 ms), not long-duration application behavior, analog conversion, meaningful music samples, playback or native telephony",
+      "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]
+    },
+    {
       "id": "c54x_mcbsp_external_receive_subset", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Generic external rx_data_w/rx_clock_w/rx_frame_w capture single-phase 8/12/16-bit words. TI SPRU302B defines sampled frame detection, clock polarity, RDATDLY, frame length/ignore, RSR-to-RBR opposite-edge transfer and next sampling-edge DRR/RRDY publication. DRR1 consumption clears saved REVT level; debugger peeks do not. Unread DRR retains its word while RBR holds the next. RJUST formats zero/sign extension or left alignment. Executable fixtures cover no-frame stalls, early-frame ignore, edge handoffs, two-word buffering, widths, delays 0/1/2, both polarities, justification, peeks, RRST cancellation, RINT0 and partial-word save/replay after synchronization drains. Overrun recovery, dual phase, wider words, companding, nonzero RINTM, loopback/SPI/A-bis receive and active format changes fail explicitly when exercised; internal receive generation/reset activation remain unvalidated. This is pin/MMIO conformance, not native codec ADC reception",
       "evidence": ["driver/tms320c54x_mcbsp.cpp", "driver/tms320c54x_mcbsp.h", "driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]

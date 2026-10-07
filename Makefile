@@ -1053,7 +1053,9 @@ check-mu4-storage-original: build
 		grep -q 'mu4_mcbsp_receive_dma: PASS' error.log; \
 		if grep -q 'Exceeded pending input line event queue' error.log; then \
 			echo 'MU4 gate failed: synchronized CPU input queue overflow' >&2; exit 1; fi; \
-		if [ "$(MU4_STORAGE_BIOS)" = stream ]; then grep -q 'mu4_native_stream: PASS' error.log && grep -q 'mu4_native_receive: PASS' error.log; fi
+		if [ "$(MU4_STORAGE_BIOS)" = stream ] || [ "$(MU4_STORAGE_BIOS)" = sustain ]; then \
+			grep -q 'mu4_native_stream: PASS' error.log; grep -q 'mu4_native_receive: PASS' error.log; fi; \
+		if [ "$(MU4_STORAGE_BIOS)" = sustain ]; then grep -q 'mu4_native_sustained: PASS' error.log; fi
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.
