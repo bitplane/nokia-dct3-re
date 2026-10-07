@@ -5,6 +5,7 @@ Uses the explicitly derived initial-record PMM comparison, not factory data.
 The normal noki6250 machine and the acquired PMM are left unchanged.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -25,7 +26,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration"),
+                                              "phonebook", "registration", "idle-state"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -43,6 +44,15 @@ def main():
         local_roms = run / "roms/noki6250"
         local_roms.mkdir(parents=True)
         (local_roms / source.name).write_bytes(fixture)
+        audit_members = []
+        # Shared legacy ROM declarations, not recovered NHM-3 native masks.
+        for name in ("dsp_prom", "dsp_drom", "dsp_pdrom"):
+            audit_source = root / "roms/noki3210" / name
+            payload = audit_source.read_bytes()
+            (local_roms / name).write_bytes(payload)
+            audit_members.append({"name": name, "source": str(audit_source),
+                                  "sha256": hashlib.sha256(payload).hexdigest(),
+                                  "native_6250_evidence": False})
         (run / "cfg").mkdir()
         (run / "nvram").mkdir()
         call = args.scenario in ("incoming-call", "outgoing-call")
@@ -60,6 +70,8 @@ def main():
             script = "noki6250_phonebook_observe.lua"
         if args.scenario == "registration":
             script = "noki6250_runtime_observe.lua"
+        if args.scenario == "idle-state":
+            script = "noki6250_state_idle.lua"
         seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
@@ -82,6 +94,7 @@ def main():
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
+            "shared_rom_audit_members": audit_members,
         }, indent=2) + "\n")
         with (run / "console.log").open("w") as console:
             subprocess.run(command, cwd=run, env=env, stdout=console,
@@ -107,6 +120,9 @@ def main():
                 raise ValueError(f"expected one save frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
                        "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
+        elif args.scenario == "idle-state":
+            checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
+                       str(run / "error.log"), str(run / "snap")]
         elif args.scenario == "registration":
             checker = [sys.executable, str(root / "tools/radio_registration_trace_check.py"),
                        str(run / "error.log"), "--profile", "nhm3"]

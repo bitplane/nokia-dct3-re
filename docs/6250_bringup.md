@@ -18,6 +18,11 @@ phonebook save and cold-start retrieval from SIM NVRAM are verified below. Norma
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
+Research idle save/load separately verifies exact CPU/RAM/time restoration,
+ordered radio/SIM replay, identical 96x60 idle pixels and post-load physical
+Menu/Messages continuation. This does not resolve the original PMM or native
+DSP boundaries below.
+
 ## Inputs
 
 ### Remaining goal boundary
@@ -55,6 +60,23 @@ boundaries above. Existing `verify` and `verify-frontier` gates also pass.
   `57c29c8387caf864603d94a22bfb63ace427b7f9`.
 - Legacy uniform-fill DSP audit members satisfy ROM declarations only; the
   HLE does not execute them. The missing boot mask is not fabricated.
+  The isolated acceptance runner now stages the declared shared members from
+  `roms/noki3210` into its private ROM directory and records source/hash plus
+  `native_6250_evidence: false`. These files are not recovered NHM-3 masks or
+  donor provisioning; the PMM comparison still comes only from the acquired
+  6250 input.
+
+### Idle Restoration Acceptance
+
+Run `tools/run_noki6250_acceptance.py RUN --scenario idle-state` in a new
+directory. `noki6250_state_idle.lua` saves registered research idle at 25
+seconds, records a one-second reference interval, restores it and then
+presses the physical left softkey. `noki6250_state_check.py LOG SNAP` requires
+exact PC/SP/mapped-RAM digest/emulated-time restoration, nonempty ordered
+protocol replay with identical payloads, identical full idle pixels, reviewed
+`DCT3 LAB` text and Messages title, plus raw matrix key `06` after load.
+The initial-record PMM remains a diagnostic external-input comparison.
+Active-call and delivered-SMS restoration are not established by this gate.
 
 ## Recovered hardware contracts
 
