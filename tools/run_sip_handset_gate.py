@@ -24,7 +24,7 @@ async def run(args):
             remote_command = [str(args.pjsua.resolve()),
                 '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
                 '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
-                '--auto-answer=200', '--duration=8', f'--play-file={root / "sip-source.wav"}',
+                f'--auto-answer={args.sip_response}', '--duration=8', f'--play-file={root / "sip-source.wav"}',
                 '--auto-play']
             if not args.incoming:
                 remote = await asyncio.create_subprocess_exec(*remote_command,
@@ -56,7 +56,8 @@ async def run(args):
                 str(Path(__file__).with_name('dct3_sip_bridge.py')),
                 '--url', f'ws://127.0.0.1:{args.http_port}/nokia/dct3/calls',
                 '--destination', f'sip:probe@127.0.0.1:{args.sip_port}',
-                '--sip-port', str(args.sip_port + 1), '--once', '--require-frames', '100',
+                '--sip-port', str(args.sip_port + 1), '--once', '--require-frames',
+                '100' if args.sip_response == 200 else '0',
                 stdout=bridge_log, stderr=asyncio.subprocess.STDOUT)
             processes.append(bridge)
             if args.incoming:
@@ -91,6 +92,9 @@ async def run(args):
                     process.kill()
                     await process.wait()
     remote_text = (root / 'sip-remote.log').read_text(errors='replace')
+    if args.sip_response != 200:
+        verify_failure(root, remote_text, args.sip_response)
+        return
     if 'state changed to CONFIRMED' not in remote_text or 'DISCONNECTED [reason=200 (OK)]' not in remote_text:
         raise RuntimeError('remote SIP call did not confirm and release normally')
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
@@ -121,7 +125,7 @@ async def run(args):
             r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101',
             r'GSM service downlink kind=12 sapi=0 pd=03 message=07',
             r'GSM service uplink sapi=0 pd=03 message=0f .*data=030f',
-            r'GSM service uplink sapi=0 pd=03 message=2d .*data=036d',
+            r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
             r'LAPDm service Channel Release acknowledged')
     for pattern in patterns:
         match = re.search(pattern, log[cursor:])
@@ -135,6 +139,43 @@ async def run(args):
     print('OK - physical handset call connected to SIP with bidirectional host media and release')
 
 
+def verify_failure(root, remote_text, status):
+    bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
+    log = (root / 'error.log').read_text(errors='replace')
+    if (f'SIP/2.0 {status} ' not in remote_text or
+            f'SIP disconnected status={status} identity=(1, 1)' not in bridge_text):
+        raise RuntimeError('missing actual SIP failure response and correlated bridge result')
+    if ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge_text or
+            re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log)):
+        raise RuntimeError('failed SIP call falsely connected')
+    match = re.search(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
+    if not match:
+        raise RuntimeError('failed SIP call never completed handset release')
+    counts = json.loads(match[1])
+    if any(counts.get(name) != 0 for name in ('uplink', 'downlink', 'pcm_transmitted', 'pcm_received')):
+        raise RuntimeError('failed SIP call falsely claimed media')
+    cursor = 0
+    for pattern in (
+            r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101',
+            r'GSM service downlink kind=13 sapi=0 pd=03 message=25 length=5',
+            # Bit 6 is the CC send-sequence flag; it is not another primitive.
+            r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
+            r'GSM service downlink kind=26 sapi=0 pd=03 message=2a',
+            r'LAPDm service Channel Release acknowledged'):
+        match = re.search(pattern, log[cursor:])
+        if not match:
+            raise RuntimeError(f'missing SIP-failure firmware checkpoint: {pattern}')
+        cursor += match.end()
+    if status == 480 and 'outgoing termination consumed id=1 cause=18' not in log:
+        raise RuntimeError('SIP 480 did not deliver cause 18 through the GSM session')
+    if status == 486 and 'outgoing decision consumed id=1 outcome=1' not in log:
+        raise RuntimeError('SIP 486 did not deliver the GSM busy decision')
+    (root / 'sip-result.json').write_text(json.dumps({
+        'scope': '3210 HLE physical outgoing SIP failure and firmware release; no connection/media',
+        'sip_status': status, 'media': counts, 'passed': True}, indent=2) + '\n')
+    print(f'OK - SIP {status} became a correlated handset failure and clean release without CONNECT/media')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--pjsua', type=Path, required=True)
@@ -142,8 +183,11 @@ def main():
     parser.add_argument('--sip-port', type=int, default=25100)
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
+    parser.add_argument('--sip-response', type=int, choices=(200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.incoming and args.sip_response != 200:
+        parser.error('--sip-response failure fixtures are outgoing only')
     if args.command[:1] == ['--']:
         args.command = args.command[1:]
     if not args.command:

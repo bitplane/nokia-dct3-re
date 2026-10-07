@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 350 gates: 206 generated from typed steps, 144 copied verbatim (shell).
+# 352 gates: 208 generated from typed steps, 144 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -221,7 +221,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
 	verify-frontier-stability verify-structure-subset verify-structure \
-	verify-radio-outgoing-call-sip verify-radio-incoming-call-sip
+	verify-radio-outgoing-call-sip verify-radio-incoming-call-sip \
+	verify-radio-outgoing-call-sip-busy \
+	verify-radio-outgoing-call-sip-unavailable
 
 verify-5510-package:
 	$(PYTHON) tools/noki5510_package_check.py roms/archive-dct3-packages/NPM5_353_mcu.exe --output-dir roms/5510-npm5-v353
@@ -3658,3 +3660,9 @@ verify-radio-outgoing-call-sip:
 
 verify-radio-incoming-call-sip:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS=--incoming SIP_HANDSET_KEYS='$(NOKI3210_INCOMING_READY_KEYS),enter' SIP_HANDSET_CONFIG=../fixtures/radio_incoming_host_adapter SIP_HANDSET_SECONDS=48
+
+verify-radio-outgoing-call-sip-busy:
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 486'
+
+verify-radio-outgoing-call-sip-unavailable:
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 480'

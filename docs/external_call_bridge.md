@@ -244,8 +244,9 @@ separate local build; no installed PJSUA2 binding is assumed by the stack probe.
 
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps
-486/600 to busy and other pre-confirmation failures to no-answer, and maps
-remote release to GSM normal clearing. Handset completion hangs up the SIP leg.
+486/600 to busy and other pre-confirmation failures to no-answer plus explicit
+clearing, and maps remote release to GSM normal clearing. Handset completion
+hangs up the SIP leg.
 The bridge does not auto-accept SMS/USSD. No registrar, credentials or destination-number
 routing policy is claimed. The explicit destination is independent of the
 physically dialed number, which is logged for acceptance evidence.
@@ -302,6 +303,37 @@ then requires the ordered paging/SETUP/physical key/CONNECT/media/remote
 termination/RELEASE COMPLETE/host-ended chain. Its remote caller uses null
 audio: this gate proves incoming signaling and media transport, not an incoming
 non-silent waveform. The independent waveform probe remains separate evidence.
+
+### Final SIP failures
+
+A `no_answer` host decision is an alerting policy, not a final failure: the
+GSM session deliberately waits for another clearing input. A final non-busy SIP
+failure therefore submits that decision followed by a correlated termination;
+the session queues clearing through its own assignment/alerting lifecycle and
+never sends CONNECT. SIP 480 uses cause 18, following the SIP-to-ISDN table in
+[RFC 3398 section 8.2.6.1](https://www.rfc-editor.org/rfc/rfc3398.html#section-8.2.6.1),
+not the inverse table. Busy uses the existing GSM cause-17 decision without
+an extra clearing message.
+
+```sh
+make verify-radio-outgoing-call-sip-busy RUN_DIR=run_3210_sip_busy
+make verify-radio-outgoing-call-sip-unavailable RUN_DIR=run_3210_sip_unavailable
+```
+
+Both gates physically dial the 3210 into actual upstream PJSIP responses and
+require the correlated failure, firmware RELEASE/RELEASE COMPLETE and LAPDm
+release, with no SIP/GSM connection and zero executed bridge media. The 480
+gate additionally requires the GSM session to consume cause 18. The release
+checker admits either CC send-sequence bit value without changing the decoded
+primitive. These gates do not measure failure-screen presentation.
+
+The implemented mapping subset also covers 403/603 -> 21, 404/604 -> 1,
+408 -> 102 and 500/503 -> 41; these have pure mapping tests, not handset runtime
+gates. Unhandled statuses use an explicit cause-41 fallback policy. Warning and
+Reason headers, authentication retries and full RFC 3398 interoperability are
+not implemented. Cancellation and SIP-linked save/load remain separate targets.
+
+### Waveform probe
 
 `tools/run_dct3_sip_backend_probe.py` independently tests the same bridge with
 a synthetic version-1 host endpoint: uplink 440 Hz and remote 660 Hz must survive

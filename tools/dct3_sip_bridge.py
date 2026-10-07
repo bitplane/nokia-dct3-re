@@ -46,6 +46,21 @@ def incoming_caller(remote_uri):
     return match[1] if match else None
 
 
+def failure_messages(identity, status):
+    # RFC 3398 8.2.6.1, SIP -> ISDN (not the inverse table). Unsupported
+    # statuses use a declared temporary-failure policy, not a fabricated answer.
+    cause = {403: 21, 404: 1, 408: 102, 480: 18, 486: 17,
+             500: 41, 503: 41, 600: 17, 603: 21, 604: 1}.get(status, 41)
+    base = {'epoch': identity[0], 'request_id': identity[1]}
+    replies = [{**base, 'type': 'outgoing_call_decision',
+                'decision': 'busy' if cause == 17 else 'no_answer'}]
+    if cause != 17:
+        # no_answer suppresses CONNECT, but does not itself clear CC/RR. The
+        # session accepts this following termination and owns its release order.
+        replies.append({**base, 'type': 'outgoing_call_terminate', 'cause': cause})
+    return replies
+
+
 class SipEndpoint:
     def __init__(self, pj, port):
         self.pj = pj
@@ -309,6 +324,7 @@ async def bridge(args, pj):
                         if call_identity != identity or blocked_restore:
                             continue
                         response = {'epoch': identity[0], 'request_id': identity[1]}
+                        followup = []
                         if phase == 'confirmed' and direction == 'incoming':
                             print(f'SIP confirmed status={status} identity={identity}', flush=True)
                             continue
@@ -320,12 +336,13 @@ async def bridge(args, pj):
                             if decision or direction == 'incoming':
                                 response.update(type=f'{direction}_call_terminate', cause=16)
                             else:
-                                response.update(type='outgoing_call_decision',
-                                                decision='busy' if status in (486, 600) else 'no_answer')
+                                response, *followup = failure_messages(identity, status)
                                 decision = True
                         else:
                             continue
                         await websocket.send(json.dumps(response))
+                        for reply in followup:
+                            await websocket.send(json.dumps(reply))
                         print(f'SIP {phase} status={status} identity={identity}', flush=True)
                     while connected:
                         try:
