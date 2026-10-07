@@ -176,6 +176,8 @@ private:
 	bool m_recorder_overlay_checked = false;
 	unsigned m_recorder_startup_entries = 0;
 	unsigned m_recorder_control_entries = 0, m_recorder_control_acks = 0;
+	unsigned m_recorder_application_calls = 0, m_recorder_application_messages = 0;
+	unsigned m_recorder_processing_waits = 0, m_recorder_processing_returns = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
 	u8 m_recorder_last_nand_command = 0;
 	unsigned m_command_ack_cursor = 0, m_command_wire_bit_count = 0;
@@ -1047,6 +1049,27 @@ private:
 			{
 				if (recorder_control_profile())
 				{
+					m_cpu->space(AS_PROGRAM).install_read_tap(0x284cd, 0x284db, "mu4_recorder_application",
+						[this](offs_t address, u16 &, u16)
+						{
+							if (machine().side_effects_disabled() || !m_recorder_overlay_checked || m_cpu->pc() != address + 1) return;
+							if (address == 0x284cd) ++m_recorder_application_calls;
+							if (address != 0x284db) return;
+							if (m_recorder_application_messages++ >= 12) return;
+							auto const disable = machine().disable_side_effects();
+							auto &data = m_cpu->space(AS_DATA);
+								logerror("mu4_native_recorder_application_message: length=%04x class=%04x selector=%04x parameter=%04x token=%04x previous_class=%04x previous_selector=%04x time_ms=%lld\n",
+								data.read_word(0x45f), data.read_word(0x460), data.read_word(0x461), data.read_word(0x462), data.read_word(0x463),
+								data.read_word(0x3766), data.read_word(0x3767),
+								static_cast<long long>(machine().time().as_ticks(1000)));
+						});
+					m_cpu->space(AS_PROGRAM).install_read_tap(0x3943a, 0x394a2, "mu4_recorder_processing",
+						[this](offs_t address, u16 &, u16)
+						{
+							if (machine().side_effects_disabled() || !m_recorder_overlay_checked || m_cpu->pc() != address + 1) return;
+							if (address == 0x394a2) ++m_recorder_processing_returns;
+							else if (address == 0x3943a || address == 0x39499) ++m_recorder_processing_waits;
+						});
 					m_cpu->space(AS_PROGRAM).install_read_tap(0x285dc, 0x285dc, "mu4_recorder_control",
 						[this](offs_t address, u16 &, u16)
 						{
@@ -1153,6 +1176,8 @@ private:
 				save_item(NAME(m_recorder_overlay_checked));
 				save_item(NAME(m_recorder_startup_entries));
 				save_item(NAME(m_recorder_control_entries)); save_item(NAME(m_recorder_control_acks));
+				save_item(NAME(m_recorder_application_calls)); save_item(NAME(m_recorder_application_messages));
+				save_item(NAME(m_recorder_processing_waits)); save_item(NAME(m_recorder_processing_returns));
 				save_item(NAME(m_recorder_nand_controls)); save_item(NAME(m_recorder_nand_data));
 				save_item(NAME(m_recorder_last_nand_command));
 			}
@@ -1313,6 +1338,8 @@ private:
 		m_recorder_overlay_checked = false;
 		m_recorder_startup_entries = 0;
 		m_recorder_control_entries = m_recorder_control_acks = 0;
+		m_recorder_application_calls = m_recorder_application_messages = 0;
+		m_recorder_processing_waits = m_recorder_processing_returns = 0;
 		m_serial_empty_reads = 0;
 		m_recorder_nand_controls = m_recorder_nand_data = 0;
 		m_recorder_last_nand_command = 0;
@@ -1667,6 +1694,9 @@ private:
 				{
 					logerror("mu4_native_recorder_control_observe: entries=%u acks=%u responses=%u rx_words=%u tx_words=%u recorded_file_verified=0\n",
 						m_recorder_control_entries, m_recorder_control_acks, m_recorder_responses, m_command_rx_irqs, unsigned(m_command_tx_words.size()));
+					logerror("mu4_native_recorder_processing: application_calls=%u application_messages=%u processing_waits=%u processing_returns=%u completion=%04x\n",
+						m_recorder_application_calls, m_recorder_application_messages, m_recorder_processing_waits, m_recorder_processing_returns,
+						data.read_word(0xfd85));
 					// Transport receipt is not proof of application dispatch or recording completion.
 					if (m_native_command_cursor != 18 || m_command_rx_ready || m_command_rx_busy ||
 						m_command_rx_irqs != 24 || m_recorder_responses != 2 || m_command_tx_words.size() != 33 ||

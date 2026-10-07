@@ -2030,7 +2030,12 @@ All nine bytes reach the native receive path and receive `7f 02 55`.
 At the 20-second endpoint RX is drained/not busy, ring head and tail
 `f9de/f9df` are both 15, and parser state `f9e8` is zero. Total receive
 events are 24, versus the baseline's 15; native output is 33 words.
-The application control handler at `02:85dc` still has zero entries.
+The application dispatcher receives one request at 10.667 seconds: class
+`1`, selector `36`, parameter `4`. The previous-command fields `3766/3767`
+are also `1/36`. Its duplicate filter at `02:84db..84ec` rejects a matching
+class/selector when the selector is greater than `28` hex (GNU's immediate
+`#40` is decimal), before parameter dispatch.
+The application control handler at `02:85dc` therefore has zero entries.
 Transport acknowledgement is not application completion or saved media.
 
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
@@ -2045,14 +2050,22 @@ mask/idle probes and stale unread-character assertion are retired.
 
 The current control endpoint is `03:bc4d`, IMR `0ac1`, IFR `0438`,
 lifecycle 9, mode 3, continuation 8 and zero tracks. The application
-dispatcher `02:84cd` is called at `03:94a2`, after the processing
-loop's `fd85` completion handshake at `03:9499..94a1`.
-Decode that original processing prerequisite and its peripheral input
-before changing packet semantics or claiming recording finalization.
+dispatcher `02:84cd` is called at `03:94a2`. The ordinary loop can reach
+that call directly; the `fd85` completion handshake at `03:9499..94a1`
+is not an unconditional prerequisite. The control run observes 40 application
+calls, one successful dequeue and zero entries at the two processing waits.
+The unresolved contract is the original sender's command sequencing and
+the legitimate updates to the previous-command fields, not absent receive
+delivery or a demonstrated processing stall. Recover that contract before
+changing packet semantics or claiming recording finalization.
+A literal-word scan of all 57,875 extended words in the original AA88
+upload finds four `3766/3767` operands, all in this dispatcher: two reads
+and its two previous-command updates. This is direct-reference coverage,
+not proof that no indirect writer or initialization record exists.
 Reproduce it with `make check-mu4-bootstrap-original
 MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootreccontrol`.
 Its receive PASS label proves native packet receipt and acknowledgement,
-not successful application dispatch or recording.
+not successful control-handler execution or recording.
 
 Resident command and loader addresses are reused by the recorder overlay;
 their resident trace counters must stop when that overlay takes ownership.
