@@ -117,6 +117,7 @@ private:
 	unsigned m_native_lookup_operand_traces = 0;
 	unsigned m_native_cache_traces[6] = {};
 	unsigned m_native_startup_subcall_traces = 0;
+	unsigned m_native_startup_return_traces = 0;
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
 	unsigned m_native_allocation_call_traces = 0;
@@ -458,6 +459,7 @@ private:
 		m_native_lookup_operand_traces = 0;
 		std::fill(std::begin(m_native_cache_traces), std::end(m_native_cache_traces), 0);
 		m_native_startup_subcall_traces = 0;
+		m_native_startup_return_traces = 0;
 		m_native_settings_call_traces = 0;
 		m_native_metadata_call_traces = 0;
 		m_native_allocation_call_traces = 0;
@@ -1349,6 +1351,22 @@ private:
 				};
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x3f1d, 0x6dbf, "mu4_native_startup_common", startup_observer);
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x2904b, 0x29117, "mu4_native_startup_main", startup_observer);
+			auto const startup_return_observer = [this](offs_t address, u16 &opcode, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled() ||
+						u16(m_cpu->state_int(tms320c54x_device::STATE_PC)) != address + 1 ||
+						(address > 0x6d61 && address < 0x6dbf) || m_native_startup_return_traces++ >= 120) return;
+					auto const disable = machine().disable_side_effects();
+					u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
+					logerror("mu4_native_startup_return_step: physical=%04x logical=%06x opcode=%04x sp=%04x stack=%04x,%04x,%04x st0=%04x st1=%04x imr=%04x ifr=%04x\n",
+						unsigned(address), unsigned(m_cpu->state_int(STATE_GENPC)), opcode, sp,
+						m_cpu->space(AS_DATA).read_word(sp), m_cpu->space(AS_DATA).read_word(u16(sp + 1)),
+						m_cpu->space(AS_DATA).read_word(u16(sp + 2)),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)));
+				};
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d44, 0x6dc5, "mu4_native_startup_return", startup_return_observer);
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x3d73, 0x3da5, "mu4_native_startup_context", startup_return_observer);
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x38c3e, 0x3c6cd, "mu4_native_startup_read",
 				[this](offs_t address, u16 &opcode, u16)
 				{

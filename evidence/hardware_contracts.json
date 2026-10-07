@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_startup_timer_context_sp_latency", "subsystem": "c54x", "status": "partial", "confidence": "strong",
+      "boundary": "Startup 6d4b enables IMR bit 3 with IFR=0438; vector 204c branches to original 02:3d73 before the helper reaches 3f1d. Context code has POPM BL at 3d9e followed by basic CPL-relative STL A,6 at 3d9f. Observed immediate SP=1275 places continuation 4044 at 127b; RET at 3da5 sees SP=127a and stack 0002,4044,6d4e. SPRU131G 7.5.5.1 table 7-9 requires one-instruction SP latency for this producer/consumer pair, which would use preceding SP=1274 and write reserved slot 127a. The core currently exposes SP updates immediately. This identifies an evidenced pipeline-defect candidate, not yet an executable red/green correction or complete native worker boot. Extension fetches are not independently treated as instructions. No stack word, mask, callback or firmware event is forced",
+      "evidence": ["driver/mu4_storage_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "docs/5510_bringup.md"]
+    },
+    {
       "id": "c54x_mcbsp_external_frame_error_recovery", "subsystem": "c54x", "status": "partial", "confidence": "strong",
       "boundary": "SPRU302B sections 2.3.7.4 and 2.3.7.1 specify TX underflow and RX overrun. Supported external single-phase 8/12/16-bit framing repeats old DXR on new FSX with XEMPTY low; reset with no data transmits zero. Fresh DXR clears empty only on shifter transfer; refill alone does not resume a mid-frame underflow. Three unread RX words set RFULL while retaining DRR and RBR; later RSR input may be lost. Side-effectful DRR reads and receiver reset clear RFULL, debugger peeks do not. Executable fixtures validate bit order, ready-edge counts, recovery, reset and save/restore of partial TX and overrun RX state. Test phases yield to drain synchronized CPU input events. Wider, internally clocked and multichannel modes and physical timing remain outside this contract",
       "evidence": ["driver/tms320c54x_mcbsp.cpp", "driver/tms320c54x_mcbsp.h", "driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]

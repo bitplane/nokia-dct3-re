@@ -27,7 +27,8 @@ The `startup` profile passes a 20-second observation tail after storage
 initialization and startup-helper entry, with zero illegal instructions.
 Its endpoint is the fixture's loader-return IDLE sentinel; the streaming
 consumer remains unentered. The open question is the original startup return
-ABI and enclosing resident-worker lifecycle, not a missing synthetic event.
+context and the CPU's stack-address pipeline latency, not a missing synthetic
+event. The original helper is interrupted before its selection call.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -1310,6 +1311,26 @@ physical `1820` IDLE instruction, installed as the isolated loader-call
 return sentinel. It is not evidence of a firmware idle loop or full native
 boot. The next question is the original loader/startup return ABI and the
 enclosing lifecycle that legitimately enters the resident worker.
+
+The startup-helper audit narrows this boundary further. Original `6d4b`
+enables IMR bit 3 (`0ac1 -> 0ac9`) while IFR is `0438`; the next instruction
+is interrupted through vector `204c -> 02:3d73`. Its context-save routine
+reaches `POPM BL` at `3d9e`, immediately followed by stack-relative
+`STL A,6` at `3d9f`. The core exposes the incremented SP `1275` to that
+store, placing `4044` at `127b`. At `3da5`, SP is `127a` and the top three
+words are `0002,4044,6d4e`; the return therefore does not consume `4044`.
+This is a CPU/context boundary, not evidence that the isolated loader caller
+must synthesize a resident-worker event.
+
+TI SPRU131G section 7.5.5.1, table 7-9 specifies a one-instruction SP
+latency from `POPM MMR` to a basic compiler-mode direct-address store.
+The immediately preceding SP (`1274`) would put that store at `127a`, the
+reserved return slot. The current core has no such addressing latency.
+This is a primary-specification-backed candidate defect; an isolated
+executable red/green test must precede a pipeline correction. Do not repair
+the return by changing stack contents, masking the interrupt or injecting a
+consumer call. The bounded bus observer also records extension reads, so
+only independently decoded instruction boundaries establish this sequence.
 
 McBSP error recovery is modeled for the supported externally framed,
 single-phase 8/12/16-bit modes. SPRU302B section 2.3.7.4 specifies that TX
