@@ -13,9 +13,9 @@ The independent MU4 `mu4nand` fixture executes original erased-media
 provisioning, receives all seven original R060 segments, reads back six
 complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
 `3538` then reaches the loaded entry and its page-2 common-window branch.
-Native execution currently loops at logical `02:9524`, waiting for McBSP1
-transmit readiness after initialization. McBSP1 is not yet modeled in the
-isolated fixture.
+The partial McBSP1 transmitter now carries six original firmware control
+words. The acceptance run stops at that observed serial-setup boundary;
+continuing reaches unsupported DMA channel 3 mode `c541`, sync `203f`.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -907,12 +907,12 @@ TI SPRU172C identifies condition `47` as signed A less than or equal to zero.
 Five core fixtures cover negative extremes, zero and positive values, predicate
 capture before two delay words, and the three-cycle branch cost.
 
-The eight-second entry run now reaches logical `02:9524`, with PMST `202c`,
+Before controller modeling, the eight-second entry run reached logical `02:9524`, with PMST `202c`,
 `illegal=0` and not idle. Original `02:951d` sets AR1 to `0048`, `951f`
 selects index 1, and `9521` executes long-offset BITF `61e1 0001 0002`;
 `9524` repeats on NTC. TI's related VC5410A register map identifies
 `48/49` as McBSP1's control window, index 1 as SPCR2. SPRU302B identifies bit 1
-as XRDY. These addresses still map to plain test RAM, not a serial controller.
+as XRDY. These addresses now map to the partial indexed McBSP device.
 Original `61e1 0001 0002` consumes displacement 1 before mask 2. It agrees
 with original InitDisk's independently executed long CMPM and GNU's decoding;
 SPRU172C places BITF and CMPM in the same Smem-plus-immediate class. The old
@@ -922,17 +922,24 @@ wrong-address sentinels, TC-only status changes and the three-cycle cost.
 SPRU131G's generic offset-last note must not override the recovered three-word
 Smem-plus-constant encodings.
 
-Read-only taps count 42 control writes, 10,719,960 SPCR2 reads at `0049`
-and no adjacent `004a` reads in the eight-second run. SPCR2 reads `0341`:
-XRST is enabled but XRDY is absent. The configuration trace covers all writes
-(cap 64), including SRGR1 `00fa`, SRGR2 `2000`, PCR `1f0b`, and final SPCR2
-`0341`. No peripheral readiness or completion is supplied.
+Recovered configuration includes SRGR1 `00fa`, SRGR2 `2000`, PCR `1f0b`,
+and programmed SPCR2 `0341`.
 
 SPRU302B 2.3.2.2 specifies XRDY becoming one on XRST's zero-to-one transition,
 clearing when DXR is written, and returning when DXR transfers into XSR.
-The next device work is that transmit-buffer lifecycle plus configured
-serial clocks and output, not a constant-ready register. Physical DA150
-timing and attached endpoint behavior still require separate validation.
+`tms320c54x_mcbsp` implements that transmit-buffer lifecycle, a separate
+shift register, CPU/2-derived internal bit clock, and MSB-first 8/12/16-bit
+output. Executable conformance covers absent external-clock stalling,
+queued words, reset cancellation, XRDY interrupts and pending save/restore.
+Receiver, wider/multiphase formats, external clock inputs and DMA events
+remain unsupported; active unsupported transmit formats fail explicitly.
+The fixture's 13 MHz source is not a validated DA150 PLL configuration.
+
+Original MCUSI16 transmits `0c10 0818 0a01 0e53 1023 1201` without illegal
+instructions. The gate ends when the sixth word completes, not after a full
+startup interval. A longer run reaches the DMA device's explicit unsupported
+channel-3 mode `c541`, sync `203f` guard. Decode that streaming contract next;
+neither its endpoint nor music playback is established by these control words.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.

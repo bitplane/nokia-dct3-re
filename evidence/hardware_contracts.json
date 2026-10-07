@@ -3,9 +3,9 @@
   "kind": "hardware_contracts",
   "entries": [
     {
-      "id": "npm5_mu4_native_mcbsp1_transmit_boundary", "subsystem": "mu4", "status": "mapped", "confidence": "strong",
-      "boundary": "Original MCUSI16 reaches logical 02:9524 without illegal opcodes. It selects McBSP1 indexed SPCR2 through 48/49 and repeats BITF 61e1 0001 0002/BC NTC until XRDY. Long BITF consumes displacement before mask, corroborated by independently executed original InitDisk CMPM, TI's shared Smem-plus-immediate class and GNU decoding. Four core fixtures cover set/clear TC, preupdate/no-update, wrong-address sentinels and three-cycle cost. Corrected native execution records 42 configuration writes, 10719960 reads of 49 and zero of 4a; SPCR2 is 0341, with XRST enabled and XRDY absent. Registers still map to test RAM, not a controller. Captured SRGR1=00fa, SRGR2=2000, PCR=1f0b. TI SPRU302B 2.3.2.2 defines initial XRDY on XRST release, clear on DXR write and reassertion on DXR-to-XSR transfer. No ready bit or completion is supplied. Transmit-buffer/clock/peer behavior remains unimplemented; native entry is not full MU4 boot",
-      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "docs/rom4_dsp_loader.md", "Makefile"]
+      "id": "npm5_mu4_native_mcbsp1_transmit_boundary", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Original MCUSI16 configures indexed McBSP1 48/49 and transmits six words 0c10 0818 0a01 0e53 1023 1201 through a partial generic transmitter. SPRU302B defines XRST/XRDY/DXR/XSR lifecycle and CPU/2 internal clock division. Executable fixtures cover 8/12/16-bit MSB-first output, absent external-clock stall, buffering, reset cancellation, XRDY IRQ and pending save/restore. Original BITF displacement-before-mask remains independently tested. The native acceptance stops on completion of the sixth word; a longer run hits unsupported DMA channel 3 mode c541 sync 203f. No receiver, DMA-event, external-clock, physical DA150 PLL, endpoint or music-playback completion is claimed",
+      "evidence": ["docs/5510_bringup.md", "driver/tms320c54x_mcbsp.cpp", "driver/tms320c54x_mcbsp.h", "driver/mu4_storage_test.cpp", "docs/rom4_dsp_loader.md", "Makefile"]
     },
     {
       "id": "npm5_mu4_original_program_entry", "subsystem": "mu4", "status": "partial", "confidence": "strong",

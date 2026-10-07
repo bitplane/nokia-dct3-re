@@ -6,6 +6,7 @@
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "machine/nandflash.h"
 #include "tms320c54x_dma.h"
+#include "tms320c54x_mcbsp.h"
 #include <vector>
 #include <sstream>
 
@@ -14,7 +15,7 @@ class mu4_storage_test_state : public driver_device
 {
 public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
-				: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_dma(*this, "dma"), m_program_ram(*this, "program_ram"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
+				: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_dma(*this, "dma"), m_mcbsp(*this, "mcbsp1"), m_program_ram(*this, "program_ram"), m_nand(*this, "nand"), m_cinit(*this, "cinit"),
 		  m_initdisk(*this, "initdisk"), m_disk_cinit(*this, "disk_cinit"), m_disk_helpers(*this, "disk_helpers"),
 		  m_disk_vectors(*this, "disk_vectors"), m_segment(*this, "segment") { }
 	void test(machine_config &config)
@@ -28,12 +29,33 @@ public:
 		m_cpu->bio_in_cb().set(FUNC(mu4_storage_test_state::bio_r));
 		TMS320C54X_DMA(config, m_dma, 13'000'000);
 		m_dma->set_cpu(m_cpu);
+		TMS320C54X_MCBSP(config, m_mcbsp, 13'000'000);
+		m_mcbsp->tx_word_cb().set(FUNC(mu4_storage_test_state::serial_tx));
+		m_mcbsp->tx_bit_cb().set(FUNC(mu4_storage_test_state::serial_tx_bit));
+		m_mcbsp->tx_irq_cb().set(FUNC(mu4_storage_test_state::serial_tx_irq));
 		SAMSUNG_K9K1208U0A(config, m_nand);
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
 	}
 private:
 	required_device<tms320c54x_device> m_cpu;
 	required_device<tms320c54x_dma_device> m_dma;
+	required_device<tms320c54x_mcbsp_device> m_mcbsp;
+	std::vector<u16> m_serial_tx_words;
+	std::vector<int> m_serial_tx_bits;
+	unsigned m_serial_saved_bits = 0;
+	unsigned m_serial_tx_irqs = 0;
+	void serial_tx_irq(int value) { if (value) ++m_serial_tx_irqs; m_cpu->set_input_line(14, value); }
+	void serial_tx_bit(int value) { if (m_phase >= 31 && m_phase <= 37) m_serial_tx_bits.push_back(value); }
+	void mcbsp_reg_w(u16 index, u16 value) { m_mcbsp->control_w(0, index); m_mcbsp->control_w(1, value); }
+	u16 mcbsp_status() { m_mcbsp->control_w(0, 1); return m_mcbsp->control_r(1); }
+	void serial_tx(u16 value)
+	{
+		m_serial_tx_words.push_back(value);
+		if (m_phase == 30 && m_serial_tx_words.size() <= 16) logerror("mu4_native_tx: word=%04x\n", value);
+		// End the serial-setup fixture at its observed complete control stream,
+		// before the separate streaming-DMA contract (not implemented here).
+		if (m_phase == 30 && m_serial_tx_words.size() == 6) m_check->adjust(attotime::zero);
+	}
 	required_shared_ptr<u16> m_program_ram;
 	required_device<samsung_k9k1208u0a_device> m_nand;
 	required_region_ptr<u16> m_cinit;
@@ -54,7 +76,7 @@ private:
 	attotime m_read_started, m_first_data;
 	std::vector<u16> m_writes;
 	emu_timer *m_check = nullptr;
-	unsigned m_phase = 25;
+	unsigned m_phase = 31;
 	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
 	unsigned m_native_mcbsp_trace = 0, m_native_mcbsp_polls = 0;
 	unsigned m_native_adjacent_reads = 0;
@@ -76,6 +98,8 @@ private:
 		map(0x0034, 0x0035).rw(FUNC(mu4_storage_test_state::serial_config_r), FUNC(mu4_storage_test_state::serial_config_w));
 		map(0x0038, 0x0039).rw(FUNC(mu4_storage_test_state::serial_config0_r), FUNC(mu4_storage_test_state::serial_config0_w));
 		map(0x003c, 0x003d).rw(FUNC(mu4_storage_test_state::gpio_r), FUNC(mu4_storage_test_state::gpio_w));
+		map(0x0040, 0x0043).rw(m_mcbsp, FUNC(tms320c54x_mcbsp_device::data_r), FUNC(tms320c54x_mcbsp_device::data_w));
+		map(0x0048, 0x0049).rw(m_mcbsp, FUNC(tms320c54x_mcbsp_device::control_r), FUNC(tms320c54x_mcbsp_device::control_w));
 		map(0x0054, 0x0057).rw(m_dma, FUNC(tms320c54x_dma_device::read), FUNC(tms320c54x_dma_device::write));
 	}
 	// Word-level receive fixture only; serial clocks/framing are not modeled here.
@@ -155,6 +179,8 @@ private:
 		m_ready = true;
 		m_bio_reads = m_busy_reads = m_data_reads = 0;
 		m_writes.clear();
+		m_serial_tx_words.clear(); m_serial_tx_bits.clear();
+		m_serial_tx_irqs = 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		// Synthetic wrapper initializes the routine ABI, then calls untouched code.
 		u16 const wrapper[] = {
@@ -165,6 +191,17 @@ private:
 			0xf980, 0x3035, 0xf980, 0x306c, 0xf4e1
 		};
 		for (unsigned i = 0; i < std::size(wrapper); ++i) program.write_word(0x1800 + i, wrapper[i]);
+		if (m_phase == 31)
+		{
+			program.write_word(0x1800, 0xf4e1);
+			mcbsp_reg_w(4, 0x0040); mcbsp_reg_w(5, 0);
+			mcbsp_reg_w(6, 12); mcbsp_reg_w(7, 0x2000);
+			mcbsp_reg_w(14, 0); // External clock absent: a queued word must remain busy.
+			mcbsp_reg_w(1, 0x0041);
+			if ((mcbsp_status() & 7) != 3) fatalerror("MU4 McBSP reset-release readiness mismatch");
+			m_mcbsp->data_w(3, 0xa55a);
+			if (mcbsp_status() & 2) fatalerror("MU4 McBSP DXR write did not clear readiness");
+		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
 			program.write_word(0x1809, 0xf4e1);
@@ -333,6 +370,69 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase >= 31 && m_phase <= 37)
+		{
+			if (m_phase == 31)
+			{
+				if (!m_serial_tx_words.empty() || (mcbsp_status() & 6)) fatalerror("MU4 McBSP advanced without clock");
+				mcbsp_reg_w(14, 0x0200);
+				m_phase = 32; m_check->adjust(attotime::from_usec(3)); return;
+			}
+			if (m_phase == 32)
+			{
+				if ((mcbsp_status() & 7) != 7 || !m_serial_tx_words.empty() || m_serial_tx_bits.size() != 1)
+					fatalerror("MU4 McBSP buffer-to-shift timing mismatch status=%04x words=%u bits=%u", mcbsp_status(), unsigned(m_serial_tx_words.size()), unsigned(m_serial_tx_bits.size()));
+				m_mcbsp->data_w(3, 0x5aa5);
+				if (mcbsp_status() & 2) fatalerror("MU4 McBSP second buffer not busy");
+				m_serial_saved_bits = m_serial_tx_bits.size();
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 McBSP pending save failed");
+				m_phase = 33; m_check->adjust(attotime::from_usec(70)); return;
+			}
+			if (m_phase == 33 || m_phase == 34)
+			{
+				if (m_serial_tx_words != std::vector<u16>({0xa55a, 0x5aa5}) || (mcbsp_status() & 7) != 3)
+					fatalerror("MU4 McBSP serialized word/completion mismatch");
+				unsigned const first = m_phase == 33 ? 0 : m_serial_saved_bits;
+				if (m_serial_tx_bits.size() != 32 - first) fatalerror("MU4 McBSP serialized bit count mismatch");
+				for (unsigned bit = first; bit < 32; ++bit)
+					if (m_serial_tx_bits[bit - first] != BIT(bit < 16 ? 0xa55a : 0x5aa5, 15 - (bit & 15)))
+						fatalerror("MU4 McBSP serialized bit order mismatch");
+				if (m_phase == 33)
+				{
+					m_saved_dma.clear(); m_saved_dma.seekg(0);
+					if (machine().save().read_stream(m_saved_dma) != STATERR_NONE || (mcbsp_status() & 7) != 5)
+						fatalerror("MU4 McBSP pending restore mismatch");
+					m_serial_tx_words.clear(); m_serial_tx_bits.clear();
+					m_phase = 34; m_check->adjust(attotime::from_usec(70)); return;
+				}
+				m_mcbsp->data_w(3, 0x1234); mcbsp_reg_w(1, 0);
+				m_phase = 35; m_check->adjust(attotime::from_usec(40)); return;
+			}
+			if (m_phase == 35)
+			{
+				if (mcbsp_status() & 7 || m_serial_tx_words.size() != 2 || m_serial_tx_irqs != 4) fatalerror("MU4 McBSP reset/interrupt count mismatch");
+				m_serial_tx_words.clear(); m_serial_tx_bits.clear();
+				mcbsp_reg_w(4, 0); mcbsp_reg_w(1, 0x0041); m_mcbsp->data_w(3, 0xa55a);
+				m_phase = 36; m_check->adjust(attotime::from_usec(40)); return;
+			}
+			unsigned const width = m_phase == 36 ? 8 : 12;
+			u16 const expected = m_phase == 36 ? 0x005a : 0x055a;
+			if (m_serial_tx_words != std::vector<u16>({expected}) || m_serial_tx_bits.size() != width || (mcbsp_status() & 7) != 3)
+				fatalerror("MU4 McBSP short-word completion mismatch");
+			for (unsigned bit = 0; bit < width; ++bit)
+				if (m_serial_tx_bits[bit] != BIT(expected, width - bit - 1)) fatalerror("MU4 McBSP short-word bit order mismatch");
+			if (m_phase == 36)
+			{
+				m_serial_tx_words.clear(); m_serial_tx_bits.clear();
+				mcbsp_reg_w(1, 0); mcbsp_reg_w(4, 0x0020); mcbsp_reg_w(1, 0x0041); m_mcbsp->data_w(3, 0xa55a);
+				m_phase = 37; m_check->adjust(attotime::from_usec(40)); return;
+			}
+			if (m_serial_tx_irqs != 8) fatalerror("MU4 McBSP short-word interrupt mismatch");
+			m_saved_dma.str(std::string());
+			logerror("mu4_mcbsp_conformance: PASS reset_ready=1 busy=1 external_stall=1 bit_order=1 pending_restore=1 cancel=1 widths=8,12,16 tx_irqs=8\n");
+			m_phase = 25; machine().schedule_soft_reset(); return;
+		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{
 			auto &data = m_cpu->space(AS_DATA);
@@ -446,12 +546,15 @@ private:
 		{
 			if (!m_native_entry_reads || !m_native_far_reads)
 				fatalerror("MU4 original program transfer missing entry=%u far=%u pc=%06x", m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)));
+			if (m_serial_tx_words != std::vector<u16>({0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023, 0x1201}))
+				fatalerror("MU4 original serial-setup sequence mismatch");
 			logerror("mu4_native_entry: PASS original_transfer=1 entry_reads=%u far_reads=%u pc=%06x illegal=%u idle=%u pmst=%04x\n",
 				m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
-			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u controller_modeled=0\n",
-				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace);
+			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u tx_words=%u tx_irqs=%u controller_modeled=partial\n",
+				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace,
+				unsigned(m_serial_tx_words.size()), m_serial_tx_irqs);
 			machine().schedule_exit();
 			return;
 		}
