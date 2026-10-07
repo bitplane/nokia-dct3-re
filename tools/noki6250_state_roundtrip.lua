@@ -1,7 +1,8 @@
 -- Research-composition restoration; no handset state writes.
 local source = debug.getinfo(1, 'S').source:sub(2)
 local call = _G.noki6250_state_call == true
-local scenario = call and 'call' or 'idle'
+local sms = _G.noki6250_state_sms == true
+local scenario = sms and 'sms' or call and 'call' or 'idle'
 _G.noki6250_call_hold = call
 dofile(assert(source:match('^(.*[/])')) ..
     (call and 'noki6250_call_observe.lua' or 'noki6250_runtime_observe.lua'))
@@ -34,6 +35,17 @@ local post_load = emu.add_machine_post_load_notifier(function()
         assert(emu.wait(1))
         machine:logerror(string.format('state_replay: phase=restored event=end t=%.9f\n', machine.time:as_double()))
         machine.screens[':screen']:snapshot('6250_state_' .. scenario .. '_restored.png')
+        if sms then
+            local key = assert(machine.ioport.ports[':COL.1'].fields['Left Softkey / Menu'])
+            machine:logerror('6250_state_physical: key=Read\n')
+            key:set_value(1)
+            assert(emu.wait(0.15))
+            key:set_value(0)
+            assert(emu.wait(1.85))
+            machine.screens[':screen']:snapshot('6250_state_sms_read.png')
+            completed = true
+            return
+        end
         if call then
             assert(emu.wait(2))
             local key = assert(machine.ioport.ports[':COL.0'].fields['End'])
@@ -60,7 +72,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(replay))
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(25))
+    assert(emu.wait(sms and 17 or 25))
     machine:save('6250_' .. scenario)
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

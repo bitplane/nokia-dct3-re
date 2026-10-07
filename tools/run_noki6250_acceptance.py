@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "idle-state", "call-state"),
+                                              "phonebook", "registration", "idle-state", "call-state", "sms-state"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -74,6 +74,8 @@ def main():
             script = "noki6250_state_idle.lua"
         if args.scenario == "call-state":
             script = "noki6250_state_call.lua"
+        if args.scenario == "sms-state":
+            script = "noki6250_state_sms.lua"
         seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
@@ -107,6 +109,13 @@ def main():
                        str(run / "error.log")]
             if args.scenario == "outgoing-call":
                 checker.extend(["--outgoing", "--number", "123"])
+        elif args.scenario in ("idle-state", "call-state", "sms-state"):
+            checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
+                       str(run / "error.log"), str(run / "snap")]
+            if args.scenario == "call-state":
+                checker.append("--call")
+            elif args.scenario == "sms-state":
+                checker.extend(["--sms", "--storage", str(run / "nvram/nhm3hle/sim_card")])
         elif sms:
             frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8}[args.scenario]
             frames = list((run / "snap").rglob(f"6250_sms_{frame_index}.png"))
@@ -123,11 +132,6 @@ def main():
                 raise ValueError(f"expected one save frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
                        "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
-        elif args.scenario in ("idle-state", "call-state"):
-            checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
-                       str(run / "error.log"), str(run / "snap")]
-            if args.scenario == "call-state":
-                checker.append("--call")
         elif args.scenario == "registration":
             checker = [sys.executable, str(root / "tools/radio_registration_trace_check.py"),
                        str(run / "error.log"), "--profile", "nhm3"]

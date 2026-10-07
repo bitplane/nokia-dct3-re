@@ -3,13 +3,38 @@ from unittest.mock import patch
 
 from tools.noki6250_state_check import verify
 from tools.test_noki8210_state_check import GOOD as IDLE_TRACE
+from tools.test_noki6250_sms_check import LOG as SMS_LOG
+from tools.radio_sms_acceptance_common import FIRST_SMS_DELIVER_BODY, SMS_NVRAM_OFFSET
 
 
 GOOD = IDLE_TRACE.replace('8210_', '6250_').replace(
     '6250_keypad_decoded: key=19', '6250_raw_matrix_key: value=06')
+SMS_STORAGE = bytes(SMS_NVRAM_OFFSET) + bytes([1]) + FIRST_SMS_DELIVER_BODY + bytes(176)
 
 
 class Nokia6250StateTest(unittest.TestCase):
+    def sms_trace(self):
+        before, after = SMS_LOG.rsplit('sim_device: update', 1)
+        return (before + GOOD.replace('key=Menu', 'key=Read') +
+                'sim_device: update' + after)
+
+    def test_sms_restoration(self):
+        verify(self.sms_trace(), sms=True, storage=SMS_STORAGE)
+
+    def test_sms_requires_storage(self):
+        with self.assertRaisesRegex(ValueError, 'persistent SIM storage'):
+            verify(self.sms_trace(), sms=True)
+
+    def test_sms_rejects_duplicate_record_write(self):
+        with self.assertRaisesRegex(ValueError, 'delivery and read-status writes'):
+            verify(self.sms_trace() + 'sim_device: update fid=6f3c record=1 length=176\n',
+                   sms=True, storage=SMS_STORAGE)
+
+    def test_sms_requires_post_load_read(self):
+        with self.assertRaisesRegex(ValueError, 'physical Read'):
+            verify(self.sms_trace().replace('key=Read', 'key=Menu'),
+                   sms=True, storage=SMS_STORAGE)
+
     def test_call_save_requires_established_connection(self):
         trace = GOOD + '6250_state_physical: key=End\n'
         with patch('tools.noki6250_state_check.verify_outgoing'):

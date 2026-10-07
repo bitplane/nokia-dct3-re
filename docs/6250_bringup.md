@@ -18,7 +18,7 @@ phonebook save and cold-start retrieval from SIM NVRAM are verified below. Norma
 retains the fail-closed final publication wait at `429842`; the research
 composition is not promoted to supported default boot.
 
-Research idle and active-call save/load separately verify exact CPU/RAM/time
+Research idle, active-call and delivered-SMS save/load separately verify exact CPU/RAM/time
 restoration, ordered radio/SIM replay, identical 96x60 pixels and post-load
 physical continuation. Idle uses Menu/Messages; the established call uses
 End and complete CC/RR release back to registered idle. Neither resolves the
@@ -88,6 +88,16 @@ the own outgoing release grammar, including request-derived confirmation and
 idle PCH, and returns to reviewed `DCT3 LAB`. Check with
 `noki6250_state_check.py LOG SNAP --call`. This is restored call signaling/UI,
 not speech, native DSP runtime or delivered-SMS restoration.
+
+`--scenario sms-state` saves at 17 seconds, after the incoming `hello`
+message has been stored in EF_SMS and SDCCH released. The same exact state,
+nonempty ordered protocol replay and full-screen pixel checks apply. After
+load, physical Read scans matrix key `06`, displays sender `5551234` and
+`hello`, and persists read status `01`. The checker requires one delivery
+and exactly two record writes (delivery and read status), preventing silent
+redelivery. Run `noki6250_state_check.py LOG SNAP --sms --storage SIM_NVRAM`.
+This proves delivered-message restoration, not an unfinished SMS transaction,
+authentic original-PMM boot or native DSP execution.
 
 ## Recovered hardware contracts
 
