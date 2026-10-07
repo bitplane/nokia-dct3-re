@@ -314,8 +314,8 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
     if phase == 'connected':
-        if ('state changed to CONFIRMED' not in remote_text or
-                'Request msg BYE/' not in remote_text):
+        if not re.search(r'state changed to CONFIRMED.*?Request msg BYE/',
+                         remote_text, re.DOTALL):
             raise RuntimeError('restoration did not close a real connected SIP dialog')
     else:
         if not re.search(r'Response msg [4-6][0-9]{2}/INVITE/', remote_text):

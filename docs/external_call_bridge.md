@@ -380,10 +380,13 @@ transaction race or cancellation before paging.
 ```sh
 make verify-radio-incoming-call-sip-restore RUN_DIR=run_3210_sip_restore
 make verify-3310-radio-incoming-call-sip-connected-restore RUN_DIR=run_3310_sip_restore
+make verify-3330-radio-incoming-call-sip-connected-restore RUN_DIR=run_3330_sip_restore
 ```
 
-The fixture physically answers an incoming SIP call, saves at 19 seconds and
-loads one second later. The checker requires that connection precede the save,
+The 3210/3310 fixtures physically answer an incoming SIP call, save at 19 seconds
+and load one second later. The 3330 fixture repeats its own physical PMM setup
+and saves at 17 seconds because its earlier Answer would let the eight-second
+remote call expire during the later save/load window. The checker requires that connection precede the save,
 the real external SIP dialog close with BYE, and the restored GSM transaction
 clear exactly once with cause 41 under epoch 2, ordered CC clearing and LAPDm
 release. An `ended` flag without that protocol closure is insufficient.

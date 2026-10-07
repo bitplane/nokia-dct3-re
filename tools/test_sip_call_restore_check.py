@@ -38,6 +38,11 @@ class SipRestoreCheckTest(unittest.TestCase):
     def test_connected_restore_clears_both_sides(self):
         self.check()
         self.check(product='3310')
+        self.check(product='3330')
+
+    def test_bye_before_confirmation_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            self.check(remote='Request msg BYE/\nstate changed to CONFIRMED\n')
 
     def test_end_flag_without_radio_release_is_rejected(self):
         for checkpoint in ('GSM service downlink kind=13',
