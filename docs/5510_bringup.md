@@ -1891,9 +1891,60 @@ boundary. Physical board attachment and independently verified output
 content remain unvalidated.
 
 Next recover the accepted media container and storage layout before attempting
-native playback, and investigate physical reset and board attachment separately.
+native playback. The original recorder is an alternative candidate producer of
+valid media; its command/lifecycle boundary is described below. Investigate
+physical reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
 a mode.
+
+### Original recorder candidate
+
+Nokia's [5510 User's Guide, issue 2](https://www.instructionsmanuals.com/sites/default/files/2019-05/Nokia-5510-en.pdf)
+documents recording from radio or external audio equipment, saving a named
+track, and subsequent playback (printed pages 58-59). Recorded radio files
+can be copied to a PC but are described as playable only on the handset
+(printed page 82). This establishes an original-firmware media producer,
+not the MU4 selector, codec, container format or a verified recorder bench.
+
+Original `aa22` dispatcher `03:acf2` consumes the selector from `b9d4`
+and parameter from `b9d5`. Its `03:ad3d..ad47` subtract/table branch
+covers selectors `29..3c`: twenty words at extended program `02:40f5`,
+with branch destinations on page 3. Independent GNU C54x disassembly and
+overlay-local final-write extraction give these relevant entries:
+
+| Selector | Handler | Verified static contract |
+| --- | --- | --- |
+| `30` | `03:b349` | Parameter 2 requires nonzero track count `3768` before playback selection; not an empty-media recorder entrance. |
+| `31` | `03:b332` | Calls `02:9e1a`; this requires lifecycle `373e == 4` before changing state and reloading index zero. |
+| `32` | `03:b30a` | Parameters 2/3 call `02:9e47/9e51`, setting `3742` to 1/2. |
+| `36` | `03:b1a9` | Parameter 5 checks `374e != 0`, sets `3750 = 3`, selects `3762 = 7/8` from `ba24`, then calls `02:9e90`. |
+
+Entry `02:9e90` itself requires `373e == 2`. It sets that lifecycle
+to 8, copies original uploaded data `c0a9 = "RERSI16 "` and
+`c0b2 = "BIN"` to the named-loader buffers, builds a file context
+at `9d0e`, and reaches the original `02:9186` named loader at
+`02:9fa8`. A successful downstream return clears `3750` and restores
+`373e = 2`. This is a recorder candidate supported by file-producing
+context setup and the original overlay selection, not proof that the
+overlay encodes audio or emits an accepted playback file.
+
+The retained-startup RAM observation in
+`run_mu4-retained.Yh686K/retained/mu4_ram_settled_leg0.bin` has
+`373e = 0`, `374e = 0f36`, `3750 = 0`, `3762 = 0`, and `3768 = 0`.
+That snapshot belongs to the retained routine-startup profile, not a
+full-startup recorder run. Nonzero capacity alone does not satisfy the
+recorder lifecycle. The concrete next question is which external command
+or board condition lets original firmware establish `373e = 2` after
+complete uploaded startup. Observe that transition before testing selector
+`36/5`; never set the lifecycle or invoke the overlay loader from the bench.
+
+Reproduce the command-table extraction with
+`tools/noki5510_a00_inventory.py --segment aa22 --extract-program-range
+0x240f5 0x24109 --disassembler-little-endian --output <new-path>` on the
+original `InitData_R060.a00`. The twenty-word output SHA-256 is
+`6f1e6fa4d54f681f90fea6f512a00127a6aa26b6013d3e55b3cfb4cad8d444c0`.
+Coverage is this recovered twenty-entry branch only; other selector tables,
+indirect state writers and actual recording execution remain separate work.
 
 The pin bench registers its external receive/transmit waveform state,
 request/acknowledgement cursors, serial shadows and NAND GPIO latches for
