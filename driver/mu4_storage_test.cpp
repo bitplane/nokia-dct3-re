@@ -133,6 +133,14 @@ private:
 	std::array<u16, 4> m_continuous_tx{};
 	unsigned m_continuous_tx_head = 0, m_continuous_tx_count = 0;
 	unsigned m_continuous_din_words = 0, m_continuous_nonzero_words = 0;
+	std::array<u16, 4> m_source_words{};
+	unsigned m_source_head = 0, m_source_count = 0, m_source_reads = 0;
+	std::array<u16, 256> m_verified_tone{};
+	std::array<bool, 2> m_verified_tone_valid{};
+	std::array<unsigned, 2> m_verified_tone_reads{};
+	unsigned m_tone_dma_words = 0;
+	std::array<bool, 256> m_tone_cleared{};
+	unsigned m_tone_discarded_words = 0;
 	unsigned m_native_dma_rx_vectors = 0, m_native_dma_tx_vectors = 0;
 	unsigned m_native_dma_tx_handler = 0;
 	unsigned m_native_stream_pending_sets = 0, m_native_stream_pending_clears = 0, m_native_stream_pending_reads = 0;
@@ -346,6 +354,11 @@ private:
 		if (m_phase == 30 && m_native_tx_words.size() < native_stream_target()) m_native_tx_words.push_back(value);
 		if (m_phase == 30 && system_bios() == 20)
 		{
+			if (!m_source_count || value != m_source_words[m_source_head])
+				fatalerror("MU4 transmitter/source mismatch word=%u source_reads=%u pending=%u actual=%04x expected=%04x pc=%06x",
+					m_stream_words, m_source_reads, m_source_count, value, m_source_words[m_source_head], unsigned(m_cpu->pc()));
+			m_source_head = (m_source_head + 1) % m_source_words.size();
+			--m_source_count;
 			if (m_continuous_tx_count == m_continuous_tx.size()) fatalerror("MU4 codec comparison queue overflow");
 			m_continuous_tx[(m_continuous_tx_head + m_continuous_tx_count) % m_continuous_tx.size()] = value;
 			++m_continuous_tx_count;
@@ -643,6 +656,16 @@ private:
 		for (unsigned channel = 0; channel < 2; ++channel)
 			if (data.read_word(0xbb79 + channel) != m_tone_phase[channel])
 				fatalerror("MU4 native tone phase disagrees with independent block model");
+		if (system_bios() == 20)
+		{
+			unsigned const bank = m_tone_buffer == 0xbaf9;
+			if (m_verified_tone_valid[bank] && m_verified_tone_reads[bank] != 128)
+				fatalerror("MU4 tone bank overwritten before complete verified DMA consumption");
+			std::copy(m_tone_expected.begin(), m_tone_expected.end(), m_verified_tone.begin() + bank * 128);
+			m_verified_tone_valid[bank] = true;
+			m_verified_tone_reads[bank] = 0;
+			std::fill(m_tone_cleared.begin() + bank * 128, m_tone_cleared.begin() + (bank + 1) * 128, false);
+		}
 		++m_tone_blocks;
 	}
 	bool finish_native_replay()
@@ -928,6 +951,46 @@ private:
 			save_item(NAME(m_continuous_tx)); save_item(NAME(m_continuous_tx_head));
 			save_item(NAME(m_continuous_tx_count)); save_item(NAME(m_continuous_din_words));
 			save_item(NAME(m_continuous_nonzero_words));
+			save_item(NAME(m_source_words)); save_item(NAME(m_source_head)); save_item(NAME(m_source_count)); save_item(NAME(m_source_reads));
+			save_item(NAME(m_verified_tone)); save_item(NAME(m_verified_tone_valid));
+			save_item(NAME(m_verified_tone_reads)); save_item(NAME(m_tone_dma_words));
+			save_item(NAME(m_tone_cleared)); save_item(NAME(m_tone_discarded_words));
+			m_cpu->space(AS_DATA).install_write_tap(0xba79, 0xbb78, "mu4_native_tone_cleanup",
+				[this](offs_t address, u16 &value, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled()) return;
+					unsigned const pc = m_cpu->pc(), bank = address >= 0xbaf9;
+					if (pc != (bank ? 0x3b05a : 0x3b058)) return;
+					unsigned const offset = address - (bank ? 0xbaf9 : 0xba79), index = bank * 128 + offset;
+					if (value || !m_verified_tone_valid[bank] || m_tone_cleared[index])
+						fatalerror("MU4 original tone cleanup store contract changed");
+					unsigned const position = 2 * (offset % 64) + (offset >= 64);
+					if (position >= m_verified_tone_reads[bank]) ++m_tone_discarded_words;
+					m_tone_cleared[index] = true;
+					m_verified_tone[index] = 0;
+				});
+			m_cpu->space(AS_DATA).install_read_tap(0x80, 0xffff, "mu4_native_dma_source",
+				[this](offs_t address, u16 &value, u16)
+				{
+					// Timer-driven DMA reads, not CPU operands or supervisor inspection.
+					if (m_phase != 30 || machine().side_effects_disabled() || machine().scheduler().currently_executing() ||
+						!m_dma->source_matches(3, AS_DATA, address)) return;
+					bool const tone = address >= 0xba79 && address <= 0xbb78;
+					if (m_source_count == m_source_words.size()) fatalerror("MU4 DMA source comparison queue overflow");
+					m_source_words[(m_source_head + m_source_count) % m_source_words.size()] = value;
+					++m_source_count; ++m_source_reads;
+					if (!tone) return;
+					unsigned const bank = address >= 0xbaf9;
+					unsigned const offset = address - (bank ? 0xbaf9 : 0xba79);
+					unsigned const count = m_verified_tone_reads[bank], position = count % 128;
+					unsigned const expected_offset = position / 2 + ((position & 1) ? 64 : 0);
+					if (!m_verified_tone_valid[bank] || (count >= 128 && !m_tone_cleared[bank * 128 + offset]) || offset != expected_offset ||
+						value != m_verified_tone[bank * 128 + offset])
+						fatalerror("MU4 tone DMA source mismatch bank=%u count=%u offset=%u actual=%04x expected=%04x mode=%04x blocks=%u pc=%06x",
+							bank, count, offset, value, m_verified_tone[bank * 128 + offset], m_cpu->space(AS_DATA).read_word(0xbb80), m_tone_blocks, unsigned(m_cpu->pc()));
+					++m_verified_tone_reads[bank];
+					if (!m_tone_cleared[bank * 128 + offset]) ++m_tone_dma_words;
+				});
 		}
 	}
 	void save_command_peer()
@@ -985,6 +1048,9 @@ private:
 		m_native_din_words = 0;
 		m_continuous_tx.fill(0);
 		m_continuous_tx_head = m_continuous_tx_count = m_continuous_din_words = m_continuous_nonzero_words = 0;
+		m_source_words.fill(0); m_source_head = m_source_count = m_source_reads = 0;
+		m_verified_tone.fill(0); m_verified_tone_valid.fill(false); m_verified_tone_reads.fill(0); m_tone_dma_words = 0;
+		m_tone_cleared.fill(false); m_tone_discarded_words = 0;
 		m_native_dma_rx_vectors = m_native_dma_tx_vectors = 0;
 		m_native_dma_tx_handler = 0;
 		m_native_stream_pending_sets = m_native_stream_pending_clears = m_native_stream_pending_reads = 0;
@@ -1141,7 +1207,12 @@ private:
 			data.write_word(0x55, 0x1e); data.write_word(0x56, 0); data.write_word(0x56, 0xff82);
 			data.write_word(0x55, 0x1f);
 			if (data.read_word(0x57) != 2 || data.read_word(0x55) != 0x1f) fatalerror("MU4 DMA page/nonincrement mismatch");
+			if (m_dma->source_matches(0, AS_DATA, 0x6000)) fatalerror("MU4 disabled DMA source inspection matched");
 			data.write_word(0x54, 1);
+			if (!m_dma->source_matches(0, AS_DATA, 0x6000) || m_dma->source_matches(0, AS_DATA, 0x6001) ||
+				m_dma->source_matches(0, AS_PROGRAM, 0x6000) || m_dma->source_matches(6, AS_DATA, 0x6000) ||
+				data.read_word(0x55) != 0x1f)
+				fatalerror("MU4 DMA source inspection changed index or matched wrong channel/address/space");
 			if (!(data.read_word(0x54) & 1) || data.read_word(0x6100) != 0xffff || program.read_word(0x2ffff) != 0xffff)
 				fatalerror("MU4 DMA completed synchronously");
 			if (m_phase == 27) data.write_word(0x54, 0);
@@ -1344,6 +1415,12 @@ private:
 					m_continuous_din_words + m_continuous_tx_count != m_stream_words || !m_continuous_nonzero_words)
 					fatalerror("MU4 processing did not produce continuously verified nonzero codec output");
 				logerror("mu4_native_codec_continuous: PASS complete_window=1 digital_din=1 nonzero=1 music_decode=0 analog_audio=0\n");
+				logerror("mu4_native_tone_dma_observe: source_reads=%u pending=%u tone_words=%u generated_blocks=%u discarded=%u\n",
+					m_source_reads, m_source_count, m_tone_dma_words, m_tone_blocks, m_tone_discarded_words);
+				if (m_source_reads != m_stream_words + m_source_count || m_source_count > 2 ||
+					!m_tone_dma_words || m_tone_dma_words + m_tone_discarded_words != m_tone_blocks * 128)
+					fatalerror("MU4 generated tone samples are neither verified through DMA nor cancelled by original cleanup");
+				logerror("mu4_native_tone_dma: PASS independent_samples=1 stereo_order=1 dma_to_tx=1 tx_to_din=1 music_decode=0 analog_audio=0\n");
 			}
 			if (finish_native_replay()) return;
 			if (system_bios() == 18)
@@ -1784,6 +1861,7 @@ private:
 				return;
 			}
 			if (data.read_word(0x54) & 1) fatalerror("MU4 DMA completion bit remains set");
+			if (m_dma->source_matches(0, AS_DATA, 0x6000)) fatalerror("MU4 completed DMA source inspection remained active");
 			if (m_phase == 25 && (program.read_word(0x2ffff) != 0x1234 || program.read_word(0x20000) != 0xabcd))
 				fatalerror("MU4 DMA program page wrap mismatch");
 			if (m_phase == 26 && data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA zero-count single-word mismatch");
@@ -1817,6 +1895,7 @@ private:
 				if (data.read_word(0x6100) != 0x1234) fatalerror("MU4 DMA restored transfer failed");
 				m_saved_dma.str(std::string());
 				logerror("mu4_dma_conformance: PASS deferred=1 page_wrap=1 zero_count=1 cancel=1 pending_restore=1 reload_banks=6 frame_mask=1 reserved=1\n");
+				logerror("mu4_dma_source_inspection: PASS disabled=1 active=1 space=1 address=1 channel=1 index_preserved=1\n");
 				m_phase = 0;
 			}
 			else ++m_phase;

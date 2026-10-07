@@ -71,6 +71,15 @@ void tms320c54x_dma_device::write(offs_t offset, u16 value)
 	}
 }
 
+bool tms320c54x_dma_device::source_matches(unsigned channel, int space, u32 address) const
+{
+	if (channel >= 6 || !BIT(m_control, channel)) return false;
+	unsigned const base = channel * 5, source_space = (m_regs[base + 4] >> 6) & 3;
+	int const spaces[] = {AS_PROGRAM, AS_DATA, AS_IO};
+	return source_space < 3 && spaces[source_space] == space &&
+		address == (m_regs[base] | (source_space == 0 ? u32(m_regs[0x1e]) << 16 : 0));
+}
+
 void tms320c54x_dma_device::enable(unsigned channel)
 {
 	validate(channel);

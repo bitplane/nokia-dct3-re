@@ -1044,6 +1044,7 @@ check-mu4-storage-original: build
 		grep -q 'mu4_initdisk_segment: PASS' error.log; grep -q 'mu4_initdisk_mount: PASS' error.log; \
 		grep -q 'mu4_file_readback: PASS files=6' error.log; \
 		grep -q 'mu4_dma_conformance: PASS' error.log; grep -q 'mu4_loader: PASS' error.log; \
+		grep -q 'mu4_dma_source_inspection: PASS' error.log; \
 		grep -q 'mu4_native_entry: PASS' error.log; grep -q 'mu4_mcbsp_conformance: PASS' error.log; \
 		grep -q 'mu4_mcbsp_underrun: PASS' error.log; grep -q 'mu4_mcbsp_underrun_restore: PASS' error.log; \
 		grep -q 'mu4_mcbsp_overrun: PASS' error.log; grep -q 'mu4_mcbsp_overrun_restore: PASS' error.log; \
@@ -1141,6 +1142,7 @@ check-mu4-bootstrap-original: build
 		if test "$$bios" = bootmeasure; then \
 			grep -q 'mu4_native_measurement: PASS' error.log; grep -q 'mu4_native_tone: PASS' error.log; \
 			grep -q 'mu4_native_codec_continuous: PASS' error.log; \
+			grep -q 'mu4_native_tone_dma: PASS' error.log; \
 		elif test "$$bios" != bootstrap; then \
 			grep -q 'mu4_native_status_transaction: PASS' error.log; grep -q 'mu4_native_receive_pins: PASS' error.log; fi; \
 		if test "$$bios" = bootreplay; then grep -q 'mu4_native_replay: PASS' error.log; fi; \

@@ -16,6 +16,8 @@ public:
 	void sync_w(unsigned event, int state);
 	u16 read(offs_t offset);
 	void write(offs_t offset, u16 value);
+	// Side-effect-free inspection; does not alter the register index or bus state.
+	bool source_matches(unsigned channel, int space, u32 address) const;
 
 protected:
 	virtual void device_start() override;

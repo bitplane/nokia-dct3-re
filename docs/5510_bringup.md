@@ -1595,7 +1595,7 @@ final phase words match on every call: 11,520 sample words, including 26
 signed phase wraps. The model explicitly rejects product saturation outside
 this fixture's supported range. These are verified generated buffer values;
 the separate `bootmeasure` profile below also validates continuous digital
-transport. Exact generator-buffer-to-DMA provenance, analog sound, music and
+transport and the generator-buffer-to-DMA contract. Analog sound, music and
 speech decoding are not established by the buffer arithmetic alone.
 
 The original directory scanner at `03:941d` accepts extensions `REL` and
@@ -1954,9 +1954,31 @@ The complete 20-second observation matches 1,633,006 words, including
 requires coverage beyond the old 1,024-word prefix, nonzero output and at
 most one final launched-but-not-yet-sampled word; exact volume is not a
 physical clock-rate oracle. This verifies sustained digital transport
-during native processing. It does not independently map each generated
-tone-buffer sample through the firmware's DMA source selection or model
-the DAC/analog output.
+during native processing; the source-selection proof below connects tone
+samples to that transport. It does not model the DAC/analog output.
+
+Original worker `02:955b..9588` writes DMA source-reload index `32`, selects
+`ba79` or `baf9`, calls the generator and flips `bb86`. Each bank contains
+64 left samples followed by 64 right samples. A passive data-read observer
+uses side-effect-free DMA channel-3 source inspection to distinguish DMA
+reads from CPU operands and other channels, without changing the DMA
+register index. Every uncancelled generated word matches the independent
+tone calculation in alternating left/right source order. Bounded queues
+then require every observed DMA source word to match McBSP TX, followed by
+the existing independent codec-DIN comparison.
+
+The command's original cleanup matters: `03:b056/b058` zero both tone
+banks while the last DMA block is in flight, before `03:b05e` writes mode
+zero. The observer recognizes only those exact CPU store boundaries and
+zero values, updates its expected source image and accounts for samples
+cancelled before DMA read. This fixture generates 11,520 words: 11,362 are
+independently verified through DMA and 158 are cancelled by original
+cleanup. The complete source stream has 1,633,007 reads, 1,633,006 completed
+transmitter words and one pending source word. Acceptance requires exact
+generated = consumed + cancelled accounting, no premature bank overwrite,
+stereo source order and source-to-TX-to-DIN agreement. These quantities
+describe this bench, not real-board rates or a requirement that every
+generated sample must play before a command stops.
 
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects
