@@ -33,6 +33,16 @@
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]
     },
     {
+      "id": "c54x_immediate_dp_load", "subsystem": "c54x", "status": "validated", "confidence": "strong",
+      "boundary": "TI SPRU172C pp. 4-70--4-71 syntax 3 encodes LD #k9,DP as ea00..ebff, replacing only ST0 bits 8--0 in one cycle. Original MU4 startup executes ea00 at 02:3d7e after storage initialization. The previously unsupported encoding is implemented and executable conformance checks all 512 immediate values in two CPL/SXM configurations, preservation of other ST0/ST1 bits and both accumulators, and one-cycle timing between two-cycle port probes. Core conformance and existing warm/cold ROM4 fixtures pass. This is an ISA contract, not a claim of complete native application or speech execution",
+      "evidence": ["cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "docs/5510_bringup.md", "Makefile"]
+    },
+    {
+      "id": "npm5_mu4_storage_startup_completion_and_underrun", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "In the five-second settings-buffer scope, c57f has 57 calls and 56 returns; page-program/readback-verification helpers have zero observed calls. Static b91d loops over 32 page reads. The separate startup profile requests a 20-second tail without changing inputs and observes the storage initialization call returning, main completing, and entries to 02:6dbf and 02:6d44. After implementing independently specified LD #k9,DP, it progresses into later startup but terminates on explicitly unimplemented McBSP framed transmit underrun. This is not a passing endpoint gate, completed 20-second tail, consumer activation, music decoding or full native boot. The next hardware contract is underrun status and repeated-DXR framing under SPRU302B 2.3.7.4; no missing peer, settings file or firmware state is synthesized",
+      "evidence": ["driver/mu4_storage_test.cpp", "driver/tms320c54x_mcbsp.cpp", "cpu/tms320c54x/tms320c54x.cpp", "docs/5510_bringup.md", "Makefile"]
+    },
+    {
       "id": "npm5_mu4_stream_selection_operands", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Original common code uses DP 017b with CPL clear: direct operand base bd80, not low peripherals. Worker observations give bdb8=0001, bdb9=0010, bde3=0000, bde4=8028 and bde7=3da6. At 3f5b A=-15 makes AGT false; at 3f5f A=0001000000 from bdbc=1 makes ALT false. Original TX ISR increments bdbc at 02:8b0d..8b0e and decrements it at 02:8b52..8b53; initialization leaves it zero. Common tail actually executes RET at 3da6. Paged epilogue probes observe TC clear after BITF 8000 at 02:8b54 and BC NTC at 02:8b56 taking ordinary epilogue 02:8b6d, not deferred return-word replacement 02:8b63. Static startup helper 6d44 calls 3f1d at 6d5e; entry calls that helper at 6dbf after far call 02:904b. Execution of that startup continuation is the next question, not a proven missing step. Official queue/priority identities and full consumer lifecycle remain unresolved; no firmware state or hardware event is injected",
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "tools/noki5510_a00_inventory.py"]

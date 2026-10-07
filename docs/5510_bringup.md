@@ -1197,7 +1197,11 @@ it is not observed in this tail. Probes must cover the paged `02:8xxx`
 program window, not just the common lower window.
 
 Startup is still performing file initialization before scheduler activation;
-the open operation is the first `SETTING1.BIN` write through `03:8c3e`.
+the five-second window ends during the first `SETTING1.BIN` write through
+`03:8c3e`. This is a bounded-window result, not the current execution ceiling:
+the longer `startup` profile completes storage initialization and enters the
+startup continuation before encountering unimplemented McBSP transmit
+underrun behavior. Resolve that peripheral contract next.
 Static original code has a call to common `3f1d` at `6d5e`, inside the
 startup helper at `6d44`. Entry code calls that helper at `6dbf`, after the
 far call to `02:904b`. The 100 ms worker tail observes one main-entry fetch
@@ -1277,8 +1281,31 @@ zero illegal-opcode requirement. Additional transfer counts are not validated
 music content. In both windows the candidate consumer has zero entries and
 `b633` has zero firmware reads. The storage reader remains active: do not
 describe an endpoint PC as a stuck instruction or assume a missing peer.
-Next resolve the active `03:c6ba -> 03:b91d` buffer/flush path before changing media
-contents or extending observation time again.
+The lower-call census for the settings buffer path observes 57 calls to
+`03:c57f`, of which 56 return in five seconds. No page-program or verification
+helper is observed in that path during the window. Static `b91d` sets AR6 to
+32 and loops over 32 page reads; the recorded activity is a completed pass
+and a partially completed pass, not a stalled single read or verification
+retry. This bound justifies the separate longer observation profile without
+altering the firmware, media or hardware inputs.
+
+`MU4_STORAGE_BIOS=startup` requests a 20-second tail. It observes return
+from main's `02:90f4 -> 03:9105` call, then reaches continuation `02:6dbf`
+and helper `02:6d44`. The first longer run exposed opcode `ea00` at
+`02:3d7e`. TI SPRU172C pp. 4-70--4-71 identifies `ea00..ebff` as
+`LD #k9,DP`, replacing only ST0 bits 8--0 in one cycle. The core now implements
+it, with 1,024 executable cases covering all immediate values, CPL/SXM
+configurations, untouched accumulator/status fields and cycle timing.
+
+With that instruction implemented, the longer profile progresses into later
+startup and stops on `McBSP framed transmit underrun is not implemented`.
+It does **not** pass the endpoint acceptance checks or prove a complete
+20-second run, consumer activation, decoded music or full native boot.
+`scan` remains the shorter acceptance profile. The next contract is McBSP
+SPCR2/XEMPTY and DX behavior under underrun; SPRU302B section 2.3.7.4
+defines repeated old DXR data at subsequent frame syncs and an empty-status
+indication, not a fatal stop. Validate the applicable framing cases before
+changing the peripheral.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero

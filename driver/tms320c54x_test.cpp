@@ -28,6 +28,24 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	void start_immediate_dp_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0109d0, 0x75d6); program.write_word(0x0109d1, 0x0124);
+		program.write_word(0x0109d2, 0xea00 | (index & 0x1ff));
+		program.write_word(0x0109d3, 0x75d6); program.write_word(0x0109d4, 0x0124);
+		program.write_word(0x0109d5, 0xf4e1);
+		m_port_writes = 0;
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x123456789aULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x9876543210ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0xfe00 | ((index ^ 0x1ff) & 0x1ff));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 512) ? 0x4800 : 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 1648 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_compact_load_case(unsigned index)
 	{
 		unsigned const shifts[] = {0, 5, 8, 15};
@@ -14805,6 +14823,22 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE), "Compact Xmem load shift/sign/destination/postincrement");
 			if (index < 15) { start_compact_load_case(index + 1); return; }
 			osd_printf_info("TMS320C54x compact load conformance: PASS variants=16\n");
+			start_immediate_dp_case(0);
+			return;
+		}
+		if (m_phase >= 1648 && m_phase < 2672)
+		{
+			unsigned const index = m_phase - 1648;
+			expect_opcode(0xea00 | (index & 0x1ff),
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (0xfe00 | (index & 0x1ff)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((index & 512) ? 0x4800 : 0x0900) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x123456789aULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9876543210ULL &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"LD #k9,DP replaces only the nine DP bits in one cycle, independent of CPL and SXM");
+			if (index < 1023) { start_immediate_dp_case(index + 1); return; }
+			osd_printf_info("TMS320C54x immediate DP conformance: PASS variants=1024\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

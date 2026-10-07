@@ -1811,6 +1811,10 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xe900: // LD #k, B
 		m_b = data_operand(low);
 		return;
+	case 0xea00: // LD #k9, DP (SPRU172C syntax 3)
+	case 0xeb00:
+		m_st0 = (m_st0 & ~u16(0x01ff)) | (op & 0x01ff);
+		return;
 	case 0xee00: // FRAME #k8
 		m_sp = u16(m_sp + s8(low));
 		return;

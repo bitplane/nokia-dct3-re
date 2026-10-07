@@ -122,13 +122,21 @@ private:
 	unsigned m_native_allocation_call_traces = 0;
 	unsigned m_native_cache_update_traces = 0;
 	unsigned m_native_cache_mode_traces[6] = {};
+	bool m_native_settings_buffer_active = false;
+	unsigned m_native_buffer_calls[20] = {}, m_native_buffer_returns[20] = {};
+	static constexpr offs_t buffer_calls[] = {
+		0x3b940, 0x3b95b, 0x3b973, 0x3b99b, 0x3b9c4, 0x3b9d3,
+		0x3b9f2, 0x3b9fb, 0x3ba17, 0x3ba6a, 0x3ba78, 0x3ba7a,
+		0x3ba84, 0x3ba88, 0x3ba8a, 0x3ba95, 0x3baa7, 0x3bab5,
+		0x3babb, 0x3bacb
+	};
 	bool m_native_worker_window_started = false;
 	attotime m_native_worker_window_start;
 	std::vector<u16> m_native_tx_words;
 	std::vector<u16> m_codec_din_words, m_codec_saved_din;
 	unsigned m_codec_rx_snapshot_count = 0;
 	unsigned native_stream_target() const { return system_bios() >= 3 ? 1024 : 128; }
-	unsigned native_worker_tail_ms() const { return system_bios() == 6 ? 5000 : system_bios() == 5 ? 1000 : 100; }
+	unsigned native_worker_tail_ms() const { return system_bios() == 7 ? 20000 : system_bios() == 6 ? 5000 : system_bios() == 5 ? 1000 : 100; }
 	void trace_native_iterator(char const *point)
 	{
 		auto const disable = machine().disable_side_effects();
@@ -384,6 +392,9 @@ private:
 		m_native_allocation_call_traces = 0;
 		m_native_cache_update_traces = 0;
 		std::fill(std::begin(m_native_cache_mode_traces), std::end(m_native_cache_mode_traces), 0);
+		m_native_settings_buffer_active = false;
+		std::fill(std::begin(m_native_buffer_calls), std::end(m_native_buffer_calls), 0);
+		std::fill(std::begin(m_native_buffer_returns), std::end(m_native_buffer_returns), 0);
 		m_native_worker_window_started = false;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
@@ -1217,6 +1228,26 @@ private:
 				{
 					if (m_phase != 30 || machine().side_effects_disabled() ||
 						u16(m_cpu->state_int(tms320c54x_device::STATE_PC)) != u16(address + 1)) return;
+					// Restrict the lower-call census to the settings operation, not earlier boot writes.
+					if (address == 0x3c6ba && m_cpu->state_int(tms320c54x_device::STATE_SP) >= 0x1200)
+						m_native_settings_buffer_active = true;
+					else if (address == 0x3c6bc)
+						m_native_settings_buffer_active = false;
+					if (m_native_settings_buffer_active)
+						for (unsigned i = 0; i < std::size(buffer_calls); ++i)
+							if (address == buffer_calls[i] || address == buffer_calls[i] + 2)
+							{
+								bool const returning = address != buffer_calls[i];
+								unsigned &count = returning ? m_native_buffer_returns[i] : m_native_buffer_calls[i];
+								if (++count > 4) continue;
+								auto const disable = machine().disable_side_effects();
+								auto &data = m_cpu->space(AS_DATA);
+								logerror("mu4_native_buffer_call: site=%06x point=%s count=%u opcode=%04x sp=%04x dirty=%04x erase=%04x retry=%04x a=%010llx\n",
+									unsigned(buffer_calls[i]), returning ? "return" : "call", count, opcode,
+									unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+									data.read_word(0x3b14), data.read_word(0x3b10), data.read_word(0xbdac),
+									static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
+							}
 					static constexpr offs_t settings_calls[] = {
 						0x38c55, 0x38c5a, 0x38c64, 0x38c75, 0x38c80, 0x38c89,
 						0x38c93, 0x38ca1, 0x38caf, 0x38cb9, 0x38cc0, 0x38cc6
@@ -1435,6 +1466,9 @@ private:
 				logerror("mu4_native_stream_binding: PASS descriptor=806e entry=029545 consumer_entries=%u\n", m_native_stream_consumer_entries);
 				logerror("mu4_native_startup_counts: main=%u continuation=%u helper=%u selection_start=%u\n",
 					m_native_startup_fetches[0], m_native_startup_fetches[1], m_native_startup_fetches[2], m_native_startup_fetches[3]);
+				for (unsigned i = 0; i < std::size(buffer_calls); ++i)
+					logerror("mu4_native_buffer_counts: site=%06x calls=%u returns=%u\n",
+						unsigned(buffer_calls[i]), m_native_buffer_calls[i], m_native_buffer_returns[i]);
 			}
 			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u tx_words=%u tx_irqs=%u controller_modeled=partial\n",
 				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace,
@@ -1802,6 +1836,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(3, "worker", "Original streaming worker observation (100 ms tail)")
 	ROM_SYSTEM_BIOS(4, "settle", "Original startup observation (1 second tail)")
 	ROM_SYSTEM_BIOS(5, "scan", "Original startup observation (5 second tail)")
+	ROM_SYSTEM_BIOS(6, "startup", "Original bounded storage startup observation (20 second tail)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)
