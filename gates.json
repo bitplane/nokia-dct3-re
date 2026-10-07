@@ -13095,6 +13095,19 @@
       ]
     },
     {
+      "name": "verify-3310-radio-incoming-call-sip",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 SIP_HANDSET_KEYS=enter SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=200 SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--incoming --product 3310' SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
       "name": "verify-3310-radio-outgoing-call-sip-waveform",
       "prerequisites": [],
       "variables": {},

@@ -152,19 +152,24 @@ def verify_success(root, remote_text, args):
                 bridge_text.count('SIP incoming identity=') != 1):
             raise RuntimeError('idle restoration did not admit exactly one fresh SIP call')
     cursor = 0
+    product = getattr(args, 'product', '3210')
+    # Exact encodings from these acceptance fixtures, including their observed
+    # CC sequence bit; not a claim that the bit is a fixed product property.
+    connect_data = '8307' if product == '3310' else '8347'
+    release_complete_data = '036a0802e0d1' if product == '3310' else '032a0802e0d1'
     patterns = (
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=paging',
             r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
             (r'sip_state: physical Answer after idle restoration' if args.restore_idle
              else r'input-press: t=[0-9.]+ name=enter'),
-            r'GSM service uplink sapi=0 pd=03 message=07 length=2 data=8347',
+            rf'GSM service uplink sapi=0 pd=03 message=07 length=2 data={connect_data}',
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=connected',
             r'gsm_call_adapter: termination id=1 cause=16 result=accepted',
-            r'GSM service uplink sapi=0 pd=03 message=2a .*data=032a0802e0d1',
+            rf'GSM service uplink sapi=0 pd=03 message=2a .*data={release_complete_data}',
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=ended',
     ) if args.incoming else (
             (r'GSM service uplink sapi=0 pd=03 message=05 length=19 data=03450404600200815e0581551532f4a2150101'
-             if getattr(args, 'product', '3210') == '3310' else
+             if product == '3310' else
              r'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101'),
             r'GSM service downlink kind=12 sapi=0 pd=03 message=07',
             r'GSM service uplink sapi=0 pd=03 message=0f .*data=030f',

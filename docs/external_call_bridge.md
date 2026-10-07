@@ -495,6 +495,20 @@ make verify-radio-outgoing-call-sip RUN_DIR=run_3310_sip_outgoing \
 make verify-3310-radio-outgoing-call-sip-waveform RUN_DIR=run_3310_sip_waveform
 ```
 
+The actual incoming SIP fixture independently proves paging, a physical Navi
+Answer, firmware CONNECT, at least 100 accepted downlink frames, and ordinary
+release on NHM-5 v6.39:
+
+```sh
+make verify-3310-radio-incoming-call-sip RUN_DIR=run_3310_sip_incoming
+```
+
+Its exact CONNECT/RELEASE COMPLETE expectations include the observed CC
+sequence bit for this fixture. Those bits are not fixed hardware properties.
+This incoming gate proves media transport, not incoming waveform fidelity.
+The result retains bounded host-queue drop counts; the gate does not assert
+lossless audio or zero startup drops.
+
 Both products use the same 440 Hz source at 0.025 full-scale, avoiding clipping
 in the 3210's +18 dB path while providing measurable input to the 3310's neutral
 HLE gain. This is an external test level, not a calibration change. The common

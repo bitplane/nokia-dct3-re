@@ -52,6 +52,41 @@ class SipProductSetupCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check('3210', '3210', rejected=True)
 
+    def check_incoming(self, product, wire_product):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            connect, release = {
+                '3210': ('8347', '032a0802e0d1'),
+                '3310': ('8307', '036a0802e0d1'),
+            }[wire_product]
+            (root / 'error.log').write_text(
+                'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging\n'
+                'GSM service downlink kind=9 sapi=0 pd=03 message=05\n'
+                'input-press: t=18.0 name=enter\n'
+                f'GSM service uplink sapi=0 pd=03 message=07 length=2 data={connect}\n'
+                'gsm_call_adapter: incoming state id=1 epoch=1 phase=connected\n'
+                'gsm_call_adapter: termination id=1 cause=16 result=accepted\n'
+                f'GSM service uplink sapi=0 pd=03 message=2a length=6 data={release}\n'
+                'gsm_call_adapter: incoming state id=1 epoch=1 phase=ended\n' + ''.join(
+                    f'gsm_call_adapter: media direction=downlink id=1 sequence={i} result=accepted\n'
+                    for i in range(100)))
+            counts = dict.fromkeys(('uplink', 'downlink', 'pcm_transmitted', 'pcm_received'), 100)
+            (root / 'sip-bridge.log').write_text(
+                'SIP incoming caller=5551234\nSIP physical answer identity=(1, 1)\n'
+                'SIP confirmed status=200\nSIP bridge ended ' + json.dumps(counts) + '\n')
+            verify_success(root, 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]',
+                           SimpleNamespace(incoming=True, restore_idle=False, product=product))
+
+    def test_own_incoming_connect_and_release_are_accepted(self):
+        for product in SETUP:
+            with self.subTest(product=product):
+                self.check_incoming(product, product)
+
+    def test_other_product_incoming_encoding_is_rejected(self):
+        for product, other in (('3210', '3310'), ('3310', '3210')):
+            with self.subTest(product=product), self.assertRaises(RuntimeError):
+                self.check_incoming(product, other)
+
 
 if __name__ == '__main__':
     unittest.main()
