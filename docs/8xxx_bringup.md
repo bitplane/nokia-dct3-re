@@ -867,6 +867,25 @@ traffic/release configurations before accepting the caller and UI frames.
 Settled incoming presentation is therefore independently checked on both
 bands; native speech remains unproved.
 
+Settled GSM900 idle additionally survives save/load. Run
+`tools/noki8890_state_idle.lua` with fresh private cfg/NVRAM/state/snapshot
+directories, verbose logging and 50 seconds, then check:
+
+```sh
+.venv/bin/python tools/noki8890_state_check.py RUN/error.log RUN/snap
+```
+
+The fixture physically provisions time/date, saves at 42 seconds and requires
+exact restored emulated time, architectural R15/R13 and a digest over the
+complete mapped handset RAM window. A nonempty one-second ordered protocol
+interval replays identically, including payloads and GSM frame numbers.
+Reference/restored idle pixels match; a new physical Menu press after load
+decodes `19` and opens the reviewed `Mitteilungen` menu. Lua resumes only its
+host-side input schedule after restoration, never handset state. Five checker
+tests protect architectural and protocol mismatches, missing input and
+incomplete fixtures. This is idle/UI restoration, not active-call/SMS replay,
+battery-backed cold RTC continuity or native DSP speech validation.
+
 A separate process preserving that run's phone/SIM NVRAM still presents
 the security editor. Physical `12345` then reaches the empty time editor,
 not the previously settled idle frame. Reproduce with
