@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "mu4_native_stereo_energy_measurement", "subsystem": "5510_mu4", "status": "partial", "confidence": "strong",
+      "boundary": "The measure profile delivers original R060 selector 40 through McBSP2 pins after the checked streaming prefix. Original firmware activates mode one and helper 02:87ea processes six 64-sample blocks per channel. A passive live-operand observer independently applies signed absolute-value/divide-by-16 scaling, square, entry-time fractional multiplier and previous aggregate; all twelve stored nonsaturating results match. Firmware emits acknowledgement 7f0155 and response 1e03aa016820807e55, accepts peer acknowledgement 7f8055, drains eleven receive and twelve transmit bytes, empties its queue and returns mode bb80 to zero with completion b64e one and block count six. Status 20 is the native numerical result, not an assumed success. No firmware memory or mode is injected. Tone-output accuracy, music decoding, board timing, native reset and full handset/MU4 boot remain unvalidated",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "mu4_native_mcbsp2_transaction_replay", "subsystem": "5510_mu4", "status": "partial", "confidence": "strong",
       "boundary": "The replay profile checkpoints the original R060 resident status transaction after three data bits of its first request byte, after the independently checked streaming prefix completes. Two complete original-firmware continuations consume eleven RX bytes, emit the same fourteen TX bytes and empty the transaction queues without retry. At the identical worker-window endpoint all 1039 registered emulation-state items match byte-for-byte, including CPU, RAM, NAND, DMA, codec, McBSP, external peer and emulation timers. Nine Lua frontend resume-timer fields are explicitly excluded because MAME's Lua post-load callback resets that timer; no Lua script runs in this fixture. This establishes native status-transaction continuation, not arbitrary boot checkpoints, a native reset lifecycle, physical board attachment, processing or music playback",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]

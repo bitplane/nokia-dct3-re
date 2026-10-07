@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "mu4_selector3a_param1_unconditional_reload",
+      "status": "disproven",
+      "hypothesis": "Resident MU4 selector 3a with parameter 01 unconditionally remounts and reloads the native program",
+      "conclusion": "The original branch at 03:b0fb skips the loader when data word 3750 is zero or one; other states require parameter one. The coherent pin-input request reaches that branch with state zero and parameter one, with one original loaded entry and zero loader re-entries. Codec reinitialization activity is not a native reset. The failed reload fixture was removed rather than forcing a state change.",
+      "evidence": ["docs/5510_bringup.md"]
+    },
+    {
       "id": "nsm2_service_channel_map_required_for_lcd", "status": "disproven",
       "hypothesis": "The 8850's rejected resource 7305 service-channel submission prevents the glyph framebuffer from reaching its LCD",
       "conclusion": "Routine 304944 forwards a service frame rather than performing physical LCD transfer. The unchanged no-map composition transfers nonzero framebuffer 1304d8 through 27f550 and GENSIO and renders Insert SIM card after 8.05 seconds. The eight-second blank capture precedes this output. Enabling the decoded class-73 map changes forwarding permission but is unnecessary for graphical boot and has been removed.",

@@ -137,6 +137,10 @@ private:
 	unsigned m_native_consumer_paths[6] = {};
 	unsigned m_native_consumer_mode_writes = 0;
 	unsigned m_native_command_paths[6] = {};
+	unsigned m_measurement_blocks = 0;
+	std::array<u32, 2> m_measurement_expected{};
+	std::array<unsigned, 2> m_measurement_samples{};
+	unsigned m_measurement_factor = 1;
 	unsigned m_native_command_cursor = 0, m_native_command_waits = 0;
 	unsigned m_command_tx_irqs = 0, m_command_wire_bits = 0;
 	unsigned m_command_ack_cursor = 0, m_command_wire_bit_count = 0;
@@ -444,6 +448,19 @@ private:
 		if (m_command_wire_decoded.size() != m_command_tx_words.size() + 1 || m_command_wire_decoded.back() != value)
 			fatalerror("MU4 serial pin decoder disagrees with McBSP transmit word");
 		m_command_tx_words.push_back(value);
+		if (system_bios() == 13)
+		{
+			if (m_command_tx_words.size() != 12) return;
+			u8 checksum = 0;
+			for (unsigned i = 3; i < 10; ++i) checksum ^= m_command_tx_words[i];
+			if (m_command_tx_words[3] != 0x1e || m_command_tx_words[4] != 3 || m_command_tx_words[5] != 0xaa ||
+				m_command_tx_words[6] != 1 || m_command_tx_words[7] != 0x68 || m_command_tx_words[10] != checksum || m_command_tx_words[11] != 0x55)
+				fatalerror("MU4 measurement response framing differs from original contract");
+			m_command_ack_token = m_command_tx_words[9];
+			m_command_ack_pending = true;
+			m_command->adjust(attotime::from_msec(1));
+			return;
+		}
 		if (system_bios() < 10 || m_command_tx_words.size() != 14) return;
 		static const std::vector<u16> expected = {0x7f, 1, 0x55, 0x1e, 5, 0xaa, 1, 0x71, 1, 0, 0, 0x80, 0x40, 0x55};
 		if (m_command_tx_words != expected) fatalerror("MU4 original status response differs from decoded contract");
@@ -504,7 +521,7 @@ private:
 		if (m_command_rx_phase) m_mcbsp2->rx_frame_w(0);
 		m_mcbsp2->rx_clock_w(m_command_rx_clock);
 		if (!m_command_rx_clock) ++m_command_rx_phase;
-		if (system_bios() >= 12 && !m_native_replay_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
+		if (system_bios() == 12 && !m_native_replay_leg && m_native_command_cursor == 1 && m_command_rx_phase == 4 && !m_command_rx_clock)
 			// Let synchronized input events settle without advancing to the next bit.
 			m_native_replay->adjust(attotime::from_nsec(1));
 		// One delay cycle, eight data cycles, then RBR-to-DRR publication.
@@ -590,7 +607,9 @@ private:
 	{
 		if (m_phase != 30 || system_bios() < 8) return;
 		// Original parser framing and selector 0x49: read-only software status query.
-		static constexpr u8 packet[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
+		static constexpr u8 status[] = {0x1e, 2, 0xaa, 1, 0x49, 1, 0xff, 0x55};
+		static constexpr u8 measurement[] = {0x1e, 2, 0xaa, 1, 0x40, 1, 0xf6, 0x55};
+		auto const &packet = system_bios() == 13 ? measurement : status;
 		bool const ack = m_native_command_cursor == std::size(packet);
 		if (ack && (!m_command_ack_pending || m_command_ack_cursor == 3)) return;
 		// Replay starts after the separately checked streaming prefix, so both
@@ -726,6 +745,10 @@ private:
 		std::fill(std::begin(m_native_consumer_paths), std::end(m_native_consumer_paths), 0);
 		std::fill(std::begin(m_native_command_paths), std::end(m_native_command_paths), 0);
 		m_native_command_cursor = m_native_command_waits = 0;
+		m_measurement_blocks = 0;
+		m_measurement_expected.fill(0);
+		m_measurement_samples.fill(0);
+		m_measurement_factor = 1;
 		m_command->adjust(attotime::never);
 		m_command_clock->adjust(attotime::never);
 		m_command_receive_clock->adjust(attotime::never);
@@ -1826,6 +1849,53 @@ private:
 						source, data.read_word(u16(source+0x11)), data.read_word(u16(source+0x12)), data.read_word(u16(source+0x13)),
 						static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)) & 0xffffffffffULL);
 				});
+			if (system_bios() == 13)
+			{
+				m_cpu->space(AS_DATA).install_read_tap(0x1900, 0x19ff, "mu4_measurement_input",
+					[this](offs_t, u16 &value, u16)
+					{
+						if (m_phase != 30 || machine().side_effects_disabled()) return;
+						unsigned const pc = m_cpu->pc();
+						if (pc != 0x287fa && pc != 0x2880b) return;
+						unsigned const channel = pc == 0x2880b;
+						s32 const sample = s16(value);
+						u32 const scaled = unsigned(sample < 0 ? -sample : sample) / 16;
+						u64 const sum = m_measurement_expected[channel] + u64(scaled) * scaled * m_measurement_factor;
+						if (sum > 0x7fffffff || ++m_measurement_samples[channel] > 64)
+							fatalerror("MU4 live measurement inputs exceed independently modeled block range");
+						m_measurement_expected[channel] = sum;
+					});
+				m_cpu->space(AS_PROGRAM).install_read_tap(0x287ea, 0x28816, "mu4_measurement_result",
+					[this](offs_t address, u16 &, u16)
+					{
+						if (m_phase != 30 || machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+						if (address != 0x287ea && address != 0x28816) return;
+						auto const disable = machine().disable_side_effects();
+						auto &data = m_cpu->space(AS_DATA);
+						if (address == 0x287ea)
+						{
+							// Observe live input reads: DMA can update the buffer during execution.
+							m_measurement_factor = BIT(m_cpu->state_int(tms320c54x_device::STATE_ST1), 6) ? 2 : 1;
+							m_measurement_samples.fill(0);
+							for (unsigned channel = 0; channel < 2; ++channel)
+							{
+								u16 const aggregate = 0xb64a + 2 * channel;
+								m_measurement_expected[channel] = (u32(data.read_word(aggregate)) << 16) | data.read_word(aggregate + 1);
+							}
+							return;
+						}
+						u16 const left = m_cpu->state_int(tms320c54x_device::STATE_AR4), right = m_cpu->state_int(tms320c54x_device::STATE_AR5);
+						if (m_measurement_samples[0] != 64 || m_measurement_samples[1] != 64 ||
+							((u32(data.read_word(left)) << 16) | data.read_word(left + 1)) != m_measurement_expected[0] ||
+							((u32(data.read_word(right)) << 16) | data.read_word(right + 1)) != m_measurement_expected[1])
+							fatalerror("MU4 native sample-energy mismatch block=%u samples=%u,%u actual=%08x,%08x expected=%08x,%08x factor=%u", m_measurement_blocks,
+								m_measurement_samples[0], m_measurement_samples[1], (u32(data.read_word(left)) << 16) | data.read_word(left + 1),
+								(u32(data.read_word(right)) << 16) | data.read_word(right + 1), m_measurement_expected[0], m_measurement_expected[1], m_measurement_factor);
+						logerror("mu4_native_measurement_block: index=%u left=%04x,%04x right=%04x,%04x st1=%04x\n",
+							m_measurement_blocks++, data.read_word(left), data.read_word(left + 1), data.read_word(right), data.read_word(right + 1),
+							unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
+					});
+			}
 			m_cpu->space(AS_DATA).install_write_tap(0x48, 0x49, "mu4_native_mcbsp_config",
 				[this](offs_t offset, u16 &value, u16)
 				{
@@ -1858,7 +1928,7 @@ private:
 		{
 			if (!m_native_entry_reads || !m_native_far_reads)
 				fatalerror("MU4 original program transfer missing entry=%u far=%u pc=%06x", m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)));
-			if (m_serial_tx_words != std::vector<u16>({0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023, 0x1201}))
+			if (system_bios() != 13 && m_serial_tx_words != std::vector<u16>({0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023, 0x1201}))
 				fatalerror("MU4 original serial-setup sequence mismatch");
 			if (m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)) fatalerror("MU4 original native stream encountered an illegal instruction");
 			if (system_bios() >= 2 && (m_stream_words < native_stream_target() || m_dma_completions < native_stream_target() / 128 ||
@@ -1867,7 +1937,7 @@ private:
 					m_stream_words, m_native_din_words, m_dma_completions, m_rx_dma_completions,
 					unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
 			if (system_bios() >= 2) logerror("mu4_native_stream: PASS words=%u dma_completions=%u\n", m_stream_words, m_dma_completions);
-			if (system_bios() >= 2)
+			if (system_bios() >= 2 && system_bios() != 13)
 			{
 				for (unsigned i = 0; i < 64; ++i)
 					if (m_cpu->space(AS_DATA).read_word(0x1980 + i) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x19c0 + i) != 0x5678)
@@ -1972,7 +2042,7 @@ private:
 						fatalerror("MU4 unacknowledged status response did not reproduce three complete wire copies");
 					logerror("mu4_native_status_noack: PASS tx_words=36 pin_decode=1 response_copies=3 peer_ack=0 processing=0\n");
 				}
-				if (system_bios() >= 10)
+				if (system_bios() >= 10 && system_bios() != 13)
 				{
 					auto const disable = machine().disable_side_effects();
 					auto &data = m_cpu->space(AS_DATA);
@@ -1989,7 +2059,22 @@ private:
 					}
 				}
 			}
-			if (finish_native_replay()) return;
+			if (system_bios() == 13)
+			{
+				auto const disable = machine().disable_side_effects();
+				auto &data = m_cpu->space(AS_DATA);
+				logerror("mu4_native_measurement_observe: mode=%04x complete=%04x blocks=%04x,%04x left=%04x,%04x right=%04x,%04x tx_words=%u full_boot=0\n",
+					data.read_word(0xbb80), data.read_word(0xb64e), data.read_word(0xb650), data.read_word(0xb651),
+					data.read_word(0xb652), data.read_word(0xb653), data.read_word(0xb65e), data.read_word(0xb65f), unsigned(m_command_tx_words.size()));
+				if (m_measurement_blocks != 6 || m_command_ack_cursor != 3 || m_command_tx_words.size() != 12 ||
+					m_command_tx_words[8] != 0x20 || m_command_wire_bit_count || m_command_rx_irqs != 11 ||
+					m_command_rx_busy || m_command_rx_ready || data.read_word(0x1657) != 11 || data.read_word(0x1658) != 11 ||
+					data.read_word(0x1659) != 12 || data.read_word(0x165a) != 12 ||
+					data.read_word(0xbb80) || data.read_word(0x165d) || data.read_word(0x165e))
+					fatalerror("MU4 original measurement command did not complete six blocks and settle its acknowledged response");
+				logerror("mu4_native_measurement: PASS blocks=6 stereo=1 independent_arithmetic=1 pin_request=1 ack=1 tx_words=12 mode=0 music_decode=0 full_boot=0\n");
+			}
+			else if (finish_native_replay()) return;
 			machine().schedule_exit();
 			return;
 		}
@@ -2359,6 +2444,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(9, "wireack", "Original serial status transaction with peer acknowledgement")
 	ROM_SYSTEM_BIOS(10, "pins", "Original status transaction with McBSP2 RX and TX pins")
 	ROM_SYSTEM_BIOS(11, "replay", "Original pin-level status transaction with mid-byte replay")
+	ROM_SYSTEM_BIOS(12, "measure", "Original pin-level sample measurement observation")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

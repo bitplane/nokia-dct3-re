@@ -32,6 +32,10 @@ The `wireack` fixture completes a native status-query transaction using the
 shared McBSP2 TX model, a bench clock and register-level RX input; `pins`
 completes the same transaction with device-owned pin-level RX too. The
 `replay` profile also verifies native continuation across a mid-byte checkpoint.
+The `measure` profile sends original selector `40` through serial pins and
+verifies six stereo sample-energy blocks against independent arithmetic from
+the live input reads, followed by an acknowledged response and mode-zero
+cleanup. Generated tone output is not yet independently verified.
 The open boundary is native reset lifecycle and board attachment, processing command/data
 semantics and independently verified output,
 not a missing worker activation. No full native boot or music decoding is
@@ -1524,10 +1528,47 @@ not alone prove native transport save/replay, other receive formats or the
 physical MA4-MU4 wiring/clock relation. The older loader preamble retains
 its separately declared register-level ingress.
 
-Next verify the native transport reset lifecycle and board attachment, and decode
-processing-command parameters and media inputs before attempting native
-playback. Do not write `bb80` or replay internal queue objects to select a
-mode.
+The resident selector `3a`, parameter `01`, is not an unconditional reload
+command. At `03:b0fb`, states `0000` and `0001` in data word `3750` branch
+past the mount/loader calls. Other states can reach those calls only with
+parameter `01`. The coherent resident fixture reaches state zero: its external
+request enters the dispatcher but does not re-enter loader `3538`. Changing
+`3750` to manufacture a reload is not an acceptable reset test. This software
+branch also does not establish the board's PURX reset lifecycle.
+
+Worker `02:9545` has a numerical-processing path, not yet a demonstrated music
+decoder. Selector `40` initializes mode `bb80=1`, two tone phases/increments
+and amplitudes, then collects six stereo sample-energy blocks through
+`02:87ea`. Tone generation uses `02:876a`, phase/table helper `02:87ae` and
+scaler `02:8818`; mode three clears the transmit buffers instead. These
+addresses identify original firmware behavior, not a public command API or
+proof of playback. Validate arithmetic and response completion using external
+serial inputs before assigning broader semantics.
+
+`MU4_STORAGE_BIOS=measure` sends `1e 02 aa 01 40 01 f6 55` after the checked
+streaming prefix. The original worker processes six blocks, each with 64
+samples per channel. A passive observer independently computes the signed
+absolute sample divided by 16, its square, the entry-time FRCT multiplier
+and the preceding channel aggregate. All twelve stored results match. It
+observes live CPU operand reads rather than an entry-time buffer snapshot:
+DMA can update samples while the routine executes. This check is bounded
+to nonsaturating sums below `7fffffff`, not all arithmetic edge cases.
+
+The original response is `1e 03 aa 01 68 20 80 7e 55`, preceded by
+`7f 01 55`. The peer acknowledges token `80`; all eleven receive bytes and
+twelve transmitted bytes drain without retry or queued residue. Status `20`
+is the firmware's numerical result for these converted samples, not an
+assumed success code. Mode `bb80` returns to zero, completion `b64e` is one,
+and the block count is six. No illegal instruction occurs. Cleanup clears
+the RX buffers, so this profile does not reuse the idle profile's final
+constant-buffer assertions; the independently checked startup prefix and
+the untouched status/replay controls retain their own acceptance checks.
+Neither music decoding nor tone waveform accuracy follows from this result.
+
+Next verify the native transport reset lifecycle and board attachment, and
+processing-command arithmetic and media inputs before attempting native
+playback. Do not write `bb80`, `3750` or replay internal queue objects to select
+a mode.
 
 The pin bench registers its external receive/transmit waveform state,
 request/acknowledgement cursors, serial shadows and NAND GPIO latches for
