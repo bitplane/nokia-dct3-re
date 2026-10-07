@@ -27,6 +27,7 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_rx_clock_input)); save_item(NAME(m_rx_frame_input)); save_item(NAME(m_rx_data_input));
 	save_item(NAME(m_rx_frame_seen)); save_item(NAME(m_rx_shift_full)); save_item(NAME(m_rx_buffer_full)); save_item(NAME(m_rx_ready));
 	save_item(NAME(m_rx_overrun));
+	save_item(NAME(m_internal_clock_stopped)); save_item(NAME(m_paused_bit_time));
 }
 
 void tms320c54x_mcbsp_device::device_reset()
@@ -39,6 +40,8 @@ void tms320c54x_mcbsp_device::device_reset()
 	m_xempty = false;
 	m_clock_input = m_frame_input = m_ready_pending = m_async_bit = false;
 	m_frame_words = 0; m_async_time = attotime::zero;
+	m_internal_clock_stopped = false;
+	m_paused_bit_time = attotime::never;
 	m_bit_timer->adjust(attotime::never);
 	m_tx_event_cb(CLEAR_LINE);
 	m_rx_clock_input = m_rx_frame_input = m_rx_data_input = false;
@@ -106,10 +109,32 @@ attotime tms320c54x_mcbsp_device::bit_period() const
 
 void tms320c54x_mcbsp_device::arm_clock()
 {
-	if (!internal_clock() || !BIT(m_regs[1], 0) || (!m_buffer_full && !m_shift_active))
+	if (m_internal_clock_stopped || !internal_clock() || !BIT(m_regs[1], 0) || (!m_buffer_full && !m_shift_active))
 		m_bit_timer->adjust(attotime::never);
 	else if (!m_bit_timer->enabled() || m_bit_timer->remaining() == attotime::never)
 		m_bit_timer->adjust(bit_period());
+}
+
+void tms320c54x_mcbsp_device::internal_clock_stop_w(int state)
+{
+	bool const stopped = bool(state);
+	if (stopped == m_internal_clock_stopped) return;
+	m_internal_clock_stopped = stopped;
+	if (stopped)
+	{
+		m_paused_bit_time = m_bit_timer->remaining();
+		m_bit_timer->adjust(attotime::never);
+	}
+	else
+	{
+		// SPRU302B 2.10: only the internal generator stops. External pins remain active.
+		if (!m_paused_bit_time.is_never() && internal_clock() && BIT(m_regs[1], 0) &&
+			(m_buffer_full || m_shift_active))
+			m_bit_timer->adjust(m_paused_bit_time);
+		else
+			arm_clock();
+		m_paused_bit_time = attotime::never;
+	}
 }
 
 void tms320c54x_mcbsp_device::set_ready(bool ready)

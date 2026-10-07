@@ -3,9 +3,15 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_deep_idle_mcbsp_clock", "owner": "native_music_dsp_bench", "status": "satisfied",
+      "predicate": "CPU IDLE2/3 pauses the internal McBSP bit generator while externally clocked/frame-synchronized transfers remain operational",
+      "current": "Four coupled CPU/device cases keep an internal queued a55a word pending across deep idle and restore its pending clock/shift state through save/load; enabled external wake resumes completion. Four further pin-driven cases complete the same external word during IDLE2/3 with masked or enabled serial interrupts; only enabled serial IMR resumes the foreground. The MU4 CPU clock-stop callback is wired to McBSP0/1/2, and original recorder polled control passes with the unchanged raw NAND snapshot. SPRU302B 2.10/3.8 allows McBSP/DMA activity in deep idle, so no blanket internal-interrupt filter or DMA halt is introduced. Tests establish ordering, not physical baud, PLL lock time, DMA clock-source switching or unsupported clock/frame configurations.",
+      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_mcbsp.cpp", "driver/tms320c54x_test.cpp", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "c54x_deep_idle_timer_clock", "owner": "native_dsp_cpu", "status": "satisfied",
       "predicate": "IDLE2/3 suspend the internal timer without changing TSS and preserve the frozen counter and prescaler across external wake and save/load",
-      "current": "Four executable fixtures use the specified NN=10/01 opcode encodings, a running divided timer and masked/enabled external INT0 with INTM set. Two timed observations prove no TIM/PSC movement or TINT while asleep. Enabled wake executes the continuation and restores timer expiry during IDLE1; masked input does neither. Each case saves and restores the frozen state and replays the same outcome. Full core conformance and the native 5110 menu gate pass. This is timer-only coverage: PLL/pulse timing, NMI/reset, serial/DMA clock gating and internal-versus-external wake classification remain unvalidated. The separate short-period interrupt-recognition boundary is unchanged.",
+      "current": "Four executable fixtures use the specified NN=10/01 opcode encodings, a running divided timer and masked/enabled external INT0 with INTM set. Two timed observations prove no TIM/PSC movement or TINT while asleep. Enabled wake executes the continuation and restores timer expiry during IDLE1; masked input does neither. Each case saves and restores the frozen state and replays the same outcome. Full core conformance and the native 5110 menu gate pass. This predicate is timer-only coverage; McBSP clock ownership has its separate predicate. PLL/pulse timing, NMI/reset and DMA clock-source switching remain unvalidated. The separate short-period interrupt-recognition boundary is unchanged.",
       "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "driver/tms320c54x_test.cpp", "Makefile"]
     },
     {

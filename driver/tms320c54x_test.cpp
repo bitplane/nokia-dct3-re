@@ -8,6 +8,7 @@
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "nokia_dspif.h"
 #include "nokia_cobba.h"
+#include "tms320c54x_mcbsp.h"
 #include <sstream>
 
 namespace {
@@ -19,7 +20,8 @@ public:
 			const char *tag) :
 		driver_device(mconfig, type, tag),
 		m_cpu(*this, "maincpu"),
-		m_transport(*this, "dspif")
+		m_transport(*this, "dspif"),
+		m_idle_mcbsp(*this, "idle_mcbsp")
 	{
 	}
 
@@ -27,6 +29,34 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void start_idle_external_serial_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x010940, index < 2 ? 0xf6e1 : 0xf5e1);
+		program.write_word(0x010941, 0x76f8);
+		program.write_word(0x010942, 0x0501);
+		program.write_word(0x010943, 1);
+		program.write_word(0x010944, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_idle_mcbsp_external = false;
+		m_idle_mcbsp->reset();
+		m_idle_mcbsp_words = 0;
+		for (auto const &[reg, value] : std::array<std::pair<u16, u16>, 3>{{{4, 0x0040}, {5, 1}, {1, 1}}})
+		{
+			m_idle_mcbsp->control_w(0, reg);
+			m_idle_mcbsp->control_w(1, value);
+		}
+		m_idle_mcbsp->data_w(3, 0xa55a);
+		m_idle_mcbsp_external = true;
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, index & 1 ? 0x20 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(STATE_GENPC, 0x010940);
+		m_cpu->space(AS_DATA).write_word(0x0501, 0);
+		m_phase = 6260 + index * 2;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_idle_timer_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -45,6 +75,15 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(STATE_GENPC, 0x010920);
 		m_cpu->space(AS_DATA).write_word(0x0501, 0);
+		m_idle_mcbsp->reset();
+		m_idle_mcbsp_words = 0;
+		for (auto const &[reg, value] : std::array<std::pair<u16, u16>, 5>{{
+			{4, 0x0040}, {6, 12}, {7, 0x2000}, {14, 0x0200}, {1, 0x0041}}})
+		{
+			m_idle_mcbsp->control_w(0, reg);
+			m_idle_mcbsp->control_w(1, value);
+		}
+		m_idle_mcbsp->data_w(3, 0xa55a);
 		m_phase = 6220 + index * 3;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
@@ -1051,7 +1090,7 @@ private:
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(STATE_GENPC) == 0x010921 &&
-					!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 8),
+					!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 8) && m_idle_mcbsp_words == 0,
 					"IDLE2/3 stop the timer without changing its running control bit");
 				u16 const counter = m_cpu->state_int(tms320c54x_device::STATE_TIM);
 				if (!step)
@@ -1080,7 +1119,8 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				m_cpu->space(AS_DATA).read_word(0x0501) == (enabled ? 1 : 0) &&
 				m_cpu->state_int(STATE_GENPC) == (enabled ? 0x010925 : 0x010921) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 8) == enabled,
+				bool(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 8) == enabled &&
+				m_idle_mcbsp_words == (enabled ? 1 : 0),
 				"enabled external wake resumes timer operation; masked wake leaves deep idle intact");
 			if (step == 2)
 			{
@@ -1091,6 +1131,7 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_TCR) == m_idle_timer_control &&
 					m_cpu->space(AS_DATA).read_word(0x0501) == 0,
 					"restore frozen timer count, prescaler and foreground continuation");
+				m_idle_mcbsp_words = 0;
 				m_cpu->set_input_line(0, ASSERT_LINE);
 				m_cpu->set_input_line(0, CLEAR_LINE);
 				m_phase = 6240 + index;
@@ -1099,6 +1140,37 @@ private:
 			}
 			if (index < 3) { start_idle_timer_case(index + 1); return; }
 			osd_printf_info("TMS320C54x IDLE2/3 timer clock: PASS cases=4 save_replay=4\n");
+			osd_printf_info("TMS320C54x IDLE2/3 McBSP internal clock: PASS cases=4 save_replay=4\n");
+			start_idle_external_serial_case(0);
+			return;
+		}
+		if (m_phase >= 6260 && m_phase < 6268)
+		{
+			unsigned const index = (m_phase - 6260) / 2;
+			if (!(m_phase & 1))
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(STATE_GENPC) == 0x010941 && m_idle_mcbsp_words == 0,
+					"external McBSP awaits frame and clock in deep idle");
+				m_idle_mcbsp->tx_frame_w(1);
+				for (unsigned bit = 0; bit < 16; ++bit)
+				{
+					m_idle_mcbsp->tx_clock_w(1);
+					m_idle_mcbsp->tx_clock_w(0);
+				}
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			bool const enabled = index & 1;
+			expect(m_idle_mcbsp_words == 1 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x20) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == (enabled ? 0x010945 : 0x010941) &&
+				m_cpu->space(AS_DATA).read_word(0x0501) == (enabled ? 1 : 0),
+				"external McBSP completes while clocks stop and wakes only with its IMR bit enabled");
+			if (index < 3) { start_idle_external_serial_case(index + 1); return; }
+			osd_printf_info("TMS320C54x IDLE2/3 McBSP external clock: PASS cases=4\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -15642,6 +15714,9 @@ private:
 	u64 m_irq_operand_cycle = 0;
 	u16 m_idle_timer_counter = 0;
 	u16 m_idle_timer_control = 0;
+	optional_device<tms320c54x_mcbsp_device> m_idle_mcbsp;
+	unsigned m_idle_mcbsp_words = 0;
+	bool m_idle_mcbsp_external = false;
 	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
@@ -15665,6 +15740,15 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->set_extended_program(true);
 	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));
 	NOKIA_DSPIF(config, m_transport, 0);
+	TMS320C54X_MCBSP(config, m_idle_mcbsp, 13'000'000);
+	m_cpu->peripheral_clock_stop_cb().set(m_idle_mcbsp, FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));
+	m_idle_mcbsp->tx_word_cb().set([this](u16 value) {
+		expect(value == 0xa55a, "deep-idle McBSP preserves the queued word");
+		++m_idle_mcbsp_words;
+	});
+	m_idle_mcbsp->tx_irq_cb().set([this](int state) {
+		if (m_idle_mcbsp_external) m_cpu->set_input_line(5, state);
+	});
 	m_cpu->set_addrmap(AS_PROGRAM, &tms320c54x_test_state::program_map);
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::data_map);
 	m_cpu->set_addrmap(AS_IO, &tms320c54x_test_state::io_map);

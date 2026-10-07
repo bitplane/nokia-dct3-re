@@ -42,6 +42,11 @@ public:
 		m_mcbsp->tx_event_cb().set([this](int state) { m_dma->sync_w(6, state); });
 		TMS320C54X_MCBSP(config, m_mcbsp0, 13'000'000);
 		TMS320C54X_MCBSP(config, m_mcbsp2, 13'000'000);
+		m_cpu->peripheral_clock_stop_cb().set([this](int state) {
+			m_mcbsp->internal_clock_stop_w(state);
+			m_mcbsp0->internal_clock_stop_w(state);
+			m_mcbsp2->internal_clock_stop_w(state);
+		});
 		m_mcbsp2->tx_irq_cb().set([this](int state) {
 			if (m_phase == 30 && system_bios() >= 9) { if (state) ++m_command_tx_irqs; m_cpu->set_input_line(7, state); }
 		});

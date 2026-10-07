@@ -1158,9 +1158,21 @@ saves the selected idle mode and remaining timer ticks; it does not substitute
 a period reload on wake. Reserved NN=11 is not accepted as an idle mode.
 This establishes timer suspension and restoration, not PLL lock time,
 cycle-exact sleep-entry latency, pulse-width qualification, NMI/reset wake,
-or clock gating of the separately attached serial/DMA peripherals. The generic
-input API's internal-versus-external wake classification also remains to be
-refined before claiming complete IDLE2/3 hardware behavior.
+or complete clock-source behavior of attached peripherals.
+SPRU302B sections 2.10/3.8 explicitly qualify the generic power-down summary:
+externally clocked/frame-synchronized McBSP and DMA transfers may continue and
+wake IDLE2/3. DMA automatically gates its transfer clock and uses X2/CLKIN
+instead of the halted PLL in IDLE3. A blanket CPU interrupt-source filter or
+blanket DMA suspension would therefore be incorrect.
+The CPU now publishes its peripheral-clock stop line to the MU4 McBSP devices.
+Only the internally generated bit timer pauses; its pending interval and shift
+state survive save/load and resume. Four coupled CPU/McBSP cases verify a
+queued internal word stays pending during deep idle and completes after
+enabled external wake, including save-state replay. Four additional pin-driven
+cases verify externally clocked words complete while asleep and wake the CPU
+only with the serial IMR bit enabled. These synthetic edges establish ordering,
+not a physical baud rate. DMA input-clock switching, PLL stabilization and
+unsupported serial clock/frame configurations remain outside this coverage.
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
 pointer. The fixture checks both results and the three one-cycle operations

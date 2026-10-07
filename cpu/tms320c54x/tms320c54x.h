@@ -14,6 +14,7 @@ public:
 	void set_power_on_imr(u16 value) { m_power_on_imr = value; }
 	void set_extended_program(bool enabled) { m_extended_program = enabled; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
+	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
 
 	enum : unsigned
 	{
@@ -114,6 +115,7 @@ private:
 	address_space_config m_data_config;
 	address_space_config m_io_config;
 	devcb_read_line m_bio_in_cb;
+	devcb_write_line m_peripheral_clock_stop_cb;
 
 	memory_access<23, 1, -1, ENDIANNESS_LITTLE>::cache m_cache;
 	memory_access<23, 1, -1, ENDIANNESS_LITTLE>::specific m_program;

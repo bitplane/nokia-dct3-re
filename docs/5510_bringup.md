@@ -21,8 +21,13 @@ The codec's digital DIN decoder verifies those transmitted words. Explicit
 already-converted stereo fixture samples also complete the original 64-frame
 RX DMA block. The `sustain` profile checks eight reloaded blocks in each
 direction; analog conversion and longer application operation are not validated.
-DMA/McBSP and codec digital interfaces have isolated conformance
-and save/replay tests.
+DMA/McBSP and codec digital interfaces have isolated conformance and
+save/replay tests. CPU IDLE2/3 now stops the McBSP internal bit generator through a
+device clock-stop callback while leaving external frame/clock pins active.
+Coupled CPU fixtures cover paused-word save/load and masked/enabled external
+serial wake. This is not blanket DMA suspension: SPRU302B sections 2.10/3.8
+allow externally triggered McBSP/DMA work during deep idle. DMA clock-source
+switching and PLL wake timing remain unmodeled.
 The `startup` profile passes its 20-second window with zero illegal
 instructions and an active original streaming consumer. It observes 1,739
 consumer entries/notification reads and 1,740 clears, but mode zero skips

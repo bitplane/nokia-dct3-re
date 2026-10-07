@@ -13,6 +13,7 @@ public:
 	u16 data_r(offs_t offset);
 	void data_w(offs_t offset, u16 value);
 	void tx_clock_w(int state);
+	void internal_clock_stop_w(int state);
 	void tx_frame_w(int state);
 	void rx_clock_w(int state);
 	void rx_frame_w(int state) { m_rx_frame_input = bool(state); }
@@ -45,6 +46,8 @@ private:
 	bool m_buffer_full = false, m_shift_active = false, m_ready = false, m_xempty = false;
 	bool m_clock_input = false, m_frame_input = false, m_ready_pending = false;
 	bool m_async_bit = false;
+	bool m_internal_clock_stopped = false;
+	attotime m_paused_bit_time = attotime::never;
 	u16 m_frame_words = 0;
 	attotime m_async_time;
 	u16 m_rx_shift = 0, m_rx_completed = 0, m_rx_buffer = 0, m_rx_word = 0, m_rx_high = 0;

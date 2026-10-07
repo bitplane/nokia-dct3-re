@@ -47,7 +47,8 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_program_config("program", ENDIANNESS_LITTLE, 16, 23, -1),
 	m_data_config("data", ENDIANNESS_LITTLE, 16, 16, -1),
 	m_io_config("io", ENDIANNESS_LITTLE, 16, 16, -1),
-	m_bio_in_cb(*this, 1)
+	m_bio_in_cb(*this, 1),
+	m_peripheral_clock_stop_cb(*this)
 {
 }
 
@@ -196,6 +197,7 @@ void tms320c54x_device::device_reset()
 	m_tcr = 0;
 	m_idle_mode = 0;
 	m_idle_timer_ticks = 0;
+	m_peripheral_clock_stop_cb(0);
 	arm_timer();
 	m_block_repeat_active = false;
 	m_idle = false;
@@ -231,6 +233,8 @@ void tms320c54x_device::arm_timer()
 void tms320c54x_device::leave_idle()
 {
 	m_idle = false;
+	if (m_idle_mode >= 2)
+		m_peripheral_clock_stop_cb(0);
 	if (m_idle_mode >= 2 && !(m_tcr & TIMER_TSS))
 		m_timer->adjust(attotime::from_ticks(m_idle_timer_ticks, clock()));
 	m_idle_mode = 0;
@@ -896,6 +900,7 @@ void tms320c54x_device::execute_one(u16 op)
 			m_timer->adjust(attotime::never);
 		}
 		m_idle_mode = mode;
+		m_peripheral_clock_stop_cb(mode >= 2);
 		m_idle = true;
 		m_icount -= 3; // Four-cycle minimum before the idle interval (SPRU172C).
 		return;
