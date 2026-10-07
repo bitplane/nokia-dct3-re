@@ -39,6 +39,7 @@ class SipRestoreCheckTest(unittest.TestCase):
         self.check()
         self.check(product='3310')
         self.check(product='3330')
+        self.check(product='3410')
 
     def test_bye_before_confirmation_is_rejected(self):
         with self.assertRaises(RuntimeError):

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class SipProductPreparationTest(unittest.TestCase):
     def test_live_incoming_defaults_keep_answer_and_fresh_storage(self):
         rule = ('sip-config-test: ; @$(info KEYS=$(SIP_3330_INCOMING_KEYS))'
+                '$(info NHM2_KEYS=$(SIP_3410_INCOMING_KEYS))'
                 '$(info SCRIPT=$(SIP_3330_INCOMING_SCRIPT))'
                 '$(info PRESERVE=$(SIP_HANDSET_PRESERVE_NVRAM))true')
         result = subprocess.run(['make', '--no-print-directory', '--eval', rule,
@@ -21,6 +22,7 @@ class SipProductPreparationTest(unittest.TestCase):
                                 capture_output=True, text=True, check=True)
         self.assertIn('KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,waitalerting,enter', result.stdout)
         self.assertIn('SCRIPT=../mame_nokia_dct3_input_exerciser.lua', result.stdout)
+        self.assertIn('NHM2_KEYS=end,waitalerting,send', result.stdout)
         self.assertIn('PRESERVE=0', result.stdout)
 
     def test_3330_setup_uses_own_captured_encoding(self):

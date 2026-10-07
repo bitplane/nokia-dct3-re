@@ -36,7 +36,7 @@ class SipCancelCheckTest(unittest.TestCase):
         self.check()
 
     def test_sibling_scopes(self):
-        for product in ('3310', '3330'):
+        for product in ('3310', '3330', '3410'):
             self.assertTrue(self.check(product=product)['scope'].startswith(product + ' HLE'))
 
     def test_incomplete_radio_release_is_rejected(self):

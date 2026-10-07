@@ -377,6 +377,7 @@ not implemented.
 make verify-radio-incoming-call-sip-cancel RUN_DIR=run_3210_sip_cancel
 make verify-3310-radio-incoming-call-sip-cancel RUN_DIR=run_3310_sip_cancel
 make verify-3330-radio-incoming-call-sip-cancel RUN_DIR=run_3330_sip_cancel
+make verify-3410-radio-incoming-call-sip-cancel RUN_DIR=run_3410_sip_cancel
 ```
 
 The real SIP caller cancels only after the handset reports alerting. The gate
@@ -395,9 +396,10 @@ transaction race or cancellation before paging.
 make verify-radio-incoming-call-sip-restore RUN_DIR=run_3210_sip_restore
 make verify-3310-radio-incoming-call-sip-connected-restore RUN_DIR=run_3310_sip_restore
 make verify-3330-radio-incoming-call-sip-connected-restore RUN_DIR=run_3330_sip_restore
+make verify-3410-radio-incoming-call-sip-connected-restore RUN_DIR=run_3410_sip_restore
 ```
 
-The 3210/3310 fixtures physically answer an incoming SIP call, save at 19 seconds
+The 3210/3310/3410 fixtures physically answer an incoming SIP call, save at 19 seconds
 and load one second later. The 3330 fixture repeats its own physical PMM setup
 and saves at 17 seconds because its earlier Answer would let the eight-second
 remote call expire during the later save/load window. The checker requires that connection precede the save,
@@ -419,6 +421,7 @@ against the observed connected event rather than assumed to be connected.
 make verify-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3210_sip_alerting_restore
 make verify-3310-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3310_sip_alerting_restore
 make verify-3330-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3330_sip_alerting_restore
+make verify-3410-radio-incoming-call-sip-alerting-restore RUN_DIR=run_3410_sip_alerting_restore
 ```
 
 The alerting variant omits physical Answer. Loading the ringing snapshot closes

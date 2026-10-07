@@ -13169,7 +13169,34 @@
       "steps": [{
         "step": "delegate", "silent": true,
         "target": "verify-radio-outgoing-call-sip",
-        "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS=end,waitalerting,send SIP_HANDSET_KEY_DELAY_MS=1000 SIP_HANDSET_KEY_DURATION_MS=200 SIP_HANDSET_KEY_GAP_MS=300 SIP_HANDSET_RUNNER_ARGS='--incoming --product 3410' SIP_HANDSET_SECONDS=40"
+        "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS='$(SIP_3410_INCOMING_KEYS)' SIP_HANDSET_KEY_DELAY_MS=1000 SIP_HANDSET_KEY_DURATION_MS=200 SIP_HANDSET_KEY_GAP_MS=300 SIP_HANDSET_RUNNER_ARGS='$(SIP_3410_INCOMING_RUNNER_ARGS)' SIP_HANDSET_SCRIPT=$(SIP_3410_INCOMING_SCRIPT) SIP_HANDSET_SECONDS=40"
+      }]
+    },
+    {
+      "name": "verify-3410-radio-incoming-call-sip-connected-restore",
+      "prerequisites": [], "variables": {},
+      "steps": [{
+        "step": "delegate", "silent": true,
+        "target": "verify-3410-radio-incoming-call-sip",
+        "command": "$(MAKE) --no-print-directory verify-3410-radio-incoming-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3410_INCOMING_RUNNER_ARGS='--incoming --restore-call --product 3410' SIP_3410_INCOMING_SCRIPT=../tools/sip_call_state_roundtrip.lua"
+      }]
+    },
+    {
+      "name": "verify-3410-radio-incoming-call-sip-alerting-restore",
+      "prerequisites": [], "variables": {},
+      "steps": [{
+        "step": "delegate", "silent": true,
+        "target": "verify-3410-radio-incoming-call-sip",
+        "command": "$(MAKE) --no-print-directory verify-3410-radio-incoming-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3410_INCOMING_KEYS=end SIP_3410_INCOMING_RUNNER_ARGS='--incoming --restore-call --restore-phase alerting --product 3410' SIP_3410_INCOMING_SCRIPT=../tools/sip_call_state_roundtrip.lua"
+      }]
+    },
+    {
+      "name": "verify-3410-radio-incoming-call-sip-cancel",
+      "prerequisites": [], "variables": {},
+      "steps": [{
+        "step": "delegate", "silent": true,
+        "target": "verify-3410-radio-incoming-call-sip",
+        "command": "$(MAKE) --no-print-directory verify-3410-radio-incoming-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_3410_INCOMING_KEYS=end SIP_3410_INCOMING_RUNNER_ARGS='--incoming --cancel-incoming --product 3410'"
       }]
     },
     {
