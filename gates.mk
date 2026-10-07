@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 348 gates: 205 generated from typed steps, 143 copied verbatim (shell).
+# 349 gates: 205 generated from typed steps, 144 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -220,7 +220,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-phonebook verify-sim-pin verify-sim-pin-unblock \
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
 	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
-	verify-frontier-stability verify-structure-subset verify-structure
+	verify-frontier-stability verify-structure-subset verify-structure \
+	verify-radio-outgoing-call-sip
 
 verify-5510-package:
 	$(PYTHON) tools/noki5510_package_check.py roms/archive-dct3-packages/NPM5_353_mcu.exe --output-dir roms/5510-npm5-v353
@@ -3634,3 +3635,23 @@ verify-structure-subset:
 
 verify-structure:
 	@$(MAKE) --no-print-directory verify-structure-subset RUN_DIR=$(RUN_DIR) ORACLE_STRUCT=$(ORACLE_STRUCT)
+
+# shell: optional external PJSIP backend and isolated physical handset
+verify-radio-outgoing-call-sip:
+	@set -e; \
+	$(DCT3_EEPROM_GUARD) \
+	test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) ERASED_IDENTITY_SECURITY_CODE=12345; \
+	$(call prepare_host_run,$(RUN_DIR),noki3210,); \
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' NOKIA_DCT3_LUA_QUIET=1 \
+		NOKIA_DCT3_POST_READY_KEYS='$(NOKI3210_OUTGOING_DIAL_KEYS)' \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=12000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=280 \
+		NOKIA_DCT3_SNAPSHOT_DIR=$(abspath $(RUN_DIR)) \
+		$(VENV)/bin/python tools/run_sip_handset_gate.py --pjsua '$(SIP_PJSUA_BIN)' --run-dir $(RUN_DIR) -- \
+		$(PYTHON) tools/run_mame_isolated.py --mame-dir $(MAME_DIR) --run-dir $(RUN_DIR) -- \
+		noki3210 -rompath roms -log -video none -sound none -throttle \
+		-keyboardprovider none -mouseprovider none -lightgunprovider none -joystickprovider none -midiprovider none \
+		-skip_gameinfo -autoboot_script ../mame_nokia_dct3_input_exerciser.lua -verbose \
+		-cfg_directory ../fixtures/radio_outgoing_host_adapter -http -http_port 18100 \
+		-nvram_directory $(abspath $(RUN_DIR))/nvram -seconds_to_run 45

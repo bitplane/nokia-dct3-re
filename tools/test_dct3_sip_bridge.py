@@ -1,0 +1,28 @@
+import queue
+import unittest
+
+from tools.dct3_sip_bridge import MediaQueues
+
+
+class SipMediaQueuesTest(unittest.TestCase):
+    def test_bounded_media_queue_does_not_block(self):
+        media = MediaQueues()
+        for index in range(12):
+            media.put(media.uplink, bytes([index]) * 320)
+        self.assertEqual(media.dropped, 4)
+        self.assertEqual(media.uplink.qsize(), 8)
+        self.assertEqual([media.uplink.get_nowait()[0] for _ in range(8)], list(range(8)))
+        with self.assertRaises(queue.Empty):
+            media.uplink.get_nowait()
+
+    def test_wrong_pcm_geometry_is_not_queued(self):
+        media = MediaQueues()
+        for data in (b'', bytes(318), bytes(640)):
+            media.put(media.downlink, data)
+        self.assertTrue(media.downlink.empty())
+        media.put(media.downlink, bytes(320))
+        self.assertEqual(media.downlink.qsize(), 1)
+
+
+if __name__ == '__main__':
+    unittest.main()

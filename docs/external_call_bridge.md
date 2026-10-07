@@ -232,10 +232,71 @@ evidence includes both endpoint logs, original/received WAV files and a result
 manifest. The reviewed 440/660 Hz recordings exceed 0.999 tone-energy fraction.
 
 [PJSUA2 AudioMediaPort](https://docs.pjsip.org/en/latest/specific-guides/audio/audio_frame_manipulation.html)
-provides application-owned PCM callbacks. The next implementation boundary is
-a standalone host backend: SIP decisions map to existing call identities;
-GSM-FR decode/encode connects bounded 8 kHz PCM queues to the PJSIP media port.
+provides application-owned PCM callbacks. The standalone outgoing backend now
+maps SIP decisions to existing call identities; GSM-FR decode/encode connects
+bounded 8 kHz PCM queues to that port.
 Neither SIP nor host wall-clock scheduling belongs in the emulated GSM/device
 state. Restoration must invalidate the old SIP call identity instead of
 replaying an already accepted incoming call. Python SWIG bindings require a
-separate local build; no installed PJSUA2 binding is assumed by this probe.
+separate local build; no installed PJSUA2 binding is assumed by the stack probe.
+
+## Outgoing SIP bridge
+
+`tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
+for SIP confirmation before accepting the handset's outgoing request, maps
+486/600 to busy and other pre-confirmation failures to no-answer, and maps
+remote release to GSM normal clearing. Handset completion hangs up the SIP leg.
+The bridge does not auto-accept SMS/USSD or implement incoming SIP; unsupported
+incoming SIP receives busy. No registrar, credentials or destination-number
+routing policy is claimed. The explicit destination is independent of the
+physically dialed number, which is logged for acceptance evidence.
+
+Each call owns independent libgsm encoder/decoder state. Media callbacks only
+exchange 160-sample, native-endian signed PCM blocks through bounded eight-frame
+queues; they never call WebSocket or emulate hardware. Queue overflow is counted.
+Null-device PJSIP timing drives the host media port. Run MAME throttled for this
+real-time backend. Its media sequence remains host correlation, not an
+emulation clock. A changed MAME epoch hangs up the old SIP leg and clears codec
+state; replayed call state is cleared with temporary-failure cause 41 rather
+than silently redialed. That restoration policy is implemented but does not yet
+have a handset save/load acceptance gate.
+
+Build the optional upstream binding in the local source tree (no system install):
+
+```sh
+.venv/bin/python -m pip install swig setuptools
+ROOT="$PWD"
+cd run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python
+PATH="$ROOT/.venv/bin:$PATH" make PYTHON_EXE="$ROOT/.venv/bin/python"
+cd "$ROOT"
+```
+
+Alternatively invoke that `make` with the absolute project `.venv/bin` paths.
+`SIP_PYTHON_PATH` points at the generated `pjsua2.py` directory and its
+`build/lib.*` extension directory; `SIP_PJSUA_BIN` selects the upstream executable.
+Both have local-build defaults in Makefile, but remain optional dependencies.
+
+```sh
+make verify-radio-outgoing-call-sip RUN_DIR=run_3210_sip_gate
+```
+
+The gate builds the erased-identity security-code fixture before preparing a
+fresh isolated run, physically unlocks and dials `5551234`, then requires SIP
+confirmation, at least 100 executed PCM/media frames in each direction, the
+firmware's exact SETUP/CONNECT ACK/RELEASE and final LAPDm release. The remote
+endpoint supplies a 660 Hz WAV source and clears the call after eight seconds.
+The own 3210 HLE gate proves signaling and media transport, not native speech,
+sound perception or a public-network end-to-end call.
+
+`tools/run_dct3_sip_backend_probe.py` independently tests the same bridge with
+a synthetic version-1 host endpoint: uplink 440 Hz and remote 660 Hz must survive
+GSM-FR/PCM conversion and actual SIP/RTP in both directions. This fixture does
+not inject anything into a phone or establish handset coverage:
+
+```sh
+PYTHONPATH="$SIP_PYTHON_PATH" .venv/bin/python tools/run_dct3_sip_backend_probe.py --pjsua "$SIP_PJSUA_BIN" --run-dir run_sip_backend_probe
+```
+
+Next boundaries are incoming SIP through ordinary paging/physical Answer,
+executable restoration/failure coverage, and microphone/earpiece waveform
+acceptance. Native DSP speech remains its independent hardware/backend milestone.
