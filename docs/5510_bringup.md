@@ -13,11 +13,13 @@ The independent MU4 `mu4nand` fixture executes original erased-media
 provisioning, receives all seven original R060 segments, reads back six
 complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
 `3538` then reaches the loaded entry and its page-2 common-window branch.
-The partial McBSP1 transmitter now carries six original firmware control
-words. The acceptance run stops at that observed serial-setup boundary.
-The subsequent DMA channel-3 configuration is mapped and its transfer mechanics
-have isolated conformance tests. McBSP0 is attached and accepts its external
-framed transmit format; the codec clock/frame source is not yet modeled.
+The partial McBSP1 transmitter carries six original firmware control words.
+The default acceptance profile stops at serial setup. The separate `stream`
+profile uses those controls to activate a partial AIC23 master-clock source,
+then observes one 128-word McBSP0 TX block and DMA channel-3 completion.
+RX, codec conversion and sustained streaming are not validated; a CPU input-line
+queue warning remains open. DMA/McBSP and codec clocks have isolated conformance
+and save/replay tests.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
@@ -1002,13 +1004,34 @@ Original controls decode as power `10`, analog path `18`, digital path `01`,
 format `53`, sample-rate `23`, active `01`. The related
 [TI AIC23B datasheet](https://www.ti.com/lit/ds/symlink/tlv320aic23b.pdf)
 corroborates master, DSP-format, 16-bit stereo and USB/272 oversampling;
-11,995,200 / 272 gives 44,100 frames/s. B-revision timing still needs comparison
-with the original part before implementation.
+11,995,200 / 272 gives 44,100 frames/s. The original
+[AIC23 EVM guide](https://www.ti.com/lit/ug/sleu003/sleu003.pdf), section 5.3,
+independently specifies codec-master DSP-format stereo, McBSP0 audio and McBSP1
+SPI control. Detailed timing uses the related B-revision manual and remains
+revision-qualified: USB-mode BCLK equals MCLK, not MCLK/4; frames span 272 bit
+clocks. LRP=1 places the left MSB after the one-bit frame pulse.
+
+Local ignored references under `roms/reference-docs/npm5/` are
+`ti_tlv320aic23_evm_sleu003.pdf` (SHA-256
+`f8fe33dfaaa2414b5f6cb80f102fb97f92f85d47375e6802d50b94e41e07cceb`)
+and `ti_tlv320aic23b_slws106h.pdf` (SHA-256
+`b9c7f9f9ef77333306a6a98cb5ec8c071fd7fa90e691f786f91b8d1ae50bbaf2`).
+
+The partial `tlv320aic23_device` receives decoded 16-bit control words rather
+than SPI pin transitions. Activation, master selection and device/clock power
+control gate its clock timer. The observed 16-bit DSP USB/272 mode is supported;
+other active master formats fail explicitly. CLKIN halves the codec clock;
+CLKOUT does not divide BCLK. Output-amplifier power-down does not stop serial
+clocks. Registers, clock phase and pending timer state are saved. Isolated tests
+verify inactive silence, control decoding, 11.9952 MHz BCLK, the 272-clock frame
+divider, reset defaults and pending-edge replay. No ADC, DAC sample decoder,
+analog filters or sound output is implemented.
 
 Original McBSP0 configuration is PCR `000e`, XCR1 `0140`, XCR2 `0044`,
 SRGR1 `0f07`, SRGR2 `101f`, SPCR2 `0101`. It selects external clocks,
-two 16-bit words per frame and frame-ignore behavior. The transmitter now
-accepts that format but receives no fabricated clock or frame edges.
+two 16-bit words per frame and frame-ignore behavior. The streaming fixture
+connects codec-generated BCLK/frame pins to this transmitter; it does not inject
+DMA readiness or firmware state.
 
 Generic `tx_clock_w`/`tx_frame_w` inputs model external single-phase frames.
 SPRU302B 2.3.4.1 and 2.3.5.2 define polarity and opposite-edge XRDY;
@@ -1025,11 +1048,12 @@ active format changes and full reset-activation timing remain unvalidated.
 loader, DMA/McBSP conformance and six-word original control setup.
 `make check-mu4-storage-original MU4_STORAGE_BIOS=stream` selects the same
 original bytes but requires a complete 128-word streaming block and DMA
-completion. Its eight-second observation reports zero words/completions and
-`illegal=0` (sampled PC `002fc8`), with no external codec edges supplied.
-That PC sample is not proof of a particular wait-loop owner. Next work is the
-codec control/clock boundary and externally framed McBSP transmit lifecycle,
-not a fixed-rate ready pulse or a claim of audio playback.
+completion. With the original six control words activating codec clocks, the
+fixture observes 128 transmitted words and one DMA completion, with `illegal=0`.
+These words are buffer contents, not validated music samples. A CPU pending-input
+queue overflow warning was also observed and remains a scheduling/interrupt
+fidelity issue; the finite-block result does not establish sustained operation.
+This is original TX/DMA execution, not full MU4 startup or audio playback.
 
 The same run programs RX DMA channel 2: source McBSP0 DRR1 `0021`,
 destination `1980`, count `0001`, sync `103f`, mode `c055`, reload bank

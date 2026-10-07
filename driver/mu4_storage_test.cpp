@@ -7,6 +7,7 @@
 #include "machine/nandflash.h"
 #include "tms320c54x_dma.h"
 #include "tms320c54x_mcbsp.h"
+#include "tlv320aic23.h"
 #include <vector>
 #include <sstream>
 
@@ -41,6 +42,15 @@ public:
 		m_mcbsp0->tx_bit_cb().set([this](int state) { if (m_phase >= 51 && m_phase <= 53) m_external_bits.push_back(state); });
 		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
 		m_mcbsp0->tx_irq_cb().set([this](int state) { m_cpu->set_input_line(5, state); });
+		TLV320AIC23(config, "codec", 11'995'200);
+		subdevice<tlv320aic23_device>("codec")->bclk_cb().set([this](int state) {
+			if (m_phase >= 54) { m_codec_edges.push_back(state); if (state) ++m_codec_clocks; }
+			else m_mcbsp0->tx_clock_w(state);
+		});
+		subdevice<tlv320aic23_device>("codec")->frame_cb().set([this](int state) {
+			if (m_phase >= 54) { m_codec_edges.push_back(2 + state); if (state) m_codec_frames.push_back(m_codec_clocks); }
+			else m_mcbsp0->tx_frame_w(state);
+		});
 		SAMSUNG_K9K1208U0A(config, m_nand);
 		m_nand->rnb_wr_callback().set(FUNC(mu4_storage_test_state::ready_w));
 	}
@@ -66,6 +76,10 @@ private:
 		}
 	}
 	unsigned m_stream_words = 0, m_stream_config_writes = 0;
+	unsigned m_codec_clocks = 0;
+	std::vector<unsigned> m_codec_frames;
+	std::vector<int> m_codec_edges, m_codec_saved_edges;
+	attotime m_codec_snapshot_time;
 	std::vector<u16> m_external_words;
 	std::vector<int> m_external_bits;
 	void external_reg_w(u16 index, u16 value) { m_mcbsp0->control_w(0, index); m_mcbsp0->control_w(1, value); }
@@ -94,10 +108,11 @@ private:
 	u16 mcbsp_status() { m_mcbsp->control_w(0, 1); return m_mcbsp->control_r(1); }
 	void serial_tx(u16 value)
 	{
+		if (m_phase == 30 && system_bios() == 2) subdevice<tlv320aic23_device>("codec")->control_word_w(value);
 		m_serial_tx_words.push_back(value);
 		if (m_phase == 30 && m_serial_tx_words.size() <= 16) logerror("mu4_native_tx: word=%04x\n", value);
 		// End the serial-setup fixture at its observed complete control stream,
-		// before the separate streaming-DMA contract (not implemented here).
+		// before the separate streaming-profile acceptance.
 		if (m_phase == 30 && system_bios() != 2 && m_serial_tx_words.size() == 6) m_check->adjust(attotime::zero);
 	}
 	required_shared_ptr<u16> m_program_ram;
@@ -121,7 +136,7 @@ private:
 	attotime m_read_started, m_first_data;
 	std::vector<u16> m_writes;
 	emu_timer *m_check = nullptr;
-	unsigned m_phase = 31;
+	unsigned m_phase = 54;
 	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
 	unsigned m_native_mcbsp_trace = 0, m_native_mcbsp_polls = 0;
 	unsigned m_native_adjacent_reads = 0;
@@ -251,6 +266,13 @@ private:
 			0xf980, 0x3035, 0xf980, 0x306c, 0xf4e1
 		};
 		for (unsigned i = 0; i < std::size(wrapper); ++i) program.write_word(0x1800 + i, wrapper[i]);
+		if (m_phase == 54)
+		{
+			program.write_word(0x1800, 0xf4e1);
+			auto &codec = *subdevice<tlv320aic23_device>("codec");
+			for (u16 word : { 0x0c10, 0x0818, 0x0a01, 0x0e53, 0x1023 }) codec.control_word_w(word);
+			m_codec_edges.clear(); m_codec_frames.clear(); m_codec_clocks = 0;
+		}
 		if (m_phase == 31)
 		{
 			program.write_word(0x1800, 0xf4e1);
@@ -466,6 +488,46 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase >= 54)
+		{
+			auto &codec = *subdevice<tlv320aic23_device>("codec");
+			if (m_phase == 54)
+			{
+				if (!m_codec_edges.empty() || codec.reg(7) != 0x53 || codec.reg(8) != 0x23)
+					fatalerror("MU4 codec inactive/control mismatch");
+				codec.control_word_w(0x1201);
+				m_phase = 55; m_check->adjust(attotime::from_usec(100)); return;
+			}
+			if (m_phase == 55)
+			{
+				if (m_codec_clocks != 1200 || m_codec_frames.size() != 5)
+					fatalerror("MU4 codec clock rate mismatch clocks=%u frames=%u", m_codec_clocks, unsigned(m_codec_frames.size()));
+				for (unsigned i = 1; i < m_codec_frames.size(); ++i)
+					if (m_codec_frames[i] - m_codec_frames[i - 1] != 272) fatalerror("MU4 codec frame divider mismatch");
+				m_saved_dma.str({}); m_saved_dma.clear();
+				m_codec_snapshot_time = machine().time();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 codec save failed");
+				m_codec_edges.clear(); m_phase = 56; m_check->adjust(attotime::from_usec(10)); return;
+			}
+			if (m_phase == 56)
+			{
+				m_codec_saved_edges = m_codec_edges;
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 codec restore failed");
+				// Loading inside a timer callback restores scheduler base time, but
+				// adjust() still uses this callback's old timestamp. Target the saved
+				// observation deadline, not ten microseconds after the old callback.
+				m_codec_edges.clear(); m_phase = 57;
+				m_check->adjust(m_codec_snapshot_time + attotime::from_usec(10) - machine().time()); return;
+			}
+			if (m_codec_edges != m_codec_saved_edges)
+				fatalerror("MU4 codec pending clock replay mismatch expected=%u actual=%u first=%d/%d", unsigned(m_codec_saved_edges.size()), unsigned(m_codec_edges.size()), m_codec_saved_edges.empty() ? -1 : m_codec_saved_edges.front(), m_codec_edges.empty() ? -1 : m_codec_edges.front());
+			codec.control_word_w(0x1200);
+			codec.control_word_w(0x1e00);
+			if (codec.reg(7) != 1 || codec.reg(9)) fatalerror("MU4 codec reset defaults mismatch");
+			logerror("mu4_codec_clock: PASS inactive=1 controls=1 bclk_mclk=1 frame_divider=272 pending_restore=1 reset=1\n");
+			m_phase = 31; machine_reset(); return;
+		}
 		if (m_phase >= 31 && m_phase <= 37)
 		{
 			if (m_phase == 31)
