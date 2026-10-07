@@ -1623,12 +1623,22 @@ Resident entry `02:9186` performs a named-file load: it mounts context
 `3aea`, enumerates into descriptor index one (`36b0 + 44`), compares both
 the supplied name and extension, and invokes unchanged `2080` with index
 one only on a matching directory entry. Its exact direct callers are
-`02:9fa8`, `03:a90f` and `03:a9c3`; the latter two supply name buffer `b54a`
-and extension buffer `b553`. These buffers are runtime inputs, not identified
-decoder names from the static upload. Their provenance and the original
-media-parser caller must be established before using this path to claim a
-particular decoder overlay was selected. Selecting descriptor one manually
-would bypass precisely that unresolved contract.
+`02:9fa8`, `03:a90f` and `03:a9c3`, using runtime name/extension buffers
+`b54a/b553`. Initialization `02:8d0f` copies the active descriptor's name
+and extension. Entry `02:9e90` replaces them with `RERSI16 .BIN` before
+its `02:9fa8` load. The separate `03:a90f` path explicitly copies
+`USBSI16 ` from data `c1a6`; it is not music-decoder selection evidence.
+
+Media inspection entry `02:a1ed` opens descriptor index two, checks `LSE`,
+processes metadata through `03:a3e3/a354`, seeks to zero and supplies file
+reads to parser `02:c824`. A successful parser result selects a subtype
+stored in its stack context: subtype 2 copies three characters `MP3` from
+`c19e` to `b54a`, subtype 1 copies `AAC` from `c1a2`; either sets `3732`
+bit 4. The consumer at `03:a9b7` requires that bit before invoking the
+named-file loader at `03:a9c3`. This is static argument/state flow, not an
+executed media-decode result. The parser's format contract and suffix
+provenance at that lifecycle remain to verify; do not force its subtype,
+the readiness bit or descriptor selection to claim decoder activation.
 
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
