@@ -2076,6 +2076,31 @@ protection mechanism or playable track. No payload transformation or
 protection bypass is performed. The inventory's five synthetic tests
 cover page boundaries, separate spare changes, disjoint runs and size errors.
 
+The resident AA22 selector-`36` parameter-`7` branch at `03:b1f8`
+consumes three length-prefixed byte strings following the parameter. It
+copies each to a local zero-terminated buffer and calls `03:8dc3` with
+the firmware-owned context at data `bf1c`, operation argument zero and
+the three pointer/length pairs. Return zero selects the class-1
+parameter-7 success reply via `03:b6ce`, then refresh routines
+`03:941d/03:bd34`; nonzero selects its failure reply. Parameter `8`
+calls the same routine with operation argument one and zeroed string
+arguments. These are static call contracts, not verified save/delete
+semantics. The extracted dispatcher range `03:acf2..b4b0` has SHA-256
+`70cc83f46258fe7b29ddb51188b62383c4055c16284f39c4643a36c0f5d71144`;
+routine `03:8dc3..8f0d` has
+`61c127d1a53db86b5d2a84fbc9c2407d89aa16a1ea5c96515fbadeba2ae6aa37`.
+
+The observation-only endpoint context capture reads `bf1c..bf2b`.
+Its name is `REL_    `, terminated at `bf24`, with extension `REL`
+at `bf25..bf27`. This differs from the new NAND literal `REL_001 `.
+Before issuing a metadata fixture, recover how the original firmware
+selects or reconstructs the current recorded-file context and whether
+the named lookup treats this padded prefix specially. Do not fill its
+digits by RAM intervention or infer a failed save merely from this
+unexecuted static path. A scan of 48,261 AA22 extended words finds only
+the two direct `bf1c` operands in these callers; indirect writes and
+initialization/data references remain outside that literal census.
+
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
 section 5.5.3.5 and table 5-4). Linear `*AR+0B` indexing made the codec

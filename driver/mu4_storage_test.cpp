@@ -1301,6 +1301,10 @@ private:
 			!m_nand->nvram_write(*file))
 			fatalerror("MU4 recorder media observation could not be written");
 		logerror("mu4_native_recorder_media_capture: file=mu4_recorder_endpoint.nand observation_only=1\n");
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i)
+			logerror("mu4_native_recorder_file_context: address=%04x value=%04x\n", 0xbf1c + i, data.read_word(0xbf1c + i));
 	}
 	virtual void machine_reset() override
 	{
