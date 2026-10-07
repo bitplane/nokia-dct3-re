@@ -105,16 +105,30 @@ private:
 	unsigned m_native_din_words = 0;
 	unsigned m_native_dma_rx_vectors = 0, m_native_dma_tx_vectors = 0;
 	unsigned m_native_dma_tx_handler = 0;
+	unsigned m_native_stream_pending_sets = 0, m_native_stream_pending_clears = 0, m_native_stream_pending_reads = 0;
+	bool m_native_worker_window_started = false;
+	attotime m_native_worker_window_start;
 	std::vector<u16> m_native_tx_words;
 	std::vector<u16> m_codec_din_words, m_codec_saved_din;
 	unsigned m_codec_rx_snapshot_count = 0;
-	unsigned native_stream_target() const { return system_bios() == 3 ? 1024 : 128; }
+	unsigned native_stream_target() const { return system_bios() >= 3 ? 1024 : 128; }
 	void finish_stream_if_ready()
 	{
 		if (m_phase == 30 && system_bios() >= 2 && m_stream_words >= native_stream_target() &&
 			m_native_din_words >= native_stream_target() && m_dma_completions >= native_stream_target() / 128 &&
 			m_rx_dma_completions >= native_stream_target() / 128)
-			m_check->adjust(attotime::zero);
+		{
+			if (system_bios() == 4)
+			{
+				if (!m_native_worker_window_started)
+				{
+					m_native_worker_window_started = true;
+					m_native_worker_window_start = machine().time();
+					m_check->adjust(attotime::from_msec(100));
+				}
+			}
+			else m_check->adjust(attotime::zero);
+		}
 	}
 	unsigned m_codec_clocks = 0;
 	std::vector<unsigned> m_codec_frames;
@@ -322,6 +336,8 @@ private:
 		m_native_din_words = 0;
 		m_native_dma_rx_vectors = m_native_dma_tx_vectors = 0;
 		m_native_dma_tx_handler = 0;
+		m_native_stream_pending_sets = m_native_stream_pending_clears = m_native_stream_pending_reads = 0;
+		m_native_worker_window_started = false;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -1043,6 +1059,19 @@ private:
 					if (m_phase == 30 && !machine().side_effects_disabled() &&
 						m_cpu->state_int(STATE_GENPC) == 0x028afd) ++m_native_dma_tx_handler;
 				});
+			m_cpu->space(AS_DATA).install_write_tap(0xb633, 0xb633, "mu4_native_stream_pending_write",
+				[this](offs_t, u16 &value, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled()) return;
+					unsigned &count = value ? m_native_stream_pending_sets : m_native_stream_pending_clears;
+					if (count++ < 8) logerror("mu4_native_stream_pending: write=%04x pc=%06x\n", value, unsigned(m_cpu->state_int(STATE_GENPC)));
+				});
+			m_cpu->space(AS_DATA).install_read_tap(0xb633, 0xb633, "mu4_native_stream_pending_read",
+				[this](offs_t, u16 &value, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled()) return;
+					if (m_native_stream_pending_reads++ < 8) logerror("mu4_native_stream_pending: read=%04x pc=%06x\n", value, unsigned(m_cpu->state_int(STATE_GENPC)));
+				});
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x207f, "mu4_native_dma_vectors",
 				[this](offs_t address, u16 &value, u16)
 				{
@@ -1103,7 +1132,7 @@ private:
 					if (m_cpu->space(AS_DATA).read_word(0x1980 + i) != 0x1234 || m_cpu->space(AS_DATA).read_word(0x19c0 + i) != 0x5678)
 						fatalerror("MU4 native converted-ADC buffer mismatch at frame %u", i);
 				logerror("mu4_native_receive: PASS converted_fixture=1 frames=64 din_words=%u rx_dma_completions=%u sorted_buffer=1980,19c0\n", m_native_din_words, m_rx_dma_completions);
-				if (system_bios() == 3)
+				if (system_bios() >= 3)
 				{
 					if (m_native_dma_tx_vectors < 7 || m_native_dma_tx_handler < 7)
 						fatalerror("MU4 original TX interrupt delivery incomplete vectors=%u handler=%u",
@@ -1125,6 +1154,16 @@ private:
 				m_native_dma_rx_vectors, m_native_dma_tx_vectors,
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
+			u16 pending;
+			{ auto const disable = machine().disable_side_effects(); pending = m_cpu->space(AS_DATA).read_word(0xb633); }
+			logerror("mu4_native_stream_pending_counts: sets=%u clears=%u reads=%u final=%04x\n",
+				m_native_stream_pending_sets, m_native_stream_pending_clears, m_native_stream_pending_reads, pending);
+			if (system_bios() == 4)
+			{
+				if (!m_native_worker_window_started || machine().time() - m_native_worker_window_start < attotime::from_msec(100))
+					fatalerror("MU4 worker observation ended before its 100 ms tail");
+				logerror("mu4_native_worker_window: PASS tail_ms=100 checked_din_prefix=1024 pending=%04x reads=%u\n", pending, m_native_stream_pending_reads);
+			}
 			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u tx_words=%u tx_irqs=%u controller_modeled=partial\n",
 				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace,
 				unsigned(m_serial_tx_words.size()), m_serial_tx_irqs);
@@ -1488,6 +1527,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(0, "setup", "Original storage, loader and serial setup")
 	ROM_SYSTEM_BIOS(1, "stream", "Original streaming frontier (incomplete)")
 	ROM_SYSTEM_BIOS(2, "sustain", "Original eight-block digital streaming fixture")
+	ROM_SYSTEM_BIOS(3, "worker", "Original streaming worker observation (100 ms tail)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

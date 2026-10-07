@@ -1142,6 +1142,29 @@ of an RX ISR is not by itself a routing defect in this lifecycle. Read IMR/IFR
 through CPU state accessors: direct address-space reads at data `0/1` bypass
 the core's internally implemented register access and do not measure them.
 
+### Streaming notification consumer
+
+Original TX handler `02:8afc` writes `b633=1` at `02:8b2e..8b30`, loads
+AR2 with `806e`, then calls common routines `3f37` and `3ec2`. Original code
+at `02:9549` reads `b633` and branches to `02:9676` when zero; code at
+`02:9641` clears it. These are an inferred software-notification contract,
+not a recovered official task name or proof of audio decoding.
+
+`make check-mu4-storage-original MU4_STORAGE_BIOS=worker` adds a 100 ms
+observation tail after the eight-block digital acceptance. It observes 9,844
+TX words, 77 TX block completions and handler entries, 76 RX completions,
+and `illegal=0` at PC `00306c`. Only the first 1,024 TX words are compared
+against decoded DIN; the remaining transfer count is not independently
+validated audio content. No controls, readiness or firmware state are injected.
+
+The ISR sets `b633` 77 times; original initialization clears it once at
+`02:96e3`. No firmware read or later clear occurs in this bounded run, and
+its final value is one. Final inspection disables side effects and does not
+count as firmware consumption. Thus repeated IRQ delivery is established,
+but the candidate notification consumer is inactive in this fixture lifecycle.
+Next identify the firmware-created `806e` descriptor and the lifecycle that
+invokes `02:9549`; do not synthesize a worker callback or pending-word clear.
+
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
 
