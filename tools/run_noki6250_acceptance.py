@@ -28,7 +28,8 @@ def main():
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "idle-state", "call-state", "sms-state",
-                                              "host-incoming-call", "host-incoming-sms", "host-outgoing-sms"),
+                                              "host-incoming-call", "host-incoming-sms", "host-outgoing-sms",
+                                              "host-rejected-sms"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -60,7 +61,7 @@ def main():
         (run / "nvram").mkdir()
         host_call = args.scenario == "host-incoming-call"
         host = args.scenario.startswith("host-")
-        host_sms = args.scenario in ("host-incoming-sms", "host-outgoing-sms")
+        host_sms = args.scenario in ("host-incoming-sms", "host-outgoing-sms", "host-rejected-sms")
         call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call")
         sms = args.scenario.startswith("sms-") or host_sms
         if args.scenario == "incoming-call":
@@ -95,6 +96,8 @@ def main():
             script = "noki6250_state_sms.lua"
         if host_call:
             script = "noki6250_host_incoming_input.lua"
+        if args.scenario == "host-rejected-sms":
+            script = "noki6250_sms_reject_input.lua"
         seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
@@ -105,6 +108,8 @@ def main():
                    "-video", "none", "-sound", "none", "-nothrottle",
                    "-log", "-verbose"]
         if host:
+            if args.scenario == "host-rejected-sms":
+                command[command.index("-seconds_to_run") + 1] = "60"
             if host_call:
                 command[command.index("-seconds_to_run") + 1] = "60"
             command.extend(["-http", "-http_port", str(args.port)])
@@ -115,6 +120,8 @@ def main():
         if host_sms:
             runner = "run_host_incoming_sms_gate.py" if args.scenario == "host-incoming-sms" else "run_host_sms_gate.py"
             options = [] if args.scenario == "host-incoming-sms" else ["--user-data", "c834", "--user-data-length", "2"]
+            if args.scenario == "host-rejected-sms":
+                options.extend(["--decision", "rp_error"])
             host_command = [sys.executable, str(root / "tools" / runner),
                             "--port", str(args.port), "--cwd", str(run)] + options + ["--"] + command
         env = os.environ.copy()
@@ -124,6 +131,7 @@ def main():
                  "sms-delete": "NOKIA_DCT3_6250_SMS_DELETE",
                  "sms-reply": "NOKIA_DCT3_6250_SMS_REPLY"}
         flags["host-outgoing-sms"] = "NOKIA_DCT3_6250_SMS_REPLY"
+        flags["host-rejected-sms"] = "NOKIA_DCT3_6250_SMS_REPLY"
         for flag in flags.values():
             env.pop(flag, None)
         if args.scenario in flags:
@@ -150,6 +158,9 @@ def main():
                 checker.append("--call")
             elif args.scenario == "sms-state":
                 checker.extend(["--sms", "--storage", str(run / "nvram/nhm3hle/sim_card")])
+        elif args.scenario == "host-rejected-sms":
+            checker = [sys.executable, str(root / "tools/noki6250_sms_failure_check.py"),
+                       str(run / "error.log"), str(run / "snap")]
         elif sms:
             frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8,
                            "host-incoming-sms": 2, "host-outgoing-sms": 8}[args.scenario]
@@ -177,7 +188,7 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
-        if host_sms:
+        if host_sms and args.scenario != "host-rejected-sms":
             name = "radio_incoming_host_sms_trace_check.py" if args.scenario == "host-incoming-sms" else "radio_outgoing_host_sms_trace_check.py"
             subprocess.run([sys.executable, str(root / "tools" / name), str(run / "error.log")], check=True)
         if args.scenario == "phonebook":

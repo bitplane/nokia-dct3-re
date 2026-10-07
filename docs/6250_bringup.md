@@ -130,6 +130,14 @@ show the reviewed Message sent frame. These are research-HLE SMS contracts,
 not native DSP or live-network evidence. Both use fresh private NVRAM and
 record the host command and provisioning provenance in `acceptance.json`.
 
+`--scenario host-rejected-sms` uses the same physical `Hi` reply with a host
+RP-error decision. Wrong request ID and duplicate error decisions are rejected;
+firmware acknowledges the RP error, releases SDCCH and paints `Message not
+sent this time`. Two physical End presses unwind the reply/message views,
+then Menu opens Messages. `noki6250_sms_failure_check.py LOG SNAP` requires
+that protocol/key order and reviewed failure/menu pixels, forbidding a success
+RP-ACK. This establishes explicit rejection recovery, not RP-silence timeout.
+
 ## Recovered hardware contracts
 
 The CTSI base literal at `4e7f70` is `00020000`. The release routine
