@@ -2063,6 +2063,18 @@ The next requirement is independent inspection of the resulting in-memory
 media and recovery of the original save/name transaction. Disk NAND stays
 unchanged because the fixture runs with NVRAM saving disabled.
 Reproduce with `MU4_BOOTSTRAP_BIOS=bootrecpoll` on the same isolated gate.
+The profile exports `mu4_recorder_endpoint.nand` using the NAND device's
+storage serialization without issuing commands or changing CPU state.
+`tools/mu4_recorder_media_inventory.py` compares it with the source and
+the gate records `media_inventory.json`. The 69,206,016-byte endpoint has
+SHA-256 `6c97a0c6a2281fb3006cd7abe91fd3d5688380f4dc008371e8fa05cbe5cd62af`.
+Only pages 34, 161, 288 and 352--369 differ; spare bytes are unchanged.
+Page 288 begins with literal `REL_001 `; page 352 begins with `ID3` and
+contains literal `POCP` at data offset 110. These are raw signature
+observations, not proof of a valid filesystem entry, decoded codec,
+protection mechanism or playable track. No payload transformation or
+protection bypass is performed. The inventory's five synthetic tests
+cover page boundaries, separate spare changes, disjoint runs and size errors.
 
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),

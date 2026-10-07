@@ -1292,6 +1292,16 @@ private:
 		if (!output) fatalerror("MU4 RAM observation could not be written");
 		logerror("mu4_native_ram_observation: stage=%s leg=%u first=0080 words=65408 encoding=le16 file=%s\n", stage, m_native_reset_leg, name.c_str());
 	}
+	void capture_recorder_media()
+	{
+		if (!recorder_poll_profile()) return;
+		// Serialize storage only; do not issue NAND commands or save the source NVRAM.
+		util::core_file::ptr file;
+		if (util::core_file::open("mu4_recorder_endpoint.nand", OPEN_FLAG_WRITE | OPEN_FLAG_CREATE, file) ||
+			!m_nand->nvram_write(*file))
+			fatalerror("MU4 recorder media observation could not be written");
+		logerror("mu4_native_recorder_media_capture: file=mu4_recorder_endpoint.nand observation_only=1\n");
+	}
 	virtual void machine_reset() override
 	{
 		if (((system_bios() == 14 && m_phase == 19) || (system_bios() == 18 && m_phase == 74)) && m_native_reset_leg == 1)
@@ -1724,6 +1734,7 @@ private:
 							data.read_word(0x373e) != 2 || data.read_word(0x3750) != 0 || data.read_word(0x3762) != 10)
 							fatalerror("MU4 recorder polled control did not reach the original handler");
 						logerror("mu4_native_recorder_polled_control: PASS status_poll=1 control_handler=1 recording_complete=0 firmware_state_forcing=0\n");
+						capture_recorder_media();
 					}
 					else if (m_native_command_cursor != 18 || m_command_rx_ready || m_command_rx_busy ||
 						m_command_rx_irqs != 24 || m_recorder_responses != 2 || m_command_tx_words.size() != 33 ||

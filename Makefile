@@ -1154,7 +1154,11 @@ check-mu4-bootstrap-original: build
 				grep -q 'mu4_native_recorder_response: index=1 selector=02 words=16 token=01 class=0' error.log; fi; \
 			if test "$$bios" = bootreccontrol; then \
 				grep -q 'mu4_native_recorder_control_receive: PASS packet_received=1 native_ack=1 recording_complete=0 firmware_state_forcing=0' error.log; fi; \
-			if test "$$bios" = bootrecpoll; then grep -q 'mu4_native_recorder_polled_control: PASS' error.log; fi; \
+			if test "$$bios" = bootrecpoll; then \
+				grep -q 'mu4_native_recorder_polled_control: PASS' error.log; \
+				$(if $(findstring /,$(PYTHON)),$(abspath $(PYTHON)),$(PYTHON)) $(abspath tools/mu4_recorder_media_inventory.py) \
+					"$$source/nvram/mu4nand_13/nand" mu4_recorder_endpoint.nand >media_inventory.json; \
+				cat media_inventory.json; fi; \
 			grep -q 'mu4_native_recorder_request_ack: words=007f,0001,0055' error.log; \
 			grep -Eq 'mu4_original_bootstrap_loader: name=0052,0045,0052,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0002,aca2 .* index=1' error.log; \
 		elif test "$$bios" != bootstrap; then \
