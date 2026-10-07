@@ -9,6 +9,14 @@ namespace {
 
 constexpr u16 ST1_BRAF = 0x8000;
 
+u16 reverse_carry_index(u16 address, u16 index, bool subtract)
+{
+	// SPRU131G 5.5.3.5: carry/borrow propagates from the MSB to the LSB.
+	const u16 left = bitswap<16>(address, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+	const u16 right = bitswap<16>(index, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+	return bitswap<16>(u16(subtract ? left - right : left + right), 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15);
+}
+
 s32 accumulator_high17(u64 value)
 {
 	const u32 high = (value >> 16) & 0x1ffff;
@@ -493,10 +501,10 @@ void tms320c54x_device::indirect_modify(u8 mode, bool long_operand)
 	case 0x08: m_ar[ar] -= word_step; break;
 	case 0x10: m_ar[ar] += word_step; break;
 	case 0x18: m_ar[ar] += word_step; break;
-	case 0x20: m_ar[ar] -= m_ar[0]; break;
+	case 0x20: m_ar[ar] = reverse_carry_index(m_ar[ar], m_ar[0], true); break;
 	case 0x28: m_ar[ar] -= m_ar[0]; break;
 	case 0x30: m_ar[ar] += m_ar[0]; break;
-	case 0x38: m_ar[ar] += m_ar[0]; break;
+	case 0x38: m_ar[ar] = reverse_carry_index(m_ar[ar], m_ar[0], false); break;
 	case 0x40: circular_modify(ar, -word_step); break;
 	case 0x48: circular_modify(ar, -s16(m_ar[0])); break;
 	case 0x50: circular_modify(ar, word_step); break;

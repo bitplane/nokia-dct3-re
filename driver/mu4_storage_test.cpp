@@ -175,9 +175,6 @@ private:
 	unsigned m_recorder_dispatches = 0, m_recorder_loader_calls = 0;
 	bool m_recorder_overlay_checked = false;
 	unsigned m_recorder_startup_entries = 0;
-	unsigned m_recorder_idle_traces = 0;
-	u16 m_recorder_observed_imr = 0xffff;
-	unsigned m_recorder_mask_traces = 0;
 	unsigned m_recorder_control_entries = 0, m_recorder_control_acks = 0;
 	unsigned m_recorder_nand_controls = 0, m_recorder_nand_data = 0;
 	u8 m_recorder_last_nand_command = 0;
@@ -790,7 +787,15 @@ private:
 		static constexpr u8 recorder[] = {0x1e, 3, 0xaa, 1, 0x36, 5, 1, 0x84, 0x55};
 		// AA88 selector 0x36/parameter 4 selects the original control transition.
 		// Token 2 distinguishes it from the resident recorder-start request.
-		static constexpr u8 recorder_control[] = {0x1e, 3, 0xaa, 1, 0x36, 4, 2, 0x84, 0x55};
+		static constexpr u8 recorder_control[] = {0x1e, 3, 0xaa, 1, 0x36, 4, 2, 0x86, 0x55};
+		constexpr auto valid_packet = [](auto const &bytes)
+		{
+			u8 checksum = 0;
+			for (unsigned i = 0; i < std::size(bytes) - 2; ++i) checksum ^= bytes[i];
+			return bytes[0] == 0x1e && bytes[2] == 0xaa && bytes[1] + 6 == std::size(bytes) &&
+				bytes[std::size(bytes) - 2] == checksum && bytes[std::size(bytes) - 1] == 0x55;
+		};
+		static_assert(valid_packet(status) && valid_packet(measurement) && valid_packet(recorder) && valid_packet(recorder_control));
 		u8 const *packet = recorder_profile() ? recorder : measurement_profile() ? measurement : status;
 		unsigned const first_size = recorder_profile() ? std::size(recorder) : std::size(status);
 		unsigned const packet_size = first_size + (recorder_control_profile() ? std::size(recorder_control) : 0);
@@ -1052,27 +1057,6 @@ private:
 							}
 						});
 				}
-				m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x3ffff, "mu4_recorder_masks",
-					[this](offs_t address, u16 &, u16)
-					{
-						if (machine().side_effects_disabled() || !m_recorder_overlay_checked || m_cpu->pc() != address + 1) return;
-						u16 const imr = m_cpu->state_int(tms320c54x_device::STATE_IMR);
-						if (imr == m_recorder_observed_imr) return;
-						if (m_recorder_mask_traces++ < 32)
-							logerror("mu4_native_recorder_mask: next_pc=%06x previous=%04x current=%04x\n", unsigned(address), m_recorder_observed_imr, imr);
-						m_recorder_observed_imr = imr;
-					});
-				m_cpu->space(AS_PROGRAM).install_read_tap(0x39013, 0x39024, "mu4_recorder_idle",
-					[this](offs_t address, u16 &, u16)
-					{
-						if (machine().side_effects_disabled() || !m_recorder_overlay_checked || m_cpu->pc() != address + 1 ||
-							(address != 0x39013 && address != 0x39019 && address != 0x39024) || m_recorder_idle_traces++ >= 12) return;
-						auto const disable = machine().disable_side_effects();
-						logerror("mu4_native_recorder_idle: pc=%06x initialized=%04x imr=%04x ifr=%04x st1=%04x ar1=%04x dma=%04x\n",
-							unsigned(m_cpu->pc()), m_cpu->space(AS_DATA).read_word(0xfda7),
-							unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
-							unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)), m_dma->read(0));
-					});
 				m_cpu->space(AS_PROGRAM).install_read_tap(0x73f8, 0x73f8, "mu4_recorder_startup",
 					[this](offs_t address, u16 &, u16)
 					{
@@ -1168,8 +1152,6 @@ private:
 				save_item(NAME(m_recorder_dispatches)); save_item(NAME(m_recorder_loader_calls));
 				save_item(NAME(m_recorder_overlay_checked));
 				save_item(NAME(m_recorder_startup_entries));
-				save_item(NAME(m_recorder_idle_traces));
-				save_item(NAME(m_recorder_observed_imr)); save_item(NAME(m_recorder_mask_traces));
 				save_item(NAME(m_recorder_control_entries)); save_item(NAME(m_recorder_control_acks));
 				save_item(NAME(m_recorder_nand_controls)); save_item(NAME(m_recorder_nand_data));
 				save_item(NAME(m_recorder_last_nand_command));
@@ -1330,8 +1312,6 @@ private:
 		m_recorder_dispatches = m_recorder_loader_calls = 0;
 		m_recorder_overlay_checked = false;
 		m_recorder_startup_entries = 0;
-		m_recorder_idle_traces = 0;
-		m_recorder_observed_imr = 0xffff; m_recorder_mask_traces = 0;
 		m_recorder_control_entries = m_recorder_control_acks = 0;
 		m_serial_empty_reads = 0;
 		m_recorder_nand_controls = m_recorder_nand_data = 0;
@@ -1666,16 +1646,10 @@ private:
 				unsigned const confirms = std::count(m_writes.begin(), m_writes.end(), u16(0x0110));
 				logerror("mu4_native_recorder_storage: program_setups=%u program_confirms=%u data_writes=%u recorded_file_verified=0\n",
 					programs, confirms, m_recorder_nand_data);
-				logerror("mu4_native_recorder_common: program_1dd7=%04x data_1dd7=%04x program_1d62=%04x data_1d62=%04x idle=%u mask_changes=%u\n",
-					m_cpu->space(AS_PROGRAM).read_word(0x1dd7), data.read_word(0x1dd7),
-					m_cpu->space(AS_PROGRAM).read_word(0x1d62), data.read_word(0x1d62),
-					unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)), m_recorder_mask_traces);
 				if (recorder_control_profile())
 				{
-					u16 const sp = m_cpu->state_int(tms320c54x_device::STATE_SP);
-					logerror("mu4_native_recorder_control_receive: cursor=%u rx_ready=%u rx_busy=%u sp=%04x stack=%04x,%04x,%04x,%04x ring_head=%04x ring_tail=%04x parser=%04x\n",
-						m_native_command_cursor, m_command_rx_ready, m_command_rx_busy, sp,
-						data.read_word(sp), data.read_word(u16(sp + 1)), data.read_word(u16(sp + 2)), data.read_word(u16(sp + 3)),
+					logerror("mu4_native_recorder_control_receive: cursor=%u rx_ready=%u rx_busy=%u ring_head=%04x ring_tail=%04x parser=%04x\n",
+						m_native_command_cursor, m_command_rx_ready, m_command_rx_busy,
 						data.read_word(0xf9de), data.read_word(0xf9df), data.read_word(0xf9e8));
 				}
 				logerror("mu4_native_recorder_observe: dispatches=%u loader_calls=%u responses=%u rx_words=%u tx_words=%u ack_pending=%u music_recording=0\n",
@@ -1693,13 +1667,12 @@ private:
 				{
 					logerror("mu4_native_recorder_control_observe: entries=%u acks=%u responses=%u rx_words=%u tx_words=%u recorded_file_verified=0\n",
 						m_recorder_control_entries, m_recorder_control_acks, m_recorder_responses, m_command_rx_irqs, unsigned(m_command_tx_words.size()));
-					// A negative receive diagnostic, not recording completion acceptance.
-					if (m_native_command_cursor != 10 || !m_command_rx_ready || m_command_rx_busy ||
-						m_command_rx_irqs != 16 || m_recorder_responses != 2 || m_command_tx_words.size() != 30 ||
-						m_recorder_control_entries || m_recorder_control_acks ||
-						data.read_word(0xf9de) != 6 || data.read_word(0xf9df) != 6)
-						fatalerror("MU4 recorder pending-character negative diagnostic changed; reassess receive boundary");
-					logerror("mu4_native_recorder_control_negative: PASS pending_character=1 handler_entered=0 recording_complete=0 firmware_state_forcing=0\n");
+					// Transport receipt is not proof of application dispatch or recording completion.
+					if (m_native_command_cursor != 18 || m_command_rx_ready || m_command_rx_busy ||
+						m_command_rx_irqs != 24 || m_recorder_responses != 2 || m_command_tx_words.size() != 33 ||
+						m_recorder_control_acks != 1 || data.read_word(0xf9de) != 15 || data.read_word(0xf9df) != 15)
+						fatalerror("MU4 recorder control packet did not complete native receive and acknowledgement");
+					logerror("mu4_native_recorder_control_receive: PASS packet_received=1 native_ack=1 recording_complete=0 firmware_state_forcing=0\n");
 				}
 				logerror("mu4_native_recorder_dispatch: PASS pin_input=1 original_loader=1 firmware_state_forcing=0 music_recording=0\n");
 			}
@@ -3150,7 +3123,7 @@ ROM_START(mu4nand)
 	ROM_SYSTEM_BIOS(19, "bootmeasure", "Original uploaded startup with pin-level sample measurement")
 	ROM_SYSTEM_BIOS(20, "bootrecord", "Original uploaded startup with pin-level recorder command probe")
 	ROM_SYSTEM_BIOS(21, "bootrecordram", "Original recorder with provisional shared data/program RAM")
-	ROM_SYSTEM_BIOS(22, "bootreccontrol", "Original recorder pending-character negative diagnostic (provisional RAM)")
+	ROM_SYSTEM_BIOS(22, "bootreccontrol", "Original recorder subsequent control receive (provisional RAM)")
 	ROM_REGION(741916, "segment", 0)
 	ROM_LOAD("mu4_initdata_container.bin", 0, 741916, CRC(e0c05bf2) SHA1(5ff0b99c8d93b6ef2cda0bcd002810a4ab7a0e8f))
 	ROM_REGION16_LE(240, "disk_vectors", 0)

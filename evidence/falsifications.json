@@ -3,17 +3,17 @@
   "kind": "falsifications",
   "entries": [
     {
-      "id": "mu4_recorder_post_startup_control_receive_ready",
+      "id": "mu4_recorder_pending_receive_requires_firmware_interrupt_override",
       "status": "disproven",
-      "hypothesis": "The provisional shared-RAM recorder remains ready to receive a further original selector-36 parameter-4 control command after both startup replies",
-      "conclusion": "At emulated time 10 seconds the peer delivers the first byte of a statically evidenced token-2 control packet through McBSP2 pins. RX-ready remains set at the 20-second endpoint, software ring head/tail remain 6/6, parser state is zero and the original control handler has no entries. Backpressure correctly prevents the remaining eight bytes; 16 receive events and 30 output words are observed. This identifies a continued receive/scheduler boundary, not a failed stop/save command or completed recording. No firmware masks or queues are modified.",
-      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+      "hypothesis": "The recorder's post-startup unread serial byte requires an injected interrupt mask, scheduler event or software queue byte",
+      "conclusion": "The last permanent IMR-zero write was a DST at 03:c85d in codec buffer reordering, not an interrupt handler. The core treated MOD4/MOD7 AR0 indexing as linear instead of reverse-carry/borrow arithmetic. Correcting those CPU semantics restores receipt of all nine token-2 control bytes and native 7f0255 acknowledgement, with drained RX, ring head/tail 15/15, 24 receive events and 33 output words. The packet checksum is independently compile-time checked as 86. Application control dispatch remains unobserved; no firmware masks or queues are modified and no completed recording is claimed.",
+      "evidence": ["docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "driver/mu4_storage_test.cpp", "Makefile"]
     },
     {
       "id": "mu4_recorder_separate_ram_executes_selected_overlay",
       "status": "disproven",
       "hypothesis": "Separate program/data RAM allows the original aa88 recorder overlay to execute its selected startup, making the later NAND command-01 writes a recorder controller contract",
-      "conclusion": "All 73762 non-register overlay destination words match the original before entry, but aa88 writes its reset vector and 0073f8 startup through data space; separate program RAM retains the resident vector to 02:6d62. A separate provisional static shared-RAM profile at 2000..7fff executes the genuine recorder startup, emits two checksum-valid native responses and completes the 20-second execution window with 96 NAND program setups/confirms and 50688 data bytes, beginning with REL_001 directory metadata. Exact DA150 shared-RAM extent remains unvalidated; a finalized recorded file is not verified and this is not a promoted handset map.",
+      "conclusion": "All 73762 non-register overlay destination words match the original before entry, but aa88 writes its reset vector and 0073f8 startup through data space; separate program RAM retains the resident vector to 02:6d62. A separate provisional static shared-RAM profile at 2000..7fff executes the genuine recorder startup, emits two checksum-valid native responses and completes the 20-second execution window with 160 NAND program setups/confirms and 84480 data bytes, beginning with REL_001 directory metadata. Exact DA150 shared-RAM extent remains unvalidated; a finalized recorded file is not verified and this is not a promoted handset map.",
       "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp"]
     },
     {

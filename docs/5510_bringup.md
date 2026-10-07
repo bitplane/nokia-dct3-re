@@ -67,10 +67,11 @@ loader but executes stale resident vectors because program/data RAM are separate
 The provisional `bootrecordram` profile shares RAM at `2000..7fff`, verifies
 the overlay destinations, executes its original startup and begins NAND
 programming through a clean 20-second execution window. The separate
-`bootreccontrol` negative diagnostic delivers a further control request's
-first byte, which remains unread in McBSP2; its handler is not reached.
-The current recorder frontier is continued receive/scheduling, not an
-unsupported instruction. None of these profiles proves a recorded track.
+`bootreccontrol` profile completes native receipt and acknowledgement of a
+further control packet. Its application handler is not reached in the
+observation window. The current recorder frontier is processing/control
+dispatch, not serial receipt or an unsupported instruction.
+None of these profiles proves a recorded track.
 
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
 identifies separate MA4 and MU4 assemblies, including UI-module keypad,
@@ -1986,8 +1987,8 @@ invalid command sequence. This is initial storage activity, not a complete
 recorded file or accepted media.
 
 The provisional shared-RAM probe completes its 20-second execution window
-without an unsupported instruction. It observes 96 NAND program setups and
-96 confirms, with 50,688 data bytes (96 pages of 528 bytes). This does not
+without an unsupported instruction. It observes 160 NAND program setups and
+160 confirms, with 84,480 data bytes (160 pages of 528 bytes). This does not
 verify a finalized recording. The native lifecycle remains state 9, mode 3,
 continuation 8, with zero accepted tracks.
 
@@ -2022,38 +2023,39 @@ and `95437b37da97d1f0b85161d13b4af80f0a1fac7cb4d2af279bc0ed21698cd452`.
 These addresses are overlay-specific: the resident image has different
 instructions at the same addresses.
 
-`bootreccontrol` attempts the evidenced parameter-4 control packet
-`1e 03 aa 01 36 04 02 84 55` (sequence token 2) at emulated time
+`bootreccontrol` sends the evidenced parameter-4 control packet
+`1e 03 aa 01 36 04 02 86 55` (sequence token 2) at emulated time
 10 seconds, after both startup replies and their acknowledgements.
-Only its first byte is delivered: McBSP2 asserts RX-ready, but firmware
-does not read DRR, so the backpressured peer does not send the rest.
-At the 20-second endpoint RX is ready/not busy, head and tail `f9de/f9df`
-are both 6, parser state `f9e8` is zero, the control handler has zero
-entries and no token-2 acknowledgement exists. Total receive events are
-16, versus the baseline's 15; native output remains 30 words.
-This falsifies continued command readiness in this provisional map, not
-the stop/save interpretation of a command that has not reached its parser.
+All nine bytes reach the native receive path and receive `7f 02 55`.
+At the 20-second endpoint RX is drained/not busy, ring head and tail
+`f9de/f9df` are both 15, and parser state `f9e8` is zero. Total receive
+events are 24, versus the baseline's 15; native output is 33 words.
+The application control handler at `02:85dc` still has zero entries.
+Transport acknowledgement is not application completion or saved media.
 
-The endpoint is `03:9025`, immediately after IDLE1, with IMR zero and
-IFR `0c78`. Stack `6f06..6f09` contains `0000,0bb0,0000,1baa`.
-Original helper `02:1ba0..1bae` saves/aligns SP, calls idle routine
-`03:9013`, restores SP and returns. Its 32-word export SHA-256 is
-`c841ac8b8502a5992c15c8b55831b6c2c8ba8e6122e825300e6c5251d62b9ece`.
-The next investigation must reconcile this scheduler/interrupt continuation
-with the recorder RX vector, not force IMR or inject a software-ring byte.
-Retire the negative diagnostic when receive readiness is corrected and
-replace it with original control-handler and storage-completion evidence.
+The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
+subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
+section 5.5.3.5 and table 5-4). Linear `*AR+0B` indexing made the codec
+buffer-reordering routine's `DST` at `03:c85d` write to address zero,
+clobbering IMR and leaving subsequent serial data unread. Correct reverse
+carry restores native receive progress without firmware changes.
+`check-c54x-core` covers 2,688 MOD4/MOD7 MAR/load/store cases and the
+reference guide's 16-address sequence in both directions. The dedicated
+mask/idle probes and stale unread-character assertion are retired.
+
+The current control endpoint is `03:bc4d`, IMR `0ac1`, IFR `0438`,
+lifecycle 9, mode 3, continuation 8 and zero tracks. The application
+dispatcher `02:84cd` is called at `03:94a2`, after the processing
+loop's `fd85` completion handshake at `03:9499..94a1`.
+Decode that original processing prerequisite and its peripheral input
+before changing packet semantics or claiming recording finalization.
 Reproduce it with `make check-mu4-bootstrap-original
 MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootreccontrol`.
-Its PASS label means that the negative receive observation reproduces,
-not that the control command or recording succeeds.
+Its receive PASS label proves native packet receipt and acknowledgement,
+not successful application dispatch or recording.
 
 Resident command and loader addresses are reused by the recorder overlay;
 their resident trace counters must stop when that overlay takes ownership.
-The recorder's idle routine and timer interrupt change IMR repeatedly
-(5,276 observed changes in this window). An endpoint with IMR zero is not
-by itself evidence of a deadlock: the timer handler temporarily masks and
-restores interrupts, and native storage activity continues.
 
 Reproduce with `make check-mu4-bootstrap-original
 MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootrecord`.

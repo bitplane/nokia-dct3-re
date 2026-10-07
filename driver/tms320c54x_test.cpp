@@ -28,6 +28,60 @@ public:
 
 private:
 	int bio_r() { return m_bio_level; }
+	static u16 reverse_carry_reference(u16 address, u16 offset, bool subtract)
+	{
+		unsigned carry = 0;
+		u16 result = 0;
+		for (int bit = 15; bit >= 0; --bit)
+		{
+			int const sum = int(BIT(address, bit)) + (subtract ? -int(BIT(offset, bit)) : int(BIT(offset, bit))) +
+				(subtract ? -int(carry) : int(carry));
+			result |= u16(sum & 1) << bit;
+			carry = subtract ? sum < 0 : sum > 1;
+		}
+		return result;
+	}
+	void start_reverse_carry_case(unsigned index)
+	{
+		unsigned const kind = index % 3;
+		unsigned const ar = 1 + (index / 3) % 7;
+		bool const subtract = (index / 21) & 1;
+		unsigned const value_case = (index / 42) % 4;
+		unsigned const offset_bit = index / 168;
+		static constexpr u16 addresses[] = {0x6000, 0x6001, 0x6fff, 0x7fff};
+		auto &program = m_cpu->space(AS_PROGRAM);
+		u16 const operand = (subtract ? 0xa0 : 0xb8) | ar;
+		program.write_word(0x0109d0, (kind == 0 ? 0x6d00 : kind == 1 ? 0x1000 : 0x8000) | operand);
+		program.write_word(0x0109d1, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(addresses[value_case], 0x1234);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1U << offset_bit);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1 + ar - 1, addresses[value_case]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 3474 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+	void start_reverse_carry_sequence(bool subtract)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i)
+		{
+			program.write_word(0x0109d0 + i * 3, 0x7313); // MVMD AR3, captured address
+			program.write_word(0x0109d1 + i * 3, 0x0500 + i);
+			program.write_word(0x0109d2 + i * 3, subtract ? 0x6da3 : 0x6dbb);
+		}
+		program.write_word(0x010a00, 0xf4e1);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0060);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 6162 + subtract;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_asm_store_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -15106,6 +15160,42 @@ private:
 				"SPRU172C ASM STL/STH stores shifted low/high words without modifying either accumulator or status");
 			if (index < 127) { start_asm_store_case(index + 1); return; }
 			osd_printf_info("TMS320C54x ASM store conformance: PASS variants=128\n");
+			start_reverse_carry_case(0);
+			return;
+		}
+		if (m_phase >= 3474 && m_phase < 6162)
+		{
+			unsigned const index = m_phase - 3474;
+			unsigned const kind = index % 3;
+			unsigned const ar = 1 + (index / 3) % 7;
+			bool const subtract = (index / 21) & 1;
+			static constexpr u16 addresses[] = {0x6000, 0x6001, 0x6fff, 0x7fff};
+			u16 const address = addresses[(index / 42) % 4];
+			u16 const offset = 1U << (index / 168);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR1 + ar - 1) == reverse_carry_reference(address, offset, subtract) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == offset &&
+				data.read_word(address) == (kind == 2 ? 0x5678 : 0x1234) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (kind == 1 ? 0x1234 : 0x5678),
+				"SPRU131G MOD4/MOD7 MAR/load/store use the original address and reverse carry/borrow postmodification");
+			if (index < 2687) { start_reverse_carry_case(index + 1); return; }
+			osd_printf_info("TMS320C54x reverse carry conformance: PASS variants=2688\n");
+			start_reverse_carry_sequence(false);
+			return;
+		}
+		if (m_phase == 6162 || m_phase == 6163)
+		{
+			static constexpr u16 sequence[] = {0x60, 0x68, 0x64, 0x6c, 0x62, 0x6a, 0x66, 0x6e,
+				0x61, 0x69, 0x65, 0x6d, 0x63, 0x6b, 0x67, 0x6f};
+			for (unsigned i = 0; i < 16; ++i)
+				expect(data.read_word(0x0500 + i) == sequence[m_phase == 6162 ? i : (16 - i) % 16],
+					"SPRU131G example 5-1 bit-reversed address sequence and inverse sequence");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0060 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"Bit-reversed traversal wraps after one complete FFT address cycle");
+			if (m_phase == 6162) { start_reverse_carry_sequence(true); return; }
+			osd_printf_info("TMS320C54x reverse carry sequences: PASS forward=16 inverse=16\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

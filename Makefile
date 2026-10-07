@@ -1153,7 +1153,7 @@ check-mu4-bootstrap-original: build
 				grep -q 'mu4_native_recorder_response: index=0 selector=5e words=11 token=80 class=1' error.log; \
 				grep -q 'mu4_native_recorder_response: index=1 selector=02 words=16 token=01 class=0' error.log; fi; \
 			if test "$$bios" = bootreccontrol; then \
-				grep -q 'mu4_native_recorder_control_negative: PASS pending_character=1 handler_entered=0 recording_complete=0 firmware_state_forcing=0' error.log; fi; \
+				grep -q 'mu4_native_recorder_control_receive: PASS packet_received=1 native_ack=1 recording_complete=0 firmware_state_forcing=0' error.log; fi; \
 			grep -q 'mu4_native_recorder_request_ack: words=007f,0001,0055' error.log; \
 			grep -Eq 'mu4_original_bootstrap_loader: name=0052,0045,0052,0053,0049,0031,0036,0020 ext=0042,0049,004e length=0002,aca2 .* index=1' error.log; \
 		elif test "$$bios" != bootstrap; then \
