@@ -55,6 +55,7 @@ private:
 	std::vector<u16> m_writes;
 	emu_timer *m_check = nullptr;
 	unsigned m_phase = 25;
+	unsigned m_native_entry_reads = 0, m_native_far_reads = 0;
 	unsigned m_page = 0;
 	static u16 pattern(unsigned index) { return u16(0x1234 + index * 37); }
 	void program_map(address_map &map)
@@ -161,7 +162,7 @@ private:
 			0xf980, 0x3035, 0xf980, 0x306c, 0xf4e1
 		};
 		for (unsigned i = 0; i < std::size(wrapper); ++i) program.write_word(0x1800 + i, wrapper[i]);
-		if (m_phase >= 25)
+		if (m_phase >= 25 && m_phase <= 29)
 		{
 			program.write_word(0x1809, 0xf4e1);
 			auto &data = m_cpu->space(AS_DATA);
@@ -329,7 +330,7 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
-		if (m_phase >= 25)
+		if (m_phase >= 25 && m_phase <= 29)
 		{
 			auto &data = m_cpu->space(AS_DATA);
 			auto &program = m_cpu->space(AS_PROGRAM);
@@ -406,6 +407,26 @@ private:
 			}
 			if (cursor + 2 != end || checked != 51921) fatalerror("MU4 loader coverage mismatch words=%u", checked);
 			logerror("mu4_loader: PASS original_loader=1 dma_complete=1 records=%u words=%u data_and_program=1\n", records, checked);
+			// Observe unchanged 3538 -> loader -> 2000 -> page-2 common-window entry.
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x2000, "mu4_native_entry",
+				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_entry_reads; });
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x6d62, 0x6d62, "mu4_native_far_entry",
+				[this](offs_t, u16 &, u16) { if (!machine().side_effects_disabled()) ++m_native_far_reads; });
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x3538);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 30;
+			m_check->adjust(attotime::from_seconds(8));
+			return;
+		}
+		if (m_phase == 30)
+		{
+			if (!m_native_entry_reads || !m_native_far_reads)
+				fatalerror("MU4 original program transfer missing entry=%u far=%u pc=%06x", m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)));
+			logerror("mu4_native_entry: PASS original_transfer=1 entry_reads=%u far_reads=%u pc=%06x illegal=%u idle=%u pmst=%04x\n",
+				m_native_entry_reads, m_native_far_reads, unsigned(m_cpu->state_int(STATE_GENPC)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_PMST)));
 			machine().schedule_exit();
 			return;
 		}

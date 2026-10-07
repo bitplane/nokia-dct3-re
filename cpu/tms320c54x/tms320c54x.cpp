@@ -225,7 +225,7 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 void tms320c54x_device::state_export(const device_state_entry &entry)
 {
 	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
-		m_debug_pc = program_address(m_pc);
+		m_debug_pc = logical_program_address(m_pc);
 }
 
 void tms320c54x_device::far_transfer(u32 address, bool delayed)
@@ -796,6 +796,11 @@ void tms320c54x_device::execute_one(u16 op)
 				m_pc = destination;
 		}
 		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
+		return;
+	}
+	if ((op & 0xfff8) == 0xf4a0) // LD #k3,ARP (SPRU172C syntax 5).
+	{
+		m_st0 = (m_st0 & 0x1fff) | ((op & 7) << 13);
 		return;
 	}
 	if ((op & 0xfcf8) == 0xf4a8) // CMPR CC, ARx (unsigned comparison with AR0)
@@ -1506,6 +1511,13 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
+	case 0x4600: // LD Smem,DP (SPRU172C syntax 2, three cycles).
+	{
+		const u16 value = indirect_read(low);
+		m_st0 = (m_st0 & ~u16(0x01ff)) | (value & 0x01ff);
+		m_icount -= 2 + (low >= 0xe0);
+		return;
+	}
 	case 0x4400: // LD Smem, 16, A
 		m_a = (data_operand(indirect_read(low)) << 16) & ACC_MASK;
 		m_icount -= low >= 0xe0;
@@ -1555,7 +1567,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
-		m_program.write_word((m_a + (repeated ? m_rpt_iteration : 0)) & (m_extended_program ? 0x7fffff : 0xffff),
+		m_program.write_word(physical_program_address(m_a + (repeated ? m_rpt_iteration : 0)),
 				indirect_read(low));
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 5 : 4;
@@ -2019,8 +2031,8 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
 			u16(m_pc - 1) == m_rpt_address;
-		const u16 value = m_program.read_word((m_a +
-				(repeated ? m_rpt_iteration : 0)) & (m_extended_program ? 0x7fffff : 0xffff));
+		const u16 value = m_program.read_word(physical_program_address(m_a +
+				(repeated ? m_rpt_iteration : 0)));
 		indirect_write(low, value);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 5 : 4;
@@ -2666,7 +2678,7 @@ void tms320c54x_device::execute_run()
 			m_icount = 0;
 			break;
 		}
-		debugger_instruction_hook(program_address(m_pc));
+		debugger_instruction_hook(logical_program_address(m_pc));
 		if (m_illegal)
 		{
 			m_icount = 0;

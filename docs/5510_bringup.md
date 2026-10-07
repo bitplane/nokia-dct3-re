@@ -9,6 +9,14 @@ the graphical `CONTACT SERVICE` diagnostic frame. No idle boot, input, SIM, regi
 call or SMS acceptance is claimed. The package supplies MCU and PPM record
 streams, not a matching handset PMM or an internal DSP mask image.
 
+The independent MU4 `mu4nand` fixture executes original erased-media
+provisioning, receives all seven original R060 segments, reads back six
+complete files, and verifies all DMA-loaded `MCUSI16` destinations. Original
+`3538` then reaches the loaded entry and its page-2 common-window branch.
+Native execution currently stops on unsupported opcode `fa47` at logical
+`02:dfa4`; this is a software-core continuation target, not a missing-ROM proof.
+This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
+
 Nokia's [NPM-5 service manual](https://www.manualslib.com/manual/1166046/Nokia-5510-Npm-5.html)
 identifies separate MA4 and MU4 assemblies, including UI-module keypad,
 display, USB and music functions. These are product differences to recover,
@@ -869,12 +877,36 @@ so they cannot silently discard DMA writes to program `3d00`.
 Original `2f00..2f0e` selects data space for destinations at most `ffff`;
 larger destinations select program space. `2f60..2f70` clears the page for
 low addresses below `8000`. These are executed firmware rules, not a flat
-replay of outer container records. The final original `3538` branch to `2000`
-and subsequent native execution remain unverified. TI SPRU131G section 3.2.5
-documents a common lower 32K program window when PMST.OVLY is set; `3538`
-writes PMST `2028`, so that mapping must be resolved before interpreting
-far-branch targets in the loaded program as missing data. Full DA150 silicon
-memory extents, PLL, bus contention and full MU4/handset boot are not claimed.
+replay of outer container records.
+
+### Loaded program entry
+
+The isolated fixture invokes unchanged `3538` with descriptor index zero.
+It reloads `MCUSI16`, selects PMST `2028` and transfers to program `2000`;
+the loaded entry branches to logical `02:6d62`. Read-only program-bus taps
+observe both entries after the complete loader comparison. TI SPRU131G
+section 3.2.5 defines the required common lower 32K window: with OVLY set,
+CPU accesses to `02:6d62` use physical program `00:6d62`, which original
+`2f56` populated. The core preserves logical XPC and applies the translation
+to CPU fetches and program operands, not DMA. Independent overlay-on/off
+core fixtures protect both address modes.
+
+Original `f4a0` at logical `02:6d71` is `LD #0,ARP`, not missing uploaded
+data. The implementation is checked against TI SPRU172C syntax 5 and all
+eight immediate pointer values, preserving unrelated ST0 fields.
+`46f8` at logical `02:6d2b` is the absolute `LD Smem,DP` form: it consumes
+the address extension and loads only the nine-bit DP field. Three independent
+values check masking and unrelated ST0 preservation. Reaching
+this loaded entry is not proof of the full startup, music playback or
+handset boot. DA150 silicon memory extents, data/program RAM aliases, PLL
+and bus contention remain unresolved.
+
+With these instruction forms implemented, the eight-second entry run reaches
+logical `02:dfa4` and stops on unsupported `fa47`, with PMST `202c`, not idle.
+`mu4_native_entry: PASS` establishes the two observed entry reads only; its
+explicit `illegal=1` result is not a complete-startup acceptance criterion.
+The next software task is to decode that opcode against the TI instruction
+contract, add independent conformance tests, then continue unchanged code.
 
 Three generic CPU contracts are independently exposed by this run:
 

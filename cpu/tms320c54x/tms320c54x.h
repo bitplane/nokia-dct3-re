@@ -68,7 +68,15 @@ private:
 	void update_timer_counter();
 	void arm_timer();
 	u16 fetch();
-	u32 program_address(u16 address) const { return (u32(m_extended_program ? m_xpc : 0) << 16) | address; }
+	u32 logical_program_address(u16 address) const { return (u32(m_extended_program ? m_xpc : 0) << 16) | address; }
+	u32 physical_program_address(u32 address) const
+	{
+		address &= m_extended_program ? 0x7fffff : 0xffff;
+		// SPRU131G 3.2.5: OVLY shares the lower 32K across extended pages.
+		// DMA accesses the address space directly and does not use this CPU mapping.
+		return m_extended_program && BIT(m_pmst, 5) && !(address & 0x8000) ? address & 0xffff : address;
+	}
+	u32 program_address(u16 address) const { return physical_program_address(logical_program_address(address)); }
 	void far_transfer(u32 address, bool delayed);
 	u16 data_read(u16 address);
 	void data_write(u16 address, u16 value);

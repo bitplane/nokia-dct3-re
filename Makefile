@@ -1040,7 +1040,8 @@ check-mu4-storage-original: build
 		grep -q 'mu4_initdisk_serial: PASS' error.log; grep -q 'mu4_initdisk_initialize: PASS' error.log; \
 		grep -q 'mu4_initdisk_segment: PASS' error.log; grep -q 'mu4_initdisk_mount: PASS' error.log; \
 		grep -q 'mu4_file_readback: PASS files=6' error.log; \
-		grep -q 'mu4_dma_conformance: PASS' error.log; grep -q 'mu4_loader: PASS' error.log
+		grep -q 'mu4_dma_conformance: PASS' error.log; grep -q 'mu4_loader: PASS' error.log; \
+		grep -q 'mu4_native_entry: PASS' error.log
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.

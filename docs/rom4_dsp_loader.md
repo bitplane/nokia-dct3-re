@@ -13,6 +13,29 @@ flat DSP image into `0x2000..0x27ff`. Its old explanation was wrong: loader2
 does not clear that range. Loader1 itself populates the resident branch table
 with a repeated MVDP data-to-program transfer.
 
+## Extended program overlay
+
+[TI SPRU131G section 3.2.5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+defines a common lower 32K program window when `PMST.OVLY=1`: CPU accesses
+to `xx0000..xx7fff` resolve to page zero, while the upper half remains
+page-specific. The core applies this to fetches, program operands and
+accumulator-addressed `READA`/`WRITA`. Logical PC/XPC and far-call stack
+values retain the executing page. DMA addresses are not passed through this
+CPU translation. This does not establish the physical RAM extent or the
+data/program alias map of any particular C54x variant.
+
+`check-c54x-core` exercises overlay-on fetch and accumulator transfers,
+wrong-page sentinels, the distinct upper-page window and logical XPC.
+Existing overlay-off far-control, repeat and save/replay fixtures remain
+independent-page tests.
+
+The MU4 loaded entry independently exposes `f4a0` (`LD #0,ARP`) and
+`46f8` (`LD Smem,DP` with an absolute address extension). TI SPRU172C's
+Load T/DP/ASM/ARP syntaxes 5 and 2 specify one and three cycles respectively,
+plus the long-address extension cost. Eight ARP immediates and three absolute
+DP values check field masking, unrelated ST0 preservation and extension
+consumption in the core gate.
+
 ## Descriptor fields
 
 The six halfwords in each recovered catalogue record are:
