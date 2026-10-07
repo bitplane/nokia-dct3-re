@@ -270,6 +270,17 @@ traffic/release contracts. Reviewed caller text and exact registered idle
 before/after the call are required. `--port` selects the unused HTTP port
 (default 16210). This is HLE signaling acceptance, not speech or native DSP.
 
+## Host outgoing call
+
+`host-outgoing-call` runs the ordinary physical `1234567` dial/Send/End
+fixture with only `CALLHOST` enabled. The external runner verifies those exact
+digits and submits a correlated connect decision; wrong-ID and duplicate
+decisions must be rejected. The own product checker requires traffic assignment,
+physical clearing and registered paging. An independent host checker requires
+one queued/accepted connect and connected/ended phases. The shared queue log
+is not itself evidence of fallback: host decisions enter that same saved queue.
+This verifies outgoing host signaling, not audio or a SIP call.
+
 ## Host SMS acceptance
 
 The isolated runner's `host-incoming-sms` scenario enables only `CALLHOST`,

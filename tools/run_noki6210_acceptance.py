@@ -33,7 +33,8 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'host-incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
              'host-outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
              'host-rejected-sms': ('npe3hle', 'sms_reject_input', 50),
-             'host-silent-sms': ('npe3hle', 'sms_silence_input', 135)}
+             'host-silent-sms': ('npe3hle', 'sms_silence_input', 135),
+             'host-outgoing-call': ('npe3hle', 'outgoing_call_input', 48)}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -203,6 +204,7 @@ def main():
                 'host-outgoing-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1']),
                 'host-rejected-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
                 'host-silent-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_silence']),
+                'host-outgoing-call': ('run_host_call_adapter_gate', ['--number', '1234567', '--decision', 'connect']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
@@ -246,9 +248,12 @@ def main():
             from PIL import Image
             with Image.open(run / 'snap/6210_before_menu.png') as frame:
                 check_frame(frame, OPERATOR_SHA256, 'DCT3 LAB registered idle')
-        elif args.scenario == 'outgoing-call':
+        elif args.scenario in ('outgoing-call', 'host-outgoing-call'):
             from tools.noki6210_outgoing_call_check import verify as check_call
             check_call(text)
+            if host:
+                from tools.radio_host_outgoing_connect_check import verify as check_host
+                check_host((run / 'error.log').read_text(errors='replace'), '1234567')
         elif args.scenario in ('incoming-call', 'host-incoming-call'):
             from tools.noki6210_incoming_call_check import verify as check_call
             check_call(text)
