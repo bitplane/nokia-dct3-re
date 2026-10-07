@@ -121,6 +121,18 @@ private:
 	unsigned m_codec_rx_snapshot_count = 0;
 	unsigned native_stream_target() const { return system_bios() >= 3 ? 1024 : 128; }
 	unsigned native_worker_tail_ms() const { return system_bios() == 6 ? 5000 : system_bios() == 5 ? 1000 : 100; }
+	void trace_native_iterator(char const *point)
+	{
+		auto const disable = machine().disable_side_effects();
+		auto &data = m_cpu->space(AS_DATA);
+		logerror("mu4_native_iterator: point=%s source142c=%04x,%04x position145c=%04x,%04x advance145e=%04x reads=%u strobes=%u\n",
+			point, data.read_word(0x142c), data.read_word(0x142d), data.read_word(0x145c),
+			data.read_word(0x145d), data.read_word(0x145e), m_data_reads, unsigned(m_writes.size()));
+		if (m_writes.size() >= 8)
+			logerror("mu4_native_iterator_bus: point=%s suffix=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x\n", point,
+				m_writes[m_writes.size()-8], m_writes[m_writes.size()-7], m_writes[m_writes.size()-6], m_writes[m_writes.size()-5],
+				m_writes[m_writes.size()-4], m_writes[m_writes.size()-3], m_writes[m_writes.size()-2], m_writes[m_writes.size()-1]);
+	}
 	void finish_stream_if_ready()
 	{
 		if (m_phase == 30 && system_bios() >= 2 && m_stream_words >= native_stream_target() &&
@@ -134,6 +146,7 @@ private:
 					m_native_worker_window_started = true;
 					m_native_worker_window_start = machine().time();
 					m_native_tail_data_reads = m_data_reads;
+					trace_native_iterator("start");
 					m_check->adjust(attotime::from_msec(native_worker_tail_ms()));
 				}
 			}
@@ -1289,6 +1302,7 @@ private:
 					fatalerror("MU4 worker observation ended before its %u ms tail", native_worker_tail_ms());
 				logerror("mu4_native_worker_window: PASS tail_ms=%u checked_din_prefix=1024 pending=%04x reads=%u\n", native_worker_tail_ms(), pending, m_native_stream_pending_reads);
 				logerror("mu4_native_worker_storage: tail_data_reads=%u\n", m_data_reads - m_native_tail_data_reads);
+				trace_native_iterator("end");
 				logerror("mu4_native_stream_binding: PASS descriptor=806e entry=029545 consumer_entries=%u\n", m_native_stream_consumer_entries);
 				logerror("mu4_native_startup_counts: main=%u continuation=%u helper=%u selection_start=%u\n",
 					m_native_startup_fetches[0], m_native_startup_fetches[1], m_native_startup_fetches[2], m_native_startup_fetches[3]);

@@ -1237,6 +1237,18 @@ describe an endpoint PC as a stuck instruction or assume a missing peer.
 Next decode the lookup's termination condition and media cursor progression
 before extending time again or supplying a track-list fixture.
 
+Side-effect-free five-second boundary snapshots show words `142c/142d`
+and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero
+to six. Do not label either double-word pair as a byte cursor from this
+observation. The last NAND read-address sequence changes from column `00`,
+row bytes `02,e9,01` to column `00`, row bytes `98,e9,01` (rows `01e902`
+and `01e998` under the validated small-page address grammar). Thus the
+bounded lookup reaches later physical rows, rather than simply repeating
+one row. These two samples do not prove monotonic traversal, the directory
+extent, a termination time or successful lookup. Decode the iterator's row
+bounds and end predicate before treating the observation deadline as a
+deadlock or providing a guessed `TRACKLST.BIN`.
+
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
 

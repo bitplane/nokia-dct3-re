@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_tracklist_scan_row_progression", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Side-effect-free five-second scan snapshots leave raw pairs 142c/142d and 145c/145d at 0001,e9ff; 145e changes from zero to six. Last NAND strobes show column 00 and row bytes 02,e9,01 at the start, then column 00 and row bytes 98,e9,01 at the end: rows 01e902 and 01e998 in the existing validated small-page controller grammar. Reads increase from 259188 to 1164331. This proves later rows are reached within the bounded observation, not monotonic traversal, byte-cursor semantics, directory extent, termination time or lookup completion. Decode iterator bounds/end predicate rather than treating a five-second deadline as a deadlock or generating unverified track-list data",
+      "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "patches/mame-nandflash-mu4.patch"]
+    },
+    {
       "id": "npm5_mu4_startup_tracklist_lookup", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Original main 02:904b executes once but continuation 6dbf, helper 6d44 and selection start 3f1d have zero fetches in 100 ms, one-second and five-second observation tails. Main's executed far calls return until call 02:90f4 to 03:9105; return point 02:90f6 is unobserved. That routine traverses original directory names through bb09/bb3d/bb5f/bbd6. Later code 03:9219..9221 supplies pointers c146=TRACKLST and c131=BIN to 03:bcb6, confirmed directly in the original upload's data sections. One-second tail completes 697 TX/RX blocks with 134969 NAND reads; five-second tail completes 3453 TX/RX blocks with 905143 NAND reads. Both retain illegal=0, zero consumer entries and zero b633 reads; only the first 1024 TX words are independently compared to DIN. This establishes an active storage lookup upstream of scheduler activation, not a missing peer, track-list format, missing-file policy or full native application boot. Lookup termination and media cursor progression remain unresolved; no firmware state, file contents or hardware input is forced",
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "tools/noki5510_a00_inventory.py", "Makefile"]
