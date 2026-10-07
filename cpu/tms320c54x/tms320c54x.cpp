@@ -222,7 +222,9 @@ TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
 {
 	m_tim = m_prd;
 	m_ifr |= 0x0008; // TINT, vector 19
-	m_idle = false;
+	// SPRU131G 6.11.1: IMR enables wake even when INTM blocks ISR entry.
+	if (m_imr & 0x0008)
+		m_idle = false;
 	arm_timer();
 }
 
@@ -2815,7 +2817,8 @@ void tms320c54x_device::execute_set_input(int inputnum, int state)
 		if (state != CLEAR_LINE)
 		{
 			m_ifr |= u16(1U << inputnum);
-			m_idle = false;
+			if (BIT(m_imr, inputnum))
+				m_idle = false;
 		}
 	}
 }

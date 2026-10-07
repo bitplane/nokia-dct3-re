@@ -586,6 +586,11 @@ pipelined execution mode. This is a potential software-only differential
 oracle for the synthetic probe, not a simulator run already performed.
 Pipeline-flush-on-halt mode changes observation and profiling behavior;
 an eventual comparison must identify the selected device and execution mode.
+TI's [C54x simulator support clarification](https://e2e.ti.com/support/tools/code-composer-studio-group/ccs/f/code-composer-studio-forum/249280/how-to-use-ccs-v5-1-for-tms320c54xx)
+places that simulator in CCS 3.x or earlier, not CCS 5.x. The referenced
+CCS 3.3.83.20 public archive paths currently return HTTP 404; no simulator
+package has been obtained or executed. This does not exhaust software-only
+evidence or establish a physical-hardware requirement.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
@@ -1104,8 +1109,13 @@ zero-extend, with `4907` exercising the B form in the fixture.
 TI SPRU172C gives `IDLE K` a four-cycle minimum before its unbounded idle
 interval. The core now charges that minimum instead of one cycle. An exact
 ROM4 `f4e1` fixture checks `IDLE 1` entry, retained continuation PC, and no
-premature execution of the next word; it does not independently time the
-minimum or establish all wake-source distinctions among IDLE 1/2/3.
+premature execution of the next word. Six additional executable cases check
+SPRU131G section 6.11.1: external IRQ and timer requests remain latched but
+do not wake IDLE1 while masked in IMR. Enabled requests wake independently
+of INTM; INTM clear enters the ISR, while INTM set resumes the continuation
+without servicing the request. The timer continues during IDLE1. These
+fixtures do not independently time the minimum, establish NMI/reset wake,
+or validate the stopped peripheral clocks of IDLE2/3.
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
 pointer. The fixture checks both results and the three one-cycle operations

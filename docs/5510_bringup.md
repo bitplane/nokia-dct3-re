@@ -2068,10 +2068,12 @@ The profile exports `mu4_recorder_endpoint.nand` using the NAND device's
 storage serialization without issuing commands or changing CPU state.
 `tools/mu4_recorder_media_inventory.py` compares it with the source and
 the gate records `media_inventory.json`. The 69,206,016-byte endpoint has
-SHA-256 `c16305685f2690767232ec9db9b8fefc9c85efe30315b3d7268b056e879da300`.
+SHA-256 `1e5be7246427efedfa856b63b87bb860d9cf0b34326895e1d153fbe10a960cfd`.
 Only pages 34, 161, 288 and 352--372 differ; spare bytes are unchanged.
-This observation is re-banked after the generic INTM-following-instruction
-guard correction; the old scheduling profile changed only through page 369.
+This observation includes the generic INTM-following-instruction guard and
+IMR-qualified IDLE1 wake corrections. Masked pending requests no longer
+resume idle code. The changed-page extent remains unchanged; the older
+pre-INTM scheduling profile changed only through page 369.
 The upload/control counts remain unchanged. The endpoint hash is an
 observation, not an acceptance constant or codec-validity oracle.
 Page 288 begins with literal `REL_001 `; page 352 begins with `ID3` and
