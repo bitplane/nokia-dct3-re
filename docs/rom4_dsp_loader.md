@@ -580,6 +580,21 @@ rather than asserted as correct: this probe is not a fidelity gate. It is
 the small executable comparison for a future generic interrupt/write/drain
 timing correction. Full pipeline behavior still requires an independently
 derived timing oracle; changing PRD to make the handset proceed is not a fix.
+SPRU131G section 7.2, example 7-18, constrains that correction more tightly:
+recognition at the end of cycle 3 inserts INTR at Decode in cycle 4,
+replacing `i2`; already-decoded `i1` completes at Execute in cycle 6.
+INTR then occupies cycles 7--9, and the first vector instruction executes
+in cycle 10. The saved continuation is `i2`, not a fixed number of later
+foreground instructions. A blanket three-instruction deferral would therefore
+implement the wrong contract. The core's current `service_interrupt()` joins
+recognition, IFR clearing, return-PC capture, stack update and vector transfer
+at one retirement boundary and charges five cycles. That aggregate is not a
+stage model; the manual's three-cycle INTR overhead alone does not justify
+replacing it without accounting for recognition and drain separately.
+The next executable timing fixture must distinguish request latching,
+Decode-stage acceptance, memory-write visibility and vector entry. Timer
+requests accepted before a later IMR write must not simply be cancelled by
+that write. The existing short/long-period probe does not resolve this order.
 TI's [SPRU598B simulator overview](https://www.ti.com/lit/pdf/spru598),
 sections 1.1 and 2.3, documents timer-capable C54x configurations and a
 pipelined execution mode. This is a potential software-only differential

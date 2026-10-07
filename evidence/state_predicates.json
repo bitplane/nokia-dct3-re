@@ -12,7 +12,7 @@
       "id": "c54x_timer_reload_interrupt_boundary", "owner": "native_dsp_cpu", "status": "unresolved",
       "predicate": "Timer reload, interrupt recognition and pipeline drain obey the C54x hardware contract when foreground code masks TINT immediately after a short-period reload",
       "current": "The separate tms54test timer BIOS reproduces starvation without any Nokia firmware or peripherals: PRD 1 repeatedly returns through PSHM XPC/FRETE to 01:0608 before the IMR mask, while PRD 256 reaches the post-mask marker and 01:060f. Both restore SP 1000; the long-period control retains IFR bit 3 with IMR zero. The probe deliberately reports rather than accepts the short-period outcome. Native AA22 tracing separately verifies its frame trampoline through original FRETE 02:4044 restores page 2, PC 98de and SP 1272 without cumulative stack loss. Exact interrupt/write/drain timing needs an independently derived oracle before changing the core; no timer slowdown, firmware-PC exemption or mask injection is used.",
-      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "driver/tms320c54x_test.cpp", "Makefile"]
+      "evidence": ["docs/rom4_dsp_loader.md", "docs/5510_bringup.md", "cpu/tms320c54x/tms320c54x.cpp", "driver/tms320c54x_test.cpp", "Makefile"]
     },
     {
       "id": "mu4_native_recorder_warm_metadata_receive", "owner": "native_music_dsp_bench", "status": "unresolved",
