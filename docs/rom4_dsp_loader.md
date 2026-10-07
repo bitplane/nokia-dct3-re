@@ -595,6 +595,13 @@ The next executable timing fixture must distinguish request latching,
 Decode-stage acceptance, memory-write visibility and vector entry. Timer
 requests accepted before a later IMR write must not simply be cancelled by
 that write. The existing short/long-period probe does not resolve this order.
+The existing `RPT #3`/one-cycle `ADD` interrupt fixture also reports cycle
+markers without treating them as hardware acceptance. Four operand reads span
+three cycles; the final body operand read to the first vector operand read
+spans six cycles in the current atomic core. This separates the protected
+repeat interval from its five-cycle aggregate vector-entry charge. Neither
+marker is a Decode-stage observation, so this measurement cannot justify a
+pipeline-drain delay or reinterpret the TI example's three-cycle overhead.
 TI's [SPRU598B simulator overview](https://www.ti.com/lit/pdf/spru598),
 sections 1.1 and 2.3, documents timer-capable C54x configurations and a
 pipelined execution mode. This is a potential software-only differential

@@ -926,6 +926,7 @@ private:
 		}
 		if (offset)
 		{
+			m_irq_operand_cycle = m_cpu->total_cycles();
 			m_irq_accumulator = m_cpu->state_int(tms320c54x_device::STATE_A);
 			m_port_writes_at_irq = m_port_writes;
 			return 0;
@@ -1942,6 +1943,11 @@ private:
 					"pending interrupt defers until the complete single-repeat body retires");
 			expect(m_last_operand_cycle - m_first_operand_cycle == 3,
 					"repeated ADD consumes one cycle per body iteration");
+			osd_printf_info("TMS320C54x interrupt boundary observation: "
+					"repeat_reads=%u body_cycles=%llu final_read_to_vector_read=%llu "
+					"pipeline_fidelity_claim=0\n", m_repeat_reads,
+					(unsigned long long)(m_last_operand_cycle - m_first_operand_cycle),
+					(unsigned long long)(m_irq_operand_cycle - m_last_operand_cycle));
 			m_cpu->set_input_line(2, CLEAR_LINE);
 			program.write_word(0x04f0, 0x0082); // Cycle marker before BD.
 			program.write_word(0x04f1, 0xf273);
@@ -15553,6 +15559,7 @@ private:
 	unsigned m_repeat_reads = 0;
 	unsigned m_irq_trigger_read = 1;
 	u64 m_irq_accumulator = 0;
+	u64 m_irq_operand_cycle = 0;
 	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
