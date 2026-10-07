@@ -27,6 +27,27 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void start_idle_timer_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x010920, index < 2 ? 0xf6e1 : 0xf5e1); // IDLE2 / IDLE3 (NN=10/01).
+		program.write_word(0x010921, 0x76f8);
+		program.write_word(0x010922, 0x0501);
+		program.write_word(0x010923, 1);
+		program.write_word(0x010924, 0xf4e1); // Timer runs again in IDLE1.
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 99);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x23);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, index & 1 ? 1 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x010920);
+		m_cpu->space(AS_DATA).write_word(0x0501, 0);
+		m_phase = 6220 + index * 3;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	int bio_r() { return m_bio_level; }
 	void start_idle_wake_case(unsigned index)
 	{
@@ -1019,6 +1040,65 @@ private:
 				"SPRU131G IDLE1 wake requires IMR enable, independently of INTM; masked requests remain pending");
 			if (index < 5) { start_idle_wake_case(index + 1); return; }
 			osd_printf_info("TMS320C54x IDLE1 wake: PASS external_cases=4 timer_cases=2\n");
+			start_idle_timer_case(0);
+			return;
+		}
+		if ((m_phase >= 6220 && m_phase < 6232) || (m_phase >= 6240 && m_phase < 6244))
+		{
+			unsigned const index = m_phase >= 6240 ? m_phase - 6240 : (m_phase - 6220) / 3;
+			unsigned const step = m_phase >= 6240 ? 3 : (m_phase - 6220) % 3;
+			if (step < 2)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(STATE_GENPC) == 0x010921 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 8),
+					"IDLE2/3 stop the timer without changing its running control bit");
+				u16 const counter = m_cpu->state_int(tms320c54x_device::STATE_TIM);
+				if (!step)
+				{
+					m_idle_timer_counter = counter;
+					m_idle_timer_control = m_cpu->state_int(tms320c54x_device::STATE_TCR);
+				}
+				else
+				{
+					expect(counter == m_idle_timer_counter && counter < 100 &&
+						m_cpu->state_int(tms320c54x_device::STATE_TCR) == m_idle_timer_control &&
+						!(m_idle_timer_control & 0x10),
+						"deep-idle timer counter is frozen, not reloaded or stopped through TSS");
+					m_saved_repeat.str(std::string());
+					m_saved_repeat.clear();
+					expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+						"save frozen deep-idle timer state");
+					m_cpu->set_input_line(0, ASSERT_LINE);
+					m_cpu->set_input_line(0, CLEAR_LINE);
+				}
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			bool const enabled = index & 1;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->space(AS_DATA).read_word(0x0501) == (enabled ? 1 : 0) &&
+				m_cpu->state_int(STATE_GENPC) == (enabled ? 0x010925 : 0x010921) &&
+				bool(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 8) == enabled,
+				"enabled external wake resumes timer operation; masked wake leaves deep idle intact");
+			if (step == 2)
+			{
+				m_saved_repeat.clear();
+				m_saved_repeat.seekg(0);
+				expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE &&
+					m_cpu->state_int(tms320c54x_device::STATE_TIM) == m_idle_timer_counter &&
+					m_cpu->state_int(tms320c54x_device::STATE_TCR) == m_idle_timer_control &&
+					m_cpu->space(AS_DATA).read_word(0x0501) == 0,
+					"restore frozen timer count, prescaler and foreground continuation");
+				m_cpu->set_input_line(0, ASSERT_LINE);
+				m_cpu->set_input_line(0, CLEAR_LINE);
+				m_phase = 6240 + index;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			if (index < 3) { start_idle_timer_case(index + 1); return; }
+			osd_printf_info("TMS320C54x IDLE2/3 timer clock: PASS cases=4 save_replay=4\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -15560,6 +15640,8 @@ private:
 	unsigned m_irq_trigger_read = 1;
 	u64 m_irq_accumulator = 0;
 	u64 m_irq_operand_cycle = 0;
+	u16 m_idle_timer_counter = 0;
+	u16 m_idle_timer_control = 0;
 	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;

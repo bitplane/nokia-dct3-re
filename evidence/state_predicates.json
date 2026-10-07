@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "c54x_deep_idle_timer_clock", "owner": "native_dsp_cpu", "status": "satisfied",
+      "predicate": "IDLE2/3 suspend the internal timer without changing TSS and preserve the frozen counter and prescaler across external wake and save/load",
+      "current": "Four executable fixtures use the specified NN=10/01 opcode encodings, a running divided timer and masked/enabled external INT0 with INTM set. Two timed observations prove no TIM/PSC movement or TINT while asleep. Enabled wake executes the continuation and restores timer expiry during IDLE1; masked input does neither. Each case saves and restores the frozen state and replays the same outcome. Full core conformance and the native 5110 menu gate pass. This is timer-only coverage: PLL/pulse timing, NMI/reset, serial/DMA clock gating and internal-versus-external wake classification remain unvalidated. The separate short-period interrupt-recognition boundary is unchanged.",
+      "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "driver/tms320c54x_test.cpp", "Makefile"]
+    },
+    {
       "id": "c54x_idle1_masked_wake", "owner": "native_dsp_cpu", "status": "satisfied",
       "predicate": "IDLE1 wakes only on IMR-enabled maskable requests, independently of INTM, while masked requests remain pending",
       "current": "Six executable CPU fixtures cover four external IRQ mask/INTM combinations and two timer mask combinations. Enabled external IRQ with INTM clear enters the vector; enabled requests with INTM set execute the continuation without ISR entry; masked external and timer requests retain IFR without executing the continuation. Full core conformance and the native 5110 Phone book menu and original recorder polled-control gates pass. This does not validate IDLE2/3 peripheral clock stopping, NMI/reset wake or the independent short-period pipeline starvation boundary.",

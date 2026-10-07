@@ -95,7 +95,7 @@ void tms320c54x_device::device_start()
 	state_add(STATE_TIM, "TIM", m_debug_timer).callimport().callexport().formatstr("%04X");
 	state_add(STATE_PRD, "PRD", m_debug_timer).callimport().callexport().formatstr("%04X");
 	state_add(STATE_TCR, "TCR", m_debug_timer).callimport().callexport().formatstr("%04X");
-	state_add(STATE_IDLE, "IDLE", m_idle).formatstr("%1u");
+	state_add(STATE_IDLE, "IDLE", m_idle).callimport().formatstr("%1u");
 	state_add(STATE_ILLEGAL, "ILLEGAL", m_illegal).formatstr("%1u");
 	state_add(STATE_GENPC, "GENPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
 	state_add(STATE_GENPCBASE, "CURPC", m_debug_pc).mask(0x7fffff).callimport().callexport().noshow();
@@ -137,6 +137,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_tcr));
 	save_item(NAME(m_block_repeat_active));
 	save_item(NAME(m_idle));
+	save_item(NAME(m_idle_mode));
+	save_item(NAME(m_idle_timer_ticks));
 	save_item(NAME(m_intm_guard));
 	save_item(NAME(m_illegal));
 }
@@ -192,6 +194,8 @@ void tms320c54x_device::device_reset()
 	m_tim = 0xffff;
 	m_prd = 0xffff;
 	m_tcr = 0;
+	m_idle_mode = 0;
+	m_idle_timer_ticks = 0;
 	arm_timer();
 	m_block_repeat_active = false;
 	m_idle = false;
@@ -200,7 +204,7 @@ void tms320c54x_device::device_reset()
 
 void tms320c54x_device::update_timer_counter()
 {
-	if ((m_tcr & TIMER_TSS) || !m_timer->enabled())
+	if ((m_tcr & TIMER_TSS) || !m_timer->enabled() || m_idle_mode >= 2)
 		return;
 	const u64 remaining = m_timer->remaining().as_ticks(clock());
 	const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
@@ -215,7 +219,21 @@ void tms320c54x_device::arm_timer()
 		return;
 	}
 	const u64 cycles = u64(m_tim + 1) * ((m_tcr & TIMER_TDDR_MASK) + 1);
+	if (m_idle_mode >= 2)
+	{
+		m_idle_timer_ticks = cycles;
+		m_timer->adjust(attotime::never);
+		return;
+	}
 	m_timer->adjust(attotime::from_ticks(cycles, clock()));
+}
+
+void tms320c54x_device::leave_idle()
+{
+	m_idle = false;
+	if (m_idle_mode >= 2 && !(m_tcr & TIMER_TSS))
+		m_timer->adjust(attotime::from_ticks(m_idle_timer_ticks, clock()));
+	m_idle_mode = 0;
 }
 
 TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
@@ -224,7 +242,7 @@ TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
 	m_ifr |= 0x0008; // TINT, vector 19
 	// SPRU131G 6.11.1: IMR enables wake even when INTM blocks ISR entry.
 	if (m_imr & 0x0008)
-		m_idle = false;
+		leave_idle();
 	arm_timer();
 }
 
@@ -242,6 +260,8 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 	}
 	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
 		data_write(0x24 + entry.index() - STATE_TIM, m_debug_timer);
+	else if (entry.index() == STATE_IDLE && !m_idle)
+		leave_idle();
 }
 
 void tms320c54x_device::state_export(const device_state_entry &entry)
@@ -320,7 +340,7 @@ u16 tms320c54x_device::data_read(u16 address)
 		if (!(m_tcr & TIMER_TSS) && m_timer->enabled())
 		{
 			const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
-			const u64 remaining = m_timer->remaining().as_ticks(clock());
+			const u64 remaining = m_idle_mode >= 2 ? m_idle_timer_ticks : m_timer->remaining().as_ticks(clock());
 			const u16 psc = remaining ? u16((remaining - 1) % divider) : 0;
 			return (m_tcr & ~TIMER_PSC_MASK) | (psc << 6);
 		}
@@ -754,7 +774,7 @@ bool tms320c54x_device::service_interrupt()
 	push(m_pc);
 	m_st1 |= 0x0800;
 	m_pc = (m_pmst & 0xff80) | ((source + 16) << 2);
-	m_idle = false;
+	leave_idle();
 	m_icount -= 5;
 	return true;
 }
@@ -864,8 +884,18 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= BIT(op, 9) ? 2 : take ? 4 : 2;
 		return;
 	}
-	if ((op & 0xfcff) == 0xf4e1) // IDLE 1/2/3
+	if ((op & 0xfcff) == 0xf4e1 && op != 0xf7e1) // IDLE 1/2/3; NN=11 is reserved.
 	{
+		// SPRU172C encodes K=2 as NN=10 and K=3 as NN=01.
+		u8 const mode = BIT(op, 9) ? 2 : BIT(op, 8) ? 3 : 1;
+		if (mode >= 2 && !(m_tcr & TIMER_TSS))
+		{
+			// Peripheral clocks stop independently of TSS; preserve prescaler phase.
+			m_idle_timer_ticks = m_timer->remaining().as_ticks(clock());
+			update_timer_counter();
+			m_timer->adjust(attotime::never);
+		}
+		m_idle_mode = mode;
 		m_idle = true;
 		m_icount -= 3; // Four-cycle minimum before the idle interval (SPRU172C).
 		return;
@@ -2818,7 +2848,7 @@ void tms320c54x_device::execute_set_input(int inputnum, int state)
 		{
 			m_ifr |= u16(1U << inputnum);
 			if (BIT(m_imr, inputnum))
-				m_idle = false;
+				leave_idle();
 		}
 	}
 }

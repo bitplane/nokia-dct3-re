@@ -1147,8 +1147,20 @@ SPRU131G section 6.11.1: external IRQ and timer requests remain latched but
 do not wake IDLE1 while masked in IMR. Enabled requests wake independently
 of INTM; INTM clear enters the ISR, while INTM set resumes the continuation
 without servicing the request. The timer continues during IDLE1. These
-fixtures do not independently time the minimum, establish NMI/reset wake,
-or validate the stopped peripheral clocks of IDLE2/3.
+fixtures do not independently time the minimum or establish NMI/reset wake.
+Four further cases implement the timer-clock part of SPRU131G sections
+6.11.2/6.11.3: `f6e1` (IDLE2, NN=10) and `f5e1` (IDLE3, NN=01) freeze TIM
+and its prescaler while retaining TSS=0. Masked external INT0 leaves the
+timer frozen; enabled INT0 with INTM set resumes the foreground and timer,
+which can subsequently latch TINT during IDLE1. All four cases save and
+restore the frozen counter/prescaler, then repeat the wake outcome. The core
+saves the selected idle mode and remaining timer ticks; it does not substitute
+a period reload on wake. Reserved NN=11 is not accepted as an idle mode.
+This establishes timer suspension and restoration, not PLL lock time,
+cycle-exact sleep-entry latency, pulse-width qualification, NMI/reset wake,
+or clock gating of the separately attached serial/DMA peripherals. The generic
+input API's internal-versus-external wake classification also remains to be
+refined before claiming complete IDLE2/3 hardware behavior.
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
 pointer. The fixture checks both results and the three one-cycle operations

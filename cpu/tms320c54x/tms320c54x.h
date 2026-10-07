@@ -70,6 +70,7 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_expired);
 	void update_timer_counter();
 	void arm_timer();
+	void leave_idle();
 	u16 fetch();
 	u32 logical_program_address(u16 address) const { return (u32(m_extended_program ? m_xpc : 0) << 16) | address; }
 	u32 physical_program_address(u32 address) const
@@ -162,6 +163,8 @@ private:
 	emu_timer *m_timer = nullptr;
 	bool m_block_repeat_active = false;
 	bool m_idle = false;
+	u8 m_idle_mode = 0;
+	u64 m_idle_timer_ticks = 0;
 	bool m_illegal = false;
 	std::array<u16, 0x10000> m_opcode_first_pc;
 	std::array<u32, 0x10000> m_opcode_count = {};
