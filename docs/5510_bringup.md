@@ -642,6 +642,20 @@ directory, file or a successful mount. Long-offset `ADDM` and immediate `ST`
 use displacement-before-immediate encoding, independently exercised by these
 original context updates and their core conformance fixtures.
 
+The gate also supplies the unchanged `0f33` C-initialization records as
+routine-global inputs, then executes recovery writer `0880`. Its call to
+`069b` uses logical sector 31; the cache path adds one, so the 512-byte
+template reaches physical NAND row 32. Independent byte reads match the
+original template exactly. The fixture does not write a disk image directly.
+
+Subsequent original format entry `051d` remounts with flag zero before
+calling initializer `0454`. On this medium it returns `1` without erase or
+program commands: the missing boot record is still a prerequisite even after
+the row-32 template is written. Thus the startup recovery sequence alone
+does not provision erased NAND. A valid initial media/partition contract must
+come from the original InitDisk path or a genuine medium image; no directory
+or music-DSP file has been produced by this fixture.
+
 This exercises generic core contracts that matter beyond MU4: long-offset
 `BANZ/BANZD` tests the effective Sind value and consumes displacement before
 target (96 cases); `CMPR` compares unsigned ARx against AR0 (192 cases);

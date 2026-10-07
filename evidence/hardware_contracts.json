@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_original_recovery_prerequisite", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Original 0880 recovery writer, supplied only unchanged 0f33 C globals and routine ABI context, writes the exact 512-byte original template to logical sector 31/physical NAND row 32 through 069b/0725. Independent byte reads match it. Subsequent unchanged 051d remounts with flag zero, returns failure one and issues no erase/program on the still-missing boot record. Startup recovery is not erased-media provisioning; original InitDisk/media placement and file population remain unresolved",
+      "evidence": ["docs/5510_bringup.md", "driver/mu4_storage_test.cpp", "Makefile"]
+    },
+    {
       "id": "npm5_mu4_original_erased_mount", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Isolated mu4nand executes unchanged InitData R060 mount 308e through original 2080..20ad trampolines, with startup ABI context 3aea and partition-aware flag one. Erased boot-sector reads use GPIO/NAND/live BIO and return failure one with balanced SP. Original 6be6/76e1 context operations corroborate displacement-before-immediate ordering for long-offset ADDM and ST. No successful filesystem, directory population, file placement or full MU4/handset boot is claimed",
       "evidence": ["docs/5510_bringup.md", "docs/rom4_dsp_loader.md", "driver/mu4_storage_test.cpp", "driver/tms320c54x_test.cpp", "cpu/tms320c54x/tms320c54x.cpp", "Makefile"]

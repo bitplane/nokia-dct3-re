@@ -12,7 +12,7 @@ class mu4_storage_test_state : public driver_device
 {
 public:
 	mu4_storage_test_state(machine_config const &config, device_type type, char const *tag)
-		: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_nand(*this, "nand") { }
+		: driver_device(config, type, tag), m_cpu(*this, "cpu"), m_nand(*this, "nand"), m_cinit(*this, "cinit") { }
 	void test(machine_config &config)
 	{
 		// Test clock only; DA150 PLL/physical memory mapping is not claimed here.
@@ -28,6 +28,7 @@ public:
 private:
 	required_device<tms320c54x_device> m_cpu;
 	required_device<samsung_k9k1208u0a_device> m_nand;
+	required_region_ptr<u16> m_cinit;
 	u8 m_direction = 0, m_gpio = 0;
 	bool m_ready = true;
 	unsigned m_bio_reads = 0, m_busy_reads = 0, m_data_reads = 0;
@@ -125,10 +126,33 @@ private:
 			u16 const mount[] = {0x7600, 1, 0xf020, 0x3aea, 0xf980, 0x308e, 0xf4e1};
 			for (unsigned i = 0; i < std::size(mount); ++i) program.write_word(0x1809 + i, mount[i]);
 		}
+		if (m_phase == 9)
+		{
+			u16 const format[] = {0xf020, 0x3aea, 0xf980, 0x051d, 0xf4e1};
+			for (unsigned i = 0; i < std::size(format); ++i) program.write_word(0x1809 + i, format[i]);
+		}
+		if (m_phase == 7)
+		{
+			// Original C globals are routine inputs, not an invented disk image.
+			auto &data = m_cpu->space(AS_DATA);
+			unsigned cursor = 0;
+			while (cursor < m_cinit.length())
+			{
+				unsigned const count = m_cinit[cursor++];
+				if (!count) break;
+				if (cursor + count + 1 > m_cinit.length()) fatalerror("MU4 fixture truncated cinit");
+				unsigned const destination = m_cinit[cursor++];
+				if (destination + count > 0x10000) fatalerror("MU4 fixture wrapping cinit");
+				for (unsigned i = 0; i < count; ++i) data.write_word(destination + i, m_cinit[cursor++]);
+			}
+			if (cursor != m_cinit.length()) fatalerror("MU4 fixture incomplete cinit");
+			u16 const recovery[] = {0xf020, 0x3aea, 0xf980, 0x0880, 0xf4e1};
+			for (unsigned i = 0; i < std::size(recovery); ++i) program.write_word(0x1809 + i, recovery[i]);
+		}
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
-		m_check->adjust(attotime::from_msec(m_phase == 4 ? 250 : m_phase == 6 ? 50 : 1));
+		m_check->adjust(attotime::from_msec(m_phase == 7 ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
 	}
 	void start_media_read()
 	{
@@ -139,6 +163,20 @@ private:
 	}
 	TIMER_CALLBACK_MEMBER(check)
 	{
+		if (m_phase == 8)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			for (unsigned i = 0; i < 512; ++i)
+			{
+				u16 const word = data.read_word(0x1746 + i / 2);
+				u8 const expected = (i & 1) ? u8(word) : u8(word >> 8);
+				if (m_nand->data_r() != expected) fatalerror("MU4 recovery template mismatch byte=%u", i);
+			}
+			logerror("mu4_storage_template: PASS original_template=512 physical_row=32\n");
+			m_phase = 9;
+			machine().schedule_soft_reset();
+			return;
+		}
 		if (m_phase == 1 || m_phase == 3)
 		{
 			if (m_nand->is_busy()) fatalerror("MU4 storage test pattern program did not complete");
@@ -169,6 +207,17 @@ private:
 				!m_cpu->state_int(tms320c54x_device::STATE_IDLE))
 			fatalerror("MU4 original storage routine did not finish: pc=%04x illegal=%u writes=%u reads=%u",
 				pc, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), unsigned(m_writes.size()), m_data_reads);
+		if (m_phase == 9)
+		{
+			unsigned mutations = 0;
+			for (u16 value : m_writes) mutations += value == 0x0160 || value == 0x0180;
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 1 ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_data_reads || mutations)
+				fatalerror("MU4 format prerequisite contract mismatch");
+			logerror("mu4_storage_format: PASS missing_boot_record rejected=1 media_mutations=0\n");
+			machine().schedule_exit();
+			return;
+		}
 		if (m_phase == 6)
 		{
 			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 1 ||
@@ -177,7 +226,19 @@ private:
 					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), m_data_reads, m_busy_reads);
 			logerror("mu4_storage_mount: PASS erased_boot_sector rejected=1 reads=%u busy_reads=%u\n", m_data_reads, m_busy_reads);
-			machine().schedule_exit();
+			m_phase = 7;
+			machine().schedule_soft_reset();
+			return;
+		}
+		if (m_phase == 7)
+		{
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 0 ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_busy_reads)
+				fatalerror("MU4 original template writer failed");
+			m_nand->command_w(0); m_nand->address_w(0); m_nand->address_w(32);
+			m_nand->address_w(0); m_nand->address_w(0);
+			m_phase = 8;
+			m_check->adjust(attotime::from_usec(11));
 			return;
 		}
 		if (m_phase == 4)
@@ -232,6 +293,8 @@ private:
 };
 static INPUT_PORTS_START(mu4_storage_test) INPUT_PORTS_END
 ROM_START(mu4nand)
+	ROM_REGION16_LE(546, "cinit", 0)
+	ROM_LOAD16_WORD_SWAP("mu4_initdata_cinit.bin", 0, 546, CRC(9d1fb99f) SHA1(d08dd94e471519ed69869b3685a8a6c9cd393f58))
 	ROM_REGION16_LE(92, "trampolines", 0)
 	ROM_LOAD16_WORD_SWAP("mu4_initdata_trampolines.bin", 0, 92, CRC(0de68a60) SHA1(3b2b1ac46f7c0cef5c5c1288a7cb0bcf1bb817de))
 	ROM_REGION16_LE(6758, "entry", 0)
