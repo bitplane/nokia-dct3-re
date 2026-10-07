@@ -112,6 +112,16 @@ must satisfy the handset CC/RR release checker and return to idle PCH.
 `6250_call_1.png` captures the caller before answer. This verifies host-backed
 HLE call signaling, not speech or an authentic original-PMM/native boot.
 
+### Host Outgoing Call Acceptance
+
+`--scenario host-outgoing-call` physically dials `123` and presses Send/End
+with only `CALLHOST` enabled. The external runner requires those exact digits,
+while the handset checker independently verifies its own outgoing CC/RR
+connection and release grammar. Wrong request ID and duplicate decisions are
+rejected; one correlated connect is accepted and connected/ended phases are
+required. The initial-record PMM comparison remains explicit, and neither
+native DSP nor speech is established by this signaling test.
+
 ### Host SMS Acceptance
 
 `--scenario host-incoming-sms` enables only `CALLHOST`, waits for adapter

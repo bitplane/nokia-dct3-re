@@ -14,6 +14,9 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 try:
     from tools.noki6250_pmm_check import initial_record_fixture
 except ModuleNotFoundError:
@@ -29,7 +32,7 @@ def main():
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-outgoing-sms",
-                                              "host-rejected-sms", "host-silent-sms"),
+                                              "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -62,7 +65,7 @@ def main():
         host_call = args.scenario == "host-incoming-call"
         host = args.scenario.startswith("host-")
         host_sms = args.scenario in ("host-incoming-sms", "host-outgoing-sms", "host-rejected-sms", "host-silent-sms")
-        call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call")
+        call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call", "host-outgoing-call")
         sms = args.scenario.startswith("sms-") or host_sms
         if args.scenario == "incoming-call":
             shutil.copyfile(root / "fixtures/radio_incoming_call_answered/nhm3hle.cfg",
@@ -121,6 +124,10 @@ def main():
                          "--port", str(args.port), "--cwd", str(run), "--caller", "5551234",
                          "--ready-file", str(run / "snap/6250_host_registered_idle.png"),
                          "--"] + command) if host_call else None
+        if args.scenario == "host-outgoing-call":
+            host_command = [sys.executable, str(root / "tools/run_host_call_adapter_gate.py"),
+                            "--port", str(args.port), "--cwd", str(run),
+                            "--number", "123", "--decision", "connect", "--"] + command
         if host_sms:
             runner = "run_host_incoming_sms_gate.py" if args.scenario == "host-incoming-sms" else "run_host_sms_gate.py"
             options = [] if args.scenario == "host-incoming-sms" else ["--user-data", "c834", "--user-data-length", "2"]
@@ -139,6 +146,7 @@ def main():
         flags["host-outgoing-sms"] = "NOKIA_DCT3_6250_SMS_REPLY"
         flags["host-rejected-sms"] = "NOKIA_DCT3_6250_SMS_REPLY"
         flags["host-silent-sms"] = "NOKIA_DCT3_6250_SMS_REPLY"
+        flags["host-outgoing-call"] = "NOKIA_DCT3_6250_OUTGOING"
         for flag in flags.values():
             env.pop(flag, None)
         if args.scenario in flags:
@@ -156,7 +164,7 @@ def main():
         if call:
             checker = [sys.executable, str(root / "tools/noki6250_call_check.py"),
                        str(run / "error.log")]
-            if args.scenario == "outgoing-call":
+            if args.scenario in ("outgoing-call", "host-outgoing-call"):
                 checker.extend(["--outgoing", "--number", "123"])
         elif args.scenario in ("idle-state", "call-state", "sms-state"):
             checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
@@ -197,6 +205,9 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        if args.scenario == "host-outgoing-call":
+            from tools.radio_host_outgoing_connect_check import verify as check_host
+            check_host((run / "error.log").read_text(errors="replace"), "123")
         if host_sms and args.scenario not in ("host-rejected-sms", "host-silent-sms"):
             name = "radio_incoming_host_sms_trace_check.py" if args.scenario == "host-incoming-sms" else "radio_outgoing_host_sms_trace_check.py"
             subprocess.run([sys.executable, str(root / "tools" / name), str(run / "error.log")], check=True)
