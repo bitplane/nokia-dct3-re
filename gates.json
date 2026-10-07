@@ -13095,6 +13095,30 @@
       ]
     },
     {
+      "name": "verify-3310-radio-incoming-call-sip-waveform",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell",
+          "silent": false,
+          "command": "SIP_PRODUCT=3310 SIP_DIRECTION=incoming RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh"
+        }
+      ]
+    },
+    {
+      "name": "verify-radio-incoming-call-sip-waveform",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "shell",
+          "silent": false,
+          "command": "SIP_DIRECTION=incoming RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) bash tools/run_sip_physical_audio_gate.sh"
+        }
+      ]
+    },
+    {
       "name": "verify-3310-radio-incoming-call-sip",
       "prerequisites": [],
       "variables": {},

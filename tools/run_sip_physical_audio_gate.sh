@@ -2,6 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 product=${SIP_PRODUCT:-3210}
+direction=${SIP_DIRECTION:-outgoing}
+incoming_arg=
+seconds=45
 case "$product" in
     3210)
         machine=noki3210 bios=
@@ -15,7 +18,21 @@ case "$product" in
         ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac
-run_dir=${RUN_DIR:-run_${product}_sip_waveform}
+case "$direction" in
+    outgoing) ;;
+    incoming)
+        incoming_arg=--incoming
+        seconds=48
+        if [[ "$product" == 3210 ]]; then
+            keys='1,2,3,4,5,enter,wait500,waitbuzzer,enter'
+        else
+            keys=enter
+            key_duration=200
+        fi
+        ;;
+    *) echo "unsupported SIP waveform direction: $direction" >&2; exit 1 ;;
+esac
+run_dir=${RUN_DIR:-run_${product}_sip_${direction}_waveform}
 input_name="dct3_sip_microphone_$$"
 output_name="dct3_sip_earpiece_$$"
 input_module= output_module= source_pid= capture_pid= router_pid=
@@ -54,7 +71,8 @@ python3 tools/pulse_route_mame.py --source "$input_name.monitor" --sink "$output
     > "$run_dir/sip-pulse-routes.log" &
 router_pid=$!
 make --no-print-directory verify-radio-outgoing-call-sip RUN_DIR="$run_dir" JOBS="${JOBS:-8}" \
-    SIP_HANDSET_RUNNER_ARGS="--record-media --product $product" SIP_HANDSET_SOUND=pulse \
+    SIP_HANDSET_RUNNER_ARGS="--record-media --product $product $incoming_arg" SIP_HANDSET_SOUND=pulse \
+    SIP_HANDSET_SECONDS="$seconds" \
     SIP_HANDSET_MACHINE="$machine" SIP_HANDSET_BIOS="$bios" SIP_HANDSET_KEYS="$keys" \
     SIP_HANDSET_KEY_DELAY_MS="$key_delay" SIP_HANDSET_KEY_DURATION_MS="$key_duration" \
     SIP_HANDSET_KEY_GAP_MS="$key_gap" \
@@ -64,4 +82,4 @@ wait "$capture_pid" || true
 capture_pid=
 grep -q '^pulse_route: source-output ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME microphone stream' >&2; exit 1; }
 grep -q '^pulse_route: sink-input ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME speaker stream' >&2; exit 1; }
-.venv/bin/python tools/sip_handset_waveform_check.py "$run_dir" --product "$product"
+.venv/bin/python tools/sip_handset_waveform_check.py "$run_dir" --product "$product" --direction "$direction"

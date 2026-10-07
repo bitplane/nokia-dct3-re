@@ -505,9 +505,22 @@ make verify-3310-radio-incoming-call-sip RUN_DIR=run_3310_sip_incoming
 
 Its exact CONNECT/RELEASE COMPLETE expectations include the observed CC
 sequence bit for this fixture. Those bits are not fixed hardware properties.
-This incoming gate proves media transport, not incoming waveform fidelity.
+This signaling gate alone proves media transport, not waveform fidelity.
 The result retains bounded host-queue drop counts; the gate does not assert
 lossless audio or zero startup drops.
+
+Incoming waveform gates add the same sustained endpoint-tone acceptance
+through each product's physical Answer path:
+
+```sh
+make verify-radio-incoming-call-sip-waveform RUN_DIR=run_3210_sip_incoming_waveform
+make verify-3310-radio-incoming-call-sip-waveform RUN_DIR=run_3310_sip_incoming_waveform
+```
+
+Run these sequentially. `sip-waveform-result.json` identifies both the product
+and call direction. Incoming and outgoing gates preserve the same frequency,
+amplitude and duration thresholds; neither establishes native DSP speech or
+real-radio operation.
 
 Both products use the same 440 Hz source at 0.025 full-scale, avoiding clipping
 in the 3210's +18 dB path while providing measurable input to the 3310's neutral
