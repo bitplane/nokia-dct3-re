@@ -112,6 +112,24 @@ must satisfy the handset CC/RR release checker and return to idle PCH.
 `6250_call_1.png` captures the caller before answer. This verifies host-backed
 HLE call signaling, not speech or an authentic original-PMM/native boot.
 
+### Host SMS Acceptance
+
+`--scenario host-incoming-sms` enables only `CALLHOST`, waits for adapter
+readiness and laboratory registration, then sends host-originated `hello`
+from `5551234`. The host runner requires correlated queued/delivered phases;
+the handset checker independently requires CP/RP closure, EF_SMS storage,
+physical Read, persistent status `01` and the reviewed full message frame.
+No automatic incoming-SMS fixture is enabled in this scenario.
+
+`--scenario host-outgoing-sms` retains the declared incoming-message fixture
+as the physical Reply target and enables `CALLHOST` for submission decisions.
+Physical input writes `Hi` and sends it to `5551234`. The host must receive
+exact packed GSM7 `c834` (two septets); wrong request ID and duplicate decisions
+must be rejected. The handset must complete CP/RP, release the channel and
+show the reviewed Message sent frame. These are research-HLE SMS contracts,
+not native DSP or live-network evidence. Both use fresh private NVRAM and
+record the host command and provisioning provenance in `acceptance.json`.
+
 ## Recovered hardware contracts
 
 The CTSI base literal at `4e7f70` is `00020000`. The release routine

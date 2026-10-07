@@ -28,7 +28,7 @@ def main():
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "idle-state", "call-state", "sms-state",
-                                              "host-incoming-call"),
+                                              "host-incoming-call", "host-incoming-sms", "host-outgoing-sms"),
                         default="calculator")
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
@@ -59,21 +59,27 @@ def main():
         (run / "cfg").mkdir()
         (run / "nvram").mkdir()
         host_call = args.scenario == "host-incoming-call"
+        host = args.scenario.startswith("host-")
+        host_sms = args.scenario in ("host-incoming-sms", "host-outgoing-sms")
         call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call")
-        sms = args.scenario.startswith("sms-")
-        if host_call:
-            config = ET.Element("mameconfig", version="10")
-            inputs = ET.SubElement(ET.SubElement(config, "system", name="nhm3hle"), "input")
-            ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
-                          mask="1", defvalue="0", value="1")
-            ET.ElementTree(config).write(run / "cfg/nhm3hle.cfg", encoding="utf-8",
-                                         xml_declaration=True)
+        sms = args.scenario.startswith("sms-") or host_sms
         if args.scenario == "incoming-call":
             shutil.copyfile(root / "fixtures/radio_incoming_call_answered/nhm3hle.cfg",
                             run / "cfg/nhm3hle.cfg")
-        if sms:
+        if sms and args.scenario != "host-incoming-sms":
             shutil.copyfile(root / "fixtures/radio_incoming_sms/nhm3hle.cfg",
                             run / "cfg/nhm3hle.cfg")
+        if host:
+            config_path = run / "cfg/nhm3hle.cfg"
+            if config_path.exists():
+                config = ET.parse(config_path).getroot()
+                inputs = config.find("system/input")
+            else:
+                config = ET.Element("mameconfig", version="10")
+                inputs = ET.SubElement(ET.SubElement(config, "system", name="nhm3hle"), "input")
+            ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
+                          mask="1", defvalue="0", value="1")
+            ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
             script = "noki6250_sms_observe.lua"
@@ -89,7 +95,7 @@ def main():
             script = "noki6250_state_sms.lua"
         if host_call:
             script = "noki6250_host_incoming_input.lua"
-        seconds = "50" if args.scenario == "sms-reply" else "35" if call or sms else "45"
+        seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
                    "-nvram_directory", "nvram", "-cfg_directory", "cfg",
@@ -98,19 +104,26 @@ def main():
                    "-autoboot_delay", "0", "-seconds_to_run", seconds,
                    "-video", "none", "-sound", "none", "-nothrottle",
                    "-log", "-verbose"]
-        if host_call:
-            command[command.index("-seconds_to_run") + 1] = "60"
+        if host:
+            if host_call:
+                command[command.index("-seconds_to_run") + 1] = "60"
             command.extend(["-http", "-http_port", str(args.port)])
         host_command = ([sys.executable, str(root / "tools/run_host_incoming_signaling_gate.py"),
                          "--port", str(args.port), "--cwd", str(run), "--caller", "5551234",
                          "--ready-file", str(run / "snap/6250_host_registered_idle.png"),
                          "--"] + command) if host_call else None
+        if host_sms:
+            runner = "run_host_incoming_sms_gate.py" if args.scenario == "host-incoming-sms" else "run_host_sms_gate.py"
+            options = [] if args.scenario == "host-incoming-sms" else ["--user-data", "c834", "--user-data-length", "2"]
+            host_command = [sys.executable, str(root / "tools" / runner),
+                            "--port", str(args.port), "--cwd", str(run)] + options + ["--"] + command
         env = os.environ.copy()
         flags = {"calculator": "NOKIA_DCT3_6250_CALCULATOR",
                  "outgoing-call": "NOKIA_DCT3_6250_OUTGOING",
                  "call-state": "NOKIA_DCT3_6250_OUTGOING",
                  "sms-delete": "NOKIA_DCT3_6250_SMS_DELETE",
                  "sms-reply": "NOKIA_DCT3_6250_SMS_REPLY"}
+        flags["host-outgoing-sms"] = "NOKIA_DCT3_6250_SMS_REPLY"
         for flag in flags.values():
             env.pop(flag, None)
         if args.scenario in flags:
@@ -138,14 +151,15 @@ def main():
             elif args.scenario == "sms-state":
                 checker.extend(["--sms", "--storage", str(run / "nvram/nhm3hle/sim_card")])
         elif sms:
-            frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8}[args.scenario]
+            frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8,
+                           "host-incoming-sms": 2, "host-outgoing-sms": 8}[args.scenario]
             frames = list((run / "snap").rglob(f"6250_sms_{frame_index}.png"))
             if len(frames) != 1:
                 raise ValueError(f"expected one SMS frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_sms_check.py"),
                        str(run / "error.log"), str(run / "nvram/nhm3hle/sim_card"),
                        str(frames[0])]
-            if args.scenario != "sms-read":
+            if args.scenario not in ("sms-read", "host-incoming-sms"):
                 checker.append("--deleted" if args.scenario == "sms-delete" else "--sent")
         elif args.scenario == "phonebook":
             frames = list((run / "snap").rglob("6250_phonebook_7.png"))
@@ -163,6 +177,9 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        if host_sms:
+            name = "radio_incoming_host_sms_trace_check.py" if args.scenario == "host-incoming-sms" else "radio_outgoing_host_sms_trace_check.py"
+            subprocess.run([sys.executable, str(root / "tools" / name), str(run / "error.log")], check=True)
         if args.scenario == "phonebook":
             shutil.copyfile(run / "error.log", run / "phonebook-save.log")
             saved_sim = (run / "nvram/nhm3hle/sim_card").read_bytes()
