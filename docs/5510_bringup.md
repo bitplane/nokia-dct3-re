@@ -1663,6 +1663,19 @@ Review every candidate against a known routine-entry disassembly before
 promoting it to a call edge. Unit fixtures cover overwritten operands,
 conflicting overlays, holes and page-end candidates.
 
+The initializer's processing dependencies are present in original `aa22`:
+`02:cdf2` copies bounded template data through ordinary memory helpers;
+it is not an allocation or external-service request. `02:ccfa` initializes
+local processing state through `ce38/d54c/d5c5/ccb1` and returns 1
+unconditionally. That return alone is therefore not a validation oracle.
+`02:cd28` stores a processing counter in `ad46`; `02:cd34` handles a bounded
+buffer of at most 512 bytes using local `cc06/d7a4/d69e/cc2f` helpers and
+updates that counter. Exact algorithm identity and correctness remain
+unvalidated. The caller `02:c902` independently compares its processed
+block at `02:c99e` and returns `-5` on mismatch. A native initialization
+gate must cover that comparison and final caller result, not merely the
+nonzero returns from local helpers; later stream decoding remains separate.
+
 Next recover the accepted media container and storage layout before attempting
 native playback, and verify transport reset and board attachment separately.
 Do not write `bb80`, `3750`, `3768` or replay internal queue objects to select
