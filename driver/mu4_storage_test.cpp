@@ -121,6 +121,7 @@ private:
 	unsigned m_native_consumer_state_traces = 0;
 	unsigned m_native_consumer_paths[6] = {};
 	unsigned m_native_consumer_mode_writes = 0;
+	unsigned m_native_command_paths[6] = {};
 	unsigned m_native_settings_call_traces = 0;
 	unsigned m_native_metadata_call_traces = 0;
 	unsigned m_native_allocation_call_traces = 0;
@@ -465,6 +466,7 @@ private:
 		m_native_startup_return_traces = 0;
 		m_native_consumer_state_traces = m_native_consumer_mode_writes = 0;
 		std::fill(std::begin(m_native_consumer_paths), std::end(m_native_consumer_paths), 0);
+		std::fill(std::begin(m_native_command_paths), std::end(m_native_command_paths), 0);
 		m_native_settings_call_traces = 0;
 		m_native_metadata_call_traces = 0;
 		m_native_allocation_call_traces = 0;
@@ -1281,6 +1283,14 @@ private:
 					if (m_phase == 30 && !machine().side_effects_disabled() && m_native_consumer_mode_writes++ < 16)
 						logerror("mu4_native_consumer_mode: value=%04x pc=%06x\n", value, unsigned(m_cpu->state_int(STATE_GENPC)));
 				});
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x39b6d, 0x3acf2, "mu4_native_command_paths",
+				[this](offs_t address, u16 &, u16)
+				{
+					if (m_phase != 30 || machine().side_effects_disabled() || m_cpu->state_int(STATE_GENPC) != address + 1) return;
+					static constexpr offs_t points[] = {0x39b6d, 0x39bc2, 0x39dc7, 0x39f08, 0x39f5e, 0x3acf2};
+					for (unsigned i = 0; i < std::size(points); ++i)
+						if (address == points[i]) ++m_native_command_paths[i];
+				});
 			m_cpu->space(AS_DATA).install_write_tap(0xb633, 0xb633, "mu4_native_stream_pending_write",
 				[this](offs_t, u16 &value, u16)
 				{
@@ -1628,6 +1638,14 @@ private:
 			logerror("mu4_native_consumer_path_counts: mode_gate=%u flag94de_gate=%u flag0062_gate=%u transfer_entry=%u mode1_test=%u transfer_exit=%u mode_writes=%u\n",
 				m_native_consumer_paths[0], m_native_consumer_paths[1], m_native_consumer_paths[2], m_native_consumer_paths[3],
 				m_native_consumer_paths[4], m_native_consumer_paths[5], m_native_consumer_mode_writes);
+			{
+				auto const disable = machine().disable_side_effects();
+				auto &data = m_cpu->space(AS_DATA);
+				logerror("mu4_native_command_paths: enqueue=%u dequeue=%u parser=%u tx_queue=%u command_read=%u dispatch=%u rx_indices=%04x,%04x tx_indices=%04x,%04x queued_words=%04x parser_state=%04x\n",
+					m_native_command_paths[0], m_native_command_paths[1], m_native_command_paths[2], m_native_command_paths[3],
+					m_native_command_paths[4], m_native_command_paths[5], data.read_word(0x1657), data.read_word(0x1658),
+					data.read_word(0x1659), data.read_word(0x165a), data.read_word(0x165e), data.read_word(0x1661));
+			}
 			if (system_bios() >= 4)
 			{
 				{

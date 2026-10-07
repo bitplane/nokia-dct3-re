@@ -1389,6 +1389,49 @@ software `INTR 25` handler uses `02:a15b/a16d`; equivalence between those
 helpers and this queue is not established. No mode, queue, callback or
 command memory is injected by this fixture.
 
+The processing queue's producer is now traced to serial receive, not the
+HPI software handler. ISR `02:8ba9..8bbd` reads data register `0031` into
+`1462 + [1657]` and advances the producer modulo 80. Parser `03:9dc7`
+consumes this ring using index `1658`; its eight-state program table is
+`02:4113`. The normal packet path accepts start word `001e`, a length
+strictly between zero and 80, header `00aa`, that many payload words and
+a checksum equal to the XOR of start, length, header and payload. It then
+consumes one trailing word before enqueueing type 2 at `03:9e13` through
+`03:9b6d`. The parser does **not** compare this trailing word to `0055`,
+although its outbound builder emits `0055`; do not invent that check.
+An alternate start `007f` selects an acknowledgement path, not a processing
+command. Low-byte versus full-word comparisons differ between states and
+must be preserved when implementing wire tests.
+
+Queue storage begins at `1554`, with used-word count `165e` and a 256-word
+capacity. `03:9b6d` appends a type, next-record offset and payload;
+`03:9bc2` searches for the requested type, copies its payload and removes
+the record. The processing reader requests type 2. The response helper
+`03:9f85` appends type 1, which `03:9c85` wraps for transmission and puts
+through the separate 80-word TX ring `14b2` (`1659/165a`). Helper
+`03:9c5b` writes its next word to register `0033` and updates GPIO `003d`
+bit 4. The isolated fixture currently provides simplified receive ingress
+at `0031`; `0033` remains plain RAM, not a verified serial transmitter.
+
+A literal far-call scan over the 48,261 uploaded program words finds four
+calls to the queue append helper (`03:9d0f`, `9da9`, `9e13`, `9fb7`) and
+one to the processing reader (`03:acfe`). These sites are independently
+disassembled; this is literal-call coverage, not proof excluding indirect
+calls or another overlay. Hardware ingress and original framing are now
+identified, but connecting MU4 firmware-generated commands, implementing
+the transmitter and verifying processing output remain separate contracts.
+
+The unchanged 20-second `startup` fixture executes the parser, processing
+reader and dispatcher 174 times each, and the typed dequeue helper 348
+times. It executes neither queue append nor TX-word enqueue. Both serial
+ring index pairs, queue word count and parser state end at zero. Thus the
+command service is scheduled but has no received packet in this fixture;
+the dormant mode is not evidence of a missing software worker. The native
+gate still passes with 1,739 notification services and zero illegal
+instructions. Next validate a non-processing packet at the recovered
+register ingress and its original response path before selecting a music
+mode or asserting playback.
+
 `noki5510_a00_inventory.py --extract-program-range START END --segment aa22`
 reconstructs final logical words in record order (last write wins), rejects
 holes and verifies the selected wire checksum. Optional
