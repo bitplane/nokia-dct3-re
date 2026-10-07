@@ -1057,7 +1057,8 @@ check-mu4-storage-original: build
 			grep -q 'mu4_native_stream: PASS' error.log; grep -q 'mu4_native_receive: PASS' error.log; fi; \
 		if [ "$(MU4_STORAGE_BIOS)" = sustain ] || [ "$(MU4_STORAGE_BIOS)" = worker ]; then \
 			grep -q 'mu4_native_sustained: PASS' error.log; grep -q 'mu4_native_interrupts: PASS' error.log; fi; \
-		if [ "$(MU4_STORAGE_BIOS)" = worker ]; then grep -q 'mu4_native_worker_window: PASS' error.log; fi
+		if [ "$(MU4_STORAGE_BIOS)" = worker ]; then \
+			grep -q 'mu4_native_worker_window: PASS' error.log; grep -q 'mu4_native_stream_binding: PASS' error.log; fi
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.

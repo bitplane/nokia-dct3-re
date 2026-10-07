@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "npm5_mu4_stream_descriptor_population", "subsystem": "mu4", "status": "partial", "confidence": "strong",
+      "boundary": "Original 02:6d89 populates data object 806e, including 8074=0002 and 8075=9545, an address pair matching the candidate consumer entry 02:9545. Worker acceptance checks the pair and separately counts actual entry fetches. Common code at 02:3f41 writes the first object word to zero; 02:3f57 writes 8071=802b. Endpoint prefix is 0000,bdc8,0010,802b,0000,0000,0002,9545. Original writes at 002fa8/02:6d89/02:6d0d leave data 007e=4000; common routines test masks c001/c020. The uninitialized-object/word hypothesis is falsified, but selection/resume semantics and official task/priority/stack identity remain unresolved. No object field, callback or firmware state is forced",
+      "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile"]
+    },
+    {
       "id": "npm5_mu4_streaming_notification_consumer", "subsystem": "mu4", "status": "partial", "confidence": "strong",
       "boundary": "Original TX ISR writes b633=1, loads AR2=806e and calls common routines 3f37/3ec2. Original 02:9549 reads b633 and branches to 02:9676 when zero; 02:9641 clears it. This is an inferred software-notification role, not an official task identity or audio-decoding claim. A separate worker profile runs a verified 100 ms tail after eight-block acceptance: 9844 TX words, 77 TX completions/handler entries, 76 RX completions, illegal=0 at 00306c. Only the first 1024 TX words are checked against codec DIN. Read-only observers see 77 ISR sets, one initialization clear, zero firmware reads and final b633=1; final inspection is side-effect-free. The consumer lifecycle/806e descriptor remains unresolved; no callback, readiness or firmware state is injected",
       "evidence": ["driver/mu4_storage_test.cpp", "docs/5510_bringup.md", "Makefile", "tools/noki5510_a00_inventory.py"]

@@ -106,6 +106,8 @@ private:
 	unsigned m_native_dma_rx_vectors = 0, m_native_dma_tx_vectors = 0;
 	unsigned m_native_dma_tx_handler = 0;
 	unsigned m_native_stream_pending_sets = 0, m_native_stream_pending_clears = 0, m_native_stream_pending_reads = 0;
+	unsigned m_native_dispatch_traces = 0, m_native_descriptor_traces = 0;
+	unsigned m_native_stream_consumer_entries = 0;
 	bool m_native_worker_window_started = false;
 	attotime m_native_worker_window_start;
 	std::vector<u16> m_native_tx_words;
@@ -337,6 +339,8 @@ private:
 		m_native_dma_rx_vectors = m_native_dma_tx_vectors = 0;
 		m_native_dma_tx_handler = 0;
 		m_native_stream_pending_sets = m_native_stream_pending_clears = m_native_stream_pending_reads = 0;
+		m_native_dispatch_traces = m_native_descriptor_traces = 0;
+		m_native_stream_consumer_entries = 0;
 		m_native_worker_window_started = false;
 		m_native_tx_words.clear();
 		m_external_words.clear(); m_external_bits.clear();
@@ -1059,6 +1063,12 @@ private:
 					if (m_phase == 30 && !machine().side_effects_disabled() &&
 						m_cpu->state_int(STATE_GENPC) == 0x028afd) ++m_native_dma_tx_handler;
 				});
+			m_cpu->space(AS_PROGRAM).install_read_tap(0x029545, 0x029545, "mu4_native_stream_consumer",
+				[this](offs_t, u16 &, u16)
+				{
+					if (m_phase == 30 && !machine().side_effects_disabled() &&
+						m_cpu->state_int(STATE_GENPC) == 0x029546) ++m_native_stream_consumer_entries;
+				});
 			m_cpu->space(AS_DATA).install_write_tap(0xb633, 0xb633, "mu4_native_stream_pending_write",
 				[this](offs_t, u16 &value, u16)
 				{
@@ -1071,6 +1081,18 @@ private:
 				{
 					if (m_phase != 30 || machine().side_effects_disabled()) return;
 					if (m_native_stream_pending_reads++ < 8) logerror("mu4_native_stream_pending: read=%04x pc=%06x\n", value, unsigned(m_cpu->state_int(STATE_GENPC)));
+				});
+			m_cpu->space(AS_DATA).install_write_tap(0x007e, 0x007e, "mu4_native_dispatch_word",
+				[this](offs_t, u16 &value, u16)
+				{
+					if (m_phase == 30 && !machine().side_effects_disabled() && m_native_dispatch_traces++ < 16)
+						logerror("mu4_native_dispatch_word: write=%04x pc=%06x\n", value, unsigned(m_cpu->state_int(STATE_GENPC)));
+				});
+			m_cpu->space(AS_DATA).install_write_tap(0x806e, 0x807f, "mu4_native_dispatch_descriptor",
+				[this](offs_t address, u16 &value, u16)
+				{
+					if (m_phase == 30 && !machine().side_effects_disabled() && m_native_descriptor_traces++ < 32)
+						logerror("mu4_native_dispatch_descriptor: address=%04x write=%04x pc=%06x\n", unsigned(address), value, unsigned(m_cpu->state_int(STATE_GENPC)));
 				});
 			m_cpu->space(AS_PROGRAM).install_read_tap(0x2000, 0x207f, "mu4_native_dma_vectors",
 				[this](offs_t address, u16 &value, u16)
@@ -1156,13 +1178,26 @@ private:
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
 			u16 pending;
 			{ auto const disable = machine().disable_side_effects(); pending = m_cpu->space(AS_DATA).read_word(0xb633); }
+			{
+				auto const disable = machine().disable_side_effects();
+				auto &data = m_cpu->space(AS_DATA);
+				logerror("mu4_native_dispatch_snapshot: word007e=%04x descriptor806e=%04x,%04x,%04x,%04x,%04x,%04x,%04x,%04x writes=%u,%u\n",
+					data.read_word(0x7e), data.read_word(0x806e), data.read_word(0x806f), data.read_word(0x8070), data.read_word(0x8071),
+					data.read_word(0x8072), data.read_word(0x8073), data.read_word(0x8074), data.read_word(0x8075), m_native_dispatch_traces, m_native_descriptor_traces);
+			}
 			logerror("mu4_native_stream_pending_counts: sets=%u clears=%u reads=%u final=%04x\n",
 				m_native_stream_pending_sets, m_native_stream_pending_clears, m_native_stream_pending_reads, pending);
 			if (system_bios() == 4)
 			{
+				{
+					auto const disable = machine().disable_side_effects();
+					if (m_cpu->space(AS_DATA).read_word(0x8074) != 2 || m_cpu->space(AS_DATA).read_word(0x8075) != 0x9545)
+						fatalerror("MU4 original stream descriptor has no expected consumer binding");
+				}
 				if (!m_native_worker_window_started || machine().time() - m_native_worker_window_start < attotime::from_msec(100))
 					fatalerror("MU4 worker observation ended before its 100 ms tail");
 				logerror("mu4_native_worker_window: PASS tail_ms=100 checked_din_prefix=1024 pending=%04x reads=%u\n", pending, m_native_stream_pending_reads);
+				logerror("mu4_native_stream_binding: PASS descriptor=806e entry=029545 consumer_entries=%u\n", m_native_stream_consumer_entries);
 			}
 			logerror("mu4_native_mcbsp_boundary: index=%04x status=%04x polls=%u adjacent_reads=%u config_writes=%u tx_words=%u tx_irqs=%u controller_modeled=partial\n",
 				m_native_mcbsp_index, m_native_mcbsp_status, m_native_mcbsp_polls, m_native_adjacent_reads, m_native_mcbsp_trace,

@@ -1162,8 +1162,21 @@ The ISR sets `b633` 77 times; original initialization clears it once at
 its final value is one. Final inspection disables side effects and does not
 count as firmware consumption. Thus repeated IRQ delivery is established,
 but the candidate notification consumer is inactive in this fixture lifecycle.
-Next identify the firmware-created `806e` descriptor and the lifecycle that
-invokes `02:9549`; do not synthesize a worker callback or pending-word clear.
+Original initialization at `02:6d89` populates the `806e` object, including
+`8074=0002` and `8075=9545`, an address pair matching the consumer's entry
+`02:9545`. The worker gate checks that pair without changing it and separately
+counts actual entry fetches (zero in the verified tail). Common code at `02:3f41` writes its first word
+to zero; `02:3f57` writes `8071=802b`. At the observation endpoint the first
+eight words are `0000,bdc8,0010,802b,0000,0000,0002,9545`.
+
+Data `007e` is written to `4000` by original code at `002fa8`, `02:6d89`
+and `02:6d0d`, and retains that value through the tail. Common routines test
+it against masks `c001` and `c020`; its broader semantics are unresolved.
+The object and word are firmware-initialized. Do not label `007e` as a missing hardware
+register or assign official task, priority or stack semantics from its value.
+Next decode how the common routines select/resume this initialized object's
+consumer and where the active lifecycle remains. Do not synthesize a worker
+callback, descriptor state or pending-word clear.
 
 `mu4_native_entry: PASS` establishes the two observed entry reads only;
 absence of an illegal opcode is not a complete-startup acceptance criterion.
