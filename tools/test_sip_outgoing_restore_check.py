@@ -6,6 +6,7 @@ from tools.run_sip_handset_gate import verify_outgoing_restore
 
 
 LOG = '''
+GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101
 gsm_call_adapter: request id=1 epoch=1 digits=5551234
 sip_state: saved
 sip_state: restored
@@ -28,6 +29,9 @@ REMOTE = 'Response msg 180/INVITE/\nRequest msg CANCEL/\nResponse msg 487/INVITE
 
 class SipOutgoingRestoreCheckTest(unittest.TestCase):
     def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, connected=False, product='3210'):
+        if product == '3310':
+            log = log.replace('length=15 data=03450401a05e0581551532f4150101',
+                              'length=19 data=03450404600200815e0581551532f4a2150101')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log)
@@ -37,6 +41,14 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
 
     def test_product_scope(self):
         self.assertIn('3310 pending outgoing', self.check(product='3310'))
+        self.assertIn('3410 pending outgoing', self.check(product='3410'))
+
+    def test_missing_or_malformed_product_setup_is_rejected(self):
+        for log in (LOG.replace('message=05', 'message=06'),
+                    LOG.replace('03450401a05e0581551532f4150101',
+                                '03450401a05e0581551532f415010100')):
+            with self.assertRaises(RuntimeError):
+                self.check(log=log, product='3410')
 
     def test_duplicate_accepted_clear_is_rejected(self):
         with self.assertRaises(RuntimeError):

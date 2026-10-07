@@ -545,6 +545,22 @@ which remains its independent hardware/backend milestone.
 
 ## Cross-product SIP acceptance
 
+The 3410 v5.46E also independently passes outgoing connected and pending
+save/load gates with fresh product-local storage and physical Send. Connected
+restoration observes SIP BYE; pending restoration observes CANCEL/487 without
+CONNECT. Both change host epoch, clear once with cause 41, complete CC/RR
+release and reject a second SIP dial. The checker requires the tested product's
+exact original SETUP frame as well as ordered restoration/release evidence.
+
+```sh
+make verify-3410-radio-outgoing-call-sip-connected-restore RUN_DIR=run_3410_sip_outgoing_connected_restore
+make verify-3410-radio-outgoing-call-sip-pending-restore RUN_DIR=run_3410_sip_outgoing_pending_restore
+```
+
+The connected fixture saves at 27 seconds, after this product's physical dial
+and before the remote endpoint's normal hangup; pending saves at 25 seconds.
+These are harness observation windows, not device timing changes.
+
 The 3310 NHM-5 v6.39 also completes a physical outgoing call through the local
 PJSIP bridge: handset SETUP, SIP confirmation, bidirectional host media, and
 normal CC/LAPDm release. Its SETUP bearer capability differs from the 3210;

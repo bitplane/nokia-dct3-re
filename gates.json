@@ -13326,6 +13326,32 @@
       ]
     },
     {
+      "name": "verify-3410-radio-outgoing-call-sip-connected-restore",
+      "prerequisites": ["normalize-3410"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS=end,wait1000,5,5,5,1,2,3,4,send SIP_HANDSET_KEY_DELAY_MS=16000 SIP_HANDSET_KEY_DURATION_MS=120 SIP_HANDSET_KEY_GAP_MS=240 SIP_HANDSET_RUNNER_ARGS='--restore-outgoing --product 3410' SIP_HANDSET_SCRIPT=../tools/sip_outgoing_connected_state_roundtrip.lua SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
+      "name": "verify-3410-radio-outgoing-call-sip-pending-restore",
+      "prerequisites": ["normalize-3410"],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS=end,wait1000,5,5,5,1,2,3,4,send SIP_HANDSET_KEY_DELAY_MS=16000 SIP_HANDSET_KEY_DURATION_MS=120 SIP_HANDSET_KEY_GAP_MS=240 SIP_HANDSET_RUNNER_ARGS='--restore-outgoing --sip-response 180 --product 3410' SIP_HANDSET_SCRIPT=../tools/sip_outgoing_state_roundtrip.lua SIP_HANDSET_SECONDS=48"
+        }
+      ]
+    },
+    {
       "name": "verify-3330-radio-outgoing-call-sip-waveform",
       "prerequisites": ["normalize-3330"],
       "variables": {},

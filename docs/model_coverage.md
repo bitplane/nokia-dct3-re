@@ -58,13 +58,13 @@ These independently executed profiles connect to a real local PJSIP endpoint
 through the standalone host bridge. They do not promote native DSP execution,
 real RF service or the other firmware versions of the same handset.
 
-| Tested profile | Incoming/outgoing SIP with HLE media | Connected/ringing restore and caller CANCEL | SIP physical waveform proof |
-| --- | --- | --- | --- |
-| 3210 v6.00 | Yes | Yes | Yes, both directions |
-| 3310 v6.39 | Yes | Yes | Yes, both directions |
-| 3330 v4.50E | Yes, own physical PMM setup | Yes | Yes, incoming and outgoing |
-| 3410 v5.46E | Yes, physical Send | Yes | Yes, incoming and outgoing |
-| 5210 v5.40E | Yes, physical Send | Yes | Yes, incoming and outgoing |
+| Tested profile | Incoming/outgoing SIP with HLE media | Incoming connected/ringing restore and caller CANCEL | Outgoing connected/pending restore | SIP physical waveform proof |
+| --- | --- | --- | --- | --- |
+| 3210 v6.00 | Yes | Yes | Yes | Yes, both directions |
+| 3310 v6.39 | Yes | Yes | Yes | Yes, both directions |
+| 3330 v4.50E | Yes, own physical PMM setup | Yes | Not tested | Yes, incoming and outgoing |
+| 3410 v5.46E | Yes, physical Send | Yes | Yes | Yes, incoming and outgoing |
+| 5210 v5.40E | Yes, physical Send | Yes | Not tested | Yes, incoming and outgoing |
 
 Media transport requires sustained ordered handset acceptance, not merely
 bridge transmission counts; bounded queue drops remain reported. Restore gates

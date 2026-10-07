@@ -266,6 +266,8 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
 def verify_outgoing_restore(root, remote_text, connected=False, product='3210'):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
+    if not re.search(outgoing_setup_pattern(product), log):
+        raise RuntimeError('restored outgoing call lacks the product SETUP frame')
     markers = (('state changed to CONFIRMED', 'Request msg BYE/') if connected else
                ('Response msg 180/INVITE/', 'Request msg CANCEL/', 'Response msg 487/INVITE/'))
     remote_cursor = 0
