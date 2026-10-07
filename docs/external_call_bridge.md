@@ -248,6 +248,11 @@ separate local build; no installed PJSUA2 binding is assumed by the stack probe.
 
 ## SIP call bridge
 
+The handset runner builds and prepares the selected machine and BIOS. Only
+3210 gates generate the erased-identity security fixture and install its EEPROM
+restore guard; sibling gates neither provision nor restore that fixture. All
+products retain isolated run-local NVRAM and logs.
+
 `tools/dct3_sip_bridge.py` supports a single explicit SIP destination. It waits
 for SIP confirmation before accepting the handset's outgoing request, maps
 486/600 to busy and other pre-confirmation failures to no-answer plus explicit

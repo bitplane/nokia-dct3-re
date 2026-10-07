@@ -3671,9 +3671,9 @@ verify-structure:
 # shell: optional external PJSIP backend and isolated physical handset
 verify-radio-outgoing-call-sip:
 	@set -e; \
-	$(DCT3_EEPROM_GUARD) \
+	$(if $(filter noki3210,$(SIP_HANDSET_MACHINE)),$(DCT3_EEPROM_GUARD)) \
 	test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }; \
-	$(MAKE) --no-print-directory build JOBS=$(JOBS) ERASED_IDENTITY_SECURITY_CODE=12345; \
+	$(MAKE) --no-print-directory build JOBS=$(JOBS) PHONE=$(SIP_HANDSET_MACHINE) BIOS=$(SIP_HANDSET_BIOS) $(if $(filter noki3210,$(SIP_HANDSET_MACHINE)),ERASED_IDENTITY_SECURITY_CODE=12345); \
 	$(call prepare_host_run,$(RUN_DIR),$(SIP_HANDSET_MACHINE),$(SIP_HANDSET_BIOS)); \
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS='$(SIP_HANDSET_KEYS)' \
