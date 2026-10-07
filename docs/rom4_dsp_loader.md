@@ -606,6 +606,17 @@ places that simulator in CCS 3.x or earlier, not CCS 5.x. The referenced
 CCS 3.3.83.20 public archive paths currently return HTTP 404; no simulator
 package has been obtained or executed. This does not exhaust software-only
 evidence or establish a physical-hardware requirement.
+Two publicly accessible alternatives do not cover this boundary:
+[gDSPsim 0.30](https://sourceforge.net/projects/gdspsim/files/gdspsim/gdspsim-0.30/)
+has a staged C54x pipeline and software INTR implementation, but the inspected
+C54x/common source has only register-display uses of IMR/IFR and no hardware
+timer or maskable-request delivery implementation. Its source RPM SHA-256 is
+`a57eda4aa6402aba0439146ddcc60ff8665ed1d116b82d4c2158e1d211b1bb7b`;
+it has not been built or run, and no code is imported into this core.
+[DSPsim](https://mpcomplete.org/proj/dspsim/) instead implements a C audio
+interface, not instruction execution. Neither is a differential oracle for
+the short-period timer probe. The TI legacy simulator remains an acquisition
+lead, not evidence that the current outcome is correct.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
