@@ -197,3 +197,45 @@ Ringing, physical Answer, assignment, GSM-FR media and local End remain
 firmware/radio-owned. `--hangup-after` sends a network DISCONNECT; this ROM may
 return CC Release Complete before the LAPDm acknowledgement, so both orderings
 are correlated before `incoming_call_state` reaches `ended`.
+
+## SIP backend prerequisite
+
+An independent loopback probe verifies upstream PJSIP 2.16, rather than a
+home-written SIP parser. Two sequential calls reverse endpoint roles, negotiate
+GSM/8000 RTP, reach CONFIRMED and release with 200 OK. Null audio supplies no
+microphone signal: each receiving endpoint records the other endpoint's WAV
+source, and the checker requires the expected tone energy, rejecting silence
+and a wrong frequency. This is stack-only evidence: no MAME, handset, native
+DSP, concurrent full-duplex bridge, registrar or public-network call is involved.
+
+The reviewed release archive is
+`https://codeload.github.com/pjsip/pjproject/tar.gz/refs/tags/2.16`, SHA-256
+`3af2e481d51aaa095897820fa2ee26c30e530590c6ca56d23e4133bbdad369eb`.
+Build outside tracked source; the upstream build was run serially because its
+parallel object-directory creation raced in this environment:
+
+```sh
+mkdir -p run_sip_build
+curl -L --fail https://codeload.github.com/pjsip/pjproject/tar.gz/refs/tags/2.16 -o run_sip_build/pjproject-2.16.tar.gz
+tar -xzf run_sip_build/pjproject-2.16.tar.gz -C run_sip_build
+cd run_sip_build/pjproject-2.16
+./configure --disable-video --disable-sound --disable-ssl CFLAGS=-fPIC CXXFLAGS=-fPIC
+make dep
+make
+cd ../..
+.venv/bin/python tools/run_sip_stack_probe.py --pjsua run_sip_build/pjproject-2.16/pjsip-apps/bin/pjsua-x86_64-pc-linux-gnu --run-dir run_sip_probe
+```
+
+Use a new run directory for repetition. Bindings and destinations are loopback;
+this TLS-disabled probe build is not a deployment configuration. Runtime
+evidence includes both endpoint logs, original/received WAV files and a result
+manifest. The reviewed 440/660 Hz recordings exceed 0.999 tone-energy fraction.
+
+[PJSUA2 AudioMediaPort](https://docs.pjsip.org/en/latest/specific-guides/audio/audio_frame_manipulation.html)
+provides application-owned PCM callbacks. The next implementation boundary is
+a standalone host backend: SIP decisions map to existing call identities;
+GSM-FR decode/encode connects bounded 8 kHz PCM queues to the PJSIP media port.
+Neither SIP nor host wall-clock scheduling belongs in the emulated GSM/device
+state. Restoration must invalidate the old SIP call identity instead of
+replaying an already accepted incoming call. Python SWIG bindings require a
+separate local build; no installed PJSUA2 binding is assumed by this probe.
