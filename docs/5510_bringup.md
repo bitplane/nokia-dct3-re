@@ -1597,6 +1597,16 @@ documents MP3-to-LSE conversion but explicitly does not implement Nokia's
 encryption/decryption. Consequently, converter availability alone would not
 validate the encrypted-container path or all original media formats.
 
+Fixture-source distinctions: the archived [Nokia 5510 disc](https://archive.org/details/nokia-5510)
+is promotional audio, not the Audio Manager installer: its original cue
+sheet declares four `AUDIO` tracks. The retained ignored BIN has SHA-256
+`920df3569a3bb343793aa17ad36855516eb1a2e70e31c35060ed206410c62169`.
+The [N-Gage software CD](https://archive.org/details/nokia-ngage) contains
+Audio Manager 3.0 help (`roms/nokia-audio-manager-reference/nam30.chm`,
+SHA-256 `0fd337fd76798b956337ed02f2e58cc4c1333e76ec364e128683ded26bf490da`),
+but that help does not establish 5510/LSE compatibility. Neither reference
+supplies an accepted original R060 media container.
+
 An exact-word scan of each final uploaded extended-program image finds
 neither `0380` nor `01c0` in resident `aa22` (48,261 words). The three
 `0380` operands in `aa44` at `02:de9c/deaa/dfe2` are AR2/AR3 sample-buffer
