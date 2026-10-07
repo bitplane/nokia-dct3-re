@@ -82,6 +82,7 @@ private:
 	attotime m_codec_snapshot_time;
 	std::vector<u16> m_external_words;
 	std::vector<int> m_external_bits;
+	bool m_external_checkpoint_pending = false;
 	void external_reg_w(u16 index, u16 value) { m_mcbsp0->control_w(0, index); m_mcbsp0->control_w(1, value); }
 	void external_clocks(unsigned count, bool inverted = true)
 	{
@@ -660,6 +661,30 @@ private:
 		}
 		if (m_phase >= 51 && m_phase <= 53)
 		{
+			// Pin transitions queue synchronized CPU inputs. Save/load must happen
+			// after those anonymous timers drain: postload discards them, while the
+			// input queue itself is not serialized by MAME.
+			if (m_external_checkpoint_pending)
+			{
+				if (!machine().scheduler().can_save()) fatalerror("MU4 external checkpoint has pending synchronized inputs");
+				if (!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x20))
+					fatalerror("MU4 external checkpoint has not latched XINT0");
+				m_external_checkpoint_pending = false;
+				if (m_phase == 51)
+				{
+					m_saved_dma.str(std::string()); m_saved_dma.clear();
+					if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 external McBSP save failed");
+				}
+				else
+				{
+					m_saved_dma.clear(); m_saved_dma.seekg(0);
+					if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 external McBSP restore failed");
+					if (!(m_cpu->state_int(tms320c54x_device::STATE_IFR) & 0x20))
+						fatalerror("MU4 external checkpoint did not restore XINT0");
+					m_external_words.clear(); m_external_bits.clear();
+				}
+				++m_phase; m_check->adjust(attotime::from_usec(1)); return;
+			}
 			if (m_phase == 51)
 			{
 				external_clocks(4);
@@ -675,8 +700,8 @@ private:
 				m_mcbsp0->tx_frame_w(1); m_mcbsp0->tx_frame_w(0); // XFIG ignores this early frame.
 				external_clocks(6);
 				if (m_external_bits.size() != 7 || !m_external_words.empty()) fatalerror("MU4 external frame progress mismatch");
-				m_saved_dma.str(std::string()); m_saved_dma.clear();
-				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 external McBSP save failed");
+				m_external_checkpoint_pending = true;
+				m_check->adjust(attotime::from_usec(1)); return;
 			}
 			else
 			{
@@ -691,9 +716,8 @@ private:
 				if (m_external_words.size() != 2) fatalerror("MU4 external McBSP advanced beyond frame length");
 				if (m_phase == 52)
 				{
-					m_saved_dma.clear(); m_saved_dma.seekg(0);
-					if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 external McBSP restore failed");
-					m_external_words.clear(); m_external_bits.clear();
+					m_external_checkpoint_pending = true;
+					m_check->adjust(attotime::from_usec(1)); return;
 				}
 				else
 				{
@@ -717,7 +741,7 @@ private:
 					external_clocks(12, false);
 					if (m_external_words != std::vector<u16>({0x055a}) || m_external_bits.size() != 12)
 						fatalerror("MU4 external two-bit delay mismatch");
-					logerror("mu4_mcbsp_external: PASS frame_gate=1 stereo=1 bit_order=1 ignore=1 asynchronous=1 delay=1 polarity=1 cancel=1 pending_restore=1\n");
+					logerror("mu4_mcbsp_external: PASS frame_gate=1 stereo=1 bit_order=1 ignore=1 asynchronous=1 delay=1 polarity=1 cancel=1 pending_restore=1 synchronized_inputs=1\n");
 					m_saved_dma.str(std::string()); m_phase = 25; machine().schedule_soft_reset(); return;
 				}
 			}

@@ -17,8 +17,8 @@ The partial McBSP1 transmitter carries six original firmware control words.
 The default acceptance profile stops at serial setup. The separate `stream`
 profile uses those controls to activate a partial AIC23 master-clock source,
 then observes one 128-word McBSP0 TX block and DMA channel-3 completion.
-RX, codec conversion and sustained streaming are not validated; a CPU input-line
-queue warning remains open. DMA/McBSP and codec clocks have isolated conformance
+RX, codec conversion and sustained streaming are not validated.
+DMA/McBSP and codec clocks have isolated conformance
 and save/replay tests.
 This is isolated music-DSP execution, not a baseband unlock or full MU4 boot.
 
@@ -1044,15 +1044,22 @@ ordered-edge conformance tests, not measurements of electrical setup/hold.
 Underrun and unexpected-frame recovery without XFIG fail explicitly;
 active format changes and full reset-activation timing remain unvalidated.
 
+The external-pin save/replay fixture defers checkpoints until synchronized CPU
+input events have drained and asserts `scheduler().can_save()`. MAME discards
+anonymous synchronization timers on load but does not serialize the input-event
+queue; bypassing this prerequisite can strand queued pulses and cause a later
+overflow unrelated to serial timing. The fixture checks XINT0 has reached CPU
+IFR bit 5 before saving and remains latched after loading. The stream acceptance
+rejects queue-overflow warnings.
+
 `make check-mu4-storage-original` uses BIOS `setup`, preserving storage,
 loader, DMA/McBSP conformance and six-word original control setup.
 `make check-mu4-storage-original MU4_STORAGE_BIOS=stream` selects the same
 original bytes but requires a complete 128-word streaming block and DMA
 completion. With the original six control words activating codec clocks, the
 fixture observes 128 transmitted words and one DMA completion, with `illegal=0`.
-These words are buffer contents, not validated music samples. A CPU pending-input
-queue overflow warning was also observed and remains a scheduling/interrupt
-fidelity issue; the finite-block result does not establish sustained operation.
+These words are buffer contents, not validated music samples. The finite-block
+run has no CPU input-queue overflow; it does not establish sustained operation.
 This is original TX/DMA execution, not full MU4 startup or audio playback.
 
 The same run programs RX DMA channel 2: source McBSP0 DRR1 `0021`,
