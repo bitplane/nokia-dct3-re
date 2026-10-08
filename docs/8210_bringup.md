@@ -724,10 +724,16 @@ no-PIN DCS control also lacks `07f0`, `1587` and type 57: none is a universal
 DCS prerequisite. It receives `03ec` before serving-channel completion;
 PIN DCS receives it afterwards. At completion, the passing control has
 `03ec` queued alongside current `03eb`; PIN DCS has no queued replacement.
-Decode the late-request lifecycle rather than making DCS reproduce GSM's
+The later request is retained, but its argument-3 selector returns 4 and
+returns to the receive loop. State `0d` can reevaluate it on a subsequent
+`8b` measurement via the argument-0 selector. The concrete open contract
+is whether channel configuration cancels the updated type-`56` window's
+pending measurement completion; the peer currently does so. The own
+producer/consumer anchors below are verified, but cancellation semantics
+are not. Do not replay acknowledgements or make DCS reproduce GSM's
 reference chain below. No firmware state or peer response is forced.
 
-The independent `--dcs1800 --pin-enabled` experiment remains unsuccessful:
+The default-timing `--dcs1800 --pin-enabled` experiment remains unsuccessful:
 the early `55:03050000` response reaches the correlated task-12 completion
 at 5.54 seconds, before physical PIN acceptance at 12 seconds. Unlike the
 verified GSM900 PIN lifecycle, no later type-57 request is emitted. The
@@ -735,8 +741,10 @@ passing no-PIN DCS control shows that request is not required on this band;
 Location Updating acceptance is still missing and the strict runner rejects
 the PIN run. Its measurement contract now expects the observed type 55,
 with correlated delivery, physical PIN acceptance and Location Updating;
-the early-scan/PIN lifecycle must be understood before authenticated DCS
-coverage can be claimed. No response, firmware state or timer is forced.
+the late-request recovery lifecycle must be understood before
+timing-independent authenticated DCS coverage can be claimed. The
+explicit seven-second fixture is bounded authenticated coverage, not a
+replacement default. No response, firmware state or timer is forced.
 Continuous carrier-823 SI1/2/3/4 and paging packets remain present after PIN,
 excluding a one-shot-broadcast explanation. Passive completion observation
 finds the same context `00113264`, selector `03` and zero word at `+4` in
@@ -949,6 +957,13 @@ three-byte table `05 03 03` at `33e8a9`, so option 0 produces the observed
 `21f3d8` and `21fa52`. This mapping does not establish continuous versus
 one-shot measurement or an implicit cancellation command; those meanings
 remain unassigned pending lifecycle evidence.
+Both type-`55` callers select option 0 when the request object's byte
+`+9` is zero, otherwise option 2 (`21f3c4` and `21fa3a`). Type-`57`
+constructor `2b31a8` uses the same helper `2b2d52` at `2b31d6`; thus the
+option byte cannot by itself distinguish acquisition from background
+measurement. No explicit stop packet occurs between the updated list
+and channel configuration in the captured late-PIN run. Neither that
+absence nor the shared encoding proves that the DSP must keep measuring.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

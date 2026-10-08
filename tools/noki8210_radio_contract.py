@@ -189,6 +189,17 @@ def verify(image):
         raise ValueError('scan-control selector mapping differs')
     if int.from_bytes(read(0x2b30d0, 4), 'big') != 0x33e8a9 or read(0x33e8a9, 3) != bytes.fromhex('050303'):
         raise ValueError('selector-three scan-control options differ')
+    for address in (0x21f3c4, 0x21fa3a):
+        expected_branch = '#0x21f3d4' if address == 0x21f3c4 else '#0x21fa4e'
+        if instructions(address, 8) != [
+                ('ldrb', 'r1, [r0, #9]'), ('cmp', 'r1, #0'),
+                ('beq', expected_branch), ('movs', 'r1, #2')]:
+            raise ValueError('scan-control option request ownership differs')
+    if instructions(0x2b31c6, 4) != [('movs', 'r0, #0x57'), ('strb', 'r0, [r4, #3]')]:
+        raise ValueError('background measurement packet type differs')
+    if instructions(0x2b31d2, 8) != [
+            ('adds', 'r0, r6, #0'), ('adds', 'r1, r5, #0'), ('bl', '#0x2b2d52')]:
+        raise ValueError('background measurement does not share selector mapping')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
