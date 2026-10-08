@@ -239,6 +239,19 @@ but does not rebuild the record counts there. Follow the linked-record
 refresh and its consumer-side triggers
 after this real notification; do not add a duplicate synthetic message.
 
+At the slow-PIN input-3 failure target `3cb4f8` (12.495830 s), the
+refreshed context begins `0208010000000100`, while the controller status
+pointer `16f910` resolves to `001028d0` containing zero. The check reaches
+context status 8, not the required 1; this invocation is not rejected by
+the earlier controller-word test. The remainder of cache updater
+`3cba56` returns at `3cbb3e` without rebuilding counts. An aligned direct
+Thumb-BL census identifies seven rebuild callers (`38e6e2`, `3caf98`,
+`3cb072`, `3cb096`, `3cb14c`, `3cb55a`, `3cb89a`) and ten incremental
+count-update callers (`38e9f8`, `38ea0a`, `38ecd6`, `38ece8`, `38f51a`,
+`38f532`, `38f760`, `38f770`, `38faee`, `38fb06`). These are the bounded
+record-update surface for the next trace; the census excludes indirect
+and ARM calls and does not independently classify code/data boundaries.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
