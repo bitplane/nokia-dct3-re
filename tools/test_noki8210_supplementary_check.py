@@ -15,15 +15,21 @@ BACK = '8210_divert_physical: key=Back\n'
 
 
 class SupplementaryTest(unittest.TestCase):
-    def check(self, text, size=(84, 48), wrong_hash=False):
+    def check(self, text, size=(84, 48), wrong_hash=False, product='8210'):
         with tempfile.TemporaryDirectory() as directory:
             frames = Path(directory)
             frame = Image.new('L', size, 255)
             digest = hashlib.sha256(frame.tobytes()).hexdigest()
             for phase in ('result', 'after_back'):
-                frame.save(frames / f'8210_divert_{phase}.png')
+                frame.save(frames / f'{product}_divert_{phase}.png')
             verify_transaction(text, frames, 'divert', KEYS, protocol,
-                               '0' * 64 if wrong_hash else digest, digest)
+                               '0' * 64 if wrong_hash else digest, digest, product=product)
+
+    def test_product_markers_are_not_interchangeable(self):
+        text = (INPUT + GOOD + BACK).replace('8210_', '8850_')
+        self.check(text, product='8850')
+        with self.assertRaisesRegex(ValueError, 'physical input'):
+            self.check(text)
 
     def test_complete(self):
         self.check(INPUT + GOOD + BACK)

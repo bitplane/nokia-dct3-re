@@ -1385,6 +1385,28 @@ The crop excludes the animated menu icon and scrollbar. Raw IRQ delivery
 alone cannot pass this acceptance. Stock absent DSP-mask warnings are not
 evidence of native mask execution.
 
+For physical USSD acceptance, use the same fresh private run setup with
+`tools/noki8850_ussd_input.lua` and a 43-second run. Then run:
+
+```sh
+.venv/bin/python tools/noki8850_ussd_check.py RUN
+```
+
+The fixture enters the security code through physical keys, then `*123#`
+and Send. Acceptance requires the exact GSM 04.80 request and correlated
+laboratory response, channel release, the reviewed `Nokia test network`
+frame, physical Back to registered idle, and persisted updated EF_LOCI.
+The own MCU and acquired PMM remain unchanged. The own table at `33f504`
+matches the 8210 `33ee78` and 8890 `339f4c` tables: Star is column 2,
+Hash column 4. Shared port labels express that contract without changing
+matrix bits. This proves research-HLE supplementary signaling and UI,
+not native DSP execution or speech.
+
+MAME also audits the declared shared `dsp_prom`, `dsp_drom` and `dsp_pdrom`
+files in the product ROM directory. Their presence is a run prerequisite,
+not evidence of a product-matched resident ROM6 mask; do not substitute
+another product's MCU, PMM or NVRAM to satisfy this fixture.
+
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first
 text: the eight-second sample precedes it. `--display-transfer` checks the
