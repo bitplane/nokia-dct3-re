@@ -10,6 +10,31 @@ from tools import run_noki8890_sip_cancel as check
 
 
 class CleanupFramesTest(unittest.TestCase):
+    def test_outgoing_requires_own_carrier_send_and_idle_pixels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            (run / 'snap').mkdir()
+            (run / 'console.log').write_text('')
+            image = Image.new('L', (84, 48), 255)
+            digest = hashlib.sha256(image.crop((0, 8, 84, 48)).tobytes()).hexdigest()
+            for name in ('8890_registered_idle.png', '8890_after_outgoing_call.png'):
+                image.save(run / 'snap' / name)
+            valid = ('gsm_call_adapter: network registered=1 arfcn=60\n'
+                     '8890_call_physical: action=send\n8890_keypad_decoded: key=0e\n')
+            with patch.object(check, 'verify_stage'), patch.dict(
+                    check.FRAMES, {'8890_sip_registered_idle.png': digest}):
+                (run / 'error.log').write_text(valid)
+                check.check_outgoing_result(run)
+                for invalid in (valid.replace('arfcn=60', 'arfcn=1'),
+                                valid.replace('key=0e', 'key=0f')):
+                    (run / 'error.log').write_text(invalid)
+                    with self.assertRaises(ValueError):
+                        check.check_outgoing_result(run)
+                (run / 'error.log').write_text(valid)
+                Image.new('L', (84, 48), 0).save(run / 'snap/8890_after_outgoing_call.png')
+                with self.assertRaisesRegex(ValueError, 'reviewed idle'):
+                    check.check_outgoing_result(run)
+
     def test_restored_call_requires_new_epoch_and_post_load_paging(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

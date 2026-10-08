@@ -1,4 +1,4 @@
-"""Own-PMM NSB-6 real SIP cancellation; no Answer, media or native DSP claim."""
+"""Own-PMM NSB-6 real SIP cancellation/busy; no media or native DSP claim."""
 import argparse
 import json
 import hashlib
@@ -59,6 +59,23 @@ def check_product_result(run, restore_idle=False):
     check_frames(run / 'snap')
 
 
+def check_outgoing_result(run):
+    text = (run / 'error.log').read_text(errors='replace')
+    check_output(text)
+    check_output((run / 'console.log').read_text(errors='replace'))
+    verify_stage(text, runtime=True, selftest=True)
+    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=60\b', text):
+        raise ValueError('host registration lacks own configured carrier')
+    send_at = text.find('8890_call_physical: action=send')
+    if send_at < 0 or not re.search(r'8890_keypad_decoded: key=0e\b', text[send_at:]):
+        raise ValueError('outgoing call lacks decoded physical Send')
+    for name in ('8890_registered_idle.png', '8890_after_outgoing_call.png'):
+        with Image.open(run / 'snap' / name) as source:
+            digest = hashlib.sha256(source.convert('L').crop((0, 8, 84, 48)).tobytes()).hexdigest()
+            if source.size != (84, 48) or digest != FRAMES['8890_sip_registered_idle.png']:
+                raise ValueError('outgoing cleanup differs from reviewed idle content: ' + name)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
@@ -66,9 +83,13 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore idle before admitting the fresh unanswered SIP call')
+    parser.add_argument('--outgoing-busy', action='store_true',
+                        help='physically dial 1234567 against a real SIP 486 response')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
+    if args.restore_idle and args.outgoing_busy:
+        parser.error('--restore-idle cannot be combined with --outgoing-busy')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8890']
@@ -83,6 +104,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki8890_outgoing_call_input.lua' if args.outgoing_busy else
                        'noki8890_sip_idle_restore.lua' if args.restore_idle else
                        'noki8890_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
@@ -91,18 +113,23 @@ def main():
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
-                   '--product', '8890', '--incoming', '--cancel-incoming',
-                   '--ready-file', str(run / 'snap/8890_sip_registered_idle.png'),
+                   '--product', '8890',
+                   *(['--sip-response', '486'] if args.outgoing_busy else
+                     ['--incoming', '--cancel-incoming', '--ready-file',
+                      str(run / 'snap/8890_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
                    '--', *handset]
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        check_product_result(run, args.restore_idle)
+        if args.outgoing_busy:
+            check_outgoing_result(run)
+        else:
+            check_product_result(run, args.restore_idle)
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),
                         '--configured-gsm900', str(run / 'error.log')], check=True)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsb6hle', 'scenario': 'incoming-sip-cancel',
+            'machine': 'nsb6hle', 'scenario': 'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel',
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 60,
             'native_dsp_complete': False, 'speech_tested': False,
@@ -110,8 +137,8 @@ def main():
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
-        parser.exit(1, f'8890 SIP cancellation FAIL: {error}; inspect {run}\n')
-    print('8890 real SIP CANCEL signaling PASS; no speech acceptance')
+        parser.exit(1, f'8890 SIP signaling FAIL: {error}; inspect {run}\n')
+    print('8890 real SIP signaling PASS; no speech acceptance')
 
 
 if __name__ == '__main__':

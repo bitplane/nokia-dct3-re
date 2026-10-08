@@ -147,6 +147,14 @@ class SipFailureCheckTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.check(product='8850', status=480, log=invalid)
 
+    def test_8890_busy_requires_own_dialed_number(self):
+        log = LOG.replace('digits=5551234', 'digits=1234567').replace('551532f4', '214365f7')
+        self.assertEqual(self.check(product='8890', log=log)['sip_status'], 486)
+        for invalid in (LOG, log.replace('214365f7', '551532f4'),
+                        log.replace('length=15', 'length=16')):
+            with self.assertRaises(RuntimeError):
+                self.check(product='8890', log=invalid)
+
     def test_6210_unavailable_requires_cause_18(self):
         log = LOG.replace('digits=5551234', 'digits=1234567').replace('551532f4', '214365f7')
         log = log.replace('outcome=1', 'outcome=2\noutgoing termination consumed id=1 cause=18')

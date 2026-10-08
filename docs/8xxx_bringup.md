@@ -559,6 +559,7 @@ injection or borrowed product verdict is part of these workflows.
 | Physical USSD | `noki8890_ussd_check.py`; exact `*123#` request/response, reviewed result/idle frames, physical Back and persisted EF_LOCI |
 | Host incoming/outgoing SMS | `verify-8890-host-incoming-sms` and `verify-8890-host-outgoing-sms`; own configured ARFCN60, external request/decision correlation, physical composition/read and persistent received content |
 | Real SIP caller cancellation | `verify-8890-sip-cancel`; own clock-settled idle, exact caller SETUP, CANCEL/487, clean CC/RR release, missed-call notification and decoded physical Exit; no Answer/media |
+| Real outgoing SIP busy | `verify-8890-sip-outgoing-busy`; own unchanged PMM, configured GSM900 carrier 60, physical `1234567`/Send, actual SIP 486, correlated busy and CC/RR release, reviewed idle pixels excluding the top-row clock; no CONNECT/media |
 | Idle restoration before real SIP | `verify-8890-sip-idle-restore`; exact PC/SP/RAM/time and protocol replay, new host epoch 2, then the same unanswered cancellation and decoded physical cleanup; no saved external dialog or speech |
 
 The host SMS gates use `fixtures/noki8890_host/nsb6hle.cfg` in fresh private
