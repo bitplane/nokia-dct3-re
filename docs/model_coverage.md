@@ -328,6 +328,8 @@ native DSP, speech or displayed forwarding-number content.
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
 NHM-3 result/idle frames on its declared derived-PMM research comparison. The
 default-cell signaling gate is not an ARFCN19/20 coherence promotion.
+`verify-6250-call-divert` separately verifies inactive interrogation and
+physical result dismissal; it does not inherit the 6210 forwarding lifecycle.
 
 `verify-8890-minute-redraw` extends the retained cold clock to a serviced minute
 interrupt and reviewed 13:48 idle. The four GSM900/PCS incoming/outgoing

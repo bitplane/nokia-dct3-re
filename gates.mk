@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 586 gates: 394 generated from typed steps, 192 copied verbatim (shell).
+# 587 gates: 395 generated from typed steps, 192 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -355,7 +355,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-idle-state verify-6250-coherent-call-state \
 	verify-6250-coherent-sms-state verify-6250-pin-state-idle \
 	verify-6250-pin-state-call verify-6250-pin-state-sms verify-6250-power-cycle \
-	verify-6250-ussd verify-6250-coherent-registration \
+	verify-6250-ussd verify-6250-call-divert verify-6250-coherent-registration \
 	verify-6250-slow-pin-registration verify-6250-pin-host-incoming-call \
 	verify-6250-pin-host-incoming-sms verify-6250-pin-host-outgoing-call \
 	verify-6250-pin-host-outgoing-sms verify-6250-pin-phonebook \
@@ -4572,6 +4572,9 @@ verify-6250-power-cycle: build
 
 verify-6250-ussd: build
 	$(PYTHON) tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario ussd --mame $(MAME_DIR)/mame
+
+verify-6250-call-divert: build
+	$(PYTHON) tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario divert --mame $(MAME_DIR)/mame
 
 verify-6250-coherent-registration: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario coherent-registration --mame $(MAME_DIR)/mame

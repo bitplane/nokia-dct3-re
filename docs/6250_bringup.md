@@ -36,6 +36,11 @@ physical inputs, exact request/correlated success/RR release, the reviewed
 6250 registered-idle frame after physical Back. The registration checker
 continues to require SIM location persistence. This default-cell signaling
 comparison is not an ARFCN19/20 coherence, native DSP or speech claim.
+`verify-6250-call-divert` separately drives physical `*#21#` and Send,
+checks exact service-`21` interrogation/inactive response/RR release, the
+reviewed `Service not active` pixels and registered idle after Back.
+Forwarding activation, save-state retention and delivery are not established
+on NHM-3 by this interrogation gate.
 
 `verify-6250-coherent-idle-state` additionally runs idle restoration with the
 explicit ARFCN19/20 host-enabled cell. It requires own native uploads and HLE

@@ -24,12 +24,22 @@ except ModuleNotFoundError:
 
 
 def check_ussd(text, frames):
+    check_supplementary(text, frames, 'ussd')
+
+
+def check_supplementary(text, frames, service):
     from tools import radio_ussd_trace_check
+    from tools import radio_call_divert_trace_check
     from tools.noki8210_supplementary_check import verify_transaction
-    verify_transaction(text, frames, 'ussd',
-                       ('Keypad *', 'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad #', 'Send'),
-                       radio_ussd_trace_check,
-                       '7282a48b0f972545caac4db1a02189d25775dd13e02b11857cba98cfd58b3112',
+    keys, protocol, result = {
+        'ussd': (('Keypad *', 'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad #', 'Send'),
+                 radio_ussd_trace_check,
+                 '7282a48b0f972545caac4db1a02189d25775dd13e02b11857cba98cfd58b3112'),
+        'divert': (('Keypad *', 'Keypad #', 'Keypad 2', 'Keypad 1', 'Keypad #', 'Send'),
+                   radio_call_divert_trace_check,
+                   '0218f879565b696f4768f55215c45166b725b1897d0d78715da54278c74244b4'),
+    }[service]
+    verify_transaction(text, frames, service, keys, protocol, result,
                        '7c541cfc93c2da8e854421941df0ac81755b73f47c3af98f2f6a40efac181b0b',
                        product='6250', geometry=(96, 60))
 
@@ -95,7 +105,7 @@ def main():
     parser.add_argument("run_directory", type=Path,
                         help="new directory; existing directories are refused")
     parser.add_argument("--mame", type=Path)
-    parser.add_argument("--scenario", choices=("calculator", "ussd", "incoming-call", "outgoing-call",
+    parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
@@ -174,8 +184,8 @@ def main():
             script = "noki6250_state_sms.lua"
         if args.scenario == 'power-cycle':
             script = 'noki6250_power_input.lua'
-        if args.scenario == 'ussd':
-            script = 'noki6250_ussd_input.lua'
+        if args.scenario in ('ussd', 'divert'):
+            script = f'noki6250_{args.scenario}_input.lua'
         if host_call:
             script = "noki6250_host_incoming_input.lua"
         if args.scenario == "host-rejected-sms":
@@ -252,8 +262,8 @@ def main():
         with (run / "console.log").open("w") as console:
             subprocess.run(host_command or command, cwd=run, env=env, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
-        if args.scenario == 'ussd':
-            check_ussd((run / 'error.log').read_text(errors='replace'), run / 'snap')
+        if args.scenario in ('ussd', 'divert'):
+            check_supplementary((run / 'error.log').read_text(errors='replace'), run / 'snap', args.scenario)
             checker = [sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                        str(run / 'error.log'), '--profile', 'nhm3']
         elif call:

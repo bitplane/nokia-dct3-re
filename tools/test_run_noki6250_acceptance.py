@@ -4,10 +4,18 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
-from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, prerequisite_trace, main, check_ussd
+from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, prerequisite_trace, main, check_ussd, check_supplementary
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_divert_keeps_its_own_sequence_and_result(self):
+        with patch('tools.noki8210_supplementary_check.verify_transaction') as verify:
+            check_supplementary('trace', Path('frames'), 'divert')
+        args, kwargs = verify.call_args
+        self.assertEqual(args[2:4], ('divert', ('Keypad *', 'Keypad #', 'Keypad 2', 'Keypad 1', 'Keypad #', 'Send')))
+        self.assertEqual(args[5], '0218f879565b696f4768f55215c45166b725b1897d0d78715da54278c74244b4')
+        self.assertEqual(kwargs, {'product': '6250', 'geometry': (96, 60)})
+
     def test_ussd_uses_own_reviewed_idle_frame(self):
         with patch('tools.noki8210_supplementary_check.verify_transaction') as verify:
             check_ussd('trace', Path('frames'))
