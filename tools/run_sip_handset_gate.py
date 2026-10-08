@@ -465,10 +465,11 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
         raise RuntimeError('restoration did not clear the handset call exactly once')
     cursor = 0
     physical_answer = (
-        r'8210_incoming_physical: action=Call / Send',
-        r'8210_keypad_decoded: key=0e\b',
+        rf'{product}_incoming_physical: action=Call / Send',
+        (r'8850_keypad_decoded key=0e\b' if product == '8850' else
+         r'8210_keypad_decoded: key=0e\b'),
         r'GSM service uplink sapi=0 pd=03 message=07 length=2',
-    ) if product == '8210' and phase == 'connected' else ()
+    ) if product in ('8210', '8850') and phase == 'connected' else ()
     for pattern in physical_answer + (
             rf'incoming state id=1 epoch=1 phase={phase}',
             r'sip_state: saved', r'sip_state: restored',
