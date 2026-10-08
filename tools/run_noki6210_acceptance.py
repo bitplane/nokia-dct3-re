@@ -25,6 +25,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
              'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
              'security': ('npe3hle', 'security_input', 37),
+             'toolkit': ('npe3hle', 'toolkit_input', 40),
              'state-idle': ('npe3hle', 'state_idle', 24),
              'state-call': ('npe3hle', 'state_call', 48),
              'state-sms': ('npe3hle', 'state_sms', 30),
@@ -79,7 +80,7 @@ def events(path):
     with path.open(errors='replace') as stream:
         return ''.join(line for line in stream if any(token in line for token in
                       ('staged_dsp:', '6210_', 'dspif_transport:', 'sim_device:',
-                       'SIM status', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:',
+                       'SIM status', 'SIM completion', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:',
                        'state_replay:', 'state_roundtrip:', '[LUA ERROR]')))
 
 
@@ -178,15 +179,19 @@ def main():
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
         host = args.scenario.startswith('host-')
-        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms') or host:
+        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit') or host:
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
             ports = ET.SubElement(system, 'input')
-            mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
-            tag = ':CALLHOST' if host else ':NETCFG'
+            if args.scenario == 'toolkit':
+                tag, mask, value = ':SATCFG', '15', '1'
+            else:
+                tag = ':CALLHOST' if host else ':NETCFG'
+                mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
+                value = mask
             ET.SubElement(ports, 'port', tag=tag, type='CONFIG',
-                          mask=mask, defvalue='0', value=mask)
+                          mask=mask, defvalue='0', value=value)
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -222,6 +227,16 @@ def main():
             if args.scenario == 'accessory':
                 with Image.open(run / 'snap/6210_before_menu.png') as frame:
                     check_accessory(text, frame)
+        elif args.scenario == 'toolkit':
+            from tools.noki6210_toolkit_check import verify as check_toolkit
+            check_toolkit(text)
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            from PIL import Image
+            with Image.open(run / 'snap/6210_toolkit_display.png') as frame:
+                check_frame(frame, '1c27b5e561a2183e01fffc11e71a78f5df35e342fde2c01d6df3fffc26c4199b',
+                            'proactive DCT3 SAT')
+            with Image.open(run / 'snap/6210_toolkit_after_dismiss.png') as frame:
+                check_frame(frame, OPERATOR_SHA256, 'registered idle after Toolkit clearance')
         elif args.scenario == 'calculator':
             from PIL import Image
             with Image.open(run / 'snap/6210_calculator_result.png') as frame:

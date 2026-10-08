@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 69
-Differences found: 108
+Families with more than one product: 70
+Differences found: 111
 
 ## ROM normalisation reachability
 
@@ -88,6 +88,7 @@ absent product is a coverage question, not a drifted gate.
 | `registration` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
 | `save-state` | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
 | `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — | — |
+| `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | yes | — | — |
 | `verifier` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 
 ## Different checker scripts
@@ -397,6 +398,11 @@ absent product is a coverage question, not a drifted gate.
 - **5110**: `tools/make_5110_eeprom_profile.py`
 - **5210**: `tools/check_lcd_frame.py`
 
+### `sim-toolkit`
+
+- **3210**: `tools/sim_toolkit_trace_check.py`
+- **6210**: `tools/run_noki6210_acceptance.py`
+
 ### `verifier`
 
 - **6210**: `tools/nsm3_verifier_check.py`
@@ -501,6 +507,11 @@ absent product is a coverage question, not a drifted gate.
 
 - **5110**: `build`
 - **5210**: _(none)_
+
+### `sim-toolkit`
+
+- **3210**: _(none)_
+- **6210**: `build`
 
 ## Different run duration
 
@@ -837,4 +848,9 @@ absent product is a coverage question, not a drifted gate.
 
 - **3210**: `shell`
 - **5210**: `shell`
+
+### `sim-toolkit`
+
+- **3210**: `shell`
+- **6210**: `structured`
 

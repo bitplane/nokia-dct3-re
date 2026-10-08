@@ -1205,6 +1205,8 @@ void nokia_sim_card_device::append_completion_status(
 		response[length++] = 0x90;
 		response[length++] = 0x00;
 	}
+	LOGMASKED(LOG_SIM, "SIM completion ins=%02x sw=%02x%02x\n",
+			m_ins, response[length - 2], response[length - 1]);
 }
 
 void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)

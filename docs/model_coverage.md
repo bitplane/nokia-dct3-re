@@ -97,6 +97,11 @@ restore a SIP dialog.
 
 ## Product-boundary cautions
 
+The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
+its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
+physical successful clearance and exact registered-idle recovery. Other
+proactive commands and native DSP are not promoted by this gate.
+
 The 8210 research-HLE profile additionally passes `verify-8210-ussd`: physical
 `*123#`/Send, exact GSM supplementary-service request/response, RR release,
 reviewed result presentation and physical Back to registered idle. Its own

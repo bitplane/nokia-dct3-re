@@ -259,6 +259,23 @@ mask routine `2c75` remain research assumptions. Native mask execution,
 measured DSP self-test values, speech/audio parity and electrical ADC units
 remain separate work, not implied by the phone-service gates.
 
+## SIM Toolkit
+
+`make verify-6210-sim-toolkit RUN_DIR=run_6210_toolkit` uses unchanged
+acquired phone PMM and a Phase-2+ laboratory SIM selected through SATCFG.
+The own firmware reads EF_PHASE `03`, sends a nine-byte TERMINAL PROFILE,
+receives normal completion, then discovers a card-owned proactive command
+through STATUS `91 16`. It performs FETCH `A0 12 ... 16`, renders `DCT3 SAT`,
+and after physical OK sends the exact successful DISPLAY TEXT TERMINAL
+RESPONSE. The gate requires ordered APDUs, both reviewed 96x60 frames,
+registered-idle recovery and persisted EF_LOCI. It does not inject any latch,
+message, firmware state or proactive object into the handset.
+
+This establishes DISPLAY TEXT clearance, not all Toolkit commands or native
+DSP execution. The completion trace records the status bytes actually appended
+to data-bearing card replies; ordinary `9000` and proactive `9116` responses
+use the same observation-only path.
+
 ## Host incoming call
 
 `tools/run_noki6210_acceptance.py RUN --scenario host-incoming-call` enables

@@ -185,6 +185,15 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "state-sms", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-sim-toolkit",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "own NPE-3 Phase-2+ SIM, proactive DISPLAY TEXT and physical clearance",
+      "recipe": [
+        "\t$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario toolkit --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-6210-security",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
