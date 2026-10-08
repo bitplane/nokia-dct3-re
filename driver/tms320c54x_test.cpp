@@ -15008,6 +15008,38 @@ private:
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0400) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"TI ADDM example saturates negative overflow and costs two cycles");
+			m_phase = 9223;
+		}
+		if (m_phase >= 9223 && m_phase <= 9225)
+		{
+			if (m_phase != 9223)
+				expect_opcode(m_phase == 9224 ? 0x6b84 : 0x6b8c,
+					data.read_word(0x0100) == 0x8000 && data.read_word(0x00ff) == 0xbeef && data.read_word(0x0101) == 0xcafe &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == (m_phase == 9224 ? 0x0100 : 0x00ff) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0c00 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0300 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 AR4 ADDM saturates before stationary/decrement pointer update, preserves neighbors/accumulators and costs two cycles");
+			if (m_phase < 9225)
+			{
+				program.write_word(0x05e2, m_phase == 9223 ? 0x6b84 : 0x6b8c);
+				data.write_word(0x00ff, 0xbeef);
+				data.write_word(0x0100, 0x8007);
+				data.write_word(0x0101, 0xcafe);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e2, 0xcdb9); // ST A,*AR3+ || MPY *AR5+,B.
 			program.write_word(0x05e3, 0x75d6);
 			program.write_word(0x05e4, 0x0124);
