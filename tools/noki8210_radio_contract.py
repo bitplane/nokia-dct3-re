@@ -48,6 +48,14 @@ def verify(image):
     if [int.from_bytes(read(address, 4), 'big') for address in
             (0x2a18f8, 0x2a1c14, 0x2a1c18)] != [0x13722c, 0x137238, 0x137240]:
         raise ValueError('selected-cell outcome/link roots differ')
+    if [int.from_bytes(read(address, 4), 'big') for address in
+            (0x258e20, 0x258e28, 0x258e10)] != [0x7d4, 0x7da, 0x3ed]:
+        raise ValueError('readiness producer status/input literals differ')
+    if instructions(0x258aea, 6) != [
+            ('movs', 'r0, #0xfb'), ('lsls', 'r0, r0, #2'), ('b', '#0x258afc')]:
+        raise ValueError('07d4 readiness input construction differs')
+    if instructions(0x258afc, 4) != [('bl', '#0x2aede0')]:
+        raise ValueError('readiness constructor boundary differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

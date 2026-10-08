@@ -6,6 +6,48 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_readiness_constructor = memory:install_read_tap(0x2aede0, 0x2aede3,
+        'nsm3_readiness_constructor', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2aede0 then return end
+            local input = cpu.state['R0'].value
+            if input ~= 0x03ec and input ~= 0x03ed then return end
+            machine:logerror(string.format('8210_readiness_constructor: input=%04x caller=%08x t=%.6f\n',
+                input, cpu.state['R14'].value, machine.time:as_double()))
+        end)
+    _G.nsm3_readiness_sender = memory:install_read_tap(0x28845c, 0x28845f, 'nsm3_readiness_sender',
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x28845c or cpu.state['R0'].value ~= 12 then return end
+            local object = cpu.state['R1'].value
+            if object < 0x100000 or object >= 0x17fffc then return end
+            local input = memory:read_u16(object)
+            if input ~= 0x03ec and input ~= 0x03ed then return end
+            machine:logerror(string.format('8210_readiness_sender: input=%04x class=%02x caller=%08x t=%.6f\n',
+                input, memory:read_u8(object + 3), cpu.state['R14'].value, machine.time:as_double()))
+        end)
+    _G.nsm3_cell_messages = memory:install_read_tap(0x2d5d80, 0x2d5d83, 'nsm3_cell_messages',
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2d5d80 then return end
+            local caller = cpu.state['R14'].value
+            if caller < 0x21b000 or caller >= 0x220000 then return end
+            local object = cpu.state['R0'].value
+            local context = cpu.state['R4'].value
+            if object < 0x100000 or object >= 0x17fff4 or
+                    context < 0x100000 or context >= 0x17fffc then return end
+            local bytes = {}
+            for index = 0, 11 do bytes[#bytes + 1] = string.format('%02x', memory:read_u8(object + index)) end
+            machine:logerror(string.format('8210_cell_message: caller=%08x state=%04x data=%s t=%.6f\n',
+                caller, memory:read_u16(context + 2), table.concat(bytes), machine.time:as_double()))
+        end)
+    _G.nsm3_cell_links = {}
+    for _, address in ipairs({0x137238, 0x137240}) do
+        _G.nsm3_cell_links[#_G.nsm3_cell_links + 1] = memory:install_write_tap(
+            address, address + 3, 'nsm3_cell_link_' .. address,
+            function(offset, value, mask)
+                machine:logerror(string.format('8210_cell_link_write: address=%08x data=%08x mask=%08x pc=%08x caller=%08x t=%.6f\n',
+                    offset, value, mask, cpu.state['PC'].value,
+                    cpu.state['R14'].value, machine.time:as_double()))
+            end)
+    end
     _G.nsm3_cell_flags = {}
     local flags_pointer
     _G.nsm3_cell_flags_root = memory:install_write_tap(0x13722c, 0x13722f,

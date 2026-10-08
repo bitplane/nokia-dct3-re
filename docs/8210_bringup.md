@@ -749,6 +749,18 @@ The post-rejection `21b8ea -> 21bb8c` path repeatedly enters `PH_9000`
 while broadcasts arrive: the task remains live, not blocked inside the
 decision helper. Compare the lifecycle that establishes the selected-cell
 record/links before treating the outcome as a missing peer reply.
+The link roots have six/four aligned literal references respectively. Runtime
+writes identify `287470` scan-link creation, `287218` scan-link clearing and
+`2873a4` selected-link publication. The working GSM path additionally uses
+`28725c` at measurement completion; these are MCU-owned transitions.
+
+The decisive post-PIN inputs differ: DCS receives `03ec`, while GSM receives
+`03ed`. Both are constructed by `2aede0`, called from `258afc`, and posted to
+task 12 by `2af11a`. The producer's status cascade maps `07d4 -> 03ec` and
+`07da -> 03ed`; enumerate the producers of those status values next. The raw
+byte at message `+3` differs too, but this constructor does not demonstrably
+initialize it as a class, so its observed `c7`/`3b` bytes have no assigned
+semantics. Do not substitute `03ed` or alter the selected-cell links.
 
 ## Evidence needed to resume
 
