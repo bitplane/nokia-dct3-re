@@ -35,8 +35,8 @@ def verify(text, *, pcs1900=False, configured_gsm900=False, preserved_location=F
     if pcs1900 and configured_gsm900:
         raise ValueError('PCS1900 and configured GSM900 are distinct compositions')
     if preserved_location:
-        if not configured_gsm900 or pcs1900:
-            raise ValueError('preserved-location acceptance requires configured GSM900')
+        if pcs1900:
+            raise ValueError('preserved-location acceptance is not established for PCS1900')
         # The restarted own handset sends 72 and its retained LAI, not the
         # cold unlocated 70/00f000fffe request. Keep both exact grammars.
         checkpoints = [(label, pattern.replace('05087000f000fffe23', '05087200f110000123'))

@@ -1842,17 +1842,21 @@ with this handset's own physically entered clock/date storage. The ordinary
 STATUS poll at 62.016 seconds returns `91 16`; FETCH follows at 62.070
 seconds. Physical Menu at 71 seconds produces successful TERMINAL RESPONSE
 `810301218002028281030100` and `90 00`, then returns to DCT3LAB idle.
+`make verify-8890-sim-toolkit` reproduces this in two isolated processes:
+the seed passes the cold-start screen-busy gate while physically entering
+clock/date; the second process copies only that seed's own NVRAM and
+configuration. Retained-LAI registration uses the independently checked
+default-channel grammar, preserves EF_LOCI and resumes paging.
 The reviewed 84x48 DISPLAY TEXT pixel SHA256 is
 `6a0bd20bfe0a7f57ae82a570eceb3a0f29fdc8a9a1e047fb294e85d61e610f6f`;
 the post-dismissal 12:01 idle hash is
 `8187cbe68f4b7fe0a15cf10c16b742b3236f3240af3f79556c319d5ed337f2ee`.
 `noki8890_toolkit_retained_input.lua` supplies only physical security entry,
 snapshots and dismissal. The shared DISPLAY TEXT protocol checker passes
-the captured exchange. This retained-clock observation is not yet a
-self-contained two-process acceptance gate: fresh clock/date seeding,
-retained registration and storage predicates must be integrated before
-promoting it into the coverage matrix. The cold-start screen-busy gate
-remains unchanged. The earlier 43-second observation window missed this
+the captured exchange, and the gate requires retained registration,
+persistent SIM location and both exact frames. This proves DISPLAY TEXT,
+not other proactive commands or native DSP speech. The cold-start screen-busy
+gate remains unchanged. The earlier 43-second observation window missed this
 later poll; no polling interval, card-ready timing or firmware UI state was
 forced to obtain the result.
 

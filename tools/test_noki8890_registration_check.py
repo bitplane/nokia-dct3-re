@@ -36,8 +36,12 @@ class RegistrationTest(unittest.TestCase):
                 verify(candidate, configured_gsm900=True, preserved_location=True)
         with self.assertRaises(ValueError):
             verify(text, configured_gsm900=True)
-        with self.assertRaisesRegex(ValueError, 'requires configured'):
+        with self.assertRaises(ValueError):
             verify(text, preserved_location=True)
+        default = text.replace('041202000000', '040000000000')
+        verify(default, preserved_location=True)
+        with self.assertRaises(ValueError):
+            verify(default, configured_gsm900=True, preserved_location=True)
         with self.assertRaisesRegex(ValueError, 'rewritten'):
             verify(text + '\nsim_device: update-binary fid=6f7e offset=4 length=5',
                    configured_gsm900=True, preserved_location=True)

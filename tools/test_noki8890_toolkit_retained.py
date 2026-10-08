@@ -1,0 +1,49 @@
+import hashlib
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+from PIL import Image
+from tools.dct3_toolkit_check import display_text_events
+from tools.run_noki8890_toolkit_retained import verify
+
+
+class RetainedToolkitTest(unittest.TestCase):
+    def test_protocol_storage_and_both_frames_required(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            (run / 'snap').mkdir()
+            (run / 'nvram/nsb6hle').mkdir(parents=True)
+            log = '\n'.join(display_text_events('8890'))
+            (run / 'error.log').write_text(log)
+            storage = bytearray(1611)
+            storage[1604:1609] = bytes.fromhex('00f1100001')
+            card = run / 'nvram/nsb6hle/sim_card'
+            card.write_bytes(storage)
+            frame = Image.new('L', (84, 48), 127)
+            digest = hashlib.sha256(frame.tobytes()).hexdigest()
+            names = ('display.png', 'idle.png')
+            for name in names:
+                frame.save(run / 'snap' / name)
+            with patch('tools.run_noki8890_toolkit_retained.FRAMES', dict.fromkeys(names, digest)), \
+                    patch('tools.run_noki8890_toolkit_retained.verify_registration') as registration:
+                verify(run)
+                registration.assert_called_once_with(log, preserved_location=True)
+                storage[1610] = 1
+                card.write_bytes(storage)
+                with self.assertRaisesRegex(ValueError, 'location'):
+                    verify(run)
+                storage[1610] = 0
+                card.write_bytes(storage)
+                for name in names:
+                    Image.new('L', (84, 48), 0).save(run / 'snap' / name)
+                    with self.assertRaisesRegex(ValueError, 'frame'):
+                        verify(run)
+                    frame.save(run / 'snap' / name)
+                (run / 'error.log').write_text(log.replace('030100', '03022001'))
+                with self.assertRaises(ValueError):
+                    verify(run)
+
+
+if __name__ == '__main__':
+    unittest.main()
