@@ -610,8 +610,9 @@ Pipeline-flush-on-halt mode changes observation and profiling behavior;
 an eventual comparison must identify the selected device and execution mode.
 TI's [C54x simulator support clarification](https://e2e.ti.com/support/tools/code-composer-studio-group/ccs/f/code-composer-studio-forum/249280/how-to-use-ccs-v5-1-for-tms320c54xx)
 places that simulator in CCS 3.x or earlier, not CCS 5.x. The referenced
-CCS 3.3.83.20 public archive paths currently return HTTP 404; no simulator
-package has been obtained or executed. This does not exhaust software-only
+CCS 3.3.83.20 public archive paths currently return HTTP 404; no runnable C54x
+simulator engine has been obtained or executed. The acquired SR12 update
+described below is not that engine. This does not exhaust software-only
 evidence or establish a physical-hardware requirement.
 Two publicly accessible alternatives do not cover this boundary:
 [gDSPsim 0.30](https://sourceforge.net/projects/gdspsim/files/gdspsim/gdspsim-0.30/)
@@ -672,6 +673,20 @@ is a documented observation interface, not an acquired executable or measured
 timer result. The 419-page PDF is retained at
 `roms/reference-docs/c54x/ti_tms320c54x_debugger_spru099d.pdf`, SHA-256
 `20e6c1573d959f3752d9f32187bd6119dee2c4a848b020af66ddbf23f685c909`.
+TI's [C54x family datasheet](https://www.ti.com/lit/gpn/tms320lc543),
+development-support table 14, identifies the standalone simulator products
+as `TMDS324L851-02` (PC DOS/Windows) and `TMDS324L551-09` (SPARC).
+These are acquisition identifiers, not the similarly named assembler/linker
+or XDS hardware-debugger packages. Searches by these identifiers and by
+`sim54x` have not yielded a runnable distribution; this is a bounded search
+result, not proof that the software is unavailable.
+The GNU-toolchain lead also needs this distinction: the author's
+[BFD page-support discussion](https://sourceware.org/pipermail/binutils/2000-January/003156.html)
+describes remote-debugger address-space encoding and assembler/linker work.
+It does not establish an instruction simulator, timer implementation or
+pipeline oracle. A C54x target name in binutils/GDB is insufficient evidence
+for any of those capabilities. No GNU simulator result is used to validate
+the short-period interrupt probe.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
