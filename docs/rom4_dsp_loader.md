@@ -1191,6 +1191,10 @@ nonfractional cross-destination case yields A=4 while retaining B=10; the
 fractional same-destination case yields B=-2 while retaining A=4. Both
 assert T/source-memory/AR3/carry preservation and two-cycle DARAM cost.
 These are fixture-only destination checks, not RF or speech acceptance.
+The integrated observed-coverage gate passes with these destination fixtures:
+the idle/Menu/long-power union remains 594 asserted words across 107 groups,
+with its accepted fingerprint unchanged. Neither physical input trace adds
+an unasserted word; the extra arithmetic words remain fixture-only.
 The immediate-MAC fixtures also assert absolute extension
 order, preincrement timing, T publication, and DARAM cycle cost. A long-offset
 fixture verifies immediate-before-offset fetch and the extra cycle; a separate
