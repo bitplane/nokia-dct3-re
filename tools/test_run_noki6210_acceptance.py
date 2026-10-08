@@ -34,6 +34,30 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_retained_location_is_product_specific_not_fresh_registration(self):
+        text = '\n'.join((
+            'read-binary fid=6f7e offset=0 length=11',
+            'TX packet type=56 payload=160 data=0023',
+            'TX packet type=02 radio_phase=candidate_channel_change data=040000000000005050000023',
+            'TX packet type=0c radio_phase=random_access',
+            'RX enqueue type=89 payload=8 data=0100000000000000',
+            'TX packet type=1b data=0080013f4905087200f110000133080910101032547698',
+            'LAPDm Location Updating Accept acknowledged nr=1',
+            'update-binary fid=6f7e offset=4 length=5',
+            'LAPDm Channel Release acknowledged nr=2',
+            'TX packet type=02 radio_phase=release_channel_change data=040000000000001a600000230000000f'))
+        storage = bytearray(3524)
+        storage[1604:1609] = bytes.fromhex('00f1100001')
+        runner.check_registration(text, storage, preserved_location=True)
+        with self.assertRaises(ValueError):
+            runner.check_registration(text, storage)
+        for broken in (text.replace('read-binary fid=6f7e', 'read-binary fid=6f3a'),
+                       text + '\nupdate-binary fid=6f7e offset=10 length=1',
+                       text.replace('05087200f1100001', '05087000f000fffe'),
+                       text.replace('update-binary fid=6f7e offset=4', 'update-binary fid=6f3a offset=4')):
+            with self.subTest(text=broken), self.assertRaises(ValueError):
+                runner.check_registration(broken, storage, preserved_location=True)
+
     def test_host_sms_frame_rejects_blank_or_wrong_geometry(self):
         for size in ((96, 60), (84, 48)):
             with self.assertRaisesRegex(ValueError, 'Message sent'):

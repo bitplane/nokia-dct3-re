@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 78
-Differences found: 119
+Families with more than one product: 79
+Differences found: 120
 
 ## ROM normalisation reachability
 
@@ -38,6 +38,7 @@ absent product is a coverage question, not a drifted gate.
 | `outgoing-call` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
 | `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
 | `phonebook` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `power-cycle` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
 | `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — | — | — | — | — | — | — |
 | `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
 | `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
@@ -191,6 +192,11 @@ absent product is a coverage question, not a drifted gate.
 
 - **6210**: `tools/run_noki6210_acceptance.py`
 - **8210**: `tools/run_noki8210_acceptance.py`
+
+### `power-cycle`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8890**: `tools/run_noki8890_power_cycle.py`
 
 ### `power-lifecycle`
 

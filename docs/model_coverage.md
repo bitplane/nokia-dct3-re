@@ -109,6 +109,14 @@ restored and no speech is established.
 
 ## Product-boundary cautions
 
+The 6210 passes `verify-6210-power-cycle` with unchanged own PMM: physical
+shutdown, blank display, at least eight seconds of retained RTC ticks and
+DSP/radio silence, PWRONX restart, both own native-upload/HLE stages,
+retained-LAI registration, exact idle recovery and decoded physical Menu.
+Its warm registration rewrites LAI but not the valid status byte, unlike
+the 8890's no-rewrite lifecycle. Firmware resets RTC seconds after wake;
+cold-process persistence and native speech remain unproved.
+
 The 8890 additionally passes `verify-8890-power-cycle`: physical shutdown,
 blank LCD, six seconds of continuous CCONT RTC ticks with DSP/radio
 transport silence while CPU power is off, separate PWRONX restart,

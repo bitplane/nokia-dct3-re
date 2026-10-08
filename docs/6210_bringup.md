@@ -378,6 +378,36 @@ explicitly resumes its physical input schedule after the replay interval;
 it does not restore or inject handset state. ARM7's named `PC` is a debugger
 cache: the snapshot reads the saved architectural `R15` instead.
 
+## Physical power lifecycle
+
+`verify-6210-power-cycle` starts a fresh private `npe3hle` process with its
+unchanged acquired PMM. Registered idle at 20 s is followed by physical
+Power at 25 s, held for four seconds. Firmware commands rail-off at about
+31.68 s; the display is blank. At least eight seconds of continuous CCONT
+RTC ticks are required with no DSP RX publication, peer shared-RAM writes,
+FIQ0 notifications, native port activity or radio LAPDm output.
+
+A separate physical Power press at 40 s restores the digital domain through
+PWRONX cause `02`, not a charger event. Firmware consumes ready/PWRONX
+status `13`, executes its own native verifier/loaders before the explicit
+missing-mask HLE handoff, and completes its own compact self-test again.
+Both boot stages are checked independently; passive debugger log caps are
+re-armed without changing firmware registers or RAM.
+
+The warm Location Updating request carries retained laboratory LAI:
+`0080013f4905087200f110000133080910101032547698`. Organic EF_LOCI reading
+must precede it. Unlike the NSB-6 warm lifecycle, NPE-3 rewrites the LAI
+after accept but does not redundantly write the already-valid location
+status byte. The cold registration grammar remains unchanged. Exact
+registered-idle frames before and after restart and physical Menu decoding
+as `19` into the reviewed Messages frame prove UI recovery without security
+code injection or manual phone-lock entry.
+
+NPE-3 firmware explicitly writes RTC seconds `07=00` after PWRONX wake.
+Retained device counters while off do not imply untouched software time,
+cold-process calendar persistence, measured wake latency, complete
+peripheral power gating or native speech.
+
 ## Unattached accessory input
 
 The NPE-3 schematic sheets 2/3 connect `HEADDET` to CCONT's EAD pin A2

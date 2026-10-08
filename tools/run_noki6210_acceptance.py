@@ -15,6 +15,7 @@ from tools.noki6210_staged_check import verify
 from tools.noki6210_radio_contract import verify as verify_radio_contract
 
 SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
+             'power-cycle': ('npe3hle', 'power_cycle_input', 65),
              'runtime': ('npe3hle', 'staged_observe', 18),
              'menu': ('npe3hle', 'menu_input', 25),
              'calculator': ('npe3hle', 'application_input', 38),
@@ -45,14 +46,16 @@ SMS_SENT_SHA256 = '67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc
 SECURITY_MENU_SHA256 = 'dca943c465ed8b7cc2c766e9ac0f6f69ce86228c04aa68cd52d1b20a75a8bf3f'
 
 
-def check_registration(text, storage):
+def check_registration(text, storage, *, preserved_location=False):
     import re
     patterns = (
         r'TX packet type=56 payload=160 .*data=0023',
         r'TX packet type=02 .*radio_phase=candidate_channel_change data=040000000000005050000023',
         r'TX packet type=0c .*radio_phase=random_access',
         r'RX enqueue type=89 payload=8 .*data=0100000000000000',
-        r'TX packet type=1b .*data=0080013f4905087000f000fffe33080910101032547698',
+        (r'TX packet type=1b .*data=0080013f4905087200f110000133080910101032547698'
+         if preserved_location else
+         r'TX packet type=1b .*data=0080013f4905087000f000fffe33080910101032547698'),
         r'LAPDm Location Updating Accept acknowledged nr=1',
         r'LAPDm Channel Release acknowledged nr=2',
         r'TX packet type=02 .*radio_phase=release_channel_change data=040000000000001a600000230000000f',
@@ -66,8 +69,17 @@ def check_registration(text, storage):
     # SIM persistence is downstream of LU acceptance, but may complete
     # before or after radio release. Do not serialize independent consumers.
     cursor = text.index('LAPDm Location Updating Accept acknowledged nr=1')
-    for record in ('update-binary fid=6f7e offset=4 length=5',
-                   'update-binary fid=6f7e offset=10 length=1'):
+    updates = ['update-binary fid=6f7e offset=4 length=5']
+    if not preserved_location:
+        updates.append('update-binary fid=6f7e offset=10 length=1')
+    else:
+        read = text.find('read-binary fid=6f7e offset=0 length=11')
+        request = text.find('data=0080013f4905087200f110000133080910101032547698')
+        if read < 0 or request < 0 or read > request:
+            raise ValueError('warm NPE-3 registration did not read retained EF_LOCI before requesting')
+        if 'update-binary fid=6f7e offset=10 length=1' in text:
+            raise ValueError('warm NPE-3 registration redundantly rewrote valid location status')
+    for record in updates:
         position = text.find(record, cursor)
         if position < 0:
             raise ValueError('missing ordered NPE-3 SIM location persistence: ' + record)
@@ -217,9 +229,15 @@ def main():
             subprocess.run(host_command or command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
         check_output((run / 'console.log').read_text(errors='replace'))
-        text = events(run / 'error.log')
+        text = ((run / 'error.log').read_text(errors='replace')
+                if args.scenario == 'power-cycle' else events(run / 'error.log'))
         runtime = args.scenario != 'stage'
-        verify(text, runtime=runtime, selftest=runtime)
+        if args.scenario == 'power-cycle':
+            from tools.noki6210_power_check import verify as check_power, check_frames
+            check_power(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            check_frames(run / 'snap')
+        else:
+            verify(text, runtime=runtime, selftest=runtime)
         if args.scenario in ('menu', 'accessory'):
             from PIL import Image
             with Image.open(run / 'snap/6210_after_menu.png') as frame:

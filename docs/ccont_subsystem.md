@@ -354,6 +354,13 @@ completes the same physical PWRONX restart, own uploads, registration and
 security entry to idle. This validates emulator state restoration, not
 battery-backed persistence across process termination.
 
+The independent NPE-3 `verify-6210-power-cycle` gate covers the same shared
+PWRONX/backend boundary with unchanged own PMM, eight seconds of off-state
+RTC ticks and DSP/radio silence, both own native-upload/HLE stages and
+physical Menu after registered-idle recovery. Its retained-location
+registration rewrites LAI but not status; no NSB-6 protocol ordering or
+security-editor requirement is imported.
+
 CCONT watchdog expiry uses the same digital-baseband reset domain. It resets
 the CPU, MAD2 peripherals, GENSIO, MBUS, DSPIF/peer, SIMI/card protocol state
 and LCD controller while retaining CCONT, flash and EEPROM. MAD2 watchdog
