@@ -149,6 +149,15 @@ def verify(image):
     if instructions(0x21bb92, 10) != [
             ('ldr', 'r0, [r4, #8]'), ('bl', '#0x288e44'), ('bl', '#0x2886b0')]:
         raise ValueError('PH9000 message disposal and receive boundary differs')
+    if int.from_bytes(read(0x21bbe4 + 13 * 4, 4), 'big') != 0x21ef30:
+        raise ValueError('state-13 measurement recovery dispatch differs')
+    if instructions(0x21ef3c, 8) != [
+            ('ldrb', 'r0, [r4]'), ('cmp', 'r0, #0x8b'),
+            ('beq', '#0x21ef44'), ('b', '#0x21ebc4')]:
+        raise ValueError('state-13 measurement completion selector differs')
+    if instructions(0x21ef4a, 10) != [
+            ('ldr', 'r0, [r4, #8]'), ('bl', '#0x2a2250'), ('bl', '#0x21f900')]:
+        raise ValueError('state-13 measurement recovery does not reevaluate queued request')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

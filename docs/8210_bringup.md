@@ -894,6 +894,15 @@ message through `288e44`, and receives again through `2886b0`. It does
 not issue a radio request or arm a retry on this path. Therefore trace
 subsequent receive events and their queued-request consumers; do not
 interpret the PH9000 label alone as an active recovery operation.
+One concrete subsequent-event candidate is decoded: the state-`0d`
+dispatch entry at `21bbe4 + 13*4` points to `21ef30`. Input `1802` with
+type `8b` takes `21ef44`, parses the measurement through `2a2250`, then
+calls `21f900`, which invokes the argument-0 queue selector. This is the
+same selector that promotes the early queued request. The late run's
+subsequent traffic contains `83` and `03f9`, not a later `8b` completion.
+The open transport question is whether an already-issued measurement
+command requires such a later completion; the consumer alone does not
+authorize unsolicited periodic `8b` packets.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
