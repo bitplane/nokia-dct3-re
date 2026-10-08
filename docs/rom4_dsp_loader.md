@@ -1091,10 +1091,12 @@ Exact `6d95` checks one AR5 increment, unchanged AR6/memory and one cycle.
 Exact `7e92` distinguishes A-addressed program memory from different data
 memory at the same address, checks AR2 post-increment, unchanged A/AR3 and
 five-cycle execution.
-The next coverage task is to classify and assert these newly observed paths,
-not extend unobserved variants or fabricate RF samples. The gate deliberately
-retains its older fingerprint until the expanded execution is explained and
-its assertion gaps are closed.
+The fresh trace's assertion gaps are closed. The next task is to explain the
+expanded execution, not fabricate RF samples or infer acquisition from opcode
+coverage. The integrated idle/Menu/power gate reproduces the 594-word,
+107-group primary fingerprint and passes the long power-key lifecycle, then
+rejects the retained older fingerprint before validating the union. The gate
+deliberately retains that fingerprint until the expanded execution is explained.
 
 The retained narrower baseline dispatches 457 words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
@@ -1109,8 +1111,9 @@ currently adds an opcode word; these are measured negative results, not
 evidence that other interactive or radio paths cannot execute more DSP
 instructions. The fixed idle fingerprint still applies only to the untouched
 primary run.
-The fixture asserts all 457 narrower-baseline words plus fixture-only words;
-this does not close the fresh 594-word run.
+The fixture asserts all 594 fresh-run words plus fixture-only words. This
+closes exact-word assertion coverage for that captured run, not every operand,
+status or hardware interaction those instructions can encounter.
 The generated report gives the current fixture-only total; these are *word*
 counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -1178,7 +1181,8 @@ modifying T or AR3. It runs in one DARAM cycle.
 The coverage tool now separates fixture execution from explicit result
 assertions. All 457 narrower-baseline ROM4 words have an `opassert` marker
 after a passing exact-word check; none of that set are executed-only or absent.
-The fresh 594-word trace still has gaps quantified above. Neither result
+The fresh 594-word trace also has explicit passing assertions for every word.
+Neither result
 establishes unexecuted ROM4 paths, unobserved encodings, or the instruction-family
 audit. Existing result
 checks now explicitly
