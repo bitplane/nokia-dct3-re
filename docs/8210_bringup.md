@@ -90,6 +90,18 @@ five focused NSM-3/NPE-3 control tests pass. Actual answered SIP/RTP and
 non-silent physical audio remain unvalidated. Endpoint wiring does not
 promote native DSP execution or factory provisioning.
 
+A bounded outgoing SIP-200 probe (`run_8210_sip_media_probe_local`) confirms
+and normally clears an actual PJSIP dialog, with bridge counters uplink 365,
+downlink 354, transmitted PCM 365 and received PCM 399 (38 dropped).
+Handset downlink sequences 0..352 are accepted in order; sequence 353 is
+rejected at 37.040 s during physical-End teardown. The strict media gate
+therefore fails: substantial traffic is not full lifecycle acceptance or
+non-silent microphone proof. Temporary answered-probe runner switches were
+removed; normal signaling-only restrictions remain. Resolve release/media
+ordering before promoting an answered gate. The common checker accepts
+PJSIP's status-200 reason strings `OK` and `Normal call clearing` while
+retaining exact numeric status and all media checks.
+
 ## Physical power lifecycle
 
 `make verify-8210-power-cycle RUN_DIR=NEW_DIRECTORY` starts with private fresh

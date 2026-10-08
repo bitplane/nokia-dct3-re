@@ -18,7 +18,7 @@ SETUP = {
 
 
 class SipProductSetupCheckTest(unittest.TestCase):
-    def check(self, product, setup_product, accepted=100, rejected=False):
+    def check(self, product, setup_product, accepted=100, rejected=False, reason='200 (OK)'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(
@@ -36,7 +36,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
             (root / 'sip-bridge.log').write_text(
                 f'SIP dial digits={number}\nSIP confirmed status=200\n'
                 'SIP bridge ended ' + json.dumps(counts) + '\n')
-            verify_success(root, 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]',
+            verify_success(root, 'state changed to CONFIRMED\nDISCONNECTED [reason=' + reason + ']',
                            SimpleNamespace(incoming=False, restore_idle=False, product=product))
             result = json.loads((root / 'sip-result.json').read_text())
             self.assertTrue(result['scope'].startswith(product + ' research-HLE'))
@@ -45,6 +45,12 @@ class SipProductSetupCheckTest(unittest.TestCase):
         for product in SETUP:
             with self.subTest(product=product):
                 self.check(product, product)
+
+    def test_normal_clearing_status_wording(self):
+        self.check('3210', '3210', reason='200 (Normal call clearing)')
+        for reason in ('2000 (OK)', '486 (Normal call clearing)'):
+            with self.subTest(reason=reason), self.assertRaises(RuntimeError):
+                self.check('3210', '3210', reason=reason)
 
     def test_other_product_setup_is_not_substituted(self):
         for product, other in (('3210', '3310'), ('3310', '3210'), ('6210', '3210')):

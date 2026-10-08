@@ -152,7 +152,8 @@ async def run(args):
 
 
 def verify_success(root, remote_text, args):
-    if 'state changed to CONFIRMED' not in remote_text or 'DISCONNECTED [reason=200 (OK)]' not in remote_text:
+    if 'state changed to CONFIRMED' not in remote_text or not re.search(
+            r'DISCONNECTED \[reason=200 \((?:OK|Normal call clearing)\)\]', remote_text):
         raise RuntimeError('remote SIP call did not confirm and release normally')
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
     number = {'6210': '1234567', '6250': '123', '8210': '1234567', '8890': '1234567'}.get(
