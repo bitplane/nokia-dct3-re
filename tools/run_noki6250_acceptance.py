@@ -76,7 +76,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "coherent-registration", "accessory", "idle-state", "call-state", "sms-state",
+                                              "phonebook", "registration", "coherent-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
                                               "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
@@ -119,7 +119,7 @@ def main():
             ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
                           mask="1", defvalue="0", value="1")
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
-        if args.scenario == 'coherent-registration' or args.coherent_cell:
+        if args.scenario in ('coherent-registration', 'power-cycle') or args.coherent_cell:
             apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
@@ -134,6 +134,8 @@ def main():
             script = "noki6250_state_call.lua"
         if args.scenario == "sms-state":
             script = "noki6250_state_sms.lua"
+        if args.scenario == 'power-cycle':
+            script = 'noki6250_power_input.lua'
         if host_call:
             script = "noki6250_host_incoming_input.lua"
         if args.scenario == "host-rejected-sms":
@@ -141,6 +143,8 @@ def main():
         if args.scenario == "host-silent-sms":
             script = "noki6250_sms_silence_input.lua"
         seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
+        if args.scenario == 'power-cycle':
+            seconds = '80'
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
                    "-nvram_directory", "nvram", "-cfg_directory", "cfg",
@@ -194,7 +198,7 @@ def main():
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
-            "laboratory_carrier": 19 if args.scenario == 'coherent-registration' or args.coherent_cell else None,
+            "laboratory_carrier": 19 if args.scenario in ('coherent-registration', 'power-cycle') or args.coherent_cell else None,
             "shared_rom_audit_members": audit_members,
             "accessory_contract": accessory_contract,
             "host_command": host_command,
@@ -240,6 +244,9 @@ def main():
                 raise ValueError(f"expected one save frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
                        "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
+        elif args.scenario == 'power-cycle':
+            checker = [sys.executable, str(root / 'tools/noki6250_power_check.py'),
+                       str(run / 'error.log'), str(run / 'nvram/nhm3hle/sim_card'), str(run / 'snap')]
         elif args.scenario == 'coherent-registration':
             checker = [sys.executable, str(root / 'tools/noki6250_coherent_registration_check.py'),
                        str(run / 'error.log'), str(run / 'nvram/nhm3hle/sim_card')]

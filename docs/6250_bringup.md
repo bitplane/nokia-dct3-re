@@ -27,7 +27,7 @@ physical continuation. Idle uses Menu/Messages; the established call uses
 End and complete CC/RR release back to registered idle. Neither resolves the
 original PMM or native DSP boundaries below.
 
-### Physical power-cycle observation
+### Physical power-cycle acceptance
 
 An isolated initial-record PMM comparison with the explicit ARFCN19/20
 configuration observes a four-second physical Power hold at 25 s, CCONT
@@ -39,14 +39,16 @@ shutdown; this is not a claim of a valid calendar or complete clock gating.
 
 After restart, the own native verifier/loaders and declared runtime-HLE
 checks pass again. A second Location Updating Accept is acknowledged at
-53.576663 s and the 75 s capture presents `DCT3 LAB`. This is an observation,
-not yet a permanent power acceptance gate: the single-boot registration
-checker requires an EF_LOCI status write absent from this warm transaction,
-and the passive NV-fault endpoint observer captures only the initial boot.
-The next gate must observe those second-boot endpoints and distinguish
-preserved valid location from a fresh status update, rather than weaken the
-fresh-registration contract. Normal `noki6250`, native speech and acquired
-PMM validity remain unchanged.
+53.576663 s and the 75 s capture presents `DCT3 LAB`.
+`make verify-6250-power-cycle RUN_DIR=NEW_DIRECTORY` repeats this sequence
+with second-boot NV-fault observations at 60 and 75 s. It requires native
+uploads/HLE isolation in both boots, fresh coherent registration before
+shutdown and the existing preserved-location registration contract after
+wake. The warm transaction reads retained EF_LOCI before its request,
+refreshes LAI and does not rewrite the already-valid location status.
+Reviewed idle pixels match before and after restart; the off frame is blank.
+The fresh-registration contract remains unchanged. Normal `noki6250`, native
+speech and acquired PMM validity remain unchanged.
 
 ## Inputs
 

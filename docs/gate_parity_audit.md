@@ -38,7 +38,7 @@ absent product is a coverage question, not a drifted gate.
 | `outgoing-call` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
 | `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
 | `phonebook` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | — |
-| `power-cycle` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | — | yes |
+| `power-cycle` | — | — | — | — | — | — | — | — | — | — | yes | yes | — | yes | — | yes |
 | `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
 | `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
 | `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
@@ -200,6 +200,7 @@ absent product is a coverage question, not a drifted gate.
 ### `power-cycle`
 
 - **6210**: `tools/run_noki6210_acceptance.py`
+- **6250**: `tools/run_noki6250_acceptance.py`
 - **8210**: `tools/run_noki8210_acceptance.py`
 - **8890**: `tools/run_noki8890_power_cycle.py`
 

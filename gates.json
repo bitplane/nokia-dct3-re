@@ -14019,6 +14019,14 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "power-cycle", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-power-cycle",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "power-cycle", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-coherent-registration",
       "prerequisites": ["build"],
       "variables": {},
