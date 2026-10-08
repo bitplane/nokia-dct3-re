@@ -7209,6 +7209,24 @@ private:
 			expect_opcode(0x6d96, m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0f43 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 MAR *AR6+ increments AR6 in one cycle");
+			program.write_word(0x05e3, 0x6d95); // MAR *AR5+.
+			data.write_word(0x0f50, 0xbeef);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f50);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6537;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6537)
+		{
+			expect_opcode(0x6d95,
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f51 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0f43 &&
+				data.read_word(0x0f50) == 0xbeef &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 MAR increments AR5 exactly once without changing AR6 or pointed memory in one cycle");
 			program.write_word(0x05e3, 0xe712); // MVMM AR1,AR2
 			program.write_word(0x05e4, 0x75f8);
 			program.write_word(0x05e5, 0x0d00);
@@ -7989,6 +8007,28 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234beef &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"absolute STL B stores the low word in two cycles");
+			program.write_word(0x05e3, 0x8192); // STL B,*AR2+.
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			data.write_word(0x0f24, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f24);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6538;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6538)
+		{
+			expect_opcode(0x8192,
+				data.read_word(0x0f24) == 0xbeef &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234beef &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f25 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 STL B stores the low word before one AR2 increment and preserves B in one cycle");
 			program.write_word(0x05e3, 0x7582); // PORTW *AR2,0124h
 			program.write_word(0x05e4, 0x0124);
 			program.write_word(0x05e5, 0x75f8);
@@ -8010,6 +8050,24 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 					m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
 					"PORTW *AR2 emits memory word without modifying AR2 in two cycles");
+			program.write_word(0x05e3, 0x7583); // PORTW *AR3,0124h.
+			data.write_word(0x0f22, 0xbeef);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f22);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6536;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6536)
+		{
+			expect_opcode(0x7583, m_middle_port_value == 0xbeef &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f22 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+				data.read_word(0x0f22) == 0xbeef &&
+				m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 PORTW selects AR3 rather than AR2, preserves source/pointers and consumes the port extension in two cycles");
 			program.write_word(0x05e3, 0x61ea); // BITF *+AR2(5),#8000
 			program.write_word(0x05e4, 5);
 			program.write_word(0x05e5, 0x8000);
@@ -10606,6 +10664,26 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f32 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
 					"ROM4 READA uses A as program source and decrements AR3 after five cycles");
+			program.write_word(0x05e2, 0x7e92); // READA *AR2+.
+			data.write_word(0x0d40, 0xface); // Distinguish program source from data source.
+			data.write_word(0x0f34, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f34);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6539;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6539)
+		{
+			expect_opcode(0x7e92,
+				data.read_word(0x0f34) == 0xabcd && data.read_word(0x0d40) == 0xface &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0d40 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f35 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f32 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 7,
+				"ROM4 READA reads program rather than data memory at A and postincrements AR2 in five cycles");
 			program.write_word(0x05e2, 0xf1c0); // XOR A,B
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff0000000fULL);
