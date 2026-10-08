@@ -95,6 +95,25 @@ registration. These observations do not extend the PIN-disabled coherent
 registration gate to a PIN-enabled boot; recover the post-CHV1 MM/RR
 continuation before doing so. Phone PMM and firmware are unchanged.
 
+The PIN-enabled and ordinary coherent boots have identical first 32 MCU
+radio TX packets. Their next serving-channel bodies are respectively
+`0412020900000010600000131000000000297000` and
+`0412020900000010600000131000000007297000`: byte 16 is `00` versus `07`.
+The PIN-enabled boot then emits type `57`, body `03050000`, at 10.364497 s;
+the ordinary boot instead emits type `46`, body `3210321000010000`, then
+reconfigures its receiver and reaches random access. Recurring type `4a`,
+body `011b`, appears in the locked boot both before and after successful
+VERIFY; it is not established as a reply-bearing post-PIN request.
+
+Passive TX-producer observation at `100a4` identifies commit PC `4295a0`,
+LR `4295f1` and stacked continuation `4f6113` for types `57/4a`. Own-ROM
+code at `4f610a..4f6112` reads the queued object's byte 2, passes its payload
+at `+3` to `4295bc`, then tests send success. This locates the common sender,
+not the original constructor or the semantics of byte 16. Recover those
+upstream owners before changing peer behavior. The peer already transmits
+continuous serving SI; absence of a one-shot repeated SI response is not
+an established cause. No guessed type-57/4a acknowledgement is installed.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
