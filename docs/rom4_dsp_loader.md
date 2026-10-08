@@ -1191,6 +1191,11 @@ nonfractional cross-destination case yields A=4 while retaining B=10; the
 fractional same-destination case yields B=-2 while retaining A=4. Both
 assert T/source-memory/AR3/carry preservation and two-cycle DARAM cost.
 These are fixture-only destination checks, not RF or speech acceptance.
+Four additional B-source cases distinguish positive overflow for both
+destinations with OVM clear/set: `7ffffffe + 3*2` retains `0080000004`
+without OVM or saturates to `007fffffff` with it. Only the destination's
+OVA/OVB bit is set, carry is retained and the other accumulator is unchanged.
+T, AR3, source memory and the two-cycle DARAM cost are independently checked.
 The integrated observed-coverage gate passes with these destination fixtures:
 the idle/Menu/long-power union remains 594 asserted words across 107 groups,
 with its accepted fingerprint unchanged. Neither physical input trace adds
