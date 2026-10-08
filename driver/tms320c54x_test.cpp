@@ -3182,26 +3182,29 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 6513 || m_phase == 6514)
+		if (m_phase == 6513 || m_phase == 6514 || m_phase == 6568 || m_phase == 6569)
 		{
-			bool const signed_memory = m_phase == 6513;
-			expect_opcode(0x4592,
+			bool const signed_memory = m_phase == 6513 || m_phase == 6568;
+			bool const stationary = m_phase >= 6568;
+			expect_opcode(stationary ? 0x4582 : 0x4592,
 				m_cpu->state_int(tms320c54x_device::STATE_B) == (signed_memory ? 0xffff800000ULL : 0xff800000ULL) &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x11223344 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d11 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (stationary ? 0x0d10 : 0x0d11) &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01 &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
 				data.read_word(0x0d10) == 0xff80 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 shifted LD through AR2 respects SXM, preserves A/status/source and postincrements once in one cycle");
-			if (signed_memory)
+				"ROM4 shifted LD through AR2 respects SXM, preserves A/status/source and selects stationary/postincrement addressing in one cycle");
+			if (m_phase != 6569)
 			{
+				const unsigned next = m_phase == 6513 ? 6514 : m_phase == 6514 ? 6568 : 6569;
+				program.write_word(0x05e2, next >= 6568 ? 0x4582 : 0x4592);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d10);
-				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next == 6568 ? 0x0100 : 0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				m_phase = 6514;
+				m_phase = next;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
@@ -11837,6 +11840,45 @@ private:
 						m_phase == 506 ? 1 : 0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_B,
 						m_phase == 507 ? 0xff00000000ULL : 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xff4f); // XC 2,BLEQ.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff00000000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6565;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 6565 && m_phase <= 6567)
+		{
+			static constexpr u64 values[] = { 0xff00000000ULL, 0, 0x0100000000ULL };
+			const unsigned index = m_phase - 6565;
+			const bool accepted = index < 2;
+			expect_opcode(0xff4f,
+				m_cpu->state_int(tms320c54x_device::STATE_AR1) == (accepted ? 0x0121 : 0x0120) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (accepted ? 0x0131 : 0x0130) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == values[index] &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 XC 2,BLEQ accepts negative/zero and rejects positive guard-bit values, preserves A/B/status and handles both slots at equal cycle cost");
+			if (index < 2)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, values[index + 1]);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0130);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
