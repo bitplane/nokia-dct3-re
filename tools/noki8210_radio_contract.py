@@ -400,6 +400,19 @@ def verify(image):
             ('bl', '#0x287272'), ('ldr', 'r5, [pc, #0x1b8]'),
             ('ldr', 'r0, [r5]'), ('strb', 'r6, [r0, #2]'), ('bl', '#0x21fb8c')]:
         raise ValueError('state-13 special-input argument-zero continuation differs')
+    if int.from_bytes(read(0x2e1150, 4), 'big') != 0x305ec5:
+        raise ValueError('special-status transport callback literal differs')
+    if instructions(0x2e0fae, 6) != [
+            ('ldr', 'r0, [pc, #0x1a0]'), ('bl', '#0x2b98e4')]:
+        raise ValueError('special-status transport callback registration differs')
+    if int.from_bytes(read(0x2b9c80, 4), 'big') != 0x12bab4:
+        raise ValueError('transport callback root differs')
+    if instructions(0x2b98e4, 6) != [
+            ('ldr', 'r1, [pc, #0x398]'), ('str', 'r0, [r1]'), ('mov', 'pc, lr')]:
+        raise ValueError('transport callback registrar differs')
+    if instructions(0x2ba074, 6) != [
+            ('adds', 'r1, r4, #0'), ('mov', 'lr, pc'), ('bx', 'r3')]:
+        raise ValueError('transport packet callback invocation differs')
     default_selectors = (0x21bcdc, 0x21bce4, 0x21bd24,
                          0x21bd28, 0x21bd2c, 0x21bd7c)
     if [int.from_bytes(read(address, 4), 'big') for address in default_selectors] != [

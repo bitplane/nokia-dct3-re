@@ -1270,10 +1270,15 @@ flag argument is not 1, message byte `+4` is not `b0`, the tracked byte
 comparison succeeds, and message byte `+5` is not 1, `305ef4/305ef6`
 replace the message ID with `03f7` and `305efc` posts it to task 24.
 There are no aligned direct-BL candidates to `305ec4`; Thumb pointer
-`305ec5` occurs in table data at `2e1150`. Its table input family and
-forwarding ownership remain unclosed. The other non-task-12 `0411` references
+`305ec5` is a callback literal at `2e1150`, loaded by `2e0fae` and registered
+through `2b98e4` at `2e0fb0`. It is not an indexed dispatch-table entry.
+The registrar stores the callback at RAM root `12bab4`. Consumer
+`2ba054..2ba078` loads it and invokes it with `r1` pointing to the packet,
+`r0=packet[2]+4`, and `r2=packet[5]&1`. This is a transport callback; its
+upstream packet family and forwarding ownership remain unclosed.
+The other non-task-12 `0411` references
 at `2ff402` and `30a086` are comparisons, not direct literal producers.
-Resolve the table-driven constructor family before assigning GSM semantics
+Resolve the registered transport-callback family before assigning GSM semantics
 to `03f7` or synthesizing a peer message.
 
 ## Evidence needed to resume
