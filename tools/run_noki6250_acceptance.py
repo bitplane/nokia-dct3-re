@@ -23,6 +23,37 @@ except ModuleNotFoundError:
     from noki6250_pmm_check import initial_record_fixture
 
 
+def check_toolkit_protocol(text):
+    from tools.sim_toolkit_trace_check import require_in_order
+    if '[LUA ERROR]' in text:
+        raise ValueError('physical NHM-3 Toolkit fixture failed')
+    require_in_order(text.replace('[:sim_card] ', ''), [
+        'read-binary fid=6fae offset=0 length=1 first=03',
+        'header cla=a0 ins=10 p1=00 p2=00 p3=09',
+        'SIM status ins=10 sw=9000',
+        'proactive DISPLAY TEXT ready',
+        'SIM completion ins=f2 sw=9116',
+        'header cla=a0 ins=12 p1=00 p2=00 p3=16',
+        '6250_toolkit_physical: action=dismiss',
+        'header cla=a0 ins=14 p1=00 p2=00 p3=0c',
+        'terminal-response data=810301218002028281030100',
+        'SIM status ins=14 sw=9000',
+    ])
+
+
+def check_toolkit(text, frames):
+    from PIL import Image
+    check_toolkit_protocol(text)
+    expected = {
+        'display': '1c27b5e561a2183e01fffc11e71a78f5df35e342fde2c01d6df3fffc26c4199b',
+        'after_dismiss': '7c541cfc93c2da8e854421941df0ac81755b73f47c3af98f2f6a40efac181b0b',
+    }
+    for phase, digest in expected.items():
+        with Image.open(frames / f'6250_toolkit_{phase}.png') as frame:
+            if frame.size != (96, 60) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
+                raise ValueError('missing reviewed NHM-3 Toolkit frame: ' + phase)
+
+
 def check_ussd(text, frames):
     check_supplementary(text, frames, 'ussd')
 
@@ -105,7 +136,7 @@ def main():
     parser.add_argument("run_directory", type=Path,
                         help="new directory; existing directories are refused")
     parser.add_argument("--mame", type=Path)
-    parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "incoming-call", "outgoing-call",
+    parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "toolkit", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
@@ -143,6 +174,12 @@ def main():
         host_sms = host_incoming_sms or args.scenario in ("host-outgoing-sms", "host-rejected-sms", "host-silent-sms")
         call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call", "host-outgoing-call")
         sms = args.scenario.startswith("sms-") or host_sms
+        if args.scenario == 'toolkit':
+            config = ET.Element('mameconfig', version='10')
+            inputs = ET.SubElement(ET.SubElement(config, 'system', name='nhm3hle'), 'input')
+            ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
+                          mask='15', defvalue='0', value='1')
+            ET.ElementTree(config).write(run / 'cfg/nhm3hle.cfg', encoding='utf-8', xml_declaration=True)
         if args.scenario == "incoming-call":
             shutil.copyfile(root / "fixtures/radio_incoming_call_answered/nhm3hle.cfg",
                             run / "cfg/nhm3hle.cfg")
@@ -184,7 +221,7 @@ def main():
             script = "noki6250_state_sms.lua"
         if args.scenario == 'power-cycle':
             script = 'noki6250_power_input.lua'
-        if args.scenario in ('ussd', 'divert'):
+        if args.scenario in ('ussd', 'divert', 'toolkit'):
             script = f'noki6250_{args.scenario}_input.lua'
         if host_call:
             script = "noki6250_host_incoming_input.lua"
@@ -262,7 +299,11 @@ def main():
         with (run / "console.log").open("w") as console:
             subprocess.run(host_command or command, cwd=run, env=env, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
-        if args.scenario in ('ussd', 'divert'):
+        if args.scenario == 'toolkit':
+            check_toolkit((run / 'error.log').read_text(errors='replace'), run / 'snap')
+            checker = [sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
+                       str(run / 'error.log'), '--profile', 'nhm3']
+        elif args.scenario in ('ussd', 'divert'):
             check_supplementary((run / 'error.log').read_text(errors='replace'), run / 'snap', args.scenario)
             checker = [sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                        str(run / 'error.log'), '--profile', 'nhm3']
