@@ -287,6 +287,18 @@ transition family downstream of a decoded layer-3 packet, not an
 independent guessed DSP completion. Recover the exact system-information
 cases and their repeat-suppression conditions before changing the peer.
 
+The decoder maps RR message `1b` to its SI3 branch at `3bc77c`; it
+publishes a transition when updater `3bbd44` reports change or the cached
+SI3 flag (bit 2 at decoder context `169334 + 0f`) is clear. However,
+duplicate suppression is not a sufficient diagnosis: an entry observer
+at `3bc630` over 45 seconds sees only `1a`, `1a`, `1b`, `1c`, `19` at
+6.808917, 7.106408, 7.406309, 7.706309 and 8.006310 s, with no later
+decoder entries after PIN acceptance. The peer's source includes a
+serving-BCCH recycle path, so next distinguish actual lower publication,
+firmware receive routing and decoder gating after channel confirmation.
+Do not infer that repeated SI was consumed and suppressed merely because
+the peer is intended to broadcast continuously.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
