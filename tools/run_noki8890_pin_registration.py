@@ -41,6 +41,8 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true')
+    parser.add_argument('--scenario', choices=('registration', 'host-incoming-call'), default='registration')
+    parser.add_argument('--port', type=int, default=18890)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -63,10 +65,17 @@ def main():
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki8890_security_input.lua'),
-                   '-seconds_to_run', '46']
+                   '-autoboot_script', str(root / ('tools/noki8890_clock_incoming_input.lua'
+                       if args.scenario == 'host-incoming-call' else 'tools/noki8890_security_input.lua')),
+                   '-seconds_to_run', '74' if args.scenario == 'host-incoming-call' else '46']
+        host_command = None
+        if args.scenario == 'host-incoming-call':
+            command += ['-http', '-http_port', str(args.port)]
+            host_command = [sys.executable, str(root / 'tools/run_host_incoming_signaling_gate.py'),
+                            '--port', str(args.port), '--cwd', str(run), '--caller', '447700900123',
+                            '--ready-file', str(run / 'snap/8890_date_after.png'), '--'] + command
         with (run / 'console.log').open('w') as console:
-            subprocess.run(command, cwd=run, env=environment, stdout=console,
+            subprocess.run(host_command or command, cwd=run, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True, timeout=180)
         text = (run / 'error.log').read_text(errors='replace')
         if not args.without_pin:
@@ -74,10 +83,15 @@ def main():
             check_pin_inputs(text)
         verify_stage(text, runtime=True, selftest=True)
         verify_registration(text, configured_gsm900=True)
+        if args.scenario == 'host-incoming-call':
+            from tools.noki8890_incoming_call_check import verify, check_host_frames
+            verify(text, caller='447700900123', configured_gsm900=True)
+            check_host_frames(run / 'snap', '447700900123')
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsb6hle', 'sim_pin_enabled': not args.without_pin,
             'provisioning': 'own acquired PMM unchanged', 'command': command,
             'native_dsp_complete': False, 'speech_tested': False, 'result': 'pass',
+            'scenario': args.scenario, 'host_command': host_command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8890 PIN registration FAIL: {error}\n')

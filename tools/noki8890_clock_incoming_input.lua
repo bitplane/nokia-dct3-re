@@ -4,7 +4,8 @@ _G.noki8890_clock_settlement_only = true
 dofile(assert(source:match('^(.*[/])')) .. 'noki8890_clock_input.lua')
 local machine = manager.machine
 local input = coroutine.create(function()
-    if not emu.wait(48) then return end
+    local start = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 52 or 48
+    if not emu.wait(start) then return end
     machine.screens[':screen']:snapshot('8890_incoming_ringing.png')
     for index, name in ipairs({'Call / Send', 'End'}) do
         local key = assert(machine.ioport.ports[':COL.0'].fields[name])

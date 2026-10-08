@@ -798,6 +798,14 @@ the product-configured late measurement response. Runtime correlation pins
 the same RX/parser object and ARFCN 60/RSSI -60 before Location Updating
 acceptance at 13.162 seconds. PMM remains unchanged; native speech is unproved.
 
+`verify-8890-pin-host-incoming-call` composes that authentication with physical
+clock/date settlement, host caller `447700900123`, physical Answer/End and
+reviewed ringing/returned-idle pixels. Configured acquisition, traffic and
+release all carry ARFCN 60 (`003c`), with prefix `0412`. The physical clock
+and answer fixtures start four seconds later for PIN runs only. The call
+checker retains separate default and PCS1900 grammars; no band or speech
+coverage is inherited from this GSM900 signaling gate.
+
 The own RX dispatcher at `30168e` selects type `80` at `301750`, calling
 `2dae9c`. Its thirteen-entry `83..8f` table at `3016bc` maps `8b` to
 `301710 -> 2db270`, which posts to task 12 through `28190c`.

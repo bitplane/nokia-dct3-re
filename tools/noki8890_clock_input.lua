@@ -14,7 +14,8 @@ local function press(column, name, call_action)
     return emu.wait(0.85)
 end
 local input = coroutine.create(function()
-    if not emu.wait(21) then return end
+    local start = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 25 or 21
+    if not emu.wait(start) then return end
     machine.screens[':screen']:snapshot('8890_clock_before.png')
     if _G.noki8890_clock_invalid_first then
         if not press(1, 'Menu') then return end
