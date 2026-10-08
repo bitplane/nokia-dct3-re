@@ -190,14 +190,24 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, 'admitted'):
             runner.main()
 
-    def test_dcs_idle_state_does_not_bypass_unresolved_pin(self):
-        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'idle-state', '--pin-enabled']), \
+    def test_dcs_phonebook_does_not_claim_pin_coverage(self):
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'phonebook', '--pin-enabled']), \
                 patch('sys.stderr', new_callable=io.StringIO), \
                 patch.object(runner, 'prepare_run') as prepare, \
                 self.assertRaises(SystemExit) as error:
             runner.main()
         self.assertEqual(error.exception.code, 2)
         prepare.assert_not_called()
+
+    def test_dcs_state_scenarios_admit_early_pin(self):
+        for scenario in ('idle-state', 'call-state', 'sms-state'):
+            with self.subTest(scenario=scenario), \
+                    patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario',
+                                       scenario, '--pin-enabled', '--pin-start', '7']), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
 
     def test_pin_service_fixtures_are_explicitly_admitted(self):
         for scenario in ('host-incoming-call', 'host-incoming-sms',
