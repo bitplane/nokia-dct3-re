@@ -730,6 +730,11 @@ incoming-SMS scenario without discarding either configuration. Run
 ordered paging/CP/RP/LAPDm closure, delivery and read-status writes to
 EF_SMS, persistent read `hello` content, and physical reading with reviewed
 body pixels. No-PIN coverage only; outgoing SMS and calls remain separate.
+`verify-8210-dcs-sms-state` uses that same external SMS/band composition
+and saves after delivery and release. `run_8210_dcs_sms_state_01` passes
+exact architecture, transport and pixel replay, persistent read content,
+and physical message reading after restoration, with DCS registration
+verified separately. This remains no-PIN research-HLE coverage.
 
 **Current frontier:** DCS with physical PIN entry starting at eight seconds
 does not register; entry starting at seven seconds does. The passing

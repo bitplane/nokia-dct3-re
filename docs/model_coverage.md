@@ -48,6 +48,8 @@ separately. It does not admit the unresolved late-PIN profile.
 `verify-8210-dcs-incoming-sms` validates no-PIN DCS paging, SMS transport,
 delivery/read-status SIM writes, persisted content and physical reading
 with reviewed message-body pixels. This is research-HLE, not native DSP.
+`verify-8210-dcs-sms-state` additionally validates delivered-SMS restoration,
+exact architectural/transport/pixel replay and physical post-load reading.
 
 `verify-8850-sim-pin-registration` independently proves physical SIM PIN and
 phone-code entry, own staged/HLE boundary, reviewed navigation pixels and

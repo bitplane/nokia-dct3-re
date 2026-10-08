@@ -510,6 +510,11 @@
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python", "before_script": [], "script": "tools/run_noki8210_acceptance.py", "arguments": ["$(RUN_DIR)", "--scenario", "incoming-sms", "--dcs1800", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8210-dcs-sms-state",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python", "before_script": [], "script": "tools/run_noki8210_acceptance.py", "arguments": ["$(RUN_DIR)", "--scenario", "sms-state", "--dcs1800", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8210-slow-pin-registration",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

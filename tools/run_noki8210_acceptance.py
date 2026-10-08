@@ -127,13 +127,13 @@ def main():
     parser.add_argument('--pin-start', type=float,
                         help='registration-only physical PIN entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
-                        help='test registration, no-PIN idle restoration or incoming SMS on DCS1800 carriers 823/824')
+                        help='test registration or supported no-PIN scenarios on DCS1800 carriers 823/824')
     args = parser.parse_args()
     if args.pin_start is not None and (
             not args.pin_enabled or args.scenario != 'registration' or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms') or
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'sms-state') or
                         (args.scenario != 'registration' and args.pin_enabled)):
         parser.error('--dcs1800 requires registration or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
