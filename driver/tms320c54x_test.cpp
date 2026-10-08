@@ -7301,6 +7301,52 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f21 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 STL B,*AR4 stores BL without pointer update in one cycle");
+			program.write_word(0x05e3, 0x8180); // STL B,*AR0.
+			data.write_word(0x0f23, 0);
+			data.write_word(0x0f24, 0xcafe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffabcd1234ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f23);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6573;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6573)
+		{
+			expect_opcode(0x8180,
+				data.read_word(0x0f23) == 0x5678 && data.read_word(0x0f24) == 0xcafe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f23 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f21 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffabcd1234ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 STL B through stationary AR0 preserves accumulators/status/pointers and the adjacent word in one cycle");
+			program.write_word(0x05e3, 0x7708); // STM #lk,AL.
+			program.write_word(0x05e4, 0xbeef);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6574;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6574)
+		{
+			expect_opcode(0x7708,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffabcdbeefULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e9 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 STM to AL replaces only the low word, preserves A high/guard/B/status and consumes its literal in two cycles");
 			program.write_word(0x05e3, 0xf162); // LD #lk,16,B
 			program.write_word(0x05e4, 0xff80);
 			program.write_word(0x05e5, 0x75f8);
@@ -10262,6 +10308,28 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0x8292); // STH A,*AR2+.
+			data.write_word(0x0f95, 0);
+			data.write_word(0x0f96, 0xcafe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f95);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6575;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6575)
+		{
+			expect_opcode(0x8292,
+				data.read_word(0x0f95) == 0x1234 && data.read_word(0x0f96) == 0xcafe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f96 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 STH A through AR2 stores the high word before increment, preserves accumulators/status/neighbor and costs one cycle");
 			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 1);
 			program.write_word(0x05e3, 0x4f82); // DST B,*AR2
 			data.write_word(0x0f90, 0);
