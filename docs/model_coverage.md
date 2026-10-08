@@ -97,6 +97,12 @@ restore a SIP dialog.
 
 ## Product-boundary cautions
 
+The 8210 research-HLE profile additionally passes `verify-8210-ussd`: physical
+`*123#`/Send, exact GSM supplementary-service request/response, RR release,
+reviewed result presentation and physical Back to registered idle. Its own
+decoder table requires product-local Star/Hash labels; this does not promote
+native DSP or the normal machine.
+
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not
   NSE-8 type `0x1a`; each enabled radio profile uses its independently recovered
   command/report lifecycle.

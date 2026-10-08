@@ -349,6 +349,18 @@ pins both acquired input hashes before creating storage; wrong-product inputs
 are rejected rather than silently provisioned. Incoming configuration is
 copied into the run, never modified in the tracked fixtures.
 
+`make verify-8210-ussd` independently exercises physical `*123#` and Send,
+the exact GSM 04.80 processUnstructuredSS request and network response,
+clean RR release, the firmware's `Nokia test network` screen, and physical
+Back to registered idle. It also requires persisted laboratory EF_LOCI.
+The NSM-3 normal decoder at `307dbe..307df4` reads pointer `33ee78` from
+literal `307e40`; its last row is `10 1a 0c 0a 0b`. Thus Star occupies
+column 2 and Hash column 4, opposite the previously inherited NSB-6 labels.
+The research composition now uses a product-local port override, while the
+shared controller and other products' mappings remain unchanged. This is
+physical firmware input and laboratory supplementary-service coverage,
+not native DSP or factory-PMM promotion.
+
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
 idle, compares a one-second reference interval with the restored interval,

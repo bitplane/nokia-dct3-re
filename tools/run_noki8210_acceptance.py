@@ -12,6 +12,7 @@ if __package__ in (None, ''):
 from tools.noki8210_pmm_check import base_record_fixture
 
 SCENARIOS = {
+    'ussd': ('ussd_input', 40, 'ussd_check'),
     'registration': ('registration_input', 46, 'registration_check'),
     'outgoing-call': ('outgoing_call_input', 49, 'outgoing_call_check'),
     'incoming-call': ('incoming_call_input', 44, 'incoming_call_check'),
@@ -59,6 +60,9 @@ def main():
     try:
         mcu = (root / 'roms/noki8210/8210_5.31ppm_c.fls').read_bytes()
         pmm = (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes()
+        if args.scenario == 'ussd':
+            from tools.noki8210_ussd_check import verify_key_table
+            verify_key_table(mcu)
         prepare_run(run, mcu, pmm)
         config = 'noki8210_host' if args.scenario.startswith('host-') else {
                   'incoming-call': 'radio_incoming_call_answered',
