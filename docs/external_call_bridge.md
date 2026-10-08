@@ -445,9 +445,9 @@ dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
 products `6210`, `6250`, `8850` and `8890`. The 8210 has a narrowly scoped
-single outgoing SIP-200 HLE media-transport fixture; incoming answered media
-and call restoration are not enabled for that product. Explicit recording
-is available for that outgoing fixture without asserting waveform success.
+single-call outgoing and incoming SIP-200 HLE media-transport fixtures;
+call restoration is not enabled for that product. Explicit recording is
+available for media fixtures without asserting waveform success.
 
 `verify-6210-sip-outgoing-busy` additionally proves physical `1234567`/Send
 against actual local PJSIP 486. It decodes the SETUP number, requires the
@@ -600,6 +600,9 @@ This proves HLE media transport, not native or non-silent microphone speech.
 microphone and 660 Hz earpiece recordings across local SIP using isolated
 virtual PulseAudio routes. It proves non-silent synthetic audio through the
 NSM-3 HLE composition, not native DSP speech or calibrated analog gain.
+`verify-8210-sip-incoming-media` waits for fresh registered idle before INVITE
+and reuses the own-product physical Answer/End, full CC/RR and presentation
+checks. Incoming waveform acceptance is not inferred from the outgoing test.
 
 `verify-8210-sip-outgoing-busy` physically dials `1234567` on configured
 carrier 4 against actual SIP 486. It requires the decoded SETUP number,

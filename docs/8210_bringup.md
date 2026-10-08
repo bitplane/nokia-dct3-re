@@ -112,8 +112,8 @@ gaps and accepted packets after closure remain failures. Adapter rejection
 reason fields are observational; no admission behavior changed. The common
 checker accepts exact PJSIP status 200 with reason `OK` or `Normal call clearing`.
 
-This establishes outgoing HLE media transport, not native DSP speech. Incoming answered SIP and external
-call restoration remain disabled for NSM-3. Provisioning remains the declared
+This establishes outgoing HLE media transport, not native DSP speech. External
+call restoration remains disabled for NSM-3. Provisioning remains the declared
 base-record comparison, not validated factory data.
 The outgoing runner accepts `--record-media --sound pulse` for explicit
 audio observation; recordings alone are not waveform acceptance.
@@ -127,6 +127,18 @@ observed. The tones traverse the configured physical audio ports and HLE
 codec/PCM paths, not firmware-state injection. This validates non-silent
 synthetic audio in both directions; it does not establish native DSP speech,
 analog gain calibration, real RF service, or incoming answered media.
+
+`make verify-8210-sip-incoming-media RUN_DIR=NEW_DIRECTORY` waits for a fresh
+registered-idle frame before a local SIP INVITE, then uses the existing own
+physical Call/Send and End fixture. It requires decoded keys, paging,
+assignment, CONNECT/acknowledgement, DISCONNECT/network RELEASE/RELEASE
+COMPLETE, return to paging, own loader/self-test/provisioning checks, ordered
+media, and reviewed ringing/post-release UI. Incoming waveform and call
+restoration acceptance are separate, not inherited from outgoing audio.
+Fresh `run_8210_sip_incoming_media_verified` passes with bridge counters
+uplink 396, downlink 380, transmitted PCM 396 and received PCM 401 (13
+dropped). This is independently executed incoming HLE media transport,
+not native DSP or non-silent incoming-waveform proof.
 
 Fresh matrix run `run_8210_sip_media_closed` passes with explicit media
 closure at 37.030 s and completion at 37.040 s, with no rejected downlink.

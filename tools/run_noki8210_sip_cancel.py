@@ -102,6 +102,8 @@ def main():
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore registered handset idle before admitting the fresh SIP call')
     outgoing = parser.add_mutually_exclusive_group()
+    outgoing.add_argument('--incoming-media', action='store_true',
+                          help='answer a fresh real SIP call using physical Send/End and validate HLE media transport')
     outgoing.add_argument('--outgoing-media', action='store_true',
                           help='physically dial against SIP 200 and validate HLE media transport, not native speech')
     outgoing.add_argument('--outgoing-busy', action='store_true',
@@ -111,8 +113,10 @@ def main():
     parser.add_argument('--http-port', type=int, default=18821)
     parser.add_argument('--sip-port', type=int, default=25821)
     args = parser.parse_args()
-    if args.record_media and not args.outgoing_media:
-        parser.error('--record-media requires --outgoing-media')
+    if args.record_media and not (args.outgoing_media or args.incoming_media):
+        parser.error('--record-media requires a media fixture')
+    if args.incoming_media and args.restore_idle:
+        parser.error('incoming-media restoration is not validated')
     outgoing_call = args.outgoing_busy or args.outgoing_unavailable or args.outgoing_media
     if args.restore_idle and outgoing_call:
         parser.error('--restore-idle cannot be combined with an outgoing call')
@@ -128,11 +132,12 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki8210_outgoing_call_input.lua' if outgoing_call else
+                       'noki8210_sip_answer_input.lua' if args.incoming_media else
                        'noki8210_sip_idle_restore.lua' if args.restore_idle else
                        'noki8210_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run',
-                   '60' if args.restore_idle else '57',
+                   '60' if args.restore_idle or args.incoming_media else '57',
                    '-video', 'none', '-sound', args.sound, '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
@@ -140,25 +145,36 @@ def main():
                    '--product', '8210',
                    *(['--record-media'] if args.record_media else []),
                    *(['--sip-response', '200' if args.outgoing_media else '480' if args.outgoing_unavailable else '486'] if outgoing_call else
-                     ['--incoming', '--cancel-incoming', '--ready-file',
-                      str(run / 'snap/8210_sip_registered_idle.png')]),
+                     ['--incoming', *([] if args.incoming_media else ['--cancel-incoming']), '--ready-file',
+                      str(run / 'snap' / ('8210_host_registered_idle.png' if args.incoming_media else
+                                         '8210_sip_registered_idle.png'))]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
                    '--', *handset]
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if outgoing_call:
+        if args.incoming_media:
+            from tools.noki8210_incoming_call_check import verify, check_frames as incoming_frames
+            text = (run / 'error.log').read_text(errors='replace')
+            check_output(text)
+            check_output((run / 'console.log').read_text(errors='replace'))
+            verify_stage(text, runtime=True, selftest=True, base_record=True)
+            verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(), configured_carrier=True)
+            verify(text, configured_carrier=True)
+            incoming_frames(run / 'snap')
+        elif outgoing_call:
             check_outgoing_result(run)
         else:
             check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsm3hle', 'scenario': ('outgoing-sip-hle-media' if args.outgoing_media else
+            'machine': 'nsm3hle', 'scenario': ('incoming-sip-hle-media' if args.incoming_media else
+                                             'outgoing-sip-hle-media' if args.outgoing_media else
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else
                                              'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),
             'mcu_sha1': MCU_SHA1, 'acquired_pmm_sha256': PMM_SHA256,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
-            'hle_media_transport_tested': args.outgoing_media,
+            'hle_media_transport_tested': args.outgoing_media or args.incoming_media,
             'media_recorded': args.record_media,
             'factory_provisioning_validated': False,
             'laboratory_carrier': 4,
@@ -167,7 +183,7 @@ def main():
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8210 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('8210 real SIP ' + ('HLE media transport' if args.outgoing_media else 'signaling') +
+    print('8210 real SIP ' + ('HLE media transport' if args.outgoing_media or args.incoming_media else 'signaling') +
           ' PASS; base-record comparison, no native or non-silent speech acceptance')
 
 
