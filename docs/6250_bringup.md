@@ -252,6 +252,18 @@ count-update callers (`38e9f8`, `38ea0a`, `38ecd6`, `38ece8`, `38f51a`,
 record-update surface for the next trace; the census excludes indirect
 and ARM calls and does not independently classify code/data boundaries.
 
+A 45-second slow-PIN run observing both update-function entries confirms
+the last rebuild is `38e60a` from `3cb09b` at 10.364053 s. The last
+incremental remove/add pair is from `38ecdb`/`38eced` at 8.007525/
+8.007741 s. Neither function runs after successful VERIFY and `03ec`
+delivery through the end of this observation window. The remove/add
+caller `38ecc2` selects a record through `38e476`, removes its old count,
+mutates the packed state through `38eb40`/`38ec4c`, adds its new count,
+and calls `38e92a`. This is a concrete mutation lifecycle to trace, not
+evidence that a delayed radio reply should be fabricated. The current
+radio peer has no explicit type-57/type-4a request handler; absence of a
+handler alone does not establish that either packet requires a reply.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
