@@ -890,11 +890,11 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 477 are asserted, two (`ec02`, `e809`) execute
-without assertions, and 115 are absent. The independent RF-boundary checker
+Against the executable fixture, 481 are asserted, two (`ec02`, `e809`) execute
+without assertions, and 111 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `6183` at first PC `309f`, `3c92` at `332d`, and `3f92` at `3336`.
+include `ec0d` at first PC `30b1`, `4592` at `332b`, and `82d3` at `3337`.
 Exact `0881` now checks SUB through AR1 with both SXM settings, 32-bit
 no-borrow carry, unchanged B/source/pointers and one-cycle arithmetic.
 Exact `e4e9` checks loading T while storing old A, independent Y increment,
@@ -907,6 +907,11 @@ Exact `e245`/`e249` check SQDST's signed X-Y difference and old-A-high square
 accumulation into B, preserved T/source cells, and independent decrementing X
 with decrementing/incrementing Y. The two fixtures separately exercise FRCT
 clear/set, including the doubled square in fractional mode.
+Exact `6183` checks both BITF TC outcomes, preservation of other ST0 bits,
+accumulators, pointer and source memory, and two-cycle execution with its
+mask extension word. Exact `3c92`/`3f92` check shifted ADD routing into A/B
+and AR2 post-increment; `3f82` checks the non-modifying AR2 form. All three
+check T, the unaffected accumulator, retained carry and one-cycle arithmetic.
 The next coverage task is to classify and assert these newly observed paths,
 not extend unobserved variants or fabricate RF samples. The gate deliberately
 retains its older fingerprint until the expanded execution is explained and
