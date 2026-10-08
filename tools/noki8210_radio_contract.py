@@ -41,6 +41,24 @@ def verify(image):
         raise ValueError('PH_1250 decision call differs')
     if instructions(0x21f5c8, 6) != [('movs', 'r0, #3'), ('bl', '#0x2a1380')]:
         raise ValueError('PH_9000 decision call differs')
+    promotion_states = [int.from_bytes(read(0x2a139c + state * 4, 4), 'big')
+                        for state in (4, 5, 6)]
+    if promotion_states != [0x2a1468, 0x2a1456, 0x2a1444]:
+        raise ValueError('queue-promotion selector states differ')
+    for address, alternate in ((0x2a1468, 0x2a14cc),
+                               (0x2a1456, 0x2a1464),
+                               (0x2a1444, 0x2a1452)):
+        if instructions(address, 4) != [('cmp', 'r6, #0'), ('bne', f'#{alternate:#x}')]:
+            raise ValueError('queue promotion is not argument-zero owned')
+    if int.from_bytes(read(0x2a17c4, 4), 'big') != 0x13721e:
+        raise ValueError('queue-promotion enable byte differs')
+    if instructions(0x2a1474, 10) != [
+            ('ldr', 'r0, [pc, #0x34c]'), ('ldrb', 'r0, [r0]'),
+            ('cmp', 'r0, #0'), ('bne', '#0x2a147e'), ('b', '#0x2a1934')]:
+        raise ValueError('queue-promotion enable predicate differs')
+    if instructions(0x2a1484, 8) != [
+            ('bl', '#0x2a0dc8'), ('ldr', 'r1, [r4, #4]'), ('strb', 'r0, [r1, #3]')]:
+        raise ValueError('queue-promotion call/return ownership differs')
     if instructions(0x2a18d0, 8) != [
             ('movs', 'r1, #2'), ('bics', 'r0, r1'),
             ('cmp', 'r0, #0'), ('bne', '#0x2a194c')]:
@@ -202,14 +220,31 @@ def verify(image):
         raise ValueError('background measurement does not share selector mapping')
     # Enumerate aligned direct-BL candidates, not indirect-call ownership.
     parser_calls = []
+    selector_calls = []
+    wrapper_calls = []
     for offset in range(0, len(image) - 4, 2):
         if image[offset] & 0xf8 != 0xf0:
             continue
         candidate = instructions(0x200000 + offset, 4)
         if candidate == [('bl', '#0x2a2250')]:
             parser_calls.append(0x200000 + offset)
+        if candidate == [('bl', '#0x2a1380')]:
+            selector_calls.append(0x200000 + offset)
+        if candidate == [('bl', '#0x21f900')]:
+            wrapper_calls.append(0x200000 + offset)
     if parser_calls != [0x21ef4c, 0x21fb86]:
         raise ValueError('direct measurement-parser candidate callsites differ')
+    if selector_calls != [0x21d886, 0x21f356, 0x21f5ca, 0x21f90a,
+                          0x21fba2, 0x2a1e28, 0x2a1e62, 0x2a224a]:
+        raise ValueError('direct selector candidate callsites differ')
+    if wrapper_calls != [0x21ef50]:
+        raise ValueError('direct selector-wrapper candidate callsites differ')
+    # Tail branches are a separate entrance class; a BL census cannot close it.
+    if instructions(0x21f2c0, 2) != [('b', '#0x21f900')]:
+        raise ValueError('state-ten acknowledgement tail entrance differs')
+    if instructions(0x21f2ae, 6) != [
+            ('ldrb', 'r0, [r4]'), ('cmp', 'r0, #0x89'), ('bne', '#0x21f2c2')]:
+        raise ValueError('state-ten acknowledgement class predicate differs')
     if int.from_bytes(read(0x21bedc, 4), 'big') != 0x137db0:
         raise ValueError('generic measurement flag address differs')
     if instructions(0x21bb5a, 6) != [

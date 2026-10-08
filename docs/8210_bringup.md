@@ -1174,10 +1174,37 @@ late run, the same queue pointer arrives at 12.696127s, after the serving
 acknowledgement; no subsequent promotion store occurs in the 46-second window.
 These observations support an unclosed request-lifetime/continuation contract,
 not selector corruption or an unanswered late type-57 request. The next
-static target is the promotion entrance at `2a1489` and its event ownership.
+static target is the promotion call at `2a1484` and its event ownership
+(`2a1489` is its Thumb return address, not a separate entrance).
 The initially watched heap address is recycled after successful teardown:
 later allocator and packet writes there are not measurement-context changes.
 Do not infer permanent object ownership from a fixed-address watch.
+The own selector table at `2a139c` maps states 4/5/6 to
+`2a1468/2a1456/2a1444`. Each requires argument zero to reach shared
+`2a1474`; byte `13721e` must be nonzero before `2a1484` calls the
+current/queued helper `2a0dc8`. State 5 with argument 3 instead branches
+through `2a1464 -> 2a1872` and the previously decoded rejection checks.
+Thus late readiness itself is not a queue-promotion trigger. These branches,
+table entries, pool pointer and call boundary are checked by
+`noki8210_radio_contract.py`. The unresolved producer question is which
+ordinary post-acquisition event invokes argument zero after late readiness;
+the known state-13 measurement continuation is eligible, but its production
+and request lifetime remain unproved. No repeat measurement is justified by
+the existence of this consumer alone.
+The aligned direct-BL census over the complete acquired image finds selector
+sites `21d886`, `21f356`, `21f5ca`, `21f90a`, `21fba2`, `2a1e28`,
+`2a1e62`, `2a224a`, and wrapper site `21ef50`. The three setup/teardown
+sites in the `2a` region use argument 1, while `21d886` uses 2 and
+`21f5ca` uses 3. Direct argument-zero sites are `21f356`, `21f90a`
+and `21fba2`; the latter follows the candidate-window measurement parser.
+This is direct-call candidate coverage, not exhaustive event ownership:
+receive state 10 additionally reaches wrapper `21f900` by tail branch
+`21f2c0`, after its message comparison and class-`89` predicate. The observed
+late lifecycle remains state 13, so that state-10 entrance is not established
+as its recovery. Tail/data-driven/indirect entrances require separate closure;
+a missing BL cannot prove absence of a producer. The next decode is the
+shared state-13 forwarding route and ordinary events selecting the alternate
+argument-zero owner at `21f356`, rather than replaying acknowledgement packets.
 
 ## Evidence needed to resume
 
