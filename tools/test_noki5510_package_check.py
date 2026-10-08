@@ -6,6 +6,24 @@ from tools.extract_dct3_wintesla import decode_records
 
 
 class PackageCheckTest(unittest.TestCase):
+    def test_thumb_reference_census_signed_calls_and_big_endian_pointers(self):
+        image = bytes.fromhex('f000f804f7fffffc0020000d')
+        report = checker.thumb_reference_census(image, (0x200000, 0x20000c))
+        self.assertEqual(report['aligned_pairs_scanned'], 5)
+        self.assertEqual(report['plausible_bl_pairs'], 2)
+        self.assertEqual(report['direct_calls'], {0x200000: [0x200004], 0x20000c: [0x200000]})
+        self.assertEqual(report['thumb_pointers'][0x20000c], [0x200008])
+        self.assertIn('computed calls', report['exclusions'])
+        swapped = b''.join(image[index:index + 2][::-1] for index in range(0, len(image), 2))
+        self.assertEqual(checker.thumb_reference_census(swapped, (0x20000c,))['direct_calls'],
+                         {0x20000c: []})
+
+    def test_thumb_reference_census_short_images_have_no_pairs(self):
+        for length in range(4):
+            report = checker.thumb_reference_census(bytes(length), (0x200000,))
+            self.assertEqual(report['aligned_pairs_scanned'], 0)
+            self.assertEqual(report['direct_calls'][0x200000], [])
+
     def test_class_router_preserves_task_and_function_destinations(self):
         table = bytearray(39 * 8)
         table[:8] = bytes.fromhex('d20000000000001d')

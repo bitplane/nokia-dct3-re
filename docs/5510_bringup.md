@@ -2519,6 +2519,29 @@ and router caller `362d5e`, confirming the internal-control interpretation.
 The next boundary is the sequenced receive path's external sender and
 startup exchange, not an inactive generic receive queue.
 
+The package checker pins sequenced receiver `2f5760..2f59db` and task-loop
+code `2f5c8c..2f5d71`. Descriptor index 8 in the 30-entry task table selects
+`2f5c8d`. Its receive loop stores the object at context offset `14`, tests
+object byte 3, and calls `2f5760` at `2f5caa` for internal selector `8e`.
+Objects whose first byte is `1e` or `1c` instead call control handler
+`2f52aa`; these are not interchangeable internal and wire namespaces.
+
+Across all 3,473,408 image bytes, the checker scans 1,736,703 aligned
+halfword pairs and finds 64,693 plausible Thumb BL encodings. The receiver has
+one matching direct reference, `2f5caa`; ingress `399fbc` has the three
+references already listed above. Neither target has an aligned odd Thumb
+pointer in this image. This quantifies encoded-reference coverage only:
+computed calls, ARM instructions, unaligned pointers and candidate code/data
+classification remain excluded. It is not a proof of absent external input.
+
+The sequenced receiver reads its trailing count and sequence bytes at
+`object + payload_length + 8/9`, uses the low three sequence bits and bit-6/7
+branches, and queues only after the selected completion branch. This is
+upstream of the MU4-specific `d2/42` consumer. The concrete next question is
+which producer queues task 8's internal `8e` object and what physical byte
+source supplies its payload. No key mapping or MU4 self-test reply is enabled
+by this static result.
+
 The two observed ingress classes are the declared external-service HLE's
 discovery replies: `nokia_external_service.cpp` echoes the discovery body
 and changes its class from `01` to `04`, using source node `02`. They are

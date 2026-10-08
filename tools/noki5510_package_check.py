@@ -29,6 +29,32 @@ def decode_class_routes(table):
             for row in (table[offset:offset + 8] for offset in range(0, len(table), 8))]
 
 
+def thumb_reference_census(image, targets, base=0x200000):
+    """Aligned encoded references, not proof against computed or ARM calls."""
+    targets = set(targets)
+    calls = {target: [] for target in targets}
+    pointers = {target: [] for target in targets}
+    candidates = 0
+    for offset in range(0, len(image) - 3, 2):
+        high, low = struct.unpack_from('>HH', image, offset)
+        if high & 0xf800 == 0xf000 and low & 0xf800 == 0xf800:
+            candidates += 1
+            displacement = ((high & 0x7ff) << 12) | ((low & 0x7ff) << 1)
+            if displacement & 0x400000:
+                displacement -= 0x800000
+            target = base + offset + 4 + displacement
+            if target in targets:
+                calls[target].append(base + offset)
+        word = (high << 16) | low
+        if word & 1 and (word & ~1) in targets:
+            pointers[word & ~1].append(base + offset)
+    return {'image_bytes': len(image), 'aligned_pairs_scanned': len(range(0, len(image) - 3, 2)),
+            'plausible_bl_pairs': candidates, 'direct_calls': calls,
+            'thumb_pointers': pointers,
+            'exclusions': ['computed calls', 'ARM instructions', 'unaligned pointers',
+                           'code/data classification of candidate pairs']}
+
+
 def assess_input(flash):
     """Pin the input consumers; table presence is not wiring acceptance."""
     for start, end, digest in (
@@ -39,6 +65,8 @@ def assess_input(flash):
         (0x3a7424, 0x3a7472, 'd4c4c0a73c2b91e65b0c3cd4200e054aa878b64b0420246587eca59adb29b67d'),
         (0x335c1c, 0x335da4, '38489482d7e1f12921a97751b72c21a878fd990e7d89a2d91bc321717c009ec5'),
         (0x335b12, 0x335b74, 'f09da60f3625c068cecfbc3e288e5a9f6591d57f5cf1f8ebbd58d6377116337f'),
+        (0x2f5760, 0x2f59dc, '2bc18cd9fa00b74f9b67a998de83dfed13420174de12d71e9821779f5e3f7056'),
+        (0x2f5c8c, 0x2f5d72, 'd59f6cb9da3e39ea01fda78ed3f2c5191fa12f30abdecb9af87844276e2b64ea'),
     ):
         if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
             raise ValueError('input consumer code mismatch')
@@ -62,7 +90,20 @@ def assess_input(flash):
     if [row for row in routes if row['class'] == 0xd2] != [
             {'class': 0xd2, 'destination': 29}]:
         raise ValueError('candidate serial class route mismatch')
+    references = thumb_reference_census(flash, (0x2f5760, 0x399fbc))
+    if references['direct_calls'] != {0x2f5760: [0x2f5caa],
+                                       0x399fbc: [0x2f58ac, 0x2f5994, 0x3841e2]}:
+        raise ValueError('serial receive direct-reference census mismatch')
+    if struct.unpack_from('>I', flash, 0x219d20 + 8 * 12)[0] != 0x2f5c8d:
+        raise ValueError('sequenced receive task descriptor mismatch')
     return {'scope': 'static consumers only; no MU4 matrix wiring validated',
+            'sequenced_receive': {'task': 8, 'entry': '2f5c8c', 'receiver': '2f5760',
+                                  'internal_selector_offset': 3, 'internal_selector': '8e',
+                                  'receiver_call': '2f5caa',
+                                  'control_transports': ['1e', '1c'],
+                                  'control_handler': '2f52aa',
+                                  'reference_census': references,
+                                  'physical_byte_source_validated': False},
             'gpio_reader': '3a738c', 'column_register': '2002a',
             'active_low_mask': '02', 'pressed_raw': '81', 'released_raw': 'ff',
             'decoder': '39dc14', 'mode_byte': '126ec6',
