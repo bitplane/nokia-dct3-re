@@ -546,8 +546,11 @@ its physical Options -> Save path selects and confirms a PMM-backed user slot.
 An ordinary cold process then lists `Test for Dhiram` at Tones 5-4-1 and
 Options -> Play replays the reconstructed note stream through PUP. The gate
 compares a no-save reference and confines durable changes to NHM-6's
-product-management flash region; its setup editors are completed physically,
-not bypassed. This lifecycle is gated by
+product-management flash region while requiring SIM and EEPROM equality with
+the no-save reference. Fresh provisioning completes the setup editors
+physically. Cold receipt and playback retain RTC/date, enter the phone code
+and acknowledge Code accepted before opening Menu; replaying first-boot
+time/date digits into the settled UI is not a valid cold fixture. This lifecycle is gated by
 `make verify-3330-radio-smart-message-persistence`.
 
 The NSE-8 persistence continuation is now independently gated by `make

@@ -289,9 +289,11 @@ preserved as an investigation journal.
   sustained DSP output; fixed-frequency DSP HLE prevents promotion of its
   playback to pitch-correlated. NHM-6 independently proves physical Save into
   product-local PMM flash, preserved cold-boot listing and payload-correlated
-  PUP replay. Its acquired virgin PMM still presents security/time editors,
-  but the gate completes them through physical keypad input rather than
-  bypassing them.
+  PUP replay. Fresh virgin-PMM provisioning completes security/time editors
+  physically. Preserved cold runs retain RTC/date and complete phone-code
+  entry plus acknowledgement before Menu; the same cold-start contract is
+  shared with the ordinary inbox fixture. SIM and EEPROM remain identical
+  to the no-save reference throughout PMM-backed ringtone storage.
   Dedicated-mode handover is independently gated on NSE-8, NHM-5, NHM-6 and
   NHM-2 for success, rollback and mid-procedure save/load. NHM-2 additionally
   proves physical Answer/End and sustained media across successful retuning.
