@@ -1245,6 +1245,36 @@ absent. In the failing run none of the alternate state routes is observed
 after state 13; the strongest current completion boundary remains its
 `1802/8b` measurement continuation and the unanswered lifetime of the
 original scan, rather than an assumed missing transition to state 21.
+State 13's special `0411` path is also an eligible argument-zero entrance.
+At `21ee52..21ee5e` it reads the measurement outcome from the object rooted
+at `13722c`, excluding outcomes 0/1/2. The observed outcome 4 satisfies
+that first predicate. It then performs candidate bookkeeping through
+`287272`, clears context byte `+2`, and calls `21fb8c` at `21ee84`,
+which reaches the existing argument-zero selector at `21fba0`.
+This does not establish that `0411` should arrive or that later predicates
+will succeed. Producer ownership is unclosed: aligned four-byte `00000411`
+values occur at ten image locations, including non-task-12 candidates
+`275e90`, `2ff570`, `30a12c` and data `33f0c6`. Decode their consumers
+and any constructed/data-driven producer before treating `0411` as a missing
+peer event. Do not inject it as a recovery shortcut.
+The `275e90` literal is a return producer, not a posting site:
+decoder `275ac0` reads two message bytes, and its `275b42` branch returns
+`0411`. Caller `275dc8` retains that result in `r5`; dispatcher `275c6c`
+selects this call for internal input `03f7` (base `03ea`, subtract 5,
+table slot 8). Passive input/return/consumer taps in
+`run_8210_late_pin_special_status_03` observe none of these three boundaries
+through 46 seconds; the registration check still fails. This is a bounded
+runtime observation, not global producer absence.
+The `03f7` literal at `306048` is used by constructor `305ec4`: if its
+flag argument is not 1, message byte `+4` is not `b0`, the tracked byte
+comparison succeeds, and message byte `+5` is not 1, `305ef4/305ef6`
+replace the message ID with `03f7` and `305efc` posts it to task 24.
+There are no aligned direct-BL candidates to `305ec4`; Thumb pointer
+`305ec5` occurs in table data at `2e1150`. Its table input family and
+forwarding ownership remain unclosed. The other non-task-12 `0411` references
+at `2ff402` and `30a086` are comparisons, not direct literal producers.
+Resolve the table-driven constructor family before assigning GSM semantics
+to `03f7` or synthesizing a peer message.
 
 ## Evidence needed to resume
 

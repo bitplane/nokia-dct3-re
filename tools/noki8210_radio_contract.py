@@ -391,6 +391,15 @@ def verify(image):
             ('beq', '#0x21ee4c'), ('movs', 'r0, #0xd'),
             ('bl', '#0x21bdc4')]:
         raise ValueError('state-13 default continuation differs')
+    if instructions(0x21ee52, 14) != [
+            ('ldr', 'r0, [pc, #0x64]'), ('ldr', 'r0, [r0]'),
+            ('ldr', 'r0, [r0]'), ('lsrs', 'r1, r0, #1'),
+            ('beq', '#0x21eef2'), ('cmp', 'r0, #2'), ('beq', '#0x21eef2')]:
+        raise ValueError('state-13 special-input outcome predicate differs')
+    if instructions(0x21ee7a, 14) != [
+            ('bl', '#0x287272'), ('ldr', 'r5, [pc, #0x1b8]'),
+            ('ldr', 'r0, [r5]'), ('strb', 'r6, [r0, #2]'), ('bl', '#0x21fb8c')]:
+        raise ValueError('state-13 special-input argument-zero continuation differs')
     default_selectors = (0x21bcdc, 0x21bce4, 0x21bd24,
                          0x21bd28, 0x21bd2c, 0x21bd7c)
     if [int.from_bytes(read(address, 4), 'big') for address in default_selectors] != [

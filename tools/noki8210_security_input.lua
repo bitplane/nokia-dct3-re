@@ -6,6 +6,26 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_special_status_decoder = {}
+    for _, address in ipairs({0x275ac0, 0x275dcc, 0x21ee4c}) do
+        local count = 0
+        _G.nsm3_special_status_decoder[#_G.nsm3_special_status_decoder + 1] =
+            memory:install_read_tap(address & ~3, (address & ~3) + 3,
+                'nsm3_special_status_decoder_' .. address, function(offset, value, mask)
+                    if cpu.state['PC'].value ~= address or count >= 80 then return end
+                    count = count + 1
+                    local argument = cpu.state['R0'].value
+                    local bytes = 'none'
+                    if address == 0x275ac0 and argument >= 0x100000 and argument < 0x17fffe then
+                        bytes = string.format('%02x%02x', memory:read_u8(argument),
+                            memory:read_u8(argument + 1))
+                    end
+                    machine:logerror(string.format(
+                        '8210_special_status_decoder: pc=%08x r0=%08x bytes=%s caller=%08x t=%.6f\n',
+                        address, argument, bytes, cpu.state['R14'].value,
+                        machine.time:as_double()))
+                end)
+    end
     _G.nsm3_request_lifetime_watches = {}
     for _, range in ipairs({{0x113264, 0x11326b}, {0x137f58, 0x137f67}}) do
         local count = 0
