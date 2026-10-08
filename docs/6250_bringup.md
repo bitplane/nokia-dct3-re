@@ -312,6 +312,16 @@ not establish which firmware filter drops or reroutes class-50 packets.
 Next trace the actual lower decoder/recipient selection after the initial
 channel change; no new broadcast payload or reply is justified yet.
 
+Receiver `3bceae` dispatches on halfword `169334 + 18`. Its state-2
+class-50 branch compares context selector byte 6 with `170ce3` and calls
+SI decoder `3bc5e0` at `3bcf04`; state 1 instead calls `3bca84` at
+`3bcfc0`. Post-PIN passive receiver observations through 16 s show state
+1 and selector `12`, matching expected `12`, while class-50 packets keep
+arriving. Thus selector mismatch is excluded at these observations: the
+alternate receive-state route, not transport loss, explains why the SI
+decoder tap is silent. Recover `3bca84` and the state-word writers before
+assigning semantic names to state 1/2 or changing a peer channel reply.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
