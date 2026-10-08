@@ -333,6 +333,18 @@ from continuation `3bcead` through 15.835048 s. Thus the missing
 it is forwarded on a distinct consumer path. Trace task 14's `03f9`
 handler and the receive-state writer together before changing the peer.
 
+Passive writes locate receive-state 2-to-1 transition at `3bcffe`,
+8.008669 s; subsequent packets retain state 1. Task 14's post-type-57
+receive continuation is `2d2101`. Its loop checks message ID `1802`
+(literal at the `2d2124` load) and class byte `8b` before calling
+`3cbe14` and returning to the selector path at `2d1d50`. This is a
+concrete completion candidate, not proof that every type-57 mode has the
+same response. Class `8b` already has an independently mapped
+ALL_RSSI_RESULTS contract in `network_scouting.md` and the radio peer.
+Recover the type-57 range/mode semantics and the two `3cbe14` result
+consumers (`38fdca`/`38fed0`) against that existing result format before
+adding request handling; a synthetic generic ACK is not the contract.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
