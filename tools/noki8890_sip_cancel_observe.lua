@@ -1,11 +1,13 @@
 -- Own physical clock/date setup; observe an unanswered call and dismiss it.
 local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
-_G.noki8890_clock_settlement_only = true
-dofile(directory .. 'noki8890_clock_input.lua')
+if not _G.noki8890_sip_restore_idle then
+    _G.noki8890_clock_settlement_only = true
+    dofile(directory .. 'noki8890_clock_input.lua')
+end
 local machine = manager.machine
 local observation = coroutine.create(function()
-    if not emu.wait(45) then return end
+    if not emu.wait(45 - machine.time:as_double()) then return end
     machine.screens[':screen']:snapshot('8890_sip_registered_idle.png')
     machine:logerror('8890_sip_cancel: ready t=45\n')
     if not emu.wait(20) then return end
@@ -19,4 +21,10 @@ local observation = coroutine.create(function()
     machine.screens[':screen']:snapshot('8890_sip_after_cancel.png')
 end)
 _G.noki8890_sip_cancel_observe = observation
-assert(coroutine.resume(observation))
+if _G.noki8890_sip_restore_idle then
+    _G.noki8890_sip_cancel_post_load = emu.add_machine_post_load_notifier(function()
+        assert(coroutine.resume(observation))
+    end)
+else
+    assert(coroutine.resume(observation))
+end

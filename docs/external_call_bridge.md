@@ -427,7 +427,17 @@ The gate pins the localized `1 Anruf in Abwesenheit` notification,
 decoded physical Exit, registered-idle content before/after and persisted
 SIM location. Frame comparison excludes the advancing top-row clock,
 not notification text or softkeys. This is real SIP signaling only;
-answered SIP, PCM, native speech and idle restoration are not promoted.
+answered SIP, PCM and native speech are not promoted.
+
+`verify-8890-sip-idle-restore` uses the same own physical setup and idle
+fixture, saves at 42 seconds, then requires exact PC/SP/RAM/time restoration
+and matching one-second transport/SIM replay before admitting INVITE at
+45 seconds. The fresh call must use host epoch 2 and satisfy the same real
+CANCEL/487, caller, release, localized notification, decoded Exit and
+registered-idle predicates. The saved handset has no external SIP dialog;
+this verifies epoch invalidation and a new call, not restoration of a dialog.
+The ordinary idle-state gate still requires physical Menu; this variant
+instead requires post-replay physical Exit after the new call.
 
 `verify-6210-sip-idle-restore` saves and restores the idle NPE-3 handset before
 the fresh INVITE. It checks exact CPU/RAM/time restoration and ordered protocol

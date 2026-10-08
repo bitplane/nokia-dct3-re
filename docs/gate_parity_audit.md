@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 77
-Differences found: 118
+Families with more than one product: 78
+Differences found: 119
 
 ## ROM normalisation reachability
 
@@ -95,6 +95,7 @@ absent product is a coverage question, not a drifted gate.
 | `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
 | `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | yes | — | — | — | — |
 | `sip-cancel` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
+| `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
 | `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `verifier` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | — | — |
 
@@ -437,6 +438,11 @@ absent product is a coverage question, not a drifted gate.
 - **6210**: `tools/run_noki6210_acceptance.py`
 
 ### `sip-cancel`
+
+- **6210**: `tools/run_noki6210_sip_cancel.py`
+- **8890**: `tools/run_noki8890_sip_cancel.py`
+
+### `sip-idle-restore`
 
 - **6210**: `tools/run_noki6210_sip_cancel.py`
 - **8890**: `tools/run_noki8890_sip_cancel.py`

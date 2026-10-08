@@ -101,7 +101,11 @@ real caller CANCEL/487 while alerting, full CC/RR release, localized missed-call
 presentation and decoded physical Exit back to registered idle. Its configured
 ARFCN60, own SETUP and persisted SIM location are checked independently.
 No Answer, accepted media or native DSP speech is allowed. It does not inherit
-the media-capable profiles' answered-call or restore promotion.
+the media-capable profiles' answered-call promotion.
+`verify-8890-sip-idle-restore` additionally proves exact idle CPU/RAM/time and
+protocol replay before a fresh epoch-2 incoming call, followed by the same
+real cancellation and physical UI cleanup. No external dialog is saved or
+restored and no speech is established.
 
 ## Product-boundary cautions
 

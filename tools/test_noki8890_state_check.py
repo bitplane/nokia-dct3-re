@@ -18,6 +18,16 @@ state_replay: phase=restored event=end t=43.000000000
 
 
 class StateTest(unittest.TestCase):
+    def test_sip_idle_continuation_requires_physical_exit(self):
+        text = sample().replace('8890_state_physical: key=Menu', '8890_sip_cancel: physical Exit').replace('key=19', 'key=1a')
+        verify(text, sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'dismissal'):
+            verify(sample(), sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'idle restoration'):
+            verify(text, sip_cancel=True, call=True)
+        with self.assertRaisesRegex(ValueError, 'exactly'):
+            verify(text.replace('event=restored pc=0000001c', 'event=restored pc=00000020'), sip_cancel=True)
+
     def test_pcs_requires_independent_registration(self):
         with self.assertRaisesRegex(ValueError, 'candidate window'):
             verify(sample(), pcs1900=True)

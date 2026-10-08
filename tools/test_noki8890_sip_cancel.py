@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +10,20 @@ from tools import run_noki8890_sip_cancel as check
 
 
 class CleanupFramesTest(unittest.TestCase):
+    def test_restored_call_requires_new_epoch_and_post_load_paging(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            (run / 'console.log').write_text('')
+            restored = 'state_roundtrip: result=pass scenario=8890_idle\n'
+            paging = 'gsm_call_adapter: incoming state id=1 epoch=2\n'
+            with patch.object(check, 'verify_stage'), patch('tools.noki8890_state_check.verify'):
+                for text, epoch, message in ((paging + restored, 2, 'follow exact'),
+                                             (restored + paging, 1, 'fresh host epoch')):
+                    (run / 'error.log').write_text(text)
+                    (run / 'sip-result.json').write_text(json.dumps({'epoch': epoch}))
+                    with self.assertRaisesRegex(ValueError, message):
+                        check.check_product_result(run, restore_idle=True)
+
     def product_result(self, mutation=lambda text: text, bad_storage=False):
         setup = '80000000000000000000032445030504046002008134015c0581551532f4'
         text = ('gsm_call_adapter: network registered=1 arfcn=60\n'

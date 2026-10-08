@@ -14,7 +14,7 @@ from tools.noki8890_incoming_sms_check import verify as verify_sms
 from tools.noki8890_registration_check import verify as verify_registration
 
 
-def verify(text, call=False, sms=False, storage=None, pcs1900=False):
+def verify(text, call=False, sms=False, storage=None, pcs1900=False, sip_cancel=False):
     if '[LUA ERROR]' in text or '8890_state: FAIL' in text:
         raise ValueError('state fixture did not complete')
     if pcs1900:
@@ -25,6 +25,13 @@ def verify(text, call=False, sms=False, storage=None, pcs1900=False):
     if states[0][1:] != states[1][1:]:
         raise ValueError('CPU/RAM/time did not restore exactly')
     verify_roundtrip(text, ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:'), '8890 idle')
+    if sip_cancel:
+        if call or sms:
+            raise ValueError('SIP cancellation requires idle restoration')
+        if not re.search(r'state_replay: phase=restored event=end[^\n]*\n[\s\S]*'
+                         r'8890_sip_cancel: physical Exit[\s\S]*8890_keypad_decoded: key=1a\b', text):
+            raise ValueError('missing post-load physical SIP notification dismissal')
+        return
     if sms:
         if storage is None:
             raise ValueError('SMS restoration requires persistent SIM storage')
