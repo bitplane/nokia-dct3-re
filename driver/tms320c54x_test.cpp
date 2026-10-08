@@ -6951,6 +6951,36 @@ private:
 					m_port_reads == 2 && m_port_writes == 1 &&
 					m_last_port_cycle - m_first_port_cycle == 2,
 					"ROM4 PORTR PA,*AR2 writes the port word in two cycles");
+			program.write_word(0x05e3, 0x7483); // PORTR PA,*AR3.
+			program.write_word(0x05e5, 0x7483);
+			data.write_word(0x0f22, 0xbeef);
+			data.write_word(0x0f23, 0);
+			data.write_word(0x0f24, 0xcafe);
+			m_port_reads = 0;
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f23);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6570;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6570)
+		{
+			expect_opcode(0x7483,
+				data.read_word(0x0f23) == 0xabcd && data.read_word(0x0f21) == 0xabcd &&
+				data.read_word(0x0f22) == 0xbeef && data.read_word(0x0f24) == 0xcafe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f23 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f21 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 133 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+				m_port_reads == 2 && m_port_writes == 1 && m_last_port_cycle - m_first_port_cycle == 2,
+				"ROM4 PORTR selects stationary AR3, preserves neighbors/pointers/accumulators/status and consumes the port extension in two cycles");
 			program.write_word(0x05e0, 0x75f8);
 			program.write_word(0x05e1, 0x0d00);
 			program.write_word(0x05e2, 0x0124);
@@ -8291,6 +8321,24 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e3, 0x758a); // PORTW *AR2-,0124h.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f28);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6571;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6571)
+		{
+			expect_opcode(0x758a,
+				m_middle_port_value == 0xface && data.read_word(0x0f28) == 0xface &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f27 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f22 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f27 &&
+				m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 PORTW emits old AR2 memory before one decrement, preserves source/unrelated pointers and costs two cycles");
 			program.write_word(0x05e3, 0x61ea); // BITF *+AR2(5),#8000
 			program.write_word(0x05e4, 5);
 			program.write_word(0x05e5, 0x8000);
@@ -13039,7 +13087,7 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if ((m_phase >= 591 && m_phase <= 597) || (m_phase >= 6508 && m_phase <= 6510))
+		if ((m_phase >= 591 && m_phase <= 597) || (m_phase >= 6508 && m_phase <= 6510) || m_phase == 6572)
 		{
 			struct shifted_case { u16 opcode, memory, t_before, t_after; u64 a_before, b_before, a_after, b_after; };
 			static constexpr shifted_case cases[] = {
@@ -13052,9 +13100,10 @@ private:
 				{ 0x3f83, 2, 0, 0, 0x1234, 1, 0x1234, 0x20001 },
 				{ 0x3c92, 0xfffe, 0, 0, 0x30000, 0x5678, 0x10000, 0x5678 },
 				{ 0x3f92, 2, 0, 0, 0x1234, 1, 0x1234, 0x20001 },
-				{ 0x3f82, 2, 0, 0, 0x1234, 1, 0x1234, 0x20001 }
+				{ 0x3f82, 2, 0, 0, 0x1234, 1, 0x1234, 0x20001 },
+				{ 0x3c82, 0xfffe, 0, 0, 0x30000, 0x5678, 0x10000, 0x5678 }
 			};
-			const unsigned index = m_phase >= 6508 ? 7 + m_phase - 6508 : m_phase - 591;
+			const unsigned index = m_phase == 6572 ? 10 : m_phase >= 6508 ? 7 + m_phase - 6508 : m_phase - 591;
 			const shifted_case &row = cases[index];
 			expect_opcode(row.opcode,
 				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
@@ -13062,6 +13111,7 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_T) == row.t_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
 				(index < 7 || m_cpu->state_int(tms320c54x_device::STATE_AR2) == (index < 9 ? 0x0f93 : 0x0f92)) &&
+				(index != 10 || (data.read_word(0x0f92) == 0xfffe && data.read_word(0x0f90) == 2)) &&
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"T load, square, and shifted-add routing with one-cycle DARAM timing");
@@ -13069,7 +13119,7 @@ private:
 			{
 				const shifted_case &next = cases[index + 1];
 				program.write_word(0x05e2, next.opcode);
-				data.write_word(0x0f90, next.memory);
+				data.write_word(0x0f90, index == 9 ? 2 : next.memory);
 				data.write_word(0x0f92, next.memory);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
@@ -13081,7 +13131,7 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f92);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				m_phase = index < 6 ? m_phase + 1 : 6508 + index - 6;
+				m_phase = index == 9 ? 6572 : index < 6 ? m_phase + 1 : 6508 + index - 6;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
