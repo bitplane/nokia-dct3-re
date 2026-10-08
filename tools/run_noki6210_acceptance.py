@@ -28,6 +28,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
              'security': ('npe3hle', 'security_input', 37),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
+             'ussd': ('npe3hle', 'ussd_input', 40),
              'state-idle': ('npe3hle', 'state_idle', 24),
              'state-call': ('npe3hle', 'state_call', 48),
              'state-sms': ('npe3hle', 'state_sms', 30),
@@ -45,6 +46,16 @@ OPERATOR_SHA256 = '9b3fe27be727ece0d99040211b125ac319ee93f6c7ce6a0599b9ebe27ab84
 SMS_READ_SHA256 = 'ab21e640456a297698ff12e89d315fb469eca215975b8ba4cc5a1a9cb2a41be3'
 SMS_SENT_SHA256 = '67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc7c8'
 SECURITY_MENU_SHA256 = 'dca943c465ed8b7cc2c766e9ac0f6f69ce86228c04aa68cd52d1b20a75a8bf3f'
+USSD_RESULT_SHA256 = '7282a48b0f972545caac4db1a02189d25775dd13e02b11857cba98cfd58b3112'
+
+
+def check_ussd(text, frames):
+    from tools import radio_ussd_trace_check
+    from tools.noki8210_supplementary_check import verify_transaction
+    verify_transaction(text, frames, 'ussd',
+                       ('Keypad *', 'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad #', 'Send'),
+                       radio_ussd_trace_check, USSD_RESULT_SHA256, OPERATOR_SHA256,
+                       product='6210', geometry=(96, 60))
 
 
 def check_registration(text, storage, *, preserved_location=False,
@@ -94,7 +105,7 @@ def events(path):
     with path.open(errors='replace') as stream:
         return ''.join(line for line in stream if any(token in line for token in
                       ('staged_dsp:', '6210_', 'dspif_transport:', 'sim_device:',
-                       'SIM status', 'SIM completion', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:',
+                       'SIM status', 'SIM completion', 'radio peer', 'dsp_hle:', 'gsm_sms_submit:', 'gsm_ss:',
                        'state_replay:', 'state_roundtrip:', '[LUA ERROR]')))
 
 
@@ -291,6 +302,9 @@ def main():
                             'proactive DCT3 SAT')
             with Image.open(run / 'snap/6210_toolkit_after_dismiss.png') as frame:
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after Toolkit clearance')
+        elif args.scenario == 'ussd':
+            check_ussd(text, run / 'snap')
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
         elif args.scenario == 'calculator':
             from PIL import Image
             with Image.open(run / 'snap/6210_calculator_result.png') as frame:

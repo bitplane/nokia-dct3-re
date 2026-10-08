@@ -21,6 +21,14 @@ execution, measured final silicon verdict, speech and full hardware fidelity
 are not claimed. The research phone-service milestone is complete; the normal
 machine remains fail-closed pending authentic native DSP completion.
 
+Physical `*123#` followed by Send also completes a laboratory USSD transaction
+on `npe3hle`: the exact processUnstructuredSS request receives a correlated
+successful response, the firmware renders `Service reply / Nokia test network`,
+and physical Back returns to the registered idle frame. The isolated runner's
+`--scenario ussd` checks ordered handset inputs, protocol release, both reviewed
+96x60 frames and persisted EF_LOCI. This is HLE network service acceptance,
+not native DSP or speech evidence.
+
 ## Inputs
 
 `roms/noki6210/6210_556c.fls` is 0x3a0000 bytes with SHA-1
