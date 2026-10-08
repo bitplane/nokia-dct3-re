@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 543 gates: 383 generated from typed steps, 160 copied verbatim (shell).
+# 545 gates: 385 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -327,7 +327,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-incoming-call-sip-restore \
 	verify-3310-radio-incoming-call-sip-cancel \
 	verify-radio-incoming-call-sip-cancel verify-radio-outgoing-call-sip-busy \
-	verify-radio-outgoing-call-sip-forbidden verify-8210-power-cycle \
+	verify-radio-outgoing-call-sip-forbidden \
+	verify-radio-outgoing-call-sip-not-found \
+	verify-radio-outgoing-call-sip-service-unavailable verify-8210-power-cycle \
 	verify-6250-coherent-idle-state verify-6250-coherent-call-state \
 	verify-6250-coherent-sms-state verify-6250-pin-state-idle \
 	verify-6250-pin-state-call verify-6250-pin-state-sms verify-6250-power-cycle \
@@ -4324,6 +4326,12 @@ verify-radio-outgoing-call-sip-busy:
 
 verify-radio-outgoing-call-sip-forbidden:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 403'
+
+verify-radio-outgoing-call-sip-not-found:
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 404'
+
+verify-radio-outgoing-call-sip-service-unavailable:
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 503'
 
 verify-8210-power-cycle: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario power-cycle --mame $(MAME_DIR)/mame

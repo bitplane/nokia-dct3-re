@@ -41,6 +41,12 @@ class SipFailureCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check(status=480)
 
+    def test_numeric_prefixes_do_not_satisfy_failure_contract(self):
+        with self.assertRaises(RuntimeError):
+            self.check(log=LOG.replace('outcome=1', 'outcome=10'))
+        with self.assertRaises(RuntimeError):
+            self.check(status=480, log='outgoing termination consumed id=1 cause=180\n' + LOG)
+
     def test_forbidden_requires_ordered_rejection_cause(self):
         log = LOG.replace('outgoing decision consumed id=1 outcome=1',
                           'outgoing decision consumed id=1 outcome=2\n'
@@ -51,6 +57,17 @@ class SipFailureCheckTest(unittest.TestCase):
                         log.replace('outgoing termination consumed id=1 cause=21', '')):
             with self.assertRaises(RuntimeError):
                 self.check(status=403, log=invalid)
+
+    def test_missing_destination_and_service_failure_require_exact_cause(self):
+        for status, cause in ((404, 1), (503, 41)):
+            with self.subTest(status=status):
+                log = LOG.replace('outgoing decision consumed id=1 outcome=1',
+                                  'outgoing decision consumed id=1 outcome=2\n'
+                                  f'outgoing termination consumed id=1 cause={cause}')
+                self.assertEqual(self.check(status=status, log=log)['sip_status'], status)
+                for wrong in (18, cause * 10):
+                    with self.assertRaises(RuntimeError):
+                        self.check(status=status, log=log.replace(f'cause={cause}', f'cause={wrong}'))
 
     def test_unhandled_attempt_and_missing_ended_state_are_rejected(self):
         for log in (LOG + 'gsm_call_adapter: request id=2 epoch=1 digits=5551234\n',
