@@ -716,7 +716,7 @@ needed. The own scan publishes `56:03370338`, selects SCH on carrier `0337`,
 uses recovered `041202` channel parameters and capability byte `30` in its
 Location Updating request (GSM900 uses `33`). Acceptance requires the ordered
 Location Updating/release sequence, carrier-823 paging and updated EF_LOCI.
-Incoming calls, media and native DSP on this band are not promoted.
+Media and native DSP on this band are not promoted.
 `verify-8210-dcs-idle-state` extends the no-PIN DCS profile through an
 idle save/load round trip. `run_8210_dcs_idle_state_01` passes explicit
 DCS registration and persisted EF_LOCI, exact saved/restored PC/SP/RAM
@@ -729,7 +729,7 @@ incoming-SMS scenario without discarding either configuration. Run
 `run_8210_dcs_incoming_sms_01` passes DCS registration and EF_LOCI,
 ordered paging/CP/RP/LAPDm closure, delivery and read-status writes to
 EF_SMS, persistent read `hello` content, and physical reading with reviewed
-body pixels. No-PIN coverage only; calls remain separate.
+body pixels. No-PIN coverage only; call coverage has separate gates below.
 `verify-8210-dcs-sms-state` uses that same external SMS/band composition
 and saves after delivery and release. `run_8210_dcs_sms_state_01` passes
 exact architecture, transport and pixel replay, persistent read content,
@@ -754,6 +754,15 @@ exact architectural, protocol and pixel replay before physically ending
 the restored call. `run_8210_dcs_call_state_01` passes the DCS channel
 contract and separate DCS registration/EF_LOCI check. No-PIN signaling
 restoration only; no media/native-speech claim follows from this gate.
+`verify-8210-dcs-incoming-call` validates paging, caller presentation,
+physical Answer/End, exact DCS traffic/release words, CC/RR closure and
+returned registered-idle pixels. `run_8210_dcs_incoming_call_02` passes.
+The caller crop `(40,8,80,16)` contains the reviewed `5551234` text and
+is byte-identical to fresh GSM control `run_8210_gsm_incoming_call_pixels_01`;
+the retired wider crop included changing signal/battery/animation pixels
+and failed for both bands. Blank-caller negative tests remain enforced.
+No-PIN laboratory signaling only; native speech, external end-to-end calls,
+DCS host-backend services and late-PIN service coverage remain unproved.
 
 **Current frontier:** DCS with physical PIN entry starting at eight seconds
 does not register; entry starting at seven seconds does. The passing

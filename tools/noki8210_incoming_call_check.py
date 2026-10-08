@@ -43,10 +43,10 @@ CHECKPOINTS = (
 )
 
 
-def verify(text, *, configured_carrier=False):
+def verify(text, *, configured_carrier=False, dcs1800=False):
     if '[LUA ERROR]' in text:
         raise ValueError('fixture error')
-    traffic, release = channel_patterns(configured_carrier)
+    traffic, release = channel_patterns(configured_carrier, dcs1800=dcs1800)
     replacements = {'own traffic configuration': traffic, 'own release configuration': release}
     checkpoints = tuple((name, replacements.get(name, pattern)) for name, pattern in CHECKPOINTS)
     require_ordered(text, checkpoints, '8210 incoming signaling')
@@ -60,9 +60,10 @@ def check_frames(directory):
             if source.size != (84, 48):
                 raise ValueError('unexpected handset frame geometry')
             return hashlib.sha256(source.convert('L').crop(crop).tobytes()).hexdigest()
-    # Static caller text: exclude icons and softkey rows.
-    if digest('8210_incoming_ringing.png', (0, 8, 84, 32)) != (
-            'cf1063a9a4b3d131613ffc53861064245cf734f82bbc2387f598912007eb5180'):
+    # Isolate all seven caller digits; signal/battery rails and ringing
+    # animation differ across band topology and capture phase.
+    if digest('8210_incoming_ringing.png', (40, 8, 80, 16)) != (
+            '520dea332454dee23be9bff0cd489d2003a88c2950a283b3fb229a827829f60d'):
         raise ValueError('missing reviewed caller 5551234')
     if digest('8210_after_incoming_call.png', (15, 0, 69, 16)) != (
             '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'):
@@ -74,13 +75,14 @@ if __name__ == '__main__':
     parser.add_argument('log', type=Path)
     parser.add_argument('--frames', type=Path)
     parser.add_argument('--configured-carrier', action='store_true')
+    parser.add_argument('--dcs1800', action='store_true')
     args = parser.parse_args()
     try:
         with args.log.open(errors='replace') as stream:
             text = ''.join(line for line in stream if 'dsp_hle:' in line or
                            'RX enqueue' in line or '8210_incoming_physical' in line or
                            '8210_keypad_decoded' in line or '[LUA ERROR]' in line)
-        verify(text, configured_carrier=args.configured_carrier)
+        verify(text, configured_carrier=args.configured_carrier, dcs1800=args.dcs1800)
         if args.frames:
             check_frames(args.frames)
     except (OSError, ValueError) as error:
