@@ -420,6 +420,8 @@ also passes with `--pin-enabled --pin-start 7`
 VERIFY and registration checks before the SMS lifecycle. This does not
 establish late-PIN recovery: the default eight-second DCS sequence remains
 an unresolved negative control.
+Standard isolated targets are `verify-8210-dcs-host-incoming-sms` and
+`verify-8210-dcs-early-pin-host-incoming-sms`; supply a new `RUN_DIR`.
 
 The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
@@ -969,6 +971,8 @@ the registered-idle capture before calling; a fixed automatic call can collide
 with security-code input and is not an equivalent fixture. Host registration
 validation selects the DCS823 contract rather than the GSM900 ARFCN4 contract.
 Speech and late-PIN recovery remain unproved.
+The corresponding standard target is
+`make verify-8210-dcs-early-pin-host-incoming-call RUN_DIR=NEW_DIRECTORY`.
 Paired `run_8210_pin_dcs_{late,early}_queue_result_01` confirms the late
 request is not lost: `21f5aa` calls `2a1eaa`, which copies `03ec` into
 context `+0c`. Both physical timings then return 4 from the argument-3
