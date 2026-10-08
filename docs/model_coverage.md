@@ -130,6 +130,12 @@ with read status and reviewed body pixels. The earlier default ARFCN1
 topology beside the firmware's ARFCN60 candidate is not this promotion.
 Native DSP, speech and hardware RF remain unproved.
 
+`verify-8890-host-rejected-sms` and `verify-8890-host-silent-sms` additionally
+prove distinct localized failure/timeout presentation and decoded physical
+menu recovery. Host decisions remain correlated and single-use; silence
+contains no RP result and closes through handset DISC/UA/deconfiguration.
+These do not promote native DSP, speech or other products' failure behavior.
+
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not
   NSE-8 type `0x1a`; each enabled radio profile uses its independently recovered
   command/report lifecycle.

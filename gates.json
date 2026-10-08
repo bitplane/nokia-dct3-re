@@ -27,6 +27,18 @@
   },
   "gates": [
     {
+      "name": "verify-8890-host-rejected-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8890_host_sms.py",
+                 "arguments": ["$(RUN_DIR)", "--direction", "outgoing", "--outcome", "rp_error", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8890-host-silent-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8890_host_sms.py",
+                 "arguments": ["$(RUN_DIR)", "--direction", "outgoing", "--outcome", "rp_silence", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8890-host-incoming-sms", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8890_host_sms.py",

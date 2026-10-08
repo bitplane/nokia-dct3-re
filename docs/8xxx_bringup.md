@@ -582,6 +582,19 @@ A/5551234 composition, exact host GSM7 data, rejection of wrong request IDs
 and duplicate decisions, one accepted result and firmware transport closure.
 These gates prove host SMS signaling, not SIP speech, native DSP or radio RF.
 
+`verify-8890-host-rejected-sms` and `verify-8890-host-silent-sms` separately
+complete the same own-carrier host path with RP-ERROR and deliberate absence
+of an RP result. Both require exact physical A/5551234 submission, wrong-ID
+and duplicate-decision rejection, radio teardown and physically decoded
+End/Menu recovery. Reviewed crops distinguish the localized rejection and
+timeout text from each other and require the recovered Messages menu.
+Silence must contain no RP-ACK/RP-ERROR and must end through the handset's
+DISC, network UA and deconfiguration; the observed current composition
+sends DISC near 107.5 seconds after a submission near 40 seconds. This is
+an observed emulation lifecycle, not a measured silicon timer period.
+The 58-second rejection and 125-second silence runs use separate fresh
+storage and record their selected host outcome in `acceptance.json`.
+
 For USSD, run `nsb6hle` for 64 seconds in fresh private working, config,
 NVRAM and snapshot directories with `-noreadconfig -debug -debugger none
 -verbose -log -video none -sound none -nothrottle`, autoboot delay zero,
