@@ -270,6 +270,23 @@ traffic/release contracts. Reviewed caller text and exact registered idle
 before/after the call are required. `--port` selects the unused HTTP port
 (default 16210). This is HLE signaling acceptance, not speech or native DSP.
 
+## SIP caller cancellation
+
+`make verify-6210-sip-cancel RUN_DIR=run_6210_sip_cancel` runs the unchanged
+acquired PMM in `npe3hle`, with fresh private NVRAM/configuration and the
+optional PJSIP 2.16 stack. A reviewed registered-idle snapshot at 32 seconds
+releases the real SIP INVITE. The endpoint cancels only after the handset
+reaches alerting; the checker requires CANCEL/487, exactly one accepted
+termination, CC release, LAPDm channel release and the ended phase. Answer,
+CONNECT and all bridge media counters are rejected.
+
+The firmware renders `1 missed call`. A physical right-softkey Exit then
+returns to the exact registered-idle frame. Product-owned bootstrap,
+registration and persisted EF_LOCI are checked as well as SIP signaling.
+The runner refuses an existing run directory or stale readiness artifact.
+The generic SIP runner explicitly limits product `6210` to this unanswered
+scenario; answered SIP, speech and native DSP are not promoted.
+
 ## Host outgoing call
 
 `host-outgoing-call` runs the ordinary physical `1234567` dial/Send/End

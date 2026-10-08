@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 411 gates: 264 generated from typed steps, 147 copied verbatim (shell).
+# 412 gates: 264 generated from typed steps, 148 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,21 +44,21 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-5510-package verify-6210-stage verify-6210-runtime \
-	verify-6210-outgoing-call verify-6210-incoming-call verify-6210-incoming-sms \
-	verify-6210-host-incoming-sms verify-6210-host-outgoing-sms \
-	verify-6210-host-rejected-sms verify-6210-host-silent-sms \
-	verify-6210-outgoing-sms verify-6210-accessory verify-6210-state-idle \
-	verify-6210-state-call verify-6210-state-sms verify-6210-security \
-	verify-6210-registration verify-6210-calculator verify-6210-phonebook \
-	verify-6210-menu verify-8210-registration verify-8210-outgoing-call \
-	verify-8210-incoming-call verify-8210-incoming-sms verify-8210-outgoing-sms \
-	verify-8210-calculator verify-8210-phonebook verify-7110-keypad-controller \
-	verify-sed1565 verify-7110-verifier verify-7110-bootstrap \
-	verify-6210-keypad-controller verify-6210-verifier verify-6210-bootstrap \
-	verify-8210-verifier verify-8210-bootstrap verify-gsm-fr-codec \
-	verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 verify-gsm-xcch-l1 \
-	verify-gsm-mobility verify-gsm-sms-transport \
+.PHONY: verify-5510-package verify-6210-sip-cancel verify-6210-stage \
+	verify-6210-runtime verify-6210-outgoing-call verify-6210-incoming-call \
+	verify-6210-incoming-sms verify-6210-host-incoming-sms \
+	verify-6210-host-outgoing-sms verify-6210-host-rejected-sms \
+	verify-6210-host-silent-sms verify-6210-outgoing-sms verify-6210-accessory \
+	verify-6210-state-idle verify-6210-state-call verify-6210-state-sms \
+	verify-6210-security verify-6210-registration verify-6210-calculator \
+	verify-6210-phonebook verify-6210-menu verify-8210-registration \
+	verify-8210-outgoing-call verify-8210-incoming-call verify-8210-incoming-sms \
+	verify-8210-outgoing-sms verify-8210-calculator verify-8210-phonebook \
+	verify-7110-keypad-controller verify-sed1565 verify-7110-verifier \
+	verify-7110-bootstrap verify-6210-keypad-controller verify-6210-verifier \
+	verify-6210-bootstrap verify-8210-verifier verify-8210-bootstrap \
+	verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 \
+	verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
@@ -279,6 +279,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 
 verify-5510-package:
 	$(PYTHON) tools/noki5510_package_check.py roms/archive-dct3-packages/NPM5_353_mcu.exe --output-dir roms/5510-npm5-v353
+
+# shell: optional external PJSIP stack with isolated NPE-3 storage and configuration
+verify-6210-sip-cancel: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6210_sip_cancel.py $(RUN_DIR) --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 verify-6210-stage: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario stage --mame $(MAME_DIR)/mame

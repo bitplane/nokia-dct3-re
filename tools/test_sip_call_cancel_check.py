@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import subprocess
+import sys
 
 from tools.run_sip_handset_gate import verify_cancel
 
@@ -36,8 +38,30 @@ class SipCancelCheckTest(unittest.TestCase):
         self.check()
 
     def test_sibling_scopes(self):
-        for product in ('3310', '3330', '3410', '5210'):
+        for product in ('3310', '3330', '3410', '5210', '6210'):
             self.assertTrue(self.check(product=product)['scope'].startswith(product + ' HLE'))
+
+    def test_6210_cli_rejects_answered_or_media_promotion(self):
+        script = Path(__file__).with_name('run_sip_handset_gate.py')
+        with tempfile.TemporaryDirectory() as directory:
+            for extra in ([], ['--incoming'],
+                          ['--incoming', '--cancel-incoming', '--record-media']):
+                result = subprocess.run([sys.executable, str(script), '--pjsua', 'absent',
+                                         '--run-dir', directory, '--product', '6210', *extra],
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('limited to unanswered incoming CANCEL', result.stderr)
+
+    def test_stale_ready_file_is_rejected_before_launch(self):
+        script = Path(__file__).with_name('run_sip_handset_gate.py')
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / 'ready.png'
+            ready.touch()
+            result = subprocess.run([sys.executable, str(script), '--pjsua', 'absent',
+                                     '--run-dir', directory, '--incoming', '--cancel-incoming',
+                                     '--ready-file', str(ready)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('must not already exist', result.stderr)
 
     def test_incomplete_radio_release_is_rejected(self):
         for line in ('GSM service downlink kind=13 sapi=0 pd=03 message=25',

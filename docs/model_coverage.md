@@ -87,6 +87,11 @@ all five profiles in the table. The new epoch admits exactly one new call, physi
 Answer, sustained ordered media and normal release. This is a separate gate
 from clearing an active restored call; other profiles have not inherited it.
 
+The 6210 v5.56 `npe3hle` profile separately passes `verify-6210-sip-cancel`:
+real caller CANCEL/487 during alerting, complete CC/RR release, the missed-call
+screen and physical Exit back to registered idle. It rejects Answer and media
+and does not establish answered SIP speech.
+
 ## Product-boundary cautions
 
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not

@@ -405,6 +405,14 @@ transaction. Stopping the traffic channel alone is not the cancellation gate's
 completion criterion. This covers cancellation while alerting, not every SIP
 transaction race or cancellation before paging.
 
+`verify-6210-sip-cancel` independently covers the research-HLE NPE-3 v5.56
+profile with unchanged acquired PMM. Its private runner waits for a fresh
+registered-idle artifact before INVITE, verifies the same unanswered
+CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
+dismisses it with the right softkey before checking registered idle again.
+It does not inherit the five media-capable profiles' answered-call coverage.
+The generic SIP runner rejects answered/media fixtures for product `6210`.
+
 ### Connected-call restoration
 
 ```sh

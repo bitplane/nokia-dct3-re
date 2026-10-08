@@ -89,6 +89,15 @@ async def run(args):
                     await asyncio.sleep(0.05)
                 else:
                     raise RuntimeError('incoming SIP lacks registered handset')
+                if args.ready_file:
+                    for _ in range(900):
+                        if args.ready_file.is_file():
+                            break
+                        if handset.returncode is not None or bridge.returncode is not None:
+                            raise RuntimeError('handset or bridge exited before incoming ready fixture')
+                        await asyncio.sleep(0.05)
+                    else:
+                        raise RuntimeError('incoming handset ready fixture did not appear')
                 remote = await asyncio.create_subprocess_exec(*remote_command,
                     '--id', f'sip:5551234@127.0.0.1:{args.sip_port}',
                     f'sip:dct3@127.0.0.1:{args.sip_port + 1}',
@@ -415,7 +424,9 @@ def main():
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--record-media', action='store_true')
-    parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210'), default='3210')
+    parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210', '6210'), default='3210')
+    parser.add_argument('--ready-file', type=Path,
+                        help='wait for a fresh handset readiness artifact before an incoming INVITE')
     parser.add_argument('--calls', type=int, choices=(1, 2), default=1)
     parser.add_argument('--cancel-incoming', action='store_true')
     parser.add_argument('--restore-call', action='store_true')
@@ -425,6 +436,13 @@ def main():
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.ready_file and not args.incoming:
+        parser.error('--ready-file requires --incoming')
+    if args.ready_file and args.ready_file.exists():
+        parser.error('--ready-file must not already exist before the handset run')
+    if args.product == '6210' and (not args.incoming or not args.cancel_incoming or
+            args.record_media or args.restore_call or args.restore_idle or args.restore_outgoing):
+        parser.error('6210 SIP coverage is limited to unanswered incoming CANCEL; media is unproved')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:

@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 57
-Differences found: 98
+Families with more than one product: 69
+Differences found: 108
 
 ## ROM normalisation reachability
 
@@ -45,6 +45,12 @@ absent product is a coverage question, not a drifted gate.
 | `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
 | `radio-incoming-call-answered` | — | yes | — | — | — | — | — | yes | — | — | — | — | — |
 | `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-incoming-call-sip` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-incoming-call-sip-alerting-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-incoming-call-sip-cancel` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-incoming-call-sip-connected-restore` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-incoming-call-sip-idle-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-incoming-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
 | `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
 | `radio-incoming-sms` | — | yes | — | — | — | — | — | yes | — | — | — | — | — |
 | `radio-loss-recovery` | — | yes | — | — | yes | — | — | yes | — | — | — | — | — |
@@ -53,6 +59,12 @@ absent product is a coverage question, not a drifted gate.
 | `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — | — | — | — | — |
 | `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
 | `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-outgoing-call-sip` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-outgoing-call-sip-busy` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-outgoing-call-sip-connected-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-outgoing-call-sip-pending-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-outgoing-call-sip-unavailable` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — |
+| `radio-outgoing-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
 | `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | yes | — | — | — | — | — |
 | `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
 | `radio-paging` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
@@ -209,6 +221,30 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `tools/radio_3410_incoming_call_lifecycle_check.py`, `tools/radio_speech_media_trace_check.py`
 - **5210**: `tools/check_lcd_frame.py`, `tools/radio_5210_incoming_call_trace_check.py`
 
+### `radio-incoming-call-sip`
+
+- **3210**: _(none)_
+- **3310**: _(none)_
+- **3330**: `tools/check_model_frontier_summary.py`
+- **3410**: _(none)_
+- **5210**: _(none)_
+
+### `radio-incoming-call-sip-connected-restore`
+
+- **3310**: _(none)_
+- **3330**: `tools/check_model_frontier_summary.py`
+- **3410**: _(none)_
+- **5210**: _(none)_
+
+### `radio-incoming-call-sip-waveform`
+
+- **3210**: _(none)_
+- **3310**: _(none)_
+- **3330**: `tools/check_model_frontier_summary.py`
+- **3410**: _(none)_
+- **5210**: _(none)_
+- shared: `tools/run_sip_physical_audio_gate.sh`
+
 ### `radio-incoming-smart-message`
 
 - **3210**: _(none)_
@@ -252,6 +288,22 @@ absent product is a coverage question, not a drifted gate.
 - **3330**: `tools/check_model_frontier_summary.py`, `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
 - **3410**: `tools/radio_outgoing_call_trace_check.py`, `tools/radio_speech_media_trace_check.py`
 - **5210**: `tools/check_lcd_frame.py`, `tools/radio_5210_outgoing_call_trace_check.py`
+
+### `radio-outgoing-call-sip`
+
+- **3210**: `tools/run_sip_handset_gate.py`
+- **3330**: `tools/check_model_frontier_summary.py`
+- **3410**: _(none)_
+- **5210**: _(none)_
+
+### `radio-outgoing-call-sip-waveform`
+
+- **3210**: _(none)_
+- **3310**: _(none)_
+- **3330**: `tools/check_model_frontier_summary.py`
+- **3410**: _(none)_
+- **5210**: _(none)_
+- shared: `tools/run_sip_physical_audio_gate.sh`
 
 ### `radio-outgoing-physical-duplex`
 
@@ -502,12 +554,28 @@ absent product is a coverage question, not a drifted gate.
 - **3310**: `7`
 - **3330**: `12`
 
+### `radio-incoming-call-sip-waveform`
+
+- **3210**: _(none)_
+- **3310**: _(none)_
+- **3330**: `44`
+- **3410**: _(none)_
+- **5210**: _(none)_
+
 ### `radio-incoming-smart-message`
 
 - **3210**: `40`
 - **3310**: `45`
 - **3330**: `35`, `44`
 - **3410**: `45`
+
+### `radio-outgoing-call-sip-waveform`
+
+- **3210**: _(none)_
+- **3310**: _(none)_
+- **3330**: `44`
+- **3410**: _(none)_
+- **5210**: _(none)_
 
 ### `radio-outgoing-physical-duplex`
 
@@ -671,6 +739,21 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `structured`
 - **5210**: `structured`
 
+### `radio-incoming-call-sip`
+
+- **3210**: `structured`
+- **3310**: `structured`
+- **3330**: `shell`
+- **3410**: `structured`
+- **5210**: `structured`
+
+### `radio-incoming-call-sip-connected-restore`
+
+- **3310**: `structured`
+- **3330**: `shell`
+- **3410**: `structured`
+- **5210**: `structured`
+
 ### `radio-loss-recovery-state`
 
 - **3210**: `shell`
@@ -699,6 +782,13 @@ absent product is a coverage question, not a drifted gate.
 - **3210**: `shell`
 - **3310**: `structured`
 - **3330**: `structured`
+- **3410**: `structured`
+- **5210**: `structured`
+
+### `radio-outgoing-call-sip`
+
+- **3210**: `shell`
+- **3330**: `shell`
 - **3410**: `structured`
 - **5210**: `structured`
 
