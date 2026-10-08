@@ -251,6 +251,19 @@ PIN-enabled profile. Physical `1234` and OK must produce VERIFY CHV1 and
 unchanged and does not request a phone-lock code on this boot. This gate
 proves SIM PIN interaction, not a recovered phone-lock EEPROM contract.
 
+Delayed-PIN registration requires coherent laboratory topology: acquisition
+uses ARFCN 35, whereas the default network configures ARFCNs 1/2. With physical
+PIN entry starting at eight seconds, the `57/03050000` background measurement
+request receives an HLE `8b` response through the firmware-owned task-14 route
+and completion parser. An isolated ARFCN 35/36 configuration reports the
+receivable serving cell at -60 dBm and permits Location Updating after CHV1
+acceptance, including persisted EF_LOCI LAI and status. The exact observed
+candidate/release channel header is `12 02`, rather than the no-PIN fixture's
+`00 00`. `verify-6210-slow-pin-registration` requires the ordered background
+request, serving-cell measurement, enabled task-14 route/completion, physical
+PIN acceptance, full registration sequence and persistent EF_LOCI. The ordinary
+security gate remains PIN/menu-only; no-PIN registration is checked separately.
+
 All service runners start with new working directories; incoming network
 events are selected through MAME configuration, not firmware injection.
 No donor PMM, forced phone state or borrowed DSP verdict is used. The staged

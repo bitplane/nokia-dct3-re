@@ -31,6 +31,17 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 
 ## Promotion rules
 
+The 6210's `verify-6210-slow-pin-registration` additionally verifies physical
+late PIN acceptance followed by registration and persisted EF_LOCI on the
+explicit ARFCN 35/36 laboratory topology. The ordinary PIN/menu gate alone
+does not establish this lifecycle. These are runtime-HLE signaling tests,
+not native DSP or speech evidence.
+
+The 6250's PIN-enabled gates independently cover delayed registration,
+incoming/outgoing host call signaling and SMS, and phonebook save followed by
+new-process PIN reauthentication and readback. They retain the declared PMM
+comparison and do not promote the normal machine or native speech.
+
 The 6250's `verify-6250-coherent-registration` independently verifies its
 declared initial-record HLE composition on external lab carriers 19/20:
 own native uploads, compact self-test, SCH/MCU/host carrier agreement,

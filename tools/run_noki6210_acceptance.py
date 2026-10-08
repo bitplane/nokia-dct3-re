@@ -46,11 +46,12 @@ SMS_SENT_SHA256 = '67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc
 SECURITY_MENU_SHA256 = 'dca943c465ed8b7cc2c766e9ac0f6f69ce86228c04aa68cd52d1b20a75a8bf3f'
 
 
-def check_registration(text, storage, *, preserved_location=False):
+def check_registration(text, storage, *, preserved_location=False,
+                       channel_header='0000'):
     import re
     patterns = (
         r'TX packet type=56 payload=160 .*data=0023',
-        r'TX packet type=02 .*radio_phase=candidate_channel_change data=040000000000005050000023',
+        rf'TX packet type=02 .*radio_phase=candidate_channel_change data=04{channel_header}000000005050000023',
         r'TX packet type=0c .*radio_phase=random_access',
         r'RX enqueue type=89 payload=8 .*data=0100000000000000',
         (r'TX packet type=1b .*data=0080013f4905087200f110000133080910101032547698'
@@ -58,7 +59,7 @@ def check_registration(text, storage, *, preserved_location=False):
          r'TX packet type=1b .*data=0080013f4905087000f000fffe33080910101032547698'),
         r'LAPDm Location Updating Accept acknowledged nr=1',
         r'LAPDm Channel Release acknowledged nr=2',
-        r'TX packet type=02 .*radio_phase=release_channel_change data=040000000000001a600000230000000f',
+        rf'TX packet type=02 .*radio_phase=release_channel_change data=04{channel_header}000000001a600000230000000f',
     )
     cursor = 0
     for pattern in patterns:
@@ -176,6 +177,8 @@ def main():
     parser.add_argument('--scenario', choices=SCENARIOS, default='menu')
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--port', type=int, default=16210)
+    parser.add_argument('--coherent-cell', action='store_true',
+                        help='configure the laboratory network on ARFCNs 35/36')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     try:
@@ -191,7 +194,8 @@ def main():
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
         host = args.scenario.startswith('host-')
-        if args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit') or host:
+        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit') or host
+        if configured or args.coherent_cell:
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
@@ -202,8 +206,12 @@ def main():
                 tag = ':CALLHOST' if host else ':NETCFG'
                 mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
                 value = mask
-            ET.SubElement(ports, 'port', tag=tag, type='CONFIG',
-                          mask=mask, defvalue='0', value=value)
+            if configured:
+                ET.SubElement(ports, 'port', tag=tag, type='CONFIG',
+                              mask=mask, defvalue='0', value=value)
+            if args.coherent_cell:
+                ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
+                              mask='1024', defvalue='0', value='1024')
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -334,6 +342,18 @@ def main():
             from PIL import Image
             with Image.open(run / 'snap/6210_security_then_menu.png') as frame:
                 check_frame(frame, SECURITY_MENU_SHA256, 'Messages after PIN verification')
+            if args.coherent_cell:
+                require_ordered(text, (
+                    ('background request', re.compile(r'TX packet type=57 payload=4 .*data=03050000')),
+                    ('serving-cell measurement', re.compile(r'RX enqueue type=8b payload=166 .*data=0010002300c4')),
+                    ('enabled firmware route', re.compile(r'6210_pin_measurement_route: enabled=01')),
+                    ('task-14 delivery', re.compile(r'6210_pin_measurement_post: target=0e')),
+                    ('measurement completion', re.compile(r'6210_pin_measurement_completion:')),
+                    ('accepted PIN', re.compile(r'SIM status ins=20 sw=9000')),
+                    ('location acceptance', re.compile(r'LAPDm Location Updating Accept acknowledged nr=1')),
+                ), '6210 delayed-PIN registration')
+                check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
+                                   channel_header='1202')
         elif args.scenario.startswith('state-'):
             from tools.noki6210_state_check import verify as check_state
             check_state(text, args.scenario.removeprefix('state-'))

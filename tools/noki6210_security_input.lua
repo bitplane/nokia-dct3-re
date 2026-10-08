@@ -2,6 +2,30 @@
 local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(assert(source:match('^(.*[/])')) .. 'noki6210_staged_observe.lua')
 local machine = manager.machine
+local cpu = machine.devices[':maincpu']
+local memory = cpu.spaces['program']
+_G.npe3_pin_measurement_route = memory:install_read_tap(0x45835c, 0x45835f, 'npe3_pin_route',
+    function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x45835c then return end
+        local enabled = memory:read_u32(0x4583cc)
+        machine:logerror(string.format('6210_pin_measurement_route: enabled=%02x message=%08x t=%.6f\n',
+            memory:read_u8(enabled), cpu.state['R0'].value, machine.time:as_double()))
+    end)
+_G.npe3_pin_measurement_post = memory:install_read_tap(0x3c22c0, 0x3c22c3, 'npe3_pin_post',
+    function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x3c22c0 then return end
+        local message = cpu.state['R1'].value
+        if message < 0x100000 or message >= 0x180000 or
+                memory:read_u16(message) ~= 0x1802 or memory:read_u8(message+3) ~= 0x8b then return end
+        machine:logerror(string.format('6210_pin_measurement_post: target=%02x message=%08x t=%.6f\n',
+            cpu.state['R0'].value, message, machine.time:as_double()))
+    end)
+_G.npe3_pin_measurement_completion = memory:install_read_tap(0x3c9750, 0x3c9753, 'npe3_pin_completion',
+    function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x3c9750 then return end
+        machine:logerror(string.format('6210_pin_measurement_completion: message=%08x t=%.6f\n',
+            cpu.state['R0'].value, machine.time:as_double()))
+    end)
 local input = coroutine.create(function()
     if not emu.wait(8) then return end
     machine.screens[':screen']:snapshot('6210_pin_prompt.png')

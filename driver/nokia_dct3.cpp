@@ -1816,6 +1816,8 @@ void nokia_dct3_state::machine_reset()
 		m_gsm_network->set_cell_carriers(4, 5);
 	if (BIT(m_neighbour_config.read_safe(0x00), 9))
 		m_gsm_network->set_cell_carriers(19, 20);
+	if (BIT(m_neighbour_config.read_safe(0x00), 10))
+		m_gsm_network->set_cell_carriers(35, 36);
 	const bool pcs1900 = BIT(m_neighbour_config.read_safe(0x00), 6);
 	m_gsm_network->set_pcs1900_band(pcs1900);
 	if (pcs1900)
@@ -2839,6 +2841,9 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x200, 0x00, "Laboratory GSM 900 carrier pair 19/20")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x200, "GSM 900 (ARFCN 19/20)")
+	PORT_CONFNAME(0x400, 0x00, "Laboratory GSM 900 carrier pair 35/36")
+	PORT_CONFSETTING(0x00, DEF_STR(Off))
+	PORT_CONFSETTING(0x400, "GSM 900 (ARFCN 35/36)")
 
 	PORT_START("NEIGHBORFAULT")
 	PORT_CONFNAME(0x07, 0x00, "Neighbour validation fault")
@@ -3940,6 +3945,9 @@ void nokia_dct3_state::npe3hle(machine_config &config)
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
 	runtime.radio = RADIO_NPE3;
+	// Own 8b handler 45835c and completion 3c9750/38b6ae recover the
+	// forty-record background measurement contract; late-PIN run verifies it.
+	runtime.radio.background_band_measurements = true;
 	// Explicit research handoff after own uploads, before absent mask code.
 	// Own 3029fe..302a02 selects command 0d -> 302a52, requires
 	// flag 17fd99 bit 2 and consumes fault bits 0/1 from message byte 9.

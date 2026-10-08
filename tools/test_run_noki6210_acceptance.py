@@ -49,6 +49,14 @@ class ApplicationAcceptanceTest(unittest.TestCase):
         storage = bytearray(3524)
         storage[1604:1609] = bytes.fromhex('00f1100001')
         runner.check_registration(text, storage, preserved_location=True)
+        pin_text = text.replace('data=040000', 'data=041202')
+        runner.check_registration(pin_text, storage, preserved_location=True,
+                                  channel_header='1202')
+        with self.assertRaises(ValueError):
+            runner.check_registration(pin_text, storage, preserved_location=True)
+        with self.assertRaises(ValueError):
+            runner.check_registration(text, storage, preserved_location=True,
+                                      channel_header='1202')
         with self.assertRaises(ValueError):
             runner.check_registration(text, storage)
         for broken in (text.replace('read-binary fid=6f7e', 'read-binary fid=6f3a'),
