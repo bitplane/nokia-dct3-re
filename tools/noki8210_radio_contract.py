@@ -75,6 +75,9 @@ def verify(image):
     if instructions(0x209be2, 6) != [
             ('movs', 'r1, #0'), ('bl', '#0x20925c')]:
         raise ValueError('upstream readiness publication boundary differs')
+    if instructions(0x210fd0, 6) != [
+            ('ldr', 'r0, [sp, #4]'), ('bl', '#0x209b90')]:
+        raise ValueError('observed upstream readiness caller differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

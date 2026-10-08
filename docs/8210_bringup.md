@@ -774,6 +774,15 @@ protocol semantics or changing peer behavior.
 A linear Thumb decode finds direct `bl 209b90` candidates at `20cc9a`,
 `210fd2` and `211048`. These are investigation anchors, not an exhaustive
 producer census: linear decoding can include data and misses indirect calls.
+Paired passive runtime observation confirms `210fd2` is the selected caller:
+DCS supplies `09c8` at 12.695703 seconds, followed by `03ec` construction
+at 12.695866; GSM supplies `09cc` at 12.696790, followed by `03ed` at
+12.696956. Both earlier supply `09c7` through the same caller at 3.181184.
+The caller loads the input from `[sp,#4]`; its message dispatch and input
+producer are the next boundary. GSM additionally invokes the mapper with
+`09fc`/`09fa` through `211048`; those are observations, not assigned protocol
+semantics. Evidence: `run_8210_pin_{dcs,gsm}_mapper_01`; GSM registration
+passes, DCS is rejected by the unchanged strict acceptance checker.
 
 ## Evidence needed to resume
 

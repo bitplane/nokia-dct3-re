@@ -6,6 +6,12 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_readiness_mapper = memory:install_read_tap(0x209b90, 0x209b93,
+        'nsm3_readiness_mapper', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x209b90 then return end
+            machine:logerror(string.format('8210_readiness_mapper: input=%04x caller=%08x t=%.6f\n',
+                cpu.state['R0'].value, cpu.state['R14'].value, machine.time:as_double()))
+        end)
     _G.nsm3_readiness_constructor = memory:install_read_tap(0x2aede0, 0x2aede3,
         'nsm3_readiness_constructor', function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2aede0 then return end
