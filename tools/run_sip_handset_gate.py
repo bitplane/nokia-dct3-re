@@ -151,6 +151,37 @@ async def run(args):
     verify_success(root, remote_text, args)
 
 
+def verify_downlink_lifecycle(log):
+    packets = list(re.finditer(
+        r'gsm_call_adapter: media direction=downlink id=1 sequence=(\d+) '
+        r'result=(accepted|rejected)([^\n]*)', log))
+    if [int(packet[1]) for packet in packets] != list(range(len(packets))):
+        raise RuntimeError('SIP downlink sequence is not contiguous')
+    accepted = 0
+    closing = False
+    for packet in packets:
+        if packet[2] == 'accepted':
+            if closing:
+                raise RuntimeError('handset accepted media after closure')
+            accepted += 1
+            continue
+        closing = True
+        stamp = re.search(r'\bt=(\d+\.\d+)\b', packet[3])
+        if not stamp or not re.search(r'\breason=session_closed\b', packet[3]):
+            raise RuntimeError('unclassified or active-session SIP downlink rejection')
+        # Closure is published after the queued-media drain in the same poll.
+        # Require both independent radio release and that exact poll boundary.
+        if 'LAPDm service Channel Release acknowledged' not in log[:packet.start()]:
+            raise RuntimeError('closed-session rejection precedes radio release')
+        boundary = re.search(
+            r'gsm_call_adapter: (?:incoming )?state id=1 epoch=\d+ phase=ended'
+            r'[^\n]*\bt=' + re.escape(stamp[1]) + r'\b', log[packet.end():])
+        if boundary is None:
+            raise RuntimeError('closed-session rejection lacks matching closure poll')
+    if accepted < 100:
+        raise RuntimeError('handset did not accept a sustained ordered SIP downlink')
+
+
 def verify_success(root, remote_text, args):
     if 'state changed to CONFIRMED' not in remote_text or not re.search(
             r'DISCONNECTED \[reason=200 \((?:OK|Normal call clearing)\)\]', remote_text):
@@ -181,11 +212,7 @@ def verify_success(root, remote_text, args):
                 len(bytes.fromhex(match['data'])) != int(match['length']) or
                 decode_called_digits(bytes.fromhex(match['data'])) != number for match in setups):
             raise RuntimeError('answered SIP SETUP differs from physically dialed number')
-    downlink = re.findall(
-        r'gsm_call_adapter: media direction=downlink id=1 sequence=(\d+) result=(accepted|rejected)', log)
-    if (len(downlink) < 100 or any(result != 'accepted' for _, result in downlink) or
-            [int(sequence) for sequence, _ in downlink] != list(range(len(downlink)))):
-        raise RuntimeError('handset did not accept a sustained ordered SIP downlink')
+    verify_downlink_lifecycle(log)
     epoch = 2 if args.restore_idle else 1
     if args.restore_idle:
         if ('SIP idle snapshot accepted epoch=2' not in bridge_text or

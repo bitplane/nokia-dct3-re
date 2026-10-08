@@ -112,12 +112,24 @@ justification to accept media into a closed session. A lifecycle acceptance
 test needs an explicit closure boundary and must continue rejecting stale
 identities, malformed frames, and active-call sequence failures; a blanket
 allowance for rejected packets would conceal those defects. The existing
-strict gate remains unchanged pending that boundary test.
+strict active-media requirements remain in force.
 The adapter's downlink trace now appends `reason=accepted`, `wrong_request`,
 `session_closed`, or `media_validation` without changing admission behavior.
 This makes a fresh probe distinguish session closure from request mismatch
 and active-session sequence/queue failure; the old capture predates these
 reason fields and must not be retroactively classified as a passing run.
+
+A fresh probe (`run_8210_sip_media_boundary_probe`) accepts sequences 0..351,
+then rejects sequence 352 explicitly as `session_closed` at 37.040 s, after
+LAPDm Channel Release acknowledgement and in the same poll as `ended`.
+The shared checker now recognizes only this ordered terminal closure suffix;
+unclassified rejections, wrong requests, active-media failures, sequence gaps,
+and accepted media after closure still fail. Twelve focused checker tests pass.
+Full answered acceptance remains unproved: the next failing check assumes a
+handset RELEASE (`2d`), whereas this physical-End run emits DISCONNECT
+`036502e090` followed by RELEASE COMPLETE `032a`. Decode and test this own
+CC release direction before adding an answered gate; do not substitute a
+sibling handset's release pattern. Temporary probe-runner switches are removed.
 
 ## Physical power lifecycle
 
