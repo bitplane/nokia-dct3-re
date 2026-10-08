@@ -1683,6 +1683,15 @@ OVM states, preservation of carry, and TI SPRU131G's `FRCT`/`SMUL` example
 assert saturated overflow in dual-memory and parallel-store MAC forms.
 Other rounded boundaries and encoded variants remain unaudited; fixture
 overlap does not claim those cases are complete.
+The executable rounded-multiplier boundary matrix covers eight explicit
+MPYR/MACR/MASR vectors across A/B destinations, `*AR2`/absolute operands,
+and clear/pre-existing destination overflow: 64 cases. It checks fractional
+minimum-times-minimum multiplication, positive rounding across the 32-bit
+boundary, negative subtraction overflow, OVM saturation, sticky destination
+and opposite overflow, preserved carry/TC, T, address and opposite accumulator.
+The arithmetic follows TI [SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+MPY/MAC/MAS definitions. This does not cover every addressing form, multiplier
+SMUL combination, 40-bit wrap boundary, cycle cost or Nokia RF sample format.
 PMST.SST now saturates the shifted 40-bit accumulator value to 32 bits before
 ordinary `STH`, `STL`, `STLM`, and `DST` stores, without modifying the
 accumulator. Focused fixtures reproduce TI SPRU131G's signed `STH` and

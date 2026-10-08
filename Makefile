@@ -1207,6 +1207,7 @@ check-c54x-core: build
 	@grep -q "TMS320C54x stack address latency conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x RC ALT conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x software interrupt conformance: PASS" /tmp/tms320c54x-core-check.log
+	@grep -q "TMS320C54x rounded multiply boundaries: PASS vectors=8 destinations=2 addressing_modes=2 sticky_overflow_states=2" /tmp/tms320c54x-core-check.log
 
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.
@@ -1306,7 +1307,7 @@ check-c54x-rom4-coherent: build
 		/tmp/tms320c54x-rom4-coherent-check.log
 
 check-c54x-rom4-rf-boundary: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-c54x-rf.XXXXXX)"; \
+	@set -eu; tmp="$$(mktemp -d -t noki5110-c54x-rf.XXXXXX)"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
