@@ -964,6 +964,16 @@ option byte cannot by itself distinguish acquisition from background
 measurement. No explicit stop packet occurs between the updated list
 and channel configuration in the captured late-PIN run. Neither that
 absence nor the shared encoding proves that the DSP must keep measuring.
+Cancellation is not yet a direct late-PIN remedy: under the current peer
+cadence, the pending terminal follows the 7.897080 SCH on the next poll,
+before the 12.696057 readiness request. Retaining it would not itself
+supply a post-PIN event. An indirect cell-state effect remains possible
+and must be shown rather than assumed. A full-image aligned direct-BL
+candidate scan (950,270 offsets) finds only two calls to parser `2a2250`,
+at `21ef4c` and `21fb86`; both decoded consumers are above. This is not
+an indirect-call absence proof. The channel-acknowledgement loop forwards
+other events through `21bdc4`/`21f48a`, whose special `8b` branch at
+`21f504` leads to a flag setter (`21bb54`), not either parser call.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

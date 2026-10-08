@@ -200,6 +200,16 @@ def verify(image):
     if instructions(0x2b31d2, 8) != [
             ('adds', 'r0, r6, #0'), ('adds', 'r1, r5, #0'), ('bl', '#0x2b2d52')]:
         raise ValueError('background measurement does not share selector mapping')
+    # Enumerate aligned direct-BL candidates, not indirect-call ownership.
+    parser_calls = []
+    for offset in range(0, len(image) - 4, 2):
+        if image[offset] & 0xf8 != 0xf0:
+            continue
+        candidate = instructions(0x200000 + offset, 4)
+        if candidate == [('bl', '#0x2a2250')]:
+            parser_calls.append(0x200000 + offset)
+    if parser_calls != [0x21ef4c, 0x21fb86]:
+        raise ValueError('direct measurement-parser candidate callsites differ')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
