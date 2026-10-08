@@ -90,8 +90,10 @@ five focused NSM-3/NPE-3 control tests pass. Actual answered SIP/RTP and
 non-silent physical audio remain unvalidated. Endpoint wiring does not
 promote native DSP execution or factory provisioning.
 
-`tools/run_noki8210_sip_cancel.py --outgoing-media` validates one physical
+`make verify-8210-sip-outgoing-media RUN_DIR=NEW_DIRECTORY` validates one physical
 outgoing SIP-200 call on `nsm3hle`, with own PCM timing and endpoints.
+It invokes `tools/run_noki8210_sip_cancel.py --outgoing-media` and requires
+the optional PJSIP 2.16 build documented in `external_call_bridge.md`.
 Fresh run `run_8210_sip_outgoing_media_verified` passes the shared media,
 full own-product CC/RR lifecycle and reviewed presentation checks. Bridge
 counters are uplink 365, downlink 353, transmitted PCM 365 and received PCM
@@ -112,6 +114,15 @@ This establishes outgoing HLE media transport, not native DSP speech or
 non-silent microphone audio. Incoming answered SIP, recording, and external
 call restoration remain disabled for NSM-3. Provisioning remains the declared
 base-record comparison, not validated factory data.
+
+The matrix target is not yet repeatably green: `run_8210_sip_media_matrix`
+rejects an in-flight frame as `session_closed` at 37.030 s, before radio
+release at 37.038919 s and final `ended` at 37.040 s. This falsifies the
+checker's assumption that media closure and call completion always share
+a poll. Preserve the failure until an explicit media-closure boundary is
+published and independently checked; do not infer closure by permitting an
+arbitrary rejection-time tolerance. The earlier passing run remains evidence
+of transport execution, not proof of deterministic release acceptance.
 
 ## Physical power lifecycle
 

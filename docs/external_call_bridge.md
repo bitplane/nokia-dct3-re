@@ -585,7 +585,8 @@ coherent ARFCN4 registration, request/decision correlation and reviewed UI.
 They use the same labelled base-record comparison and require own native
 uploads before explicit HLE handoff. Answered host signaling is not an
 answered SIP/media acceptance. The 8210 SIP runner separately offers
-`--outgoing-media` for one physical outgoing call against SIP 200, in addition
+`--outgoing-media` (`make verify-8210-sip-outgoing-media`) for one physical
+outgoing call against SIP 200, in addition
 to unanswered CANCEL and the outgoing failure fixtures below. It reuses the
 full own-product physical-End lifecycle: handset DISCONNECT, network RELEASE,
 handset RELEASE COMPLETE, RR release and return to paging. At least 100
