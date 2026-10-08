@@ -109,6 +109,15 @@ restored and no speech is established.
 
 ## Product-boundary cautions
 
+The 8850 v5.31 `nsm2hle` profile additionally passes
+`verify-8850-sip-cancel` with own acquired MCU/PMM: settled physical startup,
+own registered ARFCN1, caller `5551234`, real CANCEL/487 while alerting,
+CC/RR release, persistent SIM location and decoded physical Exit from the
+missed-call screen. Initial idle presents `DCT3 LAB`; final idle presents
+numeric PLMN `00101`. Both frames are checked separately, not treated as
+proof of retained operator text. Answered SIP, media and native speech
+remain unproved.
+
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other

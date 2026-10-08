@@ -414,7 +414,22 @@ CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
 dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
-products `6210` and `8890`.
+products `6210`, `8850` and `8890`.
+
+`verify-8850-sip-cancel` independently covers NSM-2 v5.31 research HLE
+with unchanged acquired MCU/PMM. Own physical security input settles the
+registered handset before INVITE at 32 seconds. Acceptance requires the
+native upload-to-missing-mask handoff and compact self-test, own `nsm2`
+registration, host ARFCN1, exactly one SETUP for caller `5551234`, actual
+CANCEL/487 after alerting, full CC/RR release and zero accepted media.
+Own 84x48 captures pin `1 missed call` with List/Exit and decoded physical
+Exit. The final idle shows numeric PLMN `00101`, whereas the initial idle
+shows `DCT3 LAB`; the two images deliberately have different oracles.
+Registration and persisted EF_LOCI remain valid. This is an observed
+presentation difference, not proof of network-name retention; the current
+MM Information provides time only and its causal role is unproved.
+No firmware/name override is used. Answered SIP, speech and SIP restoration
+are not established on this product.
 
 `verify-8890-sip-cancel` independently covers NSB-6 v12.20 research HLE
 with unchanged acquired MCU/PMM and the configured ARFCN60 laboratory cell.

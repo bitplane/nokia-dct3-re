@@ -27,6 +27,14 @@
   },
   "gates": [
     {
+      "name": "verify-8850-sip-cancel", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional external PJSIP stack with private own-PMM NSM-2 storage; no Answer/media",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8850_sip_cancel.py $(RUN_DIR) --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-8890-sip-idle-restore", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional external PJSIP stack; exact idle restore before fresh epoch-2 unanswered call",
       "recipe": [

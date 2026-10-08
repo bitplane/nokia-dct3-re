@@ -432,7 +432,7 @@ def main():
     parser.add_argument('--http-port', type=int, default=18100)
     parser.add_argument('--incoming', action='store_true')
     parser.add_argument('--record-media', action='store_true')
-    parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210', '6210', '8890'), default='3210')
+    parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210', '6210', '8850', '8890'), default='3210')
     parser.add_argument('--ready-file', type=Path,
                         help='wait for a fresh handset readiness artifact before an incoming INVITE')
     parser.add_argument('--calls', type=int, choices=(1, 2), default=1)
@@ -448,7 +448,7 @@ def main():
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():
         parser.error('--ready-file must not already exist before the handset run')
-    if args.product in ('6210', '8890') and (not args.incoming or not args.cancel_incoming or
+    if args.product in ('6210', '8850', '8890') and (not args.incoming or not args.cancel_incoming or
             args.record_media or args.restore_call or args.restore_idle or args.restore_outgoing):
         parser.error(f'{args.product} SIP coverage is limited to unanswered incoming CANCEL; media is unproved')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):

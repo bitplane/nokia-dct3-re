@@ -94,7 +94,7 @@ absent product is a coverage question, not a drifted gate.
 | `save-state` | — | — | — | — | — | — | yes | yes | — | — | — | — | — | — | — |
 | `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
 | `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | yes | — | — | — | — |
-| `sip-cancel` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
+| `sip-cancel` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | yes |
 | `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
 | `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `verifier` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | — | — |
@@ -440,6 +440,7 @@ absent product is a coverage question, not a drifted gate.
 ### `sip-cancel`
 
 - **6210**: `tools/run_noki6210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
 - **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `sip-idle-restore`

@@ -50,13 +50,13 @@ class SipCancelCheckTest(unittest.TestCase):
             self.check(log=LOG.replace('epoch=1 phase=alerting', 'epoch=2 phase=alerting'))
 
     def test_sibling_scopes(self):
-        for product in ('3310', '3330', '3410', '5210', '6210', '8890'):
+        for product in ('3310', '3330', '3410', '5210', '6210', '8850', '8890'):
             self.assertTrue(self.check(product=product)['scope'].startswith(product + ' HLE'))
 
     def test_signaling_only_cli_rejects_answered_or_media_promotion(self):
         script = Path(__file__).with_name('run_sip_handset_gate.py')
         with tempfile.TemporaryDirectory() as directory:
-            for product in ('6210', '8890'):
+            for product in ('6210', '8850', '8890'):
                 for extra in ([], ['--incoming'],
                               ['--incoming', '--cancel-incoming', '--record-media'],
                               ['--incoming', '--cancel-incoming', '--restore-call']):

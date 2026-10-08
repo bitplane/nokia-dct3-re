@@ -1631,6 +1631,18 @@ during an unfinished CP/RP exchange.
 
 #### Incoming Call Acceptance
 
+`verify-8850-sip-cancel` runs a real local PJSIP INVITE/CANCEL from settled
+own-PMM idle using the same host-enabled configuration, without physical
+Answer. Its private runner pins own MCU/PMM hashes, native-loader/HLE
+ownership, security-key decoding, `nsm2` registration and persisted SIM
+location. The common SIP checker requires correlated alerting/CANCEL/487,
+exactly one termination and full CC/RR release with no connection/media.
+Own captures show `1 missed call`, List/Exit, and decoded physical Exit
+back to idle. The post-call operator label is `00101`, not the initial
+`DCT3 LAB`; this presentation difference is retained explicitly in the
+frame oracles. Its cause is not decoded. This adds unanswered signaling,
+not speech, answered SIP or save-state coverage of an external dialog.
+
 Host-originated incoming calls compose with settled physical startup. Copy
 `fixtures/noki8850_host/nsm2hle.cfg` into a private cfg directory; it enables
 the host adapter without an automatic laboratory incoming call. Launch
