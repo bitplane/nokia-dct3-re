@@ -1234,6 +1234,17 @@ raw store-opcode scans also match embedded data. Context aliases `138038`
 have literal loads at `21b8b8` and `21f484`; direct-state ownership requires
 boundary-aware control flow from these roots, not counting every apparent
 `strh [r4,#2]` in the task interval as executable.
+Boundary-aware branch decoding establishes additional inline state-store
+continuations at `21f482`: `21f39e` supplies 22, `21f424` supplies 19,
+`21f45c` supplies 14, `21f46a` supplies 16, and `21f480` supplies 18.
+The shared setter's preceding `21bdc2` supplies state 1. These exact
+instructions are machine-checked; none supplies 21. Runtime initialization
+to state 8 occurs through generic copy code `2001a4`, not this setter.
+This bounds the known direct/inline routes without proving arbitrary aliases
+absent. In the failing run none of the alternate state routes is observed
+after state 13; the strongest current completion boundary remains its
+`1802/8b` measurement continuation and the unanswered lifetime of the
+original scan, rather than an assumed missing transition to state 21.
 
 ## Evidence needed to resume
 

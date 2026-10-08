@@ -251,6 +251,18 @@ def verify(image):
         operand = f'r0, #{state:#x}' if state >= 10 else f'r0, #{state}'
         if predecessor != [('movs', operand)]:
             raise ValueError('direct receive-state setter argument differs')
+    for address, state in ((0x21f39e, 22), (0x21f424, 19),
+                           (0x21f45c, 14), (0x21f46a, 16)):
+        if instructions(address, 4) != [
+                ('movs', f'r0, #{state:#x}'), ('b', '#0x21f482')]:
+            raise ValueError('inline receive-state continuation differs')
+    if instructions(0x21f480, 8) != [
+            ('movs', 'r0, #0x12'), ('strh', 'r0, [r4, #2]'),
+            ('ldr', 'r4, [pc, #0x36c]'), ('movs', 'r0, #4')]:
+        raise ValueError('inline state-eighteen continuation differs')
+    if instructions(0x21bdc2, 4) != [
+            ('movs', 'r0, #1'), ('strh', 'r0, [r4, #2]')]:
+        raise ValueError('inline state-one entrance differs')
     # Tail branches are a separate entrance class; a BL census cannot close it.
     if instructions(0x21f2c0, 2) != [('b', '#0x21f900')]:
         raise ValueError('state-ten acknowledgement tail entrance differs')
