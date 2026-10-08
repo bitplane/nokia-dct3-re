@@ -573,7 +573,7 @@ def main():
     nsm3_restore = (args.product in ('8210', '8850') and not args.incoming and
                     args.restore_outgoing and args.sip_response in (180, 200) and
                     not args.record_media and not args.restore_call and not args.restore_idle)
-    nsm3_incoming_restore = (args.product == '8210' and args.incoming and
+    nsm3_incoming_restore = (args.product in ('8210', '8850') and args.incoming and
                             args.restore_call and not args.cancel_incoming and
                             not args.record_media and not args.restore_outgoing and not args.restore_idle)
     if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not nsm3_incoming_restore and

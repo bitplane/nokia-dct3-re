@@ -3,9 +3,11 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local sms = _G.noki8850_state_sms == true
 local idle = _G.noki8850_state_idle == true
-local scenario = sms and 'sms' or idle and 'idle' or 'call'
+local incoming = _G.noki8850_state_incoming == true
+local scenario = incoming and 'incoming_call' or sms and 'sms' or idle and 'idle' or 'call'
 _G.noki8850_call_idle_only = idle
-dofile(directory .. (sms and 'noki8850_incoming_sms_input.lua' or 'noki8850_outgoing_call_input.lua'))
+dofile(directory .. (incoming and 'noki8850_host_incoming_input.lua' or
+    sms and 'noki8850_incoming_sms_input.lua' or 'noki8850_outgoing_call_input.lua'))
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local memory = cpu.spaces['program']

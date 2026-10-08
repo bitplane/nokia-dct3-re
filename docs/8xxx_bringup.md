@@ -1906,6 +1906,14 @@ epoch closes the old SIP dialog with BYE, clears the firmware call with
 cause 41 and completes release without redialing. External SIP state is
 not serialized; this gate does not claim continuous media across restore.
 
+`verify-8850-sip-incoming-restore` separately passes with physical Answer
+before the connected snapshot (`run_8850_sip_incoming_restore_probe`).
+The saved/restored PC, stack, RAM checksum and time match exactly; epoch 2
+clears the call once with cause 41, SIP BYE and ordered GSM release.
+The checker rejects missing or wrong-product Answer, duplicate delivery,
+duplicate clearing, old epochs and incomplete release. Ringing restoration
+remains unverified; neither restoration gate claims native DSP speech.
+
 Outgoing HLE waveform delivery is separately verified by
 `run_8850_sip_waveform_probe/handset`. The isolated Pulse fixture supplies
 440 Hz through MAME's actual microphone stream and receives 660 Hz through

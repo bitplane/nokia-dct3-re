@@ -103,6 +103,7 @@ def main():
                           help='verify physical incoming Answer/End and HLE media')
     parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--restore-outgoing', action='store_true')
+    parser.add_argument('--restore-incoming', action='store_true')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18885)
     parser.add_argument('--sip-port', type=int, default=25885)
@@ -114,6 +115,8 @@ def main():
         parser.error('--restore-idle cannot be combined with call modes')
     if args.restore_outgoing and (not args.outgoing_media or args.record_media or args.restore_idle):
         parser.error('--restore-outgoing requires unrecorded --outgoing-media')
+    if args.restore_incoming and (not args.incoming_media or args.record_media or args.restore_idle or args.restore_outgoing):
+        parser.error('--restore-incoming requires unrecorded --incoming-media')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8850']
@@ -129,6 +132,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki8850_sip_outgoing_restore.lua' if args.restore_outgoing else
+                       'noki8850_sip_incoming_restore.lua' if args.restore_incoming else
                        'noki8850_host_incoming_input.lua' if args.incoming_media else
                        'noki8850_outgoing_call_input.lua' if outgoing_failure or args.outgoing_media else
                        'noki8850_sip_idle_restore.lua' if args.restore_idle else
@@ -143,6 +147,7 @@ def main():
                    '--product', '8850',
                    *(['--record-media'] if args.record_media else []),
                    *(['--restore-outgoing'] if args.restore_outgoing else []),
+                   *(['--restore-call'] if args.restore_incoming else []),
                    *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      [] if args.outgoing_media else
                      ['--incoming', '--ready-file', str(run / 'snap/8850_registered_idle.png')]
@@ -154,14 +159,14 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if args.restore_outgoing:
+        if args.restore_outgoing or args.restore_incoming:
             from tools.noki8850_state_check import verify_architecture
             text = (run / 'error.log').read_text(errors='replace')
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             verify_architecture(text)
             verify_registration(text, 'nsm2')
-            if not re.search(r'8850_call_physical: action=send.*?8850_keypad_decoded key=0e\b', text, re.S):
+            if args.restore_outgoing and not re.search(r'8850_call_physical: action=send.*?8850_keypad_decoded key=0e\b', text, re.S):
                 raise ValueError('restored call lacks physical Send')
         elif args.incoming_media:
             from tools.noki8850_incoming_call_check import verify, check_frames as incoming_frames
@@ -178,12 +183,13 @@ def main():
             check_outgoing_result(run)
         else:
             check_product_result(run, args.restore_idle)
-        if (args.outgoing_media or args.incoming_media) and not args.restore_outgoing:
+        if (args.outgoing_media or args.incoming_media) and not (args.restore_outgoing or args.restore_incoming):
             from tools.noki8850_speech_control_check import recover, verify_pcm
             recover((roms / profile[1]).read_bytes())
             verify_pcm((run / 'error.log').read_text(errors='replace'), incoming=args.incoming_media)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsm2hle', 'scenario': ('outgoing-sip-restore' if args.restore_outgoing else
+            'machine': 'nsm2hle', 'scenario': ('incoming-sip-restore' if args.restore_incoming else
+                                             'outgoing-sip-restore' if args.restore_outgoing else
                                              'incoming-sip-media' if args.incoming_media else
                                              'outgoing-sip-media' if args.outgoing_media else
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else
@@ -191,16 +197,17 @@ def main():
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 1,
             'native_dsp_complete': False, 'speech_tested': False,
-            'hle_media_transport_tested': (args.outgoing_media or args.incoming_media) and not args.restore_outgoing,
+            'hle_media_transport_tested': (args.outgoing_media or args.incoming_media) and not (args.restore_outgoing or args.restore_incoming),
             'waveform_tested': False,
             'media_recorded': args.record_media,
             'idle_restored': args.restore_idle,
             'outgoing_restored': args.restore_outgoing,
+            'incoming_restored': args.restore_incoming,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8850 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('8850 real SIP ' + ('outgoing architectural restore and dialog clearing' if args.restore_outgoing else
+    print('8850 real SIP ' + ('architectural restore and dialog clearing' if args.restore_outgoing or args.restore_incoming else
                              'HLE media transport' if args.outgoing_media or args.incoming_media else 'signaling') +
           ' PASS; no native speech or waveform acceptance')
 
