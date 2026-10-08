@@ -345,6 +345,21 @@ Recover the type-57 range/mode semantics and the two `3cbe14` result
 consumers (`38fdca`/`38fed0`) against that existing result format before
 adding request handling; a synthetic generic ACK is not the contract.
 
+The own-ROM type-55 constructor `3f9992` and type-57 constructor
+`3f9d88` both use `3f9932` for their two control bytes; type 55 stores
+its opcode at `3f99b2` and calls the encoder at `3f99c0`. Mode 3 / index
+0 resolves through table `2839c5` to control bytes `03 05`, independently
+matching the observed type-57 body. Consumer `38fdca` processes up to
+forty four-byte measurement records, reads big-endian ARFCN from message
+`+6/+7` and signed RSSI from `+9`, and rejects values below -104 dBm.
+This agrees with the existing `8b` measurement encoder's layout. The
+remaining implementation distinction is lifecycle: this type-57 request
+occurs while a serving receiver remains active, whereas the existing
+autonomous type-55 path is gated to acquisition/deactivation states.
+Implement a bounded measurement transaction without forcing the handset
+or silently resetting its serving reception; retain unknown modes as
+unsupported until their contracts are recovered.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
