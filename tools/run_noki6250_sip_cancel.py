@@ -1,4 +1,4 @@
-"""NHM-3 initial-record comparison and real SIP CANCEL/busy; no speech."""
+"""NHM-3 initial-record comparison and real SIP CANCEL/failures; no speech."""
 import argparse
 import os
 import hashlib
@@ -79,16 +79,19 @@ def main():
     parser.add_argument('--http-port', type=int, default=18625)
     parser.add_argument('--sip-port', type=int, default=25625)
     parser.add_argument('--restore-idle', action='store_true')
-    parser.add_argument('--outgoing-busy', action='store_true')
+    outgoing = parser.add_mutually_exclusive_group()
+    outgoing.add_argument('--outgoing-busy', action='store_true')
+    outgoing.add_argument('--outgoing-unavailable', action='store_true')
     args = parser.parse_args()
-    if args.outgoing_busy and args.restore_idle:
-        parser.error('outgoing busy cannot use the incoming idle-restore fixture')
+    outgoing_status = 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
+    if outgoing_status and args.restore_idle:
+        parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
         accessory, audit = prepare_run(run, root)
         apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
-        script = ('noki6250_call_observe.lua' if args.outgoing_busy else
+        script = ('noki6250_call_observe.lua' if outgoing_status else
                   'noki6250_sip_idle_restore.lua' if args.restore_idle else 'noki6250_sip_cancel_observe.lua')
         handset = [str((args.mame or root / 'mame/mame').resolve()), 'nhm3hle',
                    '-rompath', f"{run / 'roms'};{root / 'roms'}", '-nvram_directory', str(run / 'nvram'),
@@ -100,38 +103,48 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6250',
-                   *(['--sip-response', '486'] if args.outgoing_busy else
+                   *(['--sip-response', str(outgoing_status)] if outgoing_status else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/6250_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port), '--', *handset]
         with (run / 'console.log').open('w') as output:
             environment = dict(os.environ)
-            if args.outgoing_busy:
+            if outgoing_status:
                 environment['NOKIA_DCT3_6250_OUTGOING'] = '1'
             subprocess.run(command, cwd=run, env=environment, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if args.outgoing_busy:
+        if outgoing_status:
             text = (run / 'error.log').read_text(errors='replace')
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
             require_ordered(text, (
                 ('physical Send', re.compile(r'6250_call_input: step=7 pressed=1')),
+                *((('own traffic carrier 19', re.compile(
+                    r'TX packet type=02 payload=20 .*radio_phase=traffic_channel_change '
+                    r'data=041202000271012fc10000130000000400000000')),
+                   ('cause-18 termination', re.compile(
+                    r'outgoing termination consumed id=1 cause=18\b')))
+                  if outgoing_status == 480 else ()),
                 ('own release carrier 19', re.compile(
                     r'TX packet type=02 payload=20 .*radio_phase=release_channel_change '
-                    r'data=041202000000001a600000130000000f00000000')),
+                    + (r'data=041202001117001a600000130000001400000001' if outgoing_status == 480 else
+                       r'data=041202000000001a600000130000000f00000000'))),
                 ('own release confirmation', re.compile(
-                    r'6250_channel_confirmation: body=00 input=0409 expected=01 pending=00')),
+                    r'6250_channel_confirmation: body=00 input=0409 expected='
+                    + ('00' if outgoing_status == 480 else '01') + r' pending=00')),
                 ('resumed idle paging', IDLE_PCH),
-            ), 'NHM-3 outgoing SIP busy')
+            ), 'NHM-3 outgoing SIP failure')
             with Image.open(run / 'snap/6250_call_4.png') as frame:
                 if frame.size != (96, 60) or hashlib.sha256(
                         frame.convert('L').crop((0, 8, 96, 60)).tobytes()).hexdigest() != FRAMES['6250_sip_after_cancel.png']:
-                    raise ValueError('NHM-3 registered idle after busy differs')
+                    raise ValueError('NHM-3 registered idle after failure differs')
         else:
             check_product_result(run, restore_idle=args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nhm3hle', 'scenario': 'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel',
+            'machine': 'nhm3hle',
+            'scenario': ('outgoing-sip-busy' if outgoing_status == 486 else
+                         'outgoing-sip-unavailable' if outgoing_status else 'incoming-sip-cancel'),
             'provisioning': 'derived acquired initial-record PMM comparison',
             'shared_rom_audit_members': audit, 'accessory_contract': accessory,
             'native_dsp_complete': False, 'speech_tested': False,
@@ -141,7 +154,7 @@ def main():
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6250 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('6250 real SIP ' + ('busy' if args.outgoing_busy else 'CANCEL') +
+    print('6250 real SIP ' + (f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +
           ' signaling PASS; initial-record comparison, speech unproved')
 
 

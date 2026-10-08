@@ -131,6 +131,10 @@ class SipFailureCheckTest(unittest.TestCase):
             'length=15 data=03450401a05e0581551532f4150101',
             'length=13 data=03450401a05e038121f3150101')
         self.assertEqual(self.check(product='6250', log=log)['sip_status'], 486)
+        unavailable = log.replace('outcome=1', 'outcome=2\noutgoing termination consumed id=1 cause=18')
+        self.assertEqual(self.check(product='6250', status=480, log=unavailable)['sip_status'], 480)
+        with self.assertRaises(RuntimeError):
+            self.check(product='6250', status=480, log=unavailable.replace('cause=18', 'cause=21'))
         with self.assertRaises(RuntimeError):
             self.check(product='6250')
 

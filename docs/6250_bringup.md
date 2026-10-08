@@ -443,6 +443,16 @@ tuples are retained in outgoing fixtures to distinguish this release from
 registration. Resumed paging and reviewed registered-idle pixels are required.
 Answered SIP and speech remain unproved.
 
+`verify-6250-sip-outgoing-unavailable` independently verifies the same physical
+`123`/Send against real local PJSIP 480. Unlike busy, the no-answer decision
+enters traffic assignment before the correlated cause-18 termination is
+consumed. The checker requires carrier-19 traffic body
+`041202000271012fc10000130000000400000000`, then traffic deconfiguration
+`041202001117001a600000130000001400000001` and confirmation
+`body=00 input=0409 expected=00 pending=00`. Complete CC/RR clearing,
+resumed paging and reviewed registered-idle pixels pass without CONNECT or
+bridge media. Assignment is not evidence of an answered call or speech.
+
 ## Recovered hardware contracts
 
 The CTSI base literal at `4e7f70` is `00020000`. The release routine

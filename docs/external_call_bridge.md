@@ -468,6 +468,12 @@ pre-assignment signaling-channel release and own firmware confirmation must
 complete before resumed paging and exact registered-idle pixels. It retains
 the declared initial-record comparison, zero-media requirement and research-HLE
 scope; it does not promote answered calls or speech.
+
+`verify-6250-sip-outgoing-unavailable` additionally passes physical `123`/Send
+against real PJSIP 480. Its no-answer decision enters carrier-19 traffic
+assignment before consuming cause 18, unlike the pre-assignment busy path.
+Own traffic release/confirmation, complete CC/RR clearing, zero media and
+reviewed registered-idle recovery are required; CONNECT is forbidden.
 `verify-6250-sip-idle-restore` separately requires exact idle architecture,
 ordered replay and matching pixels before a fresh INVITE. Its CANCEL/487
 result must use epoch 2 with zero media. The post-load observer is started
