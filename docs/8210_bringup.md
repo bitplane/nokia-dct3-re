@@ -409,6 +409,14 @@ Successful checks produce `acceptance.json`, console/log evidence and
 captures. Existing directories are refused. The normal machine remains
 unchanged; native DSP completion and speech are explicitly not claimed.
 
+No-PIN host incoming SMS is also verified on DCS823/824:
+`tools/run_noki8210_acceptance.py RUN --scenario host-incoming-sms --dcs1800`.
+`run_8210_dcs_host_sms_01` passes own DCS registration and persisted EF_LOCI,
+host CP/RP acknowledgment, physical Read, SIM read-status persistence and
+the reviewed `hello` body pixels. The host checker requires ARFCN823;
+GSM900's ARFCN4 is not accepted as DCS evidence. PIN-enabled DCS host SMS
+is not yet admitted or claimed.
+
 The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
 `outgoing-call`, `incoming-sms`, `outgoing-sms`, `calculator` and `phonebook`

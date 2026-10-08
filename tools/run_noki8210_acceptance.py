@@ -134,7 +134,7 @@ def main():
             not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call') or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration/incoming-call and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'call-state', 'phonebook') or
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'host-incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'call-state', 'phonebook') or
                         (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call') and args.pin_enabled)):
         parser.error('--dcs1800 requires registration, incoming-call or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
@@ -314,7 +314,7 @@ def main():
                 host_checker = 'radio_incoming_host_sms_trace_check' if incoming else 'radio_outgoing_host_sms_trace_check'
                 outcome = {'host-rejected-sms': 'rp_error', 'host-silent-sms': 'rp_silence'}.get(args.scenario, 'rp_ack')
                 subprocess.run([sys.executable, str(root / f'tools/{host_checker}.py')] +
-                               (['--arfcn', '4'] if incoming else ['--octets', '1', '--outcome', outcome]) + [str(run / 'error.log')],
+                               (['--arfcn', '823' if args.dcs1800 else '4'] if incoming else ['--octets', '1', '--outcome', outcome]) + [str(run / 'error.log')],
                                cwd=root, check=True)
         else:
             from PIL import Image
