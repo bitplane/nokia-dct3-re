@@ -34,10 +34,20 @@ CHECKPOINTS = (
 )
 
 
-def verify(text, number='1234567', *, pcs1900=False):
+def verify(text, number='1234567', *, pcs1900=False, configured_gsm900=False):
     if '[LUA ERROR]' in text:
         raise ValueError('fixture error')
     checkpoints = CHECKPOINTS
+    if pcs1900 and configured_gsm900:
+        raise ValueError('PCS1900 and configured GSM900 are distinct compositions')
+    if configured_gsm900:
+        verify_registration(text, configured_gsm900=True)
+        checkpoints = tuple((label, re.compile(
+            r'TX packet type=02 payload=20 .*data=041202000271012fc100003c0000000400000000'
+            if label == 'own traffic configuration' else
+            r'TX packet type=02 payload=20 .*data=041202001117001a6000003c0000001400000001'
+            if label == 'own release configuration' else pattern.pattern))
+            for label, pattern in checkpoints)
     if pcs1900:
         verify_registration(text, pcs1900=True)
         checkpoints = tuple((label, re.compile(

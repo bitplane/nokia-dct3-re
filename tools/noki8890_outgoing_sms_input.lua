@@ -14,7 +14,8 @@ local function press(column, name, label)
     return true
 end
 local input = coroutine.create(function()
-    if not emu.wait(21) then return end
+    local start = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 25 or 21
+    if not emu.wait(start) then return end
     for _, item in ipairs({
         {1, 'Menu', 'clock_notice'}, {0, 'End', 'clock_cancel'},
         {1, 'Names / C', 'idle'}, {1, 'Menu', 'messages'},

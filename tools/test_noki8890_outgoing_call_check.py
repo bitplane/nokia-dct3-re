@@ -18,3 +18,11 @@ class OutgoingTest(unittest.TestCase):
     def test_pcs_call_requires_pcs_registration(self):
         with self.assertRaisesRegex(ValueError, 'candidate window'):
             verify('8890_call_physical: action=send', pcs1900=True)
+
+    def test_configured_call_requires_registration(self):
+        with self.assertRaisesRegex(ValueError, 'candidate window'):
+            verify('', configured_gsm900=True)
+
+    def test_distinct_band_compositions(self):
+        with self.assertRaisesRegex(ValueError, 'distinct compositions'):
+            verify('', pcs1900=True, configured_gsm900=True)

@@ -41,7 +41,8 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true')
-    parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms'), default='registration')
+    parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
+                                              'host-outgoing-call', 'host-outgoing-sms'), default='registration')
     parser.add_argument('--port', type=int, default=18890)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -60,15 +61,17 @@ def main():
         environment.pop('NOKIA_DCT3_8890_PIN_ENTRY', None)
         if not args.without_pin:
             environment['NOKIA_DCT3_8890_PIN_ENTRY'] = '1'
+        script = {'registration': 'security_input', 'host-incoming-call': 'clock_incoming_input',
+                  'host-incoming-sms': 'incoming_sms_input', 'host-outgoing-call': 'clock_call_input',
+                  'host-outgoing-sms': 'outgoing_sms_input'}[args.scenario]
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsb6hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / ('tools/noki8890_incoming_sms_input.lua'
-                       if args.scenario == 'host-incoming-sms' else 'tools/noki8890_clock_incoming_input.lua'
-                       if args.scenario == 'host-incoming-call' else 'tools/noki8890_security_input.lua')),
-                   '-seconds_to_run', '74' if args.scenario == 'host-incoming-call' else '46']
+                   '-autoboot_script', str(root / f'tools/noki8890_{script}.lua'),
+                   '-seconds_to_run', '74' if args.scenario.endswith('-call') else
+                       '60' if args.scenario.endswith('-sms') else '46']
         host_command = None
         if args.scenario == 'host-incoming-call':
             command += ['-http', '-http_port', str(args.port)]
@@ -79,6 +82,14 @@ def main():
             command += ['-http', '-http_port', str(args.port)]
             host_command = [sys.executable, str(root / 'tools/run_host_incoming_sms_gate.py'),
                             '--port', str(args.port), '--cwd', str(run), '--'] + command
+        elif args.scenario.startswith('host-outgoing-'):
+            command += ['-http', '-http_port', str(args.port)]
+            call = args.scenario == 'host-outgoing-call'
+            runner = 'run_host_call_adapter_gate' if call else 'run_host_sms_gate'
+            options = ['--number', '1234567', '--decision', 'connect'] if call else [
+                '--user-data', '41', '--user-data-length', '1']
+            host_command = [sys.executable, str(root / f'tools/{runner}.py'),
+                            '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
         with (run / 'console.log').open('w') as console:
             subprocess.run(host_command or command, cwd=run, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True, timeout=180)
@@ -98,6 +109,17 @@ def main():
                             str(run / 'snap/8890_sms_read_2.png')], check=True)
             subprocess.run([sys.executable, str(root / 'tools/radio_incoming_host_sms_trace_check.py'),
                             '--arfcn', '60', str(run / 'error.log')], check=True)
+        elif args.scenario == 'host-outgoing-call':
+            from tools.noki8890_outgoing_call_check import verify
+            from tools.noki8890_clock_check import verify as verify_clock, check_frames
+            verify(text, configured_gsm900=True)
+            verify_clock(text)
+            check_frames(run / 'snap', call=True)
+        elif args.scenario == 'host-outgoing-sms':
+            subprocess.run([sys.executable, str(root / 'tools/noki8890_outgoing_sms_check.py'),
+                            str(run / 'error.log')], check=True)
+            subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
+                            '--octets', '1', str(run / 'error.log')], check=True)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsb6hle', 'sim_pin_enabled': not args.without_pin,
             'provisioning': 'own acquired PMM unchanged', 'command': command,

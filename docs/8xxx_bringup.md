@@ -814,6 +814,15 @@ and reviewed message-body pixels. The reader starts at 25 seconds for PIN
 fixtures, retaining its original 21-second schedule otherwise. The no-PIN
 composition passes the same checks. This does not establish native DSP media.
 
+`verify-8890-pin-host-outgoing-call` requires physical clock/date settlement,
+dialing `1234567`, correlated host connection, exact ARFCN-60 traffic/release
+configuration and physical End followed by reviewed ordinary idle pixels.
+`verify-8890-pin-host-outgoing-sms` independently requires physical `A` to
+`5551234`, the exact SMS-SUBMIT, host request/decision correlation, RP
+acceptance and complete CP/RP/RR closure. Both require PIN acceptance before
+registration and preserve the no-PIN physical schedules. Native speech and
+PCS1900 authenticated parity remain separate.
+
 The own RX dispatcher at `30168e` selects type `80` at `301750`, calling
 `2dae9c`. Its thirteen-entry `83..8f` table at `3016bc` maps `8b` to
 `301710 -> 2db270`, which posts to task 12 through `28190c`.
