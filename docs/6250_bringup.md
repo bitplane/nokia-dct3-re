@@ -322,6 +322,17 @@ alternate receive-state route, not transport loss, explains why the SI
 decoder tap is silent. Recover `3bca84` and the state-word writers before
 assigning semantic names to state 1/2 or changing a peer channel reply.
 
+The alternate parser `3bca84` does not simply discard these broadcasts.
+It copies the lower block, extracts RR message type, handles SI3 (`1b`)
+and SI4 (`1c`) explicitly, and builds internal message `03f9` (literal
+`3bce40`) with a decoded subtype at `+14`. Its tail posts to task `0e`
+through `3c348c`. A passive post observer confirms continued delivery
+after late PIN acceptance: messages with subtypes 0/2/3 reach task 14
+from continuation `3bcead` through 15.835048 s. Thus the missing
+`03f8` transition is not evidence that the SI information is lost;
+it is forwarded on a distinct consumer path. Trace task 14's `03f9`
+handler and the receive-state writer together before changing the peer.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
