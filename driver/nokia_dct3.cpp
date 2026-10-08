@@ -1999,6 +1999,8 @@ void nokia_dct3_state::ccont_power_w(int state)
 	{
 		m_baseband_powered = false;
 		m_maincpu->set_input_line(INPUT_LINE_RESET, ASSERT_LINE);
+		m_dsp_backend->power_off();
+		m_radio_peer->power_off();
 	}
 	else if (state && !m_baseband_powered)
 	{

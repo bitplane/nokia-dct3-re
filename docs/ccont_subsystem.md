@@ -339,8 +339,12 @@ firmware status read containing ready/PWRONX without charger cause. Both
 native upload/HLE handoffs and subsequent physical security entry to idle
 are checked. NSB-6 firmware explicitly resets RTC seconds after wake;
 retained device state is not a claim of untouched software time or cold
-calendar persistence. Per-block clock-gating during rail-off remains
-unvalidated; HLE peer timers can still publish while the CPU is reset.
+calendar persistence. The DSP backend power-off boundary stops HLE service,
+packet, response, keepalive and speech timers, native DSP execution and its
+frame/slot timers, and the radio peer's burst clock. Wake uses the existing
+full digital reset to re-arm them. The 8890 gate checks at least six seconds
+of DSP/radio transport silence alongside continuous one-second RTC ticks.
+Complete per-block clock-gating outside this boundary remains unvalidated.
 
 CCONT watchdog expiry uses the same digital-baseband reset domain. It resets
 the CPU, MAD2 peripherals, GENSIO, MBUS, DSPIF/peer, SIMI/card protocol state

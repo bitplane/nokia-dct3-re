@@ -1023,8 +1023,12 @@ that exact request and contention echo, complete accept/release/paging,
 organic EF_LOCI read before the request, and no redundant EF_LOCI rewrite.
 The final SIM location/status remain valid. The ordinary cold gate still
 requires its original request and the actual LAI/status writes.
-Neither test claims native DSP speech, physical wake timing or full
-peripheral power gating; HLE timers still run while the CPU rail is off.
+The off interval lasts at least six seconds: continuous RTC ticks are
+required and DSP RX publication, peer shared-RAM writes, FIQ0 notifications,
+native port activity and radio LAPDm output are forbidden. The backend and
+radio endpoint stop their timers on rail-off; the normal full digital reset
+re-arms them on wake. Neither test claims native DSP speech, physical wake
+timing or power gating of every other peripheral.
 
 Incoming-call signaling separately passes IMSI paging, Paging Response,
 contention UA, cipher/MM-information exchange, incoming SETUP, Call

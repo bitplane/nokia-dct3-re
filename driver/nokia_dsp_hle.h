@@ -150,6 +150,7 @@ public:
 	virtual void service_pending_w(int state) override;
 	virtual void doorbell_w(int state) override;
 	virtual void reset_line_w(int released) override;
+	virtual void power_off() override;
 	virtual void shared_002_write_w(int state) override;
 	virtual void shared_006_write_w(int state) override;
 	virtual void shared_0fe_read_w(int state) override;
@@ -191,6 +192,7 @@ private:
 	required_device<nokia_mad2_pcm_device> m_mad2_pcm;
 	devcb_write16 m_mcu_control_word_cb;
 	emu_timer *m_service_timer = nullptr;
+	bool m_powered = true;
 	emu_timer *m_packet_timer = nullptr;
 	emu_timer *m_response_timer = nullptr;
 	emu_timer *m_keepalive_timer = nullptr;

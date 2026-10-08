@@ -172,6 +172,7 @@ public:
 	void set_handover_failure(bool failure) { m_handover_failure = failure; }
 	void set_host_voice_peer(bool enabled) { m_host_voice_peer = enabled; }
 	bool enabled() const { return m_enabled; }
+	void power_off();
 	void receive_packet(const nokia_dspif_device::packet &packet);
 	void tick();
 	bool fast_completion_pending() const;

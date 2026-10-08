@@ -110,7 +110,8 @@ restored and no speech is established.
 ## Product-boundary cautions
 
 The 8890 additionally passes `verify-8890-power-cycle`: physical shutdown,
-blank LCD, a CCONT RTC tick while CPU power is off, separate PWRONX restart,
+blank LCD, six seconds of continuous CCONT RTC ticks with DSP/radio
+transport silence while CPU power is off, separate PWRONX restart,
 both own native-upload/HLE handoffs and decoded security input back to idle.
 Its second registration carries retained LAI and closes without redundant
 EF_LOCI writes, checked against a distinct strict grammar. Firmware itself

@@ -258,7 +258,9 @@ The separate active-low Power field reaches both keypad GPIO and CCONT's
 always-powered PWRONX input. It can restore the switched digital domain
 without a charger edge, retaining RTC registers and pending upper CCONT
 sources. `verify-8890-power-cycle` covers own-ROM shutdown, blank LCD,
-physical restart, cause consumption and security input back to idle.
+six seconds of DSP/radio endpoint silence with retained RTC ticks, physical
+restart, cause consumption and security input back to idle. Backend and
+radio timers stop on rail-off and re-arm through the full digital reset.
 Wake latency/debounce and complete peripheral rail clock-gating are not
 measured hardware contracts.
 

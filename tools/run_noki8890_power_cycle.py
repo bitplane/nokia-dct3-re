@@ -32,7 +32,7 @@ def main():
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools/noki8890_power_cycle_observe.lua'),
-                   '-seconds_to_run', '83']
+                   '-seconds_to_run', '89']
         with (run / 'console.log').open('w') as console:
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT,
                            check=True, timeout=240)

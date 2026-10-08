@@ -128,10 +128,6 @@ void nokia_radio_peer_device::device_start()
 {
 	m_trace_enabled = machine().options().verbose();
 	m_burst_timer = timer_alloc(FUNC(nokia_radio_peer_device::burst_tick), this);
-	// One assigned timeslot per GSM TDMA frame: 60/13 ms exactly.
-	m_burst_timer->adjust(
-			attotime::from_ticks(60, 13'000), 0,
-			attotime::from_ticks(60, 13'000));
 	save_item(NAME(m_enabled));
 	save_item(NAME(m_reports_sent));
 	save_item(NAME(m_reports_remaining));
@@ -290,8 +286,17 @@ void nokia_radio_peer_device::device_start()
 				FUNC(nokia_radio_peer_device::restore_l1_block_kinds), this));
 }
 
+void nokia_radio_peer_device::power_off()
+{
+	m_burst_timer->adjust(attotime::never);
+}
+
 void nokia_radio_peer_device::device_reset()
 {
+	// One assigned timeslot per GSM TDMA frame: 60/13 ms exactly. A digital
+	// power restart re-arms this clock after power_off stopped the endpoint.
+	m_burst_timer->adjust(attotime::from_ticks(60, 13'000), 0,
+			attotime::from_ticks(60, 13'000));
 	m_reports_sent = 0;
 	m_reports_remaining = 0;
 	set_phase(phase::inactive);

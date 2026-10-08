@@ -18,7 +18,7 @@ local input = coroutine.create(function()
     machine:logerror('8890_power_physical: action=shutdown_release\n')
     if not at(51.8) then return end
     machine.screens[':screen']:snapshot('8890_power_off.png')
-    if not at(52) then return end
+    if not at(58) then return end
     -- Re-arm only debugger log caps, so both boots have full passive evidence.
     machine.debugger:command('do temp6=0;do temp7=0;do temp8=0;do temp9=0')
     machine:logerror('8890_power_physical: action=restart_press\n')
@@ -26,11 +26,11 @@ local input = coroutine.create(function()
     if not emu.wait(2) then power:set_value(0); return end
     power:set_value(0)
     machine:logerror('8890_power_physical: action=restart_release\n')
-    if not at(59) then return end
-    machine.screens[':screen']:snapshot('8890_power_after_key.png')
     if not at(65) then return end
+    machine.screens[':screen']:snapshot('8890_power_after_key.png')
+    if not at(71) then return end
     machine.screens[':screen']:snapshot('8890_power_restart_security.png')
-    if not at(70) then return end
+    if not at(76) then return end
     for _, item in ipairs({{2, 'Keypad 1'}, {3, 'Keypad 2'}, {4, 'Keypad 3'},
             {2, 'Keypad 4'}, {3, 'Keypad 5'}, {1, 'Menu'}}) do
         local key = assert(machine.ioport.ports[':COL.' .. item[1]].fields[item[2]])
@@ -40,7 +40,7 @@ local input = coroutine.create(function()
         key:set_value(0)
         if not emu.wait(0.35) then return end
     end
-    for _, when in ipairs({75, 80}) do
+    for _, when in ipairs({81, 86}) do
         if not at(when) then return end
         machine.screens[':screen']:snapshot('8890_power_restart_' .. when .. '.png')
     end

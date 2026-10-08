@@ -14,6 +14,7 @@ public:
 
 	auto tone_update_cb() { return m_tone_update_cb.bind(); }
 	void reset_backend() { device().reset(); }
+	virtual void power_off() = 0;
 
 	virtual void tx_commit_w(int state) = 0;
 	virtual void service_pending_w(int state) = 0;

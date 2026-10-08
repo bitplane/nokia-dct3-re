@@ -16,7 +16,7 @@ FRAMES = {
     '8890_power_idle.png': ((0, 8, 84, 48), '46520fc623a6b562b2aee5f1c59e6943d4a5c1798eff4064091c38e7b3a285de'),
     '8890_power_off.png': ((0, 0, 84, 48), '7d9978ed11e23fdb98a9251da90ed9a3c299066e104d69c32f161a9b86d119b9'),
     '8890_power_restart_security.png': ((0, 0, 84, 24), '40a542aae8dd09a5fdf015bc9c595f26ef505800f67ac9b19c6f67aae16d5564'),
-    '8890_power_restart_80.png': ((0, 8, 84, 48), '46520fc623a6b562b2aee5f1c59e6943d4a5c1798eff4064091c38e7b3a285de'),
+    '8890_power_restart_86.png': ((0, 8, 84, 48), '46520fc623a6b562b2aee5f1c59e6943d4a5c1798eff4064091c38e7b3a285de'),
 }
 
 
@@ -33,9 +33,20 @@ def verify(text, storage):
     off, wake = off[0], wake[0]
     if not (actions[1].end() < off.start() < actions[2].start() < wake.start() < actions[3].start()):
         raise ValueError('rail transitions do not follow physical inputs')
-    rtc = re.search(r'ccont_rtc: event=second time=12:00:52 day=0[^\n]*t=([0-9.]+)', text[off.end():wake.start()])
+    interval = text[off.end():wake.start()]
+    if float(wake[2]) - float(off[1]) < 6:
+        raise ValueError('digital rail-off interval is too short to test sustained silence')
+    rtc = re.search(r'ccont_rtc: event=second time=12:00:52 day=0[^\n]*t=([0-9.]+)', interval)
     if not rtc or not float(off[1]) < float(rtc[1]) < float(wake[2]):
         raise ValueError('RTC did not tick with the digital rail off')
+    ticks = re.findall(r'ccont_rtc: event=second time=12:00:(\d+) day=0[^\n]*t=([0-9.]+)', interval)
+    if len(ticks) < 6 or any(int(second) != float(when) for second, when in ticks) or any(
+            float(right[1]) - float(left[1]) != 1 for left, right in zip(ticks, ticks[1:])):
+        raise ValueError('always-powered RTC did not continue across the sustained off interval')
+    if re.search(r'dspif_transport: (?:RX enqueue|FIQ0 notify|peer RAM W)|'
+                 r'rom4_(?:timing_port|port_write):|staged_dsp: publication|'
+                 r'radio_peer: LAPDm|dsp_hle: speech', interval):
+        raise ValueError('DSP/radio endpoint generated activity while its rail was off')
     after = text[wake.end():]
     cause = re.search(r'ccont_power: event=cause_read data=(\w+)', after)
     if not cause or int(cause[1], 16) & 7 != 3:

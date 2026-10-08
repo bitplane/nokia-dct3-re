@@ -10,9 +10,12 @@ def sample():
     text = '''8890_power_physical: action=shutdown_press
 8890_power_physical: action=shutdown_release
 ccont_power: event=off t=51.4
-ccont_rtc: event=second time=12:00:52 day=0 status=13 mask=50 t=52.0
+'''
+    for second in range(52, 59):
+        text += f'ccont_rtc: event=second time=12:00:{second} day=0 status=13 mask=50 t={second}.0\n'
+    text += '''
 8890_power_physical: action=restart_press
-ccont_power: event=wake cause=02 t=52.02
+ccont_power: event=wake cause=02 t=58.02
 ccont_power: event=cause_read data=13
 ccont_rtc: event=counter_write reg=07 data=00
 8890_power_physical: action=restart_release
@@ -29,6 +32,19 @@ def storage():
 
 
 class PowerTest(unittest.TestCase):
+    def test_endpoint_activity_or_missing_rtc_tick_fails_while_off(self):
+        for marker in ('dspif_transport: RX enqueue type=03',
+                       'dspif_transport: FIQ0 notify', 'dspif_transport: peer RAM W',
+                       'rom4_port_write: port=1', 'staged_dsp: publication word0=0',
+                       'radio_peer: LAPDm transaction expired', 'dsp_hle: speech frame'):
+            text = sample().replace('8890_power_physical: action=restart_press',
+                                    marker + '\n8890_power_physical: action=restart_press')
+            with self.subTest(marker=marker), self.assertRaisesRegex(ValueError, 'generated activity'):
+                self.check(text)
+        with self.assertRaisesRegex(ValueError, 'always-powered RTC'):
+            self.check(sample().replace('ccont_rtc: event=second time=12:00:54 day=0 status=13 mask=50 t=54.0\n', ''))
+        with self.assertRaisesRegex(ValueError, 'too short'):
+            self.check(sample().replace('wake cause=02 t=58.02', 'wake cause=02 t=52.02'))
     def check(self, text, data=None):
         with patch.object(check, 'verify_stage') as stage, \
                 patch.object(check, 'verify_registration') as registration:
