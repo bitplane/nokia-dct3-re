@@ -2951,13 +2951,18 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 6562)
+		if (m_phase == 6562 || (m_phase >= 9208 && m_phase <= 9210))
 		{
-			expect_opcode(0x4f90,
-				data.read_word(0x0e22) == 0x7654 && data.read_word(0x0e23) == 0x3210 &&
+			const bool into_memory_from_a = m_phase == 9208 || m_phase == 9209;
+			const bool decrement = m_phase == 9210;
+			const u16 opcode = m_phase == 6562 ? 0x4f90 : m_phase == 9208 ? 0x4e82 : m_phase == 9209 ? 0x4e95 : 0x4f8d;
+			expect_opcode(opcode,
+				data.read_word(decrement ? 0x0e23 : 0x0e22) == (into_memory_from_a ? 0xabcd : 0x7654) &&
+				data.read_word(decrement ? 0x0e22 : 0x0e23) == (into_memory_from_a ? 0xef01 : 0x3210) &&
 				data.read_word(0x0e21) == 0xbeef && data.read_word(0x0e24) == 0xcafe &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0e24 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0e10 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (m_phase == 6562 ? 0x0e10 : 0x0e22) &&
+				(m_phase == 6562 || m_cpu->state_int(tms320c54x_device::STATE_AR5) == (m_phase == 9208 ? 0x0e22 : decrement ? 0x0e21 : 0x0e24)) &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00 &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210 &&
@@ -2965,7 +2970,22 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e6 &&
 				m_port_reads == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-				"ROM4 DST B through AR0 stores high then low, advances by two and preserves neighbors/accumulators/status in two cycles");
+				"ROM4 DST selects A/B, orders both words and updates long pointers while preserving neighbors/accumulators/status in two cycles");
+			if (m_phase != 9210)
+			{
+				const unsigned next = m_phase == 6562 ? 9208 : m_phase + 1;
+				program.write_word(0x05e2, next == 9208 ? 0x4e82 : next == 9209 ? 0x4e95 : 0x4f8d);
+				data.write_word(0x0e22, 0);
+				data.write_word(0x0e23, 0);
+				m_port_reads = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0e22);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, next == 9210 ? 0x0e23 : 0x0e22);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = next;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
 			program.write_word(0x05e1, 0x0123);
 			program.write_word(0x05e2, 0x6ded); // MAR *+AR5(-7)
