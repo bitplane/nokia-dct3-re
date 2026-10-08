@@ -13796,10 +13796,35 @@ private:
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) == 0x0800 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"SUB Smem,TS sets no-borrow carry and costs one cycle");
+			program.write_word(0x05e2, 0x0c83); // SUB *AR3,TS,A.
+			data.write_word(0x0200, 0x8001);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0); // SXM clear: zero fill.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 7041;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 7041)
+		{
+			expect_opcode(0x0c83,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xc000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabff &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUB Smem,TS,A zero-fills with SXM clear, sets no-borrow carry and preserves B");
 			program.write_word(0x05e2, 0x1583); // LD *AR3,TS,B.
 			data.write_word(0x0200, 0xfedc);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_T, 8);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);

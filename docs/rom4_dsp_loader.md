@@ -887,8 +887,20 @@ recognizes a Nokia address or loader byte pattern.
 ## Executed-opcode coverage
 
 `tools/c54x_opcode_coverage.py` compares `[opcov]` records from a verbose
-30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
-idle run dispatches 457 distinct opcode words in 91 high-byte groups (set SHA-256
+30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
+idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
+`5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
+Against the executable fixture, 471 are asserted, two (`ec02`, `e809`) execute
+without assertions, and 121 are absent. The independent RF-boundary checker
+passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
+writes; this is not acquisition or speech evidence. Highest-use absent words
+include `0881` at first PC `4717`, `e4e9` at `33e4`, and `d6e9` at `3321`.
+The next coverage task is to classify and assert these newly observed paths,
+not extend unobserved variants or fabricate RF samples. The gate deliberately
+retains its older fingerprint until the expanded execution is explained and
+its assertion gaps are closed.
+
+The retained narrower baseline dispatches 457 words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
 The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
@@ -901,7 +913,8 @@ currently adds an opcode word; these are measured negative results, not
 evidence that other interactive or radio paths cannot execute more DSP
 instructions. The fixed idle fingerprint still applies only to the untouched
 primary run.
-The fixture dispatches all 457 observed ROM4 words plus fixture-only words.
+The fixture asserts all 457 narrower-baseline words plus fixture-only words;
+this does not close the fresh 594-word run.
 The generated report gives the current fixture-only total; these are *word*
 counts, not instruction-family counts. Fixture execution alone is not
 proof that a particular result is asserted, and this one boot is not a census
@@ -913,8 +926,8 @@ instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
 That inventory matches top-level cases and opcode masks and reports the
 current number of matching words that do and do not execute in the fixture.
-Every matching high-byte group now has at least one fixture word, but that
-does not establish the remaining words in those groups. These are **candidates**,
+Seventeen matching high-byte groups have no fixture word in the current report;
+even covered groups do not establish their remaining words. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
 grammar, and behavior are not established by a source mask. The report keeps
 the ROM4-observed/fixture-asserted class separate, so a new observed gap can
@@ -1976,8 +1989,10 @@ Fixture-only `0483` and `0d83` check positive TS with ADD/SUB carry behavior;
 eight; `1483` checks arithmetic right shift for TS=-1. Exact `0583` additionally
 checks B-destination ADD with SXM, TS=-1 encoded in `T=abff`, unchanged A,
 T and AR3, and one-cycle arithmetic. This guards sign fill and ignoring T's
-upper ten bits independently of the load variant. These fixtures do not
-establish out-of-range TS values or memory wait states.
+upper ten bits independently of the load variant. Exact `0c83` checks the
+complementary A-destination SUB with SXM clear and the same negative TS:
+zero-filled memory, no-borrow carry, unchanged B/T/AR3 and one-cycle arithmetic.
+These fixtures do not establish out-of-range TS values or memory wait states.
 SPRU172C's adjacent `ADD/SUB Xmem,SHFT` diagrams assign `90xx/91xx` and
 `92xx/93xx` to the single-X dual-address forms. The core now reads Xmem,
 applies SXM and the four-bit left shift, updates the selected accumulator and

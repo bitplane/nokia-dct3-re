@@ -1432,14 +1432,15 @@ check-c54x-opcode-coverage:
 	$(PYTHON) tools/c54x_opcode_coverage.py $(LOG) $(if $(ROM4_IDLE),--require-rom4-idle) $(if $(FIXTURE_LOG),--fixture-log $(FIXTURE_LOG)) $(if $(DECODE_SOURCE),--decoder-source $(DECODE_SOURCE)) $(if $(GROUPS),--group-report) $(if $(VARIANTS),--variant-report) $(if $(ALL_GAPS),--all-gaps)
 
 check-c54x-observed-coverage: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-c54x-coverage.XXXXXX)"; \
+	@set -eu; tmp="$$(mktemp -d "$${TMPDIR:-/tmp}/noki5110-c54x-coverage.XXXXXX")"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110" "$$tmp/menu/nvram/noki5110" "$$tmp/power/nvram/noki5110"; \
 		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test \
 			-rompath $(abspath $(MAME_DIR))/roms -video none -sound none \
 			-log -verbose -nothrottle -seconds_to_run 1 >output.log 2>&1 \
 			|| { status=$$?; test "$$status" -eq 3; }; \
-			grep -q 'TMS320C54x core conformance: PASS' output.log); \
+			grep -q 'TMS320C54x core conformance: PASS' output.log \
+				|| { cat output.log >&2; exit 1; }); \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
 			--flash $(abspath roms/noki5110/5110f530.fls) \
