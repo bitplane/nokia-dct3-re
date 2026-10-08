@@ -513,6 +513,11 @@ Two lower-level alternatives are documented but weaker:
   phase transitions for DSP initialization, synchronization and registration.
   A logic analyser can validate phase timing, but the one-bit flag cannot
   recover `IMR`.
+  The [NHM-3 manual](6250_bringup.md#product-documentation-boundary) supplies
+  an additional board mapping, `DSPXF` at J314, with initialization/download,
+  synchronization and registration diagrams. Its embedded captures predate
+  the manual and are not independently established 6250 timing measurements;
+  retain the phase vocabulary without importing numerical delays.
 
 The historical
 [`5110 DSP ROM v4` discussion](https://nokiafree.org/forums/archive/index.php/t-39175.html)

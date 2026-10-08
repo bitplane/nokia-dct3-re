@@ -1149,3 +1149,19 @@ material does not establish PCM clock rates, sample framing, codec gains or
 the selected internal microphone. Product-owned initialization or explicit
 timing documentation is still required before enabling speech cadence;
 do not substitute a sibling handset's configuration.
+
+The same archive's `troubleOriginal.pdf` (Original 11/00, printed pages
+12–13; SHA256
+`e3695966cceaacb5801c8ac3f0bcd548eb9548f8890d25e7aaeb4acb9972d761`)
+identifies MAD2 `DSPXF` at test point **J314**. Its diagnostic diagrams
+associate flag transitions with DSP initialization, network synchronization,
+and registration completion. The detailed initialization diagram labels
+patch and constant downloads; the network diagrams label channel scanning,
+RACH and SDCCH stages. These are useful phase-level references for a future
+native DSP trace, not PCM framing evidence.
+
+The embedded oscilloscope captures are dated **4 September 1997**, earlier
+than this NHM-3 manual. Do not treat their timebases as measured 6250-specific
+latencies or transplant them into an HLE scheduler. The single-bit flag also
+cannot recover the missing native DSP `IMR` activation state. Review the
+rendered pages: damaged text extraction loses diagram labels and scope data.
