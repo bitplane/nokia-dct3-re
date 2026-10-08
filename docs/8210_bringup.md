@@ -1290,6 +1290,15 @@ This establishes `9c -> registered callback -> 03f7 -> decoder -> 0411`
 as an eligible chain, not that ordinary DCS camping requires it or that it
 has a particular GSM message meaning. Packet lifetime, payload meaning and
 task-24 forwarding remain evidence requirements before implementing it.
+The expanded passive run `run_8210_late_pin_status_forward_04` also watches
+constructor `305ec4`, its `03f7` store at `305ef4`, and the six shared-decoder
+returns `2ff4d4`, `303cb6`, `30511c`, `30951a`, `30a0d8`, `30a576`.
+None is observed through the completed 46-second failing run. This lowers
+the route's priority for the current lifecycle but does not prove its GSM
+semantics or global irrelevance. Task numbers/aliases from the 3210 map must
+not be imported to identify this NSM-3 task-24 callback. The primary remaining
+boundary is still post-acquisition measurement/request lifetime; synthesizing
+9c solely to reach an eligible software continuation is unsupported.
 
 ## Evidence needed to resume
 

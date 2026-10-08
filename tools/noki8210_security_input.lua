@@ -7,7 +7,9 @@ if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' th
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
     _G.nsm3_special_status_decoder = {}
-    for _, address in ipairs({0x275ac0, 0x275dcc, 0x21ee4c}) do
+    for _, address in ipairs({0x275ac0, 0x275dcc, 0x21ee4c,
+            0x305ec4, 0x305ef4, 0x2ff4d4, 0x303cb6, 0x30511c,
+            0x30951a, 0x30a0d8, 0x30a576}) do
         local count = 0
         _G.nsm3_special_status_decoder[#_G.nsm3_special_status_decoder + 1] =
             memory:install_read_tap(address & ~3, (address & ~3) + 3,
