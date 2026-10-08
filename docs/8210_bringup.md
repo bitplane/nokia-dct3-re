@@ -327,7 +327,8 @@ contains LAI `00f1100001` and status `00`. A cold process retaining that
 storage passes the same exchange and `noki8210_registration_input.lua`
 captures `DCT3 LAB` at both 24 and 44 seconds after physical unlock.
 Incoming calls and SMS have the separate acceptance contracts below;
-mobility and other bands remain unproved.
+Mobility remains unproved; no-PIN DCS1800 registration is separately
+covered below, without inheriting call/SMS acceptance.
 
 ### Outgoing call signaling
 
@@ -705,6 +706,25 @@ acceptance. Existing product profiles are unchanged.
 an isolated run directory and checks the unsupported-peripheral case plus
 COBBA and immutable-version sensitivity cases. Unsupported peripheral reads
 are fatal rather than synthetic responses.
+
+## Research-HLE DCS1800 registration
+
+`verify-8210-dcs-registration` selects external laboratory carriers 823/824
+through ordinary network configuration, retaining the acquired NSM-3 MCU
+and declared own base-record PMM comparison. No firmware or peer change is
+needed. The own scan publishes `56:03370338`, selects SCH on carrier `0337`,
+uses recovered `041202` channel parameters and capability byte `30` in its
+Location Updating request (GSM900 uses `33`). Acceptance requires the ordered
+Location Updating/release sequence, carrier-823 paging and updated EF_LOCI.
+Calls, SMS, media and native DSP on this band are not promoted.
+
+The independent `--dcs1800 --pin-enabled` experiment remains unsuccessful:
+the early `55:03050000` response reaches the correlated task-12 completion
+at 5.54 seconds, before physical PIN acceptance at 12 seconds. Unlike the
+verified GSM900 PIN lifecycle, no later type-57 request is emitted and no
+Location Updating acceptance follows. The strict runner rejects this run;
+the early-scan/PIN lifecycle must be understood before authenticated DCS
+coverage can be claimed. No response, firmware state or timer is forced.
 
 ## Evidence needed to resume
 

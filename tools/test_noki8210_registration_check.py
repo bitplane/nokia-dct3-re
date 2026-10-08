@@ -48,6 +48,25 @@ class RegistrationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify('\n'.join(self.lines), self.storage)
 
+    def test_dcs_requires_own_scan_capability_and_carrier(self):
+        lines = [line.replace('data=0004', 'data=03370338')
+                 .replace('data=040000', 'data=041202')
+                 .replace('000004', '000337').replace('330809', '300809')
+                 for line in self.lines]
+        lines[-1] = 'RX enqueue type=80 payload=34 producer=001 data=601200000c4b033700001506210001f0'
+        lines.insert(1, 'RX enqueue type=80 payload=14 producer=001 data=4012000006af033700004800b900')
+        text = '\n'.join(lines)
+        verify(text, self.storage, dcs1800=True)
+        for broken in (text.replace('03370338', '00040005'),
+                       text.replace('300809', '330809'),
+                       text.replace('af0337000048', 'af0004000048'),
+                       text.replace('1a60000337', '1a60000004'),
+                       text.replace('4b033700001506', '4b000400001506')):
+            with self.subTest(text=broken), self.assertRaises(ValueError):
+                verify(broken, self.storage, dcs1800=True)
+        with self.assertRaisesRegex(ValueError, 'mutually exclusive'):
+            verify(text, self.storage, configured_carrier=True, dcs1800=True)
+
     def test_reject_stale_location(self):
         self.storage[1610] = 1
         with self.assertRaisesRegex(ValueError, 'not location-updated'):

@@ -91,7 +91,11 @@ def main():
     parser.add_argument('--port', type=int, default=18991)
     parser.add_argument('--pin-enabled', action='store_true',
                         help='test SIM PIN followed by phone security and registration')
+    parser.add_argument('--dcs1800', action='store_true',
+                        help='test registration on explicit DCS1800 carriers 823/824')
     args = parser.parse_args()
+    if args.dcs1800 and args.scenario != 'registration':
+        parser.error('--dcs1800 currently requires the registration scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
                                                  'host-outgoing-sms', 'phonebook',
@@ -116,7 +120,9 @@ def main():
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
         if config:
             shutil.copyfile(root / f'fixtures/{config}/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
-        if args.pin_enabled:
+        if args.dcs1800:
+            shutil.copyfile(root / 'fixtures/noki8210_dcs1800/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
+        elif args.pin_enabled:
             configure_pin_topology(run / 'cfg/nsm3hle.cfg')
         environment = os.environ.copy()
         environment.pop('NOKIA_DCT3_8210_PIN_ENTRY', None)
@@ -163,7 +169,7 @@ def main():
             verify_stage(pin_text, runtime=True, selftest=True, base_record=True)
             if not re.search(
                     r'TX packet type=57 payload=4[^\n]*data=03050000.*?'
-                    r'RX enqueue type=8b payload=166[^\n]*data=0010000400c4.*?'
+                    rf'RX enqueue type=8b payload=166[^\n]*data=0010{"0337" if args.dcs1800 else "0004"}00c4.*?'
                     r'8210_pin_measurement_route: enabled=01 message=([0-9a-f]{8}).*?'
                     r'8210_pin_measurement_completion: message=\1.*?'
                     r'8210_pin_physical: key=Menu.*?SIM status ins=20 sw=9000.*?'
@@ -218,8 +224,11 @@ def main():
                 check.extend(['--sms', '--storage', storage])
         elif args.scenario in ('registration', 'incoming-sms', 'host-incoming-sms'):
             check.append(storage)
-            if args.scenario == 'registration' and args.pin_enabled:
-                check.append('--configured-carrier')
+            if args.scenario == 'registration':
+                if args.dcs1800:
+                    check.append('--dcs1800')
+                elif args.pin_enabled:
+                    check.append('--configured-carrier')
             if args.scenario == 'host-incoming-sms':
                 check.extend(['--frame', str(run / 'snap/8210_sms_read_2.png')])
         if checker:
@@ -247,7 +256,7 @@ def main():
             'machine': 'nsm3hle', 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
-            'laboratory_carrier': 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' or args.pin_enabled else None,
+            'laboratory_carrier': 823 if args.dcs1800 else 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' or args.pin_enabled else None,
             'sim_profile': 'PIN-enabled laboratory card' if args.pin_enabled else 'default laboratory card',
             'command': command,
             'host_command': host_command,

@@ -9,6 +9,23 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_dcs_registration_admitted_with_or_without_pin(self):
+        for options in ([], ['--pin-enabled']):
+            with patch('sys.argv', ['runner', 'unused', '--dcs1800'] + options), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
+
+    def test_dcs_does_not_promote_untested_services(self):
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'host-incoming-call']), \
+                patch('sys.stderr', new_callable=io.StringIO), \
+                patch.object(runner, 'prepare_run') as prepare, \
+                self.assertRaises(SystemExit) as error:
+            runner.main()
+        self.assertEqual(error.exception.code, 2)
+        prepare.assert_not_called()
+
     def test_pin_service_fixtures_are_explicitly_admitted(self):
         for scenario in ('host-incoming-call', 'host-incoming-sms',
                          'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
