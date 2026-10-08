@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -42,7 +43,8 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
-                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook'), default='registration')
+                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
+                                              'idle-state', 'call-state', 'sms-state'), default='registration')
     parser.add_argument('--port', type=int, default=18890)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -52,9 +54,18 @@ def main():
         roms = root / 'roms/noki8890'
         verify_inputs('8890', (roms / profile[1]).read_bytes(), (roms / profile[3]).read_bytes())
         run.mkdir(parents=True, exist_ok=False)
-        for directory in ('cfg', 'nvram/nsb6hle', 'snap'):
+        for directory in ('cfg', 'nvram/nsb6hle', 'snap', 'sta'):
             (run / directory).mkdir(parents=True)
         shutil.copyfile(root / 'fixtures/noki8890_host/nsb6hle.cfg', run / 'cfg/nsb6hle.cfg')
+        state = args.scenario.endswith('-state')
+        if state:
+            configuration = ET.parse(run / 'cfg/nsb6hle.cfg')
+            inputs = configuration.find('./system/input')
+            inputs.find("port[@tag=':CALLHOST']").set('value', '0')
+            if args.scenario == 'sms-state':
+                ET.SubElement(inputs, 'port', tag=':NETCFG', type='CONFIG',
+                              mask='4', defvalue='0', value='4')
+            configuration.write(run / 'cfg/nsb6hle.cfg', encoding='utf-8', xml_declaration=True)
         card = run / 'nvram/nsb6hle/sim_card'
         card.write_bytes(make_profile(pin_enabled=not args.without_pin))
         environment = os.environ.copy()
@@ -63,14 +74,16 @@ def main():
             environment['NOKIA_DCT3_8890_PIN_ENTRY'] = '1'
         script = {'registration': 'security_input', 'host-incoming-call': 'clock_incoming_input',
                   'host-incoming-sms': 'incoming_sms_input', 'host-outgoing-call': 'clock_call_input',
-                  'host-outgoing-sms': 'outgoing_sms_input', 'phonebook': 'phonebook_input'}[args.scenario]
+                  'host-outgoing-sms': 'outgoing_sms_input', 'phonebook': 'phonebook_input',
+                  'idle-state': 'state_idle', 'call-state': 'state_call', 'sms-state': 'state_sms'}[args.scenario]
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsb6hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
+                   '-state_directory', 'sta',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / f'tools/noki8890_{script}.lua'),
-                   '-seconds_to_run', '74' if args.scenario.endswith('-call') else
+                   '-seconds_to_run', '80' if state else '74' if args.scenario.endswith('-call') else
                        '60' if args.scenario.endswith('-sms') else '46']
         host_command = None
         if args.scenario == 'host-incoming-call':
@@ -99,7 +112,22 @@ def main():
             check_pin_inputs(text)
         verify_stage(text, runtime=True, selftest=True)
         verify_registration(text, configured_gsm900=True)
-        if args.scenario == 'host-incoming-call':
+        if state:
+            from tools.noki8890_state_check import verify, check_frames
+            call = args.scenario == 'call-state'
+            sms = args.scenario == 'sms-state'
+            before_save = text.split('8890_state: event=saved', 1)[0]
+            verify_registration(before_save, configured_gsm900=True)
+            if call:
+                from tools.radio_outgoing_call_trace_check import CONNECT_ACKNOWLEDGE
+                if not CONNECT_ACKNOWLEDGE.search(before_save):
+                    raise ValueError('call was not connected before saving')
+            if sms and ('sim_device: update fid=6f3c record=1 length=176' not in before_save or
+                        'LAPDm service Channel Release acknowledged' not in before_save):
+                raise ValueError('SMS was not stored and released before saving')
+            verify(text, call=call, sms=sms, storage=card.read_bytes(), configured_gsm900=True)
+            check_frames(run / 'snap', call=call, sms=sms)
+        elif args.scenario == 'host-incoming-call':
             from tools.noki8890_incoming_call_check import verify, check_host_frames
             verify(text, caller='447700900123', configured_gsm900=True)
             check_host_frames(run / 'snap', '447700900123')

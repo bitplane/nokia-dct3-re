@@ -831,6 +831,15 @@ without ADN writes. The complete SIM file remains byte-identical across
 readback. `write.log` preserves the first process's evidence; `error.log`
 belongs to the cold process. The no-PIN composition is separately verified.
 
+`verify-8890-pin-state-idle`, `verify-8890-pin-state-call` and
+`verify-8890-pin-state-sms` independently verify authenticated configured
+GSM900 restoration. Save points are 46, 56 and 23 seconds respectively;
+registration must have completed first, calls must be connected and SMS
+must be stored with its delivery channel released. Exact CPU/RAM/time,
+nonempty protocol replay and whole-screen equality are followed by physical
+Menu, End or Read after load. These tests retain the separate native-speech,
+cold-clock and authenticated PCS1900 boundaries.
+
 The own RX dispatcher at `30168e` selects type `80` at `301750`, calling
 `2dae9c`. Its thirteen-entry `83..8f` table at `3016bc` maps `8b` to
 `301710 -> 2db270`, which posts to task 12 through `28190c`.
