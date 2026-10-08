@@ -109,14 +109,15 @@ def main():
     parser.add_argument('--pin-start', type=float,
                         help='registration-only physical PIN entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
-                        help='test registration on explicit DCS1800 carriers 823/824')
+                        help='test registration or no-PIN idle restoration on DCS1800 carriers 823/824')
     args = parser.parse_args()
     if args.pin_start is not None and (
             not args.pin_enabled or args.scenario != 'registration' or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and args.scenario != 'registration':
-        parser.error('--dcs1800 currently requires the registration scenario')
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state') or
+                        (args.scenario == 'idle-state' and args.pin_enabled)):
+        parser.error('--dcs1800 requires registration or no-PIN idle-state')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
                                                  'host-outgoing-sms', 'phonebook',
@@ -231,6 +232,10 @@ def main():
                      '--frame', str(run / 'snap/8210_phonebook_read_contact.png')]
         elif args.scenario in ('idle-state', 'call-state', 'sms-state'):
             check.append(str(run / 'snap'))
+            if args.dcs1800:
+                verify_registration((run / 'error.log').read_text(errors='replace'),
+                                    (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                                    dcs1800=True)
             if args.pin_enabled:
                 check.append('--configured-carrier')
                 verify_registration(pin_text, (run / 'nvram/nsm3hle/sim_card').read_bytes(),

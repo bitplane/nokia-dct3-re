@@ -717,6 +717,13 @@ uses recovered `041202` channel parameters and capability byte `30` in its
 Location Updating request (GSM900 uses `33`). Acceptance requires the ordered
 Location Updating/release sequence, carrier-823 paging and updated EF_LOCI.
 Calls, SMS, media and native DSP on this band are not promoted.
+`verify-8210-dcs-idle-state` extends the no-PIN DCS profile through an
+idle save/load round trip. `run_8210_dcs_idle_state_01` passes explicit
+DCS registration and persisted EF_LOCI, exact saved/restored PC/SP/RAM
+and emulated time, transport replay, matching registered-screen pixels,
+and post-load physical Menu decode plus reviewed menu presentation.
+The runner rejects DCS PIN idle-state and DCS service scenarios pending
+their own evidence; this gate does not weaken the late-PIN boundary.
 
 **Current frontier:** DCS with physical PIN entry starting at eight seconds
 does not register; entry starting at seven seconds does. The passing

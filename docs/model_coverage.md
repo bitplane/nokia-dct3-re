@@ -41,6 +41,10 @@ persistent SIM location. A separate `--pin-start 7` control passes physical
 PIN and full DCS registration; the default eight-second entry still fails.
 This is a bounded ordering result, not timing-independent authentication
 coverage. DCS calls and SMS remain unproved; GSM900 gates do not establish them.
+`verify-8210-dcs-idle-state` adds no-PIN registered-idle restoration:
+exact CPU/RAM snapshots, transport replay, identical restored pixels and
+physical Menu continuation, with DCS registration and EF_LOCI checked
+separately. It does not admit the unresolved late-PIN profile.
 
 `verify-8850-sim-pin-registration` independently proves physical SIM PIN and
 phone-code entry, own staged/HLE boundary, reviewed navigation pixels and
