@@ -426,8 +426,13 @@ No-PIN host outgoing SMS independently passes with
 `tools/run_noki8210_acceptance.py RUN --scenario host-outgoing-sms --dcs1800`
 (`run_8210_dcs_host_outgoing_sms_01`). Physical composition of `A` to
 `5551234`, reviewed success pixels, correlated host decision, CP/RP closure
-and own DCS registration/EF_LOCI are all required. This does not establish
-PIN-enabled outgoing SMS or DCS host rejection/timeout recovery.
+and own DCS registration/EF_LOCI are all required. Early-PIN outgoing SMS
+also passes with `--pin-enabled --pin-start 7`
+(`run_8210_early_pin_dcs_host_outgoing_sms_01`), including the correlated
+measurement/VERIFY/registration sequence. Standard targets are
+`verify-8210-dcs-host-outgoing-sms` and
+`verify-8210-dcs-early-pin-host-outgoing-sms`. Neither proves late-PIN
+recovery or DCS host rejection/timeout recovery.
 
 The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
@@ -964,7 +969,7 @@ VERIFY `9804`; it is not evidence about registration recovery.
 Reproduce the valid control with
 `tools/run_noki8210_acceptance.py RUN --pin-enabled --dcs1800 --pin-start 7`.
 The option affects physical input only, is restricted to PIN registration,
-incoming-call or host incoming-SMS fixtures,
+incoming-call or host SMS fixtures,
 and is recorded in successful run manifests. Next decode recovery when
 `03ec` arrives after the serving acknowledgement, rather than adjust peer
 latency or choose an earlier default input.
