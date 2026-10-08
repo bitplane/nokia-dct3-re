@@ -14554,6 +14554,19 @@
       ]
     },
     {
+      "name": "verify-radio-outgoing-call-sip-forbidden",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "delegate",
+          "silent": true,
+          "target": "verify-radio-outgoing-call-sip",
+          "command": "$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 403'"
+        }
+      ]
+    },
+    {
       "name": "verify-8210-power-cycle",
       "prerequisites": ["build"],
       "variables": {},

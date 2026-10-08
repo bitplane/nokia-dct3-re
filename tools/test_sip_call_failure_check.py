@@ -41,6 +41,17 @@ class SipFailureCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check(status=480)
 
+    def test_forbidden_requires_ordered_rejection_cause(self):
+        log = LOG.replace('outgoing decision consumed id=1 outcome=1',
+                          'outgoing decision consumed id=1 outcome=2\n'
+                          'outgoing termination consumed id=1 cause=21')
+        self.assertEqual(self.check(status=403, log=log)['sip_status'], 403)
+        for invalid in (log.replace('cause=21', 'cause=18'),
+                        log.replace('outcome=2', 'outcome=1'),
+                        log.replace('outgoing termination consumed id=1 cause=21', '')):
+            with self.assertRaises(RuntimeError):
+                self.check(status=403, log=invalid)
+
     def test_unhandled_attempt_and_missing_ended_state_are_rejected(self):
         for log in (LOG + 'gsm_call_adapter: request id=2 epoch=1 digits=5551234\n',
                     LOG.replace('phase=ended', 'phase=disconnecting'),

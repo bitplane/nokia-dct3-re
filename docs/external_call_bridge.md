@@ -370,16 +370,22 @@ an extra clearing message.
 ```sh
 make verify-radio-outgoing-call-sip-busy RUN_DIR=run_3210_sip_busy
 make verify-radio-outgoing-call-sip-unavailable RUN_DIR=run_3210_sip_unavailable
+make verify-radio-outgoing-call-sip-forbidden RUN_DIR=run_3210_sip_forbidden
 ```
 
-Both gates physically dial the 3210 into actual upstream PJSIP responses and
+These gates physically dial the 3210 into actual upstream PJSIP responses and
 require the correlated failure, firmware RELEASE/RELEASE COMPLETE and LAPDm
 release, with no SIP/GSM connection and zero executed bridge media. The 480
-gate additionally requires the GSM session to consume cause 18. The release
-checker admits either CC send-sequence bit value without changing the decoded
+gate additionally requires the GSM session to consume cause 18.
+The 403 gate additionally requires ordered consumption of the correlated
+no-answer decision and cause-21 termination before firmware release. It passes
+against the local real PJSIP endpoint, without connection or media; this does
+not establish authentication retries or a public-network call.
+The release checker admits either CC send-sequence bit value without changing
+the decoded
 primitive. These gates do not measure failure-screen presentation.
 
-The implemented mapping subset also covers 403/603 -> 21, 404/604 -> 1,
+The implemented mapping subset also covers 603 -> 21, 404/604 -> 1,
 408 -> 102 and 500/503 -> 41; these have pure mapping tests, not handset runtime
 gates. Unhandled statuses use an explicit cause-41 fallback policy. Warning and
 Reason headers, authentication retries and full RFC 3398 interoperability are

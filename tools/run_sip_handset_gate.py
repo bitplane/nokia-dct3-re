@@ -255,6 +255,9 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
             raise RuntimeError('missing correlated SIP failure for each handset attempt')
         patterns = [outgoing_setup_pattern(product),
                     rf'gsm_call_adapter: request id={request_id} epoch=1 digits=5551234']
+        if status == 403:
+            patterns += [rf'outgoing decision consumed id={request_id} outcome=2',
+                         rf'outgoing termination consumed id={request_id} cause=21']
         if calls > 1:
             patterns += [rf'outgoing decision consumed id={request_id} outcome={1 if status == 486 else 2}']
             if status == 480:
@@ -441,7 +444,7 @@ def main():
     parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
     parser.add_argument('--restore-idle', action='store_true')
     parser.add_argument('--restore-outgoing', action='store_true')
-    parser.add_argument('--sip-response', type=int, choices=(180, 200, 480, 486), default=200)
+    parser.add_argument('--sip-response', type=int, choices=(180, 200, 403, 480, 486), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.ready_file and not args.incoming:
