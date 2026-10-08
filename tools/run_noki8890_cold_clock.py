@@ -10,13 +10,14 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.run_noki8xxx_supplementary import PROFILES, verify_inputs
-from tools.noki8890_cold_clock_check import verify, check_frame
+from tools.noki8890_cold_clock_check import verify, verify_minute, check_frame
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--minute-redraw', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -29,7 +30,7 @@ def main():
         commands = []
         for phase, script, duration in (
                 ('seed', 'noki8890_clock_retention_input.lua', 45),
-                ('cold', 'noki8890_clock_nv_read.lua', 32)):
+                ('cold', 'noki8890_clock_nv_read.lua', 92 if args.minute_redraw else 32)):
             directory = run / phase
             (directory / 'cfg').mkdir(parents=True)
             shutil.copyfile(root / 'fixtures/noki8890_power/nsb6hle.cfg',
@@ -60,16 +61,21 @@ def main():
         verify((run / 'cold/error.log').read_text(errors='replace'), stored)
         check_frame(run / 'seed/snap/8890_date_after.png')
         check_frame(run / 'cold/snap/8890_clock_cold_30.png')
+        if args.minute_redraw:
+            verify_minute((run / 'cold/error.log').read_text(errors='replace'))
+            check_frame(run / 'cold/snap/8890_clock_cold_90.png', advanced=True)
         (run / 'acceptance.json').write_text(json.dumps({
             'result': 'pass', 'machine': 'nsb6hle', 'mcu_sha1': profile[2],
             'pmm_sha1': profile[4], 'provisioning': 'own acquired PMM unchanged',
             'commands': commands, 'retained_ccont': stored.hex(),
             'cold_user_clock': '13:47', 'offline_calendar_advance': False,
+            'minute_redraw_validated': args.minute_redraw,
             'native_dsp_complete': False,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8890 cold clock FAIL: {error}; inspect {run}\n')
-    print('8890 physical clock entry and cold 13:47 idle PASS')
+    print('8890 physical clock entry and cold retention' +
+          (' with organic 13:48 redraw' if args.minute_redraw else '') + ' PASS')
 
 
 if __name__ == '__main__':

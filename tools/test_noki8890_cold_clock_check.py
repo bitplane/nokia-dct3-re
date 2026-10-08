@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki8890_cold_clock_check import verify
+from tools.noki8890_cold_clock_check import verify, verify_minute
 
 
 TEXT = ('8890_clock_nv_result: result=00000001 flags=00 caller=00304ce9\n'
@@ -10,6 +10,19 @@ STORED = bytes((19, 47, 13, 0, 0, 30, 11, 0x50, 1))
 
 
 class ColdClockTest(unittest.TestCase):
+    def test_minute_rollover_requires_service_and_late_observation(self):
+        text = ('ccont_rtc: event=second time=13:47:59 day=0 status=13 mask=50 t=59.000000000\n'
+                'ccont_rtc: event=second time=13:48:00 day=0 status=33 mask=50 t=60.000000000\n'
+                'ccont_rtc: event=second time=13:48:01 day=0 status=13 mask=50 t=61.000000000\n'
+                '8890_clock_cold: t=90\n')
+        verify_minute(text)
+        for wrong in (text.replace('13:48:00', '13:47:00'),
+                      text.replace('status=33', 'status=13'),
+                      text.replace('13:48:01 day=0 status=13', '13:48:01 day=0 status=33'),
+                      text.replace('t=90', 't=30')):
+            with self.subTest(text=wrong), self.assertRaises(ValueError):
+                verify_minute(wrong)
+
     def test_own_record_and_controller_validation(self):
         verify(TEXT, STORED)
 

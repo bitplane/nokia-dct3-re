@@ -295,6 +295,12 @@
                  "arguments": ["$(RUN_DIR)", "--restore-off", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8890-minute-redraw", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_cold_clock.py",
+                 "arguments": ["$(RUN_DIR)", "--minute-redraw", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8890-cold-clock", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
                  "before_script": [], "script": "tools/run_noki8890_cold_clock.py",

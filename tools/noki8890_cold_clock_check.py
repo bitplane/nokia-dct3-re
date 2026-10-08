@@ -23,14 +23,24 @@ def verify(text, stored):
         raise ValueError('cold boot supplied time/date keys')
 
 
-def check_frame(path):
+def verify_minute(text):
+    if not re.search(r'ccont_rtc: event=second time=13:47:59 .*?t=59\.000000000'
+                     r'.*?ccont_rtc: event=second time=13:48:00 .*?status=33 mask=50 t=60\.000000000'
+                     r'.*?ccont_rtc: event=second time=13:48:01 .*?status=13 mask=50 t=61\.000000000'
+                     r'.*?8890_clock_cold: t=90\b', text, re.S):
+        raise ValueError('missing ordered retained-clock minute rollover and serviced minute source')
+
+
+def check_frame(path, *, advanced=False):
     with Image.open(path) as image:
         if image.size != (84, 48):
             raise ValueError('unexpected LCD geometry')
         digest = hashlib.sha256(image.convert('L').tobytes()).hexdigest()
         # Full frame includes the distinct 13:47 clock, not only the idle body.
-        if digest != 'a3f1e6eb6f5ef68a282dea0a914141dfef4423f2397b387b1828f96e52e74efc':
-            raise ValueError('reviewed 13:47 cold idle frame mismatch')
+        expected = ('e40423cea2d28b4aebf15cf10c650216ed2137f1caacfd294dcc31e856b90524'
+                    if advanced else 'a3f1e6eb6f5ef68a282dea0a914141dfef4423f2397b387b1828f96e52e74efc')
+        if digest != expected:
+            raise ValueError('reviewed cold idle clock frame mismatch')
 
 
 def main():

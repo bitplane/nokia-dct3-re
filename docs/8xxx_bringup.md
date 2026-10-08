@@ -1132,6 +1132,16 @@ time/date input. Reproduce with
 `tools/noki8890_clock_read.lua`, preserved NVRAM, fresh private cfg and
 32 seconds; it enters only the security code and captures at 12/21/30 seconds.
 `make verify-8890-cold-clock RUN_DIR=RUN` automates both isolated processes,
+while `make verify-8890-minute-redraw RUN_DIR=RUN` extends the cold process
+through 92 emulated seconds. The latter independently passes
+`run_8890_minute_redraw_verified`: the retained user clock crosses
+13:47:59 -> 13:48:00 -> 13:48:01 at seconds 59/60/61, the minute IRQ source
+is set and subsequently cleared, and the reviewed registered-idle frame
+at 90 seconds displays **13:48**. No time/date keys are supplied in the cold
+process. Acceptance requires both ordered RTC evidence and the exact
+advanced-clock frame; a running counter alone is insufficient. This proves
+in-emulation minute service/redraw, not offline wall-time/calendar advance.
+The original cold-clock gate
 pins the own MCU/PMM hashes, and requires the full reviewed 13:47 idle frame
 after both physical settlement and cold security entry.
 CCONT persists registers `07..0d`, upper IRQ mask and alarm-armed state
