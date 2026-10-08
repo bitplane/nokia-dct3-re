@@ -1,5 +1,4 @@
 -- Only physical key cells are driven; firmware observations are read-only.
-dofile('/data/gaz/src/nokia-dct3-re/tools/noki6250_runtime_observe.lua')
 local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']

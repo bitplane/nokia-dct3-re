@@ -85,9 +85,14 @@ def main():
     parser.add_argument("--port", type=int, default=16250)
     parser.add_argument('--coherent-cell', action='store_true',
                         help='use explicit ARFCN19/20 network and require carrier coherence')
+    parser.add_argument('--pin-enabled', action='store_true',
+                        help='require slow physical PIN entry before coherent incoming call/SMS')
     args = parser.parse_args()
     if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario == 'idle-state'):
         parser.error('coherent-cell downstream coverage requires a host or idle-state scenario')
+    if args.pin_enabled and (not args.coherent_cell or args.scenario not in
+                             ('host-incoming-call', 'host-incoming-sms')):
+        parser.error('pin-enabled requires coherent host incoming call or SMS')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
@@ -96,7 +101,7 @@ def main():
         if not mame.is_file():
             raise ValueError(f"missing MAME executable: {mame}")
         accessory_contract, audit_members = prepare_run(run, root)
-        if args.scenario == 'slow-pin-registration':
+        if args.scenario == 'slow-pin-registration' or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / 'nvram/nhm3hle/sim_card'
             card.parent.mkdir(parents=True)
@@ -134,7 +139,7 @@ def main():
         if args.scenario in ("registration", "coherent-registration", "accessory"):
             script = "noki6250_runtime_observe.lua"
         if args.scenario == 'slow-pin-registration':
-            script = 'noki6250_slow_pin_input.lua'
+            script = 'noki6250_slow_pin_observe.lua'
         if args.scenario == "idle-state":
             script = "noki6250_state_idle.lua"
         if args.scenario == "call-state":
@@ -188,6 +193,9 @@ def main():
             host_command = [sys.executable, str(root / "tools" / runner),
                             "--port", str(args.port), "--cwd", str(run)] + options + ["--"] + command
         env = os.environ.copy()
+        env.pop('NOKIA_DCT3_6250_PIN_ENTRY', None)
+        if args.pin_enabled:
+            env['NOKIA_DCT3_6250_PIN_ENTRY'] = '1'
         flags = {"calculator": "NOKIA_DCT3_6250_CALCULATOR",
                  "outgoing-call": "NOKIA_DCT3_6250_OUTGOING",
                  "call-state": "NOKIA_DCT3_6250_OUTGOING",
@@ -206,6 +214,7 @@ def main():
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
             "laboratory_carrier": 19 if args.scenario in ('coherent-registration', 'slow-pin-registration', 'power-cycle') or args.coherent_cell else None,
+            "slow_physical_pin": args.pin_enabled or args.scenario == 'slow-pin-registration',
             "shared_rom_audit_members": audit_members,
             "accessory_contract": accessory_contract,
             "host_command": host_command,
@@ -235,6 +244,10 @@ def main():
         elif sms:
             frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8,
                            "host-incoming-sms": 2, "host-incoming-sms-text": 2, "host-outgoing-sms": 8}[args.scenario]
+            if args.pin_enabled:
+                # Late SIM initialization reaches the same reviewed body
+                # after the 22-second Read input, not the 18-second input.
+                frame_index = 3
             frames = list((run / "snap").rglob(f"6250_sms_{frame_index}.png"))
             if len(frames) != 1:
                 raise ValueError(f"expected one SMS frame, found {len(frames)}")
@@ -270,6 +283,10 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        if args.pin_enabled:
+            from tools.noki6250_slow_pin_check import verify as check_slow_pin
+            check_slow_pin((run / 'error.log').read_text(errors='replace'),
+                           (run / 'nvram/nhm3hle/sim_card').read_bytes())
         if args.coherent_cell:
             from tools.noki6250_coherent_registration_check import verify as check_coherent
             check_coherent((run / 'error.log').read_text(errors='replace'),

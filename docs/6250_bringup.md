@@ -88,6 +88,24 @@ registers at 13.120000 s. Prompt and settled idle snapshots are retained
 in the isolated run. This proves late-PIN registration in research HLE,
 not native DSP behavior, native speech or authenticated factory PMM.
 
+`verify-6250-pin-host-incoming-call` and
+`verify-6250-pin-host-incoming-sms` repeat that fresh slow-PIN proof before
+requiring the existing coherent host-service acceptance. The call gate
+requires host-originated ringing, physical Answer/End, CC/RR release and
+registered idle. The SMS gate requires host-originated delivery, complete
+CP/RP closure, physical Read, exact persistent SIM content/read status and
+the unchanged reviewed message-body pixel hash. Late SIM initialization
+reaches that body after the 22-second Read press (24-second capture),
+rather than the PIN-disabled fixture's 20-second capture; the oracle is
+not weakened or re-banked. This adds incoming signaling/SMS coverage after
+PIN, not PIN-enabled outgoing services, speech or media proof.
+
+The runner's `--pin-enabled` option is deliberately limited to these two
+coherent incoming-service scenarios. The reusable physical-input module
+does not load another copy of the runtime observer, and the runner clears
+its harness-only input flag for ordinary runs. Every run uses private
+storage, configuration, logs and host admission evidence.
+
 #### Request and completion contract
 
 The common sender `4f610a..4f6112` passes queued payload bytes through

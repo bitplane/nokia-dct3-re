@@ -3,6 +3,12 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nhm3_slow_pin_incoming_services", "owner": "nhm3_radio", "status": "satisfied",
+      "predicate": "Fresh own 6250 research-HLE runs support host-originated incoming call signaling and durable incoming SMS after slow physical PIN verification and coherent registration",
+      "current": "Both runs require the full slow-PIN measurement-delivery, completion, CHV1 and carrier-19 registration chain before accepting service results. Incoming call requires physical Answer/End, CC/RR release and registered idle. Incoming SMS requires host CP/RP completion, exact stored/read SIM record and the existing reviewed body pixels; its explicit post-Read capture is at 24 seconds because late SIM initialization changes UI timing. Standalone slow-PIN and ordinary no-PIN SMS gates are separately checked. This does not establish PIN-enabled outgoing services, audio/media or native DSP behavior.",
+      "evidence": ["docs/6250_bringup.md", "tools/run_noki6250_acceptance.py", "tools/noki6250_slow_pin_input.lua", "tools/noki6250_slow_pin_check.py", "tools/noki6250_call_check.py", "tools/noki6250_sms_check.py", "gates.json"]
+    },
+    {
       "id": "nhm3_slow_pin_registration", "owner": "nhm3_radio", "status": "satisfied",
       "predicate": "The own 6250 research-HLE composition registers on the coherent laboratory carrier after slow physical CHV1 entry, without firmware-state forcing",
       "current": "Fresh PIN-enabled card, one-second physical 1234/Confirm intervals beginning at 8 seconds. Own type-57 body 03050000 requests a background 166-byte 8b measurement from receivable cells. Publication explicitly notifies FIQ0, firmware consumes the ring and forwards the same envelope via 4649ac to task 14 and 3cbe14. CHV1 succeeds with 9000 and retries 3/3 near 12.024 seconds; carrier-19 registration follows at 13.12 seconds and persists in EF_LOCI. Serving reception is preserved. The separate no-PIN coherent-registration gate still passes. This is request-derived DSP HLE, not native DSP, speech or original-PMM repair.",

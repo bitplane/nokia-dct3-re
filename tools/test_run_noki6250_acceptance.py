@@ -8,6 +8,30 @@ from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, ma
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_pin_services_are_admitted_before_preparation(self):
+        for scenario in ('host-incoming-call', 'host-incoming-sms'):
+            with patch('sys.argv', ['runner', 'unused', '--scenario', scenario,
+                                   '--coherent-cell', '--pin-enabled', '--mame', '/nonexistent/6250-mame']), \
+                    patch('sys.stderr', new_callable=io.StringIO) as errors, \
+                    patch('tools.run_noki6250_acceptance.prepare_run') as prepare:
+                with self.assertRaises(SystemExit) as result:
+                    main()
+                self.assertEqual(result.exception.code, 1)
+                self.assertIn('missing MAME executable', errors.getvalue())
+                prepare.assert_not_called()
+
+    def test_pin_scope_requires_explicit_coherent_incoming_service(self):
+        for options in (['--scenario', 'host-incoming-call'],
+                        ['--scenario', 'host-outgoing-call', '--coherent-cell'],
+                        ['--scenario', 'idle-state', '--coherent-cell']):
+            with patch('sys.argv', ['runner', 'unused', '--pin-enabled'] + options), \
+                    patch('sys.stderr', new_callable=io.StringIO), \
+                    patch('tools.run_noki6250_acceptance.prepare_run') as prepare:
+                with self.assertRaises(SystemExit) as result:
+                    main()
+                self.assertEqual(result.exception.code, 2)
+                prepare.assert_not_called()
+
     def test_coherent_idle_is_admitted_before_preparation(self):
         with patch('sys.argv', ['runner', 'unused', '--scenario', 'idle-state',
                                '--coherent-cell', '--mame', '/nonexistent/6250-mame']), \

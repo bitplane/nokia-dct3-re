@@ -2,6 +2,9 @@
 local source = debug.getinfo(1, "S").source:sub(2)
 local directory = assert(source:match("^(.*[/])"))
 dofile(directory .. "noki6250_runtime_observe.lua")
+if os.getenv('NOKIA_DCT3_6250_PIN_ENTRY') == '1' then
+    dofile(directory .. 'noki6250_slow_pin_input.lua')
+end
 local machine = manager.machine
 local function cell(column, row)
     for _, field in pairs(machine.ioport.ports[":COL." .. column].fields) do
