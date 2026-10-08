@@ -436,6 +436,15 @@ It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
 products `6210`, `6250`, `8210`, `8850` and `8890`.
 
+`verify-6210-sip-outgoing-busy` additionally proves physical `1234567`/Send
+against actual local PJSIP 486. It decodes the SETUP number, requires the
+correlated busy decision and complete CC/RR release, rejects CONNECT and
+media, and checks exact registered-idle pixels afterward. The isolated
+research-HLE runner retains unchanged acquired PMM and own bootstrap,
+self-test, registration and persisted SIM-location checks. Only this
+outgoing failure is enabled for the 6210; answered calls, speech and
+outgoing SIP restoration remain unproved.
+
 `verify-6250-sip-cancel` independently covers NHM-3 v5.03 research HLE with
 the declared initial-record PMM comparison, not factory provisioning.
 Own uploads and compact self-test precede coherent carrier-19 registration,

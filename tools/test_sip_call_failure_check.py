@@ -85,6 +85,14 @@ class SipFailureCheckTest(unittest.TestCase):
         self.assertTrue(self.check(product='3410')['scope'].startswith('3410 HLE'))
         self.assertTrue(self.check(product='5210')['scope'].startswith('5210 HLE'))
 
+    def test_6210_failure_requires_own_physical_number_and_setup(self):
+        log = LOG.replace('digits=5551234', 'digits=1234567').replace('551532f4', '214365f7')
+        self.assertTrue(self.check(product='6210', log=log)['scope'].startswith('6210 HLE'))
+        for invalid in (LOG, log.replace('214365f7', '551532f4'),
+                        log.replace('length=15', 'length=16')):
+            with self.assertRaises(RuntimeError):
+                self.check(product='6210', log=invalid)
+
     def test_3330_failure_requires_own_setup(self):
         with self.assertRaises(RuntimeError):
             self.check(product='3330')

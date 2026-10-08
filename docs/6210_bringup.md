@@ -355,8 +355,8 @@ The firmware renders `1 missed call`. A physical right-softkey Exit then
 returns to the exact registered-idle frame. Product-owned bootstrap,
 registration and persisted EF_LOCI are checked as well as SIP signaling.
 The runner refuses an existing run directory or stale readiness artifact.
-The generic SIP runner explicitly limits product `6210` to this unanswered
-scenario; answered SIP, speech and native DSP are not promoted.
+The generic SIP runner permits this unanswered scenario and the outgoing
+busy fixture below; answered SIP, speech and native DSP are not promoted.
 
 `make verify-6210-sip-idle-restore RUN_DIR=run_6210_sip_idle_restore` first
 performs the existing exact idle architecture/time and protocol-replay check.
@@ -374,6 +374,16 @@ physical clearing and registered paging. An independent host checker requires
 one queued/accepted connect and connected/ended phases. The shared queue log
 is not itself evidence of fallback: host decisions enter that same saved queue.
 This verifies outgoing host signaling, not audio or a SIP call.
+
+`make verify-6210-sip-outgoing-busy RUN_DIR=run_6210_sip_outgoing_busy`
+independently verifies physical `1234567`/Send against a real local PJSIP
+486 response. The checker decodes the handset's SETUP digits, requires the
+correlated busy decision and complete CC/RR release, and rejects CONNECT
+and bridge media. The final frame must match registered idle exactly.
+The runner retains unchanged acquired PMM, private fresh storage, own upload
+and self-test checks, registration and persisted EF_LOCI checks. This is
+research-HLE failure signaling and recovery, not answered-call or speech
+acceptance.
 
 ## Host SMS acceptance
 

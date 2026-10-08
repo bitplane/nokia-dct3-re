@@ -1,4 +1,4 @@
-"""Fresh NPE-3 research-HLE SIP cancellation; no Answer or speech claim."""
+"""Fresh NPE-3 research-HLE SIP cancellation/busy signaling; no speech claim."""
 import argparse
 import json
 from pathlib import Path
@@ -44,9 +44,13 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore idle CPU/RAM/time before admitting the fresh SIP call')
+    parser.add_argument('--outgoing-busy', action='store_true',
+                        help='physically dial into SIP 486 instead of receiving CANCEL')
     parser.add_argument('--http-port', type=int, default=18621)
     parser.add_argument('--sip-port', type=int, default=25621)
     args = parser.parse_args()
+    if args.outgoing_busy and args.restore_idle:
+        parser.error('--outgoing-busy cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
@@ -61,6 +65,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki6210_outgoing_call_input.lua' if args.outgoing_busy else
                        'noki6210_sip_idle_restore.lua' if args.restore_idle else
                        'noki6210_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
@@ -69,17 +74,31 @@ def main():
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
-                   '--product', '6210', '--incoming', '--cancel-incoming',
-                   '--ready-file', str(run / 'snap/6210_sip_registered_idle.png'),
+                   '--product', '6210',
+                   *(['--sip-response', '486'] if args.outgoing_busy else
+                     ['--incoming', '--cancel-incoming', '--ready-file',
+                      str(run / 'snap/6210_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
                    '--', *handset]
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        check_product_result(run, args.restore_idle)
+        if args.outgoing_busy:
+            from PIL import Image
+            text = (run / 'error.log').read_text(errors='replace')
+            verify(text, runtime=True, selftest=True)
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            if ('6210_call_physical: action=send' not in text or
+                    '6210_keypad_decoded: key=0e' not in text):
+                raise ValueError('outgoing SIP fixture did not physically decode Send')
+            with Image.open(run / 'snap/6210_after_outgoing_call.png') as frame:
+                check_frame(frame, OPERATOR_SHA256, 'registered idle after SIP busy')
+        else:
+            check_product_result(run, args.restore_idle)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
-        parser.exit(1, f'6210 SIP cancellation FAIL: {error}; inspect {run}\n')
-    print('6210 research-HLE SIP CANCEL PASS; registered idle recovered, no speech acceptance')
+        parser.exit(1, f'6210 SIP signaling FAIL: {error}; inspect {run}\n')
+    print('6210 research-HLE SIP ' + ('outgoing busy' if args.outgoing_busy else 'CANCEL') +
+          ' PASS; registered idle recovered, no speech acceptance')
 
 
 if __name__ == '__main__':

@@ -16,6 +16,9 @@ except ModuleNotFoundError:
 
 
 def outgoing_setup_pattern(product):
+    if product == '6210':
+        # Content is checked with the product's physical-number decoder below.
+        return r'GSM service uplink sapi=0 pd=03 message=05 length=\d+ data=[0-9a-f]+'
     frame = {
         '3210': '03450401a05e0581551532f4150101',
         '3310': '03450404600200815e0581551532f4a2150101',
@@ -239,7 +242,18 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
             re.search(r'GSM service downlink kind=12 sapi=0 pd=03 message=07', log) or
             re.search(r'gsm_call_adapter: media direction=\w+ id=\d+ .*result=accepted', log)):
         raise RuntimeError('failed SIP call falsely connected')
-    requests = re.findall(r'gsm_call_adapter: request id=(\d+) epoch=1 digits=5551234', log)
+    number = '1234567' if product == '6210' else '5551234'
+    requests = re.findall(rf'gsm_call_adapter: request id=(\d+) epoch=1 digits={number}\b', log)
+    if product == '6210':
+        try:
+            from tools.radio_outgoing_call_trace_check import SETUP, decode_called_digits
+        except ModuleNotFoundError:
+            from radio_outgoing_call_trace_check import SETUP, decode_called_digits
+        setups = list(SETUP.finditer(log))
+        if len(setups) != calls or any(
+                len(bytes.fromhex(match['data'])) != int(match['length']) or
+                decode_called_digits(bytes.fromhex(match['data'])) != number for match in setups):
+            raise RuntimeError('6210 SETUP differs from physically dialed number')
     if requests != [str(number) for number in range(1, calls + 1)]:
         raise RuntimeError('SIP failure left an unexpected or unhandled handset attempt')
     summaries = re.findall(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
@@ -254,7 +268,7 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
         if f'SIP disconnected status={status} identity=(1, {request_id})' not in bridge_text:
             raise RuntimeError('missing correlated SIP failure for each handset attempt')
         patterns = [outgoing_setup_pattern(product),
-                    rf'gsm_call_adapter: request id={request_id} epoch=1 digits=5551234']
+                    rf'gsm_call_adapter: request id={request_id} epoch=1 digits={number}\b']
         rejection_cause = {403: 21, 404: 1, 408: 102, 503: 41}.get(status)
         if rejection_cause is not None:
             patterns += [rf'outgoing decision consumed id={request_id} outcome=2(?!\d)',
@@ -452,9 +466,11 @@ def main():
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():
         parser.error('--ready-file must not already exist before the handset run')
-    if args.product in ('6210', '6250', '8210', '8850', '8890') and (not args.incoming or not args.cancel_incoming or
+    signaling_failure = (args.product == '6210' and not args.incoming and args.sip_response == 486)
+    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and
+            (not args.incoming or not args.cancel_incoming)) or
             args.record_media or args.restore_call or args.restore_idle or args.restore_outgoing):
-        parser.error(f'{args.product} SIP coverage is limited to unanswered incoming CANCEL; media is unproved')
+        parser.error(f'{args.product} requires unanswered incoming CANCEL (6210 also permits outgoing busy); media is unproved')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:
