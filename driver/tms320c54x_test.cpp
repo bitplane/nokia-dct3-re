@@ -6989,6 +6989,31 @@ private:
 			expect_opcode(0x7213, m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 MVDM copies dmad to AR3 in two cycles");
+			program.write_word(0x05e3, 0x720b); // MVDM dmad,BL.
+			data.write_word(0x0f20, 0xcafe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x11223344);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff1234abcdULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6564;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6564)
+		{
+			expect_opcode(0x720b,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff1234cafeULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x11223344 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+				data.read_word(0x0f20) == 0xcafe &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e9 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 MVDM to BL replaces only B low word, preserves guard/high/A/status/source and consumes dmad in two cycles");
 			program.write_word(0x05e3, 0x708a); // MVKD dmad,*AR2-
 			program.write_word(0x05e4, 0x0f20);
 			data.write_word(0x0f20, 0x5678);
@@ -7017,26 +7042,27 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 6520 || m_phase == 6531 || m_phase == 6532)
+		if (m_phase == 6520 || m_phase == 6531 || m_phase == 6532 || m_phase == 6563)
 		{
-			u16 const opcode = m_phase == 6520 ? 0x7083 : m_phase == 6531 ? 0x7092 : 0x7090;
+			u16 const opcode = m_phase == 6520 ? 0x7083 : m_phase == 6531 ? 0x7092 : m_phase == 6532 ? 0x7090 : 0x7088;
 			expect_opcode(opcode,
 				data.read_word(0x0f23) == 0x5678 && data.read_word(0x0f20) == 0x5678 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f23 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (m_phase == 6520 ? 0x0f20 : m_phase == 6531 ? 0x0f24 : 0x0f23) &&
 				(m_phase != 6532 || m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f24) &&
+				(m_phase != 6563 || m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f22) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 MVKD consumes dmad, preserves source, selects its stationary/postincrement destination and costs two cycles");
-			if (m_phase != 6532)
+				"ROM4 MVKD consumes dmad, preserves source, selects its stationary/postincrement/postdecrement destination and costs two cycles");
+			if (m_phase != 6563)
 			{
-				program.write_word(0x05e3, m_phase == 6520 ? 0x7092 : 0x7090);
+				program.write_word(0x05e3, m_phase == 6520 ? 0x7092 : m_phase == 6531 ? 0x7090 : 0x7088);
 				data.write_word(0x0f23, 0);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f23);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				m_phase = m_phase == 6520 ? 6531 : 6532;
+				m_phase = m_phase == 6520 ? 6531 : m_phase == 6531 ? 6532 : 6563;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}

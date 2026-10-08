@@ -890,11 +890,16 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 536 are asserted, none execute without an
-assertion, and 58 are absent. The independent RF-boundary checker
+Against the executable fixture, 538 are asserted, none execute without an
+assertion, and 56 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `7088` at first PC `442b`, `720b` at `32ee`, and `ff4f` at `441d`.
+include `ff4f` at first PC `441d`, `3c82` at `328d`, and `4582` at `48eb`.
+Exact `7088` checks copying the source word to old AR0 before decrement,
+preserved source/unrelated pointers and two-cycle extension-consuming
+execution. Exact `720b` checks replacing B's low word while retaining its
+high and guard bits, preserved A/status/AR3/source, continuation PC and
+two-cycle memory-to-MMR transfer.
 Exact `4082` checks stationary AR2 source selection against a distinct AR3
 word, shifted subtraction into A, retained set carry on no borrow, preserved
 B/T/source and one-cycle execution. Exact `4f90` checks B high/low word
