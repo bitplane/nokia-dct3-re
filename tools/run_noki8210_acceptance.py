@@ -43,6 +43,15 @@ SCENARIOS = {
 MCU_SHA1 = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
 PMM_SHA256 = '31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
 
+PIN_SCENARIOS = frozenset((
+    'registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call',
+    'host-incoming-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms',
+    'idle-state', 'call-state', 'sms-state', 'phonebook',
+))
+DCS_SCENARIOS = PIN_SCENARIOS | frozenset((
+    'incoming-sms', 'outgoing-sms', 'outgoing-call',
+))
+
 
 def verify_pin_measurement_registration(text, *, dcs1800=False):
     # Passing DCS/no-PIN uses the early type-55 scan, not GSM's later type 57.
@@ -128,19 +137,16 @@ def main():
     parser.add_argument('--pin-start', type=float,
                         help='supported PIN fixture physical entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
-                        help='test registration or supported no-PIN scenarios on DCS1800 carriers 823/824')
+                        help='test supported scenarios on DCS1800 carriers 823/824; late-PIN recovery remains unproved')
     args = parser.parse_args()
     if args.pin_start is not None and (
-            not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms', 'idle-state', 'call-state', 'sms-state', 'phonebook') or
+            not args.pin_enabled or args.scenario not in PIN_SCENARIOS or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires a supported PIN fixture and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'host-incoming-sms', 'outgoing-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'call-state', 'phonebook') or
-                        (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms', 'idle-state', 'call-state', 'sms-state', 'phonebook') and args.pin_enabled)):
-        parser.error('--dcs1800 requires registration, incoming-call or a supported no-PIN scenario')
-    if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
-                                                 'host-incoming-sms', 'host-outgoing-call',
-                                                 'host-outgoing-sms', 'phonebook',
-                                                 'idle-state', 'call-state', 'sms-state', 'incoming-call'):
+    if args.dcs1800 and (args.scenario not in DCS_SCENARIOS or
+                        (args.scenario not in PIN_SCENARIOS and args.pin_enabled)):
+        parser.error('--dcs1800 requires a supported DCS fixture and PIN combination')
+    if args.pin_enabled and args.scenario not in PIN_SCENARIOS:
         parser.error('--pin-enabled requires registration or a supported host service')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()

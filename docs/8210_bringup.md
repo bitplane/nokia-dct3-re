@@ -409,36 +409,26 @@ Successful checks produce `acceptance.json`, console/log evidence and
 captures. Existing directories are refused. The normal machine remains
 unchanged; native DSP completion and speech are explicitly not claimed.
 
-No-PIN host incoming SMS is also verified on DCS823/824:
-`tools/run_noki8210_acceptance.py RUN --scenario host-incoming-sms --dcs1800`.
-`run_8210_dcs_host_sms_01` passes own DCS registration and persisted EF_LOCI,
-host CP/RP acknowledgment, physical Read, SIM read-status persistence and
-the reviewed `hello` body pixels. The host checker requires ARFCN823;
-GSM900's ARFCN4 is not accepted as DCS evidence. PIN-enabled DCS host SMS
-also passes with `--pin-enabled --pin-start 7`
-(`run_8210_early_pin_dcs_host_sms_01`), including correlated measurement,
-VERIFY and registration checks before the SMS lifecycle. This does not
-establish late-PIN recovery: the default eight-second DCS sequence remains
-an unresolved negative control.
-Standard isolated targets are `verify-8210-dcs-host-incoming-sms` and
-`verify-8210-dcs-early-pin-host-incoming-sms`; supply a new `RUN_DIR`.
-No-PIN host outgoing SMS independently passes with
-`tools/run_noki8210_acceptance.py RUN --scenario host-outgoing-sms --dcs1800`
-(`run_8210_dcs_host_outgoing_sms_01`). Physical composition of `A` to
-`5551234`, reviewed success pixels, correlated host decision, CP/RP closure
-and own DCS registration/EF_LOCI are all required. Early-PIN outgoing SMS
-also passes with `--pin-enabled --pin-start 7`
-(`run_8210_early_pin_dcs_host_outgoing_sms_01`), including the correlated
-measurement/VERIFY/registration sequence. Standard targets are
-`verify-8210-dcs-host-outgoing-sms` and
-`verify-8210-dcs-early-pin-host-outgoing-sms`. Neither proves late-PIN
-recovery.
-No-PIN DCS host rejection and timeout are separately accepted by
-`verify-8210-dcs-host-rejected-sms` and `verify-8210-dcs-host-silent-sms`
-(`run_8210_dcs_host_rejected_sms_01`, `run_8210_dcs_host_silent_sms_01`).
-Each requires own DCS registration, correlated host outcome, the distinct
-RP-error or RP-silence protocol closure, reviewed failure-screen pixels and
-physical recovery. These do not establish PIN-enabled failure recovery.
+### DCS Host SMS Acceptance
+
+All four host SMS outcomes pass without PIN and with early physical PIN
+entry (`--pin-enabled --pin-start 7`). Standard targets use prefix
+`verify-8210-dcs-`; supply a new `RUN_DIR` for each:
+
+| Outcome | No-PIN Suffix | Early-PIN Suffix | Additional Required Evidence |
+| --- | --- | --- | --- |
+| Incoming | `host-incoming-sms` | `early-pin-host-incoming-sms` | Physical Read, SIM read-status persistence, reviewed `hello` pixels |
+| Submitted | `host-outgoing-sms` | `early-pin-host-outgoing-sms` | Physical `A` to `5551234`, reviewed success pixels |
+| Rejected | `host-rejected-sms` | `early-pin-host-rejected-sms` | RP error, reviewed failure pixels, physical recovery |
+| Timed out | `host-silent-sms` | `early-pin-host-silent-sms` | RP silence/timeout closure, distinct failure pixels, physical recovery |
+
+Each requires own DCS registration, persisted EF_LOCI, correlated host
+outcome and firmware CP/RP closure. ARFCN4 cannot satisfy DCS823 checks.
+PIN fixtures additionally require the correlated measurement/VERIFY/registration
+sequence. Fresh authenticated failure evidence is
+`run_8210_early_pin_dcs_rejected_sms_01` and
+`run_8210_early_pin_dcs_silent_sms_01`. The default eight-second PIN sequence
+remains a failing negative control; these gates do not establish its recovery.
 
 The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,

@@ -124,15 +124,16 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                     self.assertRaisesRegex(RuntimeError, 'admitted'):
                 runner.main()
 
-    def test_dcs_host_sms_failure_scenarios_admitted_without_pin(self):
+    def test_dcs_host_sms_failure_scenarios_admit_early_pin(self):
         for scenario in ('host-rejected-sms', 'host-silent-sms'):
-            with self.subTest(scenario=scenario), \
-                    patch('sys.argv', ['runner', 'unused', '--dcs1800',
-                                       '--scenario', scenario]), \
-                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
-                    patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
-                    self.assertRaisesRegex(RuntimeError, 'admitted'):
-                runner.main()
+            for options in ([], ['--pin-enabled', '--pin-start', '7']):
+                with self.subTest(scenario=scenario, options=options), \
+                        patch('sys.argv', ['runner', 'unused', '--dcs1800',
+                                           '--scenario', scenario] + options), \
+                        patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                        patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                        self.assertRaisesRegex(RuntimeError, 'admitted'):
+                    runner.main()
 
     def test_dcs_idle_state_admitted_without_pin(self):
         with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'idle-state']), \
