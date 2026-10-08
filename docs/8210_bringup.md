@@ -725,6 +725,13 @@ verified GSM900 PIN lifecycle, no later type-57 request is emitted and no
 Location Updating acceptance follows. The strict runner rejects this run;
 the early-scan/PIN lifecycle must be understood before authenticated DCS
 coverage can be claimed. No response, firmware state or timer is forced.
+Continuous carrier-823 SI1/2/3/4 and paging packets remain present after PIN,
+excluding a one-shot-broadcast explanation. Passive completion observation
+finds the same context `00113264`, selector `03` and zero word at `+4` in
+both GSM900 and DCS1800 runs. Both therefore select parser `28755e`, not
+alternate `287664`; parser selection alone does not explain the divergence.
+The next boundary is the selected-cell lifecycle spanning SIM acceptance,
+not a missing measurement envelope or missing periodic SI transmission.
 
 ## Evidence needed to resume
 

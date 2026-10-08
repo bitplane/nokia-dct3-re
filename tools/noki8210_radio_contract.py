@@ -28,6 +28,13 @@ def verify(image):
         raise ValueError('own task-12 measurement completion differs')
     if instructions(0x2a2260, 4) != [('bl', '#0x28755e')]:
         raise ValueError('own measurement parser differs')
+    if instructions(0x2a2258, 8) != [
+            ('ldr', 'r2, [r0, #4]'), ('cmp', 'r2, #0'),
+            ('bne', '#0x2a2266'), ('ldrb', 'r0, [r0]')]:
+        raise ValueError('measurement parser context selector differs')
+    if instructions(0x2a2266, 8) != [
+            ('ldrb', 'r0, [r0]'), ('bl', '#0x287664'), ('pop', '{pc}')]:
+        raise ValueError('alternate measurement parser differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

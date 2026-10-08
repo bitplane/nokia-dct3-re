@@ -18,6 +18,13 @@ if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
             if cpu.state['PC'].value ~= 0x2a2250 then return end
             machine:logerror(string.format('8210_pin_measurement_completion: message=%08x t=%.6f\n',
                 cpu.state['R0'].value, machine.time:as_double()))
+            -- Own completion selects its parser using context +4, not band alone.
+            local context = memory:read_u32(memory:read_u32(0x2a2294))
+            if context >= 0x100000 and context < 0x17fff8 then
+                machine:logerror(string.format('8210_pin_measurement_context: address=%08x selector=%02x alternate=%08x t=%.6f\n',
+                    context, memory:read_u8(context), memory:read_u32(context + 4),
+                    machine.time:as_double()))
+            end
         end)
 end
 local sequence = {
