@@ -25,6 +25,16 @@ REMOTE = 'state changed to CONFIRMED\nRequest msg BYE/\n'
 
 
 class SipRestoreCheckTest(unittest.TestCase):
+    def test_8210_requires_own_decoded_physical_answer(self):
+        prefix = ('8210_incoming_physical: action=Call / Send\n'
+                  '8210_keypad_decoded: key=0e\n'
+                  'GSM service uplink sapi=0 pd=03 message=07 length=2\n')
+        self.check(log=prefix + LOG, product='8210')
+        for wrong in (LOG, prefix.replace('key=0e', 'key=0f') + LOG,
+                      LOG + prefix):
+            with self.assertRaises(RuntimeError):
+                self.check(log=wrong, product='8210')
+
     def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, phase='connected', product='3210'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 566 gates: 388 generated from typed steps, 178 copied verbatim (shell).
+# 567 gates: 388 generated from typed steps, 179 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -51,8 +51,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-sip-outgoing-unavailable verify-8210-sip-outgoing-media \
 	verify-8210-sip-outgoing-waveform verify-8210-sip-incoming-media \
 	verify-8210-sip-incoming-waveform verify-8210-sip-outgoing-restore \
-	verify-8210-sip-pending-outgoing-restore verify-8210-sip-cancel \
-	verify-6250-sip-idle-restore verify-6250-sip-cancel \
+	verify-8210-sip-pending-outgoing-restore verify-8210-sip-incoming-restore \
+	verify-8210-sip-cancel verify-6250-sip-idle-restore verify-6250-sip-cancel \
 	verify-6250-sip-outgoing-busy verify-6250-sip-outgoing-unavailable \
 	verify-6210-power-cycle verify-8890-power-off-restore verify-8890-cold-clock \
 	verify-8890-power-cycle verify-8850-sip-idle-restore \
@@ -417,6 +417,11 @@ verify-8210-sip-outgoing-restore: build
 verify-8210-sip-pending-outgoing-restore: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --outgoing-media --restore-outgoing --restore-outgoing-phase alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP; physical incoming Answer, exact NSM-3 architecture restore, SIP BYE and fresh-epoch clearing without dialog replay
+verify-8210-sip-incoming-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --incoming-media --restore-incoming --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 # shell: optional PJSIP stack; labelled acquired base-record comparison, coherent ARFCN4 cell and unanswered call
 verify-8210-sip-cancel: build

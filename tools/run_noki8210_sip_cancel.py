@@ -104,6 +104,7 @@ def main():
     parser.add_argument('--restore-outgoing', action='store_true',
                         help='save/load the outgoing handset in the selected phase, closing SIP without redial')
     parser.add_argument('--restore-outgoing-phase', choices=('connected', 'alerting'), default='connected')
+    parser.add_argument('--restore-incoming', action='store_true')
     outgoing = parser.add_mutually_exclusive_group()
     outgoing.add_argument('--incoming-media', action='store_true',
                           help='answer a fresh real SIP call using physical Send/End and validate HLE media transport')
@@ -124,6 +125,8 @@ def main():
         parser.error('--restore-outgoing requires --outgoing-media without recording or idle restore')
     if args.restore_outgoing_phase != 'connected' and not args.restore_outgoing:
         parser.error('--restore-outgoing-phase requires --restore-outgoing')
+    if args.restore_incoming and (not args.incoming_media or args.restore_idle or args.record_media or args.restore_outgoing):
+        parser.error('--restore-incoming requires --incoming-media without other restoration or recording')
     outgoing_call = args.outgoing_busy or args.outgoing_unavailable or args.outgoing_media
     if args.restore_idle and outgoing_call:
         parser.error('--restore-idle cannot be combined with an outgoing call')
@@ -139,6 +142,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki8210_sip_outgoing_restore.lua' if args.restore_outgoing else
+                       'noki8210_sip_incoming_restore.lua' if args.restore_incoming else
                        'noki8210_outgoing_call_input.lua' if outgoing_call else
                        'noki8210_sip_answer_input.lua' if args.incoming_media else
                        'noki8210_sip_idle_restore.lua' if args.restore_idle else
@@ -152,6 +156,7 @@ def main():
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8210',
                    *(['--restore-outgoing'] if args.restore_outgoing else []),
+                   *(['--restore-call'] if args.restore_incoming else []),
                    *(['--record-media'] if args.record_media else []),
                    *(['--sip-response', '180' if args.restore_outgoing and args.restore_outgoing_phase == 'alerting' else
                        '200' if args.outgoing_media else '480' if args.outgoing_unavailable else '486'] if outgoing_call else
@@ -163,13 +168,14 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if args.restore_outgoing:
+        if args.restore_outgoing or args.restore_incoming:
             text = (run / 'error.log').read_text(errors='replace')
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             verify_stage(text, runtime=True, selftest=True, base_record=True)
             verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(), configured_carrier=True)
-            if 'state_roundtrip: result=pass scenario=8210_call' not in text:
+            scenario = 'incoming_call' if args.restore_incoming else 'call'
+            if f'state_roundtrip: result=pass scenario=8210_{scenario}' not in text:
                 raise ValueError('connected handset architecture did not restore exactly')
         elif args.incoming_media:
             from tools.noki8210_incoming_call_check import verify, check_frames as incoming_frames
@@ -185,7 +191,8 @@ def main():
         else:
             check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsm3hle', 'scenario': (f'outgoing-sip-{args.restore_outgoing_phase}-restore' if args.restore_outgoing else
+            'machine': 'nsm3hle', 'scenario': ('incoming-sip-connected-restore' if args.restore_incoming else
+                                             f'outgoing-sip-{args.restore_outgoing_phase}-restore' if args.restore_outgoing else
                                              'incoming-sip-hle-media' if args.incoming_media else
                                              'outgoing-sip-hle-media' if args.outgoing_media else
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else
@@ -193,18 +200,20 @@ def main():
             'mcu_sha1': MCU_SHA1, 'acquired_pmm_sha256': PMM_SHA256,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
-            'hle_media_transport_tested': (args.outgoing_media or args.incoming_media) and not args.restore_outgoing,
+            'hle_media_transport_tested': (args.outgoing_media or args.incoming_media) and not (args.restore_outgoing or args.restore_incoming),
             'media_recorded': args.record_media,
             'factory_provisioning_validated': False,
             'laboratory_carrier': 4,
             'idle_restored': args.restore_idle,
             'outgoing_restored': args.restore_outgoing,
+            'incoming_restored': args.restore_incoming,
             'outgoing_restore_phase': args.restore_outgoing_phase if args.restore_outgoing else None,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8210 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('8210 real SIP ' + ('outgoing restoration' if args.restore_outgoing else
+    print('8210 real SIP ' + ('incoming restoration' if args.restore_incoming else
+                             'outgoing restoration' if args.restore_outgoing else
                              'HLE media transport' if args.outgoing_media or args.incoming_media else 'signaling') +
           ' PASS; base-record comparison, no native or non-silent speech acceptance')
 

@@ -24,6 +24,17 @@ class OutgoingBusyTest(unittest.TestCase):
             self.assertIn('requires --restore-outgoing', errors.getvalue())
             prepare.assert_not_called()
 
+    def test_incoming_restore_cannot_use_outgoing_fixture(self):
+        with patch('sys.argv', ['run_noki8210_sip_cancel.py', '/tmp/unused-8210-run',
+                               '--pjsua', '/tmp/unused-pjsua', '--outgoing-media',
+                               '--restore-incoming']), patch.object(check, 'prepare_run') as prepare, \
+                contextlib.redirect_stderr(io.StringIO()) as errors:
+            with self.assertRaises(SystemExit) as failure:
+                check.main()
+            self.assertEqual(failure.exception.code, 2)
+            self.assertIn('requires --incoming-media', errors.getvalue())
+            prepare.assert_not_called()
+
     def test_own_carrier_send_and_reviewed_presentation(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

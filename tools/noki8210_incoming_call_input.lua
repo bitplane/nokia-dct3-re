@@ -19,6 +19,7 @@ local input = coroutine.create(function()
         if not emu.wait(7.85) then return end
         machine.screens[':screen']:snapshot(index == 1 and
             '8210_incoming_connected.png' or '8210_after_incoming_call.png')
+        if index == 1 and _G.noki8210_incoming_hold then return end
     end
 end)
 _G.noki8210_incoming_call_input = input

@@ -3,11 +3,14 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 _G.noki8210_security_only = true
 local call = _G.noki8210_state_call == true
+local incoming = _G.noki8210_state_incoming == true
 local sms = _G.noki8210_state_sms == true
-local scenario = sms and 'sms' or call and 'call' or 'idle'
+local scenario = incoming and 'incoming_call' or sms and 'sms' or call and 'call' or 'idle'
 _G.noki8210_call_hold = call
+_G.noki8210_incoming_hold = incoming
 dofile(directory ..
-    (call and 'noki8210_outgoing_call_input.lua' or 'noki8210_security_input.lua'))
+    (incoming and 'noki8210_incoming_call_input.lua' or
+     call and 'noki8210_outgoing_call_input.lua' or 'noki8210_security_input.lua'))
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local memory = cpu.spaces['program']
@@ -47,7 +50,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
             completed = true
             return
         end
-        if call then
+        if call or incoming then
             assert(emu.wait(2))
             local key = assert(machine.ioport.ports[':COL.0'].fields['End'])
             machine:logerror('8210_call_physical: action=end\n')
@@ -72,7 +75,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(replay))
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(sms and 21 or call and 34 or 32))
+    assert(emu.wait(incoming and 42 or sms and 21 or call and 34 or 32))
     machine:save('8210_' .. scenario)
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

@@ -440,7 +440,12 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
             re.search(r'termination id=1 .*result=rejected', log)):
         raise RuntimeError('restoration did not clear the handset call exactly once')
     cursor = 0
-    for pattern in (
+    physical_answer = (
+        r'8210_incoming_physical: action=Call / Send',
+        r'8210_keypad_decoded: key=0e\b',
+        r'GSM service uplink sapi=0 pd=03 message=07 length=2',
+    ) if product == '8210' and phase == 'connected' else ()
+    for pattern in physical_answer + (
             rf'incoming state id=1 epoch=1 phase={phase}',
             r'sip_state: saved', r'sip_state: restored',
             r'termination id=1 cause=41 result=accepted',
@@ -538,9 +543,12 @@ def main():
     nsm3_restore = (args.product == '8210' and not args.incoming and
                     args.restore_outgoing and args.sip_response in (180, 200) and
                     not args.record_media and not args.restore_call and not args.restore_idle)
-    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm3_restore and
+    nsm3_incoming_restore = (args.product == '8210' and args.incoming and
+                            args.restore_call and not args.cancel_incoming and
+                            not args.record_media and not args.restore_outgoing and not args.restore_idle)
+    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm3_restore and not nsm3_incoming_restore and
             (not args.incoming or not args.cancel_incoming)) or
-            (args.record_media and not nsm3_media) or args.restore_call or args.restore_idle or (args.restore_outgoing and not nsm3_restore)):
+            (args.record_media and not nsm3_media) or (args.restore_call and not nsm3_incoming_restore) or args.restore_idle or (args.restore_outgoing and not nsm3_restore)):
         parser.error(f'{args.product} requires unanswered incoming CANCEL or outgoing 480/486; media is unproved')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
