@@ -38,6 +38,11 @@ Location Updating/release/paging and persistent SIM location. Its older
 default-cell call/SMS tests remain bounded signaling comparisons because
 MCU carrier 19 and host carrier 1 do not agree. This new registration proof
 does not automatically promote those downstream lifecycles or native speech.
+Separate `verify-6250-coherent-host-incoming-call` and
+`verify-6250-coherent-host-outgoing-call` now establish both physical call
+directions, exact configured traffic/release words, host identity correlation
+and reviewed caller/digits/connected/idle pixels on carrier 19. SMS, SIP and
+native speech do not inherit that promotion.
 
 The levels are cumulative:
 

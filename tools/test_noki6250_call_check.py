@@ -1,9 +1,11 @@
 import unittest
+import tempfile
 from pathlib import Path
 import sys
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.noki6250_call_check import verify, verify_outgoing
+from tools.noki6250_call_check import verify, verify_outgoing, check_frames
 
 
 # Compact protocol transcript from the reviewed NHM-3 run; timing is omitted.
@@ -29,6 +31,28 @@ RX enqueue type=80 payload=34 data=600000000a4d000100001506210001f0
 
 
 class CallCheckTests(unittest.TestCase):
+    def test_configured_carrier_requires_exact_traffic_and_release(self):
+        configured = TRACE.replace('GSM service uplink sapi=0 pd=06 message=29',
+            'TX packet type=02 payload=20 radio_phase=traffic_channel_change '
+            'data=041202000271012fc10000130000000400000000\n'
+            'GSM service uplink sapi=0 pd=06 message=29').replace(
+            'TX packet type=02 radio_phase=release_channel_change data=040000',
+            'TX packet type=02 payload=20 radio_phase=release_channel_change data=041202')
+        verify(configured, configured_carrier=True)
+        for text in (TRACE, configured.replace('001300000004', '000100000004'),
+                     configured.replace('041202001117', '040000001117')):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                verify(text, configured_carrier=True)
+
+    def test_blank_or_wrong_geometry_frame_is_not_call_ui(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            for geometry in ((96, 60), (84, 48)):
+                Image.new('L', geometry, 255).save(path / '6250_call_1.png')
+                for outgoing_call in (False, True):
+                    with self.subTest(geometry=geometry, outgoing=outgoing_call), self.assertRaises(ValueError):
+                        check_frames(path, outgoing_call=outgoing_call)
+
     def test_incoming_trace_is_not_outgoing_proof(self):
         with self.assertRaises(ValueError):
             verify_outgoing(TRACE)

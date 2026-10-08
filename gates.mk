@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 441 gates: 283 generated from typed steps, 158 copied verbatim (shell).
+# 443 gates: 285 generated from typed steps, 158 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -288,6 +288,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-incoming-call-sip-cancel \
 	verify-radio-incoming-call-sip-cancel verify-radio-outgoing-call-sip-busy \
 	verify-8210-power-cycle verify-6250-coherent-registration \
+	verify-6250-coherent-host-incoming-call \
+	verify-6250-coherent-host-outgoing-call \
 	verify-radio-outgoing-call-sip-unavailable
 
 verify-8210-host-incoming-call: build
@@ -4030,6 +4032,12 @@ verify-8210-power-cycle: build
 
 verify-6250-coherent-registration: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario coherent-registration --mame $(MAME_DIR)/mame
+
+verify-6250-coherent-host-incoming-call: build
+	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-incoming-call --coherent-cell --mame $(MAME_DIR)/mame
+
+verify-6250-coherent-host-outgoing-call: build
+	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-outgoing-call --coherent-cell --mame $(MAME_DIR)/mame
 
 verify-radio-outgoing-call-sip-unavailable:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 480'

@@ -49,8 +49,9 @@ report `registered=1 arfcn=19`, and SIM NVRAM must contain laboratory LAI
 The older default-cell runs receive SCH for carrier 19 and publish zero-header
 candidate/release words while the host network reports carrier 1. Their
 signaling/UI evidence remains useful, but cannot be promoted to coherent RF
-selection. Call/SMS and SIP acceptance on the new configured cell require
-independent runs; native DSP, physical RF and speech are not established by
+selection. The coherent host-call gates below independently validate both
+call directions; SMS and SIP acceptance on the new configured cell still
+require independent runs. Native DSP, physical RF and speech are not established by
 this registration gate.
 
 ### Remaining goal boundary
@@ -148,6 +149,27 @@ connection and release grammar. Wrong request ID and duplicate decisions are
 rejected; one correlated connect is accepted and connected/ended phases are
 required. The initial-record PMM comparison remains explicit, and neither
 native DSP nor speech is established by this signaling test.
+
+### Coherent Host Calls
+
+`verify-6250-coherent-host-incoming-call` and
+`verify-6250-coherent-host-outgoing-call` run those physical workflows with
+`--coherent-cell` and the explicit ARFCN19/20 fixture. Each independently
+requires the own native-upload/HLE and compact self-test contract, exact
+configured SCH/candidate/release, host registration on carrier 19 and durable
+SIM location. Call traffic is exactly
+`041202000271012fc10000130000000400000000`; release is exactly
+`041202001117001a600000130000001400000001`. Legacy zero-header payloads do not
+satisfy the configured-cell matcher.
+
+Incoming caller `5551234`, physical Answer, connected Call 1 and physical End
+back to operator idle are checked. Outgoing physical `123`, Send, a correlated
+host connection and physical End are independently checked; wrong request ID
+and duplicate decisions remain rejected. Reviewed 96x60 caller/digits,
+connected-call and operator-idle crops are mandatory. The interim outgoing
+Calling screen is not mistaken for the connected frame. These are host-backed
+CC/RR signaling and presentation tests, not speech, native DSP, factory PMM
+provisioning or answered SIP evidence.
 
 ### Host SMS Acceptance
 

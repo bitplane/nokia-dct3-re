@@ -37,7 +37,11 @@ def main():
     parser.add_argument("--rompath", type=Path,
                         help="directory containing acquired noki6250 ROM members")
     parser.add_argument("--port", type=int, default=16250)
+    parser.add_argument('--coherent-cell', action='store_true',
+                        help='use explicit ARFCN19/20 network and require carrier coherence')
     args = parser.parse_args()
+    if args.coherent_cell and args.scenario not in ('host-incoming-call', 'host-outgoing-call'):
+        parser.error('coherent-cell downstream coverage currently requires a host call scenario')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
@@ -88,7 +92,7 @@ def main():
             ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
                           mask="1", defvalue="0", value="1")
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
-        if args.scenario == 'coherent-registration':
+        if args.scenario == 'coherent-registration' or args.coherent_cell:
             shutil.copyfile(root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg', run / 'cfg/nhm3hle.cfg')
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
@@ -163,7 +167,7 @@ def main():
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
-            "laboratory_carrier": 19 if args.scenario == 'coherent-registration' else None,
+            "laboratory_carrier": 19 if args.scenario == 'coherent-registration' or args.coherent_cell else None,
             "shared_rom_audit_members": audit_members,
             "accessory_contract": accessory_contract,
             "host_command": host_command,
@@ -176,6 +180,8 @@ def main():
                        str(run / "error.log")]
             if args.scenario in ("outgoing-call", "host-outgoing-call"):
                 checker.extend(["--outgoing", "--number", "123"])
+            if args.coherent_cell:
+                checker.extend(['--configured-carrier', '--frames', str(run / 'snap')])
         elif args.scenario in ("idle-state", "call-state", "sms-state"):
             checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
                        str(run / "error.log"), str(run / "snap")]
@@ -220,6 +226,10 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        if args.coherent_cell:
+            from tools.noki6250_coherent_registration_check import verify as check_coherent
+            check_coherent((run / 'error.log').read_text(errors='replace'),
+                           (run / 'nvram/nhm3hle/sim_card').read_bytes())
         if args.scenario == "accessory":
             subprocess.run([sys.executable, str(root / 'tools/noki6250_accessory_check.py'),
                             str(run / 'error.log'), str(run / 'snap/6250_runtime20.png')], check=True)
