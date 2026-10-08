@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -35,7 +36,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('product', choices=PROFILES)
     parser.add_argument('run_directory', type=Path)
-    parser.add_argument('--service', choices=('ussd', 'divert'), required=True)
+    parser.add_argument('--service', choices=('ussd', 'divert', 'toolkit'), required=True)
     parser.add_argument('--mame', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -43,25 +44,34 @@ def main():
     profile = PROFILES[args.product]
     machine = profile[0]
     try:
+        if args.service == 'toolkit' and args.product != '8850':
+            raise ValueError('Toolkit acceptance is not yet established for this product')
         roms = root / f'roms/noki{args.product}'
         verify_inputs(args.product, (roms / profile[1]).read_bytes(),
                       (roms / profile[3]).read_bytes())
         run.mkdir(parents=True, exist_ok=False)
         for directory in ('cfg', 'nvram', 'snap'):
             (run / directory).mkdir()
+        if args.service == 'toolkit':
+            config = ET.Element('mameconfig', version='10')
+            inputs = ET.SubElement(ET.SubElement(config, 'system', name=machine), 'input')
+            ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
+                          mask='15', defvalue='0', value='1')
+            ET.ElementTree(config).write(run / f'cfg/{machine}.cfg')
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / f'tools/noki{args.product}_{args.service}_input.lua'),
-                   '-seconds_to_run', str(profile[6 if args.service == 'ussd' else 7])]
+                   '-seconds_to_run', str(43 if args.service == 'toolkit' else
+                                          profile[6 if args.service == 'ussd' else 7])]
         with (run / 'console.log').open('w') as console:
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         if args.service == 'divert':
             checker = [sys.executable, str(root / 'tools/noki8xxx_divert_check.py'), args.product, str(run)]
         else:
-            checker = [sys.executable, str(root / f'tools/noki{args.product}_ussd_check.py'), str(run)]
+            checker = [sys.executable, str(root / f'tools/noki{args.product}_{args.service}_check.py'), str(run)]
         subprocess.run(checker, check=True)
         (run / 'acceptance.json').write_text(json.dumps({
             'product': args.product, 'machine': machine, 'service': args.service,

@@ -1805,6 +1805,18 @@ files in the product ROM directory. Their presence is a run prerequisite,
 not evidence of a product-matched resident ROM6 mask; do not substitute
 another product's MCU, PMM or NVRAM to satisfy this fixture.
 
+`verify-8850-sim-toolkit` separately selects the card-owned Phase 2+
+DISPLAY TEXT profile in fresh configuration. The own firmware reads
+EF_PHASE=3, sends a nine-byte TERMINAL PROFILE, receives STATUS `91 16`
+and issues FETCH `A0 12 00 00 16`. The reviewed 84x48 `DCT3 SAT` frame
+has pixel SHA256 `0c609d0fc7f1f59534f7e29ccaa995d441ff52f701b76093661b2458380ff558`.
+A physical Menu/OK press produces TERMINAL RESPONSE
+`810301218002028281030100` and `90 00`, followed by the independently
+reviewed numeric-PLMN registered idle frame. The gate also requires own
+NSM-2 laboratory registration and persisted EF_LOCI. This establishes
+DISPLAY TEXT only, not other proactive commands, native DSP execution,
+or inherited 8890 Toolkit support. Acquired MCU/PMM bytes are unchanged.
+
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first
 text: the eight-second sample precedes it. `--display-transfer` checks the

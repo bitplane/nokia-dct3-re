@@ -311,6 +311,12 @@ It does not restore an external dialog or establish media by itself. The
 separate connected/alerting incoming and connected/pending outgoing restore
 gates validate invalidation and one fresh-epoch GSM release, not dialog replay.
 
+The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
+its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,
+successful TERMINAL RESPONSE, reviewed 84x48 result/registered-idle frames
+and persisted EF_LOCI. Other proactive commands, 8890 Toolkit and native
+DSP execution are not established by this gate.
+
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other
