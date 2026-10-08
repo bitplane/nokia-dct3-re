@@ -1973,8 +1973,11 @@ decoder. The core now applies SXM to the memory source, shifts by TS, and
 charges one DARAM cycle (plus the existing long-offset/absolute surcharge).
 Fixture-only `0483` and `0d83` check positive TS with ADD/SUB carry behavior;
 `1583` reproduces TI's signed `LD *AR1,TS,B` example using `fedc` shifted by
-eight; `1483` checks arithmetic right shift for TS=-1. These do not establish
-out-of-range TS values or memory wait states.
+eight; `1483` checks arithmetic right shift for TS=-1. Exact `0583` additionally
+checks B-destination ADD with SXM, TS=-1 encoded in `T=abff`, unchanged A,
+T and AR3, and one-cycle arithmetic. This guards sign fill and ignoring T's
+upper ten bits independently of the load variant. These fixtures do not
+establish out-of-range TS values or memory wait states.
 SPRU172C's adjacent `ADD/SUB Xmem,SHFT` diagrams assign `90xx/91xx` and
 `92xx/93xx` to the single-X dual-address forms. The core now reads Xmem,
 applies SXM and the four-bit left shift, updates the selected accumulator and

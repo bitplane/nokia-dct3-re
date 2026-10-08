@@ -13755,8 +13755,32 @@ private:
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ADD Smem,TS uses T low six bits and costs one cycle");
-			program.write_word(0x05e2, 0x0d83); // SUB *AR3,TS,B.
+			program.write_word(0x05e2, 0x0583); // ADD *AR3,TS,B.
+			data.write_word(0x0200, 0x8001);
 			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0xabff); // Low six bits encode -1.
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 7031;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 7031)
+		{
+			expect_opcode(0x0583,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xc000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xabff &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ADD Smem,TS,B sign-fills negative shifts, ignores upper T bits and preserves A");
+			program.write_word(0x05e2, 0x0d83); // SUB *AR3,TS,B.
+			data.write_word(0x0200, 0x0100);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 4);
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1000);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
