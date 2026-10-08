@@ -229,7 +229,8 @@ local sequence = {
 }
 local input = coroutine.create(function()
     if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
-        if not emu.wait(8) then return end
+        local start = tonumber(os.getenv('NOKIA_DCT3_8210_PIN_START')) or 8
+        if not emu.wait(start) then return end
         machine.screens[':screen']:snapshot('8210_pin_prompt.png')
         for _, item in ipairs({{2, 'Keypad 1'}, {3, 'Keypad 2'},
                                {4, 'Keypad 3'}, {2, 'Keypad 4'}, {1, 'Menu'}}) do

@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -105,9 +106,15 @@ def main():
     parser.add_argument('--port', type=int, default=18991)
     parser.add_argument('--pin-enabled', action='store_true',
                         help='test SIM PIN followed by phone security and registration')
+    parser.add_argument('--pin-start', type=float,
+                        help='registration-only physical PIN entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
                         help='test registration on explicit DCS1800 carriers 823/824')
     args = parser.parse_args()
+    if args.pin_start is not None and (
+            not args.pin_enabled or args.scenario != 'registration' or
+            not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
+        parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
     if args.dcs1800 and args.scenario != 'registration':
         parser.error('--dcs1800 currently requires the registration scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
@@ -140,8 +147,11 @@ def main():
             configure_pin_topology(run / 'cfg/nsm3hle.cfg')
         environment = os.environ.copy()
         environment.pop('NOKIA_DCT3_8210_PIN_ENTRY', None)
+        environment.pop('NOKIA_DCT3_8210_PIN_START', None)
         if args.pin_enabled:
             environment['NOKIA_DCT3_8210_PIN_ENTRY'] = '1'
+            if args.pin_start is not None:
+                environment['NOKIA_DCT3_8210_PIN_START'] = str(args.pin_start)
         script, seconds, checker = SCENARIOS[args.scenario]
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsm3hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -265,6 +275,8 @@ def main():
             'native_dsp_complete': False, 'speech_tested': False,
             'laboratory_carrier': 823 if args.dcs1800 else 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' or args.pin_enabled else None,
             'sim_profile': 'PIN-enabled laboratory card' if args.pin_enabled else 'default laboratory card',
+            'pin_start_seconds': (args.pin_start if args.pin_start is not None else 8)
+                if args.pin_enabled else None,
             'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')

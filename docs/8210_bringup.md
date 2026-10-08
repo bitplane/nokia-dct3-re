@@ -718,7 +718,8 @@ Location Updating request (GSM900 uses `33`). Acceptance requires the ordered
 Location Updating/release sequence, carrier-823 paging and updated EF_LOCI.
 Calls, SMS, media and native DSP on this band are not promoted.
 
-**Current frontier:** authenticated DCS does not register. The passing
+**Current frontier:** DCS with physical PIN entry starting at eight seconds
+does not register; entry starting at seven seconds does. The passing
 no-PIN DCS control also lacks `07f0`, `1587` and type 57: none is a universal
 DCS prerequisite. It receives `03ec` before serving-channel completion;
 PIN DCS receives it afterwards. At completion, the passing control has
@@ -858,6 +859,26 @@ or 2 when promoting a replacement. That result controls the state-5 tail
 through `2a1484`. Gate byte `13721e` is `05` in both runs, excluding a
 different value of that gate as the explanation. The remaining question is
 how the late `03ec` should settle the already-completed initial request.
+
+### Physical-input ordering control
+
+`run_8210_pin_dcs_early_valid_01` passes the strict PIN and full DCS
+registration/release/paging/EF_LOCI checks with `--pin-start 7`. Its captured
+screen shows the PIN editor before the first key; VERIFY returns `9000`.
+At 12.262178 seconds, `2a0dc8` has queued `03ec`, and the publisher selects
+it at 12.550787; Location Updating is accepted at 12.890599. The MCU,
+PMM, card contents, radio peer and radio timing are unchanged. This proves
+an authenticated DCS path, not timing-independent PIN support: the default
+eight-second fixture remains failing and is not replaced by the favorable
+control. A four-second attempt captured a blank pre-editor screen and
+VERIFY `9804`; it is not evidence about registration recovery.
+
+Reproduce the valid control with
+`tools/run_noki8210_acceptance.py RUN --pin-enabled --dcs1800 --pin-start 7`.
+The option affects physical input only, is restricted to PIN registration,
+and is recorded in successful run manifests. Next decode recovery when
+`03ec` arrives after the serving acknowledgement, rather than adjust peer
+latency or choose an earlier default input.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

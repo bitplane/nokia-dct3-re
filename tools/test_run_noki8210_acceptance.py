@@ -9,6 +9,20 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_pin_start_requires_bounded_physical_registration_fixture(self):
+        for options in (['--pin-start', '4'],
+                        ['--pin-enabled', '--pin-start', 'nan'],
+                        ['--pin-enabled', '--pin-start', '2'],
+                        ['--pin-enabled', '--pin-start', '21'],
+                        ['--pin-enabled', '--pin-start', '4', '--scenario', 'phonebook']):
+            with self.subTest(options=options), \
+                    patch('sys.argv', ['runner', 'unused'] + options), \
+                    patch('sys.stderr', new_callable=io.StringIO), \
+                    patch.object(runner, 'prepare_run') as prepare, \
+                    self.assertRaises(SystemExit):
+                runner.main()
+            prepare.assert_not_called()
+
     def test_pin_measurement_contract_is_band_specific_and_requires_registration(self):
         for dcs, request, carrier in ((False, '57', '0004'), (True, '55', '0337')):
             text = (f'TX packet type={request} payload=4 data=03050000\n'
@@ -29,7 +43,7 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                         dcs1800=dcs)
 
     def test_dcs_registration_admitted_with_or_without_pin(self):
-        for options in ([], ['--pin-enabled']):
+        for options in ([], ['--pin-enabled'], ['--pin-enabled', '--pin-start', '7']):
             with patch('sys.argv', ['runner', 'unused', '--dcs1800'] + options), \
                     patch.object(runner.Path, 'read_bytes', return_value=b''), \
                     patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
