@@ -433,6 +433,14 @@ comparison, real CANCEL/487, zero-media and physical notification-dismissal
 requirements. No external call exists in the saved state and this gate does
 not claim restoration of a SIP dialog or native DSP speech.
 
+The separate 8210 host incoming/outgoing call gates verify physical
+Answer/End and dial/Send/End, exact configured-cell traffic/release,
+coherent ARFCN4 registration, request/decision correlation and reviewed UI.
+They use the same labelled base-record comparison and require own native
+uploads before explicit HLE handoff. Answered host signaling is not an
+answered SIP/media acceptance: the 8210 SIP runner remains restricted to
+unanswered CANCEL and no native speech is claimed.
+
 `verify-8850-sip-cancel` independently covers NSM-2 v5.31 research HLE
 with unchanged acquired MCU/PMM. Own physical security input settles the
 registered handset before INVITE at 32 seconds. Acceptance requires the

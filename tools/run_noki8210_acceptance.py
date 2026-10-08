@@ -28,6 +28,7 @@ SCENARIOS = {
     'call-state': ('state_call', 50, 'state_check'),
     'sms-state': ('state_sms', 32, 'state_check'),
     'host-incoming-call': ('host_incoming_input', 60, 'incoming_call_check'),
+    'host-outgoing-call': ('outgoing_call_input', 49, 'outgoing_call_check'),
     'host-incoming-sms': ('incoming_sms_input', 32, 'incoming_sms_check'),
     'host-outgoing-sms': ('outgoing_sms_input', 46, 'outgoing_sms_check'),
     'host-rejected-sms': ('sms_reject_input', 58, 'outgoing_sms_check'),
@@ -39,11 +40,11 @@ MCU_SHA1 = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
 PMM_SHA256 = '31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
 
 
-def check_host_sms_registration(text, storage):
+def check_host_registration(text, storage):
     verify_stage(text, runtime=True, selftest=True, base_record=True)
     verify_registration(text, storage, configured_carrier=True)
     if not re.search(r'gsm_call_adapter: network registered=1 arfcn=4\b', text):
-        raise ValueError('host SMS lacks coherent ARFCN4 registration')
+        raise ValueError('host session lacks coherent ARFCN4 registration')
 
 
 def prepare_run(run, mcu, pmm):
@@ -76,7 +77,7 @@ def main():
             verify_key_table(mcu)
         prepare_run(run, mcu, pmm)
         host_sms = args.scenario.startswith('host-') and args.scenario.endswith('-sms')
-        config = ('noki8210_host_gsm900' if host_sms else 'noki8210_host') if args.scenario.startswith('host-') else {
+        config = 'noki8210_host_gsm900' if args.scenario.startswith('host-') else {
                   'incoming-call': 'radio_incoming_call_answered',
                   'incoming-sms': 'radio_incoming_sms',
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
@@ -99,6 +100,8 @@ def main():
                 'host-incoming-call': ('run_host_incoming_signaling_gate', [
                     '--caller', '5551234', '--ready-file',
                     str(run / 'snap/8210_host_registered_idle.png')]),
+                'host-outgoing-call': ('run_host_call_adapter_gate', [
+                    '--number', '1234567', '--decision', 'connect']),
                 'host-incoming-sms': ('run_host_incoming_sms_gate', []),
                 'host-outgoing-sms': ('run_host_sms_gate', [
                     '--user-data', '41', '--user-data-length', '1']),
@@ -115,7 +118,9 @@ def main():
         check = [sys.executable, str(root / f'tools/noki8210_{checker}.py'), str(run / 'error.log')]
         storage = str(run / 'nvram/nsm3hle/sim_card')
         if args.scenario == 'host-incoming-call':
-            check.extend(['--frames', str(run / 'snap')])
+            check.extend(['--frames', str(run / 'snap'), '--configured-carrier'])
+        elif args.scenario == 'host-outgoing-call':
+            check.extend(['--configured-carrier', '--frames', str(run / 'snap')])
         elif args.scenario == 'host-outgoing-sms':
             check.extend(['--sent-frame', str(run / 'snap/8210_sms_sent.png')])
         elif args.scenario in ('host-rejected-sms', 'host-silent-sms'):
@@ -154,14 +159,17 @@ def main():
             digest = hashlib.sha256(frame.tobytes()).hexdigest()
             if frame.size != (84, 48) or digest != CALCULATOR_SHA256:
                 raise ValueError('calculator result differs from reviewed 15 frame')
-        if host_sms:
+        if args.scenario.startswith('host-'):
             text = (run / 'error.log').read_text(errors='replace')
-            check_host_sms_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
+            check_host_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
+            if args.scenario == 'host-outgoing-call':
+                from tools.radio_host_outgoing_connect_check import verify as check_host_call
+                check_host_call(text, '1234567')
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsm3hle', 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
-            'laboratory_carrier': 4 if host_sms else None,
+            'laboratory_carrier': 4 if args.scenario.startswith('host-') else None,
             'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')

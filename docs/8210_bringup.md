@@ -408,17 +408,34 @@ the independently executed idle, active-call and delivered-message
 restoration set for the research composition; it does not prove save/load
 within an unfinished SMS transaction or native DSP runtime.
 
-`host-incoming-call` uses `fixtures/noki8210_host/nsm3hle.cfg`, which enables
-only the host adapter, not automatic incoming calls. The physical startup
+`verify-8210-host-incoming-call` uses the shared configured GSM900 host
+fixture, not automatic incoming calls. The physical startup
 fixture produces registered idle at 32 seconds; only then does
 `run_host_incoming_signaling_gate.py` queue caller `5551234`. Physical Send
 and End complete the own NSM-3 CC/RR lifecycle. The runner requires matching
 epoch/request identity and all five host phases; handset acceptance also
-requires reviewed caller and post-release `DCT3 LAB` pixels. Run from a new
+requires reviewed caller and post-release `DCT3 LAB` pixels. ARFCN4 SCH,
+candidate/release parameters, host registration and persistent EF_LOCI are
+checked alongside own native uploads, explicit HLE handoff and self-test. The
+exact configured-cell traffic words are
+`041202000271012fc10000040000000400000000`, with teardown
+`041202001117001a600000040000001400000001`. Default-cell call comparisons
+retain their separate words; the two variants cannot satisfy each other's
+matchers. Run from a new
 directory with `run_noki8210_acceptance.py RUN --scenario host-incoming-call`
 (`--port` selects the private HTTP endpoint). The manifest records both MAME
 and host runner commands. This proves external host signaling through the
 research composition, not native speech or external-network calls.
+
+`verify-8210-host-outgoing-call` physically dials `1234567` and Send, then
+requires one correlated host request, rejection of wrong-ID and duplicate
+decisions, one accepted Connect, firmware CC/RR assignment and Connect
+Acknowledge, and physical End followed by complete release. It uses the
+same exact configured-cell traffic grammar and mandatory own-stage,
+registration and persistent-SIM checks. Reviewed dialed-number, Call 1 and
+post-release operator regions prove presentation; the connected/idle crops
+agree with the independent own-product state oracles. Neither host-call
+gate exercises media payloads or proves native speech.
 
 `verify-8210-sip-cancel` separately proves a real local PJSIP INVITE followed
 by caller CANCEL while alerting, 487, exactly one correlated host termination

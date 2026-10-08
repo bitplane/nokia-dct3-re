@@ -123,6 +123,11 @@ ARFCN4 cell: incoming persistent physical Read, outgoing success text,
 RP rejection and silence-timeout recovery each require coherent registration
 and their independent host/handset protocol checks. The invalid acquired
 PMM journal remains excluded only by the labelled base-record comparison.
+Both `verify-8210-host-incoming-call` and `verify-8210-host-outgoing-call`
+also require coherent ARFCN4 registration and exact own traffic/release
+words, physical Answer/End or dial/Send/End, correlated host identities and
+reviewed presentation. These establish bidirectional host call signaling,
+not media or native speech.
 
 The 6210 passes `verify-6210-power-cycle` with unchanged own PMM: physical
 shutdown, blank display, at least eight seconds of retained RTC ticks and
