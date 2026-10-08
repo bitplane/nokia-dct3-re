@@ -6,6 +6,22 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_readiness_context = {}
+    for _, address in ipairs({0x22803e, 0x2280c6, 0x229224}) do
+        _G.nsm3_readiness_context[#_G.nsm3_readiness_context + 1] = memory:install_read_tap(
+            address & ~3, (address & ~3) + 3, 'nsm3_readiness_context_' .. address,
+            function(offset, value, mask)
+                if cpu.state['PC'].value ~= address then return end
+                local context = cpu.state['R4'].value
+                if context < 0x100000 or context >= 0x17ff80 then return end
+                machine:logerror(string.format('8210_readiness_context: pc=%08x context=%08x caller=%08x b0a=%02x b11=%02x b19=%02x w30=%08x w5c=%08x w60=%08x t=%.6f\n',
+                    address, context, cpu.state['R14'].value,
+                    memory:read_u8(context + 0x0a), memory:read_u8(context + 0x11),
+                    memory:read_u8(context + 0x19), memory:read_u32(context + 0x30),
+                    memory:read_u32(context + 0x5c), memory:read_u32(context + 0x60),
+                    machine.time:as_double()))
+            end)
+    end
     _G.nsm3_readiness_upstream_constructor = memory:install_read_tap(0x2252cc, 0x2252cf,
         'nsm3_readiness_upstream_constructor', function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2252cc then return end

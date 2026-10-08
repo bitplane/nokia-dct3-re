@@ -88,6 +88,12 @@ def verify(image):
             ('movs', 'r0, #0xe'), ('adds', 'r1, r4, #0'),
             ('bl', '#0x28845c')]:
         raise ValueError('readiness input mailbox publication differs')
+    if instructions(0x22803e, 6) != [
+            ('ldrb', 'r0, [r4, #0x11]'), ('cmp', 'r0, #1'),
+            ('beq', '#0x228080')]:
+        raise ValueError('readiness producer context selector differs')
+    if instructions(0x228052, 4) != [('bl', '#0x229224')]:
+        raise ValueError('zero context selector readiness branch differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

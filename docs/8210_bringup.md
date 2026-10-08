@@ -793,6 +793,20 @@ after clearing the object referenced by its `229222` pool load. Context
 ownership and the entry conditions of these branches remain unresolved.
 Trace those branch selectors next, without assigning radio/SIM semantics
 from message numbers alone. GSM acceptance passes; DCS still fails.
+Paired producer-context observations identify the first selector: at `22803e`,
+context `136aec` byte `+11` is zero on DCS and one on GSM. Zero calls
+`229224` through `228052`, emitting `09c8`; one branches to `228080` and
+subsequently emits `09cc`. At that selector DCS also has byte `+19=0`,
+word `+5c=0`, word `+60=4`; GSM has `+19=1`, `+5c=113594`, `+60=1`.
+Both have `+0a=0` and `+30=10` (decimal). The successful branch clears
+`+11` before constructing its message, so inspecting it only at the
+constructor would hide this difference. The next question is the writer
+and meaning of `136afd` (context `+11`), not a replacement radio reply.
+Evidence: `run_8210_pin_dcs_readiness_context_02` and
+`run_8210_pin_gsm_readiness_context_01`; strict GSM acceptance passes and
+DCS remains unregistered. Direct-store candidates in the local subsystem
+are `226ff6`, `22703a`, `22707a`, `227108`, `227126`, `227aca`, `22806e`,
+`228086` and `2281d0`; this syntactic scan is not exhaustive writer coverage.
 
 ## Evidence needed to resume
 
