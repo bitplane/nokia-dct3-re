@@ -573,11 +573,20 @@ uses that same `134c4e` halfword for its `8000`-prefixed command.
 The common store at `2c338e` publishes to DSPIF `100a8`.
 `noki8890_speech_control_check.py` pins the ROM hash, instruction forms,
 selector targets and pool literals. This is static field ownership only:
-physical Send/End correlation, PCM execution and native speech remain unproved.
+PCM execution and native speech remain unproved.
+
+Physical Send/End correlation separately passes `verify-8890-speech-control`
+(`run_8890_speech_control_probe`). The unchanged own-PMM no-PIN host fixture
+completes clock/date settlement, dials `1234567`, connects and releases through
+the full existing outgoing-call acceptance. Send publishes `860b` at
+48.202981 seconds; End publishes `840a` at 57.091636 seconds. Both use
+the own writer `2c338e` with selector 8. The control checker requires ordered
+physical inputs and own decoded keys, rejecting sibling writer addresses,
+wrong selectors and missing/incorrect disable. No PCM configuration was enabled.
 
 ```sh
 .venv/bin/python -m tools.noki8890_speech_control_check \
-  roms/noki8890/8890_12.20_ppmc.fls
+  roms/noki8890/8890_12.20_ppmc.fls --log RUN/error.log
 ```
 
 The acquired v12.20 PPM C and product-local PMM have verified research-HLE

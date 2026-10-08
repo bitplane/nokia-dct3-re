@@ -87,6 +87,14 @@
       ]
     },
     {
+      "name": "verify-8890-speech-control", "prerequisites": ["build"], "variables": {},
+      "unstructured": "own PMM, physical outgoing host call and ROM-pinned NSB-6 DSP speech-control writes; not PCM or native speech",
+      "recipe": [
+        "\t$(VENV)/bin/python tools/run_noki8890_pin_registration.py $(RUN_DIR) --without-pin --scenario host-outgoing-call --mame '$(abspath $(MAME_DIR))/mame'",
+        "\t$(VENV)/bin/python -m tools.noki8890_speech_control_check roms/noki8890/8890_12.20_ppmc.fls --log $(RUN_DIR)/error.log"
+      ]
+    },
+    {
       "name": "verify-8850-sip-incoming-alerting-restore", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP; exact ringing NSM-2 restoration rejects the stale invite without Answer, CONNECT, media or redelivery",
       "recipe": [

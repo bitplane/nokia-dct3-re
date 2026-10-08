@@ -1,10 +1,25 @@
 import unittest
 from unittest.mock import patch
 
-from tools.noki8890_speech_control_check import recover
+from tools.noki8890_speech_control_check import recover, verify_call
 
 
 class SpeechControlTest(unittest.TestCase):
+    def test_physical_call_correlates_own_selector_and_writer(self):
+        text = ('8890_call_physical: action=send\n8890_keypad_decoded: key=0e\n'
+                'dsp_control_write: data=860b pc=002c338e r4=00000008 rest\n'
+                '8890_call_physical: action=end\n8890_keypad_decoded: key=0f\n'
+                'dsp_control_write: data=840a pc=002c338e r4=00000008 rest\n')
+        self.assertTrue(verify_call(text)['runtime_validated'])
+        self.assertFalse(verify_call(text)['pcm_validated'])
+        for wrong in (text.replace('002c338e', '002cb3ca'),
+                      text.replace('r4=00000008', 'r4=00000009'),
+                      text.replace('key=0e', 'key=0f'),
+                      text.replace('action=end', 'action=send'),
+                      text.replace('data=840a', 'data=860b')):
+            with self.subTest(text=wrong), self.assertRaises(ValueError):
+                verify_call(wrong)
+
     def fixture(self):
         image = bytearray(0xc36b8)
         instructions = {0x2c30a2: '2834', 0x2c32f8: '0270', 0x2c3300: '0240',
