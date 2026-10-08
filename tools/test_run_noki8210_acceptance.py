@@ -9,6 +9,21 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_dcs_topology_preserves_sms_service(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / 'nsm3hle.cfg'
+            config.write_text('<mameconfig version="10"><system name="nsm3hle"><input>'
+                              '<port tag=":NETCFG" type="CONFIG" mask="4" value="4"/>'
+                              '</input></system></mameconfig>')
+            profile = Path(__file__).resolve().parents[1] / 'fixtures/noki8210_dcs1800/nsm3hle.cfg'
+            runner.configure_dcs_topology(config, profile)
+            ports = runner.ET.parse(config).find("./system/input")
+            self.assertEqual(ports.find("./port[@tag=':NETCFG']").get('value'), '4')
+            self.assertEqual(ports.find("./port[@tag=':MOBILITYCFG']").get('value'), '10')
+            self.assertEqual(ports.find("./port[@tag=':NEIGHBORCFG']").get('value'), '8')
+            runner.configure_dcs_topology(config, profile)
+            self.assertEqual(len(runner.ET.parse(config).find('./system/input')), 3)
+
     def test_pin_start_requires_bounded_physical_registration_fixture(self):
         for options in (['--pin-start', '4'],
                         ['--pin-enabled', '--pin-start', 'nan'],
@@ -61,6 +76,13 @@ class IsolatedAcceptanceTest(unittest.TestCase):
 
     def test_dcs_idle_state_admitted_without_pin(self):
         with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'idle-state']), \
+                patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                self.assertRaisesRegex(RuntimeError, 'admitted'):
+            runner.main()
+
+    def test_dcs_incoming_sms_admitted_without_pin(self):
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'incoming-sms']), \
                 patch.object(runner.Path, 'read_bytes', return_value=b''), \
                 patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
                 self.assertRaisesRegex(RuntimeError, 'admitted'):

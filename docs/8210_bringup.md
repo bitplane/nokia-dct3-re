@@ -716,14 +716,20 @@ needed. The own scan publishes `56:03370338`, selects SCH on carrier `0337`,
 uses recovered `041202` channel parameters and capability byte `30` in its
 Location Updating request (GSM900 uses `33`). Acceptance requires the ordered
 Location Updating/release sequence, carrier-823 paging and updated EF_LOCI.
-Calls, SMS, media and native DSP on this band are not promoted.
+Calls, outgoing SMS, media and native DSP on this band are not promoted.
 `verify-8210-dcs-idle-state` extends the no-PIN DCS profile through an
 idle save/load round trip. `run_8210_dcs_idle_state_01` passes explicit
 DCS registration and persisted EF_LOCI, exact saved/restored PC/SP/RAM
 and emulated time, transport replay, matching registered-screen pixels,
 and post-load physical Menu decode plus reviewed menu presentation.
-The runner rejects DCS PIN idle-state and DCS service scenarios pending
-their own evidence; this gate does not weaken the late-PIN boundary.
+The runner rejects DCS PIN idle-state and unsupported DCS service scenarios
+pending their own evidence; this gate does not weaken the late-PIN boundary.
+`verify-8210-dcs-incoming-sms` composes the same topology with the external
+incoming-SMS scenario without discarding either configuration. Run
+`run_8210_dcs_incoming_sms_01` passes DCS registration and EF_LOCI,
+ordered paging/CP/RP/LAPDm closure, delivery and read-status writes to
+EF_SMS, persistent read `hello` content, and physical reading with reviewed
+body pixels. No-PIN coverage only; outgoing SMS and calls remain separate.
 
 **Current frontier:** DCS with physical PIN entry starting at eight seconds
 does not register; entry starting at seven seconds does. The passing

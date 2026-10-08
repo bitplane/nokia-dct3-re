@@ -98,6 +98,24 @@ def configure_pin_topology(config_path):
     ET.ElementTree(config_tree).write(config_path, encoding='utf-8', xml_declaration=True)
 
 
+def configure_dcs_topology(config_path, profile_path):
+    """Apply band inputs without discarding the independently selected service."""
+    if config_path.exists():
+        tree = ET.parse(config_path)
+    else:
+        tree = ET.parse(profile_path)
+    ports = tree.find("./system[@name='nsm3hle']/input")
+    profile_ports = ET.parse(profile_path).find("./system[@name='nsm3hle']/input")
+    if ports is None or profile_ports is None:
+        raise ValueError('DCS configuration lacks its product input section')
+    for port in profile_ports:
+        existing = ports.find(f"./port[@tag='{port.get('tag')}']")
+        if existing is not None:
+            ports.remove(existing)
+        ports.append(port)
+    tree.write(config_path, encoding='utf-8', xml_declaration=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
@@ -109,15 +127,15 @@ def main():
     parser.add_argument('--pin-start', type=float,
                         help='registration-only physical PIN entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
-                        help='test registration or no-PIN idle restoration on DCS1800 carriers 823/824')
+                        help='test registration, no-PIN idle restoration or incoming SMS on DCS1800 carriers 823/824')
     args = parser.parse_args()
     if args.pin_start is not None and (
             not args.pin_enabled or args.scenario != 'registration' or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state') or
-                        (args.scenario == 'idle-state' and args.pin_enabled)):
-        parser.error('--dcs1800 requires registration or no-PIN idle-state')
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms') or
+                        (args.scenario != 'registration' and args.pin_enabled)):
+        parser.error('--dcs1800 requires registration or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
                                                  'host-outgoing-sms', 'phonebook',
@@ -143,7 +161,8 @@ def main():
         if config:
             shutil.copyfile(root / f'fixtures/{config}/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
         if args.dcs1800:
-            shutil.copyfile(root / 'fixtures/noki8210_dcs1800/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
+            configure_dcs_topology(run / 'cfg/nsm3hle.cfg',
+                                   root / 'fixtures/noki8210_dcs1800/nsm3hle.cfg')
         elif args.pin_enabled:
             configure_pin_topology(run / 'cfg/nsm3hle.cfg')
         environment = os.environ.copy()
@@ -246,6 +265,11 @@ def main():
                 check.extend(['--sms', '--storage', storage])
         elif args.scenario in ('registration', 'incoming-sms', 'host-incoming-sms'):
             check.append(storage)
+            if args.scenario == 'incoming-sms' and args.dcs1800:
+                verify_registration((run / 'error.log').read_text(errors='replace'),
+                                    (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                                    dcs1800=True)
+                check.extend(['--frame', str(run / 'snap/8210_sms_read_2.png')])
             if args.scenario == 'registration':
                 if args.dcs1800:
                     check.append('--dcs1800')

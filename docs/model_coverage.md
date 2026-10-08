@@ -40,11 +40,14 @@ DCS1800 acquisition, Location Updating, release, carrier-823 paging and
 persistent SIM location. A separate `--pin-start 7` control passes physical
 PIN and full DCS registration; the default eight-second entry still fails.
 This is a bounded ordering result, not timing-independent authentication
-coverage. DCS calls and SMS remain unproved; GSM900 gates do not establish them.
+coverage. DCS calls and outgoing SMS remain unproved; GSM900 gates do not establish them.
 `verify-8210-dcs-idle-state` adds no-PIN registered-idle restoration:
 exact CPU/RAM snapshots, transport replay, identical restored pixels and
 physical Menu continuation, with DCS registration and EF_LOCI checked
 separately. It does not admit the unresolved late-PIN profile.
+`verify-8210-dcs-incoming-sms` validates no-PIN DCS paging, SMS transport,
+delivery/read-status SIM writes, persisted content and physical reading
+with reviewed message-body pixels. This is research-HLE, not native DSP.
 
 `verify-8850-sim-pin-registration` independently proves physical SIM PIN and
 phone-code entry, own staged/HLE boundary, reviewed navigation pixels and
