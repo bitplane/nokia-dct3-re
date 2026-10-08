@@ -302,6 +302,15 @@ def verify(image):
     if instructions(0x21bdc4, 6) != [
             ('strh', 'r0, [r4, #2]'), ('bl', '#0x21f48a')]:
         raise ValueError('task-12 state-store continuation differs')
+    if int.from_bytes(read(0x21bbe4 + 4 * 15, 4), 'big') != 0x21f8e2:
+        raise ValueError('state-15 acknowledgement handler differs')
+    if int.from_bytes(read(0x21f9a0, 4), 'big') != 0x1802:
+        raise ValueError('state-15 DSP message selector differs')
+    if instructions(0x21f8f0, 16) != [
+            ('ldrb', 'r0, [r4]'), ('cmp', 'r0, #0x89'),
+            ('beq', '#0x21f8fa'), ('bl', '#0x21ef54'),
+            ('adr', 'r0, #0x36c'), ('bl', '#0x2d5dcc')]:
+        raise ValueError('state-15 type-89 acknowledgement route differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

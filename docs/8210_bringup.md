@@ -1071,6 +1071,21 @@ No state-23/24 write occurs in this observed lifecycle. This bounds
 the timer route without closing static/data-driven entrances: the
 current failure is in state 13's request continuation, not an observed
 state-23/24 timer transaction waiting for its reply.
+The paired control `run_8210_pin_dcs_receive_state_early_01`
+(`--pin-start 7`) passes the full registration/release/paging and
+persisted-EF_LOCI check with the same passive taps. It shares the
+initial `8 -> 11 -> 17` chronology, then enters state 15 at
+11.696859s (caller `21ef5b`) before the serving acknowledgement.
+That acknowledgement returns selector result 3 at 12.262718s with
+current `03ec` and an empty queue; subsequent receive states are
+`15 -> 2` at 12.557164s and `2 -> 7` at 12.888496s.
+State 15's handler `21f8e2` checks input `1802` and class byte `89`
+before entering `21f900`'s argument-zero selector. This is the
+observed successful promotion owner, distinct from timer states
+23/24. The standard late-PIN run reaches state 13 before readiness,
+and never observes this state-15 acknowledgement pairing. The
+control does not establish timing-independent PIN coverage or
+justify delaying/replaying the radio acknowledgement.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
