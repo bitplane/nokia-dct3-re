@@ -1464,7 +1464,7 @@ SPRU131G section 6.11.1: external IRQ and timer requests remain latched but
 do not wake IDLE1 while masked in IMR. Enabled requests wake independently
 of INTM; INTM clear enters the ISR, while INTM set resumes the continuation
 without servicing the request. The timer continues during IDLE1. These
-fixtures do not independently time the minimum or establish NMI/reset wake.
+fixtures do not independently time the minimum or establish reset wake.
 Four further cases implement the timer-clock part of SPRU131G sections
 6.11.2/6.11.3: `f6e1` (IDLE2, NN=10) and `f5e1` (IDLE3, NN=01) freeze TIM
 and its prescaler while retaining TSS=0. Masked external INT0 leaves the
@@ -1474,8 +1474,24 @@ restore the frozen counter/prescaler, then repeat the wake outcome. The core
 saves the selected idle mode and remaining timer ticks; it does not substitute
 a period reload on wake. Reserved NN=11 is not accepted as an idle mode.
 This establishes timer suspension and restoration, not PLL lock time,
-cycle-exact sleep-entry latency, pulse-width qualification, NMI/reset wake,
+cycle-exact sleep-entry latency, pulse-width qualification, reset wake,
 or complete clock-source behavior of attached peripherals.
+
+External NMI is a separate architectural input, not an IFR/IMR source.
+[SPRU131G sections 6.10/6.11 and table 6-20](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+specify NMI priority, vector 1 at `IPTR:0004`, global masking on ISR entry,
+and wake independently of IMR/INTM. The core latches an assertion, wakes any
+idle mode and preserves maskable IFR bits when servicing NMI. Twelve
+executable cases cover IDLE1/2/3, both INTM values and empty/full IMR;
+simultaneous pending maskable sources do not displace NMI. Acceptance checks
+the vector, stacked idle continuation, unchanged IFR/IMR and ISR INTM state.
+`check-c54x-core` requires this result. Pending/line state is save-registered,
+but NMI-specific pending-state replay is not independently exercised here.
+[SPRS039C's interrupt timing requirements](https://www.ti.com/lit/gpn/tms320lc543)
+describe the physical synchronizer and pulse qualification. These logical
+fixtures do not establish that timing, PLL restart, nested-NMI behavior or
+pipeline drain; the existing aggregate entry-cycle charge remains calibrated.
+No handset NMI wiring or boot-unblocking timer delay is inferred.
 SPRU302B sections 2.10/3.8 explicitly qualify the generic power-down summary:
 externally clocked/frame-synchronized McBSP and DMA transfers may continue and
 wake IDLE2/3. DMA automatically gates its transfer clock and uses X2/CLKIN

@@ -156,6 +156,8 @@ private:
 	u8 m_intm_guard = 0;
 	u16 m_ifr = 0;
 	u16 m_imr = 0;
+	bool m_nmi_pending = false;
+	bool m_nmi_asserted = false;
 	u16 m_power_on_imr = 0;
 	bool m_extended_program = false;
 	u16 m_clkmd = 0;

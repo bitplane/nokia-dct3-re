@@ -31,6 +31,25 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void start_idle_nmi_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		u16 const idle[] = {0xf4e1, 0xf6e1, 0xf5e1};
+		program.write_word(0x010980, idle[index / 4]);
+		program.write_word(0x010981, 0xf4e1);
+		program.write_word(0x010004, 0xf4e1); // NMI ISR stops without changing masks.
+		m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, index & 1 ? 0xffff : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, BIT(index, 1) ? 0x0800 : 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x010980);
+		m_phase = 7100 + index * 2;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_idle_dma_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -1153,6 +1172,35 @@ private:
 
 	TIMER_CALLBACK_MEMBER(check_results)
 	{
+		if (m_phase >= 7100 && m_phase < 7124)
+		{
+			unsigned const index = (m_phase - 7100) / 2;
+			if (!(m_phase & 1))
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(STATE_GENPC) == 0x010981,
+					"each idle mode remains suspended before NMI");
+				m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0x8008);
+				m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE);
+				m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == 0x010005 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+				m_cpu->space(AS_DATA).read_word(0x0fff) == 0x0981 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0x8008 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IMR) == (index & 1 ? 0xffff : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0800 &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"NMI wakes IDLE1/2/3 despite INTM and IMR, uses vector 1, preserves IFR and stacks continuation");
+			if (index < 11) { start_idle_nmi_case(index + 1); return; }
+			osd_printf_info("TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0\n");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+		}
 		if (m_phase >= 6200 && m_phase < 6212)
 		{
 			unsigned const index = (m_phase - 6200) / 2;
@@ -1349,8 +1397,8 @@ private:
 				"SPRU172C rounded multiplier signed boundaries preserve opposite accumulator, carry, TC, T and address");
 			if (index < 175) { start_rounded_multiply_case(index + 1); return; }
 			osd_printf_info("TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2\n");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			start_idle_nmi_case(0);
+			return;
 		}
 		if (m_phase == 7000 || m_phase == 7001)
 		{

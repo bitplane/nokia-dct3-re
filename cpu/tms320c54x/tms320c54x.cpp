@@ -132,6 +132,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_xc_guard));
 	save_item(NAME(m_ifr));
 	save_item(NAME(m_imr));
+	save_item(NAME(m_nmi_pending));
+	save_item(NAME(m_nmi_asserted));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_tim));
 	save_item(NAME(m_prd));
@@ -189,6 +191,8 @@ void tms320c54x_device::device_reset()
 	m_sp_address_base = 0;
 	m_sp_address_pending = m_sp_address_late = false;
 	m_ifr = 0;
+	m_nmi_pending = false;
+	m_nmi_asserted = false;
 	// Hardware reset sets INTM and clears IFR, but does not initialise IMR.
 	// Preserve the mask written by the ROM loader across MAD2 DSP reset pulses.
 	m_clkmd = 0;
@@ -766,18 +770,25 @@ bool tms320c54x_device::service_interrupt()
 	// instruction boundary. Taking it inside either atomic sequence can skip a
 	// vector prologue's context-save slots and corrupt the return stack.
 	const bool single_repeat_active = m_rpt_armed || m_rptc || m_rpt_end != 0xffff;
-	if (BIT(m_st1, 11) || !pending || m_delayed_words || m_xc_guard || m_intm_guard ||
-			single_repeat_active)
+	if ((!m_nmi_pending && (BIT(m_st1, 11) || !pending || m_intm_guard)) ||
+			m_delayed_words || m_xc_guard || single_repeat_active)
 		return false;
 
-	unsigned source = 0;
-	while (!BIT(pending, source))
-		++source;
-	m_ifr &= ~(u16(1) << source);
+	unsigned vector = 1; // SPRU131G table 6-20: NMI, independent of IFR/IMR.
+	if (m_nmi_pending)
+		m_nmi_pending = false;
+	else
+	{
+		unsigned source = 0;
+		while (!BIT(pending, source))
+			++source;
+		m_ifr &= ~(u16(1) << source);
+		vector = source + 16;
+	}
 	m_rtn = m_pc;
 	push(m_pc);
 	m_st1 |= 0x0800;
-	m_pc = (m_pmst & 0xff80) | ((source + 16) << 2);
+	m_pc = (m_pmst & 0xff80) | (vector << 2);
 	leave_idle();
 	m_icount -= 5;
 	return true;
@@ -2848,6 +2859,17 @@ void tms320c54x_device::execute_run()
 
 void tms320c54x_device::execute_set_input(int inputnum, int state)
 {
+	if (inputnum == INPUT_LINE_NMI)
+	{
+		bool const asserted = state != CLEAR_LINE;
+		if (asserted && !m_nmi_asserted)
+		{
+			m_nmi_pending = true;
+			leave_idle();
+		}
+		m_nmi_asserted = asserted;
+		return;
+	}
 	if (inputnum >= 0 && inputnum < 16)
 	{
 		if (state != CLEAR_LINE)
