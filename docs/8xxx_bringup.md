@@ -1899,9 +1899,22 @@ downlink admission/closure, exact dialed digits, and the existing full
 make verify-8850-sip-outgoing-media RUN_DIR=NEW_RUN
 ```
 
-This proves bidirectional HLE frame transport, not audible voice: the host
-microphone was silent and no waveform oracle was exercised. SIP bidirectional
-tones and save/restore media lifetime remain the next acceptance work.
+Outgoing HLE waveform delivery is separately verified by
+`run_8850_sip_waveform_probe/handset`. The isolated Pulse fixture supplies
+440 Hz through MAME's actual microphone stream and receives 660 Hz through
+its speaker stream; both recordings contain six consecutive accepted seconds.
+The checker requires at least two consecutive seconds, RMS >= 500 and tone
+energy fraction >= 0.5, rejecting silence, wrong tones and frame-count-only
+evidence. The run retains the full SIP transport and physical call checks;
+Pulse defaults and temporary routing modules are restored on exit.
+
+```sh
+make verify-8850-sip-outgoing-waveform RUN_DIR=NEW_RUN
+```
+
+This establishes outgoing bidirectional **HLE** microphone/earpiece delivery
+through real local SIP. Incoming Answer/media and call save/restore lifetime
+remain separate acceptance work; incoming waveform mode is not yet admitted.
 Native DSP speech and physical codec gains remain unverified.
 
 Active-call save/load is independently verified with

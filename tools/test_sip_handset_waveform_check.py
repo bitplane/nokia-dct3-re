@@ -13,6 +13,14 @@ from tools.sip_handset_waveform_check import inspect_tone, verify
 
 
 class SipHandsetWaveformTest(unittest.TestCase):
+    def test_8850_incoming_is_not_promoted_by_outgoing_audio(self):
+        repository = Path(__file__).resolve().parents[1]
+        environment = dict(os.environ, SIP_PRODUCT='8850', SIP_DIRECTION='incoming')
+        result = subprocess.run(['bash', 'tools/run_sip_physical_audio_gate.sh'],
+                                cwd=repository, env=environment, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('8850 incoming waveform is not yet validated', result.stderr)
+
     def test_audio_defaults_are_captured_before_modules_and_restored_on_failure(self):
         repository = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory() as directory:

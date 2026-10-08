@@ -39,6 +39,10 @@ case "$product" in
     8210)
         machine=nsm3hle bios=
         ;;
+    8850)
+        machine=nsm2hle bios=
+        [[ "$direction" == outgoing ]] || { echo '8850 incoming waveform is not yet validated' >&2; exit 1; }
+        ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac
 case "$direction" in
@@ -102,11 +106,11 @@ capture_pid=$!
 python3 tools/pulse_route_mame.py --source "$input_name.monitor" --sink "$output_name" \
     > "$run_dir/sip-pulse-routes.log" &
 router_pid=$!
-if [[ "$product" == 8210 ]]; then
+if [[ "$product" == 8210 || "$product" == 8850 ]]; then
     media_arg=--outgoing-media
     if [[ "$direction" == incoming ]]; then media_arg=--incoming-media; fi
     env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python):$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python/build/lib.*)}" \
-        .venv/bin/python tools/run_noki8210_sip_cancel.py "$run_dir/handset" \
+        .venv/bin/python "tools/run_noki${product}_sip_cancel.py" "$run_dir/handset" \
         "$media_arg" --record-media --sound pulse \
         --pjsua "${SIP_PJSUA_BIN:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/bin/pjsua-*)}"
 else
@@ -123,7 +127,7 @@ wait "$capture_pid" || true
 capture_pid=
 grep -q '^pulse_route: source-output ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME microphone stream' >&2; exit 1; }
 grep -q '^pulse_route: sink-input ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME speaker stream' >&2; exit 1; }
-if [[ "$product" == 8210 ]]; then
+if [[ "$product" == 8210 || "$product" == 8850 ]]; then
     cp "$run_dir/sip-earpiece.wav" "$run_dir/handset/sip-earpiece.wav"
     run_dir="$run_dir/handset"
 fi

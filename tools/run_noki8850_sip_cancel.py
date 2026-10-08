@@ -99,10 +99,14 @@ def main():
                           help='exercise physical dialing against a real SIP 480 response')
     outgoing.add_argument('--outgoing-media', action='store_true',
                           help='verify physical outgoing SIP connection and HLE frame transport')
+    parser.add_argument('--record-media', action='store_true')
+    parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18885)
     parser.add_argument('--sip-port', type=int, default=25885)
     args = parser.parse_args()
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
+    if args.record_media and not args.outgoing_media:
+        parser.error('--record-media requires --outgoing-media')
     if args.restore_idle and (outgoing_failure or args.outgoing_media):
         parser.error('--restore-idle cannot be combined with outgoing modes')
     root = Path(__file__).resolve().parents[1]
@@ -125,11 +129,12 @@ def main():
                    '-state_directory', str(run / 'sta'),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run',
                    '60' if args.restore_idle else '57',
-                   '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
+                   '-video', 'none', '-sound', args.sound, '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8850',
+                   *(['--record-media'] if args.record_media else []),
                    *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      [] if args.outgoing_media else
                      ['--incoming', '--cancel-incoming', '--ready-file',
@@ -156,6 +161,7 @@ def main():
             'native_dsp_complete': False, 'speech_tested': False,
             'hle_media_transport_tested': args.outgoing_media,
             'waveform_tested': False,
+            'media_recorded': args.record_media,
             'idle_restored': args.restore_idle,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
