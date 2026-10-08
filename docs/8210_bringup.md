@@ -725,13 +725,21 @@ DCS prerequisite. It receives `03ec` before serving-channel completion;
 PIN DCS receives it afterwards. At completion, the passing control has
 `03ec` queued alongside current `03eb`; PIN DCS has no queued replacement.
 The later request is retained, but its argument-3 selector returns 4 and
-returns to the receive loop. State `0d` can reevaluate it on a subsequent
-`8b` measurement via the argument-0 selector. The concrete open contract
-is whether channel configuration cancels the updated type-`56` window's
-pending measurement completion; the peer currently does so. The own
-producer/consumer anchors below are verified, but cancellation semantics
-are not. Do not replay acknowledgements or make DCS reproduce GSM's
-reference chain below. No firmware state or peer response is forced.
+returns to the receive loop. Successful early PIN enters receive state 15
+before the acknowledgement; default late PIN is already in state 13.
+State 13 can reevaluate the queue on a subsequent `8b` measurement via
+the argument-0 selector, but ordinary `03f9` neighbour notifications do
+not do so. The alternate `0413` route requires timer `81`, whose descriptor
+never changes after initialization in the failing run; its setup owners
+are separate receive states 23/24. The concrete open contract is the
+ordinary post-acquisition measurement/request-continuation lifetime.
+The peer currently replaces one pending type-`56` measurement completion
+on channel configuration, but its cancellation semantics are unvalidated.
+Simply retaining that completion at the current cadence would deliver it
+before late PIN readiness, not prove a late recovery. The own producer/
+consumer anchors below are verified; they do not justify periodic `8b`
+or acknowledgement replay. Do not make DCS reproduce GSM's reference
+chain. No firmware state or peer response is forced.
 
 The default-timing `--dcs1800 --pin-enabled` experiment remains unsuccessful:
 the early `55:03050000` response reaches the correlated task-12 completion

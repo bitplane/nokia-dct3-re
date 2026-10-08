@@ -1660,6 +1660,10 @@ bool nokia_radio_peer_device::handle_acquisition_packet(
 		if (active_candidate_window &&
 				m_receiver_arfcn != m_serving_arfcn)
 			commit_receiver_as_serving();
+		// This replaces the candidate window's pending 8b report. ROM6
+		// cancellation/continuation semantics are not independently validated;
+		// see docs/8210_bringup.md. Retaining or repeating that report is not
+		// justified solely by the MCU's late-request consumer.
 		set_phase(selected_plmn_search ?
 				phase::selected_channel_change :
 				phase::candidate_channel_change);
