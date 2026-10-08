@@ -385,6 +385,16 @@ A passive fresh no-PIN comparison through 16 s observes `1802` envelopes
 of classes `80/83/84/89/8f` reaching task 14, but no `8b` post. Absence of
 an `8b` post in this comparison alone does not identify its cause.
 
+A fresh 16-second slow-PIN write-watch rules out a disabled route in
+the unmodified profile. Startup clears `1721e0` through `4649cc`, then
+initializer `2d1538` sets it to 1 at store `2d1590` (3.667507 s), using
+base `1721dc` plus 4. No later write changes this byte through the run;
+other bytes in the watched word are not treated as writes to this flag.
+The `4649ac` entry tap records no invocation. The next boundary is the
+packet-to-envelope path before this handler, not a missing subscription
+enable. This does not retrospectively prove where the removed candidate
+was lost: that candidate was not present in this observation.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
