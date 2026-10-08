@@ -1048,6 +1048,17 @@ does not close indirect setup/event producers, but it establishes that
 the observed boot never changes this descriptor after initialization.
 Find the lifecycle selecting the setup sites before treating timer
 expiry as a missing late-request recovery event.
+The receive-state table at `21bbe4` selects state 23 at `21e93a`
+and state 24 at `21e786`. State 23 calls the conditional timer setup
+helper `21bc88` at `21e94a`, only after its message-word comparison
+and class-byte `89` test succeed. State 24 calls the unconditional
+helper `21bcec` at `21e906`, after four comparisons of stored fields
+against extracted incoming bit fields (`21e8d2..21e904`). These are
+state-owned continuations, not generic effects of every type-`89`
+acknowledgement. The aligned direct-call scan found these two helper
+callers; indirect entrances remain unclosed. Next establish the
+ordinary transitions selecting states 23/24 and the compared fields,
+rather than replaying `89` into the existing state.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

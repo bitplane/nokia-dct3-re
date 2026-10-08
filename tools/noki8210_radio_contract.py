@@ -288,6 +288,15 @@ def verify(image):
             raise ValueError('explicit timer-81 setup candidate differs')
     if int.from_bytes(read(0x21c018, 4), 'big') != 0x75a:
         raise ValueError('timer-81 setup duration differs')
+    if [int.from_bytes(read(0x21bbe4 + 4 * state, 4), 'big')
+            for state in (23, 24)] != [0x21e93a, 0x21e786]:
+        raise ValueError('timer setup receive-state entries differ')
+    if instructions(0x21e944, 10) != [
+            ('ldrb', 'r0, [r4]'), ('cmp', 'r0, #0x89'),
+            ('bne', '#0x21e94e'), ('bl', '#0x21bc88')]:
+        raise ValueError('state-23 type-89 timer setup route differs')
+    if instructions(0x21e906, 4) != [('bl', '#0x21bcec')]:
+        raise ValueError('state-24 timer setup caller differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
