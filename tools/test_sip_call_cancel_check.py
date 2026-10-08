@@ -50,19 +50,22 @@ class SipCancelCheckTest(unittest.TestCase):
             self.check(log=LOG.replace('epoch=1 phase=alerting', 'epoch=2 phase=alerting'))
 
     def test_sibling_scopes(self):
-        for product in ('3310', '3330', '3410', '5210', '6210'):
+        for product in ('3310', '3330', '3410', '5210', '6210', '8890'):
             self.assertTrue(self.check(product=product)['scope'].startswith(product + ' HLE'))
 
-    def test_6210_cli_rejects_answered_or_media_promotion(self):
+    def test_signaling_only_cli_rejects_answered_or_media_promotion(self):
         script = Path(__file__).with_name('run_sip_handset_gate.py')
         with tempfile.TemporaryDirectory() as directory:
-            for extra in ([], ['--incoming'],
-                          ['--incoming', '--cancel-incoming', '--record-media']):
-                result = subprocess.run([sys.executable, str(script), '--pjsua', 'absent',
-                                         '--run-dir', directory, '--product', '6210', *extra],
-                                        capture_output=True, text=True)
-                self.assertEqual(result.returncode, 2)
-                self.assertIn('limited to unanswered incoming CANCEL', result.stderr)
+            for product in ('6210', '8890'):
+                for extra in ([], ['--incoming'],
+                              ['--incoming', '--cancel-incoming', '--record-media'],
+                              ['--incoming', '--cancel-incoming', '--restore-call']):
+                    with self.subTest(product=product, extra=extra):
+                        result = subprocess.run([sys.executable, str(script), '--pjsua', 'absent',
+                                                 '--run-dir', directory, '--product', product, *extra],
+                                                capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 2)
+                        self.assertIn('limited to unanswered incoming CANCEL', result.stderr)
 
     def test_stale_ready_file_is_rejected_before_launch(self):
         script = Path(__file__).with_name('run_sip_handset_gate.py')

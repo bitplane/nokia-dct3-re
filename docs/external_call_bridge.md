@@ -413,7 +413,21 @@ registered-idle artifact before INVITE, verifies the same unanswered
 CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
 dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
-The generic SIP runner rejects answered/media fixtures for product `6210`.
+The generic SIP runner rejects answered/media fixtures for signaling-only
+products `6210` and `8890`.
+
+`verify-8890-sip-cancel` independently covers NSB-6 v12.20 research HLE
+with unchanged acquired MCU/PMM and the configured ARFCN60 laboratory cell.
+Its physical security and clock/date sequence settles before the fresh
+idle artifact admits INVITE. The real caller `5551234` must appear in the
+own SETUP grammar; CANCEL follows handset alerting and must complete
+487, exactly one GSM clear and full CC/RR release without Answer or media.
+Own native-loader/HLE ownership and compact self-test checks remain required.
+The gate pins the localized `1 Anruf in Abwesenheit` notification,
+decoded physical Exit, registered-idle content before/after and persisted
+SIM location. Frame comparison excludes the advancing top-row clock,
+not notification text or softkeys. This is real SIP signaling only;
+answered SIP, PCM, native speech and idle restoration are not promoted.
 
 `verify-6210-sip-idle-restore` saves and restores the idle NPE-3 handset before
 the fresh INVITE. It checks exact CPU/RAM/time restoration and ordered protocol

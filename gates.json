@@ -27,6 +27,14 @@
   },
   "gates": [
     {
+      "name": "verify-8890-sip-cancel", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional external PJSIP stack with private own-PMM NSB-6 storage; no Answer/media",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8890_sip_cancel.py $(RUN_DIR) --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-8890-host-rejected-sms", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8890_host_sms.py",

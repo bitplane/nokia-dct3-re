@@ -95,6 +95,14 @@ and does not establish answered SIP speech.
 exact idle CPU/RAM/time restoration and host epoch invalidation; it does not
 restore a SIP dialog.
 
+The 8890 v12.20 `nsb6hle` profile separately passes
+`verify-8890-sip-cancel` after own physical security/clock/date setup:
+real caller CANCEL/487 while alerting, full CC/RR release, localized missed-call
+presentation and decoded physical Exit back to registered idle. Its configured
+ARFCN60, own SETUP and persisted SIM location are checked independently.
+No Answer, accepted media or native DSP speech is allowed. It does not inherit
+the media-capable profiles' answered-call or restore promotion.
+
 ## Product-boundary cautions
 
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
