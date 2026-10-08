@@ -492,6 +492,18 @@ deliberately re-banked to remove the false attachment indication; menu and
 application oracles remain unchanged. All 15 product scenarios, including
 call/SMS save-load continuation, pass with this profile.
 
+Two independently fresh accessory scenarios also reproduce identical selected
+protocol traces, CCONT/flash/SIM persisted bytes and registered-idle/Menu pixels.
+Compare accepted runs with
+`tools/noki6210_cold_repeat_check.py FIRST_RUN SECOND_RUN` using the project
+Python environment. The checker rejects a shared directory, unaccepted
+scenario, missing/empty artifacts and differing fingerprints; PNG metadata
+is excluded by hashing grayscale pixels. This establishes repeatability of
+the measured composition on this build, not cross-host determinism or native
+DSP behavior. Generate each input with `run_noki6210_acceptance.py --scenario
+accessory` in a distinct directory; copying a completed run is not a cold-boot
+experiment.
+
 Do not import the selector-7/EAD interpretation from the NSE-8 documentation:
 raising NPE-3 selector 7 does not remove `Headset`. The ADC audit observed
 179 paired reads through 19 caller addresses over a 24-second old-profile
