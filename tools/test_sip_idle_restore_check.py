@@ -49,6 +49,7 @@ class SipIdleRestoreCheckTest(unittest.TestCase):
         self.check(log=log, product='3410')
         self.check(log=log, product='5210')
         self.check(log=log, product='3310')
+        self.check(log=log, product='3330')
 
     def test_bridge_call_and_answer_must_use_new_epoch(self):
         for bridge in (BRIDGE.replace('identity=(2, 1)', 'identity=(1, 1)'),

@@ -544,8 +544,9 @@ otherwise corrupts sample timing despite successful calls and nonzero PCM.
 The waveform gate protects this cross-channel case through the complete HLE
 audio path. It does not prove native DSP speech or real RF operation.
 
-Next boundaries are broader restoration/failure coverage and native DSP speech,
-which remains its independent hardware/backend milestone.
+The five-profile acceptance below covers basic SIP failures, active-call
+clearing and fresh service after idle restoration. It does not establish native
+DSP speech, arbitrary SIP endpoint interoperability, or additional products.
 
 ## Cross-product SIP acceptance
 
@@ -574,6 +575,21 @@ Neither profile inherits the 3210's Navi matrix location.
 make verify-3310-radio-incoming-call-sip-idle-restore RUN_DIR=run_3310_sip_idle_restore_final
 make verify-5210-radio-incoming-call-sip-idle-restore RUN_DIR=run_5210_sip_idle_restore
 ```
+
+The 3330 v4.50E independently passes fresh incoming service after idle restore
+following its own physical PMM setup and unlock. Its driver explicitly selects
+the NHM-5 keypad matrix, so the gate reuses the column-three `Menu` fixture,
+not another product's provisioning or radio encoding. The call is created only
+after the bridge accepts the restored idle epoch; physical Answer, sustained
+ordered media and normal release all remain required:
+
+```sh
+make verify-3330-radio-incoming-call-sip-idle-restore RUN_DIR=run_3330_sip_idle_restore
+```
+
+The preceding setup evidence is in `_provision`, and the restored fresh-call
+evidence is in `_call`. All five SIP-tested HLE profiles now independently
+cover this idle-service boundary as well as active-call clearing.
 
 The 3410 v5.46E independently passes physical outgoing busy (SIP 486 → GSM
 busy decision) and unavailable (SIP 480 → cause 18) fixtures. Each produces one
