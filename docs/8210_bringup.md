@@ -38,6 +38,18 @@ and retained as `roms/research/nsm3/nsm3-system-module.pdf` (ignored source
 collection), SHA256
 `dbd9e70549b6de726be9667a2451bda74b7317f84956b50e5c91fce3124939c0`.
 
+Own compiler `0x2cafd8` has 53 selector entries at `0x2cb00c`.
+Selector `0x11` reaches `0x2cb254`, constructs bit `0200`, and combines it
+with keep-mask `fdff` into field shadow `0x135776`. Selector 8 reaches
+`0x2cb29c`, prefixes the low twelve argument bits with `8000`, retains a
+separate command shadow `0x135778` and publishes DSPIF `0x100a8` at
+`0x2cb2ea`. Do not conflate the two shadows or infer the intervening
+publisher from their adjacency. The fresh physical outgoing trace changes
+command 8 to `860b` after Send and back to `840a` after End, independently
+corroborating call-correlated bit `0200`, not yet the complete producer chain
+or delivered audio. `noki8210_speech_control_check.py ROM LOG` pins the own
+ROM, selector instructions/literals and ordered physical/control events.
+
 ## Physical power lifecycle
 
 `make verify-8210-power-cycle RUN_DIR=NEW_DIRECTORY` starts with private fresh
