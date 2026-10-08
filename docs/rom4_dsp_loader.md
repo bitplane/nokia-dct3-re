@@ -890,11 +890,16 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 554 are asserted, none execute without an
-assertion, and 40 are absent. The independent RF-boundary checker
+Against the executable fixture, 556 are asserted, none execute without an
+assertion, and 38 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `f930` at first PC `4013`, `ff44` at `457a`, and `01f8` at `4483`.
+include `01f8` at first PC `4483`, `1080` at `4438`, and `2082` at `47ec`.
+Exact `f930` checks TC-clear/set conditional calls, unchanged stack sentinel
+when rejected, extension-complete return PC pushed when taken, preserved
+A/B/status, and three/five-cycle call costs. Exact `ff44` checks ANEQ for
+zero and guard-bit-only nonzero A, preserved A/B/status, both guarded MAR
+slots, continuation PC and equal accepted/rejected cycle cost.
 Exact `f684`/`f784` check B-source negation into A/B for negative and zero
 inputs plus signed 32-bit overflow with OVM clear/set: preserved unrelated
 accumulator/TC, zero-only carry, destination overflow flags, continuation PC
