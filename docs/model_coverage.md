@@ -31,6 +31,11 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 
 ## Promotion rules
 
+`verify-8850-sim-pin-registration` independently proves physical SIM PIN and
+phone-code entry, own staged/HLE boundary, reviewed navigation pixels and
+persistent registration. Its existing type-55 scan suffices; the delayed
+type-57 response used by other products is not inherited.
+
 `verify-8210-slow-pin-registration` independently covers physical SIM PIN and
 phone-code entry, own task-12 background-measurement completion and persistent
 registration on the coherent ARFCN 4/5 laboratory network. It retains the

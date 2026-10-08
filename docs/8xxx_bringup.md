@@ -1451,6 +1451,16 @@ immediately constructs its own `56/160` candidate window containing ARFCN
 candidate-window continuation. Release/neighbour/handover calibrations not
 yet recovered for this product remain unset. The normal machine is unchanged.
 
+`verify-8850-sim-pin-registration` independently enters SIM PIN `1234`, then
+the phone code `12345`, through the product-local matrix. It checks decoded
+physical PIN input, enabled CHV1/unchanged PIN/retry state, registration after
+VERIFY, persisted EF_LOCI, own staged uploads/self-test and reviewed Messages,
+Inbox and Names pixels. No new background-measurement response is enabled:
+the existing `55` scan provides the ARFCN 1 measurements before authentication.
+`run_noki8850_pin_registration.py --without-pin` separately protects the
+ordinary phone-code-only composition. Acquired PMM is unchanged in both;
+native DSP runtime and speech remain unproved.
+
 Run `noki8850_radio_observe.lua` for 60 simulated seconds with the isolated
 research invocation above, then check:
 
