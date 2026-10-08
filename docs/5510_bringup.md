@@ -2415,6 +2415,24 @@ byte 7 equal to `42`, then calls `335c1c`. Local class routing supplies
 byte 6 = `d2`. This incoming `d2/42` pair differs from outgoing constructor
 `335a50`'s `42/d2`; do not mirror the wrappers blindly.
 
+The outgoing route is also MCU-derived. Constructor `335a50` selects
+transport `1e`, destination `28`, class `42` and wrapper `d2`, then calls
+generic sender `399f12`. For this nonzero class and destination, the sender
+tests the node-availability bitmap before copying or posting: an unavailable
+node returns 4. An accepted remote object is marked with source sentinel
+`f0` and queued to task 7 through `2ce88c`. Task 7 replaces the sentinel
+with its local node and calls router `362958`; remote `1c/1e` objects go
+through `2f5dc0`, which copies and posts them to task 8. This is distinct
+from the local class-`d2` route to task 29.
+
+Task 8's `2f52aa` fragments the frame into type-`05` DSP objects, appends
+count/sequence bytes and queues them through `3849ee` at `125ae0`.
+Drain `2f51fc` posts copies to task 3 through `2ce7a4`. These code extents
+are pinned by the package checker. This establishes the MCU-side outbound
+boundary, not the resident DSP's UART implementation or electrical timing.
+The power-up-triggered request `47` therefore does not authorize inventing
+an initial node-`28` greeting to satisfy the availability gate.
+
 `335c1c` treats opcode `[message+9] == 06` as the power-up indication and
 calls `335aec`, which enables the GPIO output and constructs request `47`
 via `335aae/335a50`. Opcode `6f` calls component validator `335b12`:

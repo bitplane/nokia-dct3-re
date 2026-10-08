@@ -78,6 +78,11 @@ def assess_input(flash):
         (0x3a52b4, 0x3a5434, '3e6da40213a48ad07b774626768b9eb0d25a1965243d619b11af67e3af6929c7'),
         (0x2f5f8a, 0x2f5f96, '90e325967de387da34abf3f518eada587225ef542bb2b8f8b9a0dffe3b5a2623'),
         (0x318ecc, 0x318ff2, 'fb2562b392ec242983e3f7b44f0d8207a1ea6b18b279834a029eb722892e180e'),
+        (0x335a50, 0x335a90, '0df79525061ab2f1080b177fcb0817343a568a1ff6d6a055044b0a40a1fecbb1'),
+        (0x399f12, 0x399fbc, 'aaecae63c7ef8b402d2ac3a4e3d81d76300742c184c8ebbfadddaa56a3811500'),
+        (0x362958, 0x3629f8, '1d0af13bd9abda0829fff7deb63ee3d8f2a31521f4d68b2472a3c99eb616ad52'),
+        (0x2f5dc0, 0x2f5dfa, '84d2390db818ac1efee99e109299c98bdb64f5f8d68cc1e7689cabce87a9b1c6'),
+        (0x2f51fc, 0x2f548e, 'f67f32597424f9483e237785c4695f7d0f805190b8a7637d574482d6d7aa3725'),
     ):
         if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
             raise ValueError('input consumer code mismatch')
@@ -164,6 +169,16 @@ def assess_input(flash):
                                       'power_up_opcode': '06', 'selftest_reply': '6f',
                                       'selftest_pass_value': 3,
                                       'wire_framing_validated': False},
+            'mu4_transmit': {'constructor': '335a50', 'destination': '28',
+                             'transport': '1e', 'class': '42', 'wrapper': 'd2',
+                             'sender': '399f12', 'requires_node_available': True,
+                             'unavailable_result': 4, 'relay_task': 7,
+                             'remote_router': '362958', 'frame_copy': '2f5dc0',
+                             'sequencer_task': 8, 'sequencer': '2f52aa',
+                             'dsp_packet_type': '05', 'queue': '125ae0',
+                             'queue_writer': '3849ee', 'queue_drain': '2f51fc',
+                             'destination_task': 3, 'post': '2ce7a4',
+                             'physical_serial_backend_validated': False},
             'local_class_router': {'consumer': '362958', 'table': '437ca4',
                                    'records': routes, 'decoded_records': 39,
                                    'class_d2_task': 29,
