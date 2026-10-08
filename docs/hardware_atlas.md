@@ -254,6 +254,14 @@ Register file (`nokia_ccont_device::serial_r/w`), addressed inside the serial co
 | `0xe` | **interrupt/reset status** | reset `0x03`: persistent bit 0 ready, clearable bit 1 PWRONX cause; upper bits `0xf8` are write-one-to-clear IRQ sources |
 | `0xf` | interrupt mask | |
 
+The separate active-low Power field reaches both keypad GPIO and CCONT's
+always-powered PWRONX input. It can restore the switched digital domain
+without a charger edge, retaining RTC registers and pending upper CCONT
+sources. `verify-8890-power-cycle` covers own-ROM shutdown, blank LCD,
+physical restart, cause consumption and security input back to idle.
+Wake latency/debounce and complete peripheral rail clock-gating are not
+measured hardware contracts.
+
 **ADC selectors** (read via reg `0x0`/`0x2`/`0x3`): the driver deliberately exposes raw selectors
 `0..7`. Nokia's NSE-8 service manual establishes its non-standard wiring:
 selector 0 measures battery `Vb` through the CCONT `RSSI` input, selector 2

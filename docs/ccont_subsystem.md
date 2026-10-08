@@ -327,6 +327,21 @@ cause, sample selector-5 VCHAR above `0x64`, and settle organically in
 acting-dead mode `0x0005`. Resetting only the ARM and MAD2 core left attached
 peripherals in stale protocol states and was rejected.
 
+The separate physical Power input also reaches CCONT's always-powered
+PWRONX path, independently of MAD2 keypad GPIO. An active-low press while
+the digital rail is off restores that domain and publishes cause bit 1;
+it preserves RTC registers and pending upper interrupt sources. Presses
+while powered leave CCONT unchanged and continue through the ordinary
+firmware keypad path. Wake assertion has no recovered debounce/delay model.
+`verify-8890-power-cycle` independently proves firmware shutdown, a blank
+LCD, a ticking CCONT during CPU rail-off, physical PWRONX restart and a
+firmware status read containing ready/PWRONX without charger cause. Both
+native upload/HLE handoffs and subsequent physical security entry to idle
+are checked. NSB-6 firmware explicitly resets RTC seconds after wake;
+retained device state is not a claim of untouched software time or cold
+calendar persistence. Per-block clock-gating during rail-off remains
+unvalidated; HLE peer timers can still publish while the CPU is reset.
+
 CCONT watchdog expiry uses the same digital-baseband reset domain. It resets
 the CPU, MAD2 peripherals, GENSIO, MBUS, DSPIF/peer, SIMI/card protocol state
 and LCD controller while retaining CCONT, flash and EEPROM. MAD2 watchdog

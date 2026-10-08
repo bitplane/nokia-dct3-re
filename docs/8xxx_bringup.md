@@ -1002,6 +1002,30 @@ not battery-backed clock continuity. Save-state restoration and an emulated
 baseband rail cycle are distinct from a new process's CCONT reset and must
 be tested separately before assigning this behavior to physical silicon.
 
+`verify-8890-power-cycle` covers the distinct in-process physical lifecycle.
+Its fresh private runner pins own MCU/PMM and the configured ARFCN60 cell,
+physically enters security/time/date, holds Power for four seconds, observes
+firmware rail-off and a blank LCD, then presses Power again without a charger.
+CCONT ticks while the CPU is off and supplies PWRONX cause `02`; firmware
+reads ready/PWRONX/RTC status `13`, re-executes its own native uploads before
+the explicit missing-mask HLE handoff and clears self-test faults normally.
+Passive debugger log caps are re-armed for the second boot, never firmware
+registers or RAM. The ROM explicitly writes RTC seconds `07=00` after wake.
+Physical `12345`/Menu then reaches the reviewed ordinary idle frame without
+re-entering time/date. This is modeled in-process state retention, not
+battery-backed cold-process clock or calendar persistence.
+
+The restarted handset sends Location Updating body
+`05087200f110000123080910101032547698`, carrying retained laboratory LAI,
+not the fresh boot's `05087000f000fffe23080910101032547698`. The strict
+`--configured-gsm900 --preserved-location` registration check requires
+that exact request and contention echo, complete accept/release/paging,
+organic EF_LOCI read before the request, and no redundant EF_LOCI rewrite.
+The final SIM location/status remain valid. The ordinary cold gate still
+requires its original request and the actual LAI/status writes.
+Neither test claims native DSP speech, physical wake timing or full
+peripheral power gating; HLE timers still run while the CPU rail is off.
+
 Incoming-call signaling separately passes IMSI paging, Paging Response,
 contention UA, cipher/MM-information exchange, incoming SETUP, Call
 Confirmed/Alerting, own traffic configuration and Assignment Complete.

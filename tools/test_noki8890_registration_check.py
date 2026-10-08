@@ -26,6 +26,25 @@ PCS_LOG = '\n'.join((
 
 
 class RegistrationTest(unittest.TestCase):
+    def test_preserved_location_has_own_request_and_contention_echo(self):
+        text = self.configured_gsm().replace('05087000f000fffe23', '05087200f110000123')
+        text = '\n'.join(line for line in text.splitlines() if 'update-binary fid=6f7e' not in line)
+        text = 'sim_device: read-binary fid=6f7e offset=0 length=11\n' + text
+        verify(text, configured_gsm900=True, preserved_location=True)
+        for candidate in (self.configured_gsm(), text.replace('05087200f110000123', '05087200f110000223', 1)):
+            with self.assertRaises(ValueError):
+                verify(candidate, configured_gsm900=True, preserved_location=True)
+        with self.assertRaises(ValueError):
+            verify(text, configured_gsm900=True)
+        with self.assertRaisesRegex(ValueError, 'requires configured'):
+            verify(text, preserved_location=True)
+        with self.assertRaisesRegex(ValueError, 'rewritten'):
+            verify(text + '\nsim_device: update-binary fid=6f7e offset=4 length=5',
+                   configured_gsm900=True, preserved_location=True)
+        with self.assertRaisesRegex(ValueError, 'not read'):
+            verify(text.replace('read-binary', 'other'), configured_gsm900=True,
+                   preserved_location=True)
+
     def configured_gsm(self):
         text = PCS_LOG.replace('0258', '003c').replace('0259', '003d').replace('fffe20', 'fffe23')
         return text.replace('TX packet type=02 payload=20 radio_phase=candidate_channel_change',

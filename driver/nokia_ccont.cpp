@@ -99,6 +99,21 @@ void nokia_ccont_device::set_adc_source(unsigned channel, uint16_t value)
 		m_adc_source[channel] = value & 0x3ff;
 }
 
+void nokia_ccont_device::set_power_key_input(bool pressed)
+{
+	if (!pressed || m_powered)
+		return;
+	// PWRONX is independent of the switched MAD2 keypad/CPU domain. Restore
+	// that domain without resetting the always-powered RTC or pending sources.
+	m_powered = true;
+	m_regs[IRQ_STATUS] = (m_regs[IRQ_STATUS] & IRQ_SOURCE_MASK) |
+			(m_ready ? RESET_READY : 0) | RESET_PWRONX;
+	if (m_adc_trace)
+		LOGMASKED(LOG_CCONT, "ccont_power: event=wake cause=%02x t=%.9f\n",
+				RESET_PWRONX, machine().time().as_double());
+	m_power_cb(1);
+}
+
 void nokia_ccont_device::set_charger_input(unsigned channel, bool connected, uint16_t vchar)
 {
 	// The firmware determines the new charger state by debouncing VCHAR on ADC

@@ -109,6 +109,14 @@ restored and no speech is established.
 
 ## Product-boundary cautions
 
+The 8890 additionally passes `verify-8890-power-cycle`: physical shutdown,
+blank LCD, a CCONT RTC tick while CPU power is off, separate PWRONX restart,
+both own native-upload/HLE handoffs and decoded security input back to idle.
+Its second registration carries retained LAI and closes without redundant
+EF_LOCI writes, checked against a distinct strict grammar. Firmware itself
+resets seconds after wake. This does not prove cold-process RTC persistence,
+physical wake timing, all-block rail clock-gating or native speech.
+
 The 8850 v5.31 `nsm2hle` profile additionally passes
 `verify-8850-sip-cancel` with own acquired MCU/PMM: settled physical startup,
 own registered ARFCN1, caller `5551234`, real CANCEL/487 while alerting,
