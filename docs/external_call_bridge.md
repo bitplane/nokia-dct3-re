@@ -541,6 +541,26 @@ sheet is attached to J200/COBBACLK (RFICLK), not PCMDCLK: it is not a PCM
 timing capture. Source: `roms/research/npe3/npe3-schematics-v1.pdf`, SHA256
 `559e9718a9dad703694f17d349383f75af4237b1c26cf94ecdb4aafe641f1e43`.
 
+An independently acquired Nokia NPE-3 Troubleshooting, issue 1 (09/00),
+[archive](https://www.eserviceinfo.com/downloadsm/25790/Nokia_6210.html)
+adds the audio fault chart on printed page 15. It checks the internal
+microphone bias at C233 (2.1 V), its path through L200 and associated
+components, and the earpiece path through R247/C248/C249 before replacing
+N240 COBBA. The accompanying SD4 v19 schematic's audio sheet A-3 was
+visually reviewed: it identifies COBBA_GJP_V4.1, fitted microphone/earpiece
+paths and the separate PCM nets. This supports board topology, not a live
+COBBA input-selection setting or neutral-gain accuracy. Neither document
+provides the required PCM clock/framing/edge definition; the NPE-3 media
+boundary remains unchanged.
+
+The ignored research collection retains the archive as
+`roms/research/npe3/npe3-troubleshooting.rar` (SHA256
+`8251aacaec517fd667e341cbaedea2378e837220bc58d4536a8655f3db129100`),
+`npe3-troubleshooting.pdf` (SHA256
+`f2371b4067111a0e9311e68fc5dead843e415290f87c0afd562e505c9b42a4cb`),
+and `npe3-sd4-v19-schematics.pdf` (SHA256
+`1e0b057dd6a8ac5d4ef7b030c0f7af8711df044270a18c97fdbed3c31f87b6e6`).
+
 `verify-6210-sip-outgoing-unavailable` independently passes against actual
 PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
 registered-idle recovery with the same physical number and own-PMM checks.
