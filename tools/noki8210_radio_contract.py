@@ -222,6 +222,7 @@ def verify(image):
     parser_calls = []
     selector_calls = []
     wrapper_calls = []
+    state_calls = []
     for offset in range(0, len(image) - 4, 2):
         if image[offset] & 0xf8 != 0xf0:
             continue
@@ -232,6 +233,9 @@ def verify(image):
             selector_calls.append(0x200000 + offset)
         if candidate == [('bl', '#0x21f900')]:
             wrapper_calls.append(0x200000 + offset)
+        if candidate == [('bl', '#0x21bdc4')]:
+            predecessor = instructions(0x200000 + offset - 2, 2)
+            state_calls.append((0x200000 + offset, predecessor))
     if parser_calls != [0x21ef4c, 0x21fb86]:
         raise ValueError('direct measurement-parser candidate callsites differ')
     if selector_calls != [0x21d886, 0x21f356, 0x21f5ca, 0x21f90a,
@@ -239,6 +243,14 @@ def verify(image):
         raise ValueError('direct selector candidate callsites differ')
     if wrapper_calls != [0x21ef50]:
         raise ValueError('direct selector-wrapper candidate callsites differ')
+    expected_states = [7, 5, 26, 4, 6, 2, 23, 24, 25, 11, 13, 15,
+                       17, 12, 9, 10, 21, 28, 20]
+    if len(state_calls) != len(expected_states):
+        raise ValueError('direct receive-state setter candidate count differs')
+    for (_, predecessor), state in zip(state_calls, expected_states):
+        operand = f'r0, #{state:#x}' if state >= 10 else f'r0, #{state}'
+        if predecessor != [('movs', operand)]:
+            raise ValueError('direct receive-state setter argument differs')
     # Tail branches are a separate entrance class; a BL census cannot close it.
     if instructions(0x21f2c0, 2) != [('b', '#0x21f900')]:
         raise ValueError('state-ten acknowledgement tail entrance differs')

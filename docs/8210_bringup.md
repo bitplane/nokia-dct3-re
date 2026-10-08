@@ -1224,6 +1224,16 @@ This is not an independent boot entrance. The scan does not cover computed
 arguments, tail branches, direct stores or indirect calls, and therefore does
 not prove state 21 unreachable. Resolve those entrance classes before claiming
 complete state ownership.
+All 19 direct setter candidates have an immediate literal predecessor;
+the argument sequence in address order is
+`7,5,26,4,6,2,23,24,25,11,13,15,17,12,9,10,21,28,20`, now checked
+against the image. No aligned 16-bit unconditional branch or aligned literal
+pointer (ARM/Thumb forms) targets `21bdc4`. These negative scans do not close
+direct stores: an inline `movs r0,#1` at `21bdc2` shares the same store, and
+raw store-opcode scans also match embedded data. Context aliases `138038`
+have literal loads at `21b8b8` and `21f484`; direct-state ownership requires
+boundary-aware control flow from these roots, not counting every apparent
+`strh [r4,#2]` in the task interval as executable.
 
 ## Evidence needed to resume
 
