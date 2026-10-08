@@ -12987,7 +12987,7 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 554 && m_phase <= 562)
+		if ((m_phase >= 554 && m_phase <= 562) || m_phase == 9211 || m_phase == 9212)
 		{
 			struct long_alu_case { u16 opcode; u64 a_before; u16 st1; u16 high; u16 low; u64 a_after; u64 b_after; u16 ar3_after; u16 st0_after; unsigned cycles; };
 			static constexpr long_alu_case cases[] = {
@@ -12999,18 +12999,24 @@ private:
 				{ 0x5083, 0x7fffffff, 0x0380, 1, 1, 0x80000000, 0, 0x0f90, 0, 3 },
 				{ 0x5483, 0x00010000, 0x0380, 0, 1, 0x0001ffff, 0, 0x0f90, 0x0800, 3 },
 				{ 0x5893, 0x56788933, 0x0100, 0x1534, 0x3456, 0xffbebbab23ULL, 0, 0x0f92, 0, 3 },
-				{ 0x588b, 0x56783933, 0x0180, 0x1534, 0x3456, 0xffbebcfb23ULL, 0, 0x0f8e, 0, 3 }
+				{ 0x588b, 0x56783933, 0x0180, 0x1534, 0x3456, 0xffbebcfb23ULL, 0, 0x0f8e, 0, 3 },
+				{ 0x5082, 0x00010000, 0x0100, 1, 0xffff, 0x0002ffff, 0, 0x0f90, 0, 3 },
+				{ 0x5085, 0x00010000, 0x0100, 1, 0xffff, 0x0002ffff, 0, 0x0f90, 0, 3 }
 			};
-			const unsigned index = m_phase - 554;
+			const unsigned index = m_phase >= 9211 ? m_phase - 9211 + 9 : m_phase - 554;
 			const long_alu_case &row = cases[index];
 			expect_opcode(row.opcode,
 				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == row.ar3_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == row.st0_after &&
+				(index < 9 || (m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f92 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
+					data.read_word(0x0f92) == row.high && data.read_word(0x0f93) == row.low &&
+					data.read_word(0x0f90) == 2 && data.read_word(0x0f91) == 3)) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == row.cycles,
 				"DADD/DSUB/DRSUB long-word arithmetic matches TI C16 examples and cycle costs");
-			if (m_phase < 562)
+			if (index + 1 < std::size(cases))
 			{
 				const long_alu_case &next = cases[index + 1];
 				program.write_word(0x05e2, next.opcode);
@@ -13018,19 +13024,23 @@ private:
 				program.write_word(0x05e4, next.opcode == 0x50f8 ? 0x75d6 : 0x0124);
 				program.write_word(0x05e5, next.opcode == 0x50f8 ? 0x0124 : 0xf5e1);
 				program.write_word(0x05e6, 0xf5e1);
-				data.write_word(0x0f90, next.high);
-				data.write_word(0x0f91, next.low);
+				data.write_word(0x0f90, index >= 8 ? 2 : next.high);
+				data.write_word(0x0f91, index >= 8 ? 3 : next.low);
+				data.write_word(0x0f92, next.high);
+				data.write_word(0x0f93, next.low);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
 				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f92);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f92);
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST0,
 						next.opcode == 0x588b ? 0x0800 : 0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next.st1);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				++m_phase;
+				m_phase = index < 8 ? m_phase + 1 : 9211 + index - 8;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
