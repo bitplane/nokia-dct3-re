@@ -9,7 +9,7 @@ from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, ma
 
 class CoherentConfigTest(unittest.TestCase):
     def test_pin_services_are_admitted_before_preparation(self):
-        for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms'):
+        for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook'):
             with patch('sys.argv', ['runner', 'unused', '--scenario', scenario,
                                    '--coherent-cell', '--pin-enabled', '--mame', '/nonexistent/6250-mame']), \
                     patch('sys.stderr', new_callable=io.StringIO) as errors, \

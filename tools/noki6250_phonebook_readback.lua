@@ -2,6 +2,8 @@
 local source = debug.getinfo(1, "S").source:sub(2)
 local directory = assert(source:match("^(.*[/])"))
 dofile(directory .. "noki6250_runtime_observe.lua")
+local pin_enabled = os.getenv('NOKIA_DCT3_6250_PIN_ENTRY') == '1'
+if pin_enabled then dofile(directory .. 'noki6250_slow_pin_input.lua') end
 local machine = manager.machine
 local function cell(column, row)
     for _, field in pairs(machine.ioport.ports[":COL." .. column].fields) do
@@ -16,6 +18,10 @@ local actions = {
     {26, cell(1, 1), 1}, {26.15, cell(1, 1), 0}
 }
 local deadlines = {17, 19, 22, 25, 27}
+if pin_enabled then
+    for _, action in ipairs(actions) do action[1] = action[1] + 6 end
+    for index, time in ipairs(deadlines) do deadlines[index] = time + 6 end
+end
 local next_action, next_capture = 1, 1
 emu.register_periodic(function()
     local time = machine.time:as_double()

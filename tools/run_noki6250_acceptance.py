@@ -86,13 +86,13 @@ def main():
     parser.add_argument('--coherent-cell', action='store_true',
                         help='use explicit ARFCN19/20 network and require carrier coherence')
     parser.add_argument('--pin-enabled', action='store_true',
-                        help='require slow physical PIN entry before coherent host call/SMS')
+                        help='require slow physical PIN entry before coherent services or phonebook')
     args = parser.parse_args()
-    if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario == 'idle-state'):
-        parser.error('coherent-cell downstream coverage requires a host or idle-state scenario')
+    if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario in ('idle-state', 'phonebook')):
+        parser.error('coherent-cell downstream coverage requires a host, idle-state or phonebook scenario')
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
-                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms')):
-        parser.error('pin-enabled requires coherent host call or SMS')
+                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook')):
+        parser.error('pin-enabled requires coherent host services or phonebook')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
@@ -314,6 +314,8 @@ def main():
             command[command.index("-autoboot_script") + 1] = str(
                 root / "tools/noki6250_phonebook_readback.lua")
             command[command.index("-seconds_to_run") + 1] = "30"
+            if args.pin_enabled:
+                command[command.index("-seconds_to_run") + 1] = "40"
             manifest = json.loads((run / "acceptance.json").read_text())
             manifest["cold_restart_command"] = command
             (run / "acceptance.json").write_text(json.dumps(manifest, indent=2) + "\n")
@@ -328,6 +330,13 @@ def main():
             checker[2] = "readback"
             checker[-1] = str(frames[0])
             subprocess.run(checker, check=True)
+            if args.pin_enabled:
+                from tools.sim_security_trace_check import validate as check_security
+                from tools.noki6250_coherent_registration_check import verify as check_coherent
+                cold_text = (run / 'error.log').read_text(errors='replace')
+                cold_sim = (run / 'nvram/nhm3hle/sim_card').read_bytes()
+                check_security(cold_text, cold_sim, 'verify', '1234')
+                check_coherent(cold_text, cold_sim, preserved=True)
         if args.scenario == "registration":
             shutil.copyfile(run / "error.log", run / "registration-fresh.log")
             shutil.copyfile(run / "nvram/nhm3hle/sim_card", run / "registration-fresh.sim")

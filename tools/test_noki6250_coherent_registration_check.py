@@ -21,6 +21,16 @@ def storage():
 
 
 class CoherentRegistrationTest(unittest.TestCase):
+    def test_preserved_scope_keeps_carrier_and_upload_requirements(self):
+        text = 'gsm_call_adapter: network registered=1 arfcn=19\n'
+        with patch.object(check, 'check_uploads') as uploads, \
+                patch.object(check, 'check_initial_fixture') as fixture, \
+                patch.object(check, 'check_registration') as radio:
+            check.verify(text, storage(), preserved=True)
+            uploads.assert_called_once_with(text, runtime=True)
+            fixture.assert_called_once_with(text)
+            radio.assert_called_once_with(text, 'nhm3', preserved=True, configured_carrier=True)
+
     def verify(self, text, card=None):
         with patch.object(check, 'check_uploads') as uploads, patch.object(check, 'check_initial_fixture') as fixture:
             check.verify(text, storage() if card is None else card)

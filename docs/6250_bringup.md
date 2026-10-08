@@ -110,8 +110,20 @@ unchanged Message sent pixels. Their physical actions and captures begin
 six seconds later than the PIN-disabled fixtures to allow SIM/phonebook
 initialization to settle; emulation clocks and peer timing are unchanged.
 
+`verify-6250-pin-phonebook` physically saves A/123 after slow PIN entry,
+then starts a new MAME process using the same persistent card. The second
+process enters the PIN again and physically retrieves the contact. Both
+save/detail frames match the existing exact oracles, and the complete
+persisted card remains byte-for-byte unchanged during readback. The cold
+process independently requires successful VERIFY with the original PIN
+still enabled and strict carrier-coherent preserved-location registration.
+It does not reuse session authorization or a machine save state. Its
+physical actions/captures also start six seconds later than the ordinary
+phonebook fixture; the no-PIN save/readback path remains unchanged.
+
 The runner's `--pin-enabled` option is deliberately limited to the four
-coherent host call/SMS scenarios above. The reusable physical-input module
+coherent host call/SMS scenarios above and coherent phonebook acceptance.
+The reusable physical-input module
 does not load another copy of the runtime observer, and the runner clears
 its harness-only input flag for ordinary runs. Every run uses private
 storage, configuration, logs and host admission evidence.
