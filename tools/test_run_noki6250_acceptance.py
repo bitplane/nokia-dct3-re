@@ -1,12 +1,34 @@
 from pathlib import Path
+import io
 import tempfile
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
-from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run
+from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, main
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_coherent_idle_is_admitted_before_preparation(self):
+        with patch('sys.argv', ['runner', 'unused', '--scenario', 'idle-state',
+                               '--coherent-cell', '--mame', '/nonexistent/6250-mame']), \
+                patch('sys.stderr', new_callable=io.StringIO) as errors, \
+                patch('tools.run_noki6250_acceptance.prepare_run') as prepare:
+            with self.assertRaises(SystemExit) as result:
+                main()
+            self.assertEqual(result.exception.code, 1)
+            self.assertIn('missing MAME executable', errors.getvalue())
+            prepare.assert_not_called()
+
+    def test_coherent_active_state_is_not_implicitly_promoted(self):
+        for scenario in ('call-state', 'sms-state'):
+            with patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--coherent-cell']), \
+                    patch('sys.stderr', new_callable=io.StringIO), \
+                    patch('tools.run_noki6250_acceptance.prepare_run') as prepare:
+                with self.assertRaises(SystemExit) as result:
+                    main()
+                self.assertEqual(result.exception.code, 2)
+                prepare.assert_not_called()
+
     def test_shared_preparation_keeps_own_comparison_and_audit_labels(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

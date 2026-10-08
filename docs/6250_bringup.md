@@ -27,6 +27,13 @@ physical continuation. Idle uses Menu/Messages; the established call uses
 End and complete CC/RR release back to registered idle. Neither resolves the
 original PMM or native DSP boundaries below.
 
+`verify-6250-coherent-idle-state` additionally runs idle restoration with the
+explicit ARFCN19/20 host-enabled cell. It requires own native uploads and HLE
+isolation, carrier-coherent registration and persistent EF_LOCI alongside
+exact CPU/RAM/time, ordered protocol replay, identical restored pixels and
+physical Menu continuation. This does not restore an external SIP dialog or
+promote coherent active-call/delivered-SMS restoration without separate runs.
+
 ### Physical power-cycle acceptance
 
 An isolated initial-record PMM comparison with the explicit ARFCN19/20

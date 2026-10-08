@@ -86,8 +86,8 @@ def main():
     parser.add_argument('--coherent-cell', action='store_true',
                         help='use explicit ARFCN19/20 network and require carrier coherence')
     args = parser.parse_args()
-    if args.coherent_cell and not args.scenario.startswith('host-'):
-        parser.error('coherent-cell downstream coverage requires a host scenario')
+    if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario == 'idle-state'):
+        parser.error('coherent-cell downstream coverage requires a host or idle-state scenario')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
