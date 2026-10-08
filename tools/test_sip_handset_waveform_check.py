@@ -108,7 +108,7 @@ esac
             root = Path(directory)
             self.recording(root, [(440, 8000)] * 2).rename(root / 'sip-microphone.wav')
             self.recording(root, [(660, 8000)] * 2).rename(root / 'sip-earpiece.wav')
-            for product in ('3210', '3310', '3330', '3410', '5210'):
+            for product in ('3210', '3310', '3330', '3410', '5210', '8210'):
                 with self.subTest(product=product):
                     verify(root, product, 'incoming')
                     result = json.loads((root / 'sip-waveform-result.json').read_text())

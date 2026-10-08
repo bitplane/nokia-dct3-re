@@ -126,19 +126,27 @@ recording and 660 Hz in the MAME earpiece recording. Both stream routes were
 observed. The tones traverse the configured physical audio ports and HLE
 codec/PCM paths, not firmware-state injection. This validates non-silent
 synthetic audio in both directions; it does not establish native DSP speech,
-analog gain calibration, real RF service, or incoming answered media.
+analog gain calibration or real RF service. Incoming audio is tested separately.
 
 `make verify-8210-sip-incoming-media RUN_DIR=NEW_DIRECTORY` waits for a fresh
 registered-idle frame before a local SIP INVITE, then uses the existing own
 physical Call/Send and End fixture. It requires decoded keys, paging,
 assignment, CONNECT/acknowledgement, DISCONNECT/network RELEASE/RELEASE
 COMPLETE, return to paging, own loader/self-test/provisioning checks, ordered
-media, and reviewed ringing/post-release UI. Incoming waveform and call
-restoration acceptance are separate, not inherited from outgoing audio.
+media, and reviewed ringing/post-release UI. Call restoration acceptance is
+separate, not inherited from these media tests.
 Fresh `run_8210_sip_incoming_media_verified` passes with bridge counters
 uplink 396, downlink 380, transmitted PCM 396 and received PCM 401 (13
 dropped). This is independently executed incoming HLE media transport,
 not native DSP or non-silent incoming-waveform proof.
+
+`make verify-8210-sip-incoming-waveform RUN_DIR=NEW_DIRECTORY` independently
+adds the isolated virtual microphone/earpiece tone fixture to incoming calls.
+Fresh `run_8210_sip_incoming_waveform_probe/handset` passes sustained 440 Hz
+microphone and 660 Hz earpiece recordings, full physical Answer/End, release
+and UI checks. Bridge counters are uplink 396, downlink 379, transmitted PCM
+396 and received PCM 400 (13 dropped). This verifies non-silent synthetic
+audio in both directions on an incoming HLE call, not native DSP speech.
 
 Fresh matrix run `run_8210_sip_media_closed` passes with explicit media
 closure at 37.030 s and completion at 37.040 s, with no rejected downlink.

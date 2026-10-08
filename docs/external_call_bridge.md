@@ -602,7 +602,9 @@ virtual PulseAudio routes. It proves non-silent synthetic audio through the
 NSM-3 HLE composition, not native DSP speech or calibrated analog gain.
 `verify-8210-sip-incoming-media` waits for fresh registered idle before INVITE
 and reuses the own-product physical Answer/End, full CC/RR and presentation
-checks. Incoming waveform acceptance is not inferred from the outgoing test.
+checks. `verify-8210-sip-incoming-waveform` independently checks sustained
+microphone/earpiece tones on that incoming lifecycle; its passing recording
+is not inferred from the outgoing test. Neither direction proves native DSP speech.
 
 `verify-8210-sip-outgoing-busy` physically dials `1234567` on configured
 carrier 4 against actual SIP 486. It requires the decoded SETUP number,

@@ -38,7 +38,6 @@ case "$product" in
         ;;
     8210)
         machine=nsm3hle bios=
-        [[ "$direction" == outgoing ]] || { echo '8210 answered incoming waveform is not validated' >&2; exit 1; }
         ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac
@@ -104,9 +103,11 @@ python3 tools/pulse_route_mame.py --source "$input_name.monitor" --sink "$output
     > "$run_dir/sip-pulse-routes.log" &
 router_pid=$!
 if [[ "$product" == 8210 ]]; then
+    media_arg=--outgoing-media
+    if [[ "$direction" == incoming ]]; then media_arg=--incoming-media; fi
     env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python):$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python/build/lib.*)}" \
         .venv/bin/python tools/run_noki8210_sip_cancel.py "$run_dir/handset" \
-        --outgoing-media --record-media --sound pulse \
+        "$media_arg" --record-media --sound pulse \
         --pjsua "${SIP_PJSUA_BIN:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/bin/pjsua-*)}"
 else
 make --no-print-directory verify-radio-outgoing-call-sip RUN_DIR="$run_dir" JOBS="${JOBS:-8}" \
