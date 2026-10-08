@@ -490,6 +490,17 @@ therefore invalid as absence evidence. Those ineffective probes were
 removed. Establish a working observation hook before using further null
 results to classify this active compiler or its field setter.
 
+The mailbox-boundary CPU snapshot resolves that observation problem:
+fresh accepted physical outgoing calls publish `870b` at Send and `850a`
+after End, both at writer PC `42727c` with compiler selector 8. Bit `0200`
+is selected during the call and removed at teardown, independently matching
+the own static field encoding. `verify_call_field()` checks the ordered
+physical-input/control-write correspondence. This supplies a candidate
+NPE-3 HLE speech-request contract (command 8, mask/value `0200`), not PCM
+or native speech acceptance. Next configure it in the explicit runtime-HLE
+composition and rerun full bidirectional SIP media checks; reject any
+unsupported PCM link rather than fabricating uplink.
+
 `verify-6210-sip-outgoing-unavailable` independently passes against actual
 PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
 registered-idle recovery with the same physical number and own-PMM checks.

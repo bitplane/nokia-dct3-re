@@ -2255,6 +2255,15 @@ void nokia_dct3_state::dsp_ram_w(offs_t offset, uint16_t data, uint16_t mem_mask
 				"dsp_shared_write: off=%03x old=%04x data=%04x pc=%08x t=%.6f\n",
 				byte_offset, old_data, new_data, m_maincpu->pc(),
 				machine().time().as_double());
+	if (m_trace_enabled && byte_offset == 0x0a8 && old_data != new_data)
+		LOGMASKED(LOG_DSP_SHARED,
+				"dsp_control_write: data=%04x pc=%08x r4=%08x r7=%08x sp=%08x lr=%08x t=%.6f\n",
+				new_data, m_maincpu->pc(),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R4),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R7),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R13),
+				m_maincpu->state_int(arm7_cpu_device::ARM7_R14),
+				machine().time().as_double());
 	m_dsp_backend->mcu_shared_write(byte_offset);
 	if (m_dsp_c54x && (byte_offset == 0x0fe || byte_offset == 0x100))
 	{

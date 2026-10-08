@@ -1,5 +1,6 @@
 """Recover NPE-3 parameter encoding; bit 0x0200 is not yet speech-validated."""
 import hashlib
+import re
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
 
 
@@ -69,3 +70,19 @@ def recover(image):
             'direct_bl_candidates': calls,
             'indirect_call_coverage': False,
             'speech_semantics_validated': False}
+
+
+def verify_call_field(log):
+    """Pin observed call/teardown selection, not PCM or native DSP execution."""
+    cursor = 0
+    for pattern in (
+            r'6210_call_physical: action=send\b',
+            r'dsp_control_write: data=870b pc=0042727c r4=0000870b r7=00000008\b',
+            r'6210_call_physical: action=end\b',
+            r'dsp_control_write: data=850a pc=0042727c r4=0000850a r7=00000008\b'):
+        match = re.search(pattern, log[cursor:])
+        if not match:
+            raise ValueError('missing ordered physical call field evidence: ' + pattern)
+        cursor += match.end()
+    return {'parameter_command': 8, 'call_field': 0x0200,
+            'pcm_validated': False, 'native_speech_validated': False}
