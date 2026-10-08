@@ -616,8 +616,12 @@ microphone/earpiece tones on that incoming lifecycle; its passing recording
 is not inferred from the outgoing test. Neither direction proves native DSP speech.
 `verify-8210-sip-outgoing-restore` verifies exact connected handset architecture
 restoration, real SIP BYE, fresh-epoch clearing and no redial. The external
-dialog is discarded rather than restored; incoming/pending-call restoration
+dialog is discarded rather than restored; incoming-call restoration
 and audio continuity across load are not inferred from this gate.
+`verify-8210-sip-pending-outgoing-restore` independently covers SIP 180
+save/load followed by CANCEL/487, exactly one fresh-epoch clear, no redial,
+no CONNECT and no accepted media. Both restoration phases pin the own dialed
+number and exact handset architecture; neither restores an external dialog.
 
 `verify-8210-sip-outgoing-busy` physically dials `1234567` on configured
 carrier 4 against actual SIP 486. It requires the decoded SETUP number,

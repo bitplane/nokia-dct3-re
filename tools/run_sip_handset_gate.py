@@ -536,7 +536,7 @@ def main():
                  not args.restore_call and
                  not args.restore_idle and not args.restore_outgoing)
     nsm3_restore = (args.product == '8210' and not args.incoming and
-                    args.restore_outgoing and args.sip_response == 200 and
+                    args.restore_outgoing and args.sip_response in (180, 200) and
                     not args.record_media and not args.restore_call and not args.restore_idle)
     if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm3_restore and
             (not args.incoming or not args.cancel_incoming)) or

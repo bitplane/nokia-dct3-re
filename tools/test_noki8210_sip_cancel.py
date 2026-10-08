@@ -1,5 +1,7 @@
 from pathlib import Path
 import hashlib
+import contextlib
+import io
 import json
 import re
 import tempfile
@@ -10,6 +12,18 @@ from tools import run_noki8210_sip_cancel as check
 
 
 class OutgoingBusyTest(unittest.TestCase):
+    def test_restore_phase_requires_explicit_restoration(self):
+        with patch('sys.argv', ['run_noki8210_sip_cancel.py', '/tmp/unused-8210-run',
+                               '--pjsua', '/tmp/unused-pjsua',
+                               '--restore-outgoing-phase', 'alerting']), \
+                patch.object(check, 'prepare_run') as prepare, \
+                contextlib.redirect_stderr(io.StringIO()) as errors:
+            with self.assertRaises(SystemExit) as failure:
+                check.main()
+            self.assertEqual(failure.exception.code, 2)
+            self.assertIn('requires --restore-outgoing', errors.getvalue())
+            prepare.assert_not_called()
+
     def test_own_carrier_send_and_reviewed_presentation(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

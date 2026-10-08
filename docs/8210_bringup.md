@@ -154,8 +154,15 @@ with SIP BYE. The fresh epoch republishes the own `1234567` request; the bridge
 must clear it exactly once without redial and complete firmware CC/RR release.
 Fresh `run_8210_sip_outgoing_restore_probe` passes, restoring architecture at
 34.000 s and ending the epoch-2 call at 34.130 s. SIP dialog restoration,
-incoming/pending-call restoration and waveform continuity across load are
+incoming-call restoration and waveform continuity across load are
 not claimed. This fixture tests restoration, not media-quality acceptance.
+
+`verify-8210-sip-pending-outgoing-restore` uses SIP 180 and the same exact
+architectural save/load before connection. Fresh
+`run_8210_sip_pending_restore_probe` passes real CANCEL/487, one fresh-epoch
+clear and complete firmware release without redial, CONNECT, or accepted
+media. The physically dialed `1234567` is checked both in request identities
+and decoded SETUP; another product's digits cannot substitute for it.
 
 Fresh matrix run `run_8210_sip_media_closed` passes with explicit media
 closure at 37.030 s and completion at 37.040 s, with no rejected downlink.
