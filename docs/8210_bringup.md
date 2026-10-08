@@ -1161,6 +1161,24 @@ the separate `1802/8b -> 2a2250 -> 21f900` measurement continuation,
 whose post-acquisition production/lifetime contract is still unproved.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
+The bounded request-lifetime watches in `noki8210_security_input.lua` cover
+root `137f58..137f67` and the initially selected heap context `113264..11326b`.
+Paired current-build runs `run_8210_late_pin_lifetime_02` and
+`run_8210_early_pin_lifetime_02` reproduce failure at eight-second PIN entry
+and full registration at seven seconds, respectively. Both initialize selector
+`03` at `2a1e78` and alternate pointer zero at `2a1e7c`, at 3.181635s.
+In the successful run, queued pointer `1135f4` arrives at 11.696917s;
+`2a0df4/2a0df8` promote it to current and clear the queue at 12.262181s,
+before ordinary teardown clears the context roots at 12.557286s. In the
+late run, the same queue pointer arrives at 12.696127s, after the serving
+acknowledgement; no subsequent promotion store occurs in the 46-second window.
+These observations support an unclosed request-lifetime/continuation contract,
+not selector corruption or an unanswered late type-57 request. The next
+static target is the promotion entrance at `2a1489` and its event ownership.
+The initially watched heap address is recycled after successful teardown:
+later allocator and packet writes there are not measurement-context changes.
+Do not infer permanent object ownership from a fixed-address watch.
+
 ## Evidence needed to resume
 
 The software-accessible stock upload, operand decoding, existing COBBA model
