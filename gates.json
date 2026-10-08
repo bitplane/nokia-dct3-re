@@ -14051,6 +14051,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "coherent-registration", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-slow-pin-registration",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "slow-pin-registration", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-coherent-host-incoming-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

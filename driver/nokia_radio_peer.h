@@ -62,6 +62,7 @@ public:
 				neighbour_bsic_encoding::none;
 		bool band_scan_accepts_candidate_window = false;
 		bool split_gsm_pcs_scans = false;
+		bool background_band_measurements = false;
 
 		constexpr bool enabled() const
 		{
@@ -327,6 +328,7 @@ private:
 	bool m_trace_enabled = false;
 	unsigned m_reports_sent = 0;
 	unsigned m_reports_remaining = 0;
+	bool m_background_measurement_pending = false;
 	u8 m_phase = u8(phase::inactive);
 	unsigned m_search_round = 0;
 	unsigned m_idle_measurement_sample = 0;

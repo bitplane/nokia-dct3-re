@@ -131,6 +131,7 @@ void nokia_radio_peer_device::device_start()
 	save_item(NAME(m_enabled));
 	save_item(NAME(m_reports_sent));
 	save_item(NAME(m_reports_remaining));
+	save_item(NAME(m_background_measurement_pending));
 	save_item(NAME(m_phase));
 	save_item(NAME(m_search_round));
 	save_item(NAME(m_idle_measurement_sample));
@@ -299,6 +300,7 @@ void nokia_radio_peer_device::device_reset()
 			attotime::from_ticks(60, 13'000));
 	m_reports_sent = 0;
 	m_reports_remaining = 0;
+	m_background_measurement_pending = false;
 	set_phase(phase::inactive);
 	m_search_round = 0;
 	m_idle_measurement_sample = 0;
@@ -1717,6 +1719,15 @@ void nokia_radio_peer_device::encode_random_access_info(u8 *payload)
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
 {
+	// NHM-3 requests this measurement before late SIM initialization finishes.
+	// It consumes ordinary 8b records without stopping the serving receiver.
+	if (m_protocol.background_band_measurements && packet.type == 0x57 &&
+			packet.length == 4 && packet.payload[0] == 3 &&
+			packet.payload[1] == 5 && packet.payload[2] == 0 && packet.payload[3] == 0)
+	{
+		m_background_measurement_pending = true;
+		return;
+	}
 	const search_request search = decode_search_request(packet);
 	if (handle_search_request(search))
 		return;
@@ -3133,6 +3144,34 @@ void nokia_radio_peer_device::tick()
 {
 	if (!m_enabled)
 		return;
+	if (m_background_measurement_pending)
+	{
+		std::array<u8, 166> payload{};
+		payload[1] = 0x10;
+		for (unsigned slot = 0; slot < 40; ++slot)
+		{
+			payload[2 + slot * 4] = 0xff;
+			payload[3 + slot * 4] = 0xff;
+			payload[5 + slot * 4] = 0x81;
+		}
+		unsigned slot = 0;
+		for (unsigned index = 0; index < m_gsm_network->cell_count() && slot < 40; ++index)
+		{
+			const auto *cell = m_gsm_network->cell_at(index);
+			if (!cell || !m_gsm_network->cell_receivable(cell->arfcn))
+				continue;
+			payload[2 + slot * 4] = cell->arfcn >> 8;
+			payload[3 + slot * 4] = cell->arfcn;
+			payload[5 + slot * 4] = u8(m_gsm_network->cell_rssi(cell->arfcn, 0));
+			++slot;
+		}
+		if (m_transport->enqueue_rx_packet(0x8b, payload.data(), payload.size()))
+		{
+			m_background_measurement_pending = false;
+			m_transport->notify_rx();
+		}
+		return;
+	}
 
 	if (m_handover_enabled && !m_handover_started &&
 			m_traffic_channel_active && m_gsm_session->call_connected() &&

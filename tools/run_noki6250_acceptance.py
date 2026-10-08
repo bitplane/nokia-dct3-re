@@ -76,7 +76,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "coherent-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
+                                              "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
                                               "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
@@ -96,6 +96,11 @@ def main():
         if not mame.is_file():
             raise ValueError(f"missing MAME executable: {mame}")
         accessory_contract, audit_members = prepare_run(run, root)
+        if args.scenario == 'slow-pin-registration':
+            from tools.make_sim_card_profile import make_profile
+            card = run / 'nvram/nhm3hle/sim_card'
+            card.parent.mkdir(parents=True)
+            card.write_bytes(make_profile(pin_enabled=True))
         host_call = args.scenario == "host-incoming-call"
         host = args.scenario.startswith("host-")
         host_incoming_sms = args.scenario in ("host-incoming-sms", "host-incoming-sms-text")
@@ -119,7 +124,7 @@ def main():
             ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
                           mask="1", defvalue="0", value="1")
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
-        if args.scenario in ('coherent-registration', 'power-cycle') or args.coherent_cell:
+        if args.scenario in ('coherent-registration', 'slow-pin-registration', 'power-cycle') or args.coherent_cell:
             apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
@@ -128,6 +133,8 @@ def main():
             script = "noki6250_phonebook_observe.lua"
         if args.scenario in ("registration", "coherent-registration", "accessory"):
             script = "noki6250_runtime_observe.lua"
+        if args.scenario == 'slow-pin-registration':
+            script = 'noki6250_slow_pin_input.lua'
         if args.scenario == "idle-state":
             script = "noki6250_state_idle.lua"
         if args.scenario == "call-state":
@@ -198,7 +205,7 @@ def main():
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
-            "laboratory_carrier": 19 if args.scenario in ('coherent-registration', 'power-cycle') or args.coherent_cell else None,
+            "laboratory_carrier": 19 if args.scenario in ('coherent-registration', 'slow-pin-registration', 'power-cycle') or args.coherent_cell else None,
             "shared_rom_audit_members": audit_members,
             "accessory_contract": accessory_contract,
             "host_command": host_command,
@@ -249,6 +256,9 @@ def main():
                        str(run / 'error.log'), str(run / 'nvram/nhm3hle/sim_card'), str(run / 'snap')]
         elif args.scenario == 'coherent-registration':
             checker = [sys.executable, str(root / 'tools/noki6250_coherent_registration_check.py'),
+                       str(run / 'error.log'), str(run / 'nvram/nhm3hle/sim_card')]
+        elif args.scenario == 'slow-pin-registration':
+            checker = [sys.executable, str(root / 'tools/noki6250_slow_pin_check.py'),
                        str(run / 'error.log'), str(run / 'nvram/nhm3hle/sim_card')]
         elif args.scenario in ("registration", "accessory"):
             checker = [sys.executable, str(root / "tools/radio_registration_trace_check.py"),

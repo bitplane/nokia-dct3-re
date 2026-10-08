@@ -3689,6 +3689,9 @@ void nokia_dct3_state::nhm3hle(machine_config &config)
 	// selected here. Assigned-channel and call-release contracts are
 	// configured below; handover remains unproved.
 	runtime.radio.acquisition = nokia_radio_peer_device::acquisition_strategy::candidate_window;
+	// Own type-57 (3,0) -> task-14 1802/8b -> 3cbe14 is exercised by
+	// physical slow-PIN registration. This remains a runtime DSP HLE contract.
+	runtime.radio.background_band_measurements = true;
 	// Own consumer 0x464756 compares RX body bit 0 with pending context
 	// 0x0402 byte 2, observed as 1 for assigned SDCCH.
 	runtime.radio.assigned_channel_confirmation = 1;

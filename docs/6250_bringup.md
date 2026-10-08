@@ -16,6 +16,8 @@ cell now verifies fresh registration with matching SCH, MCU and host carrier;
 the older default-cell gates are bounded signaling comparisons, not this
 coherence proof. Physical incoming/outgoing call
 signaling and complete release are verified, but speech/audio is not.
+Slow physical SIM-PIN entry now also reaches coherent registration through
+a request-derived background DSP measurement with verified RX delivery.
 SMS delivery, reading, deletion and reply submission are verified. An organic
 phonebook save and cold-start retrieval from SIM NVRAM are verified below. Normal `noki6250`
 retains the fail-closed final publication wait at `429842`; the research
@@ -68,348 +70,104 @@ speech and acquired PMM validity remain unchanged.
 
 ## Inputs
 
-### SIM PIN boundary
+### SIM PIN and late-initialization recovery
 
-A cold initial-record PMM comparison with a PIN-enabled laboratory card
-(`make_sim_card_profile.make_profile(pin_enabled=True)`) displays the
-96x60 `Enter PIN code:` prompt. Physical cells `(column,row)`
-`(2,1), (3,1), (4,1), (2,2), (1,1)` pressed for 150 ms at 8, 9, 10,
-11 and 12 s enter `1234` and confirm. Their observed raw codes are
-`07,08,09,0c,06`. The firmware sends `A0 20 00 01 08` (VERIFY CHV1),
-and the card returns `9000` with retries `3/3` and PIN still enabled.
-Another physical `(1,1)` press at 32 s opens Messages. This is SIM PIN
-verification, not the phone's EEPROM-owned security code.
+`make verify-6250-slow-pin-registration RUN_DIR=NEW_DIRECTORY` creates a
+fresh PIN-enabled laboratory card (CHV1 1234) and the declared acquired-PMM
+initial-record comparison. Physical digits 1/2/3/4 and Confirm use matrix
+cells (2,1)/(3,1)/(4,1)/(2,2)/(1,1), beginning at 8 s with 150 ms presses
+and 850 ms releases. No firmware state or internal message is injected.
 
-Reviewed full-frame grayscale SHA-256 values are
-`be6373a76dbb583af392c54f2252a8f03cd1e7541341f0b4969bf6157ab90734`
-(PIN prompt) and
-`67172dbab6f0c4ab41a80b08642a373f0ca37e6d1ce4e7efe518ae13d602ba2a`
-(Messages). Own native upload/HLE and initial-record validation checks pass.
+The gate requires own native uploads/HLE isolation, a request-derived
+background measurement reaching the own-ROM consumer, successful
+`A0 20 00 01 08` verification with `9000` and unchanged retries 3/3,
+carrier-coherent ARFCN19 registration after verification, and persistent
+EF_LOCI. The verified run routes the measurement at 10.365085 s, invokes
+completion `3cbe14` at 10.365198 s, verifies CHV1 near 12.024 s and
+registers at 13.120000 s. Prompt and settled idle snapshots are retained
+in the isolated run. This proves late-PIN registration in research HLE,
+not native DSP behavior, native speech or authenticated factory PMM.
 
-Slow-entry post-PIN network continuation is **unresolved**: neither the erased-location
-card nor a separate card-only comparison carrying the existing laboratory
-LAI `00f1100001`, location status `01`, and BCCH `00` x 15 + `01`
-registers within 45 s. Both verify CHV1 successfully and remain physically
-interactive. Thus cached location alone does not explain the missing
-registration. These observations do not extend the PIN-disabled coherent
-registration gate to a PIN-enabled boot; recover the post-CHV1 MM/RR
-continuation before doing so. Phone PMM and firmware are unchanged.
+#### Request and completion contract
 
-The PIN-enabled and ordinary coherent boots have identical first 32 MCU
-radio TX packets. Their next serving-channel bodies are respectively
-`0412020900000010600000131000000000297000` and
-`0412020900000010600000131000000007297000`: byte 16 is `00` versus `07`.
-The PIN-enabled boot then emits type `57`, body `03050000`, at 10.364497 s;
-the ordinary boot instead emits type `46`, body `3210321000010000`, then
-reconfigures its receiver and reaches random access. Recurring type `4a`,
-body `011b`, appears in the locked boot both before and after successful
-VERIFY; it is not established as a reply-bearing post-PIN request.
+The common sender `4f610a..4f6112` passes queued payload bytes through
+`4295bc`. Type-57 constructor `3f9d88` allocates an eight-byte object,
+sets envelope halfword 2 and payload length 4, and stores opcode 57 at
+`3f9da8`. Helper `3f9932` encodes arguments (3,0) as `03050000`;
+the two remaining bytes are zero. Type 55 shares this encoder, which
+alone does not establish reply equivalence. The aligned Thumb-BL census
+finds type-57 constructor calls at `2d1dbe/2d36b6` among 98,084
+BL-shaped pairs; it does not cover ARM/computed calls.
 
-Passive TX-producer observation at `100a4` identifies commit PC `4295a0`,
-LR `4295f1` and stacked continuation `4f6113` for types `57/4a`. Own-ROM
-code at `4f610a..4f6112` reads the queued object's byte 2, passes its payload
-at `+3` to `4295bc`, then tests send success. This locates the common sender,
-not the original constructor or the semantics of byte 16. Recover those
-upstream owners before changing peer behavior. The peer already transmits
-continuous serving SI; absence of a one-shot repeated SI response is not
-an established cause. No guessed type-57/4a acknowledgement is installed.
+For the evidenced NHM-3 request only, the HLE queues an independent
+166-byte `8b` measurement, preserving the serving receiver and acquisition
+state. Its two-byte header and forty four-byte ARFCN/RSSI records come
+from receivable laboratory cells; unused records use ARFCN ffff and
+RSSI -127. The transaction is backpressure-aware, pending state is saved
+and reset, and successful publication explicitly raises FIQ0. Other
+products and unknown request bodies do not acquire this behavior.
 
-The type-57 object is constructed at `3f9d88`: an eight-byte allocation is
-zeroed, envelope halfword 2 and payload length 4 are set, and `57` is stored
-at object `+3` by `3f9da8`. Helper `3f9932` encodes its two arguments into
-payload bytes `+4/+5`; the remaining payload bytes remain zero. Passive
-entry observation identifies caller continuation `2d1dc3` and arguments
-`(3,0)` in the PIN-enabled boot, matching `03050000` without a guessed
-wire interpretation. The encoded aligned Thumb-BL scan finds calls only at
-`2d1dbe` and `2d36b6` among 98,084 BL-shaped halfword pairs. This does not
-cover computed/ARM calls or classify every code/data candidate.
+The own-ROM RX dispatcher subtracts 80 and then 03 before indexing the
+thirteen-entry big-endian table at `504598` for types 83..8f. Entry 8b
+selects `5045ec -> 4649ac`, not adjacent type-8a handler `4646c0`.
+Handler `4649ac` forwards its envelope to task 14 through `3c348c`
+only when byte `1721e0` equals 1; otherwise it frees it through
+`3c3c34`. Initializer `2d1538` clears the byte through `4649cc`
+and sets it to 1 at `2d1590` using base `1721dc + 4`. A slow-PIN
+write-watch confirms it remains enabled through 16 s.
 
-At the observed caller, `2d1d6e..2d1d76` reads field `+6` of the object
-pointed to by global `172a0c` and selects the constructor branch for value
-1. Its preceding path calls selector `3caf2c(0)` and stores that result
-back into field `+6`. Constructor arguments instead come from the separate
-object pointed to by `172a1c`: byte 0 supplies argument 0, and byte 9
-selects argument 1 as zero or two. These two contexts must not be conflated.
-Selector `3caf2c` indexes a nine-entry branch table at `3caf48` by the
-signed halfword at `172a0a`; literal `3cb264` names the structure base
-`172a08`, not a pointer. Passive fresh 16-second comparisons show both
-boots enter state 8 and then state 4 at 3.676 s. The no-PIN boot calls
-`3caf2c(3)` from continuation `2d1917` at 9.874555 s, before its
-`3caf2c(0)` call at 10.365044 s, which leaves state 4. The PIN-enabled boot
-instead calls `(0)` at 10.364015 s, changes state 4 to 6 and constructs
-type 57 with arguments `(3,0)`. Its `(3)` call from the same continuation
-arrives only at 12.495750 s, after successful VERIFY and subsequent SIM
-reads, and leaves state 6.
+Task 14's receive continuation `2d2101` checks ID 1802 and class 8b
+before calling `3cbe14`. That helper selects `38fdca` when the args
+record's word +4 is zero, otherwise `38fed0`. The former reads up to
+forty records, big-endian ARFCN from message +6/+7 and signed RSSI from
++9, rejecting values below -104 dBm. The permanent gate correlates the
+same envelope through raw handler, task-14 post and completion consumer.
 
-The state-6 branch at `3caff0` sends every nonzero input directly to
-`3cb41e` with state 6; state 4 similarly records state 4 for nonzero input
-at `3cb078`. This is not the end of processing: the shared tail dispatches
-on the input. Input 3 reaches `3cb468`, calls status helper `3caa64`,
-stores its result in context byte 1, and tests a further completion
-predicate. It does not call flag-count rebuild `38e60a` along that path.
-Thus the late call is observed and refreshes derived status; retaining
-the selector state alone is not proof that the input was ignored.
-This comparison establishes ordering, not that
-the argument-3 call is sufficient for registration or that a timer should
-be delayed. The next boundary is the upstream continuation `2d1917` and
-the state-4/state-6 zero-input decision: recover the condition that differs
-after CHV1 and the legitimate re-evaluation mechanism without forcing
-state or inventing a radio acknowledgement.
+#### Firmware lifecycle distinctions
 
-The zero-input state-4 predicate at `3cb0a2..3cb0d6` requires context
-bytes 0/1/2 to equal 2/1/1, matching nonzero pointers through globals
-`16f91c` and `16f924`, and the detail object's signed halfword to equal
-`03ec`. In the PIN boot its failure target `3cb0ea` observes context bytes
-`02080100000001008105`, detail halfword `03eb`, and both pointer values
-`0011c770`: pointer equality is satisfied, but status byte 1 is 8, not 1.
-The detail comparison is therefore not reached in that invocation.
+Selector `3caf2c` uses signed state at `172a0a`; literal `3cb264`
+names structure base `172a08`, not a pointer. Context pointers at
++4/+8/+12/+20 address separate records; constructor arguments come from
+the record at `172a1c`, not context field +6.
 
-Status helper `3caa64` uses accessor `38ea84`, which normalizes three
-nine-byte flag groups at `16f92c` and appends an any-set result to each
-temporary record. Passive writes show a concrete group-2 divergence after
-the zero-input refresh: the PIN run sets `16f942` (group offset 4) through
-`38e698`, continuation `38e50b`, at 10.364155 s; the no-PIN run instead
-sets `16f93f` (group offset 1), continuation `38e55b`, at 10.365222 s.
-No later writes to these 27 flag bytes appear through 16 s in either run,
-including the PIN run's successful VERIFY and late selector input 3.
-Recover the refresh predicates in `38e60a` and their backing state before
-interpreting either flag as a named SIM or network condition.
+Without the background transaction, late PIN initialization leaves
+selector state 6 after state-4 zero-input selection. Fast PIN entry
+(150 ms press / 50 ms release) precedes that selection and registers,
+but is not an acceptable substitute for recovery. Cached EF_LOCI/BCCH
+alone does not restore slow-entry registration.
 
-Classifier `38e50c` derives the flag index from bits 16..19 of a record's
-word `+0c` and a separate predicate. Paired passive observations identify
-the same record `0011c770`, unchanged packed word `00450000`, in both
-boots: at their first selection near 8 s both return class 4 with predicate
-zero; at the 10.365 s no-PIN refresh the predicate is one and class is 1,
-whereas at 10.364 s the PIN refresh still has predicate zero and class 4.
-These are record counts, not direct SIM-status flags. The underlying
-predicate comes from `38e4ee`/`4af4e0`, with an additional path through
-`4af676` capable of selecting one. Recover that record predicate and its
-post-VERIFY update before changing any transport behavior.
+Nonzero selector inputs do not stop at `3cb41e`: the shared tail
+processes input 3 at `3cb468`, refreshes derived status via `3caa64`
+and checks completion. Retained state 6 is not proof of ignored input.
+Groups at `16f92c` are counts of classified firmware records, not
+direct SIM/network flags. Classifier `38e50c` uses packed record bits
+16..19 plus identity predicate `38e4ee/4af4e0`; the latter compares
+three bytes exactly. The status divergence reflects whether SIM-derived
+identity arrived before the selection, not a missing SIM notification.
 
-The primary predicate `4af4e0` is an exact three-byte equality test.
-Passive calls from `38e4ee` show both boots initially compare `15f520`
-with `00f110` near 8 s. At the 10.365 s ordinary refresh the first operand
-has moved to another object and contains `00f110`, matching the second;
-the PIN boot still compares `15f520` with `00f110` at 10.364 s. The
-PIN-enabled fixture's later SIM reads therefore have not preceded this
-selection. The additional predicate `4af676` is not the only explanation
-for the ordinary result: the primary equality already succeeds there.
-Trace the first operand's linked-object source and its legitimate refresh
-after SIM initialization. These bytes resemble PLMN encoding, but byte
-shape alone does not establish object ownership or authorize substituting
-an identity.
+The real late notification `03ec` reaches cache updater `3cba56`,
+which owns detail pointer `172a14` and accepts 03ea..03ed. The caller
+then invokes selector input 3. The serving peer continues BCCH delivery:
+receiver state 1 routes SI through `3bca84` as task-14 messages 03f9,
+whereas state 2 routes it through `3bc5e0` as 03f8 transitions. A
+silent `3bc5e0` after PIN is not evidence that the peer stopped sending
+SI or that the alternate path drops it.
 
-A discriminating physical-input experiment starts at the same known-visible
-8-second PIN prompt but uses 150 ms press / 50 ms release intervals instead
-of one-second key intervals. VERIFY returns `9000` with CHV retries 3/3;
-selector input 3 arrives at 9.296042 s, before zero-input selection at
-10.364181 s. Its comparison reads `00f110` on both sides, and the host
-adapter records `network registered=1 arfcn=19` at 11.020000 s. This
-establishes a PIN-enabled registration path without firmware or peer
-timing changes. It does not repair late PIN entry: ordinary users must
-not have to beat this decision. An earlier attempt beginning input at
-6 s produced no VERIFY and is not a valid registration comparison.
-The remaining question is legitimate re-evaluation after late SIM
-initialization, rather than inability to register any PIN-enabled card.
+#### Experiment acceptance discipline
 
-The late continuation calls message-cache updater `3cba56` before selector
-input 3. This updater owns the detail pointer at `172a14`, accepts message
-family `03ea..03ed` (literal `3cbe10 = 03ea`), and copies the incoming
-halfword to detail `+0`. For `03ec` it copies four bytes from message `+4`
-to detail `+4`, message byte `+8` to detail `+2`, sets detail `+3 = 1`, and
-copies message byte `+9` to detail `+10`. For `03eb` the copied identity
-is likewise from `+4`, while message `+9` controls detail `+3` and detail
-`+10` is cleared. The next observation should capture the actual incoming
-record at `3cba56` and the linked-record updates, not guess an additional
-DSP packet. The nearby `2d29ce` target is an internal dispatcher branch
-leading to its receive loop, not a standalone re-evaluation helper.
+`tools/noki6250_measurement_delivery_check.py LOG` requires enqueue,
+matching RX notification, consumer advance, enabled raw handler and
+task-14 dispatch for one isolated candidate. Later packets cannot supply
+evidence for an earlier one. Its PASS proves delivery only; the slow-PIN
+checker additionally requires completion, verification and registration.
 
-Actual cache-entry observations confirm both boots first receive
-`03eb476215f520bf240100000016c144` at 3.675851 s. The ordinary boot later
-receives `03ec7dd900f110bf2001050b08000000` at 9.874504 s; the slow-PIN
-boot receives `03ec7dd900f110bf2001000008000000` at 12.495698 s. Both
-late messages contain identity bytes `00f110` and enter from continuation
-`2d18f9`; the body is not wholly identical (bytes 10/11 differ), so this
-does not exclude every SIM-content distinction. It does exclude a wholly
-missing `03ec` post-PIN notification. Pre-cache helper `3cbddc` clears
-context fields 2/4/5 and invokes selector input 1; the continuation then
-updates the cache and invokes input 3. Input 1 resets selected contexts;
-input 3 refreshes derived status and checks completion through `3cb468`,
-but does not rebuild the record counts there. Follow the linked-record
-refresh and its consumer-side triggers
-after this real notification; do not add a duplicate synthetic message.
-
-At the slow-PIN input-3 failure target `3cb4f8` (12.495830 s), the
-refreshed context begins `0208010000000100`, while the controller status
-pointer `16f910` resolves to `001028d0` containing zero. The check reaches
-context status 8, not the required 1; this invocation is not rejected by
-the earlier controller-word test. The remainder of cache updater
-`3cba56` returns at `3cbb3e` without rebuilding counts. An aligned direct
-Thumb-BL census identifies seven rebuild callers (`38e6e2`, `3caf98`,
-`3cb072`, `3cb096`, `3cb14c`, `3cb55a`, `3cb89a`) and ten incremental
-count-update callers (`38e9f8`, `38ea0a`, `38ecd6`, `38ece8`, `38f51a`,
-`38f532`, `38f760`, `38f770`, `38faee`, `38fb06`). These are the bounded
-record-update surface for the next trace; the census excludes indirect
-and ARM calls and does not independently classify code/data boundaries.
-
-A 45-second slow-PIN run observing both update-function entries confirms
-the last rebuild is `38e60a` from `3cb09b` at 10.364053 s. The last
-incremental remove/add pair is from `38ecdb`/`38eced` at 8.007525/
-8.007741 s. Neither function runs after successful VERIFY and `03ec`
-delivery through the end of this observation window. The remove/add
-caller `38ecc2` selects a record through `38e476`, removes its old count,
-mutates the packed state through `38eb40`/`38ec4c`, adds its new count,
-and calls `38e92a`. This is a concrete mutation lifecycle to trace, not
-evidence that a delayed radio reply should be fabricated. The current
-radio peer has no explicit type-57/type-4a request handler; absence of a
-handler alone does not establish that either packet requires a reply.
-
-The last mutation helper `38ecc2` has one aligned direct BL caller,
-`3cb8be`, inside transition function `3cb7c8`. A passive 45-second slow-PIN
-run sees that function only at 7.407658, 7.407904, 7.706699 and 8.007231 s
-with arguments `(1,0)`, `(2,0)`, `(3,0)` and `(0,1)`, all from continuation
-`2d1b5d`; none follows the late `03ec`. That caller supplies its arguments
-from incoming message bytes `+7/+8`, calls `50c496` with byte `+7` first,
-and stores the transition result in context byte 6. The next boundary is
-the identity and producer of this incoming message family, and the
-transition decision in `4bb414`, not another search for flag-byte stores.
-
-The observed transition messages are `03f8`, with arguments in bytes
-`+7/+8`: bodies begin `03f800040000000100`,
-`03f87d340000000200`, `03f844440000000300`, and
-`03f800000000000001`. Passive heap writes identify constructors at
-`3bc620` and `3bc7ec`. The primary producer builds message ID as
-`7f << 3`, so a census limited to full-width literal `000003f8` misses
-it. Its decoder copies 24 bytes from a lower input object's `+0e`,
-requires input class byte `50`, checks payload protocol nibble 6, and
-dispatches on the lower six bits of payload byte 2. This places the
-transition family downstream of a decoded layer-3 packet, not an
-independent guessed DSP completion. Recover the exact system-information
-cases and their repeat-suppression conditions before changing the peer.
-
-The decoder maps RR message `1b` to its SI3 branch at `3bc77c`; it
-publishes a transition when updater `3bbd44` reports change or the cached
-SI3 flag (bit 2 at decoder context `169334 + 0f`) is clear. However,
-duplicate suppression is not a sufficient diagnosis: an entry observer
-at `3bc630` over 45 seconds sees only `1a`, `1a`, `1b`, `1c`, `19` at
-6.808917, 7.106408, 7.406309, 7.706309 and 8.006310 s, with no later
-decoder entries after PIN acceptance. The peer's source includes a
-serving-BCCH recycle path, so next distinguish actual lower publication,
-firmware receive routing and decoder gating after channel confirmation.
-Do not infer that repeated SI was consumed and suppressed merely because
-the peer is intended to broadcast continuously.
-
-An otherwise identical 45-second run with existing `-verbose` transport
-diagnostics verifies continued type-80 BCCH publication after the late
-PIN transaction: at 44.175906 s the peer enqueues a class-50 SI4 block,
-at 44.480906 s SI1, and at 44.785906 s SI2. Interleaved type-83 reports
-and class-60 paging blocks also continue. FIQ0 notifications accompany
-these publications, and the logged consumer cursor advances between
-them (for example `095 -> 0a7 -> 0ac` at 44.775906..44.785906 s).
-The SI decoder observer still ends at 8.006310 s. This excludes a stopped
-peer broadcast loop and an entirely stuck RX ring for this run, but does
-not establish which firmware filter drops or reroutes class-50 packets.
-Next trace the actual lower decoder/recipient selection after the initial
-channel change; no new broadcast payload or reply is justified yet.
-
-Receiver `3bceae` dispatches on halfword `169334 + 18`. Its state-2
-class-50 branch compares context selector byte 6 with `170ce3` and calls
-SI decoder `3bc5e0` at `3bcf04`; state 1 instead calls `3bca84` at
-`3bcfc0`. Post-PIN passive receiver observations through 16 s show state
-1 and selector `12`, matching expected `12`, while class-50 packets keep
-arriving. Thus selector mismatch is excluded at these observations: the
-alternate receive-state route, not transport loss, explains why the SI
-decoder tap is silent. Recover `3bca84` and the state-word writers before
-assigning semantic names to state 1/2 or changing a peer channel reply.
-
-The alternate parser `3bca84` does not simply discard these broadcasts.
-It copies the lower block, extracts RR message type, handles SI3 (`1b`)
-and SI4 (`1c`) explicitly, and builds internal message `03f9` (literal
-`3bce40`) with a decoded subtype at `+14`. Its tail posts to task `0e`
-through `3c348c`. A passive post observer confirms continued delivery
-after late PIN acceptance: messages with subtypes 0/2/3 reach task 14
-from continuation `3bcead` through 15.835048 s. Thus the missing
-`03f8` transition is not evidence that the SI information is lost;
-it is forwarded on a distinct consumer path. Trace task 14's `03f9`
-handler and the receive-state writer together before changing the peer.
-
-Passive writes locate receive-state 2-to-1 transition at `3bcffe`,
-8.008669 s; subsequent packets retain state 1. Task 14's post-type-57
-receive continuation is `2d2101`. Its loop checks message ID `1802`
-(literal at the `2d2124` load) and class byte `8b` before calling
-`3cbe14` and returning to the selector path at `2d1d50`. This is a
-concrete completion candidate, not proof that every type-57 mode has the
-same response. Class `8b` already has an independently mapped
-ALL_RSSI_RESULTS contract in `network_scouting.md` and the radio peer.
-Recover the type-57 range/mode semantics and the two `3cbe14` result
-consumers (`38fdca`/`38fed0`) against that existing result format before
-adding request handling; a synthetic generic ACK is not the contract.
-
-The own-ROM type-55 constructor `3f9992` and type-57 constructor
-`3f9d88` both use `3f9932` for their two control bytes; type 55 stores
-its opcode at `3f99b2` and calls the encoder at `3f99c0`. Mode 3 / index
-0 resolves through table `2839c5` to control bytes `03 05`, independently
-matching the observed type-57 body. Consumer `38fdca` processes up to
-forty four-byte measurement records, reads big-endian ARFCN from message
-`+6/+7` and signed RSSI from `+9`, and rejects values below -104 dBm.
-This agrees with the existing `8b` measurement encoder's layout. The
-remaining contract distinction includes lifecycle: this type-57 request
-occurs while a serving receiver remains active, whereas the existing
-autonomous type-55 path is gated to acquisition/deactivation states.
-A candidate measurement transaction must preserve serving reception and
-cannot treat shared control encoding as proof of reply-envelope semantics.
-Unknown modes remain unsupported until their contracts are recovered.
-
-That bounded background type-55-layout candidate was tested and removed.
-It published a 166-byte `8b` result from receivable laboratory cells at
-10.364597 s without changing the serving phase. The mapped completion
-consumer `3cbe14` was not observed, the wait later saw the real `03ec`
-notification, and registration remained absent through 45 s. Shared
-control encoding and a reachable `8b` consumer do not establish that the
-proposed envelope reaches this consumer in this lifecycle. The ledger
-records `nhm3_late_pin_type57_accepts_background_type55_measurements`;
-recover the own-ROM `8b` routing and subscription contract next. The
-independent NHM-2 type-57 alias falsification is corroborating negative
-knowledge, not proof that every NHM-3 response has the same outcome.
-
-The own-ROM RX dispatch at `504572` subtracts `80`, then `03`, and
-indexes the thirteen-entry big-endian table at `504598` for types
-`83..8f`. Entry `8b` is `5045ec`, which calls `4649ac` (not the adjacent
-`8a` handler `4646c0`). Handler `4649ac` reads byte `1721e0` through
-literal pool `464a1c`: only value 1 forwards the existing envelope to
-task 14 through `3c348c`; other values free it through `3c3c34`.
-This is a delivery prerequisite, not evidence that the rejected response
-was valid or that this flag was zero during that experiment. The next
-question is who owns this flag and its value when late-PIN recovery runs.
-A passive fresh no-PIN comparison through 16 s observes `1802` envelopes
-of classes `80/83/84/89/8f` reaching task 14, but no `8b` post. Absence of
-an `8b` post in this comparison alone does not identify its cause.
-
-A fresh 16-second slow-PIN write-watch rules out a disabled route in
-the unmodified profile. Startup clears `1721e0` through `4649cc`, then
-initializer `2d1538` sets it to 1 at store `2d1590` (3.667507 s), using
-base `1721dc` plus 4. No later write changes this byte through the run;
-other bytes in the watched word are not treated as writes to this flag.
-The `4649ac` entry tap records no invocation. The next boundary is the
-packet-to-envelope path before this handler, not a missing subscription
-enable. This does not retrospectively prove where the removed candidate
-was lost: that candidate was not present in this observation.
-
-The retained candidate transport log narrows its negative result further:
-the enqueue at 10.364597 s has no following logged FIQ0 notification or
-RX consumer advance. The last notification preceded it at 10.363536 s
-for type `89`, whose consumer reached `00b4`; the candidate moved the
-producer from `00b4` to `00a4` after wrapping the ring. Publication alone
-does not prove delivery. The removed implementation failed, but this
-experiment cannot reject the response layout on semantic grounds. A
-future test must establish notification, ring consumption, decoded class
-and task destination before interpreting the completion result.
-`tools/noki6250_measurement_delivery_check.py LOG` enforces these
-prerequisites for one isolated 166-byte candidate, using the passive
-route/post observations. It rejects the retained candidate specifically
-for missing notification; its PASS would establish delivery only, not
-reply semantics or registration. Later `8b` publications cannot supply
-evidence for an earlier candidate.
+The ledger entry
+`nhm3_late_pin_type57_accepts_background_type55_measurements` rejects
+the earlier implementation, not the reply layout: that run enqueued a
+packet but had no subsequent logged FIQ0 notification or consumer advance.
+It therefore never established delivery. The independently rejected
+NHM-2 alias is not a substitute for NHM-3 evidence. No generic type-57
+acknowledgement or firmware-state forcing is installed.
 
 ### Coherent laboratory registration
 
