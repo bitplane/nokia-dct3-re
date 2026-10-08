@@ -2057,9 +2057,11 @@ is isolated and cleaned up on exit.
 make verify-8850-sip-incoming-waveform RUN_DIR=NEW_RUN
 ```
 
-Both call directions now have HLE waveform acceptance. Connected and
-alerting external-SIP save/restore lifetimes remain independent work;
-these results do not restore a host dialog or establish native speech.
+Both call directions have HLE waveform acceptance. The separate connected
+and alerting incoming and connected and pending outgoing restoration gates
+validate external-dialog invalidation and fresh-epoch GSM release. They do
+not restore a host dialog, preserve external media across load or establish
+native speech.
 
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot

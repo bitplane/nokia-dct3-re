@@ -203,7 +203,8 @@ in `external_call_bridge.md`. Signaling-only research products have not inherite
 this media promotion.
 
 SIP failure coverage is separate: busy (486) and unavailable (480) are verified
-for all five profiles in the table. The 3310 fixtures cover
+for 3210, 3310, 3330, 3410 and 5210. Separate research-profile gates cover
+8210 and 8850; their promotion is not inherited from the first five. The 3310 fixtures cover
 two organic attempts; the 3410 and 5210 fixtures observe one attempt and no
 redial in the 45-second run. The 3330 fixtures independently observe one ended
 attempt and no redial in the 40-second call run after fresh physical PMM setup. Checkers
@@ -211,7 +212,7 @@ require every observed host request to end and reject unhandled retry attempts
 or accepted media.
 
 Fresh incoming SIP after an idle save/load is independently verified for
-all five profiles in the table. The new epoch admits exactly one new call, physical
+3210, 3310, 3330, 3410 and 5210. The new epoch admits exactly one new call, physical
 Answer, sustained ordered media and normal release. This is a separate gate
 from clearing an active restored call; other profiles have not inherited it.
 
@@ -299,17 +300,40 @@ CC/RR release, persistent SIM location and decoded physical Exit from the
 missed-call screen. Initial idle presents `DCT3 LAB`; final idle presents
 numeric PLMN `00101`. Both frames are checked separately, not treated as
 proof of retained operator text. Answered SIP, media and native speech
-remain unproved.
+are not established by this unanswered gate. Separate 8850 incoming/outgoing
+media and waveform gates establish HLE speech transport; native DSP speech
+remains unproved.
 
 `verify-8850-sip-idle-restore` separately verifies exact idle architectural
 state, byte-identical replayed LCD pixels and transport/SIM replay before
 a new epoch-2 incoming SIP call and the same cancellation/physical cleanup.
-It does not restore an external dialog or establish media.
+It does not restore an external dialog or establish media by itself. The
+separate connected/alerting incoming and connected/pending outgoing restore
+gates validate invalidation and one fresh-epoch GSM release, not dialog replay.
 
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other
 proactive commands and native DSP are not promoted by this gate.
+
+`verify-6210-ussd` and `verify-6210-call-divert` independently establish physical
+supplementary requests, correlated laboratory responses, RR release, reviewed
+result/idle pixels and EF_LOCI persistence. `verify-6210-call-divert-lifecycle`
+extends forwarding through register/active-query/deactivate/inactive-query;
+`verify-6210-state-divert` additionally restores exact CPU/RAM/time and observed
+protocol replay before a fresh physical active query. Forwarding is laboratory
+network save-state data, not cold-process NVRAM. These gates do not establish
+native DSP, speech or displayed forwarding-number content.
+
+`verify-6250-ussd` separately establishes the physical USSD exchange and reviewed
+NHM-3 result/idle frames on its declared derived-PMM research comparison. The
+default-cell signaling gate is not an ARFCN19/20 coherence promotion.
+
+`verify-8890-minute-redraw` extends the retained cold clock to a serviced minute
+interrupt and reviewed 13:48 idle. The four GSM900/PCS incoming/outgoing
+speech-control gates independently establish own-ROM command-8 `860b`/`840a`
+publication on physical Send/End. Neither control words nor RTC redraw prove
+PCM transport: NSB-6 framing/edge ownership remains unvalidated.
 
 The 8210 research-HLE profile additionally passes `verify-8210-ussd`: physical
 `*123#`/Send, exact GSM supplementary-service request/response, RR release,
