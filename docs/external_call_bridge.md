@@ -91,6 +91,15 @@ cannot obtain its paging entrance within sixty seconds of emulation time is
 cancelled and reports `expired`; active firmware-owned transactions are not
 timed out by the host adapter.
 
+Media closure is not final call closure: stop audio on the correlated
+`media_closed` event and retain the dialog until `ended`. This distinction
+is runtime-checked on both NSM-3 and the existing 3210 composition. Fresh
+`run_3210_sip_media_closed_regression` passes the complete outgoing SIP gate,
+with media closure at 32.380 s and final completion at 32.410 s. These are
+fixture observations, not fixed hardware delays or a portable timing policy.
+Shared bridge/epoch/restoration tests also preserve the fresh-epoch/no-redial
+behavior. Do not restore an external SIP dialog from a MAME save state.
+
 The outgoing SMS acceptance runner uses a single 180-second wall-clock
 budget after submitting its host decision (`--completion-timeout` is a finite
 positive override). It waits for the current epoch/request's `ended` state;
