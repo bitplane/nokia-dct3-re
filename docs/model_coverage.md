@@ -94,6 +94,14 @@ The 6250's PIN-enabled gates independently cover delayed registration,
 incoming/outgoing host call signaling and SMS, and phonebook save followed by
 new-process PIN reauthentication and readback. They retain the declared PMM
 comparison and do not promote the normal machine or native speech.
+The three `verify-6250-pin-state-*` gates establish authenticated idle,
+connected-call and delivered-SMS restoration on coherent lab carrier 19,
+including architectural/protocol replay and physical menu, hang-up or read
+continuation. `verify-6250-coherent-call-state` and
+`verify-6250-coherent-sms-state` cover the corresponding no-PIN lifecycles.
+These local-peer fixtures disable the host adapter, while still requiring
+handset Location Updating and persistent SIM location; host-service gates
+retain their separate host/carrier agreement requirement.
 
 The 6250's `verify-6250-coherent-registration` independently verifies its
 declared initial-record HLE composition on external lab carriers 19/20:

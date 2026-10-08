@@ -15,7 +15,7 @@ from tools.noki6250_sms_check import verify as verify_sms
 from tools.radio_sms_acceptance_common import require_single_transport, sms_record, FIRST_SMS_DELIVER_BODY
 
 
-def verify(text, *, call=False, sms=False, storage=None, fresh_sip=False):
+def verify(text, *, call=False, sms=False, storage=None, fresh_sip=False, configured_carrier=False):
     if fresh_sip and (call or sms):
         raise ValueError('fresh SIP restoration requires idle')
     if '[LUA ERROR]' in text or '6250_state: FAIL' in text:
@@ -46,7 +46,7 @@ def verify(text, *, call=False, sms=False, storage=None, fresh_sip=False):
             raise ValueError('missing post-load physical Read scan')
         return
     if call:
-        verify_outgoing(text, '123')
+        verify_outgoing(text, '123', configured_carrier=configured_carrier)
         before_save = text.split('6250_state: event=saved', 1)[0]
         if not CONNECT_ACKNOWLEDGE.search(before_save) or DISCONNECT.search(before_save):
             raise ValueError('save was not inside an established active call')
@@ -102,11 +102,13 @@ if __name__ == '__main__':
     scenario.add_argument('--call', action='store_true')
     scenario.add_argument('--sms', action='store_true')
     parser.add_argument('--storage', type=Path)
+    parser.add_argument('--configured-carrier', action='store_true')
     args = parser.parse_args()
     try:
         text = args.log.read_text(errors='replace')
         storage = args.storage.read_bytes() if args.storage else None
-        verify(text, call=args.call, sms=args.sms, storage=storage)
+        verify(text, call=args.call, sms=args.sms, storage=storage,
+               configured_carrier=args.configured_carrier)
         check_frames(args.frames, call=args.call, sms=args.sms, text=text, storage=storage)
     except (OSError, ValueError) as error:
         parser.exit(1, f'6250 restoration FAIL: {error}\n')

@@ -88,11 +88,11 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true',
                         help='require slow physical PIN entry before coherent services or phonebook')
     args = parser.parse_args()
-    if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario in ('idle-state', 'phonebook')):
-        parser.error('coherent-cell downstream coverage requires a host, idle-state or phonebook scenario')
+    if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario in ('idle-state', 'call-state', 'sms-state', 'phonebook')):
+        parser.error('coherent-cell downstream coverage requires a host, state or phonebook scenario')
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
-                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook')):
-        parser.error('pin-enabled requires coherent host services or phonebook')
+                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook', 'idle-state', 'call-state', 'sms-state')):
+        parser.error('pin-enabled requires coherent host services, restoration or phonebook')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
@@ -131,6 +131,11 @@ def main():
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
         if args.scenario in ('coherent-registration', 'slow-pin-registration', 'power-cycle') or args.coherent_cell:
             apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
+        if args.coherent_cell and args.scenario in ('idle-state', 'call-state', 'sms-state'):
+            config_path = run / 'cfg/nhm3hle.cfg'
+            configuration = ET.parse(config_path)
+            configuration.find("./system/input/port[@tag=':CALLHOST']").set('value', '0')
+            configuration.write(config_path, encoding='utf-8', xml_declaration=True)
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
             script = "noki6250_sms_observe.lua"
@@ -238,6 +243,8 @@ def main():
                 checker.append("--call")
             elif args.scenario == "sms-state":
                 checker.extend(["--sms", "--storage", str(run / "nvram/nhm3hle/sim_card")])
+            if args.coherent_cell:
+                checker.append('--configured-carrier')
         elif args.scenario in ("host-rejected-sms", "host-silent-sms"):
             checker = [sys.executable, str(root / "tools/noki6250_sms_failure_check.py"),
                        str(run / "error.log"), str(run / "snap")]
@@ -288,11 +295,13 @@ def main():
         if args.pin_enabled:
             from tools.noki6250_slow_pin_check import verify as check_slow_pin
             check_slow_pin((run / 'error.log').read_text(errors='replace'),
-                           (run / 'nvram/nhm3hle/sim_card').read_bytes())
+                           (run / 'nvram/nhm3hle/sim_card').read_bytes(),
+                           require_host=args.scenario not in ('idle-state', 'call-state', 'sms-state'))
         if args.coherent_cell:
             from tools.noki6250_coherent_registration_check import verify as check_coherent
             check_coherent((run / 'error.log').read_text(errors='replace'),
-                           (run / 'nvram/nhm3hle/sim_card').read_bytes())
+                           (run / 'nvram/nhm3hle/sim_card').read_bytes(),
+                           require_host=args.scenario not in ('idle-state', 'call-state', 'sms-state'))
         if args.scenario == "accessory":
             subprocess.run([sys.executable, str(root / 'tools/noki6250_accessory_check.py'),
                             str(run / 'error.log'), str(run / 'snap/6250_runtime20.png')], check=True)

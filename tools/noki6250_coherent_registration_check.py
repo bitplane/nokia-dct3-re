@@ -10,11 +10,11 @@ from tools.noki6250_staged_check import check as check_uploads, check_initial_fi
 from tools.radio_registration_trace_check import verify as check_registration
 
 
-def verify(text, storage, *, preserved=False):
+def verify(text, storage, *, preserved=False, require_host=True):
     check_uploads(text, runtime=True)
     check_initial_fixture(text)
     check_registration(text, 'nhm3', preserved=preserved, configured_carrier=True)
-    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=19\b', text):
+    if require_host and not re.search(r'gsm_call_adapter: network registered=1 arfcn=19\b', text):
         raise ValueError('NHM-3 host and handset do not share carrier 19')
     if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
         raise ValueError('NHM-3 persistent SIM location is not laboratory-updated')

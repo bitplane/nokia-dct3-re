@@ -10,8 +10,8 @@ from tools.noki6250_coherent_registration_check import verify as registration
 from tools.noki6250_measurement_delivery_check import verify as delivery
 
 
-def verify(text, storage):
-    registration(text, storage)
+def verify(text, storage, *, require_host=True):
+    registration(text, storage, require_host=require_host)
     result = delivery(text)
     keys = re.findall(r'6250_pin_physical: column=(\d+) row=(\d+) t=([0-9.]+)', text)
     if [(int(c), int(r)) for c, r, _ in keys] != [(2, 1), (3, 1), (4, 1), (2, 2), (1, 1)]:
@@ -28,7 +28,8 @@ def verify(text, storage):
         rf'6250_pin_rssi_completion: caller=002d2141 message={result["message"]:08x} t=([0-9.]+)', text)
     if completion is None or float(completion[1]) < result['routed']:
         raise ValueError('delivered envelope did not reach the mapped completion consumer')
-    registered = re.search(r'network registered=1 arfcn=19 t=([0-9.]+)', text)
+    registered = re.search(r'network registered=1 arfcn=19 t=([0-9.]+)', text) if require_host else re.search(
+        r'RX enqueue type=80 payload=34[^\n]*data=8012[0-9a-f]{8}00130000030045050200f1100001[0-9a-f]* t=([0-9.]+)', text)
     if registered is None or float(registered[1]) <= float(header[1]):
         raise ValueError('registration did not follow late PIN verification')
 

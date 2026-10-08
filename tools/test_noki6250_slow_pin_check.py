@@ -25,7 +25,17 @@ class SlowPinTest(unittest.TestCase):
 
     def test_success(self):
         verify(TEXT, b'card')
-        self.registration.assert_called_once_with(TEXT, b'card')
+        self.registration.assert_called_once_with(TEXT, b'card', require_host=True)
+
+    def test_local_acceptance_after_pin(self):
+        text = TEXT.replace('network registered=1 arfcn=19 t=13.120000',
+            'RX enqueue type=80 payload=34 producer=0ab data=801200000b1400130000030045050200f1100001170809101010325476982b2b2b2b t=13.120000')
+        verify(text, b'card', require_host=False)
+        self.registration.assert_called_once_with(text, b'card', require_host=False)
+        for altered in (text.replace('t=13.120000', 't=11.120000'),
+                        text.replace('00130000030045', '00140000030045'), TEXT):
+            with self.subTest(text=altered), self.assertRaisesRegex(ValueError, 'follow late PIN'):
+                verify(altered, b'card', require_host=False)
 
     def test_fast_input_rejected(self):
         with self.assertRaisesRegex(ValueError, 'slow entry'):

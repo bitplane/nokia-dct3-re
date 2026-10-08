@@ -21,6 +21,15 @@ def storage():
 
 
 class CoherentRegistrationTest(unittest.TestCase):
+    def test_local_peer_still_requires_handset_registration_and_storage(self):
+        text = radio_fixture().replace('gsm_call_adapter: network registered=1 arfcn=19', '')
+        with patch.object(check, 'check_uploads'), patch.object(check, 'check_initial_fixture'):
+            check.verify(text, storage(), require_host=False)
+            with self.assertRaises(ValueError):
+                check.verify(text, storage())
+            with self.assertRaises(ValueError):
+                check.verify(text, bytes(1611), require_host=False)
+
     def test_preserved_scope_keeps_carrier_and_upload_requirements(self):
         text = 'gsm_call_adapter: network registered=1 arfcn=19\n'
         with patch.object(check, 'check_uploads') as uploads, \

@@ -9,7 +9,7 @@ from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, ma
 
 class CoherentConfigTest(unittest.TestCase):
     def test_pin_services_are_admitted_before_preparation(self):
-        for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook'):
+        for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook', 'idle-state', 'call-state', 'sms-state'):
             with patch('sys.argv', ['runner', 'unused', '--scenario', scenario,
                                    '--coherent-cell', '--pin-enabled', '--mame', '/nonexistent/6250-mame']), \
                     patch('sys.stderr', new_callable=io.StringIO) as errors, \
@@ -23,7 +23,7 @@ class CoherentConfigTest(unittest.TestCase):
     def test_pin_scope_requires_explicit_coherent_host_service(self):
         for options in (['--scenario', 'host-incoming-call'],
                         ['--scenario', 'host-incoming-sms-text', '--coherent-cell'],
-                        ['--scenario', 'idle-state', '--coherent-cell']):
+                        ['--scenario', 'idle-state']):
             with patch('sys.argv', ['runner', 'unused', '--pin-enabled'] + options), \
                     patch('sys.stderr', new_callable=io.StringIO), \
                     patch('tools.run_noki6250_acceptance.prepare_run') as prepare:
@@ -43,14 +43,14 @@ class CoherentConfigTest(unittest.TestCase):
             self.assertIn('missing MAME executable', errors.getvalue())
             prepare.assert_not_called()
 
-    def test_coherent_active_state_is_not_implicitly_promoted(self):
+    def test_coherent_active_state_is_admitted_before_preparation(self):
         for scenario in ('call-state', 'sms-state'):
-            with patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--coherent-cell']), \
+            with patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--coherent-cell', '--mame', '/nonexistent/6250-mame']), \
                     patch('sys.stderr', new_callable=io.StringIO), \
                     patch('tools.run_noki6250_acceptance.prepare_run') as prepare:
                 with self.assertRaises(SystemExit) as result:
                     main()
-                self.assertEqual(result.exception.code, 2)
+                self.assertEqual(result.exception.code, 1)
                 prepare.assert_not_called()
 
     def test_shared_preparation_keeps_own_comparison_and_audit_labels(self):

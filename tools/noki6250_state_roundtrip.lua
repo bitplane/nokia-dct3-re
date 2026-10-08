@@ -3,11 +3,15 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local call = _G.noki6250_state_call == true
 local sms = _G.noki6250_state_sms == true
 local scenario = sms and 'sms' or call and 'call' or 'idle'
+local pin = os.getenv('NOKIA_DCT3_6250_PIN_ENTRY') == '1'
 _G.noki6250_call_hold = call
 if not _G.noki6250_runtime_observer_loaded then
     dofile(assert(source:match('^(.*[/])')) ..
         (call and 'noki6250_call_observe.lua' or 'noki6250_runtime_observe.lua'))
     _G.noki6250_runtime_observer_loaded = true
+end
+if pin and not call then
+    dofile(assert(source:match('^(.*[/])')) .. 'noki6250_slow_pin_input.lua')
 end
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
@@ -82,7 +86,8 @@ local post_load = emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(replay))
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(sms and 17 or 25))
+    -- Physical PIN entry delays SIM initialization and outgoing dialing.
+    assert(emu.wait(pin and (sms and 25 or 31) or (sms and 17 or 25)))
     machine:save('6250_' .. scenario)
     assert(emu.wait(1))
     assert(saved, 'save did not execute')
