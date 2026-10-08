@@ -158,7 +158,9 @@ ORACLE_3610_CONTACT_SERVICE_SHA ?= dd5322bd6175d71dfea6d222d0572eab6fa787f3e2321
 NOKI3330_FIRST_BOOT_KEYS := 1,2,3,4,5,enter,wait8000,1,2,0,0,enter,wait1200,0,1,0,1,2,0,0,2,wait600,enter
 NOKI3330_COLD_SETUP_KEYS := $(NOKI3330_FIRST_BOOT_KEYS)
 NOKI3330_SECURITY_SETTINGS_KEYS := $(NOKI3330_FIRST_BOOT_KEYS),wait4000,enter,wait700,6,wait700,3,wait700,5,wait700,enter,wait700,1,2,3,4,5,enter
-NOKI3330_SMS_READ_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,down,wait800,enter,wait800,down,wait800,enter,wait800,enter
+# Preserved RTC skips the time/date editors; acknowledge Code accepted before Menu.
+NOKI3330_SMS_COLD_SETUP_KEYS := 1,2,3,4,5,enter,wait4000,enter
+NOKI3330_SMS_READ_KEYS := $(NOKI3330_SMS_COLD_SETUP_KEYS),wait1200,enter,wait800,down,wait800,enter,wait800,down,wait800,enter,wait800,enter
 NOKI3330_SMS_DELETE_KEYS := $(NOKI3330_SMS_READ_KEYS),wait1000,enter,wait800,enter,wait800,enter
 NOKI3330_SMART_SAVE_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,down,wait800,enter,wait1200,enter,wait1200,enter,wait1200,enter
 NOKI3330_SMART_PLAY_KEYS := $(NOKI3330_COLD_SETUP_KEYS),wait4000,enter,wait800,5,wait800,4,wait1000,enter,wait1200,enter,wait1200,enter

@@ -41,9 +41,9 @@ distinction.
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |
 | `5510_bringup.md` | NPM-5 staged DSP/service frontier, erased NV journal and separate MU4/FBUS input ownership. |
-| `8210_bringup.md` | NSM-3 stock inputs, staged-verifier execution and unresolved final DSP publication contract. |
+| `8210_bringup.md` | NSM-3 normal/native boundary, acquired base-record research-HLE phone services, own PCM/audio and restoration acceptance. |
 | `8xxx_bringup.md` | Acquired 8250/8850/8890 GENSIO contracts and bounded software-only frontiers. |
-| `6210_bringup.md` | NPE-3 reset/GENSIO contracts, staged verifier and final DSP upload frontier. |
+| `6210_bringup.md` | NPE-3 normal/native boundary, own-PMM research-HLE phone services, accessory audit and isolated restoration acceptance. |
 | `6250_bringup.md` | Product-local staged DSP boundary and research boot, input, SIM, phonebook, registration, call-signaling and SMS acceptance. |
 | `7110_bringup.md` | NSE-5 upload, SED1565/keypad/roller contracts, fail-closed product boundary and explicit ROM4 compatibility instrument. |
 | `2100_bringup.md` | Bounded NAM-2 v5.84 portability frontier and display resumption contract. |

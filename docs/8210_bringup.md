@@ -15,7 +15,7 @@ calculator, SIM initialization and cold-persistent phonebook, registration
 and operator idle, both call-signaling directions, and both SMS directions.
 Identity and record success replies remain unselected. This is research-HLE
 phone-service acceptance, not a promotion of the normal machine, complete
-hardware fidelity, speech, or authentic factory-default provisioning.
+hardware fidelity, native DSP speech, or authentic factory-default provisioning.
 
 ### Documented PCM bus
 
@@ -24,13 +24,14 @@ independently specifies COBBA-GJP-generated PCMDClk at 1 MHz (13 MHz / 13)
 and PCMSClk at 8 kHz (PCMDClk / 125). The inspected timing diagram shows
 a one-data-clock active-high sync pulse, MSB-first 16-bit words with bits
 15..13 extending the sign of the 13-bit sample, and data transitions at
-rising clock edges (falling-edge sampling). This closes the product's PCM
-specification gap, not working speech. The product configuration now records
+rising clock edges (falling-edge sampling). This establishes the product's
+physical PCM contract, not native DSP speech. The product configuration records
 those independently evidenced bus fields. A fresh rebuilt physical
 outgoing-call gate (`run_8210_pcm_profile_regression`) preserves own-number
-dialing and CC/RR release. Own speech-request selection and active microphone/
-output routing still require evidence; this signaling regression is not an
-audio acceptance test.
+dialing and CC/RR release. That profile-only signaling regression does not
+establish audio. Own speech-request selection and endpoint routing have
+separate compiler, runtime and physical-audio evidence below; neither is
+inferred from the PCM diagram alone.
 
 The primary-authored PDF is acquired from
 [the service-manual mirror](https://www.eserviceinfo.com/downloadsm/228901/NOKIA_03sys.html)

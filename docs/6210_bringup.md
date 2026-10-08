@@ -71,8 +71,10 @@ at region offset `0x3fa000`. Sources and archive hashes are in
   `0x2c` precedes polling status offset `0x6d` bit 2 at `0x4ec7bc` and
   reading offset `0x6c`. Control bit 2 stays clear, so receive-ready follows
   the byte write rather than a control-bit trigger. The LCD uses `0x2e/0x6e`.
-- The unvalidated 6250 retains its previous generic composition; it does not
-  silently inherit the new 6210 contract through a shared machine config.
+- The 6250 has a separate decoded NHM-3 configuration and initial-record
+  research-PMM comparison; its phone-service gates are documented in
+  [6250 bring-up](6250_bringup.md). Neither its native boundary nor its
+  provisioning is inherited from the 6210 configuration.
 
 ## Keypad
 
