@@ -22,9 +22,14 @@ CHECKPOINTS = (
 )
 
 
-def verify(text, storage):
+def verify(text, storage, *, configured_carrier=False):
+    checkpoints = list(CHECKPOINTS)
+    if configured_carrier:
+        checkpoints[1] = r'TX packet type=02 .*radio_phase=candidate_channel_change data=041202000000005050000004'
+        checkpoints[10] = r'TX packet type=02 .*radio_phase=release_channel_change data=041202000000001a600000040000000f00000000'
+        checkpoints.insert(1, r'RX enqueue type=80 payload=14 .*data=4012[0-9a-f]{8}0004000048')
     cursor = 0
-    for pattern in CHECKPOINTS:
+    for pattern in checkpoints:
         match = re.search(pattern, text[cursor:])
         if not match:
             raise ValueError(f'missing ordered registration evidence: {pattern}')
@@ -39,13 +44,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('sim_nvram', type=Path)
+    parser.add_argument('--configured-carrier', action='store_true',
+                        help='require coherent ARFCN4 SCH and recovered channel parameters')
     args = parser.parse_args()
     try:
         with args.log.open(errors='replace') as stream:
             text = ''.join(line for line in stream if 'TX packet' in line or
                            'RX enqueue' in line or 'acknowledged' in line or
                            'update-binary' in line)
-        verify(text, args.sim_nvram.read_bytes())
+        verify(text, args.sim_nvram.read_bytes(), configured_carrier=args.configured_carrier)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 registration FAIL: {error}\n')
     print('8210 own registration/release/paging and persisted EF_LOCI PASS; inspect idle capture separately')

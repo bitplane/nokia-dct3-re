@@ -260,7 +260,8 @@ deconfiguration/confirmation and post-release paging. Persisted EF_LOCI
 contains LAI `00f1100001` and status `00`. A cold process retaining that
 storage passes the same exchange and `noki8210_registration_input.lua`
 captures `DCT3 LAB` at both 24 and 44 seconds after physical unlock.
-Incoming calls, SMS, mobility and other bands remain unproved.
+Incoming calls and SMS have the separate acceptance contracts below;
+mobility and other bands remain unproved.
 
 ### Outgoing call signaling
 
@@ -418,6 +419,26 @@ directory with `run_noki8210_acceptance.py RUN --scenario host-incoming-call`
 (`--port` selects the private HTTP endpoint). The manifest records both MAME
 and host runner commands. This proves external host signaling through the
 research composition, not native speech or external-network calls.
+
+`verify-8210-sip-cancel` separately proves a real local PJSIP INVITE followed
+by caller CANCEL while alerting, 487, exactly one correlated host termination
+and complete firmware CC/RR release with zero accepted media. Physical
+security entry settles registered idle before admitting the call. The own
+SETUP carries caller `5551234`; physical Names/C decodes `1a` and dismisses
+the reviewed `1 missed call` screen. The final idle frame displays numeric
+`001 01`, not the initial `DCT3 LAB`; both are separately reviewed, with no
+forced network-name repaint and no established cause for that presentation
+difference.
+
+This runner pins the acquired MCU and PMM and uses the same explicitly
+labelled base-record comparison, not reconstructed factory data or donor
+provisioning. Its host fixture independently selects a GSM900 laboratory
+cell pair 4/5. Acceptance requires ARFCN4 SCH, recovered `041202` candidate
+and release parameters, host registration on 4 and persistent EF_LOCI.
+Legacy default-cell gates tune MCU carrier 4 while their default network
+reports 1; they establish their documented signaling contracts but not this
+stronger carrier-coherence claim. This gate does not promote those gates,
+factory PMM validation, native resident DSP execution or speech/media.
 
 `host-incoming-sms` and `host-outgoing-sms` independently use the same
 host-only configuration and fresh storage. The incoming host supplies

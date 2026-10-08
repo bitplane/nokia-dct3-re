@@ -109,6 +109,12 @@ restored and no speech is established.
 
 ## Product-boundary cautions
 
+The 8210 additionally passes `verify-8210-sip-cancel`: real local
+INVITE/CANCEL/487, coherent ARFCN4 SCH/tuning/host registration, zero media,
+complete CC/RR release and physical missed-call dismissal to reviewed idle.
+It retains the labelled acquired base-record comparison; factory PMM and
+native speech are not promoted.
+
 The 6210 passes `verify-6210-power-cycle` with unchanged own PMM: physical
 shutdown, blank display, at least eight seconds of retained RTC ticks and
 DSP/radio silence, PWRONX restart, both own native-upload/HLE stages,

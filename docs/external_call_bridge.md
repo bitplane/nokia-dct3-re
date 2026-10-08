@@ -414,7 +414,17 @@ CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
 dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
-products `6210`, `8850` and `8890`.
+products `6210`, `8210`, `8850` and `8890`.
+
+`verify-8210-sip-cancel` covers NSM-3 v5.31 research HLE with the explicitly
+labelled acquired base-record comparison (invalid later journal omitted),
+not factory provisioning. Physical startup precedes a real INVITE/CANCEL/487
+exchange, complete CC/RR release, zero media, missed-call presentation and
+decoded physical Names/C dismissal. Its separate external cell configuration
+requires coherent ARFCN4 SCH, MCU tuning/release and host registration. The
+post-dismissal numeric `001 01` idle frame is reviewed separately from the
+initial `DCT3 LAB`; no name repaint is injected. Native DSP speech remains
+unproved.
 
 `verify-8850-sip-cancel` independently covers NSM-2 v5.31 research HLE
 with unchanged acquired MCU/PMM. Own physical security input settles the

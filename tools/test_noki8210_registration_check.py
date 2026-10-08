@@ -29,6 +29,20 @@ class RegistrationTest(unittest.TestCase):
     def test_accept(self):
         verify('\n'.join(self.lines), self.storage)
 
+    def test_configured_carrier_requires_sch_and_recovered_channel_parameters(self):
+        with self.assertRaises(ValueError):
+            verify('\n'.join(self.lines), self.storage, configured_carrier=True)
+        lines = [line.replace('data=040000', 'data=041202') for line in self.lines]
+        lines.insert(1, 'RX enqueue type=80 payload=14 producer=001 data=4012000004b00004000048006100')
+        text = '\n'.join(lines)
+        verify(text, self.storage, configured_carrier=True)
+        for broken in (text.replace('b00004000048', 'b00001000048'),
+                       text.replace('data=041202', 'data=040000', 1),
+                       text.replace('release_channel_change data=041202',
+                                    'release_channel_change data=040000')):
+            with self.subTest(text=broken), self.assertRaises(ValueError):
+                verify(broken, self.storage, configured_carrier=True)
+
     def test_reject_sibling_capability(self):
         self.lines[4] = self.lines[4].replace('330809', '230809')
         with self.assertRaises(ValueError):
