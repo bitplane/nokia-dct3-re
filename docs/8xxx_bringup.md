@@ -1884,6 +1884,13 @@ decoded physical Send and the existing operator-text frame crops. Those
 crops establish operator presentation, not whole-screen pixel identity.
 This does not promote answered SIP, speech or outgoing-dialog restoration.
 
+`verify-8850-sip-outgoing-unavailable` uses `--outgoing-unavailable` and
+requires a real SIP 480, correlated no-answer decision and consumed cause
+18 before release. A fresh run completed LAPDm release and host phase
+`ended`, with all media counters zero and the same reviewed operator
+presentation. Busy and unavailable are distinct fixtures; neither
+substitutes a synthetic handset termination for the remote SIP response.
+
 `verify-8850-sip-cancel` runs a real local PJSIP INVITE/CANCEL from settled
 own-PMM idle using the same host-enabled configuration, without physical
 Answer. Its private runner pins own MCU/PMM hashes, native-loader/HLE

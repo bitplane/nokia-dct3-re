@@ -1,4 +1,4 @@
-"""Own-PMM NSM-2 real SIP cancellation; no Answer or native speech claim."""
+"""Own-PMM NSM-2 real SIP cancellation/failures; no Answer or speech claim."""
 import argparse
 import hashlib
 import json
@@ -81,7 +81,7 @@ def check_outgoing_result(run):
         raise ValueError('host registration lacks own laboratory carrier')
     send_at = text.find('8850_call_physical: action=send')
     if send_at < 0 or not re.search(r'8850_keypad_decoded key=0e\b', text[send_at:]):
-        raise ValueError('outgoing busy call lacks decoded physical Send')
+        raise ValueError('outgoing call lacks decoded physical Send')
     verify_frames(run / 'snap')
 
 
@@ -92,13 +92,17 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore idle before admitting the fresh unanswered SIP call')
-    parser.add_argument('--outgoing-busy', action='store_true',
+    outgoing = parser.add_mutually_exclusive_group()
+    outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='exercise physical dialing against a real SIP 486 response')
+    outgoing.add_argument('--outgoing-unavailable', action='store_true',
+                          help='exercise physical dialing against a real SIP 480 response')
     parser.add_argument('--http-port', type=int, default=18885)
     parser.add_argument('--sip-port', type=int, default=25885)
     args = parser.parse_args()
-    if args.restore_idle and args.outgoing_busy:
-        parser.error('--restore-idle cannot be combined with --outgoing-busy')
+    outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
+    if args.restore_idle and outgoing_failure:
+        parser.error('--restore-idle cannot be combined with outgoing failure')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8850']
@@ -113,7 +117,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
-                       'noki8850_outgoing_call_input.lua' if args.outgoing_busy else
+                       'noki8850_outgoing_call_input.lua' if outgoing_failure else
                        'noki8850_sip_idle_restore.lua' if args.restore_idle else
                        'noki8850_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
@@ -124,7 +128,7 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8850',
-                   *(['--sip-response', '486'] if args.outgoing_busy else
+                   *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/8850_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
@@ -132,12 +136,13 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if args.outgoing_busy:
+        if outgoing_failure:
             check_outgoing_result(run)
         else:
             check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsm2hle', 'scenario': 'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel',
+            'machine': 'nsm2hle', 'scenario': ('outgoing-sip-unavailable' if args.outgoing_unavailable else
+                                             'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 1,
             'native_dsp_complete': False, 'speech_tested': False,

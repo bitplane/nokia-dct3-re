@@ -136,6 +136,17 @@ class SipFailureCheckTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.check(product='8850', log=invalid)
 
+    def test_8850_unavailable_requires_cause_18(self):
+        log = LOG.replace('length=15 data=03450401a05e0581551532f4150101',
+                          'length=18 data=03450404600200815e0581551532f4150101')
+        log = log.replace('outcome=1', 'outcome=2\noutgoing termination consumed id=1 cause=18')
+        self.assertEqual(self.check(product='8850', status=480, log=log)['sip_status'], 480)
+        for invalid in (log.replace('cause=18', 'cause=180'),
+                        log.replace('termination consumed id=1', 'termination consumed id=2'),
+                        log.replace('outcome=2', 'outcome=1')):
+            with self.assertRaises(RuntimeError):
+                self.check(product='8850', status=480, log=invalid)
+
     def test_6210_unavailable_requires_cause_18(self):
         log = LOG.replace('digits=5551234', 'digits=1234567').replace('551532f4', '214365f7')
         log = log.replace('outcome=1', 'outcome=2\noutgoing termination consumed id=1 cause=18')
