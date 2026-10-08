@@ -46,6 +46,29 @@ def apply_coherent_config(path, fixture):
     ET.ElementTree(config).write(path, encoding='utf-8', xml_declaration=True)
 
 
+def prepare_run(run, root):
+    """Own acquired PMM comparison; audit-only shared ROMs are not NHM-3 masks."""
+    from tools.noki6250_accessory_contract import verify as verify_accessory
+    accessory = verify_accessory((root / 'roms/noki6250/6250-503mcuppmc.fls').read_bytes())
+    source = root / 'roms/noki6250/6250 virgin eeprom 005fa000.fls'
+    fixture = initial_record_fixture(source.read_bytes())
+    run.mkdir(parents=True, exist_ok=False)
+    local_roms = run / 'roms/noki6250'
+    local_roms.mkdir(parents=True)
+    (local_roms / source.name).write_bytes(fixture)
+    audit_members = []
+    for name in ('dsp_prom', 'dsp_drom', 'dsp_pdrom'):
+        audit_source = root / 'roms/noki3210' / name
+        payload = audit_source.read_bytes()
+        (local_roms / name).write_bytes(payload)
+        audit_members.append({'name': name, 'source': str(audit_source),
+                              'sha256': hashlib.sha256(payload).hexdigest(),
+                              'native_6250_evidence': False})
+    (run / 'cfg').mkdir()
+    (run / 'nvram').mkdir()
+    return accessory, audit_members
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path,
@@ -68,30 +91,11 @@ def main():
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
-    source = root / "roms/noki6250/6250 virgin eeprom 005fa000.fls"
     run = args.run_directory.resolve()
     try:
-        from tools.noki6250_accessory_contract import verify as verify_accessory
-        accessory_contract = verify_accessory(
-            (root / 'roms/noki6250/6250-503mcuppmc.fls').read_bytes())
-        fixture = initial_record_fixture(source.read_bytes())
         if not mame.is_file():
             raise ValueError(f"missing MAME executable: {mame}")
-        run.mkdir(parents=True, exist_ok=False)
-        local_roms = run / "roms/noki6250"
-        local_roms.mkdir(parents=True)
-        (local_roms / source.name).write_bytes(fixture)
-        audit_members = []
-        # Shared legacy ROM declarations, not recovered NHM-3 native masks.
-        for name in ("dsp_prom", "dsp_drom", "dsp_pdrom"):
-            audit_source = root / "roms/noki3210" / name
-            payload = audit_source.read_bytes()
-            (local_roms / name).write_bytes(payload)
-            audit_members.append({"name": name, "source": str(audit_source),
-                                  "sha256": hashlib.sha256(payload).hexdigest(),
-                                  "native_6250_evidence": False})
-        (run / "cfg").mkdir()
-        (run / "nvram").mkdir()
+        accessory_contract, audit_members = prepare_run(run, root)
         host_call = args.scenario == "host-incoming-call"
         host = args.scenario.startswith("host-")
         host_incoming_sms = args.scenario in ("host-incoming-sms", "host-incoming-sms-text")

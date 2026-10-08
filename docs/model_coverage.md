@@ -44,8 +44,10 @@ directions, exact configured traffic/release words, host identity correlation
 and reviewed caller/digits/connected/idle pixels on carrier 19. Four separate
 `verify-6250-coherent-host-*-sms` gates now validate incoming persistent Read,
 physical outgoing success, RP rejection and unshortened silence-timeout
-recovery on the same coherent cell. SIP and native speech do not inherit
-that promotion.
+recovery on the same coherent cell. `verify-6250-sip-cancel` separately proves
+a real local unanswered INVITE/CANCEL/487 lifecycle, own CC/RR release,
+zero media and decoded physical missed-call dismissal to reviewed idle.
+Answered SIP, native speech and SIP restoration do not inherit that promotion.
 
 The levels are cumulative:
 

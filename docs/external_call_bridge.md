@@ -414,7 +414,17 @@ CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
 dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
-products `6210`, `8210`, `8850` and `8890`.
+products `6210`, `6250`, `8210`, `8850` and `8890`.
+
+`verify-6250-sip-cancel` independently covers NHM-3 v5.03 research HLE with
+the declared initial-record PMM comparison, not factory provisioning.
+Own uploads and compact self-test precede coherent carrier-19 registration,
+then a fresh idle artifact admits the real INVITE/CANCEL/487 exchange.
+Exact own RR deconfiguration/confirmation, resumed paging, zero media,
+reviewed missed-call/idle pixels and physical Names/C Exit decoded as `15`
+are mandatory. Both the shared preparation and the manifest retain explicit
+non-native labels for audit-only shared ROM members. Answered SIP, speech and
+restoration have not inherited the other products' promotion.
 
 `verify-8210-sip-cancel` covers NSM-3 v5.31 research HLE with the explicitly
 labelled acquired base-record comparison (invalid later journal omitted),

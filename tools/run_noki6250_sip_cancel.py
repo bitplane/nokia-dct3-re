@@ -1,0 +1,101 @@
+"""NHM-3 initial-record comparison and real unanswered SIP CANCEL; no speech."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+import re
+from PIL import Image
+
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.run_noki6250_acceptance import prepare_run, apply_coherent_config
+from tools.noki6250_coherent_registration_check import verify as check_registration
+from tools.run_noki8890_host_sms import check_output
+from tools.radio_call_lifecycle_common import INCOMING_SETUP
+from tools.radio_call_lifecycle_common import require_ordered, IDLE_PCH
+
+
+FRAMES = {
+    '6250_sip_registered_idle.png': '519c59eb68967255c5b2f7cd2b8ae2351cac00b03828c78cf86109e5496a6f49',
+    '6250_sip_missed_call.png': 'e14c6bafddb6113310a53f04ab9eed869d35350d79004fbd42340779be7fbb98',
+    '6250_sip_after_cancel.png': '519c59eb68967255c5b2f7cd2b8ae2351cac00b03828c78cf86109e5496a6f49',
+}
+
+
+def check_frames(directory):
+    for name, expected in FRAMES.items():
+        with Image.open(directory / name) as frame:
+            # Exclude advancing clock pixels, retain notification and softkeys.
+            if frame.size != (96, 60) or hashlib.sha256(
+                    frame.convert('L').crop((0, 8, 96, 60)).tobytes()).hexdigest() != expected:
+                raise ValueError('NHM-3 reviewed SIP cleanup pixels differ: ' + name)
+
+
+def check_product_result(run):
+    text = (run / 'error.log').read_text(errors='replace')
+    check_output(text)
+    check_output((run / 'console.log').read_text(errors='replace'))
+    check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
+    if len(INCOMING_SETUP.findall(text)) != 1:
+        raise ValueError('NHM-3 lacks exactly one SETUP for caller 5551234')
+    if re.search(r'GSM service uplink sapi=0 pd=03 message=07\b|'
+                 r'gsm_call_adapter: incoming state .*phase=connected', text):
+        raise ValueError('NHM-3 cancelled call was answered')
+    require_ordered(text, (
+        ('own release carrier 19', re.compile(
+            r'TX packet type=02 payload=20 .*radio_phase=release_channel_change '
+            r'data=041202001117001a600000130000001400000001')),
+        ('own release confirmation', re.compile(
+            r'6250_channel_confirmation: body=00 input=0409 expected=00 pending=00')),
+        ('resumed idle paging', IDLE_PCH),
+        ('physical Exit', re.compile(r'6250_sip_cancel: physical Exit')),
+        ('own decoded Exit', re.compile(r'6250_raw_matrix_key: value=15\b')),
+    ), 'NHM-3 SIP cancellation')
+    check_frames(run / 'snap')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('run_directory', type=Path)
+    parser.add_argument('--pjsua', type=Path, required=True)
+    parser.add_argument('--mame', type=Path)
+    parser.add_argument('--http-port', type=int, default=18625)
+    parser.add_argument('--sip-port', type=int, default=25625)
+    args = parser.parse_args()
+    root = Path(__file__).resolve().parents[1]
+    run = args.run_directory.resolve()
+    try:
+        accessory, audit = prepare_run(run, root)
+        apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
+        handset = [str((args.mame or root / 'mame/mame').resolve()), 'nhm3hle',
+                   '-rompath', f"{run / 'roms'};{root / 'roms'}", '-nvram_directory', str(run / 'nvram'),
+                   '-cfg_directory', str(run / 'cfg'), '-noreadconfig', '-autoboot_delay', '0',
+                   '-autoboot_script', str(root / 'tools/noki6250_sip_cancel_observe.lua'),
+                   '-snapshot_directory', str(run / 'snap'), '-seconds_to_run', '57',
+                   '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
+                   '-http', '-http_port', str(args.http_port)]
+        command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
+                   '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
+                   '--product', '6250', '--incoming', '--cancel-incoming',
+                   '--ready-file', str(run / 'snap/6250_sip_registered_idle.png'),
+                   '--http-port', str(args.http_port), '--sip-port', str(args.sip_port), '--', *handset]
+        with (run / 'console.log').open('w') as output:
+            subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
+                           check=True, timeout=180)
+        check_product_result(run)
+        (run / 'acceptance.json').write_text(json.dumps({
+            'machine': 'nhm3hle', 'scenario': 'incoming-sip-cancel',
+            'provisioning': 'derived acquired initial-record PMM comparison',
+            'shared_rom_audit_members': audit, 'accessory_contract': accessory,
+            'native_dsp_complete': False, 'speech_tested': False,
+            'laboratory_carrier': 19, 'command': command, 'result': 'pass',
+        }, indent=2) + '\n')
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        parser.exit(1, f'6250 SIP cancellation FAIL: {error}; inspect {run}\n')
+    print('6250 real SIP CANCEL signaling PASS; initial-record comparison, speech unproved')
+
+
+if __name__ == '__main__':
+    main()

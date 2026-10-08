@@ -50,8 +50,8 @@ The older default-cell runs receive SCH for carrier 19 and publish zero-header
 candidate/release words while the host network reports carrier 1. Their
 signaling/UI evidence remains useful, but cannot be promoted to coherent RF
 selection. The coherent host-call and host-SMS gates below independently
-validate both directions and SMS error/timeout recovery. SIP acceptance on
-the new configured cell still requires an independent run. Native DSP,
+validate both directions and SMS error/timeout recovery. The separate
+unanswered SIP cancellation gate below also passes on that cell. Native DSP,
 physical RF and speech are not established by
 this registration gate.
 
@@ -224,6 +224,23 @@ decoded physical End/End/Menu recovery. Independent host checks require
 correlated decisions/outcomes and reject wrong IDs and duplicates. The
 default-cell gates remain available as comparisons; no native speech or
 factory provisioning is inferred from any of these HLE SMS tests.
+
+### Real SIP Cancellation
+
+`verify-6250-sip-cancel` uses the optional local PJSIP stack with the same
+private initial-record comparison and coherent ARFCN19/20 cell. It waits for
+a fresh registered-idle frame at 32 seconds before the real caller sends
+INVITE. The caller cancels only after alerting; acceptance requires actual
+CANCEL/487, exactly one correlated GSM termination, complete CC/RR release
+and zero media. Own carrier-19 deconfiguration and firmware confirmation
+are checked independently before resumed paging.
+
+The reviewed 96x60 `1 missed call` screen must appear, followed by physical
+Names/C Exit decoded as own raw matrix value `15` and the reviewed operator
+idle frame. The generic SIP runner rejects answered, media and call/idle
+restore fixtures for this profile. This proves an unanswered external SIP
+lifecycle, not speech, native DSP, live RF or authentic factory PMM repair.
+The normal `noki6250` machine remains fail-closed.
 
 ## Recovered hardware contracts
 

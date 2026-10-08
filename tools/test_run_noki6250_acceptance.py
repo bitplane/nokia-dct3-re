@@ -1,11 +1,35 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import xml.etree.ElementTree as ET
-from tools.run_noki6250_acceptance import apply_coherent_config
+from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_shared_preparation_keeps_own_comparison_and_audit_labels(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'roms/noki6250').mkdir(parents=True)
+            (root / 'roms/noki3210').mkdir()
+            (root / 'roms/noki6250/6250-503mcuppmc.fls').write_bytes(b'own MCU')
+            source = root / 'roms/noki6250/6250 virgin eeprom 005fa000.fls'
+            source.write_bytes(b'own PMM')
+            for name in ('dsp_prom', 'dsp_drom', 'dsp_pdrom'):
+                (root / 'roms/noki3210' / name).write_bytes(name.encode())
+            run = root / 'fresh'
+            with patch('tools.noki6250_accessory_contract.verify', return_value={'own': True}) as contract, \
+                    patch('tools.run_noki6250_acceptance.initial_record_fixture', return_value=b'comparison') as fixture:
+                accessory, audit = prepare_run(run, root)
+                contract.assert_called_once_with(b'own MCU')
+                fixture.assert_called_once_with(b'own PMM')
+                self.assertEqual(accessory, {'own': True})
+                self.assertEqual((run / 'roms/noki6250' / source.name).read_bytes(), b'comparison')
+                self.assertTrue(all(member['native_6250_evidence'] is False for member in audit))
+                self.assertEqual(source.read_bytes(), b'own PMM')
+                with self.assertRaises(FileExistsError):
+                    prepare_run(run, root)
+
     def fixture(self):
         return Path(__file__).resolve().parents[1] / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg'
 
