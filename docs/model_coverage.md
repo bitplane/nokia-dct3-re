@@ -316,6 +316,11 @@ its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,
 successful TERMINAL RESPONSE, reviewed 84x48 result/registered-idle frames
 and persisted EF_LOCI. Other proactive commands, 8890 Toolkit and native
 DSP execution are not established by this gate.
+`verify-8890-sim-toolkit-busy` independently verifies nine-byte profile
+download, STATUS/FETCH and the explicit `20 01` screen-busy terminal response
+during physical date entry, followed by successful date-editor recovery and
+persisted laboratory registration. It does not prove displayed proactive
+text or successful physical dismissal on 8890.
 
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,

@@ -11,7 +11,8 @@ from tools.noki8890_registration_check import verify as verify_registration
 
 KEYS = ('Keypad *', 'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad #', 'Call / Send')
 RESULT = 'a8da777883404e560788e40d1709459b12dd266ef6d0b29481ec8a36cab82495'
-IDLE = '8187cbe68f4b7fe0a15cf10c16b742b3236f3240af3f79556c319d5ed337f2ee'
+# Fresh current and pre-Toolkit runners reproduce the own call-divert idle frame.
+IDLE = '03cd1654572ac2cbe001a2fda57cdc3ead7b8d578d81efcaffe2af3350e0d6bc'
 
 
 def verify(text, frames, storage):

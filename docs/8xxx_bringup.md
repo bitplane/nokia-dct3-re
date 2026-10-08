@@ -692,9 +692,20 @@ directory or substitutes another product's PMM.
 
 The own MCU and acquired PMM remain unchanged. Only key-sequence mechanics
 are shared with the 8850 fixture; own registration predicates, startup
-settlement, German response softkey and 12:01 DCT3LAB idle frame are
+settlement, German response softkey and 12:00 DCT3LAB idle frame are
 independently checked. Shared DSP audit files remain a MAME run prerequisite,
 not evidence of a product-matched resident ROM6 mask or native execution.
+
+The exact USSD idle oracle is pixel SHA256
+`03cd1654572ac2cbe001a2fda57cdc3ead7b8d578d81efcaffe2af3350e0d6bc`,
+also independently used by the own call-divert gate. Fresh runs with both
+the current runner and its pre-Toolkit version reproduce it; the USSD result
+hash and all signaling/storage checks remain unchanged. The earlier
+`8187cbe68f4b7fe0a15cf10c16b742b3236f3240af3f79556c319d5ed337f2ee`
+12:01 expectation is retired deliberately, not accepted as an alternate.
+The current RTC trace reaches 12:00:34 at emulated second 60 after physical
+time entry. This re-bank establishes current deterministic acceptance,
+not the cause of the historical frame difference.
 
 Native resident DSP execution, speech/media, identity/security-record
 replies, neighbour/handover contracts and normal-machine promotion remain
@@ -1816,6 +1827,23 @@ reviewed numeric-PLMN registered idle frame. The gate also requires own
 NSM-2 laboratory registration and persisted EF_LOCI. This establishes
 DISPLAY TEXT only, not other proactive commands, native DSP execution,
 or inherited 8890 Toolkit support. Acquired MCU/PMM bytes are unchanged.
+
+`verify-8890-sim-toolkit-busy` independently covers the NSB-6 cold-start
+response, not successful DISPLAY TEXT. Its own nine-byte TERMINAL PROFILE
+arms the card; STATUS returns `91 16` and FETCH reaches the firmware while
+physical date entry is active. TERMINAL RESPONSE is
+`81030121800202828103022001`: terminal currently unable, screen busy.
+The card acknowledges `90 00`; the same physical date-entry sequence
+finishes at the reviewed 84x48 DCT3LAB/12:00 idle frame (pixel SHA256
+`03cd1654572ac2cbe001a2fda57cdc3ead7b8d578d81efcaffe2af3350e0d6bc`).
+Own laboratory registration and persisted EF_LOCI remain required.
+Successful NSB-6 DISPLAY TEXT presentation/dismissal remains unproved.
+Separate retained-clock probes using only this handset's generated storage
+observed profile download and card readiness but no subsequent FETCH within
+43 seconds, including a physical Names press. This bounded observation is
+not proof that the firmware lacks a later proactive-command route. No
+polling interval, card-ready timing or firmware UI state was forced to
+produce a favorable result.
 
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first
