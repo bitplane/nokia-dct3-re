@@ -1020,7 +1020,7 @@ private:
 	void data_map(address_map &map) ATTR_COLD
 	{
 		map(0x0000, 0xffff).ram();
-		map(0x0060, 0x0061).r(FUNC(tms320c54x_test_state::repeat_irq_r));
+		map(0x0060, 0x0061).rw(FUNC(tms320c54x_test_state::repeat_irq_r), FUNC(tms320c54x_test_state::stack_mmr_w));
 	}
 	void io_map(address_map &map) ATTR_COLD
 	{
@@ -1058,6 +1058,8 @@ private:
 	}
 	u16 repeat_irq_r(offs_t offset)
 	{
+		if (m_phase == 6517 || m_phase == 6518)
+			return m_stack_mmr[offset];
 		if (m_phase == 784)
 		{
 			// Abort this timeslice after the current instruction retires. Saving
@@ -1081,6 +1083,10 @@ private:
 		if (m_repeat_reads == m_irq_trigger_read)
 			m_cpu->set_input_line(2, ASSERT_LINE);
 		return 1;
+	}
+	void stack_mmr_w(offs_t offset, u16 value)
+	{
+		m_stack_mmr[offset] = value;
 	}
 
 	void rom4_program_map(address_map &map) ATTR_COLD
@@ -2824,10 +2830,32 @@ private:
 		}
 		if (m_phase == 90)
 		{
-			expect(data.read_word(0x0e02) == 0x7654 &&
+			expect_opcode(0x4fd3, data.read_word(0x0e02) == 0x7654 &&
 					data.read_word(0x0e03) == 0x3210 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00,
 					"DST long circular operand advances by two and wraps");
+			program.write_word(0x05e0, 0x4fd2); // DST B,*AR2+%.
+			data.write_word(0x0e11, 0xbeef);
+			data.write_word(0x0e12, 0);
+			data.write_word(0x0e13, 0);
+			data.write_word(0x0e14, 0xcafe);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0e12);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6519;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6519)
+		{
+			expect_opcode(0x4fd2,
+				data.read_word(0x0e12) == 0x7654 && data.read_word(0x0e13) == 0x3210 &&
+				data.read_word(0x0e11) == 0xbeef && data.read_word(0x0e14) == 0xcafe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0e10 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210,
+				"ROM4 DST through AR2 stores high/low words then wraps by two without changing accumulators or adjacent cells");
 			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
 			program.write_word(0x05e1, 0x0123);
 			program.write_word(0x05e2, 0x6ded); // MAR *+AR5(-7)
@@ -3393,6 +3421,45 @@ private:
 			expect_opcode(0x8a08, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
 					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300,
 					"ROM4 8a08 restores AL from TOS and advances SP");
+			program.write_word(0x05e0, 0x4a60); // PSHM data address 60.
+			program.write_word(0x05e1, 0x4a61); // PSHM data address 61.
+			program.write_word(0x05e2, 0xf5e1);
+			data.write_word(0x0060, 0x1234);
+			data.write_word(0x0061, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6517;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6517)
+		{
+			expect_opcode(0x4a60, data.read_word(0x02ff) == 0x1234 &&
+				data.read_word(0x0060) == 0x1234,
+				"ROM4 PSHM 60 reads its seven-bit data address and pushes without changing the source");
+			expect_opcode(0x4a61, data.read_word(0x02fe) == 0xabcd &&
+				data.read_word(0x0061) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x02fe &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678,
+				"ROM4 PSHM 61 pushes after 60 in descending stack order without changing A");
+			data.write_word(0x0060, 0);
+			data.write_word(0x0061, 0);
+			program.write_word(0x05e0, 0x8a61); // POPM data address 61.
+			program.write_word(0x05e1, 0x8a60); // POPM data address 60.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6518;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6518)
+		{
+			expect_opcode(0x8a61, data.read_word(0x0061) == 0xabcd,
+				"ROM4 POPM 61 restores the last-pushed value to its data address");
+			expect_opcode(0x8a60, data.read_word(0x0060) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678,
+				"ROM4 POPM 60 restores the first-pushed value and balances the stack without changing A");
 			program.write_word(0x05e0, 0xf6bb); // RSBX INTM
 			program.write_word(0x05e1, 0xf5e1);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
@@ -16207,6 +16274,7 @@ private:
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_repeat_reads = 0;
+	u16 m_stack_mmr[2] = {};
 	unsigned m_irq_trigger_read = 1;
 	u64 m_irq_accumulator = 0;
 	u64 m_irq_operand_cycle = 0;

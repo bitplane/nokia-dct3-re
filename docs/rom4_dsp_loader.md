@@ -890,11 +890,11 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 490 are asserted, one (`e809`) executes
-without an assertion, and 103 are absent. The independent RF-boundary checker
+Against the executable fixture, 495 are asserted, one (`e809`) executes
+without an assertion, and 98 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `4a60` at first PC `32f6`, `4a61` at `32f7`, and `4fd2` at `3373`.
+include `a249` at first PC `3369`, `e723` at `32fa`, and `7083` at `0a22`.
 Exact `0881` now checks SUB through AR1 with both SXM settings, 32-bit
 no-borrow carry, unchanged B/source/pointers and one-cycle arithmetic.
 Exact `e4e9` checks loading T while storing old A, independent Y increment,
@@ -921,6 +921,12 @@ Exact `4592` checks signed/unsigned shifted loads into B, unchanged A/status,
 AR2 post-increment, preserved source and one-cycle execution. Exact
 `82d3`/`83d3` check A/B high-word stores before four-word circular wrap,
 unchanged accumulators/status and the established store cycle cost.
+Exact `4a60`/`4a61` and `8a61`/`8a60` check seven-bit data-address ownership,
+descending stack order, balanced restore, and preserved A. The fixture uses
+an explicit register read/write mode at its otherwise interrupting-read
+peripheral addresses `60/61`; these tests do not assign Nokia silicon meaning
+to those addresses. Exact `4fd2` checks high/low word order, a two-word circular
+AR2 advance, unchanged AR3/accumulators, and untouched adjacent memory cells.
 The next coverage task is to classify and assert these newly observed paths,
 not extend unobserved variants or fabricate RF samples. The gate deliberately
 retains its older fingerprint until the expanded execution is explained and
