@@ -52,6 +52,20 @@ class Nokia6250StateTest(unittest.TestCase):
     def test_exact_replay(self):
         verify(GOOD)
 
+    def test_fresh_sip_follows_idle_restoration(self):
+        trace = GOOD + ('6250_state: restored_idle_for_fresh_sip\n'
+                        '6250_sip_cancel: ready\n'
+                        'GSM service downlink kind=9 sapi=0 pd=03 message=05\n')
+        verify(trace, fresh_sip=True)
+        for token in ('6250_state: restored_idle_for_fresh_sip', '6250_sip_cancel: ready'):
+            with self.assertRaisesRegex(ValueError, 'completed idle restoration'):
+                verify(trace.replace(token, 'missing'), fresh_sip=True)
+
+    def test_fresh_sip_not_active_call_or_sms_restore(self):
+        for options in ({'call': True}, {'sms': True}):
+            with self.assertRaisesRegex(ValueError, 'requires idle'):
+                verify(GOOD, fresh_sip=True, **options)
+
     def test_architectural_mismatch(self):
         with self.assertRaisesRegex(ValueError, 'architectural state'):
             verify(GOOD.replace('restored pc=0000001c', 'restored pc=00000020'))

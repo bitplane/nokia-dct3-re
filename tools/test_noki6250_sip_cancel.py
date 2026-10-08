@@ -10,6 +10,16 @@ from tools import run_noki6250_sip_cancel as check
 
 
 class SipCancelTest(unittest.TestCase):
+    def test_restored_dialog_requires_fresh_epoch_and_no_media(self):
+        good = {'passed': True, 'sip_status': 487, 'epoch': 2,
+                'media': dict.fromkeys(('uplink', 'downlink', 'pcm_transmitted', 'pcm_received', 'dropped'), 0)}
+        check.check_restored_dialog(good)
+        for key, value in (('epoch', 1), ('sip_status', 200), ('passed', False), ('media', {})):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                check.check_restored_dialog({**good, key: value})
+        with self.assertRaisesRegex(ValueError, 'produced media'):
+            check.check_restored_dialog({**good, 'media': {**good['media'], 'uplink': 1}})
+
     def test_product_result_requires_own_coherence_and_one_setup(self):
         text = ('SETUP caller=5551234\nTX packet type=02 payload=20 '
                 'radio_phase=release_channel_change data=041202001117001a600000130000001400000001\n'

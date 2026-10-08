@@ -4,8 +4,11 @@ local call = _G.noki6250_state_call == true
 local sms = _G.noki6250_state_sms == true
 local scenario = sms and 'sms' or call and 'call' or 'idle'
 _G.noki6250_call_hold = call
-dofile(assert(source:match('^(.*[/])')) ..
-    (call and 'noki6250_call_observe.lua' or 'noki6250_runtime_observe.lua'))
+if not _G.noki6250_runtime_observer_loaded then
+    dofile(assert(source:match('^(.*[/])')) ..
+        (call and 'noki6250_call_observe.lua' or 'noki6250_runtime_observe.lua'))
+    _G.noki6250_runtime_observer_loaded = true
+end
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local memory = cpu.spaces['program']
@@ -35,6 +38,13 @@ local post_load = emu.add_machine_post_load_notifier(function()
         assert(emu.wait(1))
         machine:logerror(string.format('state_replay: phase=restored event=end t=%.9f\n', machine.time:as_double()))
         machine.screens[':screen']:snapshot('6250_state_' .. scenario .. '_restored.png')
+        if _G.noki6250_sip_restore_idle then
+            assert(not call and not sms, 'SIP restore must start from idle')
+            completed = true
+            machine:logerror('6250_state: restored_idle_for_fresh_sip\n')
+            assert(_G.noki6250_begin_fresh_sip, 'fresh SIP observer absent')()
+            return
+        end
         if sms then
             local key = assert(machine.ioport.ports[':COL.1'].fields['Left Softkey / Menu'])
             machine:logerror('6250_state_physical: key=Read\n')

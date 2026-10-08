@@ -34,6 +34,15 @@ exact CPU/RAM/time, ordered protocol replay, identical restored pixels and
 physical Menu continuation. This does not restore an external SIP dialog or
 promote coherent active-call/delivered-SMS restoration without separate runs.
 
+`verify-6250-sip-idle-restore` repeats exact idle CPU/RAM/time restoration,
+ordered protocol replay and identical restored pixels before admitting a new
+real SIP INVITE. It then requires the ordinary unanswered CANCEL/487 outcome,
+own CC/RR release, physical missed-call Exit and registered idle pixels.
+The observer begins after post-load replay: MAME cancels pending Lua waits on
+load, so creating its coroutine before loading would prevent call admission.
+This is a fresh dialog after handset restoration, never SIP-dialog restoration
+or answered-media/native-speech proof.
+
 ### Physical power-cycle acceptance
 
 An isolated initial-record PMM comparison with the explicit ARFCN19/20

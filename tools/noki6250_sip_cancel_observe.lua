@@ -1,9 +1,12 @@
 -- Passive own-ROM observer plus physical missed-call Exit, never Answer.
 local source = debug.getinfo(1, 'S').source:sub(2)
-dofile(assert(source:match('^(.*[/])')) .. 'noki6250_runtime_observe.lua')
+if not _G.noki6250_runtime_observer_loaded then
+    dofile(assert(source:match('^(.*[/])')) .. 'noki6250_runtime_observe.lua')
+    _G.noki6250_runtime_observer_loaded = true
+end
 local machine = manager.machine
 local input = coroutine.create(function()
-    assert(emu.wait(32))
+    assert(emu.wait(32 - machine.time:as_double()))
     machine.screens[':screen']:snapshot('6250_sip_registered_idle.png')
     machine:logerror('6250_sip_cancel: ready\n')
     assert(emu.wait(20))

@@ -423,8 +423,12 @@ then a fresh idle artifact admits the real INVITE/CANCEL/487 exchange.
 Exact own RR deconfiguration/confirmation, resumed paging, zero media,
 reviewed missed-call/idle pixels and physical Names/C Exit decoded as `15`
 are mandatory. Both the shared preparation and the manifest retain explicit
-non-native labels for audit-only shared ROM members. Answered SIP, speech and
-restoration have not inherited the other products' promotion.
+non-native labels for audit-only shared ROM members. Answered SIP and speech
+have not inherited the other products' promotion.
+`verify-6250-sip-idle-restore` separately requires exact idle architecture,
+ordered replay and matching pixels before a fresh INVITE. Its CANCEL/487
+result must use epoch 2 with zero media. The post-load observer is started
+only after replay completes; no existing SIP dialog is restored.
 
 `verify-8210-sip-cancel` covers NSM-3 v5.31 research HLE with the explicitly
 labelled acquired base-record comparison (invalid later journal omitted),

@@ -15,7 +15,9 @@ from tools.noki6250_sms_check import verify as verify_sms
 from tools.radio_sms_acceptance_common import require_single_transport, sms_record, FIRST_SMS_DELIVER_BODY
 
 
-def verify(text, *, call=False, sms=False, storage=None):
+def verify(text, *, call=False, sms=False, storage=None, fresh_sip=False):
+    if fresh_sip and (call or sms):
+        raise ValueError('fresh SIP restoration requires idle')
     if '[LUA ERROR]' in text or '6250_state: FAIL' in text:
         raise ValueError('state fixture did not complete')
     states = re.findall(r'6250_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
@@ -52,13 +54,20 @@ def verify(text, *, call=False, sms=False, storage=None):
                          r'6250_state_physical: key=End', text):
             raise ValueError('missing post-load physical call release')
         return
+    if fresh_sip:
+        if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
+                         r'6250_state: restored_idle_for_fresh_sip[\s\S]*'
+                         r'6250_sip_cancel: ready[\s\S]*'
+                         r'GSM service downlink kind=9 sapi=0 pd=03 message=05\b', text):
+            raise ValueError('fresh SIP did not follow completed idle restoration')
+        return
     if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
                      r'6250_state_physical: key=Menu[\s\S]*'
                      r'6250_raw_matrix_key: value=06\b', text):
         raise ValueError('missing post-load physical Menu scan')
 
 
-def check_frames(directory, *, call=False, sms=False, text=None, storage=None):
+def check_frames(directory, *, call=False, sms=False, text=None, storage=None, fresh_sip=False):
     def read(name):
         with Image.open(directory / name) as source:
             if source.size != (96, 60):
@@ -80,7 +89,7 @@ def check_frames(directory, *, call=False, sms=False, text=None, storage=None):
     if hashlib.sha256(operator.crop((15, 0, 81, 16)).tobytes()).hexdigest() != (
             '3fe7f6101004fbdb4634491764dcae956ab34e6701e88330f6cde4e781d8ab85'):
         raise ValueError('missing reviewed registered operator')
-    if not call and hashlib.sha256(read('6250_state_idle_menu.png').crop((0, 0, 84, 16)).tobytes()).hexdigest() != (
+    if not call and not fresh_sip and hashlib.sha256(read('6250_state_idle_menu.png').crop((0, 0, 84, 16)).tobytes()).hexdigest() != (
             '91f4829ae667137ccc27fa2e3a266161d4b6518d2ed6f10470abf7de6ce7e372'):
         raise ValueError('missing reviewed Messages menu')
 

@@ -24,6 +24,15 @@ FRAMES = {
 }
 
 
+def check_restored_dialog(result):
+    if result.get('passed') is not True or result.get('sip_status') != 487 or result.get('epoch') != 2:
+        raise ValueError('NHM-3 restored idle requires a fresh epoch-2 CANCEL/487 dialog')
+    media = result.get('media', {})
+    if any(media.get(name) != 0 for name in (
+            'uplink', 'downlink', 'pcm_transmitted', 'pcm_received', 'dropped')):
+        raise ValueError('NHM-3 restored unanswered dialog produced media')
+
+
 def check_frames(directory):
     for name, expected in FRAMES.items():
         with Image.open(directory / name) as frame:
@@ -33,11 +42,16 @@ def check_frames(directory):
                 raise ValueError('NHM-3 reviewed SIP cleanup pixels differ: ' + name)
 
 
-def check_product_result(run):
+def check_product_result(run, *, restore_idle=False):
     text = (run / 'error.log').read_text(errors='replace')
     check_output(text)
     check_output((run / 'console.log').read_text(errors='replace'))
     check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
+    if restore_idle:
+        from tools.noki6250_state_check import verify, check_frames as check_state_frames
+        verify(text, fresh_sip=True)
+        check_state_frames(run / 'snap', fresh_sip=True)
+        check_restored_dialog(json.loads((run / 'sip-result.json').read_text()))
     if len(INCOMING_SETUP.findall(text)) != 1:
         raise ValueError('NHM-3 lacks exactly one SETUP for caller 5551234')
     if re.search(r'GSM service uplink sapi=0 pd=03 message=07\b|'
@@ -63,16 +77,18 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--http-port', type=int, default=18625)
     parser.add_argument('--sip-port', type=int, default=25625)
+    parser.add_argument('--restore-idle', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
         accessory, audit = prepare_run(run, root)
         apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
+        script = 'noki6250_sip_idle_restore.lua' if args.restore_idle else 'noki6250_sip_cancel_observe.lua'
         handset = [str((args.mame or root / 'mame/mame').resolve()), 'nhm3hle',
                    '-rompath', f"{run / 'roms'};{root / 'roms'}", '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki6250_sip_cancel_observe.lua'),
+                   '-autoboot_script', str(root / 'tools' / script),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run', '57',
                    '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
@@ -84,12 +100,14 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        check_product_result(run)
+        check_product_result(run, restore_idle=args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nhm3hle', 'scenario': 'incoming-sip-cancel',
             'provisioning': 'derived acquired initial-record PMM comparison',
             'shared_rom_audit_members': audit, 'accessory_contract': accessory,
             'native_dsp_complete': False, 'speech_tested': False,
+            'idle_restored_before_fresh_sip': args.restore_idle,
+            'external_dialog_restored': False,
             'laboratory_carrier': 19, 'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
