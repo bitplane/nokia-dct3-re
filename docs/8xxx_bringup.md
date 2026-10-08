@@ -564,6 +564,22 @@ the 8850's 1 MHz/125-clock framing; the reported NSB-6 ratio would be 64 clocks.
 Own-ROM speech-control decoding and physical Send/End correlation remain
 separate prerequisites. Native DSP speech is not established.
 
+The acquired v12.20 MCU (SHA1 `a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed`)
+independently pins the compiler at `2c307c`, selector table `2c30b0`
+(`00..34`), selector 17 at `2c32f8` and selector 8 at `2c3340`.
+Selector 17 updates bit `0200` using keep mask `fdff`; the field base is
+`134c4c` and the halfword shadow is `134c4e`. Unlike NSM-2, selector 8
+uses that same `134c4e` halfword for its `8000`-prefixed command.
+The common store at `2c338e` publishes to DSPIF `100a8`.
+`noki8890_speech_control_check.py` pins the ROM hash, instruction forms,
+selector targets and pool literals. This is static field ownership only:
+physical Send/End correlation, PCM execution and native speech remain unproved.
+
+```sh
+.venv/bin/python -m tools.noki8890_speech_control_check \
+  roms/noki8890/8890_12.20_ppmc.fls
+```
+
 The acquired v12.20 PPM C and product-local PMM have verified research-HLE
 acceptance for the following workflows. Normal `noki8890` is deliberately
 conservative; select `nsb6hle` explicitly. No donor PMM, firmware-state
