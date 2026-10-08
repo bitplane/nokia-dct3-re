@@ -1918,6 +1918,14 @@ restores while ringing, rejects the stale SIP invite and clears GSM once
 under epoch 2 without Answer, CONNECT, accepted media or redelivery.
 These restoration gates do not claim native DSP speech or restored SIP dialogs.
 
+`verify-8850-sip-outgoing-pending-restore` passes independently
+(`run_8850_sip_pending_restore_probe`). A remote SIP 180 holds the physical
+outgoing request pending across the exact 40-second handset snapshot.
+Acceptance requires ordered SIP CANCEL/487, one fresh-epoch cause-41
+clear and completed GSM release, with no redial, CONNECT or accepted media.
+Together the four restore gates cover incoming/outgoing calls both before
+and after connection; external dialog state is always discarded, not replayed.
+
 Outgoing HLE waveform delivery is separately verified by
 `run_8850_sip_waveform_probe/handset`. The isolated Pulse fixture supplies
 440 Hz through MAME's actual microphone stream and receives 660 Hz through

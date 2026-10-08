@@ -103,6 +103,8 @@ def main():
                           help='verify physical incoming Answer/End and HLE media')
     parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--restore-outgoing', action='store_true')
+    parser.add_argument('--pending-outgoing', action='store_true',
+                        help='hold the remote party at SIP 180 during outgoing restoration')
     parser.add_argument('--restore-incoming', action='store_true')
     parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
@@ -120,6 +122,8 @@ def main():
         parser.error('--restore-incoming requires unrecorded --incoming-media')
     if args.restore_phase == 'alerting' and not args.restore_incoming:
         parser.error('--restore-phase alerting requires --restore-incoming')
+    if args.pending_outgoing and not args.restore_outgoing:
+        parser.error('--pending-outgoing requires --restore-outgoing')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8850']
@@ -151,6 +155,7 @@ def main():
                    '--product', '8850',
                    *(['--record-media'] if args.record_media else []),
                    *(['--restore-outgoing'] if args.restore_outgoing else []),
+                   *(['--sip-response', '180'] if args.pending_outgoing else []),
                    *(['--restore-call', '--restore-phase', args.restore_phase] if args.restore_incoming else []),
                    *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      [] if args.outgoing_media else
@@ -206,6 +211,7 @@ def main():
             'media_recorded': args.record_media,
             'idle_restored': args.restore_idle,
             'outgoing_restored': args.restore_outgoing,
+            'outgoing_pending': args.pending_outgoing,
             'incoming_restored': args.restore_incoming,
             'restore_phase': args.restore_phase if args.restore_incoming else None,
             'command': command, 'result': 'pass',
