@@ -14951,6 +14951,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "power-cycle", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-ussd",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "ussd", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-coherent-registration",
       "prerequisites": ["build"],
       "variables": {},

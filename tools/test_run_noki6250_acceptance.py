@@ -4,10 +4,18 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
-from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, prerequisite_trace, main
+from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, prerequisite_trace, main, check_ussd
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_ussd_uses_own_reviewed_idle_frame(self):
+        with patch('tools.noki8210_supplementary_check.verify_transaction') as verify:
+            check_ussd('trace', Path('frames'))
+        args, kwargs = verify.call_args
+        self.assertEqual(args[3][-1], 'Send')
+        self.assertEqual(args[6], '7c541cfc93c2da8e854421941df0ac81755b73f47c3af98f2f6a40efac181b0b')
+        self.assertEqual(kwargs, {'product': '6250', 'geometry': (96, 60)})
+
     def test_saved_prerequisites_exclude_post_load_events(self):
         text = 'before\n6250_state: event=saved pc=1\nafter\n'
         for scenario in ('idle-state', 'call-state', 'sms-state'):

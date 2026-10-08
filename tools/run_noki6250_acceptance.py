@@ -23,6 +23,17 @@ except ModuleNotFoundError:
     from noki6250_pmm_check import initial_record_fixture
 
 
+def check_ussd(text, frames):
+    from tools import radio_ussd_trace_check
+    from tools.noki8210_supplementary_check import verify_transaction
+    verify_transaction(text, frames, 'ussd',
+                       ('Keypad *', 'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad #', 'Send'),
+                       radio_ussd_trace_check,
+                       '7282a48b0f972545caac4db1a02189d25775dd13e02b11857cba98cfd58b3112',
+                       '7c541cfc93c2da8e854421941df0ac81755b73f47c3af98f2f6a40efac181b0b',
+                       product='6250', geometry=(96, 60))
+
+
 def prerequisite_trace(text, scenario):
     """A restored event cannot establish the prerequisites of the saved state."""
     if scenario not in ('idle-state', 'call-state', 'sms-state'):
@@ -84,7 +95,7 @@ def main():
     parser.add_argument("run_directory", type=Path,
                         help="new directory; existing directories are refused")
     parser.add_argument("--mame", type=Path)
-    parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
+    parser.add_argument("--scenario", choices=("calculator", "ussd", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
@@ -163,6 +174,8 @@ def main():
             script = "noki6250_state_sms.lua"
         if args.scenario == 'power-cycle':
             script = 'noki6250_power_input.lua'
+        if args.scenario == 'ussd':
+            script = 'noki6250_ussd_input.lua'
         if host_call:
             script = "noki6250_host_incoming_input.lua"
         if args.scenario == "host-rejected-sms":
@@ -239,7 +252,11 @@ def main():
         with (run / "console.log").open("w") as console:
             subprocess.run(host_command or command, cwd=run, env=env, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
-        if call:
+        if args.scenario == 'ussd':
+            check_ussd((run / 'error.log').read_text(errors='replace'), run / 'snap')
+            checker = [sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
+                       str(run / 'error.log'), '--profile', 'nhm3']
+        elif call:
             checker = [sys.executable, str(root / "tools/noki6250_call_check.py"),
                        str(run / "error.log")]
             if args.scenario in ("outgoing-call", "host-outgoing-call"):

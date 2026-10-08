@@ -29,6 +29,14 @@ physical continuation. Idle uses Menu/Messages; the established call uses
 End and complete CC/RR release back to registered idle. Neither resolves the
 original PMM or native DSP boundaries below.
 
+Physical `*123#` and Send also complete a laboratory USSD exchange on the
+existing derived-PMM research fixture. `verify-6250-ussd` checks ordered
+physical inputs, exact request/correlated success/RR release, the reviewed
+`Service reply / Nokia test network` frame and the independently captured
+6250 registered-idle frame after physical Back. The registration checker
+continues to require SIM location persistence. This default-cell signaling
+comparison is not an ARFCN19/20 coherence, native DSP or speech claim.
+
 `verify-6250-coherent-idle-state` additionally runs idle restoration with the
 explicit ARFCN19/20 host-enabled cell. It requires own native uploads and HLE
 isolation, carrier-coherent registration and persistent EF_LOCI alongside
