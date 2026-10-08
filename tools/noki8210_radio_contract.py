@@ -248,6 +248,20 @@ def verify(image):
         raise ValueError('direct selector-wrapper candidate callsites differ')
     if alternate_readiness_calls != [0x21fc4a]:
         raise ValueError('alternate readiness direct entrance candidates differ')
+    for offset in range(0, len(image) - 1, 2):
+        word = int.from_bytes(image[offset:offset + 2], 'big')
+        if word & 0xf800 == 0xe000:
+            displacement = (word & 0x7ff) << 1
+            if displacement & 0x800:
+                displacement -= 0x1000
+        elif word & 0xf000 == 0xd000 and ((word >> 8) & 15) < 14:
+            displacement = (word & 0xff) << 1
+            if displacement & 0x100:
+                displacement -= 0x200
+        else:
+            continue
+        if 0x200000 + offset + 4 + displacement == 0x21f2ec:
+            raise ValueError('alternate readiness short-branch entrance candidate present')
     if any(int.from_bytes(image[offset:offset + 4], 'big') in
            (0x21f2ec, 0x21f2ed) for offset in range(0, len(image) - 3, 4)):
         raise ValueError('alternate readiness literal pointer candidate present')

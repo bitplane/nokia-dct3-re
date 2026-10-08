@@ -1253,10 +1253,11 @@ complete state ownership.
 The complete aligned direct-BL candidate scan also finds only `21fc4a`
 calling the alternate handler `21f2ec`, from receive state 21 itself;
 there are no four-byte-aligned ARM/Thumb literal pointer candidates to that
-handler. Its `03eb/03ec/03ea` comparisons and unmatched-input state-21
+handler. Complete aligned 16-bit unconditional and conditional branch
+candidate scans also find no target of `21f2ec`. Its `03eb/03ec/03ea` comparisons and unmatched-input state-21
 assignment are machine-checked. Thus this route has no independently
-identified direct entrance from state 13. Computed calls, aliases and
-tail entrances remain outside this negative result; it is not a total
+identified direct or short-branch entrance from state 13. Computed calls,
+aliases and other instruction modes remain outside this negative result; it is not a total
 producer-absence proof or justification for forcing state 21.
 All 19 direct setter candidates have an immediate literal predecessor;
 the argument sequence in address order is
