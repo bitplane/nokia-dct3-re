@@ -1,9 +1,12 @@
--- Observe an unanswered external call; no keys or firmware writes.
+-- Observe an unanswered external call and dismiss its notification physically.
 local source = debug.getinfo(1, 'S').source:sub(2)
-dofile(assert(source:match('^(.*[/])')) .. 'noki6210_staged_observe.lua')
+local directory = assert(source:match('^(.*[/])'))
+if not _G.noki6210_sip_restore_idle then
+    dofile(directory .. 'noki6210_staged_observe.lua')
+end
 local machine = manager.machine
 local observation = coroutine.create(function()
-    if not emu.wait(32) then return end
+    if not emu.wait(32 - machine.time:as_double()) then return end
     machine.screens[':screen']:snapshot('6210_sip_registered_idle.png')
     machine:logerror('6210_sip_cancel: ready t=32\n')
     if not emu.wait(23) then return end
@@ -18,4 +21,10 @@ local observation = coroutine.create(function()
     machine:logerror('6210_sip_cancel: final t=57\n')
 end)
 _G.noki6210_sip_cancel_observe = observation
-assert(coroutine.resume(observation))
+if _G.noki6210_sip_restore_idle then
+    _G.noki6210_sip_cancel_post_load = emu.add_machine_post_load_notifier(function()
+        assert(coroutine.resume(observation))
+    end)
+else
+    assert(coroutine.resume(observation))
+end

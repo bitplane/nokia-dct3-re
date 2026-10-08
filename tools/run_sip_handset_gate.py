@@ -105,7 +105,8 @@ async def run(args):
                 processes.append(remote)
                 if args.cancel_incoming:
                     for _ in range(400):
-                        if 'incoming state id=1 epoch=1 phase=alerting' in (root / 'error.log').read_text(errors='replace'):
+                        if re.search(r'incoming state id=1 epoch=\d+ phase=alerting',
+                                     (root / 'error.log').read_text(errors='replace')):
                             break
                         if bridge.returncode is not None or remote.returncode is not None:
                             raise RuntimeError('call ended before incoming alerting')
@@ -380,8 +381,12 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
 def verify_cancel(root, remote_text, product='3210'):
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
+    calls = re.findall(r'gsm_call_adapter: incoming state id=1 epoch=(\d+) phase=paging', log)
+    if len(calls) != 1:
+        raise RuntimeError('cancelled incoming call lacks one fresh paging identity')
+    epoch = int(calls[0])
     if ('Request msg CANCEL/' not in remote_text or 'Response msg 487/INVITE/' not in remote_text or
-            'SIP disconnected status=487 identity=(1, 1)' not in bridge_text):
+            f'SIP disconnected status=487 identity=({epoch}, 1)' not in bridge_text):
         raise RuntimeError('missing real SIP CANCEL/487 exchange')
     if ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge_text or
             'SIP physical answer' in bridge_text or
@@ -401,21 +406,21 @@ def verify_cancel(root, remote_text, product='3210'):
             re.search(r'gsm_call_adapter: termination id=1 .*result=rejected', log)):
         raise RuntimeError('cancelled incoming call did not clear exactly once')
     for pattern in (
-            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging',
+            rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=paging',
             r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
-            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=alerting',
+            rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=alerting',
             r'gsm_call_adapter: termination id=1 cause=16 result=accepted',
             r'GSM service downlink kind=13 sapi=0 pd=03 message=25',
             r'GSM service uplink sapi=0 pd=03 message=2a',
             r'LAPDm service Channel Release acknowledged',
-            r'gsm_call_adapter: incoming state id=1 epoch=1 phase=ended'):
+            rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=ended'):
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing cancelled incoming call checkpoint: {pattern}')
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': f'{product} HLE incoming SIP CANCEL while alerting; no Answer/connection/media',
-        'sip_status': 487, 'media': counts, 'passed': True}, indent=2) + '\n')
+        'sip_status': 487, 'epoch': epoch, 'media': counts, 'passed': True}, indent=2) + '\n')
     print('OK - SIP CANCEL before Answer cleared the ringing handset without connection/media')
 
 

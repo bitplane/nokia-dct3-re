@@ -1,5 +1,6 @@
 """Fresh NPE-3 research-HLE SIP cancellation; no Answer or speech claim."""
 import argparse
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -12,10 +13,19 @@ from tools.noki6210_staged_check import verify
 from tools.run_noki6210_acceptance import OPERATOR_SHA256, check_frame, check_registration
 
 
-def check_product_result(run):
+def check_product_result(run, restore_idle=False):
     from PIL import Image
     text = (run / 'error.log').read_text(errors='replace')
     verify(text, runtime=True, selftest=True)
+    if restore_idle:
+        from tools.noki6210_state_check import verify as verify_state
+        verify_state(text, 'idle')
+        restored = text.find('state_roundtrip: result=pass scenario=idle')
+        paging = text.find('gsm_call_adapter: incoming state id=1 epoch=')
+        if restored < 0 or paging <= restored:
+            raise ValueError('incoming call did not start after idle restoration')
+        if json.loads((run / 'sip-result.json').read_text()).get('epoch') != 2:
+            raise ValueError('idle restoration did not invalidate the original host epoch')
     check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
     if '6210_sip_cancel: physical Exit' not in text:
         raise ValueError('missed-call notification was not physically dismissed')
@@ -32,6 +42,8 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--pjsua', type=Path, required=True)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--restore-idle', action='store_true',
+                        help='restore idle CPU/RAM/time before admitting the fresh SIP call')
     parser.add_argument('--http-port', type=int, default=18621)
     parser.add_argument('--sip-port', type=int, default=25621)
     args = parser.parse_args()
@@ -48,7 +60,10 @@ def main():
                    '-rompath', str(root / 'roms'), '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki6210_sip_cancel_observe.lua'),
+                   '-autoboot_script', str(root / 'tools' / (
+                       'noki6210_sip_idle_restore.lua' if args.restore_idle else
+                       'noki6210_sip_cancel_observe.lua')),
+                   '-state_directory', str(run / 'sta'),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run', '60',
                    '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
@@ -61,7 +76,7 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        check_product_result(run)
+        check_product_result(run, args.restore_idle)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6210 SIP cancellation FAIL: {error}; inspect {run}\n')
     print('6210 research-HLE SIP CANCEL PASS; registered idle recovered, no speech acceptance')

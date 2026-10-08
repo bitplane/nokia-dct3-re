@@ -415,6 +415,12 @@ dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for product `6210`.
 
+`verify-6210-sip-idle-restore` saves and restores the idle NPE-3 handset before
+the fresh INVITE. It checks exact CPU/RAM/time restoration and ordered protocol
+replay, requires the new host epoch 2, then independently checks the same
+CANCEL/487, missed-call and physical Exit lifecycle. No external SIP dialog
+exists at the save point; this does not claim dialog restoration or speech.
+
 ### Connected-call restoration
 
 ```sh

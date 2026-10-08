@@ -23,12 +23,12 @@ COUNTS = dict(uplink=0, downlink=0, pcm_transmitted=0, pcm_received=0)
 
 
 class SipCancelCheckTest(unittest.TestCase):
-    def check(self, log=LOG, remote=REMOTE, counts=None, extra='', product='3210'):
+    def check(self, log=LOG, remote=REMOTE, counts=None, extra='', product='3210', epoch=1):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log)
             (root / 'sip-bridge.log').write_text(
-                'SIP disconnected status=487 identity=(1, 1)\n'
+                f'SIP disconnected status=487 identity=({epoch}, 1)\n'
                 + 'SIP bridge ended ' + json.dumps(COUNTS if counts is None else counts)
                 + '\n' + extra)
             verify_cancel(root, remote, product)
@@ -36,6 +36,18 @@ class SipCancelCheckTest(unittest.TestCase):
 
     def test_cancel_completes_without_answer(self):
         self.check()
+
+    def test_fresh_call_after_idle_restore_uses_new_epoch(self):
+        result = self.check(log=LOG.replace('epoch=1', 'epoch=2'), epoch=2, product='6210')
+        self.assertEqual(result['epoch'], 2)
+
+    def test_stale_bridge_identity_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            self.check(log=LOG.replace('epoch=1', 'epoch=2'))
+
+    def test_mixed_handset_epochs_are_rejected(self):
+        with self.assertRaises(RuntimeError):
+            self.check(log=LOG.replace('epoch=1 phase=alerting', 'epoch=2 phase=alerting'))
 
     def test_sibling_scopes(self):
         for product in ('3310', '3330', '3410', '5210', '6210'):

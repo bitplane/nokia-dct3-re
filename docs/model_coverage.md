@@ -91,6 +91,9 @@ The 6210 v5.56 `npe3hle` profile separately passes `verify-6210-sip-cancel`:
 real caller CANCEL/487 during alerting, complete CC/RR release, the missed-call
 screen and physical Exit back to registered idle. It rejects Answer and media
 and does not establish answered SIP speech.
+`verify-6210-sip-idle-restore` separately repeats this fresh-call lifecycle after
+exact idle CPU/RAM/time restoration and host epoch invalidation; it does not
+restore a SIP dialog.
 
 ## Product-boundary cautions
 

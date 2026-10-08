@@ -287,6 +287,12 @@ The runner refuses an existing run directory or stale readiness artifact.
 The generic SIP runner explicitly limits product `6210` to this unanswered
 scenario; answered SIP, speech and native DSP are not promoted.
 
+`make verify-6210-sip-idle-restore RUN_DIR=run_6210_sip_idle_restore` first
+performs the existing exact idle architecture/time and protocol-replay check.
+The fresh incoming call must use host epoch 2 and start after restoration;
+the same missed-call frame, physical Exit and registered-idle recovery are
+required. The save contains no SIP dialog and no media is admitted.
+
 ## Host outgoing call
 
 `host-outgoing-call` runs the ordinary physical `1234567` dial/Send/End
