@@ -42,6 +42,13 @@ reviewed `Service not active` pixels and registered idle after Back.
 Forwarding activation, save-state retention and delivery are not established
 on NHM-3 by this interrogation gate.
 
+`verify-6250-call-divert-lifecycle` separately covers physical registration
+for `5551234`, active interrogation, deactivation and inactive interrogation
+within one coherent laboratory session. Protocol transitions and all four
+reviewed result frames plus product-local idle are checked independently.
+The active query renders `Done`, not a reviewed forwarding-number frame.
+This scenario does not establish save-state or cold-process persistence.
+
 `verify-6250-sim-toolkit` independently exercises a Phase-2+ card: the own
 firmware submits a nine-byte TERMINAL PROFILE, STATUS returns `91 16`, FETCH
 retrieves DISPLAY TEXT, and physical OK produces the successful 12-byte

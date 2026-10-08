@@ -330,6 +330,9 @@ NHM-3 result/idle frames on its declared derived-PMM research comparison. The
 default-cell signaling gate is not an ARFCN19/20 coherence promotion.
 `verify-6250-call-divert` separately verifies inactive interrogation and
 physical result dismissal; it does not inherit the 6210 forwarding lifecycle.
+The separate `verify-6250-call-divert-lifecycle` validates its own physical
+register/query/deactivate/query session and reviewed frames; restoration
+and cold-process forwarding persistence remain unpromoted on NHM-3.
 `verify-6250-sim-toolkit` independently verifies its nine-byte TERMINAL
 PROFILE, card-owned DISPLAY TEXT, physical OK, successful TERMINAL RESPONSE
 and reviewed idle recovery. Other proactive commands remain unpromoted.

@@ -4,10 +4,19 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
-from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, prerequisite_trace, main, check_ussd, check_supplementary
+from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, prerequisite_trace, main, check_ussd, check_supplementary, check_divert_lifecycle
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_forwarding_requires_own_physical_transaction_before_protocol(self):
+        protocol = ('gsm_ss: request=register transaction=1b invoke=1 service=21 '
+                    'number_length=5 active=1\n')
+        with self.assertRaisesRegex(ValueError, 'physical transaction 1'):
+            check_divert_lifecycle(protocol, Path('unused'))
+        with self.assertRaisesRegex(ValueError, 'forwarding protocol 1'):
+            check_divert_lifecycle('6250_divert_lifecycle_physical: transaction=1\n' +
+                                  protocol.replace('invoke=1', 'invoke=9'), Path('unused'))
+
     def test_divert_keeps_its_own_sequence_and_result(self):
         with patch('tools.noki8210_supplementary_check.verify_transaction') as verify:
             check_supplementary('trace', Path('frames'), 'divert')

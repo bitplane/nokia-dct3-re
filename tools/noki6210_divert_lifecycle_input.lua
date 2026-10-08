@@ -1,42 +1,11 @@
--- Physical NPE-3 forwarding lifecycle against the laboratory network.
-local source = debug.getinfo(1, "S").source:sub(2)
-local directory = assert(source:match("^(.*[/])"))
-dofile(directory .. "noki6210_staged_observe.lua")
-local machine = manager.machine
-machine.devices[":maincpu"].debug:bpset(0x4fad30, nil,
+-- Own NPE-3 observation and physical forwarding lifecycle.
+local source = debug.getinfo(1, 'S').source:sub(2)
+local directory = assert(source:match('^(.*[/])'))
+dofile(directory .. 'noki6210_staged_observe.lua')
+manager.machine.devices[':maincpu'].debug:bpset(0x4fad30, nil,
     'logerror "6210_keypad_decoded: key=%02x\\n",r0;g')
-local function press(column, name)
-    local key = assert(machine.ioport.ports[":COL." .. column].fields[name])
-    machine:logerror("6210_divert_lifecycle_physical: key=" .. name .. "\n")
-    key:set_value(1)
-    if not emu.wait(0.15) then key:set_value(0); return false end
-    key:set_value(0)
-    return emu.wait(0.85)
-end
-local sequences = {"*21*5551234#", "*#21#", "#21#", "*#21#"}
-local function transactions(first)
-    for index = first, #sequences do
-        local sequence = sequences[index]
-        machine:logerror("6210_divert_lifecycle_physical: transaction=" .. index .. "\n")
-        for character in sequence:gmatch(".") do
-            local column = character == "*" and 2 or character == "#" and 4
-                or 2 + (tonumber(character) - 1) % 3
-            if not press(column, "Keypad " .. character) then return end
-        end
-        if not press(0, "Send") or not emu.wait(1) then return end
-        machine.screens[":screen"]:snapshot("6210_divert_lifecycle_" .. index .. ".png")
-        if not press(1, "Right Softkey / C") or not emu.wait(1) then return end
-        -- Give the save/load wrapper an input-free observation interval.
-        if index == 1 and _G.noki6210_state_scenario == 'divert' then
-            if not emu.wait(3) then return end
-        end
-    end
-    machine.screens[":screen"]:snapshot("6210_divert_lifecycle_idle.png")
-end
-_G.noki6210_resume_divert = function() transactions(2) end
-local input = coroutine.create(function()
-    if not emu.wait(20) then return end
-    transactions(1)
-end)
-_G.noki6210_divert_lifecycle_input = input
-assert(coroutine.resume(input))
+_G.dct3_divert_product = '6210'
+_G.dct3_divert_start = 20
+_G.dct3_divert_save_window = _G.noki6210_state_scenario == 'divert' and 3 or nil
+dofile(directory .. 'dct3_divert_lifecycle_input.lua')
+_G.noki6210_resume_divert = _G.dct3_resume_divert

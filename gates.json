@@ -14972,6 +14972,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "toolkit", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-call-divert-lifecycle",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "divert-lifecycle", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-coherent-registration",
       "prerequisites": ["build"],
       "variables": {},

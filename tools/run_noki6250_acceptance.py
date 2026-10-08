@@ -23,6 +23,33 @@ except ModuleNotFoundError:
     from noki6250_pmm_check import initial_record_fixture
 
 
+def check_divert_lifecycle(text, frames):
+    from PIL import Image
+    from tools.radio_call_divert_lifecycle_trace_check import EVENTS
+    from tools.radio_call_lifecycle_common import require_ordered
+    import re
+    if '[LUA ERROR]' in text:
+        raise ValueError('NHM-3 forwarding physical fixture failed')
+    ordered = []
+    for index in range(4):
+        ordered.append((f'physical transaction {index + 1}', re.compile(
+            rf'6250_divert_lifecycle_physical: transaction={index + 1}\b')))
+        ordered.extend((f'forwarding protocol {index * 2 + offset + 1}', pattern)
+                       for offset, pattern in enumerate(EVENTS[index * 2:index * 2 + 2]))
+    require_ordered(text, tuple(ordered), '6250 forwarding lifecycle')
+    expected = (
+        'e9e4c057d769f66a48893d561b8edc1de9213a44c3756f047db4bf3d14653295',
+        '466a5a0241eb09e162c00227e8737eaddc5717251ec2663bf9a97b3c8c8c58d9',
+        '45ca2e2d94aa2af50a1f008baef60fffecbb49ba304c3ff8e68818a91b88bf3e',
+        '0218f879565b696f4768f55215c45166b725b1897d0d78715da54278c74244b4',
+        '7c541cfc93c2da8e854421941df0ac81755b73f47c3af98f2f6a40efac181b0b',
+    )
+    for phase, digest in zip(('1', '2', '3', '4', 'idle'), expected):
+        with Image.open(frames / f'6250_divert_lifecycle_{phase}.png') as frame:
+            if frame.size != (96, 60) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
+                raise ValueError('missing reviewed NHM-3 forwarding frame: ' + phase)
+
+
 def check_toolkit_protocol(text):
     from tools.sim_toolkit_trace_check import require_in_order
     if '[LUA ERROR]' in text:
@@ -136,7 +163,7 @@ def main():
     parser.add_argument("run_directory", type=Path,
                         help="new directory; existing directories are refused")
     parser.add_argument("--mame", type=Path)
-    parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "toolkit", "incoming-call", "outgoing-call",
+    parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "divert-lifecycle", "toolkit", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
@@ -223,6 +250,8 @@ def main():
             script = 'noki6250_power_input.lua'
         if args.scenario in ('ussd', 'divert', 'toolkit'):
             script = f'noki6250_{args.scenario}_input.lua'
+        if args.scenario == 'divert-lifecycle':
+            script = 'noki6250_divert_lifecycle_input.lua'
         if host_call:
             script = "noki6250_host_incoming_input.lua"
         if args.scenario == "host-rejected-sms":
@@ -231,6 +260,8 @@ def main():
             script = "noki6250_sms_silence_input.lua"
         seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
         if args.scenario == 'power-cycle':
+            seconds = '80'
+        if args.scenario == 'divert-lifecycle':
             seconds = '80'
         if args.pin_enabled and args.scenario in ('host-outgoing-call', 'host-outgoing-sms'):
             seconds = '60'
@@ -299,7 +330,11 @@ def main():
         with (run / "console.log").open("w") as console:
             subprocess.run(host_command or command, cwd=run, env=env, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
-        if args.scenario == 'toolkit':
+        if args.scenario == 'divert-lifecycle':
+            check_divert_lifecycle((run / 'error.log').read_text(errors='replace'), run / 'snap')
+            checker = [sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
+                       str(run / 'error.log'), '--profile', 'nhm3']
+        elif args.scenario == 'toolkit':
             check_toolkit((run / 'error.log').read_text(errors='replace'), run / 'snap')
             checker = [sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                        str(run / 'error.log'), '--profile', 'nhm3']
