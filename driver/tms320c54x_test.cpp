@@ -15678,6 +15678,33 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x210a0a0a0aULL &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"TI NORM B,A example shifts guarded B right by seven");
+			m_phase = 9247;
+		}
+		if (m_phase >= 9247 && m_phase <= 9249)
+		{
+			if (m_phase != 9247)
+				expect_opcode(0xf78f,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (m_phase == 9248 ? 0xff80080000ULL : 0x0042141414ULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_T) == (m_phase == 9248 ? 0x13 : 0xfff9) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 NORM B left/right uses signed six-bit T, preserves A/T/carry/status and costs one cycle");
+			if (m_phase < 9249)
+			{
+				program.write_word(0x05e2, 0xf78f);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, m_phase == 9247 ? 0xfffffff001ULL : 0x210a0a0a0aULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, m_phase == 9247 ? 0x13 : 0xfff9);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e2, 0xf48e); // EXP A with zero source.
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
