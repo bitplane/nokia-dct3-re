@@ -332,7 +332,9 @@ transferred between processes.
 
 The `verify-6210-pin-state-idle`, `-call` and `-sms` gates save the
 authenticated runtime, then require exact CPU/RAM/emulated-time restoration
-and a matched protocol replay window. The call fixture physically releases
+and a matched protocol replay window. Physical PIN confirmation, successful
+VERIFY and completed registration are required in order before saving, not
+merely somewhere in the whole run. The call fixture physically releases
 the restored call; the SMS fixture physically reads the restored delivery and
 checks the exact message image and persistent read-status record. Each run
 retains enabled CHV1, PIN `1234` and a single successful startup VERIFY.
@@ -479,7 +481,9 @@ The 135-second fixture does not shorten firmware timers.
 `verify-6210-state-idle`, `verify-6210-state-call` and
 `verify-6210-state-sms` save and restore emulated time, architectural R15/R13
 and a digest of the complete handset RAM. Each requires a nonempty, identical
-ordered protocol replay interval after restoration. The call fixture then
+ordered protocol replay interval after restoration. Location Updating Accept
+and its subsequent Channel Release must occur before the saved snapshot;
+post-load registration cannot satisfy this prerequisite. The call fixture then
 presses physical End and verifies release and resumed paging; the SMS fixture
 opens the delivered message and verifies its persistent read status and frame.
 These remain signaling/storage checks, not speech validation.

@@ -6,6 +6,8 @@ from tools.noki6210_state_check import verify
 class StateAcceptanceTest(unittest.TestCase):
     def fixture(self):
         return '\n'.join((
+            'LAPDm Location Updating Accept acknowledged nr=1',
+            'LAPDm Channel Release acknowledged nr=2',
             '6210_state: scenario=idle event=saved pc=1c sp=17583c ram=127bd2b1 t=19.000000',
             'state_replay: phase=reference event=begin t=19.000000',
             'TX packet type=70 payload=01 t=19.100000',
@@ -33,7 +35,30 @@ class StateAcceptanceTest(unittest.TestCase):
 
     def test_missing_snapshot(self):
         with self.assertRaises(ValueError):
-            verify('\n'.join(self.fixture().splitlines()[1:]), 'idle')
+            verify(self.fixture().replace(self.fixture().splitlines()[2], ''), 'idle')
+
+    def test_registration_must_precede_save(self):
+        for event in ('LAPDm Location Updating Accept acknowledged nr=1',
+                      'LAPDm Channel Release acknowledged nr=2'):
+            with self.subTest(event=event), self.assertRaises(ValueError):
+                verify(self.fixture().replace(event, '') + '\n' + event, 'idle')
+
+    def test_registration_order(self):
+        with self.assertRaises(ValueError):
+            verify(self.fixture().replace(
+                'LAPDm Location Updating Accept acknowledged nr=1\n'
+                'LAPDm Channel Release acknowledged nr=2',
+                'LAPDm Channel Release acknowledged nr=2\n'
+                'LAPDm Location Updating Accept acknowledged nr=1'), 'idle')
+
+    def test_pin_must_precede_registration_and_save(self):
+        pin = ('6210_security_physical: action=confirm\n'
+               'SIM status ins=20 sw=9000\n')
+        verify(pin + self.fixture(), 'idle', pin_enabled=True)
+        for text in (self.fixture(), self.fixture() + '\n' + pin,
+                     pin.replace('SIM status ins=20 sw=9000', '') + self.fixture()):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                verify(text, 'idle', pin_enabled=True)
 
     def test_protocol_divergence(self):
         with self.assertRaises(ValueError):

@@ -457,7 +457,8 @@ def main():
                                    channel_header='1202')
         elif args.scenario.startswith('state-'):
             from tools.noki6210_state_check import verify as check_state
-            check_state(text, args.scenario.removeprefix('state-'))
+            check_state(text, args.scenario.removeprefix('state-'),
+                        pin_enabled=args.pin_enabled)
             if args.scenario == 'state-call':
                 from tools.noki6210_outgoing_call_check import verify as check_call
                 check_call(text, coherent_pin=args.pin_enabled)
