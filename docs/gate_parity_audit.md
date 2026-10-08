@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 70
-Differences found: 111
+Families with more than one product: 72
+Differences found: 113
 
 ## ROM normalisation reachability
 
@@ -18,78 +18,80 @@ Every product gate reaches its own ROM normalisation step.
 Which products have a gate in each shared capability family. An
 absent product is a coverage question, not a drifted gate.
 
-| Family | 2100 | 3210 | 3310 | 3330 | 3410 | 3610 | 5110 | 5210 | 5510 | 6110 | 6210 | 7110 | 8210 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `bootstrap` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
-| `calculator` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
-| `charger-wake` | — | yes | — | — | — | — | — | yes | — | — | — | — | — |
-| `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — | — |
-| `incoming-call` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
-| `incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
-| `keypad-controller` | — | — | — | — | — | — | — | — | — | — | yes | yes | — |
-| `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — | — |
-| `menu` | — | — | yes | — | yes | — | yes | yes | — | — | yes | — | — |
-| `navigation` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `outgoing-call` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
-| `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
-| `phonebook` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
-| `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — | — | — | — | — |
-| `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-a5-1-outgoing-call` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-all-cell-loss` | — | yes | — | — | yes | — | — | yes | — | — | — | — | — |
-| `radio-authentication-boundary` | — | yes | yes | — | — | — | — | — | — | — | — | — | — |
-| `radio-boundary` | — | — | yes | yes | — | — | — | — | — | — | — | — | — |
-| `radio-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-call-answered` | — | yes | — | — | — | — | — | yes | — | — | — | — | — |
-| `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-incoming-call-sip` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-incoming-call-sip-alerting-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-incoming-call-sip-cancel` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-incoming-call-sip-connected-restore` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-incoming-call-sip-idle-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-incoming-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-incoming-sms` | — | yes | — | — | — | — | — | yes | — | — | — | — | — |
-| `radio-loss-recovery` | — | yes | — | — | yes | — | — | yes | — | — | — | — | — |
-| `radio-loss-recovery-state` | — | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-media-resilience` | — | — | yes | yes | — | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-call-sip` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-call-sip-busy` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-call-sip-connected-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-call-sip-pending-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-call-sip-unavailable` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-paging` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-paging-negatives` | — | — | — | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-paging-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-paging-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-periodic-location-update` | — | yes | — | — | yes | — | — | — | — | — | — | — | — |
-| `radio-physical-duplex` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-registration` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-registration-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-registration-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-reselection-different-lac` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-reselection-paging` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-reselection-preserved` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-reselection-same-lac` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — |
-| `radio-reselection-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-smart-message-application` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — |
-| `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — |
-| `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — | — |
-| `registration` | — | — | — | — | — | — | — | — | — | — | yes | — | yes |
-| `save-state` | — | — | — | — | — | — | yes | yes | — | — | — | — | — |
-| `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — | — |
-| `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | yes | — | — |
-| `verifier` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
+| Family | 2100 | 3210 | 3310 | 3330 | 3410 | 3610 | 5110 | 5210 | 5510 | 6110 | 6210 | 7110 | 8210 | 8850 | 8890 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `bootstrap` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | — | — |
+| `calculator` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `call-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
+| `charger-wake` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
+| `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — | — | — | — |
+| `incoming-call` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `keypad-controller` | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — |
+| `mbus` | yes | yes | — | — | — | yes | — | — | — | — | — | — | — | — | — |
+| `menu` | — | — | yes | — | yes | — | yes | yes | — | — | yes | — | — | — | — |
+| `navigation` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `outgoing-call` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `phonebook` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `power-lifecycle` | — | yes | — | — | — | — | yes | yes | — | — | — | — | — | — | — |
+| `radio-a5-1-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-a5-1-incoming-call` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-a5-1-outgoing-call` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-all-cell-loss` | — | yes | — | — | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-authentication-boundary` | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-boundary` | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — | — |
+| `radio-handover` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-handover-failure-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-call-answered` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-alerting-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-cancel` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-connected-restore` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-idle-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-incoming-smart-message` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-incoming-sms` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
+| `radio-loss-recovery` | — | yes | — | — | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-loss-recovery-state` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-media-resilience` | — | — | yes | yes | — | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-call-host-media` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-host-termination` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-outgoing-call-lifecycle` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-busy` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-connected-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-pending-restore` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-unavailable` | — | yes | — | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-call-sip-waveform` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-physical-duplex` | — | — | — | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-outgoing-sms` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-paging` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-paging-negatives` | — | — | — | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-paging-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-paging-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-periodic-location-update` | — | yes | — | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-physical-duplex` | — | — | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-registration` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-registration-preserved` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-registration-state` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-different-lac` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-reselection-paging` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-reselection-preserved` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-reselection-same-lac` | — | yes | yes | yes | yes | — | — | yes | — | — | — | — | — | — | — |
+| `radio-reselection-state` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-smart-message-application` | — | yes | yes | — | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-smart-message-persistence` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-sms-inbox` | — | yes | yes | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `radio-unsuitable-cells` | — | — | — | yes | yes | — | — | — | — | — | — | — | — | — | — |
+| `registration` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
+| `save-state` | — | — | — | — | — | — | yes | yes | — | — | — | — | — | — | — |
+| `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
+| `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | yes | — | — | — | — |
+| `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
+| `verifier` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | — | — |
 
 ## Different checker scripts
 
@@ -103,6 +105,12 @@ absent product is a coverage question, not a drifted gate.
 
 - **6210**: `tools/run_noki6210_acceptance.py`
 - **8210**: `tools/run_noki8210_acceptance.py`
+
+### `call-divert`
+
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8xxx_supplementary.py`
 
 ### `frontier`
 
@@ -402,6 +410,12 @@ absent product is a coverage question, not a drifted gate.
 
 - **3210**: `tools/sim_toolkit_trace_check.py`
 - **6210**: `tools/run_noki6210_acceptance.py`
+
+### `ussd`
+
+- **8210**: `tools/run_noki8210_acceptance.py`
+- **8850**: `tools/run_noki8xxx_supplementary.py`
+- **8890**: `tools/run_noki8xxx_supplementary.py`
 
 ### `verifier`
 

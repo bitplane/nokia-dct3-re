@@ -569,6 +569,15 @@ Check the resulting private run with:
 .venv/bin/python tools/noki8890_ussd_check.py RUN
 ```
 
+`make verify-8890-ussd RUN_DIR=NEW_RUN` automates that fresh setup and pins
+the own MCU/PMM hashes and normal keypad table. The corresponding
+`verify-8890-call-divert` gate physically enters `*#21#`, checks the exact
+inactive service-21 result, the reviewed `Dienst nicht aktiv` frame, physical
+Back to 12:00 DCT3LAB idle and persisted EF_LOCI. This is interrogation
+coverage, not activation or call forwarding. Its earlier result capture
+precedes firmware automatic dismissal. Neither gate accepts a reused run
+directory or substitutes another product's PMM.
+
 The own MCU and acquired PMM remain unchanged. Only key-sequence mechanics
 are shared with the 8850 fixture; own registration predicates, startup
 settlement, German response softkey and 12:01 DCT3LAB idle frame are
@@ -1409,6 +1418,14 @@ For physical USSD acceptance, use the same fresh private run setup with
 ```sh
 .venv/bin/python tools/noki8850_ussd_check.py RUN
 ```
+
+`make verify-8850-ussd RUN_DIR=NEW_RUN` automates the isolated run with
+own MCU/PMM provenance checks. `verify-8850-call-divert` uses the same
+own startup with physical `*#21#`, exact inactive service-21 result,
+reviewed `Service not active` frame, physical Back to DCT3LAB idle and
+persisted EF_LOCI. The divert fixture runs for 36 seconds and captures
+the transient result early, before automatic dismissal. Activation and
+actual call forwarding are not proved by this gate.
 
 The fixture enters the security code through physical keys, then `*123#`
 and Send. Acceptance requires the exact GSM 04.80 request and correlated

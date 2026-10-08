@@ -105,11 +105,21 @@ proactive commands and native DSP are not promoted by this gate.
 The 8210 research-HLE profile additionally passes `verify-8210-ussd`: physical
 `*123#`/Send, exact GSM supplementary-service request/response, RR release,
 reviewed result presentation and physical Back to registered idle. Its own
-decoder table requires product-local Star/Hash labels; this does not promote
-native DSP or the normal machine.
+decoder table matches the independently checked 8850 and 8890 tables, so
+their research profiles share corrected Star/Hash labels; this does not
+promote native DSP or the normal machines.
 `verify-8210-call-divert` separately proves physical service-`21`
 interrogation, the inactive result, RR release and Back-to-idle; forwarding
 activation and delivery are not covered by that gate.
+
+The 8850 and 8890 independently pass `verify-8850-ussd`,
+`verify-8890-ussd`, `verify-8850-call-divert` and
+`verify-8890-call-divert` through fresh isolated own-MCU/PMM runs.
+Each requires physical input, exact supplementary signaling, its own
+reviewed result and registered-idle frames, and persisted EF_LOCI.
+The 8890 includes physical clock/date settlement; its localized frames
+are not inherited from the 8850. Divert coverage is inactive interrogation
+only, and these gates do not establish native resident DSP or speech.
 
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not
   NSE-8 type `0x1a`; each enabled radio profile uses its independently recovered
