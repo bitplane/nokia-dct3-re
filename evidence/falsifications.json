@@ -811,8 +811,8 @@
     },
     {
       "id": "nhm3_late_pin_type57_accepts_background_type55_measurements", "status": "disproven",
-      "hypothesis": "NHM-3's type-57 body 03050000 accepts the existing type-55 ALL_RSSI_RESULTS layout as a background measurement completion after slow PIN entry",
-      "conclusion": "The own-ROM type-55 and type-57 constructors share a control encoder, and task 14 has an 1802/class-8b completion branch. A bounded request-derived model preserved serving reception and enqueued a 166-byte 8b result from receivable laboratory cells at 10.364597 seconds. A passive tap did not observe completion consumer 3cbe14; the mapped wait next observed the real 03ec SIM notification, and no registration completed through 45 seconds. This rejects the implemented alias, not all possible type-57 replies. The candidate model was removed; recover the own-ROM 8b dispatch before another response experiment. The analogous NHM-2 alias was already falsified independently.",
+      "hypothesis": "The tested NHM-3 background type-55-layout implementation delivers a completion for type-57 body 03050000 and restores registration after slow PIN entry",
+      "conclusion": "The candidate enqueued a 166-byte 8b result at 10.364597 seconds, but did not reach consumer 3cbe14 or restore registration through 45 seconds. Review of the retained transport log finds no FIQ0 notification after that enqueue and no subsequent logged RX consumer advance. Thus the implementation is rejected, but its negative outcome does not falsify the reply-layout hypothesis: delivery was not established. The own-ROM raw-8b handler 4649ac forwards to task 14 when byte 1721e0 equals 1; a separate unmodified slow-PIN run establishes that this byte remains enabled. The candidate was removed. Establish notification and consumption before interpreting another semantic test. The NHM-2 alias falsification remains an independent result, not a substitute for NHM-3 delivery evidence.",
       "evidence": ["docs/6250_bringup.md", "docs/network_scouting.md"]
     },
     {

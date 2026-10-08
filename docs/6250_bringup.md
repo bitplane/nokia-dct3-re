@@ -395,6 +395,16 @@ packet-to-envelope path before this handler, not a missing subscription
 enable. This does not retrospectively prove where the removed candidate
 was lost: that candidate was not present in this observation.
 
+The retained candidate transport log narrows its negative result further:
+the enqueue at 10.364597 s has no following logged FIQ0 notification or
+RX consumer advance. The last notification preceded it at 10.363536 s
+for type `89`, whose consumer reached `00b4`; the candidate moved the
+producer from `00b4` to `00a4` after wrapping the ring. Publication alone
+does not prove delivery. The removed implementation failed, but this
+experiment cannot reject the response layout on semantic grounds. A
+future test must establish notification, ring consumption, decoded class
+and task destination before interpreting the completion result.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
