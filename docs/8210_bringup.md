@@ -739,6 +739,16 @@ calls observe states 4 then 6; DCS observes state 5 and subsequently calls
 the same helper with argument 3 from `21f5c8`. These are observed internal
 states, not yet named protocol semantics. Decode the state-5/argument-3
 contract and its `2a0eb8` dependency before adding any peer response.
+The observed state-5/argument-3 rejection reaches `2a194c`: its measurement
+outcome is `4`, which fails the first `outcome & ~2 == 0` predicate. The
+record is `07 08 01 00`, and the two selected-cell links are nonzero/zero;
+those later predicates are not reached. The outcome is written organically
+by parser `28755e` at `287640` into the object referenced by `13722c`.
+GSM also receives outcome `4`, so it is not a DCS-specific failure code.
+The post-rejection `21b8ea -> 21bb8c` path repeatedly enters `PH_9000`
+while broadcasts arrive: the task remains live, not blocked inside the
+decision helper. Compare the lifecycle that establishes the selected-cell
+record/links before treating the outcome as a missing peer reply.
 
 ## Evidence needed to resume
 

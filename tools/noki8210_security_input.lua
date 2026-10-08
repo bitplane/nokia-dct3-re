@@ -6,6 +6,22 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_cell_flags = {}
+    local flags_pointer
+    _G.nsm3_cell_flags_root = memory:install_write_tap(0x13722c, 0x13722f,
+        'nsm3_cell_flags_root', function(offset, value, mask)
+            local pointer = (memory:read_u32(0x13722c) & (~mask & 0xffffffff)) | (value & mask)
+            if pointer == flags_pointer or pointer < 0x100000 or pointer >= 0x17fffc then return end
+            flags_pointer = pointer
+            _G.nsm3_cell_flags[#_G.nsm3_cell_flags + 1] = memory:install_write_tap(
+                pointer, pointer + 3, 'nsm3_cell_flags_' .. pointer,
+                function(address, data, written)
+                    if memory:read_u32(0x13722c) ~= pointer then return end
+                    machine:logerror(string.format('8210_cell_flags_write: address=%08x data=%08x mask=%08x pc=%08x caller=%08x t=%.6f\n',
+                        address, data, written, cpu.state['PC'].value,
+                        cpu.state['R14'].value, machine.time:as_double()))
+                end)
+        end)
     _G.nsm3_cell_decision = memory:install_read_tap(0x2a1380, 0x2a1383, 'nsm3_cell_decision',
         function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2a1380 then return end
@@ -14,11 +30,31 @@ if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
                 cpu.state['R14'].value, cpu.state['R0'].value,
                 memory:read_u16(state + 2), machine.time:as_double()))
         end)
+    _G.nsm3_cell_predicates = {}
+    for _, branch in ipairs({0x2a1934, 0x2a194c}) do
+        _G.nsm3_cell_predicates[#_G.nsm3_cell_predicates + 1] = memory:install_read_tap(
+            branch, branch + 3, 'nsm3_cell_predicate_' .. branch,
+            function(offset, value, mask)
+                if cpu.state['PC'].value ~= branch then return end
+                local context = cpu.state['R4'].value
+                if context < 0x100000 or context >= 0x17fff0 then return end
+                local record = memory:read_u32(context + 4)
+                if record < 0x100000 or record >= 0x17fffc then return end
+                local flags = memory:read_u32(memory:read_u32(0x2a18f8))
+                local left = memory:read_u32(memory:read_u32(0x2a1c14))
+                local right = memory:read_u32(memory:read_u32(0x2a1c18))
+                machine:logerror(string.format('8210_cell_predicates: branch=%08x argument=%02x flags=%08x record=%02x%02x%02x%02x left=%08x right=%08x t=%.6f\n',
+                    branch, cpu.state['R6'].value, memory:read_u32(flags),
+                    memory:read_u8(record), memory:read_u8(record + 1),
+                    memory:read_u8(record + 2), memory:read_u8(record + 3),
+                    left, right, machine.time:as_double()))
+            end)
+    end
     _G.nsm3_cell_trace = memory:install_read_tap(0x2d5dcc, 0x2d5dcf, 'nsm3_cell_trace',
         function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2d5dcc then return end
             local caller = cpu.state['R14'].value
-            if caller < 0x21e000 or caller >= 0x220000 then return end
+            if caller < 0x21b000 or caller >= 0x220000 then return end
             local address = cpu.state['R0'].value
             if address < 0x200000 or address >= 0x400000 then return end
             local bytes = {}

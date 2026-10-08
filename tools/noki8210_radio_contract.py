@@ -41,6 +41,13 @@ def verify(image):
         raise ValueError('PH_1250 decision call differs')
     if instructions(0x21f5c8, 6) != [('movs', 'r0, #3'), ('bl', '#0x2a1380')]:
         raise ValueError('PH_9000 decision call differs')
+    if instructions(0x2a18d0, 8) != [
+            ('movs', 'r1, #2'), ('bics', 'r0, r1'),
+            ('cmp', 'r0, #0'), ('bne', '#0x2a194c')]:
+        raise ValueError('selected-cell outcome rejection differs')
+    if [int.from_bytes(read(address, 4), 'big') for address in
+            (0x2a18f8, 0x2a1c14, 0x2a1c18)] != [0x13722c, 0x137238, 0x137240]:
+        raise ValueError('selected-cell outcome/link roots differ')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
