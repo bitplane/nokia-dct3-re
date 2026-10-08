@@ -2936,6 +2936,27 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d00,
 					"ROM4 d6e1 stores old B and rounds MAC into A");
+			program.write_word(0x05e0, 0xd6e9); // ST B,*AR3+ || MACR *AR4+0%,A.
+			data.write_word(0x0c03, 0xfffe);
+			data.write_word(0x0d00, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8008);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6504;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6504)
+		{
+			expect_opcode(0xd6e9,
+				data.read_word(0x0d00) == 0x1234 && data.read_word(0x0c03) == 0xfffe &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x0012345678ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01,
+				"ROM4 d6e9 stores old B, rounds signed MAC into A and updates both pointers independently");
 			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 			program.write_word(0x05e1, 0x0124);
 			program.write_word(0x05e2, 0x6c8a); // BANZ 05e4, *AR2-
@@ -11099,6 +11120,45 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f22 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 SUB *AR2,A sign-extends without pointer motion in one cycle");
+			program.write_word(0x05e2, 0x0881); // SUB *AR1,A.
+			data.write_word(0x0f21, 0x8001);
+			data.write_word(0x0f22, 0x1234); // Distinguish AR1 from the prior AR2 case.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f21);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6501;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6501 || m_phase == 6502)
+		{
+			bool const signed_memory = m_phase == 6501;
+			expect_opcode(0x0881,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (signed_memory ? 0x17fff : 0x7fff) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0f21 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f22 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == (signed_memory ? 0 : 0x0800) &&
+				data.read_word(0x0f21) == 0x8001 && data.read_word(0x0f22) == 0x1234 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 SUB *AR1,A respects SXM, no-borrow carry, source selection and one-cycle cost");
+			if (signed_memory)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6502;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 			program.write_word(0x05e2, 0x1b84); // OR *AR4,B
 			data.write_word(0x0f24, 0x00f0);
 			m_port_writes = 0;
@@ -13688,6 +13748,34 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ST||LD T reads Xmem before writing the same Ymem cell");
+			program.write_word(0x05e2, 0xe4e9); // ST A,*AR3+ || LD *AR4+0%,T.
+			data.write_word(0x0203, 0x80ff);
+			data.write_word(0x0300, 0xbeef);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0300);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0203);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6503;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6503)
+		{
+			expect_opcode(0xe4e9,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x80ff &&
+				data.read_word(0x0300) == 0x1234 && data.read_word(0x0203) == 0x80ff &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0301 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0200 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 e4e9 loads T, stores old A, independently advances Y and wraps circular X in one cycle");
 			program.write_word(0x05e2, 0xc131); // ST A,*AR3 || ADD *AR5,B.
 			data.write_word(0x0300, 1);
 			m_port_writes = 0;
