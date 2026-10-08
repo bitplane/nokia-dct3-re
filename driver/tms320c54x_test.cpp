@@ -10582,27 +10582,37 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 6515 || m_phase == 6516)
+		if (m_phase == 6515 || m_phase == 6516 || m_phase == 9227 || m_phase == 9228)
 		{
-			bool const store_b = m_phase == 6516;
-			expect_opcode(store_b ? 0x83d3 : 0x82d3,
+			bool const ar2 = m_phase >= 9227;
+			bool const store_b = m_phase == 6516 || m_phase == 9228;
+			expect_opcode(ar2 ? (store_b ? 0x83d2 : 0x82d2) : (store_b ? 0x83d3 : 0x82d3),
 				data.read_word(0x0f93) == (store_b ? 0x8765 : 0x1234) &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				(!ar2 || (m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f90 &&
+					data.read_word(0x0f92) == 0xbeef && data.read_word(0x0f94) == 0xcafe)) &&
 				m_cpu->state_int(tms320c54x_device::STATE_BK) == 4 &&
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 STH A/B stores the high word before circular wrap without changing accumulators/status");
-			if (!store_b)
+			if (m_phase != 9228)
 			{
-				program.write_word(0x05e3, 0x83d3);
+				const unsigned next = m_phase == 6515 ? 6516 : m_phase == 6516 ? 9227 : 9228;
+				program.write_word(0x05e3, next == 6516 ? 0x83d3 : next == 9227 ? 0x82d2 : 0x83d2);
 				data.write_word(0x0f93, 0);
+				if (next >= 9227)
+				{
+					data.write_word(0x0f92, 0xbeef);
+					data.write_word(0x0f94, 0xcafe);
+					m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f93);
+				}
 				m_port_writes = 0;
-				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f93);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, next >= 9227 ? 0x0f90 : 0x0f93);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				m_phase = 6516;
+				m_phase = next;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
