@@ -60,12 +60,10 @@ The command-8 mask/value `0200` is now selected only in the explicit
 `nsm3hle` composition. Fresh rebuilt `run_8210_speech_request_regression`
 passes the physical outgoing lifecycle and own control checker; HLE retains
 `060b` during the call and `040a` at release. Its PCM-derived cadence executes
-400 uplink frames and zero downlink frames before stopping. Analog input/
-output selectors remain disconnected: those uplink frames are not evidence
-of captured microphone audio, and this laboratory signaling fixture is not
-an answered SIP/media gate. Recover the product's active audio endpoints
-before promoting bidirectional speech acceptance. The normal machine and
-native-DSP limitations are unchanged.
+400 uplink frames and zero downlink frames before stopping. That run preceded
+audio endpoint configuration, so its uplink frames are not evidence of
+captured microphone audio. It is not an answered SIP/media gate. The normal
+machine and native-DSP limitations are unchanged.
 
 ### Own audio endpoint evidence
 
@@ -83,6 +81,14 @@ COBBA register policy. The page-15 32 dB gain is an electrical test condition,
 not a recovered runtime gain. No gain is promoted from that figure.
 SHA256 of `04ui.pdf`:
 `684b896015d1531f552d224742d957286d7869ecda2517910f1c5bfa88062c5e`.
+
+The explicit `nsm3hle` composition now selects those declared MIC2/EAR
+endpoints and neutral host microphone/receiver routes, without inherited
+gains or synthesized COBBA register writes. Fresh rebuilt
+`run_8210_audio_endpoints_final` preserves the physical outgoing call gate;
+five focused NSM-3/NPE-3 control tests pass. Actual answered SIP/RTP and
+non-silent physical audio remain unvalidated. Endpoint wiring does not
+promote native DSP execution or factory provisioning.
 
 ## Physical power lifecycle
 

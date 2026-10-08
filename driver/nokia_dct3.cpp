@@ -3804,6 +3804,14 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	runtime.dsp_speech_control = {
 		0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0200, 0x0200 }
 	};
+	// NSM-3 UI Module issue 1 12/1999, pages 4/15 establishes EAR/MIC2.
+	// Declared HLE endpoints only: its 32 dB electrical test condition does
+	// not establish a runtime gain or a COBBA control-register sequence.
+	runtime.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	runtime.cobba_hle_voice.output = nokia_cobba_device::ear;
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	// Own task-12 8b completion 21ef4c -> 2a2250 -> 28755e
 	// consumes forty ARFCN/RSSI records; runtime delivery is gated separately.
 	runtime.radio.background_band_measurements = true;
