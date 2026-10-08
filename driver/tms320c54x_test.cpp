@@ -10444,6 +10444,41 @@ private:
 			expect_opcode(0x7693, all_stored &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d20,
 					"ROM4 ST #lk,*AR3+ writes consecutive ordinary-memory words");
+			program.write_word(0x05e2, 0xf495);
+			program.write_word(0x05e3, 0x7690); // ST #lk,*AR0+.
+			program.write_word(0x05e4, 0xbeef);
+			data.write_word(0x0f5f, 0x1234);
+			data.write_word(0x0f60, 0);
+			data.write_word(0x0f61, 0xabcd);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x11111111);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x22222222);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x3333);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f60);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6553;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6553)
+		{
+			expect_opcode(0x7690,
+				data.read_word(0x0f60) == 0xbeef &&
+				data.read_word(0x0f5f) == 0x1234 && data.read_word(0x0f61) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f61 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d20 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x11111111 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x22222222 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x3333 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 ST #lk,*AR0+ consumes the literal, preserves neighbors/arithmetic state and postincrements after a two-cycle store");
 			program.write_word(0x05e2, 0xf495); // NOP between marker and target
 			program.write_word(0x05e3, 0xf032); // AND #lk,2,A
 			program.write_word(0x05e4, 0x0f0f);
@@ -10877,6 +10912,49 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 ADD A<<8,B updates B only in one cycle");
+			program.write_word(0x05e2, 0xf500); // ADD A,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8888);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6554;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 6554 && m_phase <= 6557)
+		{
+			const unsigned index = m_phase - 6554;
+			const bool destination_b = !(index & 1);
+			const u16 st1 = index >= 2 ? 0x0200 : 0;
+			const u64 result = index >= 2 ? 0x7fffffff : 0x80000000;
+			expect_opcode(destination_b ? 0xf500 : 0xf600,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (destination_b ? 1 : result) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (destination_b ? result : 1) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8888 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (destination_b ? 0x1200 : 0x1400) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 ADD A/B into the opposite accumulator preserves its source/T/TC, selects destination overflow, clears carry and obeys OVM in one cycle");
+			if (index < 3)
+			{
+				const bool next_b = !((index + 1) & 1);
+				program.write_word(0x05e2, next_b ? 0xf500 : 0xf600);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next_b ? 1 : 0x7fffffff);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next_b ? 0x7fffffff : 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, index + 1 >= 2 ? 0x0200 : 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 			program.write_word(0x05e2, 0xf400); // ADD A,A
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
