@@ -181,6 +181,19 @@ predicate comes from `38e4ee`/`4af4e0`, with an additional path through
 `4af676` capable of selecting one. Recover that record predicate and its
 post-VERIFY update before changing any transport behavior.
 
+The primary predicate `4af4e0` is an exact three-byte equality test.
+Passive calls from `38e4ee` show both boots initially compare `15f520`
+with `00f110` near 8 s. At the 10.365 s ordinary refresh the first operand
+has moved to another object and contains `00f110`, matching the second;
+the PIN boot still compares `15f520` with `00f110` at 10.364 s. The
+PIN-enabled fixture's later SIM reads therefore have not preceded this
+selection. The additional predicate `4af676` is not the only explanation
+for the ordinary result: the primary equality already succeeds there.
+Trace the first operand's linked-object source and its legitimate refresh
+after SIM initialization. These bytes resemble PLMN encoding, but byte
+shape alone does not establish object ownership or authorize substituting
+an identity.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
