@@ -1145,7 +1145,7 @@ configured backend distinctions; this aggregate pass is regression evidence,
 not native DSP, RF acquisition or speech validation for every handset.
 That inventory matches top-level cases and opcode masks and reports the
 current number of matching words that do and do not execute in the fixture.
-Sixteen matching high-byte groups have no fixture word in the current report;
+The generated report identifies matching high-byte groups without a fixture word;
 even covered groups do not establish their remaining words. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
 grammar, and behavior are not established by a source mask. The report keeps
@@ -1180,7 +1180,12 @@ model external-memory wait states. A static decoder mask match is not counted
 as a validated instruction in this matrix.
 
 The immediate-MAC fixtures reproduce SPRU172C's `MAC #345h,A,B` fractional
-example and `MAC *AR5+,#1234h,A` example. They also assert absolute extension
+example and `MAC *AR5+,#1234h,A` example. Immediate multiply word `6383`
+(`MPY *AR3,#fffe,B`) additionally checks signed products -6 and -12 with
+FRCT clear/set, T publication, unchanged A/source/AR3/carry and the two-cycle
+DARAM cost. This destination variant is fixture-only, not newly observed
+ROM4 boot execution.
+The immediate-MAC fixtures also assert absolute extension
 order, preincrement timing, T publication, and DARAM cycle cost. A long-offset
 fixture verifies immediate-before-offset fetch and the extra cycle; a separate
 FRCT/OVM fixture verifies saturation and OVB for the immediate form. The shared

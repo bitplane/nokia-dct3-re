@@ -15893,6 +15893,44 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"MPY Smem,#lk publishes T, doubles under FRCT and costs two cycles");
+			program.write_word(0x05e2, 0x6383); // MPY *AR3,#fffe,B.
+			program.write_word(0x05e3, 0xfffe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 9400;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 9400 || m_phase == 9401)
+		{
+			const bool fractional = m_phase == 9401;
+			expect_opcode(0x6383,
+				m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(fractional ? 0xfffffffff4ULL : 0xfffffffffaULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 24 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (fractional ? 0x0040 : 0) &&
+				data.read_word(0x0200) == 3 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"immediate MPY to B preserves A/source/pointer/carry, sign extends and doubles only under FRCT in two cycles");
+			if (!fractional)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0040);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 9401;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e2, 0xf166); // MPY #fffe,B.
 			program.write_word(0x05e3, 0xfffe);
 			m_port_writes = 0;
