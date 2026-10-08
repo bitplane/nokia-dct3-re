@@ -691,6 +691,34 @@
                  "arguments": ["$(RUN_DIR)", "--pcs1900", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8890-pin-pcs-host-incoming-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_pin_registration.py",
+                 "arguments": ["$(RUN_DIR)", "--pcs1900", "--scenario", "host-incoming-call", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8890-pin-pcs-host-outgoing-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_pin_registration.py",
+                 "arguments": ["$(RUN_DIR)", "--pcs1900", "--scenario", "host-outgoing-call", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8890-pin-pcs-host-incoming-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_pin_registration.py",
+                 "arguments": ["$(RUN_DIR)", "--pcs1900", "--scenario", "host-incoming-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8890-pin-pcs-host-outgoing-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_pin_registration.py",
+                 "arguments": ["$(RUN_DIR)", "--pcs1900", "--scenario", "host-outgoing-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8210-registration",
       "prerequisites": [
             "build"

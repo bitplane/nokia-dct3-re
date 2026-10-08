@@ -820,8 +820,8 @@ configuration and physical End followed by reviewed ordinary idle pixels.
 `verify-8890-pin-host-outgoing-sms` independently requires physical `A` to
 `5551234`, the exact SMS-SUBMIT, host request/decision correlation, RP
 acceptance and complete CP/RP/RR closure. Both require PIN acceptance before
-registration and preserve the no-PIN physical schedules. Native speech and
-PCS1900 authenticated parity remain separate.
+registration and preserve the no-PIN physical schedules. Native speech
+remains unproved; PCS1900 authenticated parity is covered separately below.
 
 `verify-8890-pin-phonebook` saves `A / 123` physically, then restarts on
 the same product-local PMM and SIM bytes. The cold process must enter PIN
@@ -1145,8 +1145,17 @@ empty; its subsequent `55:04080000` receives 600/601, with the same response
 object reaching own parser `2809fc` as ARFCN `0258`/RSSI `c3`. Acceptance
 requires the complete existing PCS scan/SI1/channel/EF_LOCI/release contract,
 not the GSM900 type-57 response. No additional peer behavior is selected.
-The no-PIN PCS composition also passes. Authenticated PCS calls, SMS and
-restoration require separate gates and are not inherited.
+The no-PIN PCS composition also passes.
+
+Four `verify-8890-pin-pcs-host-*` gates independently cover incoming/outgoing
+calls and SMS after authentication. Calls require the exact carrier-600
+traffic/release grammar, host caller/called-number correlation, physical
+clock/date and Answer/End or dialing, and reviewed returned-idle pixels.
+SMS requires host correlation and exact CP/RP closure; incoming `hello`
+must additionally persist and render through physical Read. The private
+PCS config retains its carrier/band settings and adds only CALLHOST.
+No extra peer behavior is selected. Authenticated PCS restoration remains
+separate; signaling does not establish native speech.
 
 Current result: fresh own PMM reaches PCS1900 registration on ARFCN 600,
 writes EF_LOCI, acknowledges release and returns to paging. This uses the

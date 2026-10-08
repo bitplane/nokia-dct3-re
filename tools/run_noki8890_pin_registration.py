@@ -48,7 +48,7 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true')
-    parser.add_argument('--pcs1900', action='store_true', help='independent PCS registration only')
+    parser.add_argument('--pcs1900', action='store_true', help='independent PCS registration and host services')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
                                               'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
                                               'idle-state', 'call-state', 'sms-state'), default='registration')
@@ -58,7 +58,8 @@ def main():
     run = args.run_directory.resolve()
     profile = PROFILES['8890']
     try:
-        if args.pcs1900 and args.scenario != 'registration':
+        if args.pcs1900 and args.scenario not in ('registration', 'host-incoming-call',
+                'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms'):
             raise ValueError('PCS downstream scenarios require separate acceptance coverage')
         roms = root / 'roms/noki8890'
         verify_inputs('8890', (roms / profile[1]).read_bytes(), (roms / profile[3]).read_bytes())
@@ -67,6 +68,11 @@ def main():
             (run / directory).mkdir(parents=True)
         shutil.copyfile(root / ('fixtures/noki8890_pcs1900/nsb6hle.cfg' if args.pcs1900 else
                                'fixtures/noki8890_host/nsb6hle.cfg'), run / 'cfg/nsb6hle.cfg')
+        if args.pcs1900 and args.scenario.startswith('host-'):
+            configuration = ET.parse(run / 'cfg/nsb6hle.cfg')
+            ET.SubElement(configuration.find('./system/input'), 'port', tag=':CALLHOST',
+                          type='CONFIG', mask='1', defvalue='0', value='1')
+            configuration.write(run / 'cfg/nsb6hle.cfg', encoding='utf-8', xml_declaration=True)
         state = args.scenario.endswith('-state')
         if state:
             configuration = ET.parse(run / 'cfg/nsb6hle.cfg')
@@ -139,23 +145,24 @@ def main():
             check_frames(run / 'snap', call=call, sms=sms)
         elif args.scenario == 'host-incoming-call':
             from tools.noki8890_incoming_call_check import verify, check_host_frames
-            verify(text, caller='447700900123', configured_gsm900=True)
+            verify(text, caller='447700900123', configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
             check_host_frames(run / 'snap', '447700900123')
         elif args.scenario == 'host-incoming-sms':
             subprocess.run([sys.executable, str(root / 'tools/noki8890_incoming_sms_check.py'),
                             str(run / 'error.log'), str(card),
-                            str(run / 'snap/8890_sms_read_2.png')], check=True)
+                            str(run / 'snap/8890_sms_read_2.png')] +
+                           (['--pcs1900'] if args.pcs1900 else []), check=True)
             subprocess.run([sys.executable, str(root / 'tools/radio_incoming_host_sms_trace_check.py'),
-                            '--arfcn', '60', str(run / 'error.log')], check=True)
+                            '--arfcn', '600' if args.pcs1900 else '60', str(run / 'error.log')], check=True)
         elif args.scenario == 'host-outgoing-call':
             from tools.noki8890_outgoing_call_check import verify
             from tools.noki8890_clock_check import verify as verify_clock, check_frames
-            verify(text, configured_gsm900=True)
+            verify(text, configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
             verify_clock(text)
             check_frames(run / 'snap', call=True)
         elif args.scenario == 'host-outgoing-sms':
             subprocess.run([sys.executable, str(root / 'tools/noki8890_outgoing_sms_check.py'),
-                            str(run / 'error.log')], check=True)
+                            str(run / 'error.log')] + (['--pcs1900'] if args.pcs1900 else []), check=True)
             subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
                             '--octets', '1', str(run / 'error.log')], check=True)
         elif args.scenario == 'phonebook':

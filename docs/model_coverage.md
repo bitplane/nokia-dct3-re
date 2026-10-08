@@ -42,8 +42,13 @@ idle/call/SMS restoration. These remain research-HLE contracts.
 
 `verify-8890-sim-pin-registration` independently proves delayed physical
 PIN acceptance and configured GSM900 registration through its own
-`57:01140000` measurement request and correlated type-8b consumer. It does
-not promote PIN-authenticated downstream services, PCS1900 or native speech.
+`57:01140000` measurement request and correlated type-8b consumer.
+`verify-8890-pin-host-*`, `verify-8890-pin-phonebook` and
+`verify-8890-pin-state-*` separately cover authenticated GSM900 host calls/SMS,
+cold persistent contacts and exact idle/call/SMS restoration.
+`verify-8890-pin-pcs-registration` and four `verify-8890-pin-pcs-host-*` gates
+independently add authenticated PCS acquisition and both host call/SMS
+directions. Authenticated PCS restoration and native speech remain unproved.
 
 `verify-8210-slow-pin-registration` independently covers physical SIM PIN and
 phone-code entry, own task-12 background-measurement completion and persistent
