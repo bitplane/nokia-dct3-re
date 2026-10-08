@@ -732,6 +732,13 @@ both GSM900 and DCS1800 runs. Both therefore select parser `28755e`, not
 alternate `287664`; parser selection alone does not explain the divergence.
 The next boundary is the selected-cell lifecycle spanning SIM acceptance,
 not a missing measurement envelope or missing periodic SI transmission.
+Own firmware diagnostic strings narrow this further: successful GSM reaches
+`PH_1300`, whereas authenticated DCS enters `PH_9000b2`. Both call decision
+helper `2a1380`, whose halfword state is at `137f5a`. The GSM `PH_1250`
+calls observe states 4 then 6; DCS observes state 5 and subsequently calls
+the same helper with argument 3 from `21f5c8`. These are observed internal
+states, not yet named protocol semantics. Decode the state-5/argument-3
+contract and its `2a0eb8` dependency before adding any peer response.
 
 ## Evidence needed to resume
 

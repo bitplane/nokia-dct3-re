@@ -6,6 +6,31 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_cell_decision = memory:install_read_tap(0x2a1380, 0x2a1383, 'nsm3_cell_decision',
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2a1380 then return end
+            local state = memory:read_u32(0x2a16b8)
+            machine:logerror(string.format('8210_cell_decision: caller=%08x argument=%02x state=%04x t=%.6f\n',
+                cpu.state['R14'].value, cpu.state['R0'].value,
+                memory:read_u16(state + 2), machine.time:as_double()))
+        end)
+    _G.nsm3_cell_trace = memory:install_read_tap(0x2d5dcc, 0x2d5dcf, 'nsm3_cell_trace',
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2d5dcc then return end
+            local caller = cpu.state['R14'].value
+            if caller < 0x21e000 or caller >= 0x220000 then return end
+            local address = cpu.state['R0'].value
+            if address < 0x200000 or address >= 0x400000 then return end
+            local bytes = {}
+            for index = 0, 159 do
+                local byte = memory:read_u8(address + index)
+                if byte == 0 then break end
+                if byte < 32 or byte > 126 then byte = 32 end
+                bytes[#bytes + 1] = string.char(byte)
+            end
+            machine:logerror(string.format('8210_cell_trace: caller=%08x text=%s t=%.6f\n',
+                caller, table.concat(bytes), machine.time:as_double()))
+        end)
     _G.nsm3_pin_route = memory:install_read_tap(0x2df484, 0x2df487, 'nsm3_pin_route',
         function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2df484 then return end

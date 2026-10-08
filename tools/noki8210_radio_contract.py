@@ -35,6 +35,12 @@ def verify(image):
     if instructions(0x2a2266, 8) != [
             ('ldrb', 'r0, [r0]'), ('bl', '#0x287664'), ('pop', '{pc}')]:
         raise ValueError('alternate measurement parser differs')
+    if int.from_bytes(read(0x2a16b8, 4), 'big') != 0x137f58:
+        raise ValueError('selected-cell decision state differs')
+    if instructions(0x21f908, 6) != [('movs', 'r0, #0'), ('bl', '#0x2a1380')]:
+        raise ValueError('PH_1250 decision call differs')
+    if instructions(0x21f5c8, 6) != [('movs', 'r0, #3'), ('bl', '#0x2a1380')]:
+        raise ValueError('PH_9000 decision call differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
