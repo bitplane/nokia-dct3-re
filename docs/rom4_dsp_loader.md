@@ -1096,7 +1096,19 @@ expanded execution, not fabricate RF samples or infer acquisition from opcode
 coverage. The integrated idle/Menu/power gate reproduces the 594-word,
 107-group primary fingerprint and passes the long power-key lifecycle, then
 rejects the retained older fingerprint before validating the union. The gate
-deliberately retains that fingerprint until the expanded execution is explained.
+deliberately retains that fingerprint pending the checkpoint re-bank.
+
+Direct comparison with the retained relative-timer trace finds no removed
+opcode words and 137 added words. Its summary has zero slot expiries,
+29 completion strobes, mode `AC=0` and no port-32 writes; the current run has
+6,467 slot expiries, 6,497 completion strobes, mode `AC=1` and three port-32
+writes. The port-write sequences agree through the first 44 records; the new
+run then continues at `0x0dfe/0x0e03` around 0.134 s instead of returning to
+the older codec-control sequence around 0.158 s. This matches the already
+documented free-running CTSI/absolute-compare expansion introduced in
+`d5c1022`, including its table-driven and accumulator-sourced port-31/32
+writes. It is a comparison of emulated traces, not independent silicon
+validation or a single-change causal experiment.
 
 The retained narrower baseline dispatches 457 words in 91 high-byte groups (set SHA-256
 `e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
