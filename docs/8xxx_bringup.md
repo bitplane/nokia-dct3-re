@@ -1476,6 +1476,13 @@ for PIN fixtures. Both incoming scenarios pass with `--without-pin` as well.
 Permanent gates are `verify-8850-pin-host-incoming-call` and
 `verify-8850-pin-host-incoming-sms`.
 
+The corresponding `host-outgoing-call` and `host-outgoing-sms` scenarios
+verify physical dialing of `5551234`, host connection and complete CC/RR
+release, or physical composition of `A` with exact SMS-SUBMIT and host CP/RP
+closure. Both require registration after PIN acceptance. Their permanent
+gates are `verify-8850-pin-host-outgoing-call` and
+`verify-8850-pin-host-outgoing-sms`; no native speech is claimed.
+
 Run `noki8850_radio_observe.lua` for 60 simulated seconds with the isolated
 research invocation above, then check:
 

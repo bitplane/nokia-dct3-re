@@ -13,7 +13,8 @@ local function press(column, name, label)
     return emu.wait(0.85)
 end
 local input = coroutine.create(function()
-    if not emu.wait(20) then return end
+    local start = os.getenv('NOKIA_DCT3_8850_PIN_ENTRY') == '1' and 24 or 20
+    if not emu.wait(start) then return end
     if not press(1, 'Menu', 'messages') then return end
     if not press(1, 'Menu', 'message_list') then return end
     for index = 1, 2 do

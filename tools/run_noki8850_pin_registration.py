@@ -37,7 +37,8 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true',
                         help='run the original phone-code-only baseline')
-    parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms'),
+    parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
+                                              'host-outgoing-call', 'host-outgoing-sms'),
                         default='registration')
     parser.add_argument('--port', type=int, default=18850)
     args = parser.parse_args()
@@ -52,7 +53,15 @@ def main():
         for directory in ('cfg', 'nvram/nsm2hle', 'snap'):
             (run / directory).mkdir(parents=True)
         host = args.scenario != 'registration'
-        sms = args.scenario == 'host-incoming-sms'
+        sms = args.scenario.endswith('-sms')
+        incoming = args.scenario.startswith('host-incoming-')
+        script = {
+            'registration': 'security_input',
+            'host-incoming-call': 'host_incoming_input',
+            'host-incoming-sms': 'incoming_sms_input',
+            'host-outgoing-call': 'outgoing_call_input',
+            'host-outgoing-sms': 'outgoing_sms_input',
+        }[args.scenario]
         if host:
             shutil.copyfile(root / 'fixtures/noki8850_host/nsm2hle.cfg', run / 'cfg/nsm2hle.cfg')
         card = run / 'nvram/nsm2hle/sim_card'
@@ -66,19 +75,22 @@ def main():
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / ('tools/noki8850_incoming_sms_input.lua' if sms else
-                                                   'tools/noki8850_host_incoming_input.lua'
-                                                   if host else 'tools/noki8850_security_input.lua')),
+                   '-autoboot_script', str(root / f'tools/noki8850_{script}.lua'),
                    '-seconds_to_run', '60' if host else '46']
         host_command = None
         if host:
             command.extend(['-http', '-http_port', str(args.port)])
-            host_command = [sys.executable, str(root / ('tools/run_host_incoming_sms_gate.py'
-                            if sms else 'tools/run_host_incoming_signaling_gate.py')),
-                            '--port', str(args.port), '--cwd', str(run)]
-            if not sms:
-                host_command += ['--caller', '5551234', '--ready-file',
-                                 str(run / 'snap/8850_registered_idle.png')]
+            runner, options = {
+                'host-incoming-call': ('run_host_incoming_signaling_gate',
+                    ['--caller', '5551234', '--ready-file', str(run / 'snap/8850_registered_idle.png')]),
+                'host-incoming-sms': ('run_host_incoming_sms_gate', []),
+                'host-outgoing-call': ('run_host_call_adapter_gate',
+                    ['--number', '5551234', '--decision', 'connect']),
+                'host-outgoing-sms': ('run_host_sms_gate',
+                    ['--user-data', '41', '--user-data-length', '1']),
+            }[args.scenario]
+            host_command = [sys.executable, str(root / f'tools/{runner}.py'),
+                            '--port', str(args.port), '--cwd', str(run)] + options
             host_command += ['--'] + command
         with (run / 'console.log').open('w') as console:
             subprocess.run(host_command or command, cwd=run, env=environment, stdout=console,
@@ -94,7 +106,16 @@ def main():
             raise ValueError('; '.join(errors))
         subprocess.run([sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                         str(run / 'error.log'), '--profile', 'nsm2'], check=True)
-        if sms:
+        if sms and not incoming:
+            from tools.noki8850_outgoing_sms_check import verify
+            verify(text)
+            subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
+                            '--octets', '1', str(run / 'error.log')], check=True)
+        elif host and not incoming:
+            from tools.noki8850_outgoing_call_check import verify, verify_frames
+            verify(text)
+            verify_frames(run / 'snap')
+        elif sms:
             from tools.noki8850_sms_check import verify, verify_frame
             verify(text, card.read_bytes())
             verify_frame(run / 'snap/8850_sms_read_4.png')
