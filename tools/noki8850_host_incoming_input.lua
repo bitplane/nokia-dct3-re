@@ -6,6 +6,7 @@ local machine = manager.machine
 local input = coroutine.create(function()
     if not emu.wait(38) then return end
     machine.screens[':screen']:snapshot('8850_incoming_ringing.png')
+    if _G.noki8850_incoming_alerting_hold then return end
     for index, name in ipairs({'Call / Send', 'End'}) do
         local key = assert(machine.ioport.ports[':COL.0'].fields[name])
         machine:logerror('8850_incoming_physical: action=' .. name .. '\n')

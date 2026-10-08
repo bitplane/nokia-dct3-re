@@ -98,6 +98,7 @@ class SipRestoreCheckTest(unittest.TestCase):
         self.check(log=log, remote='Response msg 603/INVITE/\n', phase='alerting')
         self.check(log=log, remote='Response msg 603/INVITE/\n', phase='alerting', product='3330')
         self.check(log=log, remote='Response msg 603/INVITE/\n', phase='alerting', product='5210')
+        self.check(log=log, remote='Response msg 603/INVITE/\n', phase='alerting', product='8850')
         with self.assertRaises(RuntimeError):
             self.check(log=log, remote='Response msg 180/INVITE/\n', phase='alerting')
 

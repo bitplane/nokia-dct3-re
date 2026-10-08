@@ -1911,8 +1911,12 @@ before the connected snapshot (`run_8850_sip_incoming_restore_probe`).
 The saved/restored PC, stack, RAM checksum and time match exactly; epoch 2
 clears the call once with cause 41, SIP BYE and ordered GSM release.
 The checker rejects missing or wrong-product Answer, duplicate delivery,
-duplicate clearing, old epochs and incomplete release. Ringing restoration
-remains unverified; neither restoration gate claims native DSP speech.
+duplicate clearing, old epochs and incomplete release.
+`verify-8850-sip-incoming-alerting-restore` also passes
+(`run_8850_sip_alerting_restore_probe`): an exact snapshot at 36 seconds
+restores while ringing, rejects the stale SIP invite and clears GSM once
+under epoch 2 without Answer, CONNECT, accepted media or redelivery.
+These restoration gates do not claim native DSP speech or restored SIP dialogs.
 
 Outgoing HLE waveform delivery is separately verified by
 `run_8850_sip_waveform_probe/handset`. The isolated Pulse fixture supplies

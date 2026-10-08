@@ -104,6 +104,7 @@ def main():
     parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--restore-outgoing', action='store_true')
     parser.add_argument('--restore-incoming', action='store_true')
+    parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18885)
     parser.add_argument('--sip-port', type=int, default=25885)
@@ -117,6 +118,8 @@ def main():
         parser.error('--restore-outgoing requires unrecorded --outgoing-media')
     if args.restore_incoming and (not args.incoming_media or args.record_media or args.restore_idle or args.restore_outgoing):
         parser.error('--restore-incoming requires unrecorded --incoming-media')
+    if args.restore_phase == 'alerting' and not args.restore_incoming:
+        parser.error('--restore-phase alerting requires --restore-incoming')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8850']
@@ -132,6 +135,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki8850_sip_outgoing_restore.lua' if args.restore_outgoing else
+                       'noki8850_sip_incoming_alerting_restore.lua' if args.restore_incoming and args.restore_phase == 'alerting' else
                        'noki8850_sip_incoming_restore.lua' if args.restore_incoming else
                        'noki8850_host_incoming_input.lua' if args.incoming_media else
                        'noki8850_outgoing_call_input.lua' if outgoing_failure or args.outgoing_media else
@@ -147,7 +151,7 @@ def main():
                    '--product', '8850',
                    *(['--record-media'] if args.record_media else []),
                    *(['--restore-outgoing'] if args.restore_outgoing else []),
-                   *(['--restore-call'] if args.restore_incoming else []),
+                   *(['--restore-call', '--restore-phase', args.restore_phase] if args.restore_incoming else []),
                    *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      [] if args.outgoing_media else
                      ['--incoming', '--ready-file', str(run / 'snap/8850_registered_idle.png')]
@@ -203,6 +207,7 @@ def main():
             'idle_restored': args.restore_idle,
             'outgoing_restored': args.restore_outgoing,
             'incoming_restored': args.restore_incoming,
+            'restore_phase': args.restore_phase if args.restore_incoming else None,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

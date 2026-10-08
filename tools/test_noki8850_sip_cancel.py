@@ -17,6 +17,7 @@ class SipCancelTest(unittest.TestCase):
                         ['--record-media'],
                         ['--restore-outgoing'],
                         ['--restore-incoming'],
+                        ['--restore-phase', 'alerting'],
                         ['--outgoing-media', '--restore-incoming'],
                         ['--incoming-media', '--restore-incoming', '--record-media'],
                         ['--incoming-media', '--restore-outgoing'],

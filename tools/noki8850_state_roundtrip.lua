@@ -4,7 +4,8 @@ local directory = assert(source:match('^(.*[/])'))
 local sms = _G.noki8850_state_sms == true
 local idle = _G.noki8850_state_idle == true
 local incoming = _G.noki8850_state_incoming == true
-local scenario = incoming and 'incoming_call' or sms and 'sms' or idle and 'idle' or 'call'
+local scenario = incoming and (_G.noki8850_incoming_alerting_hold and 'incoming_alerting_call' or 'incoming_call') or
+    sms and 'sms' or idle and 'idle' or 'call'
 _G.noki8850_call_idle_only = idle
 dofile(directory .. (incoming and 'noki8850_host_incoming_input.lua' or
     sms and 'noki8850_incoming_sms_input.lua' or 'noki8850_outgoing_call_input.lua'))
@@ -73,7 +74,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
 end)
 local runner = coroutine.create(function()
     local pin_delay = os.getenv('NOKIA_DCT3_8850_PIN_ENTRY') == '1' and 4 or 0
-    assert(emu.wait((sms and 19 or idle and 32 or 40) + pin_delay))
+    assert(emu.wait((_G.noki8850_incoming_alerting_hold and 36 or sms and 19 or idle and 32 or 40) + pin_delay))
     machine:save('8850_call')
     assert(emu.wait(1))
     assert(saved, 'save did not execute')
