@@ -43,6 +43,14 @@ frames show `Divert activated`, `Done`, the inactive service summary and
 does not establish displayed forwarding-number content. Save/load and
 cold-process forwarding persistence are not covered by this scenario.
 
+`state-divert` saves after physical forwarding activation, restores exact
+CPU/RAM/time and compares the one-second observed protocol replay. Only after
+load does a fresh physical query establish retained active forwarding; physical
+deactivation and a final inactive query complete normally with the same four
+reviewed result frames. The laboratory network retains forwarding through
+MAME save/load, not through NVRAM: a new emulator process starts a new network
+fixture. No cold-process persistence is claimed.
+
 ## Inputs
 
 `roms/noki6210/6210_556c.fls` is 0x3a0000 bytes with SHA-1

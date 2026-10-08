@@ -31,6 +31,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'ussd': ('npe3hle', 'ussd_input', 40),
              'divert': ('npe3hle', 'divert_input', 35),
              'divert-lifecycle': ('npe3hle', 'divert_lifecycle_input', 80),
+             'state-divert': ('npe3hle', 'state_divert', 80),
              'state-idle': ('npe3hle', 'state_idle', 24),
              'state-call': ('npe3hle', 'state_call', 48),
              'state-sms': ('npe3hle', 'state_sms', 30),
@@ -314,9 +315,21 @@ def main():
                             'proactive DCT3 SAT')
             with Image.open(run / 'snap/6210_toolkit_after_dismiss.png') as frame:
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after Toolkit clearance')
-        elif args.scenario == 'divert-lifecycle':
+        elif args.scenario in ('divert-lifecycle', 'state-divert'):
+            if args.scenario == 'state-divert':
+                from tools.noki6210_state_check import verify as check_state
+                check_state(text, 'divert')
             from tools.radio_call_divert_lifecycle_trace_check import EVENTS
             from tools.radio_call_lifecycle_common import require_ordered
+            if args.scenario == 'state-divert':
+                import re
+                require_ordered(text, (
+                    ('forwarding activated', EVENTS[0]),
+                    ('active state saved', re.compile(r'6210_state: scenario=divert event=saved')),
+                    ('active state restored', re.compile(r'6210_state: scenario=divert event=restored')),
+                    ('physical query after restore', re.compile(r'6210_divert_lifecycle_physical: transaction=2')),
+                    ('restored forwarding active', EVENTS[2]),
+                ), '6210 forwarding restore')
             require_ordered(text, tuple((f'divert lifecycle {index}', pattern)
                                        for index, pattern in enumerate(EVENTS, 1)), '6210 divert lifecycle')
             check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())

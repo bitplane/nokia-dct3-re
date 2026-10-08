@@ -19,6 +19,9 @@ class StateAcceptanceTest(unittest.TestCase):
     def test_exact_restore(self):
         verify(self.fixture(), 'idle')
 
+    def test_divert_exact_restore(self):
+        verify(self.fixture().replace('scenario=idle', 'scenario=divert'), 'divert')
+
     def test_wrong_scenario(self):
         with self.assertRaises(ValueError):
             verify(self.fixture(), 'call')

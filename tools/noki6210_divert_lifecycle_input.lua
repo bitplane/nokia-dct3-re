@@ -13,9 +13,10 @@ local function press(column, name)
     key:set_value(0)
     return emu.wait(0.85)
 end
-local input = coroutine.create(function()
-    if not emu.wait(20) then return end
-    for index, sequence in ipairs({"*21*5551234#", "*#21#", "#21#", "*#21#"}) do
+local sequences = {"*21*5551234#", "*#21#", "#21#", "*#21#"}
+local function transactions(first)
+    for index = first, #sequences do
+        local sequence = sequences[index]
         machine:logerror("6210_divert_lifecycle_physical: transaction=" .. index .. "\n")
         for character in sequence:gmatch(".") do
             local column = character == "*" and 2 or character == "#" and 4
@@ -25,8 +26,17 @@ local input = coroutine.create(function()
         if not press(0, "Send") or not emu.wait(1) then return end
         machine.screens[":screen"]:snapshot("6210_divert_lifecycle_" .. index .. ".png")
         if not press(1, "Right Softkey / C") or not emu.wait(1) then return end
+        -- Give the save/load wrapper an input-free observation interval.
+        if index == 1 and _G.noki6210_state_scenario == 'divert' then
+            if not emu.wait(3) then return end
+        end
     end
     machine.screens[":screen"]:snapshot("6210_divert_lifecycle_idle.png")
+end
+_G.noki6210_resume_divert = function() transactions(2) end
+local input = coroutine.create(function()
+    if not emu.wait(20) then return end
+    transactions(1)
 end)
 _G.noki6210_divert_lifecycle_input = input
 assert(coroutine.resume(input))
