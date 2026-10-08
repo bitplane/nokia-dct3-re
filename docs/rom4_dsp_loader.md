@@ -650,6 +650,17 @@ redirects an unauthenticated request to the myTI login page. Acquisition via
 that route requires user account access; no credentials or export/license
 forms have been submitted. This is an observed access boundary, not evidence
 that no legitimate independent copy exists.
+TI's surviving [evaluation-tools landing page](https://www.ti.com/sc/eur)
+also links a C5000 free-tools referral at
+`https://www.ti.com/sc/docs/tools/dsp/c5000freetools.html`. An unauthenticated
+HTTP check follows that referral to the current DSP product overview, not an
+evaluation installer. A successful final HTTP 200 therefore does not establish
+package availability. The pre-CCS standalone simulator remains a distinct
+acquisition lead: TI's [SPRU302B reference](https://www.ti.com/lit/ug/spru302b/spru302b.pdf)
+identifies the C54x Simulator Getting Started manual (SPRU137), with DOS and
+Unix installations. That reference establishes historical software availability,
+not timer/pipeline accuracy or a presently obtainable binary. Neither referral
+provides a runnable differential oracle for the current timer probe.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
