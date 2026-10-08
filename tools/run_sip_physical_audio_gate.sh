@@ -36,6 +36,10 @@ case "$product" in
         keys='5,5,5,1,2,3,4,send'
         key_delay=18000 key_duration=220 key_gap=280
         ;;
+    8210)
+        machine=nsm3hle bios=
+        [[ "$direction" == outgoing ]] || { echo '8210 answered incoming waveform is not validated' >&2; exit 1; }
+        ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac
 case "$direction" in
@@ -99,6 +103,12 @@ capture_pid=$!
 python3 tools/pulse_route_mame.py --source "$input_name.monitor" --sink "$output_name" \
     > "$run_dir/sip-pulse-routes.log" &
 router_pid=$!
+if [[ "$product" == 8210 ]]; then
+    env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python):$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python/build/lib.*)}" \
+        .venv/bin/python tools/run_noki8210_sip_cancel.py "$run_dir/handset" \
+        --outgoing-media --record-media --sound pulse \
+        --pjsua "${SIP_PJSUA_BIN:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/bin/pjsua-*)}"
+else
 make --no-print-directory verify-radio-outgoing-call-sip RUN_DIR="$run_dir" JOBS="${JOBS:-8}" \
     SIP_HANDSET_RUNNER_ARGS="--record-media --product $product $incoming_arg" SIP_HANDSET_SOUND=pulse \
     SIP_HANDSET_SECONDS="$seconds" \
@@ -106,9 +116,14 @@ make --no-print-directory verify-radio-outgoing-call-sip RUN_DIR="$run_dir" JOBS
     SIP_HANDSET_KEY_DELAY_MS="$key_delay" SIP_HANDSET_KEY_DURATION_MS="$key_duration" \
     SIP_HANDSET_KEY_GAP_MS="$key_gap" \
     SIP_HANDSET_CONFIG="$(realpath "$run_dir/audio_cfg")" "${storage_args[@]}"
+fi
 kill -INT "$capture_pid"
 wait "$capture_pid" || true
 capture_pid=
 grep -q '^pulse_route: source-output ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME microphone stream' >&2; exit 1; }
 grep -q '^pulse_route: sink-input ' "$run_dir/sip-pulse-routes.log" || { echo 'missing MAME speaker stream' >&2; exit 1; }
+if [[ "$product" == 8210 ]]; then
+    cp "$run_dir/sip-earpiece.wav" "$run_dir/handset/sip-earpiece.wav"
+    run_dir="$run_dir/handset"
+fi
 .venv/bin/python tools/sip_handset_waveform_check.py "$run_dir" --product "$product" --direction "$direction"

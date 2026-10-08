@@ -112,10 +112,21 @@ gaps and accepted packets after closure remain failures. Adapter rejection
 reason fields are observational; no admission behavior changed. The common
 checker accepts exact PJSIP status 200 with reason `OK` or `Normal call clearing`.
 
-This establishes outgoing HLE media transport, not native DSP speech or
-non-silent microphone audio. Incoming answered SIP, recording, and external
+This establishes outgoing HLE media transport, not native DSP speech. Incoming answered SIP and external
 call restoration remain disabled for NSM-3. Provisioning remains the declared
 base-record comparison, not validated factory data.
+The outgoing runner accepts `--record-media --sound pulse` for explicit
+audio observation; recordings alone are not waveform acceptance.
+
+`make verify-8210-sip-outgoing-waveform RUN_DIR=NEW_DIRECTORY` adds isolated
+virtual PulseAudio endpoints and restores server defaults on exit. Fresh
+`run_8210_sip_waveform_probe/handset` passes the full outgoing call plus
+at least two consecutive seconds of 440 Hz in the SIP remote microphone
+recording and 660 Hz in the MAME earpiece recording. Both stream routes were
+observed. The tones traverse the configured physical audio ports and HLE
+codec/PCM paths, not firmware-state injection. This validates non-silent
+synthetic audio in both directions; it does not establish native DSP speech,
+analog gain calibration, real RF service, or incoming answered media.
 
 Fresh matrix run `run_8210_sip_media_closed` passes with explicit media
 closure at 37.030 s and completion at 37.040 s, with no rejected downlink.

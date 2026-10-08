@@ -52,7 +52,7 @@ def verify(root, product='3210', direction='outgoing'):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_dir', type=Path)
-    parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210'), default='3210')
+    parser.add_argument('--product', choices=('3210', '3310', '3330', '3410', '5210', '8210'), default='3210')
     parser.add_argument('--direction', choices=('incoming', 'outgoing'), default='outgoing')
     args = parser.parse_args()
     try:

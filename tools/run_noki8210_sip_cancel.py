@@ -96,6 +96,9 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--pjsua', type=Path, required=True)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--record-media', action='store_true',
+                        help='capture outgoing HLE PCM and remote audio; does not assert non-silent waveform acceptance')
+    parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore registered handset idle before admitting the fresh SIP call')
     outgoing = parser.add_mutually_exclusive_group()
@@ -108,6 +111,8 @@ def main():
     parser.add_argument('--http-port', type=int, default=18821)
     parser.add_argument('--sip-port', type=int, default=25821)
     args = parser.parse_args()
+    if args.record_media and not args.outgoing_media:
+        parser.error('--record-media requires --outgoing-media')
     outgoing_call = args.outgoing_busy or args.outgoing_unavailable or args.outgoing_media
     if args.restore_idle and outgoing_call:
         parser.error('--restore-idle cannot be combined with an outgoing call')
@@ -128,11 +133,12 @@ def main():
                    '-state_directory', str(run / 'sta'),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run',
                    '60' if args.restore_idle else '57',
-                   '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
+                   '-video', 'none', '-sound', args.sound, '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8210',
+                   *(['--record-media'] if args.record_media else []),
                    *(['--sip-response', '200' if args.outgoing_media else '480' if args.outgoing_unavailable else '486'] if outgoing_call else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/8210_sip_registered_idle.png')]),
@@ -153,6 +159,7 @@ def main():
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
             'hle_media_transport_tested': args.outgoing_media,
+            'media_recorded': args.record_media,
             'factory_provisioning_validated': False,
             'laboratory_carrier': 4,
             'idle_restored': args.restore_idle,

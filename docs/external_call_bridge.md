@@ -445,8 +445,9 @@ dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
 products `6210`, `6250`, `8850` and `8890`. The 8210 has a narrowly scoped
-single outgoing SIP-200 HLE media-transport fixture; incoming answered media,
-recording and call restoration are not enabled for that product.
+single outgoing SIP-200 HLE media-transport fixture; incoming answered media
+and call restoration are not enabled for that product. Explicit recording
+is available for that outgoing fixture without asserting waveform success.
 
 `verify-6210-sip-outgoing-busy` additionally proves physical `1234567`/Send
 against actual local PJSIP 486. It decodes the SETUP number, requires the
@@ -595,6 +596,10 @@ required. A terminal packet explicitly rejected as `session_closed` is safe
 only after correlated `media_closed`, with later correlated `ended` and radio release; wrong requests,
 active-media failures, sequence gaps and post-closure acceptance still fail.
 This proves HLE media transport, not native or non-silent microphone speech.
+`verify-8210-sip-outgoing-waveform` separately validates sustained 440 Hz
+microphone and 660 Hz earpiece recordings across local SIP using isolated
+virtual PulseAudio routes. It proves non-silent synthetic audio through the
+NSM-3 HLE composition, not native DSP speech or calibrated analog gain.
 
 `verify-8210-sip-outgoing-busy` physically dials `1234567` on configured
 carrier 4 against actual SIP 486. It requires the decoded SETUP number,
