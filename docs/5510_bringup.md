@@ -347,6 +347,19 @@ consumer census, not sufficient evidence for normal key/startup replies.
 Music-DSP images are separate from MAD2's missing resident baseband mask
 code and are not MSP430 program dumps.
 
+The original Group Sense V2.0 guide further limits this reference: programming
+disables normal FBUS operation until EXT_UI reset, and its message window
+explicitly omits CMT-to-EXT_UI messages. A flashing-tool log therefore cannot
+stand in for the normal MA4/MU4 startup or keyboard transcript, even if its
+self-test succeeds. The listed INITDISK/INITDATA files initialize NAND and
+install music-DSP code; an MCUSW version field in product information is not
+an MSP430 executable. Targeted public searches for the cited Maverick FBUS
+specification and Nokia 5510 MSP430F135/MU4 firmware have not located either
+input. This is a bounded acquisition result, not proof that no public copy
+exists. Resume this branch on a matching MSP430 program or normal-operation
+wire capture/specification, not service-tool defaults or another MSP430-based
+board's software.
+
 The Linux package's `dsp_repair/fbus.py` (SHA256
 `9cfc318d185cbebb7bbad9a615adcd334e3ec56d40516c2eccb040620176f2fe`)
 and `ORIGINAL_PROTOCOL_ANALYSIS.md` independently agree with the MCU's
