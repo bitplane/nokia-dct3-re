@@ -210,6 +210,20 @@ def verify(image):
             parser_calls.append(0x200000 + offset)
     if parser_calls != [0x21ef4c, 0x21fb86]:
         raise ValueError('direct measurement-parser candidate callsites differ')
+    if int.from_bytes(read(0x21bedc, 4), 'big') != 0x137db0:
+        raise ValueError('generic measurement flag address differs')
+    if instructions(0x21bb5a, 6) != [
+            ('ldr', 'r1, [pc, #0x380]'), ('movs', 'r0, #1'), ('b', '#0x21b950')]:
+        raise ValueError('generic measurement flag setter differs')
+    if instructions(0x2865dc, 4) != [('cmp', 'r0, #1'), ('bne', '#0x2865f2')]:
+        raise ValueError('measurement flag consumer enable predicate differs')
+    if int.from_bytes(read(0x28693c, 4), 'big') != 0x13722c:
+        raise ValueError('measurement flag normalization outcome root differs')
+    if instructions(0x2865e4, 16) != [
+            ('ldr', 'r0, [r1]'), ('cmp', 'r0, #1'), ('beq', '#0x2865ee'),
+            ('cmp', 'r0, #2'), ('bne', '#0x2865f2'),
+            ('movs', 'r0, #0'), ('str', 'r0, [r1]'), ('mov', 'pc, lr')]:
+        raise ValueError('measurement flag outcome normalization differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

@@ -974,6 +974,15 @@ at `21ef4c` and `21fb86`; both decoded consumers are above. This is not
 an indirect-call absence proof. The channel-acknowledgement loop forwards
 other events through `21bdc4`/`21f48a`, whose special `8b` branch at
 `21f504` leads to a flag setter (`21bb54`), not either parser call.
+That generic branch sets byte `137db0` to one. Its byte-zero consumer
+at `21d952` passes the value to `2865dc`, which uses outcome root
+`13722c` and, only when enabled, clears outcome 1 or 2 to zero. It leaves
+outcome 4 unchanged and publishes no event. The read-only write-watch in
+`run_8210_pin_dcs_measurement_flag_01` observes zero during RAM initialization
+and one at 7.908521 and 12.261757 (writer PC `2eafbc`, channel-acknowledgement
+times). The late request still returns 4. Thus a missing set of this byte
+is not the late-PIN defect. The address is shared by other offset-bearing
+consumers; it is not assigned a general subsystem name from this one use.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

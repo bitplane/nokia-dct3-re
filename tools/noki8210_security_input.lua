@@ -6,6 +6,12 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_measurement_recovery_flag = memory:install_write_tap(0x137db0, 0x137db3,
+        'nsm3_measurement_recovery_flag', function(offset, value, mask)
+            if (mask & 0xff000000) == 0 then return end
+            machine:logerror(string.format('8210_measurement_recovery_flag: value=%02x pc=%08x t=%.6f\n',
+                (value >> 24) & 0xff, cpu.state['PC'].value, machine.time:as_double()))
+        end)
     _G.nsm3_candidate_list_producers = {}
     for _, address in ipairs({0x21f394, 0x21faae}) do
         _G.nsm3_candidate_list_producers[#_G.nsm3_candidate_list_producers + 1] = memory:install_read_tap(
