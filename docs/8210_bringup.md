@@ -43,11 +43,17 @@ Selector `0x11` reaches `0x2cb254`, constructs bit `0200`, and combines it
 with keep-mask `fdff` into field shadow `0x135776`. Selector 8 reaches
 `0x2cb29c`, prefixes the low twelve argument bits with `8000`, retains a
 separate command shadow `0x135778` and publishes DSPIF `0x100a8` at
-`0x2cb2ea`. Do not conflate the two shadows or infer the intervening
-publisher from their adjacency. The fresh physical outgoing trace changes
+`0x2cb2ea`. Do not conflate the two shadows. The independent parameter
+publisher at `0x2c6cf4` masks its constructed word with `fdff` from
+`0x337db8`, then conditionally adds a halfword from table `0x337db0`.
+The four entries preceding that keep-mask are `0200`; runtime index-domain
+coverage is not claimed. Its command-selector table at `0x337da4` starts
+`08 09 30`, and `0x2c733e` publishes the first constructed word through
+the own compiler. This is a decoded producer connection, not an inference
+from shadow adjacency. The fresh physical outgoing trace changes
 command 8 to `860b` after Send and back to `840a` after End, independently
-corroborating call-correlated bit `0200`, not yet the complete producer chain
-or delivered audio. `noki8210_speech_control_check.py ROM LOG` pins the own
+corroborating call-correlated bit `0200`, not delivered audio.
+`noki8210_speech_control_check.py ROM LOG` pins the own
 ROM, selector instructions/literals and ordered physical/control events.
 
 ## Physical power lifecycle

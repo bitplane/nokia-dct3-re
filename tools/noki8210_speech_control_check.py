@@ -31,6 +31,14 @@ def recover(image):
         0x2cb29c: ('ldr', 'r0, [pc, #0x36c]'),
         0x2cb2a4: ('ldr', 'r1, [pc, #0x368]'),
         0x2cb2ea: ('strh', 'r0, [r2]'),
+        0x2c6cf8: ('ldrh', 'r1, [r4]'),
+        0x2c6cfa: ('ands', 'r0, r1'),
+        0x2c6d02: ('ldr', 'r2, [pc, #0x3a4]'),
+        0x2c6d0a: ('ldrh', 'r1, [r2, r1]'),
+        0x2c6d0c: ('orrs', 'r1, r0'),
+        0x2c6d12: ('strh', 'r1, [r4]'),
+        0x2c732e: ('ldrh', 'r1, [r4]'),
+        0x2c733e: ('bl', '#0x2cafd8'),
     }
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     for address, pair in expected.items():
@@ -41,12 +49,17 @@ def recover(image):
         raise ValueError('selector table differs')
     literals = {0x2cb5e4: 0xfdff, 0x2cb250: 0x135774,
                 0x2cb608: 0x135778, 0x2cb60c: 0xffff8000,
-                0x2cb4d0: 0x100a8}
+                0x2cb4d0: 0x100a8, 0x2c70a4: 0x337db8,
+                0x2c70a8: 0x337db0, 0x2c76c8: 0x337da4}
     if any(u32(address) != value for address, value in literals.items()):
         raise ValueError('control literals differ')
+    if read(0x337db0, 10) != bytes.fromhex('0200020002000200fdff'):
+        raise ValueError('publisher field table differs')
+    if read(0x337da4, 3) != bytes.fromhex('080930'):
+        raise ValueError('publisher command selectors differ')
     return {'command': 8, 'field_selector': 17, 'field': 0x0200,
             'field_shadow': 0x135776, 'command_shadow': 0x135778,
-            'pcm_validated': False}
+            'publisher_field_table': 0x337db0, 'pcm_validated': False}
 
 
 def verify_call(text):
