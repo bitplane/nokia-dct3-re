@@ -3059,6 +3059,42 @@ private:
 					m_port_writes == 2 &&
 					m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 4593 sign-extends into B, post-increments AR3, and costs one cycle");
+			program.write_word(0x05e2, 0x4592); // LD *AR2+,16,B.
+			data.write_word(0x0d10, 0xff80);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x11223344);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6513;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6513 || m_phase == 6514)
+		{
+			bool const signed_memory = m_phase == 6513;
+			expect_opcode(0x4592,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (signed_memory ? 0xffff800000ULL : 0xff800000ULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x11223344 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0d11 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				data.read_word(0x0d10) == 0xff80 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 shifted LD through AR2 respects SXM, preserves A/status/source and postincrements once in one cycle");
+			if (signed_memory)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d10);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6514;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 			program.write_word(0x05e0, 0x75d6); // PORTW *AR6+%, port
 			program.write_word(0x05e1, 0x0124);
 			program.write_word(0x05e2, 0xf830); // BC 05e4, TC
@@ -9660,6 +9696,45 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x7ffff0000ULL &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"PMST.SST clamps signed STH without changing accumulator or cycle cost");
+			program.write_word(0x05e3, 0x82d3); // STH A,*AR3+%.
+			data.write_word(0x0f93, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff87654321ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f93);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6515;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6515 || m_phase == 6516)
+		{
+			bool const store_b = m_phase == 6516;
+			expect_opcode(store_b ? 0x83d3 : 0x82d3,
+				data.read_word(0x0f93) == (store_b ? 0x8765 : 0x1234) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				m_cpu->state_int(tms320c54x_device::STATE_BK) == 4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 STH A/B stores the high word before circular wrap without changing accumulators/status");
+			if (!store_b)
+			{
+				program.write_word(0x05e3, 0x83d3);
+				data.write_word(0x0f93, 0);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f93);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6516;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 1);
 			program.write_word(0x05e3, 0x4f82); // DST B,*AR2
 			data.write_word(0x0f90, 0);
 			data.write_word(0x0f91, 0);
@@ -11521,7 +11596,7 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
-			program.write_word(0x05e2, 0xec09); // RPT #9
+			program.write_word(0x05e2, 0xec00); // RPT #0.
 			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
 			program.write_word(0x05e4, 0x75d6);
 			program.write_word(0x05e5, 0x0124);
@@ -11531,26 +11606,23 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-			m_phase = 526;
+			m_phase = 6600;
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 526 && m_phase <= 532)
+		if (m_phase >= 6600 && m_phase <= 6855)
 		{
-			static constexpr u16 repeat_words[] = {
-				0xec09, 0xec0a, 0xec0f, 0xec11, 0xec13, 0xec1e, 0xec9f
-			};
-			const unsigned index = m_phase - 526;
-			const u16 opcode = repeat_words[index];
+			const unsigned index = m_phase - 6600;
+			const u16 opcode = 0xec00 | index;
 			const unsigned count = (opcode & 0xff) + 1;
 			expect_opcode(opcode,
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x0120 + count &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == count + 3,
 					"ROM4 RPT #K executes MAR K+1 times after one setup cycle");
-			if (m_phase < 532)
+			if (index < 255)
 			{
-				program.write_word(0x05e2, repeat_words[index + 1]);
+				program.write_word(0x05e2, opcode + 1);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0120);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
@@ -11560,6 +11632,7 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			osd_printf_info("TMS320C54x immediate repeat conformance: PASS variants=256\n");
 			program.write_word(0x05e2, 0xf6bd); // RSBX ST1 bit 13
 			program.write_word(0x05e3, 0x75d6);
 			program.write_word(0x05e4, 0x0124);

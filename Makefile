@@ -1208,6 +1208,7 @@ check-c54x-core: build
 	@grep -q "TMS320C54x stack address latency conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x RC ALT conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x software interrupt conformance: PASS" /tmp/tms320c54x-core-check.log
+	@grep -q "TMS320C54x immediate repeat conformance: PASS variants=256" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x rounded multiply boundaries: PASS vectors=8 destinations=2 addressing_modes=2 sticky_overflow_states=2" /tmp/tms320c54x-core-check.log
 
 # Diagnostic observation only: the short-period outcome is deliberately not
