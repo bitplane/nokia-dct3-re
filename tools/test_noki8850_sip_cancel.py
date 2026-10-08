@@ -15,6 +15,9 @@ class SipCancelTest(unittest.TestCase):
                         ['--incoming-media', '--restore-idle'],
                         ['--incoming-media', '--outgoing-media'],
                         ['--record-media'],
+                        ['--restore-outgoing'],
+                        ['--incoming-media', '--restore-outgoing'],
+                        ['--outgoing-media', '--restore-outgoing', '--record-media'],
                         ['--outgoing-media', '--outgoing-busy'],
                         ['--outgoing-media', '--outgoing-unavailable']):
             with self.subTest(options=options), \

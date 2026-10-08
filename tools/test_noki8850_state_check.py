@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch
 from PIL import Image
-from tools.noki8850_state_check import verify, check_frames
+from tools.noki8850_state_check import verify, verify_architecture, check_frames
 
 
 GOOD = '''8850_state: event=saved pc=0000001c sp=00137000 ram=12345678 t=40.000000000
@@ -20,6 +20,17 @@ state_replay: phase=restored event=end t=41.000000000
 
 
 class StateTest(unittest.TestCase):
+    def test_external_dialog_restore_requires_exact_architecture(self):
+        verify_architecture(GOOD)
+        for original, replacement in (('event=restored pc=0000001c', 'event=restored pc=00000020'),
+                                      ('event=restored', 'event=missing'),
+                                      ('ram=12345678 t=40.000000000\nstate_roundtrip',
+                                       'ram=87654321 t=40.000000000\nstate_roundtrip')):
+            with self.subTest(original=original), self.assertRaises(ValueError):
+                verify_architecture(GOOD.replace(original, replacement))
+        with self.assertRaises(ValueError):
+            verify_architecture(GOOD + '8850_state: FAIL incomplete')
+
     def test_sip_idle_requires_exact_replay_and_physical_exit(self):
         text = GOOD + '8850_sip_cancel: physical Exit\n8850_keypad_decoded key=1a\n'
         verify(text, idle=True, sip_cancel=True)

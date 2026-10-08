@@ -35,7 +35,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
         assert(emu.wait(1))
         machine:logerror(string.format('state_replay: phase=restored event=end t=%.9f\n', machine.time:as_double()))
         machine.screens[':screen']:snapshot('8850_state_call_restored.png')
-        if _G.noki8850_sip_restore_idle then
+        if _G.noki8850_sip_restore_idle or _G.noki8850_sip_restore_call then
             completed = true
             return
         end

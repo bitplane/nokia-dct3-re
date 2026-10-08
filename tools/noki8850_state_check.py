@@ -13,7 +13,7 @@ from tools.noki8850_outgoing_call_check import verify as verify_call, verify_fra
 from tools.noki8850_sms_check import verify as verify_sms, verify_frame as verify_sms_frame
 
 
-def verify(text, *, sms=False, idle=False, storage=None, sip_cancel=False):
+def verify_architecture(text):
     if '[LUA ERROR]' in text or '8850_state: FAIL' in text:
         raise ValueError('state fixture did not complete')
     states = re.findall(r'8850_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
@@ -21,6 +21,11 @@ def verify(text, *, sms=False, idle=False, storage=None, sip_cancel=False):
         raise ValueError('missing exact save/load snapshots')
     if states[0][1:] != states[1][1:]:
         raise ValueError('architectural state did not restore exactly')
+    return states
+
+
+def verify(text, *, sms=False, idle=False, storage=None, sip_cancel=False):
+    verify_architecture(text)
     verify_roundtrip(text, ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:'),
                      '8850 SMS' if sms else '8850 active call')
     if sip_cancel:
