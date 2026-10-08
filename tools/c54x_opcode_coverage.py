@@ -14,9 +14,10 @@ OPCODE = re.compile(
     r"^\[opcov\] op=([0-9a-fA-F]{4}) first_pc=([0-9a-fA-F]{4})(?: count=(\d+))?$"
 )
 ASSERTION = re.compile(r"^(?:\[:\] )?\[opassert\] op=([0-9a-fA-F]{4})$")
-ROM4_IDLE_OPCODE_COUNT = 457
-ROM4_IDLE_GROUP_COUNT = 91
-ROM4_IDLE_SET_SHA256 = "e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc"
+# Free-running CTSI/absolute-compare baseline; provenance is in rom4_dsp_loader.md.
+ROM4_IDLE_OPCODE_COUNT = 594
+ROM4_IDLE_GROUP_COUNT = 107
+ROM4_IDLE_SET_SHA256 = "5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e"
 DECODER_MASK = re.compile(r"\(op\s*&\s*0x([0-9a-fA-F]+)\)\s*==\s*0x([0-9a-fA-F]+)")
 DECODER_EXACT = re.compile(r"\bop\s*==\s*0x([0-9a-fA-F]{4})\b")
 DECODER_CASE = re.compile(r"\bcase\s+0x([0-9a-fA-F]{4})\s*:")

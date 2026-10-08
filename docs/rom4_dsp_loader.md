@@ -1091,12 +1091,11 @@ Exact `6d95` checks one AR5 increment, unchanged AR6/memory and one cycle.
 Exact `7e92` distinguishes A-addressed program memory from different data
 memory at the same address, checks AR2 post-increment, unchanged A/AR3 and
 five-cycle execution.
-The fresh trace's assertion gaps are closed. The next task is to explain the
-expanded execution, not fabricate RF samples or infer acquisition from opcode
-coverage. The integrated idle/Menu/power gate reproduces the 594-word,
-107-group primary fingerprint and passes the long power-key lifecycle, then
-rejects the retained older fingerprint before validating the union. The gate
-deliberately retains that fingerprint pending the checkpoint re-bank.
+The fresh trace's assertion gaps are closed. The integrated idle/Menu/power
+gate now enforces the 594-word, 107-group primary fingerprint, passes the
+long power-key lifecycle and verifies explicit assertions for all 594 union
+words. Menu and power add no distinct words in this run. This is not evidence
+of acquisition or a reason to fabricate RF samples.
 
 Direct comparison with the retained relative-timer trace finds no removed
 opcode words and 137 added words. Its summary has zero slot expiries,
