@@ -74,6 +74,16 @@ class IsolatedAcceptanceTest(unittest.TestCase):
         self.assertEqual(error.exception.code, 2)
         prepare.assert_not_called()
 
+    def test_dcs_host_incoming_admits_physical_pin_ordering(self):
+        for options in ([], ['--pin-enabled', '--pin-start', '7']):
+            with self.subTest(options=options), \
+                    patch('sys.argv', ['runner', 'unused', '--dcs1800',
+                                       '--scenario', 'host-incoming-call'] + options), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
+
     def test_dcs_idle_state_admitted_without_pin(self):
         with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'idle-state']), \
                 patch.object(runner.Path, 'read_bytes', return_value=b''), \
