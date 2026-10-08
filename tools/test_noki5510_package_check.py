@@ -6,6 +6,17 @@ from tools.extract_dct3_wintesla import decode_records
 
 
 class PackageCheckTest(unittest.TestCase):
+    def test_dsp_rx_router_uses_big_endian_addresses_and_full_type_extent(self):
+        table = bytes.fromhex('003a53b2') * 13
+        routes = checker.decode_dsp_rx_routes(table)
+        self.assertEqual([row['type'] for row in routes], list(range(0x83, 0x90)))
+        self.assertEqual(routes[11], {'type': 0x8e, 'branch': 0x3a53b2})
+        self.assertNotEqual(checker.decode_dsp_rx_routes(bytes.fromhex('b2533a00') * 13), routes)
+
+    def test_dsp_rx_router_rejects_incomplete_extent(self):
+        with self.assertRaisesRegex(ValueError, 'extent'):
+            checker.decode_dsp_rx_routes(bytes(12 * 4))
+
     def test_thumb_reference_census_signed_calls_and_big_endian_pointers(self):
         image = bytes.fromhex('f000f804f7fffffc0020000d')
         report = checker.thumb_reference_census(image, (0x200000, 0x20000c))

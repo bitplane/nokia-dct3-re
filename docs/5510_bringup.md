@@ -2537,10 +2537,25 @@ classification remain excluded. It is not a proof of absent external input.
 The sequenced receiver reads its trailing count and sequence bytes at
 `object + payload_length + 8/9`, uses the low three sequence bits and bit-6/7
 branches, and queues only after the selected completion branch. This is
-upstream of the MU4-specific `d2/42` consumer. The concrete next question is
-which producer queues task 8's internal `8e` object and what physical byte
-source supplies its payload. No key mapping or MU4 self-test reply is enabled
-by this static result.
+upstream of the MU4-specific `d2/42` consumer.
+
+The internal producer is task 4, not a literal `8e` constructor. Its own
+descriptor selects `3a52b5`. Ring header reader `318ee6` reads a halfword
+from the shared window at `10000`, allocates `length + 5` bytes and builds
+`{18, 02, length, type, payload...}`. Reader `318f5c` copies the packed
+halfword payload to object offset 4 and advances the ring consumer. Task
+loop `3a52b4` selects the type from object byte 3. The 13-entry big-endian
+jump table at `3a5304` covers `83..8f`; entries `8d` and `8e` both select
+`3a53b2`, whose explicit range check forwards through `2f5f8a`. That wrapper
+posts the unchanged object to task 8 via `2ce88c`. The package checker pins
+these code bodies, task descriptor, shared-window literal and table entries.
+This is a static transport contract, not a runtime MU4 acceptance result.
+
+The remaining question is which physical receive mechanism delivers MU4's
+node-`28` bytes to this DSP-carried service ring, including its activation
+and framing rules. Existing node-`02` HLE replies demonstrate the route but
+cannot establish that physical source. No key mapping or MU4 self-test reply
+is enabled by this result.
 
 The two observed ingress classes are the declared external-service HLE's
 discovery replies: `nokia_external_service.cpp` echoes the discovery body

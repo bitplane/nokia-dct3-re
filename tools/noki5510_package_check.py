@@ -29,6 +29,14 @@ def decode_class_routes(table):
             for row in (table[offset:offset + 8] for offset in range(0, len(table), 8))]
 
 
+def decode_dsp_rx_routes(table):
+    """NPM-5 task-4 jump table: big-endian addresses for types 83..8f."""
+    if len(table) != 13 * 4:
+        raise ValueError('DSP RX router extent mismatch')
+    return [{'type': 0x83 + index, 'branch': address}
+            for index, (address,) in enumerate(struct.iter_unpack('>I', table))]
+
+
 def thumb_reference_census(image, targets, base=0x200000):
     """Aligned encoded references, not proof against computed or ARM calls."""
     targets = set(targets)
@@ -67,6 +75,9 @@ def assess_input(flash):
         (0x335b12, 0x335b74, 'f09da60f3625c068cecfbc3e288e5a9f6591d57f5cf1f8ebbd58d6377116337f'),
         (0x2f5760, 0x2f59dc, '2bc18cd9fa00b74f9b67a998de83dfed13420174de12d71e9821779f5e3f7056'),
         (0x2f5c8c, 0x2f5d72, 'd59f6cb9da3e39ea01fda78ed3f2c5191fa12f30abdecb9af87844276e2b64ea'),
+        (0x3a52b4, 0x3a5434, '3e6da40213a48ad07b774626768b9eb0d25a1965243d619b11af67e3af6929c7'),
+        (0x2f5f8a, 0x2f5f96, '90e325967de387da34abf3f518eada587225ef542bb2b8f8b9a0dffe3b5a2623'),
+        (0x318ecc, 0x318ff2, 'fb2562b392ec242983e3f7b44f0d8207a1ea6b18b279834a029eb722892e180e'),
     ):
         if hashlib.sha256(flash[start - 0x200000:end - 0x200000]).hexdigest() != digest:
             raise ValueError('input consumer code mismatch')
@@ -96,6 +107,14 @@ def assess_input(flash):
         raise ValueError('serial receive direct-reference census mismatch')
     if struct.unpack_from('>I', flash, 0x219d20 + 8 * 12)[0] != 0x2f5c8d:
         raise ValueError('sequenced receive task descriptor mismatch')
+    if struct.unpack_from('>I', flash, 0x219d20 + 4 * 12)[0] != 0x3a52b5:
+        raise ValueError('DSP receive task descriptor mismatch')
+    dsp_routes = decode_dsp_rx_routes(flash[0x1a5304:0x1a5338])
+    if [row['branch'] for row in dsp_routes if row['type'] in (0x8d, 0x8e)] != [
+            0x3a53b2, 0x3a53b2]:
+        raise ValueError('sequenced DSP receive route mismatch')
+    if struct.unpack_from('>I', flash, 0x1191d8)[0] != 0x10000:
+        raise ValueError('DSP receive shared window mismatch')
     return {'scope': 'static consumers only; no MU4 matrix wiring validated',
             'sequenced_receive': {'task': 8, 'entry': '2f5c8c', 'receiver': '2f5760',
                                   'internal_selector_offset': 3, 'internal_selector': '8e',
@@ -103,6 +122,15 @@ def assess_input(flash):
                                   'control_transports': ['1e', '1c'],
                                   'control_handler': '2f52aa',
                                   'reference_census': references,
+                                  'producer': {'task': 4, 'entry': '3a52b4',
+                                               'ring_reader': '318f5c', 'header_reader': '318ee6',
+                                               'shared_base': '10000',
+                                               'object_prefix': ['18', '02', 'length', 'type'],
+                                               'payload_offset': 4,
+                                               'routes': dsp_routes,
+                                               'forwarder': '2f5f8a', 'post': '2ce88c',
+                                               'destination_task': 8,
+                                               'preserves_object': True},
                                   'physical_byte_source_validated': False},
             'gpio_reader': '3a738c', 'column_register': '2002a',
             'active_low_mask': '02', 'pressed_raw': '81', 'released_raw': 'ff',
