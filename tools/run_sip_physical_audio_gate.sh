@@ -41,7 +41,6 @@ case "$product" in
         ;;
     8850)
         machine=nsm2hle bios=
-        [[ "$direction" == outgoing ]] || { echo '8850 incoming waveform is not yet validated' >&2; exit 1; }
         ;;
     *) echo "unsupported SIP waveform product: $product" >&2; exit 1 ;;
 esac

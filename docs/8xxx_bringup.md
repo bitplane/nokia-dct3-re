@@ -1913,9 +1913,8 @@ make verify-8850-sip-outgoing-waveform RUN_DIR=NEW_RUN
 ```
 
 This establishes outgoing bidirectional **HLE** microphone/earpiece delivery
-through real local SIP. Incoming waveform delivery and call save/restore
-lifetime remain separate acceptance work. Native DSP speech and physical
-codec gains remain unverified.
+through real local SIP. Native DSP speech and physical codec gains remain
+unverified.
 
 Incoming SIP media is independently verified by
 `run_8850_sip_incoming_media_verified`. The existing physical incoming fixture
@@ -1938,6 +1937,21 @@ not changed handset or peer behavior.
 ```sh
 make verify-8850-sip-incoming-media RUN_DIR=NEW_RUN
 ```
+
+The independent incoming waveform run
+`run_8850_sip_incoming_waveform_probe/handset` also passes sustained
+440 Hz microphone-to-remote and 660 Hz remote-to-earpiece checks through
+actual MAME audio streams. The full incoming caller/operator presentation,
+physical Answer/End and SIP media checks remain enforced; fixture routing
+is isolated and cleaned up on exit.
+
+```sh
+make verify-8850-sip-incoming-waveform RUN_DIR=NEW_RUN
+```
+
+Both call directions now have HLE waveform acceptance. Connected and
+alerting external-SIP save/restore lifetimes remain independent work;
+these results do not restore a host dialog or establish native speech.
 
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot

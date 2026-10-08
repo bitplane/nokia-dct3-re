@@ -658,8 +658,20 @@ shows `DCT3 LAB`; the two images deliberately have different oracles.
 Registration and persisted EF_LOCI remain valid. This is an observed
 presentation difference, not proof of network-name retention; the current
 MM Information provides time only and its causal role is unproved.
-No firmware/name override is used. Answered SIP, speech and external-dialog
-restoration are not established on this product.
+No firmware/name override is used. This cancellation gate does not test
+answered media; the separate gates below do. External-dialog restoration
+is not established by cancellation or media gates.
+
+`verify-8850-sip-outgoing-media` and `verify-8850-sip-incoming-media` require
+physical Send or Answer/End, full own-product CC/RR lifecycle, actual local
+SIP confirmation and at least 100 executed frames in each direction.
+The own NSM-2 manual establishes the PCM bus and MIC2/EAR endpoints; the
+ROM-pinned control checker verifies field `0200` and publisher `2cb3ca`.
+`verify-8850-sip-outgoing-waveform` and `verify-8850-sip-incoming-waveform`
+additionally require sustained microphone
+440 Hz and earpiece 660 Hz recordings through MAME audio streams. These are
+HLE audio gates, not native DSP or physical analogue-gain validation; see
+`8xxx_bringup.md` for the product evidence and release-ordering constraints.
 
 `verify-8850-sip-outgoing-busy` and
 `verify-8850-sip-outgoing-unavailable` additionally exercise physical
