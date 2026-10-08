@@ -170,8 +170,15 @@ the real SIP dialog with BYE and clears the restored handset once under
 epoch 2. Fresh `run_8210_sip_incoming_restore_probe` passes, ending the
 restored call at 42.130 s. The checker requires the own decoded physical
 Answer before connection, complete firmware release, and no dialog replay.
-Incoming alerting restoration and waveform continuity across load remain
-separate unvalidated cases.
+Waveform continuity across load remains a separate unvalidated case.
+
+`verify-8210-sip-alerting-incoming-restore` holds before physical Answer and
+saves/restores exact CPU/SP/RAM/time at 36.000 s. Fresh
+`run_8210_sip_alerting_restore_probe` passes real INVITE rejection and one
+fresh-epoch handset clear, ending at 36.110 s, without Answer, CONNECT,
+accepted media or dialog replay. Connected and alerting restoration are
+independently exercised in both call directions; external dialogs are always
+discarded, not restored. None of these gates establishes native DSP speech.
 
 Fresh matrix run `run_8210_sip_media_closed` passes with explicit media
 closure at 37.030 s and completion at 37.040 s, with no rejected downlink.

@@ -105,6 +105,7 @@ def main():
                         help='save/load the outgoing handset in the selected phase, closing SIP without redial')
     parser.add_argument('--restore-outgoing-phase', choices=('connected', 'alerting'), default='connected')
     parser.add_argument('--restore-incoming', action='store_true')
+    parser.add_argument('--restore-incoming-phase', choices=('connected', 'alerting'), default='connected')
     outgoing = parser.add_mutually_exclusive_group()
     outgoing.add_argument('--incoming-media', action='store_true',
                           help='answer a fresh real SIP call using physical Send/End and validate HLE media transport')
@@ -127,6 +128,8 @@ def main():
         parser.error('--restore-outgoing-phase requires --restore-outgoing')
     if args.restore_incoming and (not args.incoming_media or args.restore_idle or args.record_media or args.restore_outgoing):
         parser.error('--restore-incoming requires --incoming-media without other restoration or recording')
+    if args.restore_incoming_phase != 'connected' and not args.restore_incoming:
+        parser.error('--restore-incoming-phase requires --restore-incoming')
     outgoing_call = args.outgoing_busy or args.outgoing_unavailable or args.outgoing_media
     if args.restore_idle and outgoing_call:
         parser.error('--restore-idle cannot be combined with an outgoing call')
@@ -142,6 +145,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki8210_sip_outgoing_restore.lua' if args.restore_outgoing else
+                       'noki8210_sip_incoming_alerting_restore.lua' if args.restore_incoming and args.restore_incoming_phase == 'alerting' else
                        'noki8210_sip_incoming_restore.lua' if args.restore_incoming else
                        'noki8210_outgoing_call_input.lua' if outgoing_call else
                        'noki8210_sip_answer_input.lua' if args.incoming_media else
@@ -156,7 +160,7 @@ def main():
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8210',
                    *(['--restore-outgoing'] if args.restore_outgoing else []),
-                   *(['--restore-call'] if args.restore_incoming else []),
+                   *(['--restore-call', '--restore-phase', args.restore_incoming_phase] if args.restore_incoming else []),
                    *(['--record-media'] if args.record_media else []),
                    *(['--sip-response', '180' if args.restore_outgoing and args.restore_outgoing_phase == 'alerting' else
                        '200' if args.outgoing_media else '480' if args.outgoing_unavailable else '486'] if outgoing_call else
@@ -174,7 +178,8 @@ def main():
             check_output((run / 'console.log').read_text(errors='replace'))
             verify_stage(text, runtime=True, selftest=True, base_record=True)
             verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(), configured_carrier=True)
-            scenario = 'incoming_call' if args.restore_incoming else 'call'
+            scenario = ('incoming_alerting_call' if args.restore_incoming_phase == 'alerting' else
+                        'incoming_call') if args.restore_incoming else 'call'
             if f'state_roundtrip: result=pass scenario=8210_{scenario}' not in text:
                 raise ValueError('connected handset architecture did not restore exactly')
         elif args.incoming_media:
@@ -191,7 +196,7 @@ def main():
         else:
             check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsm3hle', 'scenario': ('incoming-sip-connected-restore' if args.restore_incoming else
+            'machine': 'nsm3hle', 'scenario': (f'incoming-sip-{args.restore_incoming_phase}-restore' if args.restore_incoming else
                                              f'outgoing-sip-{args.restore_outgoing_phase}-restore' if args.restore_outgoing else
                                              'incoming-sip-hle-media' if args.incoming_media else
                                              'outgoing-sip-hle-media' if args.outgoing_media else
@@ -207,6 +212,7 @@ def main():
             'idle_restored': args.restore_idle,
             'outgoing_restored': args.restore_outgoing,
             'incoming_restored': args.restore_incoming,
+            'incoming_restore_phase': args.restore_incoming_phase if args.restore_incoming else None,
             'outgoing_restore_phase': args.restore_outgoing_phase if args.restore_outgoing else None,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')

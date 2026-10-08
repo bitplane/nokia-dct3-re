@@ -4,8 +4,9 @@ local directory = assert(source:match('^(.*[/])'))
 _G.noki8210_security_only = true
 local call = _G.noki8210_state_call == true
 local incoming = _G.noki8210_state_incoming == true
+local incoming_alerting = incoming and _G.noki8210_incoming_alerting_hold == true
 local sms = _G.noki8210_state_sms == true
-local scenario = incoming and 'incoming_call' or sms and 'sms' or call and 'call' or 'idle'
+local scenario = incoming_alerting and 'incoming_alerting_call' or incoming and 'incoming_call' or sms and 'sms' or call and 'call' or 'idle'
 _G.noki8210_call_hold = call
 _G.noki8210_incoming_hold = incoming
 dofile(directory ..
@@ -75,7 +76,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(replay))
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(incoming and 42 or sms and 21 or call and 34 or 32))
+    assert(emu.wait(incoming_alerting and 36 or incoming and 42 or sms and 21 or call and 34 or 32))
     machine:save('8210_' .. scenario)
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

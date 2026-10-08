@@ -624,8 +624,11 @@ no CONNECT and no accepted media. Both restoration phases pin the own dialed
 number and exact handset architecture; neither restores an external dialog.
 `verify-8210-sip-incoming-restore` independently covers physical Answer,
 exact connected incoming architecture restoration, SIP BYE, one fresh-epoch
-clear and complete firmware release without dialog replay. Incoming alerting
-restoration and waveform continuity across load are not inferred from it.
+clear and complete firmware release without dialog replay.
+`verify-8210-sip-alerting-incoming-restore` independently covers ringing
+save/load, real INVITE rejection and one fresh-epoch clear without Answer,
+CONNECT, accepted media or dialog replay. Waveform continuity across load
+is not inferred from any restoration gate.
 
 `verify-8210-sip-outgoing-busy` physically dials `1234567` on configured
 carrier 4 against actual SIP 486. It requires the decoded SETUP number,
