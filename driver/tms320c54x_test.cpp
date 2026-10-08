@@ -8029,6 +8029,46 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f25 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 				"ROM4 STL B stores the low word before one AR2 increment and preserves B in one cycle");
+			program.write_word(0x05e3, 0x8190); // STL B,*AR0+.
+			data.write_word(0x0f26, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f26);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f28);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6540;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 6540 && m_phase <= 6542)
+		{
+			const unsigned variant = m_phase - 6540;
+			const u16 opcode = variant == 0 ? 0x8190 : variant == 1 ? 0x8191 : 0x8090;
+			const u16 destination = variant == 1 ? 0x0f28 : 0x0f26;
+			expect_opcode(opcode,
+				data.read_word(destination) == (variant == 2 ? 0x5678 : 0xbeef) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234beef &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == (variant == 1 ? 0x0f26 : 0x0f27) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR1) == (variant == 1 ? 0x0f29 : 0x0f28) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f25 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 STL selects A/B and AR0/AR1 independently, postincrements only its destination and preserves both accumulators in one cycle");
+			if (variant < 2)
+			{
+				program.write_word(0x05e3, variant == 0 ? 0x8191 : 0x8090);
+				data.write_word(0x0f26, 0);
+				data.write_word(0x0f28, 0);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f26);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x0f28);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e3, 0x7582); // PORTW *AR2,0124h
 			program.write_word(0x05e4, 0x0124);
 			program.write_word(0x05e5, 0x75f8);
