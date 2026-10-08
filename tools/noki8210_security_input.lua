@@ -6,6 +6,12 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_readiness_prerequisite_constructor = memory:install_read_tap(0x2af30c, 0x2af30f,
+        'nsm3_readiness_prerequisite_constructor', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2af30c or cpu.state['R0'].value ~= 0x09fc then return end
+            machine:logerror(string.format('8210_readiness_prerequisite_constructor: input=%04x caller=%08x t=%.6f\n',
+                cpu.state['R0'].value, cpu.state['R14'].value, machine.time:as_double()))
+        end)
     _G.nsm3_readiness_selector_writes = memory:install_write_tap(0x136afc, 0x136aff,
         'nsm3_readiness_selector_writes', function(offset, value, mask)
             -- Big-endian byte 136afd occupies bits 16..23 in this bus word.
@@ -58,7 +64,7 @@ if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
             local object = cpu.state['R1'].value
             if object < 0x100000 or object >= 0x17fffc then return end
             local input = memory:read_u16(object)
-            if input == 0x09c8 or input == 0x09cc then
+            if input == 0x09c8 or input == 0x09cc or input == 0x09fc or input == 0x1587 then
                 machine:logerror(string.format('8210_readiness_upstream_post: input=%04x task=%d object=%08x caller=%08x t=%.6f\n',
                     input, cpu.state['R0'].value, object,
                     cpu.state['R14'].value, machine.time:as_double()))

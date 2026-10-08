@@ -103,6 +103,15 @@ def verify(image):
     if instructions(0x227124, 4) != [
             ('movs', 'r0, #1'), ('strb', 'r0, [r4, #0x11]')]:
         raise ValueError('readiness selector setter differs')
+    if instructions(0x258c1a, 10) != [
+            ('movs', 'r0, #0x7f'), ('lsls', 'r1, r0, #4'),
+            ('ldr', 'r0, [sp, #8]'), ('cmp', 'r0, r1'),
+            ('beq', '#0x258c3a')]:
+        raise ValueError('07f0 prerequisite input selector differs')
+    if int.from_bytes(read(0x258fd4, 4), 'big') != 0x9fc:
+        raise ValueError('07f0 prerequisite producer literal differs')
+    if instructions(0x258c6e, 4) != [('bl', '#0x2af30c')]:
+        raise ValueError('09fc prerequisite constructor boundary differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

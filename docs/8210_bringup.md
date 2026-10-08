@@ -814,10 +814,17 @@ only has the initial zeroing writes, not a later set or clear in this run.
 The setter loop calls input retrieval `225688` and requires `1587` before
 storing one. Own-ROM checks pin this predicate and store; the watch reports
 PC `227124`, the preceding instruction, not a different store site.
-The earlier GSM mapper observation of `09fc` at 10.794140 is a candidate
-predecessor (`209b90` maps that input to `1587`), but its mailbox delivery
-and original producer still need tracing. This is the current frontier;
-do not set the selector or inject `1587` to obtain authenticated DCS coverage.
+Paired `run_8210_pin_{dcs,gsm}_readiness_prerequisite_01` observations
+confirm the predecessor: GSM posts `09fc` at 10.793668, maps it through
+`209b90`, then posts `1587` at 10.794179 before the selector write.
+DCS posts neither in this run. The raw send observation reports target
+arguments 15 and 17 respectively; these are not subsystem names.
+`run_8210_pin_gsm_prerequisite_constructor_01` identifies `258c6e` as the
+original `09fc` constructor call. Its status cascade selects this input
+for `07f0` (`7f << 4`) at `258c1a`; the other branches construct
+`09f8`, `09f9` or `09fa`. The next boundary is the producer of `07f0`
+and why it is absent in DCS, not the final PIN readiness selector.
+Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
 
