@@ -36,6 +36,12 @@ if _G.noki6250_call_hold then
     table.remove(actions)
 end
 local captures = {17, 21, 26, 32}
+if os.getenv('NOKIA_DCT3_6250_PIN_ENTRY') == '1' and
+        os.getenv('NOKIA_DCT3_6250_OUTGOING') == '1' then
+    -- Let post-PIN SIM/phonebook initialization settle before dialing.
+    for _, action in ipairs(actions) do action[1] = action[1] + 6 end
+    for index, time in ipairs(captures) do captures[index] = time + 6 end
+end
 local host_ready = false
 if _G.noki6250_host_incoming then captures = {37, 44, 54} end
 local next_action, next_capture = 1, 1

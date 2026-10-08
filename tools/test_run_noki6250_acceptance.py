@@ -9,7 +9,7 @@ from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, ma
 
 class CoherentConfigTest(unittest.TestCase):
     def test_pin_services_are_admitted_before_preparation(self):
-        for scenario in ('host-incoming-call', 'host-incoming-sms'):
+        for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms'):
             with patch('sys.argv', ['runner', 'unused', '--scenario', scenario,
                                    '--coherent-cell', '--pin-enabled', '--mame', '/nonexistent/6250-mame']), \
                     patch('sys.stderr', new_callable=io.StringIO) as errors, \
@@ -20,9 +20,9 @@ class CoherentConfigTest(unittest.TestCase):
                 self.assertIn('missing MAME executable', errors.getvalue())
                 prepare.assert_not_called()
 
-    def test_pin_scope_requires_explicit_coherent_incoming_service(self):
+    def test_pin_scope_requires_explicit_coherent_host_service(self):
         for options in (['--scenario', 'host-incoming-call'],
-                        ['--scenario', 'host-outgoing-call', '--coherent-cell'],
+                        ['--scenario', 'host-incoming-sms-text', '--coherent-cell'],
                         ['--scenario', 'idle-state', '--coherent-cell']):
             with patch('sys.argv', ['runner', 'unused', '--pin-enabled'] + options), \
                     patch('sys.stderr', new_callable=io.StringIO), \

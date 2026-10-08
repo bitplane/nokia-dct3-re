@@ -98,10 +98,20 @@ the unchanged reviewed message-body pixel hash. Late SIM initialization
 reaches that body after the 22-second Read press (24-second capture),
 rather than the PIN-disabled fixture's 20-second capture; the oracle is
 not weakened or re-banked. This adds incoming signaling/SMS coverage after
-PIN, not PIN-enabled outgoing services, speech or media proof.
+PIN, not speech or media proof.
 
-The runner's `--pin-enabled` option is deliberately limited to these two
-coherent incoming-service scenarios. The reusable physical-input module
+`verify-6250-pin-host-outgoing-call` and
+`verify-6250-pin-host-outgoing-sms` require the same slow-PIN proof before
+physical dialing or SMS reply composition. Outgoing call requires the
+exact dialed number 123, the host connect decision, CC/RR release and the
+reviewed dialing/connected/idle crops. Outgoing SMS requires the exact Hi
+SMS-SUBMIT to 5551234, host acceptance, complete CP/RP release and the
+unchanged Message sent pixels. Their physical actions and captures begin
+six seconds later than the PIN-disabled fixtures to allow SIM/phonebook
+initialization to settle; emulation clocks and peer timing are unchanged.
+
+The runner's `--pin-enabled` option is deliberately limited to the four
+coherent host call/SMS scenarios above. The reusable physical-input module
 does not load another copy of the runtime observer, and the runner clears
 its harness-only input flag for ordinary runs. Every run uses private
 storage, configuration, logs and host admission evidence.

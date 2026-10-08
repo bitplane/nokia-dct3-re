@@ -86,13 +86,13 @@ def main():
     parser.add_argument('--coherent-cell', action='store_true',
                         help='use explicit ARFCN19/20 network and require carrier coherence')
     parser.add_argument('--pin-enabled', action='store_true',
-                        help='require slow physical PIN entry before coherent incoming call/SMS')
+                        help='require slow physical PIN entry before coherent host call/SMS')
     args = parser.parse_args()
     if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario == 'idle-state'):
         parser.error('coherent-cell downstream coverage requires a host or idle-state scenario')
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
-                             ('host-incoming-call', 'host-incoming-sms')):
-        parser.error('pin-enabled requires coherent host incoming call or SMS')
+                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms')):
+        parser.error('pin-enabled requires coherent host call or SMS')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
@@ -157,6 +157,8 @@ def main():
         seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
         if args.scenario == 'power-cycle':
             seconds = '80'
+        if args.pin_enabled and args.scenario in ('host-outgoing-call', 'host-outgoing-sms'):
+            seconds = '60'
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{run / 'roms'};{rompath}",
                    "-nvram_directory", "nvram", "-cfg_directory", "cfg",
@@ -244,7 +246,7 @@ def main():
         elif sms:
             frame_index = {"sms-read": 2, "sms-delete": 5, "sms-reply": 8,
                            "host-incoming-sms": 2, "host-incoming-sms-text": 2, "host-outgoing-sms": 8}[args.scenario]
-            if args.pin_enabled:
+            if args.pin_enabled and host_incoming_sms:
                 # Late SIM initialization reaches the same reviewed body
                 # after the 22-second Read input, not the 18-second input.
                 frame_index = 3

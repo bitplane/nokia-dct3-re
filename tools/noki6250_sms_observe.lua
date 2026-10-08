@@ -39,6 +39,12 @@ if os.getenv("NOKIA_DCT3_6250_SMS_REPLY") == "1" then
     }
 end
 local captures = {17, 20, 24, 28, 34, 37, 40, 44, 48}
+if os.getenv('NOKIA_DCT3_6250_PIN_ENTRY') == '1' and
+        os.getenv('NOKIA_DCT3_6250_SMS_REPLY') == '1' then
+    -- Preserve the reviewed reply sequence after late SIM initialization.
+    for _, action in ipairs(actions) do action[1] = action[1] + 6 end
+    for index, time in ipairs(captures) do captures[index] = time + 6 end
+end
 local next_action, next_capture = 1, 1
 emu.register_periodic(function()
     local time = machine.time:as_double()
