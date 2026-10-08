@@ -1819,6 +1819,34 @@ before dialing and `DCT3 LAB` after release, excluding animated indicators.
 The wire also contains `860b`/`840a` speech-control commands, but no NSM-2
 speech-media contract is selected; this acceptance does not prove audio.
 
+#### Own PCM Documentation
+
+The complete three-volume [Nokia NSM-2 service archive](https://www.eserviceinfo.com/downloadsm/5444/Nokia_8850.html)
+is acquired under ignored `roms/research/nsm2/`; `unrar t manual.rar`
+passes with both continuation volumes. `03SYS.PDF`, Issue 1 12/1999,
+printed page 24, has SHA256
+`d87c5261c8d80b2a1b6e94883614041440c4e37acfbfb82dab2c26c388456244`.
+It independently specifies a 1 MHz PCMDClk (13 MHz RFIClk divided by 13)
+and 8 kHz PCMSClk (PCMDClk divided by 125). The rendered timing diagram
+shows one active-high sync clock and a 16-clock, MSB-first word, with bits
+15..13 extending the sign of the 13-bit sample. Data changes on rising
+edges; the stable sampling edge is falling. This is NSM-2 evidence, not an
+inference from the similarly shaped NSM-3 interface.
+
+`04UI.PDF`, same issue, has SHA256
+`b4d0816473d2d2dc353f077741317044eed21e5c586ed2c3f743d06e9df11013`.
+Its audio description identifies internal MIC2 versus headset MIC1;
+the receiver table connects EARP/EARN to COBBA. Page 15 explicitly maps
+slide connector X300/2 MICP to MIC2N and X300/1 MICN to MIC2P. Preserve
+that documented polarity rather than normalizing names. Electrical test
+levels are not runtime codec gains or a decoded COBBA control-register map.
+
+These documents close the missing bus-shape and physical-endpoint evidence
+for 8850 only. Before enabling HLE speech, recover the own-ROM field writer
+and command publisher corresponding to the observed `860b`/`840a` pair,
+then verify ordered physical Send/End and bidirectional PCM/media. No native
+DSP speech, audible call or 8890 PCM contract is established by this finding.
+
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot
 directories, verbose logging and 60 seconds. The physical `5551234` call is
