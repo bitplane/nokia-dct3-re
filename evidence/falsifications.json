@@ -810,6 +810,12 @@
       "evidence": ["docs/cell_broadcast_and_ems.md", "tools/cell_broadcast_static_check.py"]
     },
     {
+      "id": "nhm3_late_pin_type57_accepts_background_type55_measurements", "status": "disproven",
+      "hypothesis": "NHM-3's type-57 body 03050000 accepts the existing type-55 ALL_RSSI_RESULTS layout as a background measurement completion after slow PIN entry",
+      "conclusion": "The own-ROM type-55 and type-57 constructors share a control encoder, and task 14 has an 1802/class-8b completion branch. A bounded request-derived model preserved serving reception and enqueued a 166-byte 8b result from receivable laboratory cells at 10.364597 seconds. A passive tap did not observe completion consumer 3cbe14; the mapped wait next observed the real 03ec SIM notification, and no registration completed through 45 seconds. This rejects the implemented alias, not all possible type-57 replies. The candidate model was removed; recover the own-ROM 8b dispatch before another response experiment. The analogous NHM-2 alias was already falsified independently.",
+      "evidence": ["docs/6250_bringup.md", "docs/network_scouting.md"]
+    },
+    {
       "id": "nam2_full_donor_fixture_executes_selected_v584_bios", "status": "disproven",
       "hypothesis": "Selecting BIOS 584e while restoring a complete v5.21 donor flash image executes v5.84 code with only donor product state",
       "conclusion": "MAME restores persistent flash NVRAM over the selected BIOS, so the original full-donor fixture executed v5.21 code. The 281-byte and alternate-credential censuses performed with that composition do not establish v5.84 semantics. The corrected generator preserves the complete v5.84 MCU/PPM region and imports only the donor's 64 KiB PMM partition. The first corrected gate selected a stale frame, but a subsequently isolated fresh-fixture run independently executed both v5.84 cipher calls and reproduced the physical Wrong code result.",

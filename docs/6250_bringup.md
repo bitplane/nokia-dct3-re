@@ -353,12 +353,24 @@ matching the observed type-57 body. Consumer `38fdca` processes up to
 forty four-byte measurement records, reads big-endian ARFCN from message
 `+6/+7` and signed RSSI from `+9`, and rejects values below -104 dBm.
 This agrees with the existing `8b` measurement encoder's layout. The
-remaining implementation distinction is lifecycle: this type-57 request
+remaining contract distinction includes lifecycle: this type-57 request
 occurs while a serving receiver remains active, whereas the existing
 autonomous type-55 path is gated to acquisition/deactivation states.
-Implement a bounded measurement transaction without forcing the handset
-or silently resetting its serving reception; retain unknown modes as
-unsupported until their contracts are recovered.
+A candidate measurement transaction must preserve serving reception and
+cannot treat shared control encoding as proof of reply-envelope semantics.
+Unknown modes remain unsupported until their contracts are recovered.
+
+That bounded background type-55-layout candidate was tested and removed.
+It published a 166-byte `8b` result from receivable laboratory cells at
+10.364597 s without changing the serving phase. The mapped completion
+consumer `3cbe14` was not observed, the wait later saw the real `03ec`
+notification, and registration remained absent through 45 s. Shared
+control encoding and a reachable `8b` consumer do not establish that the
+proposed envelope reaches this consumer in this lifecycle. The ledger
+records `nhm3_late_pin_type57_accepts_background_type55_measurements`;
+recover the own-ROM `8b` routing and subscription contract next. The
+independent NHM-2 type-57 alias falsification is corroborating negative
+knowledge, not proof that every NHM-3 response has the same outcome.
 
 ### Coherent laboratory registration
 
