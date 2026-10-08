@@ -6,6 +6,16 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_candidate_list_producers = {}
+    for _, address in ipairs({0x21f394, 0x21faae}) do
+        _G.nsm3_candidate_list_producers[#_G.nsm3_candidate_list_producers + 1] = memory:install_read_tap(
+            address & ~3, (address & ~3) + 3, 'nsm3_candidate_list_producer_' .. address,
+            function(offset, value, mask)
+                if cpu.state['PC'].value ~= address then return end
+                machine:logerror(string.format('8210_candidate_list_producer: return=%08x t=%.6f\n',
+                    address, machine.time:as_double()))
+            end)
+    end
     _G.nsm3_cell_decision_results = {}
     for _, address in ipairs({0x21f5ce, 0x21f90e}) do
         _G.nsm3_cell_decision_results[#_G.nsm3_cell_decision_results + 1] = memory:install_read_tap(

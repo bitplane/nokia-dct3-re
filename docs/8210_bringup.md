@@ -927,6 +927,19 @@ this constructor, selects list population through `2869bc` or `286bc0`,
 then sends via `2b300e` to task 3. These are ROM-checked producer anchors,
 not a proof of measurement lifetime or cancellation semantics. Follow
 their caller's state/control transitions to settle that remaining question.
+Read-only caller-return taps in
+`run_8210_pin_dcs_candidate_owner_02` identify `21f390` as the initial
+publication (return `21f394`, 3.183910), and `21faaa` as the updated DCS
+publication (return `21faae`, 5.542089). The latter's receive loop tests
+`8b` at `21fb78`, parses it at `21fb86`, and invokes the argument-0
+selector at `21fba2`. Result zero branches back to `21fa68` to publish
+another list. This establishes an own-firmware consumer/retry contract
+for that window, but not whether channel configuration cancels it.
+The initial function-entry tap produced no observations despite the
+transport publications; caller-return taps replace it. No absence claim
+is based on the silent entry tap. The normal PIN run still fails the
+strict registration gate with the same empty-queue acknowledgement and
+later retained `03ec`.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

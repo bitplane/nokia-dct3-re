@@ -169,6 +169,16 @@ def verify(image):
             ('adds', 'r0, r7, #0'), ('bl', '#0x2b300e'),
             ('pop', '{r4, r5, r6, r7, pc}')]:
         raise ValueError('candidate-list producer send tail differs')
+    if instructions(0x21faaa, 4) != [('bl', '#0x286c48')]:
+        raise ValueError('candidate-window producer caller differs')
+    if instructions(0x21fb78, 6) != [
+            ('cmp', 'r2, #0x8b'), ('beq', '#0x21fb7e'), ('b', '#0x21f44e')]:
+        raise ValueError('candidate-window measurement receive selector differs')
+    if instructions(0x21fb84, 6) != [('ldr', 'r0, [r4, #8]'), ('bl', '#0x2a2250')]:
+        raise ValueError('candidate-window measurement parser differs')
+    if instructions(0x21fbb0, 6) != [
+            ('cmp', 'r0, #0'), ('bne', '#0x21fbb6'), ('b', '#0x21fa68')]:
+        raise ValueError('candidate-window zero-result retry differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
