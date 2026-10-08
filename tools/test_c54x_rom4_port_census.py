@@ -37,6 +37,11 @@ class C54xRom4PortCensusTest(unittest.TestCase):
         self.assertEqual(census(words(0x74ea)), {})
         self.assertEqual(census(words(0x75f8, 0x0008)), {})
 
+    def test_missing_long_offset_extension_is_not_a_candidate(self):
+        self.assertEqual(census(words(0x74ea, 0x0039)), {})
+        self.assertEqual(census(words(0x75ea, 0x0032)), {})
+        self.assertEqual(census(words(0x7492, 0x0039)), {("R", 0x39): [0]})
+
     def test_direct_callers_include_delayed_calls_only_to_target(self):
         result = direct_callers(words(
             0xf074, 0x7b0a,

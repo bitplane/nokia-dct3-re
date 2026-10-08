@@ -17,9 +17,13 @@ def census(image: bytes) -> dict[tuple[str, int], list[int]]:
         family = opcode & 0xff00
         if family not in (0x7400, 0x7500):
             continue
+        mode = opcode & 0xff
+        # A port operand alone is not a complete long-offset instruction.
+        if mode >= 0xe0 and address + 2 >= len(words):
+            continue
         # Absolute Smem (F8) puts the address before the port; long-offset
         # forms (E0..F7) put the port before the address extension instead.
-        port_index = address + (2 if opcode & 0xff == 0xf8 else 1)
+        port_index = address + (2 if mode == 0xf8 else 1)
         if port_index < len(words) and words[port_index] < 0x100:
             direction = "R" if family == 0x7400 else "W"
             sites[(direction, words[port_index])].append(address)
