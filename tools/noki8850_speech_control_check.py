@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 from pathlib import Path
+import re
 
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
 
@@ -53,11 +54,30 @@ def recover(image):
             'native_speech_validated': False}
 
 
+def verify_call(text):
+    cursor = 0
+    for pattern in (
+        r'8850_call_physical: action=send\b',
+        r'dsp_control_write: data=860b pc=002cb3ca r4=00000008 ',
+        r'8850_call_physical: action=end\b',
+        r'dsp_control_write: data=840a pc=002cb3ca r4=00000008 ',
+    ):
+        match = re.search(pattern, text[cursor:])
+        if match is None:
+            raise ValueError(f'missing ordered call-control event: {pattern}')
+        cursor += match.end()
+    return {'call_field': 0x0200, 'runtime_validated': True,
+            'native_speech_validated': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('rom', type=Path)
+    parser.add_argument('--log', type=Path)
     args = parser.parse_args()
     print(recover(args.rom.read_bytes()))
+    if args.log:
+        print(verify_call(args.log.read_text(errors='replace')))
 
 
 if __name__ == '__main__':

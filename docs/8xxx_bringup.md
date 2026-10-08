@@ -1842,9 +1842,8 @@ that documented polarity rather than normalizing names. Electrical test
 levels are not runtime codec gains or a decoded COBBA control-register map.
 
 These documents close the missing bus-shape and physical-endpoint evidence
-for 8850 only. Before enabling HLE speech, recover the own-ROM field writer
-and command publisher corresponding to the observed `860b`/`840a` pair,
-then verify ordered physical Send/End and bidirectional PCM/media. No native
+for 8850 only. The own-ROM field writer and physical Send/End correspondence
+are verified below; bidirectional PCM/media remains to be enabled and tested. No native
 DSP speech, audible call or 8890 PCM contract is established by this finding.
 
 The acquired `8850v531.fls` (SHA1
@@ -1864,12 +1863,24 @@ publisher writes DSPIF `100a8` at `2cb3ca`. These are independently decoded
 NSM-2 addresses, not relocated NSM-3 guesses. The checker validates the ROM
 digest, instruction forms, selector targets and pool literals.
 
-Static decoding alone does not establish the live speech-enable lifecycle.
-Existing outgoing logs contain physical Send/End markers but lack the newer
-`dsp_control_write` tap. Capture a fresh own-product call with that passive
-tap and correlate both `860b` and `840a` at `2cb3ca` before selecting the
-HLE speech predicate. PCM and analogue routing remain disabled until that
-runtime prerequisite is verified.
+The live speech-enable lifecycle is independently verified by a fresh
+isolated no-PIN host outgoing call (`run_8850_speech_control_probe`). The
+own-product runner's registration and call acceptance passes. Physical Send
+is followed by `860b` at `2cb3ca`, selector 8, at 33.079237 seconds; physical
+End is followed by `840a` through the same publisher at 41.562303 seconds.
+The runtime checker rejects a sibling publisher, wrong selector, missing
+disable or incorrectly ordered physical actions:
+
+```sh
+.venv/bin/python tools/noki8850_speech_control_check.py \
+  roms/noki8850/8850v531.fls --log RUN/error.log
+```
+
+This establishes the research HLE predicate: command 8, mask/value `0200`.
+PCM and analogue routing are still disabled in the current configuration;
+select the independently documented NSM-2 bus and MIC2/EAR endpoints, then
+prove bidirectional media and physical waveform delivery before claiming
+working HLE audio. The result does not establish native speech or codec gains.
 
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot
