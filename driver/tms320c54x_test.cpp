@@ -13577,27 +13577,42 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 602 && m_phase <= 605)
+		if ((m_phase >= 602 && m_phase <= 605) || m_phase == 9213 || m_phase == 9214)
 		{
 			struct dadd_case { u16 opcode, st1; u64 a_after, b_after; };
 			static constexpr dadd_case cases[] = {
 				{ 0x5283, 0x0100, 0x50001, 0x30002 },
 				{ 0x5383, 0x0100, 0x1234,  0x50001 },
 				{ 0x5283, 0x0180, 0x40001, 0x30002 },
-				{ 0x5383, 0x0180, 0x1234,  0x40001 }
+				{ 0x5383, 0x0180, 0x1234,  0x40001 },
+				{ 0x5385, 0x0100, 0x1234,  0x50001 },
+				{ 0x5385, 0x0180, 0x1234,  0x40001 }
 			};
-			const unsigned index = m_phase - 602;
+			const unsigned index = m_phase >= 9213 ? m_phase - 9213 + 4 : m_phase - 602;
 			const dadd_case &row = cases[index];
 			expect_opcode(row.opcode,
 				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				(index < 4 || (m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f92 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == row.st1 &&
+					data.read_word(0x0f92) == 1 && data.read_word(0x0f93) == 0xffff &&
+					data.read_word(0x0f90) == 7 && data.read_word(0x0f91) == 8)) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"DADD B-source routing and C16 carry isolation with one-cycle DARAM timing");
-			if (m_phase < 605)
+			if (index + 1 < std::size(cases))
 			{
 				const dadd_case &next = cases[index + 1];
 				program.write_word(0x05e2, next.opcode);
+				if (index >= 3)
+				{
+					data.write_word(0x0f90, 7);
+					data.write_word(0x0f91, 8);
+					data.write_word(0x0f92, 1);
+					data.write_word(0x0f93, 0xffff);
+					m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f92);
+				}
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
 				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x30002);
@@ -13606,7 +13621,7 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				++m_phase;
+				m_phase = index < 3 ? m_phase + 1 : 9213 + index - 3;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
