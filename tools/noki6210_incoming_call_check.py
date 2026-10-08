@@ -32,9 +32,19 @@ CHECKPOINTS = (
 )
 
 
-def verify(text):
+def verify(text, *, coherent_pin=False):
     if '[LUA ERROR]' in text:
         raise ValueError('fixture error')
-    require_ordered(text, CHECKPOINTS, '6210 incoming signaling')
+    checkpoints = CHECKPOINTS
+    if coherent_pin:
+        replacements = {
+            'own traffic configuration': re.compile(
+                r'TX packet type=02 payload=24 .*data=041202000271012fc1000023000000040000000000000000'),
+            'own release configuration': re.compile(
+                r'TX packet type=02 payload=24 .*data=041202001117001a60000023000000140000000100000000'),
+        }
+        checkpoints = tuple((label, replacements.get(label, pattern))
+                            for label, pattern in CHECKPOINTS)
+    require_ordered(text, checkpoints, '6210 incoming signaling')
     for label, pattern in (('incoming SETUP', INCOMING_SETUP), ('Connect', CONNECT), ('Disconnect', DISCONNECT)):
         require_count(text, pattern, 1, f'6210 exactly one {label}')

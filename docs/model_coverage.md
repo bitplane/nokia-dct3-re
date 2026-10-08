@@ -36,6 +36,9 @@ late PIN acceptance followed by registration and persisted EF_LOCI on the
 explicit ARFCN 35/36 laboratory topology. The ordinary PIN/menu gate alone
 does not establish this lifecycle. These are runtime-HLE signaling tests,
 not native DSP or speech evidence.
+`verify-6210-pin-host-incoming-call` additionally composes this authentication
+and registration lifecycle with host paging, physical Answer/End, exact
+NPE-3 call signaling and reviewed caller/registered-idle pixels.
 
 The 6250's PIN-enabled gates independently cover delayed registration,
 incoming/outgoing host call signaling and SMS, and phonebook save followed by

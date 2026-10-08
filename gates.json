@@ -374,6 +374,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "security", "--coherent-cell", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-pin-host-incoming-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-incoming-call", "--coherent-cell", "--pin-enabled", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-registration",
       "prerequisites": ["build"],
       "variables": {},

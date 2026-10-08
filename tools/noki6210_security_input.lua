@@ -1,6 +1,9 @@
 -- Physical PIN entry against a PIN-enabled laboratory SIM, no phone NV edits.
 local source = debug.getinfo(1, 'S').source:sub(2)
-dofile(assert(source:match('^(.*[/])')) .. 'noki6210_staged_observe.lua')
+local pin_only = os.getenv('NOKIA_DCT3_6210_PIN_ENTRY') == '1'
+if not pin_only then
+    dofile(assert(source:match('^(.*[/])')) .. 'noki6210_staged_observe.lua')
+end
 local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
@@ -40,6 +43,7 @@ local input = coroutine.create(function()
         key:set_value(0)
         if not emu.wait(0.85) then return end
     end
+    if pin_only then return end
     if not emu.wait(20) then return end
     local menu = assert(machine.ioport.ports[':COL.1'].fields['Left Softkey / Menu'])
     machine:logerror('6210_security_physical: action=menu\n')

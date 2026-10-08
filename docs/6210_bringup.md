@@ -264,6 +264,12 @@ request, serving-cell measurement, enabled task-14 route/completion, physical
 PIN acceptance, full registration sequence and persistent EF_LOCI. The ordinary
 security gate remains PIN/menu-only; no-PIN registration is checked separately.
 
+`verify-6210-pin-host-incoming-call` composes the PIN-enabled card and coherent
+carrier topology with host-originated paging, physical Answer/End, the own
+NPE-3 CC/RR grammar, reviewed caller pixels and exact registered-idle recovery.
+It requires PIN acceptance and location persistence before validating the call.
+This proves host call signaling, not speech or native DSP execution.
+
 All service runners start with new working directories; incoming network
 events are selected through MAME configuration, not firmware injection.
 No donor PMM, forced phone state or borrowed DSP verdict is used. The staged

@@ -1,5 +1,6 @@
 """Fresh isolated NPE-3 own-upload and research-HLE graphical acceptance."""
 import argparse
+import os
 import hashlib
 import json
 from pathlib import Path
@@ -179,7 +180,11 @@ def main():
     parser.add_argument('--port', type=int, default=16210)
     parser.add_argument('--coherent-cell', action='store_true',
                         help='configure the laboratory network on ARFCNs 35/36')
+    parser.add_argument('--pin-enabled', action='store_true',
+                        help='authenticate a PIN-enabled SIM before the host incoming call')
     args = parser.parse_args()
+    if args.pin_enabled and (not args.coherent_cell or args.scenario != 'host-incoming-call'):
+        parser.error('--pin-enabled requires --coherent-cell and host-incoming-call')
     root = Path(__file__).resolve().parents[1]
     try:
         contract = assess((root / 'roms/noki6210/6210_556c.fls').read_bytes(),
@@ -188,7 +193,7 @@ def main():
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
-        if args.scenario == 'security':
+        if args.scenario == 'security' or args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
@@ -234,8 +239,12 @@ def main():
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
         with (run / 'console.log').open('w') as output:
+            environment = os.environ.copy()
+            environment.pop('NOKIA_DCT3_6210_PIN_ENTRY', None)
+            if args.pin_enabled:
+                environment['NOKIA_DCT3_6210_PIN_ENTRY'] = '1'
             subprocess.run(host_command or command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
-                           check=True, timeout=180)
+                           check=True, timeout=180, env=environment)
         check_output((run / 'console.log').read_text(errors='replace'))
         text = ((run / 'error.log').read_text(errors='replace')
                 if args.scenario == 'power-cycle' else events(run / 'error.log'))
@@ -246,6 +255,16 @@ def main():
             check_frames(run / 'snap')
         else:
             verify(text, runtime=runtime, selftest=runtime)
+        if args.pin_enabled:
+            from tools.radio_call_lifecycle_common import require_ordered
+            import re
+            require_ordered(text, (
+                ('physical PIN', re.compile(r'6210_security_physical: action=confirm')),
+                ('accepted PIN', re.compile(r'SIM status ins=20 sw=9000')),
+                ('location acceptance', re.compile(r'LAPDm Location Updating Accept acknowledged nr=1')),
+            ), '6210 PIN before host service')
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
+                               channel_header='1202')
         if args.scenario in ('menu', 'accessory'):
             from PIL import Image
             with Image.open(run / 'snap/6210_after_menu.png') as frame:
@@ -297,7 +316,7 @@ def main():
                 check_host((run / 'error.log').read_text(errors='replace'), '1234567')
         elif args.scenario in ('incoming-call', 'host-incoming-call'):
             from tools.noki6210_incoming_call_check import verify as check_call
-            check_call(text)
+            check_call(text, coherent_pin=args.pin_enabled)
             if args.scenario == 'host-incoming-call':
                 from PIL import Image
                 with Image.open(run / 'snap/6210_host_registered_idle.png') as frame:
@@ -377,7 +396,7 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
-            'sim_profile': 'PIN-enabled laboratory card' if args.scenario == 'security' else 'default laboratory card',
+            'sim_profile': 'PIN-enabled laboratory card' if args.scenario == 'security' or args.pin_enabled else 'default laboratory card',
             'native_dsp_complete': False, 'speech_tested': False, 'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')
