@@ -6945,14 +6945,29 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 6520)
+		if (m_phase == 6520 || m_phase == 6531 || m_phase == 6532)
 		{
-			expect_opcode(0x7083,
+			u16 const opcode = m_phase == 6520 ? 0x7083 : m_phase == 6531 ? 0x7092 : 0x7090;
+			expect_opcode(opcode,
 				data.read_word(0x0f23) == 0x5678 && data.read_word(0x0f20) == 0x5678 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f23 &&
-				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (m_phase == 6520 ? 0x0f20 : m_phase == 6531 ? 0x0f24 : 0x0f23) &&
+				(m_phase != 6532 || m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0f24) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-				"ROM4 MVKD through AR3 consumes dmad, preserves source and pointers and costs two cycles");
+				"ROM4 MVKD consumes dmad, preserves source, selects its stationary/postincrement destination and costs two cycles");
+			if (m_phase != 6532)
+			{
+				program.write_word(0x05e3, m_phase == 6520 ? 0x7092 : 0x7090);
+				data.write_word(0x0f23, 0);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0f23);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = m_phase == 6520 ? 6531 : 6532;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e0, 0x75d6);
 			program.write_word(0x05e1, 0x0124);
 			program.write_word(0x05e2, 0xec0e); // RPT #14
@@ -7380,6 +7395,40 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				m_phase = 303;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e3, 0x1e84); // SUBC *AR4,A.
+			data.write_word(0x0f66, 1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f66);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6534;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6534 || m_phase == 6535)
+		{
+			bool const subtracts = m_phase == 6534;
+			expect_opcode(0x1e84,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (subtracts ? 1 : 0xfffe) &&
+				bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == subtracts &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f66 &&
+				data.read_word(0x0f66) == 1 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 SUBC through AR4 checks both quotient/carry outcomes and preserves B/source/pointer in one cycle");
+			if (subtracts)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fff);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6535;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
@@ -14184,6 +14233,7 @@ private:
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ST||LD T reads Xmem before writing the same Ymem cell");
 			program.write_word(0x05e2, 0xe4e9); // ST A,*AR3+ || LD *AR4+0%,T.
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x87654321);
 			data.write_word(0x0203, 0x80ff);
 			data.write_word(0x0300, 0xbeef);
 			m_port_writes = 0;
@@ -14199,18 +14249,33 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 6503)
+		if (m_phase == 6503 || m_phase == 6533)
 		{
-			expect_opcode(0xe4e9,
+			bool const store_b = m_phase == 6533;
+			expect_opcode(store_b ? 0xe6e9 : 0xe4e9,
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x87654321 &&
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x80ff &&
-				data.read_word(0x0300) == 0x1234 && data.read_word(0x0203) == 0x80ff &&
+				data.read_word(0x0300) == (store_b ? 0x8765 : 0x1234) && data.read_word(0x0203) == 0x80ff &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0301 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0200 &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 e4e9 loads T, stores old A, independently advances Y and wraps circular X in one cycle");
+				"ROM4 parallel load T selects old A/B store, independently advances Y and wraps circular X in one cycle");
+			if (!store_b)
+			{
+				program.write_word(0x05e2, 0xe6e9);
+				data.write_word(0x0300, 0xbeef);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_T, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0300);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0203);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6533;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e2, 0xc131); // ST A,*AR3 || ADD *AR5,B.
 			data.write_word(0x0300, 1);
 			m_port_writes = 0;

@@ -890,11 +890,11 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 504 are asserted, one (`e809`) executes
-without an assertion, and 89 are absent. The independent RF-boundary checker
+Against the executable fixture, 508 are asserted, one (`e809`) executes
+without an assertion, and 85 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `e6e9` at first PC `33e6`, `7092` at `a1ba`, and `1e84` at `4794`.
+include `7583` at first PC `4560`, `8192` at `a1b1`, and `6d95` at `a1b0`.
 Exact `0881` now checks SUB through AR1 with both SXM settings, 32-bit
 no-borrow carry, unchanged B/source/pointers and one-cycle arithmetic.
 Exact `e4e9` checks loading T while storing old A, independent Y increment,
@@ -940,6 +940,12 @@ source, single AR2 post-increment and one-cycle arithmetic. Exact `438a`
 checks shifted SUB's read-before-decrement ordering and partial-carry rule.
 Exact `b43e` checks signed rounded MAC into A, preserved B/source, X publication
 in T, and independent stationary-X/circular-Y pointers.
+Exact `e6e9` complements `e4e9` with distinct A/B contents, proving old-B
+store selection while loading T, preserving both accumulators/status and
+independently advancing/wrapping Y/X. Exact `7092`/`7090` extend MVKD to
+post-incrementing AR2/AR0 with unchanged source and two-cycle execution.
+Exact `1e84` checks both SUBC quotient/carry outcomes through AR4, preserved
+B/source/pointer and one-cycle arithmetic.
 The next coverage task is to classify and assert these newly observed paths,
 not extend unobserved variants or fabricate RF samples. The gate deliberately
 retains its older fingerprint until the expanded execution is explained and
@@ -971,7 +977,7 @@ instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
 That inventory matches top-level cases and opcode masks and reports the
 current number of matching words that do and do not execute in the fixture.
-Seventeen matching high-byte groups have no fixture word in the current report;
+Sixteen matching high-byte groups have no fixture word in the current report;
 even covered groups do not establish their remaining words. These are **candidates**,
 not a verified implemented-instruction count: nested validity, extension-word
 grammar, and behavior are not established by a source mask. The report keeps
