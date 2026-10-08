@@ -10,6 +10,25 @@ from tools import run_noki8850_sip_cancel as check
 
 
 class SipCancelTest(unittest.TestCase):
+    def test_outgoing_send_must_follow_physical_input_on_own_carrier(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            (run / 'console.log').write_text('')
+            valid = ('gsm_call_adapter: network registered=1 arfcn=1\n'
+                     '8850_call_physical: action=send\n8850_keypad_decoded key=0e\n')
+            with patch.object(check, 'check_trace', return_value=[]), \
+                    patch.object(check, 'verify_registration'), \
+                    patch('tools.noki8850_outgoing_call_check.verify_frames'):
+                (run / 'error.log').write_text(valid)
+                check.check_outgoing_result(run)
+                for invalid in (valid.replace('arfcn=1', 'arfcn=13'),
+                                valid.replace('key=0e', 'key=0f'),
+                                '8850_keypad_decoded key=0e\n' + valid.replace(
+                                    '8850_keypad_decoded key=0e\n', '')):
+                    (run / 'error.log').write_text(invalid)
+                    with self.assertRaises(ValueError):
+                        check.check_outgoing_result(run)
+
     def test_idle_restore_requires_fresh_epoch_after_load(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

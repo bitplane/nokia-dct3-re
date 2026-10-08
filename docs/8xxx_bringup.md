@@ -1872,6 +1872,17 @@ during an unfinished CP/RP exchange.
 
 #### Incoming Call Acceptance
 
+The same isolated runner accepts `--outgoing-busy` for physical dialing
+of `5551234` against a real local SIP 486 response. A fresh own-PMM run
+reproduced the 18-byte SETUP
+`03450404600200815e0581551532f4150101`, correlated busy decision,
+CC RELEASE/RELEASE COMPLETE and LAPDm release acknowledgement. Every
+firmware SETUP must decode to the physical number; no CONNECT or media
+is accepted. Product checks retain native-loader/HLE ownership, carrier 1,
+decoded physical Send and the existing operator-text frame crops. Those
+crops establish operator presentation, not whole-screen pixel identity.
+This does not promote answered SIP, speech or outgoing-dialog restoration.
+
 `verify-8850-sip-cancel` runs a real local PJSIP INVITE/CANCEL from settled
 own-PMM idle using the same host-enabled configuration, without physical
 Answer. Its private runner pins own MCU/PMM hashes, native-loader/HLE

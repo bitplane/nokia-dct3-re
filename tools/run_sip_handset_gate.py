@@ -16,7 +16,7 @@ except ModuleNotFoundError:
 
 
 def outgoing_setup_pattern(product):
-    if product in ('6210', '6250'):
+    if product in ('6210', '6250', '8850'):
         # Content is checked with the product's physical-number decoder below.
         return r'GSM service uplink sapi=0 pd=03 message=05 length=\d+ data=[0-9a-f]+'
     frame = {
@@ -461,11 +461,12 @@ def main():
         parser.error('--ready-file must not already exist before the handset run')
     signaling_failure = (not args.incoming and (
         (args.product == '6210' and args.sip_response in (480, 486)) or
-        (args.product == '6250' and args.sip_response in (480, 486))))
+        (args.product == '6250' and args.sip_response in (480, 486)) or
+        (args.product == '8850' and args.sip_response == 486)))
     if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and
             (not args.incoming or not args.cancel_incoming)) or
             args.record_media or args.restore_call or args.restore_idle or args.restore_outgoing):
-        parser.error(f'{args.product} requires unanswered incoming CANCEL (6210/6250 permit outgoing 480/486); media is unproved')
+        parser.error(f'{args.product} requires unanswered incoming CANCEL (6210/6250 permit outgoing 480/486; 8850 permits 486); media is unproved')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:
