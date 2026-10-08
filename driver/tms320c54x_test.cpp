@@ -12546,25 +12546,34 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 543 && m_phase <= 547)
+		if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583))
 		{
-			struct shift_case { u16 opcode; u64 a_before; u64 b_before; u64 a_after; u64 b_after; u16 st0_before; u16 st0_after; };
+			struct shift_case { u16 opcode; u64 a_before; u64 b_before; u64 a_after; u64 b_after; u16 st0_before; u16 st0_after; u16 st1 = 0x0100; };
 			static constexpr shift_case cases[] = {
 				{ 0xf1fc, 0x12345678, 0, 0x12345678, 0x01234567, 0, 0x0800 },
 				{ 0xf463, 0x1001, 0, 0x8008, 0, 0x0800, 0 },
 				{ 0xf470, 0xff80000000ULL, 0, 0xffffff8000ULL, 0, 0x0800, 0 },
 				{ 0xf578, 0x123456ff, 0, 0x123456ff, 0x123456, 0, 0x0800 },
-				{ 0xf763, 0, 0x1234, 0, 0x91a0, 0x0800, 0 }
+				{ 0xf763, 0, 0x1234, 0, 0x91a0, 0x0800, 0 },
+				{ 0xf477, 0xff80000100ULL, 0x1234, 0xffffc00000ULL, 0x1234, 0x1000, 0x1800 },
+				{ 0xf477, 0xff80000100ULL, 0x1234, 0x007fc00000ULL, 0x1234, 0x1000, 0x1800, 0 },
+				{ 0xf561, 0x1001, 0x1234, 0x1001, 0x2002, 0x1800, 0x1000 },
+				{ 0xf67d, 0x1234, 0xff80000004ULL, 0xfff0000000ULL, 0xff80000004ULL, 0x1000, 0x1800 },
+				{ 0xf67d, 0x1234, 0xff80000004ULL, 0x1ff0000000ULL, 0xff80000004ULL, 0x1000, 0x1800, 0 },
+				{ 0xf766, 0x1234, 0x1234, 0x1234, 0x48d00, 0x1800, 0x1000 },
+				{ 0xf77a, 0x1234, 0xff80000020ULL, 0x1234, 0xfffe000000ULL, 0x1000, 0x1800 },
+				{ 0xf77a, 0x1234, 0xff80000020ULL, 0x1234, 0x03fe000000ULL, 0x1000, 0x1800, 0 }
 			};
-			const unsigned index = m_phase - 543;
+			const unsigned index = m_phase >= 6576 ? m_phase - 6576 + 5 : m_phase - 543;
 			const shift_case &row = cases[index];
 			expect_opcode(row.opcode,
 					m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
 					m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == row.st0_after &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == row.st1 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 SFTL/SFTA checks source, destination, carry, and one-cycle cost");
-			if (m_phase < 547)
+			if (index + 1 < std::size(cases))
 			{
 				const shift_case &next = cases[index + 1];
 				program.write_word(0x05e2, next.opcode);
@@ -12572,10 +12581,11 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
 				m_cpu->set_state_int(tms320c54x_device::STATE_B, next.b_before);
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, next.st0_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next.st1);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				++m_phase;
+				m_phase = index < 4 ? m_phase + 1 : 6576 + index - 4;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
