@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 596 gates: 404 generated from typed steps, 192 copied verbatim (shell).
+# 597 gates: 405 generated from typed steps, 192 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -62,16 +62,17 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-sip-idle-restore verify-6250-sip-cancel \
 	verify-6250-sip-outgoing-busy verify-6250-sip-outgoing-unavailable \
 	verify-6210-power-cycle verify-8890-power-off-restore \
-	verify-8890-minute-redraw verify-8890-cold-clock verify-8890-power-cycle \
-	verify-8850-sip-idle-restore verify-8850-sip-outgoing-busy \
-	verify-8850-sip-outgoing-unavailable verify-8850-sip-cancel \
-	verify-8890-sip-idle-restore verify-8890-sip-outgoing-busy \
-	verify-8890-sip-outgoing-unavailable verify-8890-sip-cancel \
-	verify-8890-host-rejected-sms verify-8890-host-silent-sms \
-	verify-8890-host-incoming-sms verify-8890-host-outgoing-sms verify-8850-ussd \
-	verify-8850-sim-toolkit verify-8850-call-divert verify-8890-sim-toolkit \
-	verify-8890-sim-toolkit-busy verify-8890-ussd verify-8890-call-divert \
-	verify-5510-package verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
+	verify-8890-minute-redraw verify-8890-calendar-rollover \
+	verify-8890-cold-clock verify-8890-power-cycle verify-8850-sip-idle-restore \
+	verify-8850-sip-outgoing-busy verify-8850-sip-outgoing-unavailable \
+	verify-8850-sip-cancel verify-8890-sip-idle-restore \
+	verify-8890-sip-outgoing-busy verify-8890-sip-outgoing-unavailable \
+	verify-8890-sip-cancel verify-8890-host-rejected-sms \
+	verify-8890-host-silent-sms verify-8890-host-incoming-sms \
+	verify-8890-host-outgoing-sms verify-8850-ussd verify-8850-sim-toolkit \
+	verify-8850-call-divert verify-8890-sim-toolkit verify-8890-sim-toolkit-busy \
+	verify-8890-ussd verify-8890-call-divert verify-5510-package \
+	verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
 	verify-6210-sip-outgoing-unavailable verify-6210-sip-idle-restore \
 	verify-6210-stage verify-6210-runtime verify-6210-outgoing-call \
 	verify-6210-incoming-call verify-6210-incoming-sms \
@@ -532,6 +533,9 @@ verify-8890-power-off-restore: build
 
 verify-8890-minute-redraw: build
 	$(VENV)/bin/python tools/run_noki8890_cold_clock.py $(RUN_DIR) --minute-redraw --mame $(MAME_DIR)/mame
+
+verify-8890-calendar-rollover: build
+	$(VENV)/bin/python tools/run_noki8890_calendar.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-8890-cold-clock: build
 	$(VENV)/bin/python tools/run_noki8890_cold_clock.py $(RUN_DIR) --mame $(MAME_DIR)/mame
