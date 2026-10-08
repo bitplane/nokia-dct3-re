@@ -114,7 +114,14 @@ def main():
         subprocess.run([sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                         str(run / 'error.log'), '--profile', 'nsm2'], check=True)
         if state:
-            before_save = text.split('8850_state: event=saved', 1)[0]
+            before_save, boundary, _ = text.partition('8850_state: event=saved')
+            if not boundary:
+                raise ValueError('restoration prerequisites lack a save boundary')
+            from tools.radio_registration_trace_check import verify as check_saved_registration
+            check_saved_registration(before_save, 'nsm2')
+            if not args.without_pin:
+                validate(before_save, card.read_bytes(), 'verify', '1234')
+                check_pin_inputs(before_save)
             if args.scenario == 'call-state':
                 from tools.radio_outgoing_call_trace_check import CONNECT_ACKNOWLEDGE
                 if not CONNECT_ACKNOWLEDGE.search(before_save):

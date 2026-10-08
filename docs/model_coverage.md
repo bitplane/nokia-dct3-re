@@ -4,6 +4,10 @@ This matrix records demonstrated product coverage, not family resemblance. A
 cell is promoted only by a named reproducible gate or reviewed hardware or
 firmware evidence. `Partial` means that the preceding acceptance level works
 but a material hardware contract remains calibrated, opaque, or unverified.
+Authenticated restoration gates must establish PIN acceptance and laboratory
+registration before the save boundary, independently of post-load events.
+Whole-run hardware/provisioning checks remain separate from that ordering
+requirement.
 
 | Product / tested firmware | Booting | Interactive | Registered | Call control | Internal media | Physical duplex | Hardware-faithful | Principal evidence or next boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

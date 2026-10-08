@@ -137,8 +137,13 @@ def main():
             from tools.noki8890_state_check import verify, check_frames
             call = args.scenario == 'call-state'
             sms = args.scenario == 'sms-state'
-            before_save = text.split('8890_state: event=saved', 1)[0]
+            before_save, boundary, _ = text.partition('8890_state: event=saved')
+            if not boundary:
+                raise ValueError('restoration prerequisites lack a save boundary')
             verify_registration(before_save, configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
+            if not args.without_pin:
+                validate(before_save, card.read_bytes(), 'verify', '1234')
+                check_pin_inputs(before_save, gsm900_measurements=not args.pcs1900)
             if call:
                 from tools.radio_outgoing_call_trace_check import CONNECT_ACKNOWLEDGE
                 if not CONNECT_ACKNOWLEDGE.search(before_save):
