@@ -56,6 +56,8 @@ and reviewed success pixels, with DCS registration checked independently.
 `verify-8210-dcs-outgoing-call` proves physical outgoing call signaling and
 release using exact observed carrier-823 traffic/release words and reviewed
 UI. It does not prove native speech or an external end-to-end call.
+`verify-8210-dcs-call-state` adds active-call save/load with exact
+architecture, transport and pixel replay, then physical End/release.
 
 `verify-8850-sim-pin-registration` independently proves physical SIM PIN and
 phone-code entry, own staged/HLE boundary, reviewed navigation pixels and

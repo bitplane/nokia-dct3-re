@@ -133,7 +133,7 @@ def main():
             not args.pin_enabled or args.scenario != 'registration' or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call') or
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call', 'call-state') or
                         (args.scenario != 'registration' and args.pin_enabled)):
         parser.error('--dcs1800 requires registration or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
@@ -271,6 +271,8 @@ def main():
                                     configured_carrier=True)
             if args.scenario == 'call-state':
                 check.append('--call')
+                if args.dcs1800:
+                    check.append('--dcs1800')
             elif args.scenario == 'sms-state':
                 check.extend(['--sms', '--storage', storage])
         elif args.scenario in ('registration', 'incoming-sms', 'host-incoming-sms'):

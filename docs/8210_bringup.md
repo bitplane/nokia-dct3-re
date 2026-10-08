@@ -749,6 +749,11 @@ release word `041202001117001a600003370000001400000001`; fresh run
 `run_8210_dcs_outgoing_call_01` passes those exact contracts. GSM and DCS
 patterns reject each other's carrier words. No peer behavior changed;
 this is no-PIN laboratory signaling, not native speech or an external call.
+`verify-8210-dcs-call-state` saves inside the connected call and verifies
+exact architectural, protocol and pixel replay before physically ending
+the restored call. `run_8210_dcs_call_state_01` passes the DCS channel
+contract and separate DCS registration/EF_LOCI check. No-PIN signaling
+restoration only; no media/native-speech claim follows from this gate.
 
 **Current frontier:** DCS with physical PIN entry starting at eight seconds
 does not register; entry starting at seven seconds does. The passing
