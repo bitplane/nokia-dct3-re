@@ -783,6 +783,16 @@ producer are the next boundary. GSM additionally invokes the mapper with
 `09fc`/`09fa` through `211048`; those are observations, not assigned protocol
 semantics. Evidence: `run_8210_pin_{dcs,gsm}_mapper_01`; GSM registration
 passes, DCS is rejected by the unchanged strict acceptance checker.
+The paired `run_8210_pin_{dcs,gsm}_upstream_constructor_01` runs identify
+the actual input producers. Constructor `2252cc` receives DCS `09c8` from
+`22923e` and GSM `09cc` from `2280c8`; its common `225366` mailbox send
+targets task 15. These distinct producer branches precede the common mapper.
+The working GSM branch tests context `+60`, byte `+19` and helper `2c2986`
+before constructing `09cc`; the observed DCS branch constructs `09c8`
+after clearing the object referenced by its `229222` pool load. Context
+ownership and the entry conditions of these branches remain unresolved.
+Trace those branch selectors next, without assigning radio/SIM semantics
+from message numbers alone. GSM acceptance passes; DCS still fails.
 
 ## Evidence needed to resume
 

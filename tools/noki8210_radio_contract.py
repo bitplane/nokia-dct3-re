@@ -78,6 +78,16 @@ def verify(image):
     if instructions(0x210fd0, 6) != [
             ('ldr', 'r0, [sp, #4]'), ('bl', '#0x209b90')]:
         raise ValueError('observed upstream readiness caller differs')
+    for address in (0x2280c8, 0x22923e):
+        if instructions(address, 4) != [('bl', '#0x2252cc')]:
+            raise ValueError('observed readiness input constructor caller differs')
+    if [int.from_bytes(read(address, 4), 'big') for address in
+            (0x228440, 0x2295dc)] != [0x9cc, 0x9c8]:
+        raise ValueError('observed readiness input producer literals differ')
+    if instructions(0x225362, 8) != [
+            ('movs', 'r0, #0xe'), ('adds', 'r1, r4, #0'),
+            ('bl', '#0x28845c')]:
+        raise ValueError('readiness input mailbox publication differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

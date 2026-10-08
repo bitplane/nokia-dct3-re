@@ -6,6 +6,14 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_readiness_upstream_constructor = memory:install_read_tap(0x2252cc, 0x2252cf,
+        'nsm3_readiness_upstream_constructor', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2252cc then return end
+            local input = cpu.state['R0'].value
+            if input ~= 0x09c8 and input ~= 0x09cc then return end
+            machine:logerror(string.format('8210_readiness_upstream_constructor: input=%04x caller=%08x t=%.6f\n',
+                input, cpu.state['R14'].value, machine.time:as_double()))
+        end)
     _G.nsm3_readiness_mapper = memory:install_read_tap(0x209b90, 0x209b93,
         'nsm3_readiness_mapper', function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x209b90 then return end
@@ -22,10 +30,16 @@ if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
         end)
     _G.nsm3_readiness_sender = memory:install_read_tap(0x28845c, 0x28845f, 'nsm3_readiness_sender',
         function(offset, value, mask)
-            if cpu.state['PC'].value ~= 0x28845c or cpu.state['R0'].value ~= 12 then return end
+            if cpu.state['PC'].value ~= 0x28845c then return end
             local object = cpu.state['R1'].value
             if object < 0x100000 or object >= 0x17fffc then return end
             local input = memory:read_u16(object)
+            if input == 0x09c8 or input == 0x09cc then
+                machine:logerror(string.format('8210_readiness_upstream_post: input=%04x task=%d object=%08x caller=%08x t=%.6f\n',
+                    input, cpu.state['R0'].value, object,
+                    cpu.state['R14'].value, machine.time:as_double()))
+            end
+            if cpu.state['R0'].value ~= 12 then return end
             if input ~= 0x03ec and input ~= 0x03ed then return end
             machine:logerror(string.format('8210_readiness_sender: input=%04x class=%02x caller=%08x t=%.6f\n',
                 input, memory:read_u8(object + 3), cpu.state['R14'].value, machine.time:as_double()))
