@@ -2554,6 +2554,27 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e5 &&
 					m_last_port_cycle - m_first_port_cycle == 2,
 					"PORTR port reads take two cycles and circularly update AR6");
+			program.write_word(0x05e0, 0x74d4); // PORTR port,*AR4+%.
+			program.write_word(0x05e2, 0xf5e1);
+			data.write_word(0x0a13, 0);
+			data.write_word(0x0a10, 0xbeef);
+			m_port_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0a13);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6524;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6524)
+		{
+			expect_opcode(0x74d4,
+				m_port_reads == 1 && data.read_word(0x0a13) == 0xabcd &&
+				data.read_word(0x0a10) == 0xbeef &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0a10 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR6) == 0x0a01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e3,
+				"ROM4 PORTR consumes its port word and stores through AR4 before circular wrap without selecting AR6");
 			program.write_word(0x05e0, 0xb03a); // MAC *AR5, *AR4+, A, A
 			program.write_word(0x05e1, 0xf5e1);
 			data.write_word(0x0b00, 0xfffe);
@@ -2978,6 +2999,32 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c02 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00,
 					"ROM4 b736 MACR rounds and updates Y pointer");
+			program.write_word(0x05e0, 0xb43e); // MACR *AR5,*AR4+0%,A,A.
+			data.write_word(0x0b00, 0xfffe);
+			data.write_word(0x0c03, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8008);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0b00);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0c03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_BK, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6530;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6530)
+		{
+			expect_opcode(0xb43e,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x10000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0xfffe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0b00 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
+				data.read_word(0x0b00) == 0xfffe && data.read_word(0x0c03) == 4,
+				"ROM4 MACR uses signed X/Y, rounds old A plus product, publishes X in T and circularly wraps Y");
 			program.write_word(0x05e0, 0xd6e1); // ST B,*AR3 || MACR *AR4+0%,A
 			data.write_word(0x0c03, 0xfffe);
 			data.write_word(0x0d00, 0);
@@ -11411,6 +11458,51 @@ private:
 				return;
 			}
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			program.write_word(0x05e2, 0x0092); // ADD *AR2+,A.
+			data.write_word(0x0f22, 0xffff);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f22);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6525;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 6525 && m_phase <= 6528)
+		{
+			unsigned const index = m_phase - 6525;
+			bool const destination_b = index >= 2;
+			bool const signed_memory = !(index & 1);
+			u64 const result = signed_memory ? 0 : 0x10000;
+			expect_opcode(destination_b ? 0x0192 : 0x0092,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (destination_b ? 0x12345678 : result) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (destination_b ? result : 0x12345678) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f23 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0e00) == (signed_memory ? 0x0800 : 0) &&
+				data.read_word(0x0f22) == 0xffff &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 ADD through AR2 postincrements once, respects SXM and sets 32-bit carry for A/B");
+			if (index < 3)
+			{
+				unsigned const next = index + 1;
+				program.write_word(0x05e2, next >= 2 ? 0x0192 : 0x0092);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next >= 2 ? 0x12345678 : 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next >= 2 ? 1 : 0x12345678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f22);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next & 1 ? 0 : 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 			program.write_word(0x05e2, 0x1b84); // OR *AR4,B
 			data.write_word(0x0f24, 0x00f0);
 			m_port_writes = 0;
@@ -12569,6 +12661,27 @@ private:
 				data.read_word(0x0f92) == 2 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ROM4 shifted SUB into B retains cleared carry on no borrow and postincrements AR2 in one cycle");
+			program.write_word(0x05e2, 0x438a); // SUB *AR2-,16,B,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x30000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f92);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6529;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6529)
+		{
+			expect_opcode(0x438a,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x9abc &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f91 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) &&
+				data.read_word(0x0f92) == 2 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 shifted SUB through AR2 reads before decrement and preserves A/T/cleared carry in one cycle");
 			program.write_word(0x05e2, 0x5283); // DADD *AR3,B,A
 			data.write_word(0x0f90, 1);
 			data.write_word(0x0f91, 0xffff);

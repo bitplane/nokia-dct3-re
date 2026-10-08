@@ -890,11 +890,11 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 499 are asserted, one (`e809`) executes
-without an assertion, and 94 are absent. The independent RF-boundary checker
+Against the executable fixture, 504 are asserted, one (`e809`) executes
+without an assertion, and 89 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `74d4` at first PC `32cd`, `0092` at `4e10`, and `0192` at `4e11`.
+include `e6e9` at first PC `33e6`, `7092` at `a1ba`, and `1e84` at `4794`.
 Exact `0881` now checks SUB through AR1 with both SXM settings, 32-bit
 no-borrow carry, unchanged B/source/pointers and one-cycle arithmetic.
 Exact `e4e9` checks loading T while storing old A, independent Y increment,
@@ -933,6 +933,13 @@ pointers, with one-cycle execution. Exact `e723` distinguishes AR2-to-AR3
 from the adjacent AR5 source and checks source preservation and one-cycle
 execution. Exact `7083` checks dmad-to-AR3-indirect movement, preserved source
 and pointers, extension consumption and two-cycle execution.
+Exact `74d4` checks one port read, extension consumption, destination-before-
+circular-wrap ordering and unchanged AR6. Exact `0092`/`0192` check both SXM
+settings, A/B destination routing, the `1 + ffff` carry boundary, preserved
+source, single AR2 post-increment and one-cycle arithmetic. Exact `438a`
+checks shifted SUB's read-before-decrement ordering and partial-carry rule.
+Exact `b43e` checks signed rounded MAC into A, preserved B/source, X publication
+in T, and independent stationary-X/circular-Y pointers.
 The next coverage task is to classify and assert these newly observed paths,
 not extend unobserved variants or fabricate RF samples. The gate deliberately
 retains its older fingerprint until the expanded execution is explained and
