@@ -59,7 +59,8 @@ def main():
     profile = PROFILES['8890']
     try:
         if args.pcs1900 and args.scenario not in ('registration', 'host-incoming-call',
-                'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms'):
+                'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms',
+                'idle-state', 'call-state', 'sms-state'):
             raise ValueError('PCS downstream scenarios require separate acceptance coverage')
         roms = root / 'roms/noki8890'
         verify_inputs('8890', (roms / profile[1]).read_bytes(), (roms / profile[3]).read_bytes())
@@ -77,7 +78,9 @@ def main():
         if state:
             configuration = ET.parse(run / 'cfg/nsb6hle.cfg')
             inputs = configuration.find('./system/input')
-            inputs.find("port[@tag=':CALLHOST']").set('value', '0')
+            host_port = inputs.find("port[@tag=':CALLHOST']")
+            if host_port is not None:
+                host_port.set('value', '0')
             if args.scenario == 'sms-state':
                 ET.SubElement(inputs, 'port', tag=':NETCFG', type='CONFIG',
                               mask='4', defvalue='0', value='4')
@@ -92,6 +95,8 @@ def main():
                   'host-incoming-sms': 'incoming_sms_input', 'host-outgoing-call': 'clock_call_input',
                   'host-outgoing-sms': 'outgoing_sms_input', 'phonebook': 'phonebook_input',
                   'idle-state': 'state_idle', 'call-state': 'state_call', 'sms-state': 'state_sms'}[args.scenario]
+        if args.pcs1900 and args.scenario == 'sms-state':
+            script = 'pcs_state_sms'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsb6hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
@@ -133,7 +138,7 @@ def main():
             call = args.scenario == 'call-state'
             sms = args.scenario == 'sms-state'
             before_save = text.split('8890_state: event=saved', 1)[0]
-            verify_registration(before_save, configured_gsm900=True)
+            verify_registration(before_save, configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
             if call:
                 from tools.radio_outgoing_call_trace_check import CONNECT_ACKNOWLEDGE
                 if not CONNECT_ACKNOWLEDGE.search(before_save):
@@ -141,7 +146,8 @@ def main():
             if sms and ('sim_device: update fid=6f3c record=1 length=176' not in before_save or
                         'LAPDm service Channel Release acknowledged' not in before_save):
                 raise ValueError('SMS was not stored and released before saving')
-            verify(text, call=call, sms=sms, storage=card.read_bytes(), configured_gsm900=True)
+            verify(text, call=call, sms=sms, storage=card.read_bytes(),
+                   configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
             check_frames(run / 'snap', call=call, sms=sms)
         elif args.scenario == 'host-incoming-call':
             from tools.noki8890_incoming_call_check import verify, check_host_frames

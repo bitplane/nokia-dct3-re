@@ -48,7 +48,9 @@ PIN acceptance and configured GSM900 registration through its own
 cold persistent contacts and exact idle/call/SMS restoration.
 `verify-8890-pin-pcs-registration` and four `verify-8890-pin-pcs-host-*` gates
 independently add authenticated PCS acquisition and both host call/SMS
-directions. Authenticated PCS restoration and native speech remain unproved.
+directions. Three `verify-8890-pin-pcs-state-*` gates independently add exact
+authenticated PCS idle/call/SMS restoration and physical continuation.
+Native speech remains unproved.
 
 `verify-8210-slow-pin-registration` independently covers physical SIM PIN and
 phone-code entry, own task-12 background-measurement completion and persistent

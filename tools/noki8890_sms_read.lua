@@ -1,7 +1,8 @@
 -- Resume the product's physical SMS reading schedule on the saved timeline.
 local machine = manager.machine
 local input = coroutine.create(function()
-    local start = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 25 or 21
+    local start = _G.noki8890_sms_read_start or
+        (os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 25 or 21)
     local delay = start - machine.time:as_double()
     if delay > 0 and not emu.wait(delay) then return end
     for _, item in ipairs({{1, 'Menu'}, {0, 'End'}, {1, 'Names / C'}}) do

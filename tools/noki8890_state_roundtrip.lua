@@ -72,7 +72,8 @@ local post_load = emu.add_machine_post_load_notifier(function()
 end)
 local runner = coroutine.create(function()
     local pin_delay = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 4 or 0
-    assert(emu.wait((sms and 19 or call and 52 or 42) + pin_delay))
+    local save_time = sms and _G.noki8890_sms_state_save_time or nil
+    assert(emu.wait(save_time or ((sms and 19 or call and 52 or 42) + pin_delay)))
     machine:save('8890_idle')
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

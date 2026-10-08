@@ -1154,8 +1154,18 @@ clock/date and Answer/End or dialing, and reviewed returned-idle pixels.
 SMS requires host correlation and exact CP/RP closure; incoming `hello`
 must additionally persist and render through physical Read. The private
 PCS config retains its carrier/band settings and adds only CALLHOST.
-No extra peer behavior is selected. Authenticated PCS restoration remains
-separate; signaling does not establish native speech.
+No extra peer behavior is selected; signaling does not establish native speech.
+
+Three `verify-8890-pin-pcs-state-*` gates independently add authenticated
+idle/call/SMS restoration with exact architecture, ordered protocol replay,
+whole-screen equality and post-load physical continuation. Idle/call save
+at 46/56 seconds. PCS SMS delivery releases at 24.627 seconds, so its
+dedicated physical fixture saves at 25 and begins reading at 27; the
+23-second GSM900 fixture would save before delivery completes and is rejected
+by the prerequisite check. No firmware or peer timing changes are made.
+The no-PIN PCS baseline likewise releases at 19.190 seconds; the dedicated
+fixture saves at 20 and begins reading at 22 rather than calling an in-flight
+19-second save a delivered-message state.
 
 Current result: fresh own PMM reaches PCS1900 registration on ARFCN 600,
 writes EF_LOCI, acknowledges release and returns to paging. This uses the

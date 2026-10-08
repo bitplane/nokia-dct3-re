@@ -44,6 +44,9 @@ def verify(text, call=False, sms=False, storage=None, pcs1900=False, sip_cancel=
         return
     if call:
         verify_call(text, pcs1900=pcs1900, configured_gsm900=configured_gsm900)
+        if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
+                         r'8890_call_physical: action=end', text):
+            raise ValueError('missing post-load physical call release')
         return
     if not re.search(r'state_replay: phase=restored event=end[^\n]*\n[\s\S]*'
                      r'8890_state_physical: key=Menu[\s\S]*8890_keypad_decoded: key=19\b', text):
