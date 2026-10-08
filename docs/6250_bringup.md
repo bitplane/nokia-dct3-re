@@ -264,6 +264,16 @@ evidence that a delayed radio reply should be fabricated. The current
 radio peer has no explicit type-57/type-4a request handler; absence of a
 handler alone does not establish that either packet requires a reply.
 
+The last mutation helper `38ecc2` has one aligned direct BL caller,
+`3cb8be`, inside transition function `3cb7c8`. A passive 45-second slow-PIN
+run sees that function only at 7.407658, 7.407904, 7.706699 and 8.007231 s
+with arguments `(1,0)`, `(2,0)`, `(3,0)` and `(0,1)`, all from continuation
+`2d1b5d`; none follows the late `03ec`. That caller supplies its arguments
+from incoming message bytes `+7/+8`, calls `50c496` with byte `+7` first,
+and stores the transition result in context byte 6. The next boundary is
+the identity and producer of this incoming message family, and the
+transition decision in `4bb414`, not another search for flag-byte stores.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
