@@ -104,6 +104,14 @@ class SipFailureCheckTest(unittest.TestCase):
         self.assertTrue(self.check(product='3410')['scope'].startswith('3410 HLE'))
         self.assertTrue(self.check(product='5210')['scope'].startswith('5210 HLE'))
 
+    def test_unhandled_setup_is_rejected_even_without_host_request(self):
+        # A valid first dialog must not hide another firmware-side attempt.
+        extra = LOG.splitlines()[1].replace('551532f4', '214365f7')
+        for product in ('3210', '3410', '5210'):
+            with self.subTest(product=product), self.assertRaisesRegex(
+                    RuntimeError, 'SETUP differs from physically dialed number'):
+                self.check(product=product, log=LOG + extra + '\n')
+
     def test_6210_failure_requires_own_physical_number_and_setup(self):
         log = LOG.replace('digits=5551234', 'digits=1234567').replace('551532f4', '214365f7')
         self.assertTrue(self.check(product='6210', log=log)['scope'].startswith('6210 HLE'))

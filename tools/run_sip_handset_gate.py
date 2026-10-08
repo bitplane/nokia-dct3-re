@@ -244,16 +244,15 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
         raise RuntimeError('failed SIP call falsely connected')
     number = {'6210': '1234567', '6250': '123'}.get(product, '5551234')
     requests = re.findall(rf'gsm_call_adapter: request id=(\d+) epoch=1 digits={number}\b', log)
-    if product in ('6210', '6250'):
-        try:
-            from tools.radio_outgoing_call_trace_check import SETUP, decode_called_digits
-        except ModuleNotFoundError:
-            from radio_outgoing_call_trace_check import SETUP, decode_called_digits
-        setups = list(SETUP.finditer(log))
-        if len(setups) != calls or any(
-                len(bytes.fromhex(match['data'])) != int(match['length']) or
-                decode_called_digits(bytes.fromhex(match['data'])) != number for match in setups):
-            raise RuntimeError(f'{product} SETUP differs from physically dialed number')
+    try:
+        from tools.radio_outgoing_call_trace_check import SETUP, decode_called_digits
+    except ModuleNotFoundError:
+        from radio_outgoing_call_trace_check import SETUP, decode_called_digits
+    setups = list(SETUP.finditer(log))
+    if len(setups) != calls or any(
+            len(bytes.fromhex(match['data'])) != int(match['length']) or
+            decode_called_digits(bytes.fromhex(match['data'])) != number for match in setups):
+        raise RuntimeError(f'{product} SETUP differs from physically dialed number')
     if requests != [str(number) for number in range(1, calls + 1)]:
         raise RuntimeError('SIP failure left an unexpected or unhandled handset attempt')
     summaries = re.findall(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
