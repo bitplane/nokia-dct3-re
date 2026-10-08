@@ -15931,6 +15931,44 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0x6683); // MAC *AR3,#fffe,B,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 9402;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 9402 || m_phase == 9403)
+		{
+			const bool same_destination = m_phase == 9403;
+			expect_opcode(same_destination ? 0x6783 : 0x6683,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) ==
+					(same_destination ? 0xfffffffffeULL : 10) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0200 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (same_destination ? 0x0040 : 0) &&
+				data.read_word(0x0200) == 3 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"immediate MAC selects B addend independently of A/B destination, applies FRCT and preserves source/pointer/carry in two cycles");
+			if (!same_destination)
+			{
+				program.write_word(0x05e2, 0x6783); // MAC *AR3,#fffe,B,B.
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0040);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 9403;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e2, 0xf166); // MPY #fffe,B.
 			program.write_word(0x05e3, 0xfffe);
 			m_port_writes = 0;

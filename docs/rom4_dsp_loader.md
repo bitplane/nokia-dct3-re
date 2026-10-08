@@ -1185,6 +1185,12 @@ example and `MAC *AR5+,#1234h,A` example. Immediate multiply word `6383`
 FRCT clear/set, T publication, unchanged A/source/AR3/carry and the two-cycle
 DARAM cost. This destination variant is fixture-only, not newly observed
 ROM4 boot execution.
+The B-source immediate-MAC words `6683` and `6783` independently select A
+and B destinations: with source B=10 and memory/immediate product -6, the
+nonfractional cross-destination case yields A=4 while retaining B=10; the
+fractional same-destination case yields B=-2 while retaining A=4. Both
+assert T/source-memory/AR3/carry preservation and two-cycle DARAM cost.
+These are fixture-only destination checks, not RF or speech acceptance.
 The immediate-MAC fixtures also assert absolute extension
 order, preincrement timing, T publication, and DARAM cycle cost. A long-offset
 fixture verifies immediate-before-offset fetch and the extra cycle; a separate
