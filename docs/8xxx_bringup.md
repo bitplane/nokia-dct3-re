@@ -806,6 +806,14 @@ and answer fixtures start four seconds later for PIN runs only. The call
 checker retains separate default and PCS1900 grammars; no band or speech
 coverage is inherited from this GSM900 signaling gate.
 
+`verify-8890-pin-host-incoming-sms` separately composes physical PIN entry
+and configured GSM900 registration with host-originated `hello` delivery.
+Acceptance requires the correlated host lifecycle, one IMSI page, complete
+CP/RP release, exact persistent read-status record, physical Read decoding
+and reviewed message-body pixels. The reader starts at 25 seconds for PIN
+fixtures, retaining its original 21-second schedule otherwise. The no-PIN
+composition passes the same checks. This does not establish native DSP media.
+
 The own RX dispatcher at `30168e` selects type `80` at `301750`, calling
 `2dae9c`. Its thirteen-entry `83..8f` table at `3016bc` maps `8b` to
 `301710 -> 2db270`, which posts to task 12 through `28190c`.

@@ -635,6 +635,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "host-incoming-call", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8890-pin-host-incoming-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_pin_registration.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-incoming-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8210-registration",
       "prerequisites": [
             "build"
