@@ -30,6 +30,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'ussd': ('npe3hle', 'ussd_input', 40),
              'divert': ('npe3hle', 'divert_input', 35),
+             'divert-lifecycle': ('npe3hle', 'divert_lifecycle_input', 80),
              'state-idle': ('npe3hle', 'state_idle', 24),
              'state-call': ('npe3hle', 'state_call', 48),
              'state-sms': ('npe3hle', 'state_sms', 30),
@@ -313,6 +314,26 @@ def main():
                             'proactive DCT3 SAT')
             with Image.open(run / 'snap/6210_toolkit_after_dismiss.png') as frame:
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after Toolkit clearance')
+        elif args.scenario == 'divert-lifecycle':
+            from tools.radio_call_divert_lifecycle_trace_check import EVENTS
+            from tools.radio_call_lifecycle_common import require_ordered
+            require_ordered(text, tuple((f'divert lifecycle {index}', pattern)
+                                       for index, pattern in enumerate(EVENTS, 1)), '6210 divert lifecycle')
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            from PIL import Image
+            # Own reviewed presentation: activation, query acknowledgement,
+            # inactive service summary, then inactive interrogation result.
+            expected_frames = (
+                'e9e4c057d769f66a48893d561b8edc1de9213a44c3756f047db4bf3d14653295',
+                '466a5a0241eb09e162c00227e8737eaddc5717251ec2663bf9a97b3c8c8c58d9',
+                '45ca2e2d94aa2af50a1f008baef60fffecbb49ba304c3ff8e68818a91b88bf3e',
+                DIVERT_RESULT_SHA256,
+            )
+            for index, expected in enumerate(expected_frames, 1):
+                with Image.open(run / f'snap/6210_divert_lifecycle_{index}.png') as frame:
+                    check_frame(frame, expected, f'divert lifecycle result {index}')
+            with Image.open(run / 'snap/6210_divert_lifecycle_idle.png') as frame:
+                check_frame(frame, OPERATOR_SHA256, 'registered idle after divert lifecycle')
         elif args.scenario in ('ussd', 'divert'):
             if args.scenario == 'ussd':
                 check_ussd(text, run / 'snap')

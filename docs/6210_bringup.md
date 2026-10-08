@@ -35,6 +35,14 @@ drives physical `*#21#` and Send: an exact InterrogateSS request for service
 and returns to registered idle after Back. These checks do not establish
 divert registration, activation, deactivation or persistence.
 
+The separate runner scenario `divert-lifecycle` extends coverage within one
+coherent session: physical `*21*5551234#`, `*#21#`, `#21#`, `*#21#` produce
+register/active-query/deactivate/inactive-query responses in order. Reviewed
+frames show `Divert activated`, `Done`, the inactive service summary and
+`Service not active`, followed by registered idle. The active query's frame
+does not establish displayed forwarding-number content. Save/load and
+cold-process forwarding persistence are not covered by this scenario.
+
 ## Inputs
 
 `roms/noki6210/6210_556c.fls` is 0x3a0000 bytes with SHA-1

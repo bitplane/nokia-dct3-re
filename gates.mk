@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 583 gates: 391 generated from typed steps, 192 copied verbatim (shell).
+# 584 gates: 392 generated from typed steps, 192 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -79,7 +79,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-host-silent-sms-realtime verify-6210-outgoing-sms \
 	verify-6210-accessory verify-6210-cold-repeat verify-6210-state-idle \
 	verify-6210-state-call verify-6210-state-sms verify-6210-ussd \
-	verify-6210-call-divert verify-6210-sim-toolkit verify-6210-security \
+	verify-6210-call-divert verify-6210-call-divert-lifecycle \
+	verify-6210-sim-toolkit verify-6210-security \
 	verify-6210-slow-pin-registration verify-6210-pin-host-incoming-call \
 	verify-6210-pin-host-incoming-sms verify-6210-pin-host-outgoing-call \
 	verify-6210-pin-host-outgoing-sms verify-6210-pin-phonebook \
@@ -675,6 +676,9 @@ verify-6210-ussd: build
 
 verify-6210-call-divert: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario divert --mame $(MAME_DIR)/mame
+
+verify-6210-call-divert-lifecycle: build
+	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario divert-lifecycle --mame $(MAME_DIR)/mame
 
 # shell: own NPE-3 Phase-2+ SIM, proactive DISPLAY TEXT and physical clearance
 verify-6210-sim-toolkit: build
