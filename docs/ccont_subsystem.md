@@ -361,6 +361,21 @@ physical Menu after registered-idle recovery. Its retained-location
 registration rewrites LAI but not status; no NSB-6 protocol ordering or
 security-editor requirement is imported.
 
+NSM-3 `verify-8210-power-cycle` independently covers physical rail-off,
+eight seconds of retained RTC ticks, coherent carrier-4 re-registration,
+both own-upload/HLE/self-test sequences and repeated physical security entry
+back to idle. Its explicit base-record PMM comparison is not factory
+provisioning. Like NPE-3 it rewrites retained LAI but not valid location status;
+the CCONT calendar day differs from the NPE-3/NSB-6 fixtures.
+
+`tools/power_domain_contract.py` owns the common rejection of known
+DSPIF publication/notification, native port, staged publication, radio LAPDm
+and HLE speech activity within rail-off windows. It is used by all three
+product checkers and both NSB-6 restore timelines. Product checkers retain
+physical ordering, minimum observation duration, RTC/calendar expectations,
+independent boot/registration evidence and post-wake input. Absence of these
+known events is not proof of every internal peripheral clock being gated.
+
 CCONT watchdog expiry uses the same digital-baseband reset domain. It resets
 the CPU, MAD2 peripherals, GENSIO, MBUS, DSPIF/peer, SIMI/card protocol state
 and LCD controller while retaining CCONT, flash and EEPROM. MAD2 watchdog

@@ -9,6 +9,7 @@ from PIL import Image
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.run_noki8210_acceptance import check_host_registration
+from tools.power_domain_contract import require_endpoint_silence
 
 
 IDLE_CROP_SHA256 = '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'
@@ -35,10 +36,7 @@ def verify(text, storage):
     if len(ticks) < 8 or any(int(second) != float(when) for second, when in ticks) or any(
             float(right[1]) - float(left[1]) != 1 for left, right in zip(ticks, ticks[1:])):
         raise ValueError('NSM-3 RTC did not keep ticking while off')
-    if re.search(r'dspif_transport: (?:RX enqueue|FIQ0 notify|peer RAM W)|'
-                 r'rom4_(?:timing_port|port_write):|staged_dsp: publication|'
-                 r'radio_peer: LAPDm|dsp_hle: speech', interval):
-        raise ValueError('NSM-3 DSP/radio generated activity while off')
+    require_endpoint_silence(interval, 'NSM-3 DSP/radio generated activity while off')
     before, after = text[:off.start()], text[wake.end():]
     cause = re.search(r'ccont_power: event=cause_read data=(\w+)', after)
     if not cause or int(cause[1], 16) & 7 != 3:

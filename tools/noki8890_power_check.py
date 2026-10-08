@@ -11,6 +11,7 @@ if __package__ in (None, ''):
 from tools.noki8890_staged_check import verify as verify_stage
 from tools.noki8890_registration_check import verify as verify_registration
 from tools.run_noki8890_host_sms import check_output
+from tools.power_domain_contract import require_endpoint_silence
 
 FRAMES = {
     '8890_power_idle.png': ((0, 8, 84, 48), '46520fc623a6b562b2aee5f1c59e6943d4a5c1798eff4064091c38e7b3a285de'),
@@ -43,10 +44,9 @@ def verify_off_restore(text):
         raise ValueError('off-state RTC replay differs or is absent')
     # Validate both branches before removing the abandoned timeline for the
     # ordinary power checker, which requires monotonically advancing RTC ticks.
-    forbidden = r'dspif_transport: (?:RX enqueue|FIQ0 notify|peer RAM W)|' \
-                r'rom4_(?:timing_port|port_write):|staged_dsp: publication|' \
-                r'radio_peer: LAPDm|dsp_hle: speech|ccont_power: event=wake'
-    if re.search(forbidden, reference + restored):
+    require_endpoint_silence(reference + restored,
+                             'off-state replay resumed powered endpoint activity')
+    if re.search(r'ccont_power: event=wake', reference + restored):
         raise ValueError('off-state replay resumed powered endpoint activity')
     return text[:states[0].start()] + text[states[1].start():]
 
@@ -78,10 +78,7 @@ def verify(text, storage, *, restore_off=False):
     if len(ticks) < 6 or any(int(second) != float(when) for second, when in ticks) or any(
             float(right[1]) - float(left[1]) != 1 for left, right in zip(ticks, ticks[1:])):
         raise ValueError('always-powered RTC did not continue across the sustained off interval')
-    if re.search(r'dspif_transport: (?:RX enqueue|FIQ0 notify|peer RAM W)|'
-                 r'rom4_(?:timing_port|port_write):|staged_dsp: publication|'
-                 r'radio_peer: LAPDm|dsp_hle: speech', interval):
-        raise ValueError('DSP/radio endpoint generated activity while its rail was off')
+    require_endpoint_silence(interval, 'DSP/radio endpoint generated activity while its rail was off')
     after = text[wake.end():]
     cause = re.search(r'ccont_power: event=cause_read data=(\w+)', after)
     if not cause or int(cause[1], 16) & 7 != 3:

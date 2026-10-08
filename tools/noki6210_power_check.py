@@ -2,6 +2,7 @@
 import re
 from PIL import Image
 from tools.noki6210_staged_check import verify as verify_stage
+from tools.power_domain_contract import require_endpoint_silence
 from tools.run_noki6210_acceptance import check_registration, check_frame, OPERATOR_SHA256, check_output
 
 FRAMES = {
@@ -34,10 +35,7 @@ def verify(text, storage):
     if len(ticks) < 8 or any(int(second) != float(when) for second, when in ticks) or any(
             float(right[1]) - float(left[1]) != 1 for left, right in zip(ticks, ticks[1:])):
         raise ValueError('NPE-3 always-powered RTC did not keep ticking while off')
-    if re.search(r'dspif_transport: (?:RX enqueue|FIQ0 notify|peer RAM W)|'
-                 r'rom4_(?:timing_port|port_write):|staged_dsp: publication|'
-                 r'radio_peer: LAPDm|dsp_hle: speech', interval):
-        raise ValueError('NPE-3 DSP/radio endpoint generated activity while off')
+    require_endpoint_silence(interval, 'NPE-3 DSP/radio endpoint generated activity while off')
     before, after = text[:off.start()], text[wake.end():]
     cause = re.search(r'ccont_power: event=cause_read data=(\w+)', after)
     if not cause or int(cause[1], 16) & 7 != 3:
