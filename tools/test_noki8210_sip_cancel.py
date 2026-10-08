@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import json
 import re
 import tempfile
@@ -6,6 +7,37 @@ import unittest
 from unittest.mock import patch
 from PIL import Image
 from tools import run_noki8210_sip_cancel as check
+
+
+class OutgoingBusyTest(unittest.TestCase):
+    def test_own_carrier_send_and_reviewed_presentation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            (run / 'snap').mkdir()
+            (run / 'nvram/nsm3hle').mkdir(parents=True)
+            (run / 'nvram/nsm3hle/sim_card').write_bytes(b'')
+            (run / 'console.log').write_text('')
+            image = Image.new('L', (84, 48), 255)
+            digest = hashlib.sha256(image.tobytes()).hexdigest()
+            frames = dict.fromkeys(('8210_dialed_number.png', '8210_after_outgoing_call.png'),
+                                   ((0, 0, 84, 48), digest))
+            for name in frames:
+                image.save(run / 'snap' / name)
+            valid = ('gsm_call_adapter: network registered=1 arfcn=4\n'
+                     '8210_call_physical: action=send\n8210_keypad_decoded: key=0e\n')
+            with patch.object(check, 'verify_stage'), patch.object(check, 'verify_registration'), \
+                    patch('tools.noki8210_outgoing_call_check.FRAMES', frames):
+                (run / 'error.log').write_text(valid)
+                check.check_outgoing_result(run)
+                for invalid in (valid.replace('arfcn=4', 'arfcn=1'),
+                                valid.replace('key=0e', 'key=0f')):
+                    (run / 'error.log').write_text(invalid)
+                    with self.assertRaises(ValueError):
+                        check.check_outgoing_result(run)
+                (run / 'error.log').write_text(valid)
+                Image.new('L', (84, 48), 0).save(run / 'snap/8210_after_outgoing_call.png')
+                with self.assertRaisesRegex(ValueError, 'presentation differs'):
+                    check.check_outgoing_result(run)
 
 
 def sample():

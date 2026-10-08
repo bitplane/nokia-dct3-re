@@ -508,8 +508,17 @@ Answer/End and dial/Send/End, exact configured-cell traffic/release,
 coherent ARFCN4 registration, request/decision correlation and reviewed UI.
 They use the same labelled base-record comparison and require own native
 uploads before explicit HLE handoff. Answered host signaling is not an
-answered SIP/media acceptance: the 8210 SIP runner remains restricted to
-unanswered CANCEL and no native speech is claimed.
+answered SIP/media acceptance: the 8210 SIP runner permits unanswered
+CANCEL and the outgoing busy fixture below; no native speech is claimed.
+
+`verify-8210-sip-outgoing-busy` physically dials `1234567` on configured
+carrier 4 against actual SIP 486. It requires the decoded SETUP number,
+correlated busy decision, full CC/RR clearing, no CONNECT/media, own
+loader/HLE/self-test checks and persisted SIM registration. Reviewed crops
+check dialed digits and the post-release operator label, not whole-screen
+idle identity. Provisioning remains the declared acquired base-record
+comparison with later low-journal records omitted; factory provisioning
+and the ordinary product profile are not promoted.
 
 `verify-8850-sip-cancel` independently covers NSM-2 v5.31 research HLE
 with unchanged acquired MCU/PMM. Own physical security input settles the
