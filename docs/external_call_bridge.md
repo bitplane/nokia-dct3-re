@@ -468,6 +468,16 @@ removed; normal answered/media restrictions remain. Recover the own
 MCU command compiler and call/release speech field before configuring
 this contract; do not import the 6250 predicate or synthesize uplink.
 
+Own-ROM static recovery (`noki6210_dsp_control_contract.recover`) locates
+the 55-selector compiler at `426eb4`, table `426f08`. Selector `11`
+(`4271d4`) sets/removes bit `0200` using keep-mask `fdff` in parameter
+shadow `16ffe6`; selector `08` (`42722e`) encodes the low 12 bits under
+wire prefix `8000`. The checker pins instructions, pointers and the own
+image hash. This is an encoding contract, not proof that selector 11 is
+the call speech-enable operation. Next trace its callers and shadow writes
+across physical call setup/release, including why the observed call only
+publishes command-9 words while HLE speech control remains zero.
+
 `verify-6210-sip-outgoing-unavailable` independently passes against actual
 PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
 registered-idle recovery with the same physical number and own-PMM checks.

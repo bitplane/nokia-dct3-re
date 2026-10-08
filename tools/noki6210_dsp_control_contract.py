@@ -1,0 +1,53 @@
+"""Recover NPE-3 parameter encoding; bit 0x0200 is not yet speech-validated."""
+import hashlib
+from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
+
+
+def recover(image):
+    if hashlib.sha1(image).hexdigest() != '3d9ea319503e78ec69b60d72cda23e461e118ea9':
+        raise ValueError('requires acquired NPE-3 v5.56 PPM C')
+
+    def read(address, size):
+        offset = address - 0x200000
+        if offset < 0 or offset + size > len(image):
+            raise ValueError('control contract address outside image')
+        return image[offset:offset + size]
+
+    def u32(address):
+        return int.from_bytes(read(address, 4), 'big')
+
+    expected = {
+        0x426efa: ('cmp', 'r0, #0x36'),
+        0x426efe: ('adr', 'r2, #8'),
+        0x4271d4: ('lsls', 'r2, r4, #9'),
+        0x4271d6: ('rsbs', 'r2, r2, #0'),
+        0x4271da: ('lsrs', 'r2, r2, #0x1f'),
+        0x4271dc: ('lsls', 'r2, r2, #9'),
+        0x4271e2: ('ldr', 'r2, [pc, #0x368]'),
+        0x42719e: ('ldrh', 'r5, [r3, #2]'),
+        0x42719c: ('ldr', 'r3, [pc, #0x70]'),
+        0x4271a0: ('ands', 'r2, r5'),
+        0x42718a: ('strh', 'r4, [r3, #2]'),
+        0x42722e: ('ldr', 'r2, [pc, #0x344]'),
+        0x427230: ('lsls', 'r3, r4, #0x14'),
+        0x427232: ('lsrs', 'r3, r3, #0x14'),
+        0x427234: ('orrs', 'r2, r3'),
+        0x42723a: ('ldr', 'r2, [pc, #0x33c]'),
+    }
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
+    for address, value in expected.items():
+        instruction = next(decoder.disasm(read(address, 4), address), None)
+        if instruction is None or (instruction.mnemonic, instruction.op_str) != value:
+            raise ValueError(f'control instruction differs at {address:x}')
+    table = [u32(0x426f08 + 4 * index) for index in range(55)]
+    if table[0x11] != 0x4271d4 or table[8] != 0x42722e:
+        raise ValueError('control selector routing differs')
+    if u32(0x42754c) != 0xfdff or u32(0x427574) != 0xffff8000:
+        raise ValueError('field keep-mask or command encoding differs')
+    if u32(0x427210) != 0x16ffe4 or u32(0x427578) != 0x16ffe6:
+        raise ValueError('parameter-shadow ownership differs')
+    return {'compiler': 0x426eb4, 'selector_count': 55,
+            'field_selector': 0x11, 'field_mask': 0x0200,
+            'keep_mask': 0xfdff, 'parameter_selector': 8,
+            'parameter_shadow': 0x16ffe6,
+            'speech_semantics_validated': False}
