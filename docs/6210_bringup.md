@@ -401,7 +401,16 @@ make verify-6210-host-incoming-sms RUN_DIR=run_6210_host_sms_incoming
 make verify-6210-host-outgoing-sms RUN_DIR=run_6210_host_sms_outgoing
 make verify-6210-host-rejected-sms RUN_DIR=run_6210_host_sms_rejected
 make verify-6210-host-silent-sms RUN_DIR=run_6210_host_sms_silent
+make verify-6210-host-silent-sms-realtime RUN_DIR=run_6210_host_sms_silent_realtime
 ```
+
+The real-time silent-SMS gate uses `--throttle`, retaining the same own-PMM,
+protocol, failure-pixel and physical End/Menu recovery checks as the fast
+fixture. Its accepted host decision at 34.09 seconds completes at 101.11
+seconds, within the host runner's explicit 180-second total wall-clock
+completion budget. This budget is not an emulated firmware timer; unrelated
+notifications do not extend it. The generic runner accepts a finite positive
+`--completion-timeout` override for slower host environments.
 
 The isolated runner's `host-incoming-sms` scenario enables only `CALLHOST`,
 waits for current-epoch adapter readiness and laboratory registration, and

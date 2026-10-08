@@ -178,6 +178,8 @@ def main():
     parser.add_argument('--scenario', choices=SCENARIOS, default='menu')
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--port', type=int, default=16210)
+    parser.add_argument('--throttle', action='store_true',
+                        help='run at real-time speed to verify host wait budgets')
     parser.add_argument('--coherent-cell', action='store_true',
                         help='configure the laboratory network on ARFCNs 35/36')
     parser.add_argument('--pin-enabled', action='store_true',
@@ -226,7 +228,8 @@ def main():
                    '-cfg_directory', 'cfg', '-noreadconfig', '-debug', '-debugger', 'none',
                    '-autoboot_script', str(root / f'tools/noki6210_{script}.lua'),
                    '-autoboot_delay', '0', '-seconds_to_run', str(seconds),
-                   '-video', 'none', '-sound', 'none', '-nothrottle', '-log', '-verbose']
+                   '-video', 'none', '-sound', 'none',
+                   '-throttle' if args.throttle else '-nothrottle', '-log', '-verbose']
         host_command = None
         if host:
             command.extend(['-http', '-http_port', str(args.port)])

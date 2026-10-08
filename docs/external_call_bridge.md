@@ -91,6 +91,13 @@ cannot obtain its paging entrance within sixty seconds of emulation time is
 cancelled and reports `expired`; active firmware-owned transactions are not
 timed out by the host adapter.
 
+The outgoing SMS acceptance runner uses a single 180-second wall-clock
+budget after submitting its host decision (`--completion-timeout` is a finite
+positive override). It waits for the current epoch/request's `ended` state;
+unrelated events cannot restart the budget. This accommodates the independently
+verified throttled NPE-3 RP-silence lifecycle, whose firmware completion arrives
+about 67 seconds after the host decision, without changing emulated timers.
+
 `network_state` is published on connection, save-state restoration,
 registration changes and serving-cell changes. A host should wait for
 `registered: true` before submitting incoming calls or SMS. Its registered
