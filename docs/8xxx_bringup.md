@@ -1168,6 +1168,18 @@ Controller-domain retention is
 separately checked by `tools/run_ccont_rtc_retention.py`; this does not prove
 complete battery-backed calendar continuity.
 
+The physical midnight probe `tools/noki8890_midnight_input.lua` enters
+23:59 and 07/10/2026 on a fresh own-PMM `nsb6hle` boot. Run it for 110
+emulated seconds with private, empty cfg/NVRAM directories and verbose logging.
+`run_8890_midnight_corrected` observes 23:59:59/day 0 at 85 seconds,
+00:00:00/day 1 with minute IRQ pending at 86 seconds, four firmware reads
+of day register `0a`, and a firmware write clearing that counter at
+86.001084385 seconds. The 100-second registered-idle frame displays 00:00.
+This establishes midnight service/redraw and consumption of the elapsed-day
+counter, not the resulting Gregorian date or offline elapsed-time behavior.
+The next boundary is reading the handset's calendar after this consumption;
+do not replace the CCONT day register with a host Gregorian calendar.
+
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
 hooks. Physical time confirmation near 25 seconds and date confirmation near
