@@ -3798,6 +3798,12 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
 	runtime.radio = RADIO_NSM3;
+	// Own parameter publisher 2c6cf4 adds field 0200 from table 337db0;
+	// command 8 changes 840a -> 860b -> 840a on physical Send/End.
+	// This selects the HLE request only, not an unevidenced analogue route.
+	runtime.dsp_speech_control = {
+		0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0200, 0x0200 }
+	};
 	// Own task-12 8b completion 21ef4c -> 2a2250 -> 28755e
 	// consumes forty ARFCN/RSSI records; runtime delivery is gated separately.
 	runtime.radio.background_band_measurements = true;

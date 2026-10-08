@@ -56,6 +56,17 @@ corroborating call-correlated bit `0200`, not delivered audio.
 `noki8210_speech_control_check.py ROM LOG` pins the own
 ROM, selector instructions/literals and ordered physical/control events.
 
+The command-8 mask/value `0200` is now selected only in the explicit
+`nsm3hle` composition. Fresh rebuilt `run_8210_speech_request_regression`
+passes the physical outgoing lifecycle and own control checker; HLE retains
+`060b` during the call and `040a` at release. Its PCM-derived cadence executes
+400 uplink frames and zero downlink frames before stopping. Analog input/
+output selectors remain disconnected: those uplink frames are not evidence
+of captured microphone audio, and this laboratory signaling fixture is not
+an answered SIP/media gate. Recover the product's active audio endpoints
+before promoting bidirectional speech acceptance. The normal machine and
+native-DSP limitations are unchanged.
+
 ## Physical power lifecycle
 
 `make verify-8210-power-cycle RUN_DIR=NEW_DIRECTORY` starts with private fresh
