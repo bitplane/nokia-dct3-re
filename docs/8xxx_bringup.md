@@ -1847,6 +1847,30 @@ and command publisher corresponding to the observed `860b`/`840a` pair,
 then verify ordered physical Send/End and bidirectional PCM/media. No native
 DSP speech, audible call or 8890 PCM contract is established by this finding.
 
+The acquired `8850v531.fls` (SHA1
+`9f966787403b68a09530680ad911302403eb1521`) now has a ROM-pinned static
+check:
+
+```sh
+.venv/bin/python tools/noki8850_speech_control_check.py roms/noki8850/8850v531.fls
+```
+
+Compiler `2cb0b8` bounds selectors to `0..34` and dispatches through the
+BE32 table at `2cb0ec`. Selector 17 targets `2cb334`, preserves the other
+bits with `fdff` and updates field `0200` in shadow `135666` (base
+`135664`, offset 2). Selector 8 targets `2cb37c`, constructs the `8000`
+command prefix and stores the command shadow at `135668`; the common
+publisher writes DSPIF `100a8` at `2cb3ca`. These are independently decoded
+NSM-2 addresses, not relocated NSM-3 guesses. The checker validates the ROM
+digest, instruction forms, selector targets and pool literals.
+
+Static decoding alone does not establish the live speech-enable lifecycle.
+Existing outgoing logs contain physical Send/End markers but lack the newer
+`dsp_control_write` tap. Capture a fresh own-product call with that passive
+tap and correlate both `860b` and `840a` at `2cb3ca` before selecting the
+HLE speech predicate. PCM and analogue routing remain disabled until that
+runtime prerequisite is verified.
+
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot
 directories, verbose logging and 60 seconds. The physical `5551234` call is
