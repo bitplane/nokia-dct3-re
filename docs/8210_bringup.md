@@ -1250,6 +1250,14 @@ This is not an independent boot entrance. The scan does not cover computed
 arguments, tail branches, direct stores or indirect calls, and therefore does
 not prove state 21 unreachable. Resolve those entrance classes before claiming
 complete state ownership.
+The complete aligned direct-BL candidate scan also finds only `21fc4a`
+calling the alternate handler `21f2ec`, from receive state 21 itself;
+there are no four-byte-aligned ARM/Thumb literal pointer candidates to that
+handler. Its `03eb/03ec/03ea` comparisons and unmatched-input state-21
+assignment are machine-checked. Thus this route has no independently
+identified direct entrance from state 13. Computed calls, aliases and
+tail entrances remain outside this negative result; it is not a total
+producer-absence proof or justification for forcing state 21.
 All 19 direct setter candidates have an immediate literal predecessor;
 the argument sequence in address order is
 `7,5,26,4,6,2,23,24,25,11,13,15,17,12,9,10,21,28,20`, now checked

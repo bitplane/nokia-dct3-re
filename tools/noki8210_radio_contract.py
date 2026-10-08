@@ -222,6 +222,7 @@ def verify(image):
     parser_calls = []
     selector_calls = []
     wrapper_calls = []
+    alternate_readiness_calls = []
     state_calls = []
     for offset in range(0, len(image) - 4, 2):
         if image[offset] & 0xf8 != 0xf0:
@@ -233,6 +234,8 @@ def verify(image):
             selector_calls.append(0x200000 + offset)
         if candidate == [('bl', '#0x21f900')]:
             wrapper_calls.append(0x200000 + offset)
+        if candidate == [('bl', '#0x21f2ec')]:
+            alternate_readiness_calls.append(0x200000 + offset)
         if candidate == [('bl', '#0x21bdc4')]:
             predecessor = instructions(0x200000 + offset - 2, 2)
             state_calls.append((0x200000 + offset, predecessor))
@@ -243,6 +246,11 @@ def verify(image):
         raise ValueError('direct selector candidate callsites differ')
     if wrapper_calls != [0x21ef50]:
         raise ValueError('direct selector-wrapper candidate callsites differ')
+    if alternate_readiness_calls != [0x21fc4a]:
+        raise ValueError('alternate readiness direct entrance candidates differ')
+    if any(int.from_bytes(image[offset:offset + 4], 'big') in
+           (0x21f2ec, 0x21f2ed) for offset in range(0, len(image) - 3, 4)):
+        raise ValueError('alternate readiness literal pointer candidate present')
     expected_states = [7, 5, 26, 4, 6, 2, 23, 24, 25, 11, 13, 15,
                        17, 12, 9, 10, 21, 28, 20]
     if len(state_calls) != len(expected_states):
@@ -275,6 +283,15 @@ def verify(image):
             ('ldr', 'r0, [pc, #0x3a4]'), ('cmp', 'r1, r0'),
             ('beq', '#0x21fc4e'), ('bl', '#0x21f2ec')]:
         raise ValueError('state-21 alternate readiness entrance differs')
+    if instructions(0x21f2f6, 30) != [
+            ('ldr', 'r0, [pc, #0x230]'), ('cmp', 'r1, r0'),
+            ('beq', '#0x21f314'), ('movs', 'r0, #0xfb'),
+            ('lsls', 'r0, r0, #2'), ('cmp', 'r1, r0'),
+            ('beq', '#0x21f314'), ('ldr', 'r0, [pc, #0x23c]'),
+            ('cmp', 'r1, r0'), ('beq', '#0x21f314'),
+            ('movs', 'r0, #0x15'), ('bl', '#0x21bdc4'),
+            ('movs', 'r3, r2'), ('ldrb', 'r0, [r5, #5]')]:
+        raise ValueError('alternate readiness unmatched-input state transition differs')
     for pool, expected in ((0x21f434, 0x03e9), (0x21f528, 0x03eb),
                            (0x21f544, 0x03ea)):
         if int.from_bytes(read(pool, 4), 'big') != expected:
