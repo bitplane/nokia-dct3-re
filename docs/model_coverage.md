@@ -278,7 +278,12 @@ transport silence while CPU power is off, separate PWRONX restart,
 both own native-upload/HLE handoffs and decoded security input back to idle.
 Its second registration carries retained LAI and closes without redundant
 EF_LOCI writes, checked against a distinct strict grammar. Firmware itself
-resets seconds after wake. This does not prove cold-process RTC persistence,
+resets seconds after wake. The separate cold-clock acceptance uses physical
+13:47 entry and a new process preserving own NVRAM: the original firmware
+restores its clock record, validates the retained CCONT domain and reaches
+reviewed 13:47 idle after security entry without time/date input. See
+`tools/noki8890_cold_clock_check.py` and the reproduction in `8xxx_bringup.md`.
+Neither test proves offline calendar advance, battery-removal behavior,
 physical wake timing, all-block rail clock-gating or native speech.
 `verify-8890-power-off-restore` additionally proves exact CPU/RAM/time
 restoration while off, identical RTC replay and blank frames, sustained

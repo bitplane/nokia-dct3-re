@@ -90,7 +90,7 @@ not prove that physical GENSIO or CCONT has zero latency.
 | `0x5` | watchdog and power control | Proven role; reload command semantics inferred from firmware. |
 | `0x6` | unidentified control | Compatibility storage. Every supported ROM writes the same `0x54,0x56` sequence, but no device-side effect is established. |
 | `0x7..0xa` | RTC second/minute/hour/day read surface | The reader at `0x2b068c` weights these fields by 1, 60, 3,600 and 86,400 respectively. Firmware polls the seconds field and separately writes zero to the day/epoch field during its software-date lifecycle. |
-| `0xb..0xc` | RTC alarm minute/hour | Partial one-shot comparison; hour bit 7 is a self-clearing disable/update strobe. An ordinary hour write arms the comparator. |
+| `0xb..0xc` | Shared RTC clock-load/alarm minute/hour latches | Hour bit 7 loads the running clock and self-clears after settling. An ordinary hour write arms the one-shot comparator. |
 | `0xd` | unidentified control | Compatibility storage; organically read as zero during boot. Effects are not recovered. |
 | `0xe` | interrupt/reset status | Cold power-key reset exposes ready bit 0 and PWRONX cause bit 1 (`0x03`); bit 0 persists while bit 1 and upper interrupt sources are write-one-to-clear. |
 | `0xf` | interrupt mask | Strongly inferred from firmware ISR behavior. |
@@ -104,28 +104,34 @@ removal. Both edges use the same firmware debounce path.
 The ROM IRQ dispatcher at `0x2b08c6` independently handles status bit 4 as the
 second source, bit 5 as the minute source, and bit 7 as the alarm source. The
 device initializes fresh storage to fixed `day 1, 12:00:00`, rather than host
-wall-clock time. Its four raw counter bytes (`0x07..0x0a`) are persisted through
-the device NVRAM interface and survive digital reset. A new process resumes
-the counters without adding offline host time. Alarm/control/IRQ state is not
-persisted; save states retain the full live device state separately. Firmware helpers at
+wall-clock time. Registers `0x07..0x0d`, the upper interrupt mask and the alarm
+armed latch are persisted through the device NVRAM interface and survive digital
+reset. A new process resumes without adding offline host time. Pending interrupts,
+watchdog and rail state are not persisted; save states retain full live state separately.
+Legacy four-byte counter files remain readable. Firmware helpers at
 `0x2b068c..0x2b080c` multiply the returned fields directly by 60 and 3600 and
 bound the seconds field at `0x3a`; this establishes binary rather than BCD
 encoding. The recovered alarm helper programs the minute/hour pair without a
-separate enable register. Alarm-hour bit 7 requests disable/update and clears
-after the latch settles; a normal hour write arms the one-shot comparison.
+separate enable register. Alarm-hour bit 7 transfers the minute/hour latches to
+the running clock, resets seconds and clears after the calibrated 1 ms latch delay;
+a normal hour write arms the one-shot comparison. The own-ROM 8890 helper at
+`0x2fd21c` uses this strobe to set user time. Physical 13:47 entry followed by a
+new emulator process retains 13:47 and reaches idle after security entry without
+time/date input. This proves powered RTC-domain continuity, not offline calendar
+advance or battery-removal behavior.
 Register `0xd` remains a clock-gate latch with unknown side effects.
 
 `tools/run_ccont_rtc_retention.py RUN_DIR` runs the existing mapped-register
 RTC/IRQ fixture, then a new isolated process with a private copy of its NVRAM.
 It requires retained minute/day values, the firmware-owned seconds reset,
-three ordered ticks and cleared alarm registers. This is MMIO conformance,
+three ordered ticks and retained alarm latches. This is MMIO conformance,
 not proof of battery-removal behavior or cold handset clock provisioning.
 The day/epoch byte may legitimately be zero after a firmware write; the
 storage format preserves register bytes rather than validating a calendar.
 
 The seconds register exposes bit 7 as the RTC-running status. Firmware checks
 that bit before accepting the physical clock, masks it from the numeric seconds,
-and uses bit 7 of the alarm-hour register as a polled disable/update strobe.
+and uses bit 7 of the alarm-hour register as a polled clock-load strobe.
 These two status semantics are required for task 1 to program an organic user
 alarm.
 

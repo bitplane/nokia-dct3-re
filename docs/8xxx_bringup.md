@@ -1042,21 +1042,23 @@ registration and the band-specific SMS lifecycle are required before replay
 and storage acceptance. No redelivery or SIM-record rewrite is used to recover
 the message.
 
-A separate process preserving that run's phone/SIM NVRAM still presents
-the security editor. Physical `12345` then reaches the empty time editor,
-not the previously settled idle frame. Reproduce with
+Cold clock retention requires both the running CCONT clock and its retained
+alarm/control/mask snapshot. With that domain preserved, a separate process
+using the handset's own phone/SIM NVRAM presents the security editor; physical
+`12345` reaches ordinary idle with the previously entered **13:47**, without
+time/date input. Reproduce with
 `tools/noki8890_clock_read.lua`, preserved NVRAM, fresh private cfg and
 32 seconds; it enters only the security code and captures at 12/21/30 seconds.
-CCONT now persists its raw second/minute/hour/day counters separately from
-handset storage, without advancing offline host time. The empty editor still
-appears with those counters retained; cold clock provisioning is therefore
-not explained by RTC counter reset alone. Physical `13:47` entry paints that
-time while the CCONT counters remain `12:00` and firmware resets only the
-day/epoch byte. The user clock includes firmware-owned software state/offset;
-its persistence/validity contract remains unresolved. Reproduce the distinct
+CCONT persists registers `07..0d`, upper IRQ mask and alarm-armed state
+separately from handset storage, without advancing offline host time. The
+own-ROM clock setter `0x2fd21c` writes minutes and hour-with-bit-7 through the
+shared alarm latches; the strobe loads the running clock and self-clears.
+Reproduce the distinct
 entry with `tools/noki8890_clock_retention_input.lua`, then the security-only
 cold fixture above, using private cfg directories and the same own storage.
-No software clock or validity flag is injected. Counter-domain retention is
+No software clock or validity flag is injected. Check the cold trace and full
+13:47 frame with `tools/noki8890_cold_clock_check.py SEED_CCONT COLD_RUN`.
+Controller-domain retention is
 separately checked by `tools/run_ccont_rtc_retention.py`; this does not prove
 complete battery-backed calendar continuity.
 
@@ -1076,9 +1078,7 @@ At startup, NV getter `0x2c641c` receives offset `047c`, destination
 `0x137420` and length 12 through wrapper `0x304cd0`. It copies three words
 from the cache through `0x3062cc` and returns **1**, with validity flags
 zero, at `0x2c6456`. The record is therefore restored successfully, not
-skipped or rejected at this boundary. The unresolved question is the
-application's interpretation of the restored block and selection of the
-cold time editor. The writer association does not yet establish each
+skipped or rejected at this boundary. The writer association does not establish each
 field's clock semantics. The NSE-5 single-sector journal parser is not an
 established NSB-6 contract; no clock field, checksum or validity flag
 should be changed from these observations alone.
@@ -1092,14 +1092,13 @@ physical registers, not identical logical descriptor indices. Disabled
 deadline `7fffffff` expects hardware alarm scalar `0x1a5e0` (hour 30,
 minute zero). The physical clock-entry run actually programs alarm `00/1e`
 and IRQ mask `50`; its saved register-`0x0d` snapshot is `0b`.
-On cold boot the restored snapshot is `0b/05/aa`, but these controller
-fields reset. The initializer consequently stores state `34` at `0x137414`
-and enters `0x2e0124` reinitialization. Time getter `0x2dfc28` requires
-state `2a`; state `34` takes its invalid-time result. Thus counter-only
-CCONT persistence is insufficient for the firmware's retained-clock
-validation contract. The next correction belongs to the controller's
-retained alarm/control/mask domain, with fresh defaults and legacy counter
-storage migration tested separately; no application-state override is needed.
+The restored snapshot is `0b/05/aa`. Matching retained controller fields let
+the original initializer select state `2a` at `0x137414`; time getter
+`0x2dfc28` requires that state. Mismatched fields select state `34` and
+`0x2e0124` reinitialization. Counter-only persistence is therefore insufficient:
+the firmware validates the complete retained clock domain. No application-state
+override is needed. Offline calendar advance and battery-removal behavior remain
+outside this cold-process acceptance.
 
 `verify-8890-power-cycle` covers the distinct in-process physical lifecycle.
 Its fresh private runner pins own MCU/PMM and the configured ARFCN60 cell,
