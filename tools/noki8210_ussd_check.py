@@ -1,12 +1,12 @@
 """Own NSM-3 physical USSD and supplementary-service protocol acceptance."""
 import argparse
-import hashlib
 from pathlib import Path
 import sys
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.radio_ussd_trace_check import RESPONSE, RR_RELEASE, verify as verify_protocol
+from tools import radio_ussd_trace_check as protocol
+from tools.noki8210_supplementary_check import verify_transaction
 
 
 def verify_key_table(image):
@@ -18,27 +18,11 @@ def verify_key_table(image):
 
 
 def verify(text, frames):
-    if '[LUA ERROR]' in text:
-        raise ValueError('physical USSD fixture failed')
-    cursor = 0
-    for key in ('Keypad *', 'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad #', 'Call / Send'):
-        event = '8210_ussd_physical: key=' + key
-        index = text.find(event, cursor)
-        if index < 0:
-            raise ValueError('missing ordered physical input: ' + key)
-        cursor = index + len(event)
-    verify_protocol(text[cursor:], frames, require_frame=False)
-    response = RESPONSE.search(text, cursor)
-    release = RR_RELEASE.search(text, response.end())
-    if '8210_ussd_physical: key=Back' not in text[release.end():]:
-        raise ValueError('missing physical Back after USSD response')
-    from PIL import Image
-    for name, expected in (
-            ('8210_ussd_result.png', 'eac7017b7ae7da13b4b33e5e47aac57495c8ca92554f812b52efb6443119efb1'),
-            ('8210_ussd_after_back.png', 'd6d4b05af24a06c42a97e31c3134f7e497e149f4420f87f3d243613f06926300')):
-        with Image.open(frames / name) as frame:
-            if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != expected:
-                raise ValueError('missing reviewed firmware frame: ' + name)
+    verify_transaction(text, frames, 'ussd',
+                       ('Keypad *', 'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad #', 'Call / Send'),
+                       protocol,
+                       'eac7017b7ae7da13b4b33e5e47aac57495c8ca92554f812b52efb6443119efb1',
+                       'd6d4b05af24a06c42a97e31c3134f7e497e149f4420f87f3d243613f06926300')
 
 
 def main():

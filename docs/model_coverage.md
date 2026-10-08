@@ -102,6 +102,9 @@ The 8210 research-HLE profile additionally passes `verify-8210-ussd`: physical
 reviewed result presentation and physical Back to registered idle. Its own
 decoder table requires product-local Star/Hash labels; this does not promote
 native DSP or the normal machine.
+`verify-8210-call-divert` separately proves physical service-`21`
+interrogation, the inactive result, RR release and Back-to-idle; forwarding
+activation and delivery are not covered by that gate.
 
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not
   NSE-8 type `0x1a`; each enabled radio profile uses its independently recovered

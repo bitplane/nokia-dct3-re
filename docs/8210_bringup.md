@@ -361,6 +361,15 @@ shared controller and other products' mappings remain unchanged. This is
 physical firmware input and laboratory supplementary-service coverage,
 not native DSP or factory-PMM promotion.
 
+`make verify-8210-call-divert` independently enters physical `*#21#`/Send,
+requires the exact service-`21` InterrogateSS and inactive network result,
+RR release, the transient `Service not active` screen and physical Back
+to registered idle with persistent EF_LOCI. Its early result capture is
+intentional: the firmware automatically dismisses this result before the
+later USSD capture time. Both fixtures share input mechanics and boundary
+checks, not message payloads or frame oracles. This verifies interrogation
+of an inactive service, not activation, forwarding or delivery of a call.
+
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
 idle, compares a one-second reference interval with the restored interval,

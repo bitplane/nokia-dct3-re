@@ -239,6 +239,15 @@
       ]
 },
 {
+      "name": "verify-8210-call-divert",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "isolated own NSM-3 PMM comparison and physical call-divert interrogation",
+      "recipe": [
+        "\t$(PYTHON) tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario divert --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-8210-ussd",
       "prerequisites": ["build"],
       "variables": {},
