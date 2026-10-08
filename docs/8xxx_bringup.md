@@ -541,6 +541,29 @@ silent command-32 boundary; successful process exit is not phone boot:
 
 ### 8890 Support And Native Boundary
 
+#### Own Audio Evidence
+
+The acquired Nokia NSB-6 UI Description, Issue 1 06/2000, is retained at
+`roms/research/nsb6/04uif.pdf` (SHA256
+`57dc97dbbd63709b8c4c41086cdac77b7a5ac210b36989018045f51c10df02ec`).
+Source: [Nokia 8890 UI service manual](https://www.eserviceinfo.com/downloadsm/228092/NOKIA_04uif.html).
+Printed page 7 identifies internal MIC2, headset MIC1 and differential EAR
+for the internal earpiece; page 5 independently lists COBBA EARP/EARN.
+These establish product-owned endpoint topology, not codec gains or an
+enabled media path.
+
+The indexed NSB-6 System Module, Issue 1 06/2000, printed page 25,
+[Audio Control](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html?page=25),
+lists 512 kHz PCMDClk and 8 kHz PCMSClk. The independent NSB-6 troubleshooting
+[test-point table, printed page 9](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/8890/DISTRBLE%20%5B42%5D.pdf)
+also labels J254 as 512 kHz and J255 as 8 kHz. These are indexed primary-document
+leads, not acquired/visually reviewed timing evidence: direct retrieval failed.
+Before enabling PCM, acquire the system timing diagram and establish word
+shape, sync polarity/width, sample edge and clock ownership. Do not inherit
+the 8850's 1 MHz/125-clock framing; the reported NSB-6 ratio would be 64 clocks.
+Own-ROM speech-control decoding and physical Send/End correlation remain
+separate prerequisites. Native DSP speech is not established.
+
 The acquired v12.20 PPM C and product-local PMM have verified research-HLE
 acceptance for the following workflows. Normal `noki8890` is deliberately
 conservative; select `nsb6hle` explicitly. No donor PMM, firmware-state
@@ -1843,7 +1866,7 @@ levels are not runtime codec gains or a decoded COBBA control-register map.
 
 These documents close the missing bus-shape and physical-endpoint evidence
 for 8850 only. The own-ROM field writer and physical Send/End correspondence
-are verified below; bidirectional PCM/media remains to be enabled and tested. No native
+are verified below, including bidirectional PCM/media. No native
 DSP speech, audible call or 8890 PCM contract is established by this finding.
 
 The acquired `8850v531.fls` (SHA1
