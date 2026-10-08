@@ -170,6 +170,17 @@ including the PIN run's successful VERIFY and late selector input 3.
 Recover the refresh predicates in `38e60a` and their backing state before
 interpreting either flag as a named SIM or network condition.
 
+Classifier `38e50c` derives the flag index from bits 16..19 of a record's
+word `+0c` and a separate predicate. Paired passive observations identify
+the same record `0011c770`, unchanged packed word `00450000`, in both
+boots: at their first selection near 8 s both return class 4 with predicate
+zero; at the 10.365 s no-PIN refresh the predicate is one and class is 1,
+whereas at 10.364 s the PIN refresh still has predicate zero and class 4.
+These are record counts, not direct SIM-status flags. The underlying
+predicate comes from `38e4ee`/`4af4e0`, with an additional path through
+`4af676` capable of selecting one. Recover that record predicate and its
+post-VERIFY update before changing any transport behavior.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
