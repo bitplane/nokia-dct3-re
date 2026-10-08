@@ -7412,12 +7412,37 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 285)
+		if (m_phase == 285 || m_phase == 9226)
 		{
-			expect_opcode(0x7194, data.read_word(0x0f22) == 0xabcd &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0f22 &&
+			const bool stationary = m_phase == 9226;
+			expect_opcode(stationary ? 0x7184 : 0x7194, data.read_word(0x0f22) == 0xabcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == (stationary ? 0x0f21 : 0x0f22) &&
+					(!stationary || (data.read_word(0x0f21) == 0xabcd && data.read_word(0x0f20) == 0xbeef && data.read_word(0x0f23) == 0xcafe &&
+						m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+						m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210 &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+						m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+						m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7)) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-					"ROM4 MVDK copies *AR4+ to dmad in two cycles");
+					"ROM4 MVDK copies stationary/incrementing AR4 to dmad in two cycles");
+			if (!stationary)
+			{
+				program.write_word(0x05e2, 0x7184);
+				data.write_word(0x0f20, 0xbeef);
+				data.write_word(0x0f22, 0);
+				data.write_word(0x0f23, 0xcafe);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f21);
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x76543210);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 9226;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e0, 0x75f8);
 			program.write_word(0x05e1, 0x0d00);
 			program.write_word(0x05e2, 0x0124);
