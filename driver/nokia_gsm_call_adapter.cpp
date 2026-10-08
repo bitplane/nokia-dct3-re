@@ -825,16 +825,19 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 		const bool direction_matches = item.incoming ?
 				item.request_id == m_incoming_request_id :
 				item.request_id == m_session->outgoing_request_id();
+		const bool session_connected = item.incoming ? incoming_connected : connected;
 		const bool accepted = direction_matches &&
 				m_voice_peer->submit_host_downlink(
 						item.request_id, item.sequence, item.frame);
 		LOGMASKED(LOG_CALL_ADAPTER,
 				"gsm_call_adapter: media direction=downlink id=%u sequence=%u "
-				"result=%s source_time_us=%llu t=%.6f\n",
+				"result=%s source_time_us=%llu t=%.6f reason=%s\n",
 				item.request_id, item.sequence,
 				accepted ? "accepted" : "rejected",
 				item.source_time_us,
-				machine().time().as_double());
+				machine().time().as_double(),
+				accepted ? "accepted" : !direction_matches ? "wrong_request" :
+				!session_connected ? "session_closed" : "media_validation");
 	}
 	for (const auto &termination : terminations)
 	{

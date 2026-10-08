@@ -102,6 +102,23 @@ ordering before promoting an answered gate. The common checker accepts
 PJSIP's status-200 reason strings `OK` and `Normal call clearing` while
 retaining exact numeric status and all media checks.
 
+The release boundary is now localized: `poll_host()` samples the session's
+connection state, calls `end_host_media()` when disconnected, processes queued
+downlink packets, and only then publishes `ended`. In the captured probe,
+sequence 353's rejection and the `ended` publication share timestamp
+37.040 s. The bridge can still have a packet in flight before receiving that
+notification. This is not evidence that active-call media was rejected, nor
+justification to accept media into a closed session. A lifecycle acceptance
+test needs an explicit closure boundary and must continue rejecting stale
+identities, malformed frames, and active-call sequence failures; a blanket
+allowance for rejected packets would conceal those defects. The existing
+strict gate remains unchanged pending that boundary test.
+The adapter's downlink trace now appends `reason=accepted`, `wrong_request`,
+`session_closed`, or `media_validation` without changing admission behavior.
+This makes a fresh probe distinguish session closure from request mismatch
+and active-session sequence/queue failure; the old capture predates these
+reason fields and must not be retroactively classified as a passing run.
+
 ## Physical power lifecycle
 
 `make verify-8210-power-cycle RUN_DIR=NEW_DIRECTORY` starts with private fresh
