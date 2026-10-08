@@ -4,6 +4,9 @@ local directory = assert(source:match('^(.*[/])'))
 local scenario = assert(_G.noki6210_state_scenario)
 local inputs = {idle='staged_observe', call='outgoing_call_input', sms='incoming_sms_input'}
 dofile(directory .. 'noki6210_' .. assert(inputs[scenario]) .. '.lua')
+if scenario == 'idle' and os.getenv('NOKIA_DCT3_6210_PIN_ENTRY') == '1' then
+    dofile(directory .. 'noki6210_security_input.lua')
+end
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local memory = cpu.spaces['program']

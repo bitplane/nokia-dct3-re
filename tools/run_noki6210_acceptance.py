@@ -185,7 +185,8 @@ def main():
     args = parser.parse_args()
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
                              ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call',
-                              'host-outgoing-sms', 'phonebook')):
+                              'host-outgoing-sms', 'phonebook', 'state-call',
+                              'state-idle', 'state-sms')):
         parser.error('--pin-enabled requires --coherent-cell and a supported service fixture')
     root = Path(__file__).resolve().parents[1]
     try:
@@ -394,7 +395,7 @@ def main():
             check_state(text, args.scenario.removeprefix('state-'))
             if args.scenario == 'state-call':
                 from tools.noki6210_outgoing_call_check import verify as check_call
-                check_call(text)
+                check_call(text, coherent_pin=args.pin_enabled)
             elif args.scenario == 'state-sms':
                 from tools.radio_incoming_sms_trace_check import SMS_NVRAM_OFFSET, STORED_RECORD_PREFIX
                 storage = (run / 'nvram/npe3hle/sim_card').read_bytes()

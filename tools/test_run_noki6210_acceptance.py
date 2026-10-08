@@ -35,13 +35,15 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
-    def test_pin_phonebook_is_admitted_with_coherent_network(self):
-        with patch('sys.argv', ['runner', 'unused', '--scenario', 'phonebook',
-                                '--pin-enabled', '--coherent-cell']), \
-                patch.object(runner.Path, 'read_bytes', return_value=b''), \
-                patch.object(runner, 'assess', side_effect=RuntimeError('admitted')), \
-                self.assertRaisesRegex(RuntimeError, 'admitted'):
-            runner.main()
+    def test_pin_phonebook_and_states_are_admitted_with_coherent_network(self):
+        for scenario in ('phonebook', 'state-idle', 'state-call', 'state-sms'):
+            with self.subTest(scenario=scenario), \
+                    patch('sys.argv', ['runner', 'unused', '--scenario', scenario,
+                                      '--pin-enabled', '--coherent-cell']), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'assess', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
 
     def test_pin_service_requires_coherent_network_and_supported_fixture(self):
         for arguments in (['--scenario', 'host-incoming-sms', '--pin-enabled'],

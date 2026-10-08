@@ -48,6 +48,9 @@ completion after PIN-enabled registration; speech remains unproved.
 `verify-6210-pin-phonebook` proves physical save, independent-process PIN
 reauthentication, retained-location registration and exact contact readback
 without changing the saved card bytes.
+The three `verify-6210-pin-state-*` gates separately cover authenticated
+idle/call/SMS architecture and protocol restoration, physical call release
+and SMS reading after load; they do not establish native DSP restoration.
 
 The 6250's PIN-enabled gates independently cover delayed registration,
 incoming/outgoing host call signaling and SMS, and phonebook save followed by

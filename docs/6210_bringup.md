@@ -289,6 +289,13 @@ registration, one successful VERIFY per process, enabled CHV1/PIN/retry state
 and byte-identical card storage across readback. No session authorization is
 transferred between processes.
 
+The `verify-6210-pin-state-idle`, `-call` and `-sms` gates save the
+authenticated runtime, then require exact CPU/RAM/emulated-time restoration
+and a matched protocol replay window. The call fixture physically releases
+the restored call; the SMS fixture physically reads the restored delivery and
+checks the exact message image and persistent read-status record. Each run
+retains enabled CHV1, PIN `1234` and a single successful startup VERIFY.
+
 All service runners start with new working directories; incoming network
 events are selected through MAME configuration, not firmware injection.
 No donor PMM, forced phone state or borrowed DSP verdict is used. The staged
