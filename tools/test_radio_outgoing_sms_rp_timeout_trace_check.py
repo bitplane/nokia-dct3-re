@@ -1,5 +1,5 @@
 import unittest
-from tools.radio_outgoing_sms_rp_timeout_trace_check import verify
+from tools.radio_outgoing_sms_rp_timeout_trace_check import verify, verify_state
 
 
 LOG = '''
@@ -40,3 +40,32 @@ class RpTimeoutTest(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as directory, self.assertRaises(ValueError):
             verify(LOG, directory)
+
+    def state_log(self):
+        prefix, clearing = LOG.split('TX pending type=1b', 1)
+        prefix = prefix.replace('message=04 length=2\n', 'message=04 length=2 t=34.71\n')
+        clearing = 'TX pending type=1b' + clearing
+        clearing = clearing.replace('RX enqueue', 'dspif_transport: RX enqueue')
+        clearing = clearing.replace('TX packet type=02', 'dsp_hle: TX packet type=02')
+        return (prefix + 'state_replay: phase=reference event=begin t=40.0\n' + clearing +
+                'state_replay: phase=reference event=end t=105.0\n'
+                'state_replay: phase=restored event=begin t=40.01\n'
+                'state_roundtrip: result=pass timer_delta=0001 requested_at=40.0 t=40.01\n' +
+                clearing + 'state_replay: phase=restored event=end t=105.01\n')
+
+    def test_state_replays_timeout_clearing(self):
+        verify_state(self.state_log())
+
+    def test_state_requires_pending_wait_and_clearing_in_replay(self):
+        for bad in (self.state_log().replace('requested_at=40.0', 'requested_at=30.0'),
+                    self.state_log().replace('restored event=end t=105.01', 'restored event=end t=100.0'),
+                    self.state_log().replace('result=pass', 'result=fail')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                verify_state(bad)
+
+    def test_state_rejects_changed_release_payload(self):
+        text = self.state_log()
+        offset = text.index('phase=restored event=begin')
+        text = text[:offset] + text[offset:].replace('000f00000000', '000e00000000')
+        with self.assertRaises(ValueError):
+            verify_state(text)

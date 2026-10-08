@@ -83,9 +83,15 @@ The originated-SMS contract covers accepted and rejected submits, CP silence
 with the firmware's bounded retry, service-centre editing, requested delivery
 reports, and save-state continuation during the CP wait. Firmware-owned
 `EF_SMS`/`EF_SMSP` writes are observed rather than synthesized by the network.
-RP silence after CP acknowledgement is separately accepted by the gate above;
-it does not inherit the CP-wait save-state result or establish host-service
-reconnect behavior.
+RP silence after CP acknowledgement is separately accepted by the gate above.
+`verify-radio-outgoing-sms-rp-timeout-state` saves at 40 seconds, after CP-ACK
+but before timeout clearing. Its 65-second reference/restored interval spans
+the main-link DISC, UA and channel deconfiguration, comparing protocol records
+and payload bytes with the shared replay checker. The restored timeline must
+still satisfy the timeout and resumed-paging contract; the sampled hardware
+round-trip and failure-frame gates remain separate checks. This does not claim
+an exact full CPU/RAM image comparison or establish host-service reconnect
+behavior.
 
 Nokia 3210 v5.01 independently reaches the same MM service-type-4, mobile
 SAPI-3, CP/RP and RR-release lifecycle from physical composition. Its editor
