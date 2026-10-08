@@ -12929,7 +12929,7 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583) || (m_phase >= 9232 && m_phase <= 9246))
+		if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583) || (m_phase >= 9232 && m_phase <= 9246) || m_phase == 9250 || m_phase == 9251)
 		{
 			struct shift_case { u16 opcode; u64 a_before; u64 b_before; u64 a_after; u64 b_after; u16 st0_before; u16 st0_after; u16 st1 = 0x0100; };
 			static constexpr shift_case cases[] = {
@@ -12960,9 +12960,11 @@ private:
 				{ 0xf77c, 0x1234, 0xff80000008ULL, 0x1234, 0xfff8000000ULL, 0x1000, 0x1800 },
 				{ 0xf77c, 0x1234, 0xff80000008ULL, 0x1234, 0x0ff8000000ULL, 0x1000, 0x1800, 0 },
 				{ 0xf77e, 0x1234, 0xff80000002ULL, 0x1234, 0xffe0000000ULL, 0x1000, 0x1800 },
-				{ 0xf77e, 0x1234, 0xff80000002ULL, 0x1234, 0x3fe0000000ULL, 0x1000, 0x1800, 0 }
+				{ 0xf77e, 0x1234, 0xff80000002ULL, 0x1234, 0x3fe0000000ULL, 0x1000, 0x1800, 0 },
+				{ 0xf3e6, 0x1234, 0xff84000001ULL, 0x1234, 0x40, 0x1000, 0x1800 },
+				{ 0xf640, 0x1234, 0xff80000000ULL, 0xff80000000ULL, 0xff80000000ULL, 0x1800, 0x1800 }
 			};
-			const unsigned index = m_phase >= 9232 ? m_phase - 9232 + 13 : m_phase >= 6576 ? m_phase - 6576 + 5 : m_phase - 543;
+			const unsigned index = m_phase >= 9250 ? m_phase - 9250 + 28 : m_phase >= 9232 ? m_phase - 9232 + 13 : m_phase >= 6576 ? m_phase - 6576 + 5 : m_phase - 543;
 			const shift_case &row = cases[index];
 			expect_opcode(row.opcode,
 					m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
@@ -12983,7 +12985,7 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				m_phase = index >= 12 ? 9232 + index - 12 : index < 4 ? m_phase + 1 : 6576 + index - 4;
+				m_phase = index >= 27 ? 9250 + index - 27 : index >= 12 ? 9232 + index - 12 : index < 4 ? m_phase + 1 : 6576 + index - 4;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
