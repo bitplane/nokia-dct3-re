@@ -17,7 +17,8 @@ def census(image: bytes) -> dict[tuple[str, int], list[int]]:
         family = opcode & 0xff00
         if family not in (0x7400, 0x7500):
             continue
-        # Absolute Smem (F8) consumes an address extension before the port.
+        # Absolute Smem (F8) puts the address before the port; long-offset
+        # forms (E0..F7) put the port before the address extension instead.
         port_index = address + (2 if opcode & 0xff == 0xf8 else 1)
         if port_index < len(words) and words[port_index] < 0x100:
             direction = "R" if family == 0x7400 else "W"

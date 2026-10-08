@@ -722,7 +722,8 @@ Neither `0x27` nor `0x39` is established as the complete FCCH/SCH sample
 stream. The sibling emulator supplies only a constant for port `0x27`, so it
 offers no independent sample-format evidence. No valid signal fixture follows yet.
 
-A focused consumer trace closes the direct type-`0x1a` activation hypothesis.
+A focused consumer trace under the earlier relative-compare timer model
+closes the direct type-`0x1a` activation hypothesis for that measured lifecycle.
 The resident host-command dispatcher advances the transmit-ring consumer at
 C54x PC `0x3909`. The selected handler spans `0x3d70..0x3db6`: it derives
 local value `0x0010`, copies the payload into scratch words `0x1200..0x121f`,
@@ -731,7 +732,9 @@ words `0x0284/0x0286/0x0287`, sets bit 3 at `0x06bc`, and increments `0x06e3`
 from zero to one before returning. It performs no I/O-port access. Across the
 same 30-second receiver gate, none of those identified control words is read
 after the handler returns; the existing port-`0x27` cadence continues and the
-`0x32/0x38/0x39` counts remain zero. Temporary write/read taps used for this
+`0x32/0x38/0x39` counts remain zero in that earlier run. The current absolute-
+compare gate records three port-`0x32` writes; the old zero count is not a
+current invariant. Temporary write/read taps used for this
 classification were removed. Thus the observed search-list packet is accepted
 and stored, but does not by itself enter the dormant parallel receive path or
 establish an RF acquisition. Which lifecycle consumes the stored control state
@@ -739,7 +742,7 @@ and which DSP path owns ordinary acquisition remain unresolved. Separately,
 the `0x7b0a` mode initializer remains useful for later dedicated-channel work;
 injecting a reply or waveform at type-`0x1a` would skip both boundaries.
 
-The post-handler reader census covers `0x1200..0x121f` and the complete
+The earlier relative-compare post-handler reader census covers `0x1200..0x121f` and the complete
 `0x0284..0x02b0` control/vector interval: 77 DSP data words. Temporary
 read/write taps at the backend data bus observed zero accesses to those words
 from 1.52 seconds through the end of a coherent 30-second no-cell run. These
