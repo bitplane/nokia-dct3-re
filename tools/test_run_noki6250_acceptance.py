@@ -17,7 +17,7 @@ class CoherentConfigTest(unittest.TestCase):
         self.assertEqual(prerequisite_trace(text, 'host-incoming-call'), text)
 
     def test_pin_services_are_admitted_before_preparation(self):
-        for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook', 'idle-state', 'call-state', 'sms-state'):
+        for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'phonebook', 'idle-state', 'call-state', 'sms-state'):
             with patch('sys.argv', ['runner', 'unused', '--scenario', scenario,
                                    '--coherent-cell', '--pin-enabled', '--mame', '/nonexistent/6250-mame']), \
                     patch('sys.stderr', new_callable=io.StringIO) as errors, \

@@ -101,7 +101,7 @@ def main():
     if args.coherent_cell and not (args.scenario.startswith('host-') or args.scenario in ('idle-state', 'call-state', 'sms-state', 'phonebook')):
         parser.error('coherent-cell downstream coverage requires a host, state or phonebook scenario')
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
-                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook', 'idle-state', 'call-state', 'sms-state')):
+                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'phonebook', 'idle-state', 'call-state', 'sms-state')):
         parser.error('pin-enabled requires coherent host services, restoration or phonebook')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()

@@ -110,6 +110,15 @@ unchanged Message sent pixels. Their physical actions and captures begin
 six seconds later than the PIN-disabled fixtures to allow SIM/phonebook
 initialization to settle; emulation clocks and peer timing are unchanged.
 
+`verify-6250-pin-host-rejected-sms` and `verify-6250-pin-host-silent-sms`
+also require slow PIN verification and coherent ARFCN19/20 registration
+before the respective host RP-error or full firmware-timeout lifecycle.
+They retain the distinct reviewed failure text and physical End/End/Menu
+recovery. The observer inherits the composer's six-second input delay, so
+recovery cannot collide with late submission; no-PIN timing stays unchanged.
+Fresh evidence is `run_6250_pin_host_rejected_sms_01` and
+`run_6250_pin_host_silent_sms_01`. No protocol timer is shortened.
+
 `verify-6250-pin-phonebook` physically saves A/123 after slow PIN entry,
 then starts a new MAME process using the same persistent card. The second
 process enters the PIN again and physically retrieves the contact. Both
