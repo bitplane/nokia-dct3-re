@@ -995,6 +995,22 @@ before the sentinel: the persistent outcome reflects this completed scan,
 not absence of radio candidates. Late readiness must be explained through
 the subsequent lifecycle rather than by synthesizing a stronger RSSI or
 changing the outcome value.
+The record storage is seven rows, not a three-row table. Accessor
+`286218` indexes `137248 + 9*index`, booleanizes its nine bytes, and
+derives returned byte `+9` as true exactly when source byte `+8` is
+nonzero. Helper `2a0eb8` examines only rows 0..2. The complementary
+helper `2a1170` examines rows 3..6; selector state 2 selects it when the
+**current** request is `03ec` (`2a15b2 -> 2a168e -> 2a1694`). These
+are structural row indices, not assigned band/subsystem names.
+Read-only `run_8210_pin_dcs_record_banks_01` observes identical rows at
+the serving acknowledgement and late readiness result: rows 0..4 are
+zero, row 5 is `000000000000000001`, and row 6 is
+`010000000100000000`. Thus the first-bank accessor sees no flagged
+record while a complementary row does satisfy its derived byte-9 test.
+The late call still has current `03eb`, queued `03ec`, and selector state
+5; it does not take state 2's current-`03ec` selection. Explain the
+firmware-owned promotion/continuation that changes request ownership;
+do not strengthen signal levels or rewrite either record bank.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

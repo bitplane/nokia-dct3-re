@@ -233,6 +233,22 @@ def verify(image):
             ('mov', 'r0, sl'), ('cmp', 'r0, #0'), ('beq', '#0x287634'),
             ('movs', 'r0, #3'), ('ldr', 'r5, [pc, #0x104]'), ('str', 'r0, [r4]')]:
         raise ValueError('measurement terminal skipped-entry outcome differs')
+    if int.from_bytes(read(0x28651c, 4), 'big') != 0x137248:
+        raise ValueError('flag-record table address differs')
+    if instructions(0x28621a, 4) != [('lsls', 'r2, r1, #3'), ('adds', 'r1, r1, r2')]:
+        raise ValueError('flag-record table stride differs')
+    if instructions(0x2a117a, 20) != [
+            ('movs', 'r4, #3'), ('lsls', 'r0, r4, #0x18'),
+            ('lsrs', 'r1, r0, #0x18'), ('adds', 'r0, r5, #0'),
+            ('bl', '#0x286218'), ('adds', 'r5, #0xc'),
+            ('adds', 'r4, #1'), ('cmp', 'r4, #7'), ('blt', '#0x2a117c')]:
+        raise ValueError('complementary flag-record bank indices differ')
+    if instructions(0x2a15b2, 8) != [
+            ('movs', 'r1, #0xfb'), ('lsls', 'r1, r1, #2'),
+            ('cmp', 'r0, r1'), ('beq', '#0x2a168e')]:
+        raise ValueError('state-two 03ec record-bank selection differs')
+    if instructions(0x2a1694, 4) != [('bl', '#0x2a1170')]:
+        raise ValueError('state-two complementary bank consumer differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

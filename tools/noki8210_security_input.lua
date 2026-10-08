@@ -45,9 +45,13 @@ if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' th
                     if pointer >= 0x100000 and pointer < 0x17fffc then return memory:read_u16(pointer) end
                     return 0
                 end
-                machine:logerror(string.format('8210_cell_decision_result: pc=%08x result=%02x state=%04x current=%04x queued=%04x t=%.6f\n',
+                local flags = {}
+                for index = 0, 62 do
+                    flags[#flags + 1] = string.format('%02x', memory:read_u8(0x137248 + index))
+                end
+                machine:logerror(string.format('8210_cell_decision_result: pc=%08x result=%02x state=%04x current=%04x queued=%04x record_flags=%s t=%.6f\n',
                     address, cpu.state['R0'].value, memory:read_u16(context + 2),
-                    input(current), input(queued), machine.time:as_double()))
+                    input(current), input(queued), table.concat(flags), machine.time:as_double()))
             end)
     end
     _G.nsm3_cell_pending_requests = memory:install_read_tap(0x2a0dc8, 0x2a0dcb,
