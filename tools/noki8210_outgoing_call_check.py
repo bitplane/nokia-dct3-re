@@ -45,10 +45,10 @@ CHECKPOINTS = (
 )
 
 
-def verify(text, number='1234567', *, configured_carrier=False):
+def verify(text, number='1234567', *, configured_carrier=False, dcs1800=False):
     if '[LUA ERROR]' in text:
         raise ValueError('fixture error')
-    traffic, release = channel_patterns(configured_carrier)
+    traffic, release = channel_patterns(configured_carrier, dcs1800=dcs1800)
     replacements = {'own traffic configuration': traffic, 'own release configuration': release}
     checkpoints = tuple((name, replacements.get(name, pattern)) for name, pattern in CHECKPOINTS)
     require_ordered(text, checkpoints, '8210 outgoing signaling')
@@ -74,6 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('log', type=Path)
     parser.add_argument('--number', default='1234567')
     parser.add_argument('--configured-carrier', action='store_true')
+    parser.add_argument('--dcs1800', action='store_true')
     parser.add_argument('--frames', type=Path)
     args = parser.parse_args()
     try:
@@ -82,7 +83,8 @@ if __name__ == '__main__':
                            'LAPDm' in line or 'PCH no-identity' in line or 'packet' in line or
                            'RX enqueue' in line or '8210_call_physical' in line or
                            '8210_keypad_decoded' in line or '[LUA ERROR]' in line)
-        verify(text, args.number, configured_carrier=args.configured_carrier)
+        verify(text, args.number, configured_carrier=args.configured_carrier,
+               dcs1800=args.dcs1800)
         if args.frames:
             check_frames(args.frames)
     except (OSError, ValueError) as error:

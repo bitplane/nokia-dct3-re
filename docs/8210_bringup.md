@@ -716,7 +716,7 @@ needed. The own scan publishes `56:03370338`, selects SCH on carrier `0337`,
 uses recovered `041202` channel parameters and capability byte `30` in its
 Location Updating request (GSM900 uses `33`). Acceptance requires the ordered
 Location Updating/release sequence, carrier-823 paging and updated EF_LOCI.
-Calls, media and native DSP on this band are not promoted.
+Incoming calls, media and native DSP on this band are not promoted.
 `verify-8210-dcs-idle-state` extends the no-PIN DCS profile through an
 idle save/load round trip. `run_8210_dcs_idle_state_01` passes explicit
 DCS registration and persisted EF_LOCI, exact saved/restored PC/SP/RAM
@@ -741,6 +741,14 @@ release/resumed paging and reviewed Message-sent pixels. Run
 `run_8210_dcs_outgoing_sms_01` also passes explicit DCS registration and
 persisted EF_LOCI. This is no-PIN laboratory signaling, not external
 SMS delivery or native DSP validation.
+`verify-8210-dcs-outgoing-call` independently checks registration, physical
+`1234567` entry/Send/End, CC setup/connect/disconnect/release and reviewed
+dialed/active/released screens. Capture `run_8210_dcs_outgoing_call_contract_01`
+established traffic word `041202000271012fc10003370000000400000000` and
+release word `041202001117001a600003370000001400000001`; fresh run
+`run_8210_dcs_outgoing_call_01` passes those exact contracts. GSM and DCS
+patterns reject each other's carrier words. No peer behavior changed;
+this is no-PIN laboratory signaling, not native speech or an external call.
 
 **Current frontier:** DCS with physical PIN entry starting at eight seconds
 does not register; entry starting at seven seconds does. The passing

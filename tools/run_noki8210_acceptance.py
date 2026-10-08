@@ -133,7 +133,7 @@ def main():
             not args.pin_enabled or args.scenario != 'registration' or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state') or
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call') or
                         (args.scenario != 'registration' and args.pin_enabled)):
         parser.error('--dcs1800 requires registration or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
@@ -220,6 +220,11 @@ def main():
             check.extend(['--frames', str(run / 'snap'), '--configured-carrier'])
         elif args.scenario == 'host-outgoing-call':
             check.extend(['--configured-carrier', '--frames', str(run / 'snap')])
+        elif args.scenario == 'outgoing-call' and args.dcs1800:
+            verify_registration((run / 'error.log').read_text(errors='replace'),
+                                (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                                dcs1800=True)
+            check.extend(['--dcs1800', '--frames', str(run / 'snap')])
         elif args.scenario == 'host-outgoing-sms':
             check.extend(['--sent-frame', str(run / 'snap/8210_sms_sent.png')])
         elif args.scenario == 'outgoing-sms' and args.dcs1800:
