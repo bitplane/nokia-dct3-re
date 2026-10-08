@@ -54,11 +54,13 @@ def recover(image):
             'native_speech_validated': False}
 
 
-def verify_call(text):
+def verify_call(text, incoming=False):
     cursor = 0
     for pattern in (
+        r'8850_incoming_physical: action=Call / Send\b' if incoming else
         r'8850_call_physical: action=send\b',
         r'dsp_control_write: data=860b pc=002cb3ca r4=00000008 ',
+        r'8850_incoming_physical: action=End\b' if incoming else
         r'8850_call_physical: action=end\b',
         r'dsp_control_write: data=840a pc=002cb3ca r4=00000008 ',
     ):
@@ -70,14 +72,19 @@ def verify_call(text):
             'native_speech_validated': False}
 
 
-def verify_pcm(text):
-    verify_call(text)
+def verify_pcm(text, incoming=False):
+    verify_call(text, incoming)
     if 'speech blocked by unsupported PCM link' in text:
         raise ValueError('unsupported PCM link')
     ticks = re.findall(r'dsp_hle: speech tick uplink=(\d+) downlink=(\d+) '
                        r'pcm=(\d+) pcm_clock=1000000/8000 pcm_shape=125 ', text)
-    stop = re.search(r'8850_call_physical: action=end\b.*?'
-                     r'dsp_hle: speech stop control=040a uplink=(\d+) '
+    end = (r'8850_incoming_physical: action=End\b' if incoming else
+           r'8850_call_physical: action=end\b')
+    # Incoming bearer release can stop cadence before the later 840a write.
+    # verify_call still requires that physical End owns the eventual disable.
+    control = r'(?:040a|060b)' if incoming else '040a'
+    stop = re.search(end + r'.*?'
+                     r'dsp_hle: speech stop control=' + control + r' uplink=(\d+) '
                      r'downlink=(\d+)', text, re.S)
     if not ticks or stop is None or min(map(int, stop.groups())) < 100:
         raise ValueError('missing sustained bidirectional PCM and physical stop')
@@ -93,14 +100,17 @@ def main():
     parser.add_argument('rom', type=Path)
     parser.add_argument('--log', type=Path)
     parser.add_argument('--pcm', action='store_true')
+    parser.add_argument('--incoming', action='store_true')
     args = parser.parse_args()
     if args.pcm and not args.log:
         parser.error('--pcm requires --log')
+    if args.incoming and not args.log:
+        parser.error('--incoming requires --log')
     print(recover(args.rom.read_bytes()))
     if args.log:
-        print(verify_call(args.log.read_text(errors='replace')))
+        print(verify_call(args.log.read_text(errors='replace'), args.incoming))
         if args.pcm:
-            print(verify_pcm(args.log.read_text(errors='replace')))
+            print(verify_pcm(args.log.read_text(errors='replace'), args.incoming))
 
 
 if __name__ == '__main__':

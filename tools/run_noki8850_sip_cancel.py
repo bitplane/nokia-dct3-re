@@ -99,16 +99,18 @@ def main():
                           help='exercise physical dialing against a real SIP 480 response')
     outgoing.add_argument('--outgoing-media', action='store_true',
                           help='verify physical outgoing SIP connection and HLE frame transport')
+    outgoing.add_argument('--incoming-media', action='store_true',
+                          help='verify physical incoming Answer/End and HLE media')
     parser.add_argument('--record-media', action='store_true')
     parser.add_argument('--sound', choices=('none', 'pulse'), default='none')
     parser.add_argument('--http-port', type=int, default=18885)
     parser.add_argument('--sip-port', type=int, default=25885)
     args = parser.parse_args()
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
-    if args.record_media and not args.outgoing_media:
-        parser.error('--record-media requires --outgoing-media')
-    if args.restore_idle and (outgoing_failure or args.outgoing_media):
-        parser.error('--restore-idle cannot be combined with outgoing modes')
+    if args.record_media and not (args.outgoing_media or args.incoming_media):
+        parser.error('--record-media requires a media mode')
+    if args.restore_idle and (outgoing_failure or args.outgoing_media or args.incoming_media):
+        parser.error('--restore-idle cannot be combined with call modes')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8850']
@@ -123,12 +125,13 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki8850_host_incoming_input.lua' if args.incoming_media else
                        'noki8850_outgoing_call_input.lua' if outgoing_failure or args.outgoing_media else
                        'noki8850_sip_idle_restore.lua' if args.restore_idle else
                        'noki8850_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run',
-                   '60' if args.restore_idle else '57',
+                   '60' if args.restore_idle or args.incoming_media else '57',
                    '-video', 'none', '-sound', args.sound, '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
@@ -137,6 +140,8 @@ def main():
                    *(['--record-media'] if args.record_media else []),
                    *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      [] if args.outgoing_media else
+                     ['--incoming', '--ready-file', str(run / 'snap/8850_registered_idle.png')]
+                     if args.incoming_media else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/8850_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
@@ -144,22 +149,34 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if outgoing_failure or args.outgoing_media:
+        if args.incoming_media:
+            from tools.noki8850_incoming_call_check import verify, check_frames as incoming_frames
+            text = (run / 'error.log').read_text(errors='replace')
+            check_output(text)
+            check_output((run / 'console.log').read_text(errors='replace'))
+            errors = check_trace(text, runtime_hle=True)
+            if errors:
+                raise ValueError('; '.join(errors))
+            verify_registration(text, 'nsm2')
+            verify(text)
+            incoming_frames(run / 'snap')
+        elif outgoing_failure or args.outgoing_media:
             check_outgoing_result(run)
-            if args.outgoing_media:
-                from tools.noki8850_speech_control_check import recover, verify_pcm
-                recover((roms / profile[1]).read_bytes())
-                verify_pcm((run / 'error.log').read_text(errors='replace'))
         else:
             check_product_result(run, args.restore_idle)
+        if args.outgoing_media or args.incoming_media:
+            from tools.noki8850_speech_control_check import recover, verify_pcm
+            recover((roms / profile[1]).read_bytes())
+            verify_pcm((run / 'error.log').read_text(errors='replace'), incoming=args.incoming_media)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsm2hle', 'scenario': ('outgoing-sip-media' if args.outgoing_media else
+            'machine': 'nsm2hle', 'scenario': ('incoming-sip-media' if args.incoming_media else
+                                             'outgoing-sip-media' if args.outgoing_media else
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else
                                              'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 1,
             'native_dsp_complete': False, 'speech_tested': False,
-            'hle_media_transport_tested': args.outgoing_media,
+            'hle_media_transport_tested': args.outgoing_media or args.incoming_media,
             'waveform_tested': False,
             'media_recorded': args.record_media,
             'idle_restored': args.restore_idle,
@@ -167,7 +184,7 @@ def main():
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8850 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('8850 real SIP ' + ('HLE media transport' if args.outgoing_media else 'signaling') +
+    print('8850 real SIP ' + ('HLE media transport' if args.outgoing_media or args.incoming_media else 'signaling') +
           ' PASS; no native speech or waveform acceptance')
 
 

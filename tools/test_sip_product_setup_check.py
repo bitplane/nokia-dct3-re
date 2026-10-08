@@ -131,6 +131,13 @@ class SipProductSetupCheckTest(unittest.TestCase):
             own_verify.assert_called_once()
             self.assertEqual(own_verify.call_args.kwargs, {'configured_carrier': True})
 
+    def test_8850_incoming_requires_own_physical_lifecycle(self):
+        with self.assertRaises(ValueError):
+            self.check_incoming('8850', '3210')
+        with patch('tools.noki8850_incoming_call_check.verify') as own_verify:
+            self.check_incoming('8850', '3210')
+            own_verify.assert_called_once()
+
     def test_other_product_incoming_encoding_is_rejected(self):
         for product, other in (('3210', '3310'), ('3310', '3210')):
             with self.subTest(product=product), self.assertRaises(RuntimeError):

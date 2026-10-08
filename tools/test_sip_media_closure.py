@@ -23,6 +23,17 @@ class SipMediaClosureTest(unittest.TestCase):
             with self.subTest(reason=reason), self.assertRaises(RuntimeError):
                 verify_downlink_lifecycle(self.log(reason=reason))
 
+    def test_incoming_requires_ordered_wire_release_not_outgoing_marker(self):
+        rr = 'RX enqueue type=80 payload=34 data=b0' + '00' * 9 + '03000d060d00'
+        ua = 'RX enqueue type=80 payload=34 data=b0' + '00' * 9 + '017301'
+        text = self.log().replace('gsm_call_adapter: state', 'gsm_call_adapter: incoming state')
+        text = text.replace('LAPDm service Channel Release acknowledged', rr + '\n' + ua)
+        verify_downlink_lifecycle(text)
+        for altered in (text.replace(rr, ''), text.replace(ua, ''),
+                        text.replace(rr + '\n' + ua, ua + '\n' + rr)):
+            with self.assertRaises(RuntimeError):
+                verify_downlink_lifecycle(altered)
+
     def test_closure_requires_explicit_boundary_and_completion(self):
         for log in (self.log().replace('phase=media_closed', 'phase=alerting'),
                     self.log().replace('LAPDm service Channel Release acknowledged', ''),

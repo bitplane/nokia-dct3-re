@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 570 gates: 388 generated from typed steps, 182 copied verbatim (shell).
+# 571 gates: 388 generated from typed steps, 183 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -48,13 +48,13 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-host-incoming-sms verify-8210-host-outgoing-sms \
 	verify-8210-host-rejected-sms verify-8210-host-silent-sms \
 	verify-8210-sip-idle-restore verify-8210-sip-outgoing-busy \
-	verify-8210-sip-outgoing-unavailable verify-8850-sip-outgoing-media \
-	verify-8210-sip-outgoing-media verify-8850-sip-outgoing-waveform \
-	verify-8210-sip-outgoing-waveform verify-8210-sip-incoming-media \
-	verify-8210-sip-incoming-waveform verify-8210-sip-outgoing-restore \
-	verify-8210-sip-pending-outgoing-restore verify-8210-sip-incoming-restore \
-	verify-8210-sip-alerting-incoming-restore verify-8210-sip-cancel \
-	verify-6250-sip-idle-restore verify-6250-sip-cancel \
+	verify-8210-sip-outgoing-unavailable verify-8850-sip-incoming-media \
+	verify-8850-sip-outgoing-media verify-8210-sip-outgoing-media \
+	verify-8850-sip-outgoing-waveform verify-8210-sip-outgoing-waveform \
+	verify-8210-sip-incoming-media verify-8210-sip-incoming-waveform \
+	verify-8210-sip-outgoing-restore verify-8210-sip-pending-outgoing-restore \
+	verify-8210-sip-incoming-restore verify-8210-sip-alerting-incoming-restore \
+	verify-8210-sip-cancel verify-6250-sip-idle-restore verify-6250-sip-cancel \
 	verify-6250-sip-outgoing-busy verify-6250-sip-outgoing-unavailable \
 	verify-6210-power-cycle verify-8890-power-off-restore verify-8890-cold-clock \
 	verify-8890-power-cycle verify-8850-sip-idle-restore \
@@ -391,6 +391,11 @@ verify-8210-sip-outgoing-busy: build
 verify-8210-sip-outgoing-unavailable: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --outgoing-unavailable --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP; own NSM-2 physical Answer/End, full incoming lifecycle and HLE media, not waveform or native speech
+verify-8850-sip-incoming-media: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8850_sip_cancel.py $(RUN_DIR) --incoming-media --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 # shell: optional PJSIP stack; own NSM-2 PCM/endpoints and physical outgoing SIP HLE media, not waveform or native speech
 verify-8850-sip-outgoing-media: build

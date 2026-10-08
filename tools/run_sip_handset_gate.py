@@ -179,7 +179,18 @@ def verify_downlink_lifecycle(log):
             re.escape(closure[2]) + r' phase=ended\b', log[packet.end():])
         if boundary is None:
             raise RuntimeError('closed-session rejection lacks correlated completion')
-        if 'LAPDm service Channel Release acknowledged' not in log[:packet.end() + boundary.end()]:
+        released = log[closure.start():packet.end() + boundary.end()]
+        if 'incoming state' in closure[1]:
+            try:
+                from tools.radio_call_lifecycle_common import RR_CHANNEL_RELEASE, TRAFFIC_RELEASE_UA
+            except ModuleNotFoundError:
+                from radio_call_lifecycle_common import RR_CHANNEL_RELEASE, TRAFFIC_RELEASE_UA
+            rr = RR_CHANNEL_RELEASE.search(released)
+            ua = TRAFFIC_RELEASE_UA.search(released, rr.end()) if rr else None
+            release_observed = ua is not None
+        else:
+            release_observed = 'LAPDm service Channel Release acknowledged' in released
+        if not release_observed:
             raise RuntimeError('closed-session rejection lacks radio release')
     if accepted < 100:
         raise RuntimeError('handset did not accept a sustained ordered SIP downlink')
@@ -229,12 +240,19 @@ def verify_success(root, remote_text, args):
                 raise RuntimeError(f'idle restoration lacks fresh-epoch SIP evidence: {marker}')
     cursor = 0
     product = getattr(args, 'product', '3210')
-    if product == '8850' and not args.incoming:
-        try:
-            from tools.noki8850_outgoing_call_check import verify as verify_8850_call
-        except ModuleNotFoundError:
-            from noki8850_outgoing_call_check import verify as verify_8850_call
-        verify_8850_call(log, number=number)
+    if product == '8850':
+        if args.incoming:
+            try:
+                from tools.noki8850_incoming_call_check import verify as verify_8850_call
+            except ModuleNotFoundError:
+                from noki8850_incoming_call_check import verify as verify_8850_call
+            verify_8850_call(log)
+        else:
+            try:
+                from tools.noki8850_outgoing_call_check import verify as verify_8850_call
+            except ModuleNotFoundError:
+                from noki8850_outgoing_call_check import verify as verify_8850_call
+            verify_8850_call(log, number=number)
     if product == '8210':
         if args.incoming:
             try:
@@ -275,8 +293,7 @@ def verify_success(root, remote_text, args):
             r'LAPDm service Channel Release acknowledged')
     if args.restore_idle:
         patterns = (r'sip_state: saved', r'sip_state: restored') + patterns
-    for pattern in (() if product == '8210' or
-                    (product == '8850' and not args.incoming) else patterns):
+    for pattern in (() if product in ('8210', '8850') else patterns):
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing ordered firmware call checkpoint: {pattern}')
@@ -547,7 +564,7 @@ def main():
                  args.sip_response == 200 and args.calls == 1 and
                  not args.restore_call and
                  not args.restore_idle and not args.restore_outgoing)
-    nsm2_media = (args.product == '8850' and not args.incoming and
+    nsm2_media = (args.product == '8850' and
                  args.sip_response == 200 and args.calls == 1 and
                  not args.cancel_incoming and
                  not args.restore_call and not args.restore_idle and

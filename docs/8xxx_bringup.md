@@ -1913,9 +1913,31 @@ make verify-8850-sip-outgoing-waveform RUN_DIR=NEW_RUN
 ```
 
 This establishes outgoing bidirectional **HLE** microphone/earpiece delivery
-through real local SIP. Incoming Answer/media and call save/restore lifetime
-remain separate acceptance work; incoming waveform mode is not yet admitted.
-Native DSP speech and physical codec gains remain unverified.
+through real local SIP. Incoming waveform delivery and call save/restore
+lifetime remain separate acceptance work. Native DSP speech and physical
+codec gains remain unverified.
+
+Incoming SIP media is independently verified by
+`run_8850_sip_incoming_media_verified`. The existing physical incoming fixture
+publishes the registered-idle snapshot before external paging, presses
+Call/Send at 38 seconds and End at 46 seconds. Acceptance reuses the complete
+own-product incoming lifecycle and caller/operator frame checks, plus real
+SIP confirmation and sustained bidirectional media. The speech-control
+checker accepts incoming physical markers only in its explicit `--incoming`
+mode; it still requires both `860b` and the eventual `840a` at `2cb3ca`.
+
+The release ordering matters: incoming bearer closure stops speech while
+control remains `060b`, before the later firmware `840a` write. A queued
+terminal downlink frame can therefore be rejected as `session_closed`.
+The shared media checker requires the explicit correlated closure, ordered
+wire RR Channel Release followed by traffic UA before final completion,
+and no accepted media after closure. The outgoing-only service-release log
+message is not evidence for this incoming route. This is a checker correction,
+not changed handset or peer behavior.
+
+```sh
+make verify-8850-sip-incoming-media RUN_DIR=NEW_RUN
+```
 
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot
