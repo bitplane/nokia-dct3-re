@@ -9,6 +9,25 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_pin_measurement_contract_is_band_specific_and_requires_registration(self):
+        for dcs, request, carrier in ((False, '57', '0004'), (True, '55', '0337')):
+            text = (f'TX packet type={request} payload=4 data=03050000\n'
+                    f'RX enqueue type=8b payload=166 data=0010{carrier}00c4\n'
+                    '8210_pin_measurement_route: enabled=01 message=001132ac\n'
+                    '8210_pin_measurement_completion: message=001132ac\n'
+                    '8210_pin_physical: key=Menu\nSIM status ins=20 sw=9000\n'
+                    'LAPDm Location Updating Accept acknowledged nr=1')
+            with self.subTest(dcs=dcs):
+                runner.verify_pin_measurement_registration(text, dcs1800=dcs)
+                with self.assertRaises(ValueError):
+                    runner.verify_pin_measurement_registration(text, dcs1800=not dcs)
+                with self.assertRaises(ValueError):
+                    runner.verify_pin_measurement_registration(text.split('LAPDm')[0], dcs1800=dcs)
+                with self.assertRaises(ValueError):
+                    runner.verify_pin_measurement_registration(
+                        text.replace('completion: message=001132ac', 'completion: message=001132ad'),
+                        dcs1800=dcs)
+
     def test_dcs_registration_admitted_with_or_without_pin(self):
         for options in ([], ['--pin-enabled']):
             with patch('sys.argv', ['runner', 'unused', '--dcs1800'] + options), \

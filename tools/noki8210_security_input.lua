@@ -3,9 +3,30 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 _G.noki8210_observe_only = true
 dofile(assert(source:match('^(.*[/])')) .. 'noki8210_menu_input.lua')
 local machine = manager.machine
-if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
+if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_cell_pending_requests = memory:install_read_tap(0x2a0dc8, 0x2a0dcb,
+        'nsm3_cell_pending_requests', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2a0dc8 then return end
+            local context = memory:read_u32(0x2a110c)
+            local current = memory:read_u32(context + 8)
+            local queued = memory:read_u32(context + 12)
+            local function input(pointer)
+                if pointer >= 0x100000 and pointer < 0x17fffc then return memory:read_u16(pointer) end
+                return 0
+            end
+            machine:logerror(string.format('8210_cell_pending_requests: current=%08x/%04x queued=%08x/%04x caller=%08x t=%.6f\n',
+                current, input(current), queued, input(queued),
+                cpu.state['R14'].value, machine.time:as_double()))
+        end)
+    _G.nsm3_cell_completion_gate_writes = memory:install_write_tap(0x13721c, 0x13721f,
+        'nsm3_cell_completion_gate_writes', function(offset, value, mask)
+            if (mask & 0x0000ff00) == 0 then return end
+            machine:logerror(string.format('8210_cell_completion_gate_write: value=%02x pc=%08x caller=%08x t=%.6f\n',
+                (value >> 8) & 0xff, cpu.state['PC'].value,
+                cpu.state['R14'].value, machine.time:as_double()))
+        end)
     _G.nsm3_readiness_status_dispatch = memory:install_read_tap(0x2a21a4, 0x2a21a7,
         'nsm3_readiness_status_dispatch', function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2a21a4 then return end
@@ -134,6 +155,12 @@ if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
         function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2a1380 then return end
             local state = memory:read_u32(0x2a16b8)
+            local pending = memory:read_u32(state + 8)
+            if pending >= 0x100000 and pending < 0x17fffc then
+                machine:logerror(string.format('8210_cell_completion_gate: pending=%04x gate=%02x t=%.6f\n',
+                    memory:read_u16(pending), memory:read_u8(0x13721e),
+                    machine.time:as_double()))
+            end
             machine:logerror(string.format('8210_cell_decision: caller=%08x argument=%02x state=%04x t=%.6f\n',
                 cpu.state['R14'].value, cpu.state['R0'].value,
                 memory:read_u16(state + 2), machine.time:as_double()))

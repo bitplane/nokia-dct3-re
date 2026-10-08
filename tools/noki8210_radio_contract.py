@@ -124,6 +124,16 @@ def verify(image):
         raise ValueError('03eb to 07f0 status construction differs')
     if instructions(0x21bffa, 4) != [('bl', '#0x2a21a4')]:
         raise ValueError('observed selected-cell publication caller differs')
+    if int.from_bytes(read(0x2a110c, 4), 'big') != 0x137f58:
+        raise ValueError('selected-cell request queue context differs')
+    if instructions(0x2a0dcc, 10) != [
+            ('ldr', 'r0, [r1, #0xc]'), ('cmp', 'r0, #0'),
+            ('bne', '#0x2a0dd6'), ('movs', 'r4, #0'), ('b', '#0x2a0dfa')]:
+        raise ValueError('empty replacement request handling differs')
+    if instructions(0x2a0df0, 10) != [
+            ('ldr', 'r0, [r1, #0xc]'), ('movs', 'r4, #2'),
+            ('str', 'r0, [r1, #8]'), ('movs', 'r0, #0'), ('str', 'r0, [r1, #0xc]')]:
+        raise ValueError('replacement request promotion differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

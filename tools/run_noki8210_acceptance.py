@@ -43,6 +43,20 @@ MCU_SHA1 = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
 PMM_SHA256 = '31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
 
 
+def verify_pin_measurement_registration(text, *, dcs1800=False):
+    # Passing DCS/no-PIN uses the early type-55 scan, not GSM's later type 57.
+    request = '55' if dcs1800 else '57'
+    carrier = '0337' if dcs1800 else '0004'
+    if not re.search(
+            rf'TX packet type={request} payload=4[^\n]*data=03050000.*?'
+            rf'RX enqueue type=8b payload=166[^\n]*data=0010{carrier}00c4.*?'
+            r'8210_pin_measurement_route: enabled=01 message=([0-9a-f]{8}).*?'
+            r'8210_pin_measurement_completion: message=\1.*?'
+            r'8210_pin_physical: key=Menu.*?SIM status ins=20 sw=9000.*?'
+            r'LAPDm Location Updating Accept acknowledged nr=1', text, re.S):
+        raise ValueError('missing correlated measurement/PIN/registration sequence')
+
+
 def check_host_registration(text, storage):
     verify_stage(text, runtime=True, selftest=True, base_record=True)
     verify_registration(text, storage, configured_carrier=True)
@@ -167,14 +181,7 @@ def main():
             check_security(pin_text,
                            (run / 'nvram/nsm3hle/sim_card').read_bytes(), 'verify', '1234')
             verify_stage(pin_text, runtime=True, selftest=True, base_record=True)
-            if not re.search(
-                    r'TX packet type=57 payload=4[^\n]*data=03050000.*?'
-                    rf'RX enqueue type=8b payload=166[^\n]*data=0010{"0337" if args.dcs1800 else "0004"}00c4.*?'
-                    r'8210_pin_measurement_route: enabled=01 message=([0-9a-f]{8}).*?'
-                    r'8210_pin_measurement_completion: message=\1.*?'
-                    r'8210_pin_physical: key=Menu.*?SIM status ins=20 sw=9000.*?'
-                    r'LAPDm Location Updating Accept acknowledged nr=1', pin_text, re.S):
-                raise ValueError('missing correlated measurement/PIN/registration sequence')
+            verify_pin_measurement_registration(pin_text, dcs1800=args.dcs1800)
         check = [sys.executable, str(root / f'tools/noki8210_{checker}.py'), str(run / 'error.log')]
         storage = str(run / 'nvram/nsm3hle/sim_card')
         if args.scenario == 'power-cycle':

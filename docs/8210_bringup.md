@@ -718,11 +718,22 @@ Location Updating request (GSM900 uses `33`). Acceptance requires the ordered
 Location Updating/release sequence, carrier-823 paging and updated EF_LOCI.
 Calls, SMS, media and native DSP on this band are not promoted.
 
+**Current frontier:** authenticated DCS does not register. The passing
+no-PIN DCS control also lacks `07f0`, `1587` and type 57: none is a universal
+DCS prerequisite. It receives `03ec` before serving-channel completion;
+PIN DCS receives it afterwards. At completion, the passing control has
+`03ec` queued alongside current `03eb`; PIN DCS has no queued replacement.
+Decode the late-request lifecycle rather than making DCS reproduce GSM's
+reference chain below. No firmware state or peer response is forced.
+
 The independent `--dcs1800 --pin-enabled` experiment remains unsuccessful:
 the early `55:03050000` response reaches the correlated task-12 completion
 at 5.54 seconds, before physical PIN acceptance at 12 seconds. Unlike the
-verified GSM900 PIN lifecycle, no later type-57 request is emitted and no
-Location Updating acceptance follows. The strict runner rejects this run;
+verified GSM900 PIN lifecycle, no later type-57 request is emitted. The
+passing no-PIN DCS control shows that request is not required on this band;
+Location Updating acceptance is still missing and the strict runner rejects
+the PIN run. Its measurement contract now expects the observed type 55,
+with correlated delivery, physical PIN acceptance and Location Updating;
 the early-scan/PIN lifecycle must be understood before authenticated DCS
 coverage can be claimed. No response, firmware state or timer is forced.
 Continuous carrier-823 SI1/2/3/4 and paging packets remain present after PIN,
@@ -730,8 +741,10 @@ excluding a one-shot-broadcast explanation. Passive completion observation
 finds the same context `00113264`, selector `03` and zero word at `+4` in
 both GSM900 and DCS1800 runs. Both therefore select parser `28755e`, not
 alternate `287664`; parser selection alone does not explain the divergence.
-The next boundary is the selected-cell lifecycle spanning SIM acceptance,
-not a missing measurement envelope or missing periodic SI transmission.
+The selected-cell lifecycle spans SIM acceptance; the measurement envelope
+and periodic SI transmission are present.
+
+### Mapped GSM reference chain
 Own firmware diagnostic strings narrow this further: successful GSM reaches
 `PH_1300`, whereas authenticated DCS enters `PH_9000b2`. Both call decision
 helper `2a1380`, whose halfword state is at `137f5a`. The GSM `PH_1250`
@@ -833,8 +846,18 @@ does not call it. Both originally receive the same `03eb` request at
 DCS: the missing transition is the completion path reaching `21bffa`,
 not construction of the request or the final PIN readiness selector.
 GSM subsequently calls it again with `03ed`, state 0, at 12.896008.
-The next boundary is the entry predicate/message of that completion path,
-compared with the already-observed early DCS measurement completion.
+The independent `run_8210_dcs_no_pin_completion_01` passes full registration
+while following `03ec`, with no `07f0`, `1587` or type-57 request. Its
+`03ec` arrives at 6.422718 seconds, before candidate/serving changes; in the
+PIN run it arrives at 12.696057, after the serving acknowledgement.
+`run_8210_{pin_dcs,dcs_no_pin}_pending_requests_01` observes the queue at
+`2a0dc8`: both retain current `03eb`, but at the serving completion the
+passing control has queued `03ec` while PIN DCS has zero at context `+0c`.
+The helper returns 0 with no queued request, 1 for the first current request,
+or 2 when promoting a replacement. That result controls the state-5 tail
+through `2a1484`. Gate byte `13721e` is `05` in both runs, excluding a
+different value of that gate as the explanation. The remaining question is
+how the late `03ec` should settle the already-completed initial request.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
