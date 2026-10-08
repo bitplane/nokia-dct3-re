@@ -7,6 +7,18 @@ from tools.noki6210_incoming_sms_check import verify as incoming_sms
 
 
 class ServicesTest(unittest.TestCase):
+    def test_outgoing_coherent_pin_keeps_exact_topology(self):
+        from tools import noki6210_outgoing_call_check as checker
+        with patch.object(checker, 'require_ordered', side_effect=ValueError('stop')) as ordered:
+            with self.assertRaisesRegex(ValueError, 'stop'):
+                checker.verify('', coherent_pin=True)
+        patterns = dict(ordered.call_args.args[1])
+        self.assertRegex('TX packet type=02 payload=24 data=041202000271012fc1000023000000040000000000000000',
+                         patterns['own traffic configuration'])
+        self.assertNotRegex('TX packet type=02 payload=24 data=040002000271012fc1000001000000040000000000000000',
+                            patterns['own traffic configuration'])
+        self.assertEqual(len(patterns), len(checker.CHECKPOINTS))
+
     def test_incoming_coherent_pin_keeps_exact_topology(self):
         from tools import noki6210_incoming_call_check as checker
         with patch.object(checker, 'require_ordered') as ordered, patch.object(checker, 'require_count'):

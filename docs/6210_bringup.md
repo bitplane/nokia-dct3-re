@@ -276,6 +276,12 @@ physical Read, the existing exact message-body image and persistent read-status
 SIM record. The host checker is explicitly bound to ARFCN 35; the original
 no-PIN host SMS fixture remains on its default topology.
 
+`verify-6210-pin-host-outgoing-call` verifies physical `1234567`/Send/End,
+the host connect decision and complete own CC/RR lifecycle after PIN-enabled
+registration. `verify-6210-pin-host-outgoing-sms` verifies physical `A` to
+`5551234`, the host submit decision, CP/RP completion and reviewed Message sent
+text. Both retain the unchanged acquired PMM and explicit HLE boundary.
+
 All service runners start with new working directories; incoming network
 events are selected through MAME configuration, not firmware injection.
 No donor PMM, forced phone state or borrowed DSP verdict is used. The staged

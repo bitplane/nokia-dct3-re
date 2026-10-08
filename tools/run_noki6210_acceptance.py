@@ -181,11 +181,12 @@ def main():
     parser.add_argument('--coherent-cell', action='store_true',
                         help='configure the laboratory network on ARFCNs 35/36')
     parser.add_argument('--pin-enabled', action='store_true',
-                        help='authenticate a PIN-enabled SIM before the host incoming service')
+                        help='authenticate a PIN-enabled SIM before the host service')
     args = parser.parse_args()
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
-                             ('host-incoming-call', 'host-incoming-sms')):
-        parser.error('--pin-enabled requires --coherent-cell and a host incoming service')
+                             ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call',
+                              'host-outgoing-sms')):
+        parser.error('--pin-enabled requires --coherent-cell and a supported host service')
     root = Path(__file__).resolve().parents[1]
     try:
         contract = assess((root / 'roms/noki6210/6210_556c.fls').read_bytes(),
@@ -311,7 +312,7 @@ def main():
                 check_frame(frame, OPERATOR_SHA256, 'DCT3 LAB registered idle')
         elif args.scenario in ('outgoing-call', 'host-outgoing-call'):
             from tools.noki6210_outgoing_call_check import verify as check_call
-            check_call(text)
+            check_call(text, coherent_pin=args.pin_enabled)
             if host:
                 from tools.radio_host_outgoing_connect_check import verify as check_host
                 check_host((run / 'error.log').read_text(errors='replace'), '1234567')
