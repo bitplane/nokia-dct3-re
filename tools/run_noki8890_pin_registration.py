@@ -50,7 +50,8 @@ def main():
     parser.add_argument('--without-pin', action='store_true')
     parser.add_argument('--pcs1900', action='store_true', help='independent PCS registration and host services')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
-                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
+                                              'host-outgoing-call', 'host-outgoing-sms',
+                                              'host-rejected-sms', 'host-silent-sms', 'phonebook',
                                               'idle-state', 'call-state', 'sms-state'), default='registration')
     parser.add_argument('--port', type=int, default=18890)
     args = parser.parse_args()
@@ -94,6 +95,7 @@ def main():
         script = {'registration': 'security_input', 'host-incoming-call': 'clock_incoming_input',
                   'host-incoming-sms': 'incoming_sms_input', 'host-outgoing-call': 'clock_call_input',
                   'host-outgoing-sms': 'outgoing_sms_input', 'phonebook': 'phonebook_input',
+                  'host-rejected-sms': 'sms_reject_input', 'host-silent-sms': 'sms_silence_input',
                   'idle-state': 'state_idle', 'call-state': 'state_call', 'sms-state': 'state_sms'}[args.scenario]
         if args.pcs1900 and args.scenario == 'sms-state':
             script = 'pcs_state_sms'
@@ -104,7 +106,8 @@ def main():
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / f'tools/noki8890_{script}.lua'),
-                   '-seconds_to_run', '80' if state else '74' if args.scenario.endswith('-call') else
+                   '-seconds_to_run', '125' if args.scenario == 'host-silent-sms' else
+                       '80' if state else '74' if args.scenario.endswith('-call') else
                        '60' if args.scenario.endswith('-sms') else '46']
         host_command = None
         if args.scenario == 'host-incoming-call':
@@ -116,12 +119,15 @@ def main():
             command += ['-http', '-http_port', str(args.port)]
             host_command = [sys.executable, str(root / 'tools/run_host_incoming_sms_gate.py'),
                             '--port', str(args.port), '--cwd', str(run), '--'] + command
-        elif args.scenario.startswith('host-outgoing-'):
+        elif args.scenario in ('host-outgoing-call', 'host-outgoing-sms',
+                               'host-rejected-sms', 'host-silent-sms'):
             command += ['-http', '-http_port', str(args.port)]
             call = args.scenario == 'host-outgoing-call'
             runner = 'run_host_call_adapter_gate' if call else 'run_host_sms_gate'
             options = ['--number', '1234567', '--decision', 'connect'] if call else [
                 '--user-data', '41', '--user-data-length', '1']
+            if args.scenario in ('host-rejected-sms', 'host-silent-sms'):
+                options += ['--decision', 'rp_error' if args.scenario == 'host-rejected-sms' else 'rp_silence']
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options + ['--'] + command
         with (run / 'console.log').open('w') as console:
@@ -171,11 +177,17 @@ def main():
             verify(text, configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
             verify_clock(text)
             check_frames(run / 'snap', call=True)
-        elif args.scenario == 'host-outgoing-sms':
+        elif args.scenario in ('host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms'):
+            outcome = {'host-rejected-sms': 'rp_error', 'host-silent-sms': 'rp_silence'}.get(
+                args.scenario, 'rp_ack')
+            options = [] if outcome == 'rp_ack' else [
+                '--rejected' if outcome == 'rp_error' else '--rp-silence',
+                '--recovery-frames', str(run / 'snap')]
             subprocess.run([sys.executable, str(root / 'tools/noki8890_outgoing_sms_check.py'),
-                            str(run / 'error.log')] + (['--pcs1900'] if args.pcs1900 else []), check=True)
+                            str(run / 'error.log')] + options +
+                           (['--pcs1900'] if args.pcs1900 else []), check=True)
             subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
-                            '--octets', '1', str(run / 'error.log')], check=True)
+                            '--octets', '1', '--outcome', outcome, str(run / 'error.log')], check=True)
         elif args.scenario == 'phonebook':
             original_card = card.read_bytes()
             subprocess.run([sys.executable, str(root / 'tools/noki8890_phonebook_check.py'),

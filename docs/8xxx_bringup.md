@@ -823,6 +823,15 @@ acceptance and complete CP/RP/RR closure. Both require PIN acceptance before
 registration and preserve the no-PIN physical schedules. Native speech
 remains unproved; PCS1900 authenticated parity is covered separately below.
 
+`verify-8890-pin-host-rejected-sms` and `verify-8890-pin-host-silent-sms`
+separately prove GSM900 authenticated host failure recovery. They require
+the correlated PIN/measurement/registration chain, physical composition,
+host RP-error or full firmware-timeout closure, distinct reviewed failure
+text and physical End/Menu recovery. The observer follows the composer's
+existing four-second PIN input delay; no-PIN timing is unchanged. Evidence:
+`run_8890_pin_host_rejected_sms_02`, `run_8890_pin_host_silent_sms_01`.
+These gates do not establish PCS1900 authenticated failure recovery.
+
 `verify-8890-pin-phonebook` saves `A / 123` physically, then restarts on
 the same product-local PMM and SIM bytes. The cold process must enter PIN
 again, read the persisted LAI before its exact retained-location request,

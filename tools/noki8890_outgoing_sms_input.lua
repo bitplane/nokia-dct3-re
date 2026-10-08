@@ -3,6 +3,7 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 _G.noki8890_security_only = true
 dofile(assert(source:match('^(.*[/])')) .. 'noki8890_security_input.lua')
 local machine = manager.machine
+_G.noki8890_sms_input_delay = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 4 or 0
 local function press(column, name, label)
     local key = assert(machine.ioport.ports[':COL.' .. column].fields[name])
     machine:logerror('8890_sms_send_physical: action=' .. label .. '\n')
@@ -14,7 +15,7 @@ local function press(column, name, label)
     return true
 end
 local input = coroutine.create(function()
-    local start = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 25 or 21
+    local start = 21 + _G.noki8890_sms_input_delay
     if not emu.wait(start) then return end
     for _, item in ipairs({
         {1, 'Menu', 'clock_notice'}, {0, 'End', 'clock_cancel'},

@@ -3,7 +3,8 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(assert(source:match('^(.*[/])')) .. 'noki8890_outgoing_sms_input.lua')
 local machine = manager.machine
 local input = coroutine.create(function()
-    if not emu.wait(_G.noki8890_sms_failure_observe_at or 40.5) then return end
+    if not emu.wait((_G.noki8890_sms_failure_observe_at or 40.5) +
+                    (_G.noki8890_sms_input_delay or 0)) then return end
     for index = 1, (_G.noki8890_sms_failure_observe_count or 8) do
         machine.screens[':screen']:snapshot('8890_sms_reject_' .. index .. '.png')
         if not emu.wait(_G.noki8890_sms_failure_observe_interval or 0.5) then return end
