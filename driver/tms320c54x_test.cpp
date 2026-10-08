@@ -3235,26 +3235,34 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 6513 || m_phase == 6514 || m_phase == 6568 || m_phase == 6569)
+		if (m_phase == 6513 || m_phase == 6514 || m_phase == 6568 || m_phase == 6569 || m_phase == 9206 || m_phase == 9207)
 		{
-			bool const signed_memory = m_phase == 6513 || m_phase == 6568;
+			bool const into_a = m_phase >= 9206;
+			bool const signed_memory = m_phase == 6513 || m_phase == 6568 || m_phase == 9206;
 			bool const stationary = m_phase >= 6568;
-			expect_opcode(stationary ? 0x4582 : 0x4592,
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (signed_memory ? 0xffff800000ULL : 0xff800000ULL) &&
-				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x11223344 &&
+			expect_opcode(into_a ? 0x4488 : stationary ? 0x4582 : 0x4592,
+				m_cpu->state_int(into_a ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == (signed_memory ? 0xffff800000ULL : 0xff800000ULL) &&
+				m_cpu->state_int(into_a ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 0x11223344 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (stationary ? 0x0d10 : 0x0d11) &&
+				(!into_a || m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0d0f) &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0d01 &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
 				data.read_word(0x0d10) == 0xff80 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-				"ROM4 shifted LD through AR2 respects SXM, preserves A/status/source and selects stationary/postincrement addressing in one cycle");
-			if (m_phase != 6569)
+				"ROM4 shifted LD respects SXM, accumulator selection and pointer updates, preserving status/source in one cycle");
+			if (m_phase != 9207)
 			{
-				const unsigned next = m_phase == 6513 ? 6514 : m_phase == 6514 ? 6568 : 6569;
-				program.write_word(0x05e2, next >= 6568 ? 0x4582 : 0x4592);
+				const unsigned next = m_phase == 6513 ? 6514 : m_phase == 6514 ? 6568 : m_phase == 6568 ? 6569 : m_phase == 6569 ? 9206 : 9207;
+				program.write_word(0x05e2, next >= 9206 ? 0x4488 : next >= 6568 ? 0x4582 : 0x4592);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0d10);
-				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next == 6568 ? 0x0100 : 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0d10);
+				if (next >= 9206)
+				{
+					m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+					m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x11223344);
+				}
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next == 6568 || next == 9206 ? 0x0100 : 0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				m_phase = next;
