@@ -890,11 +890,17 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 517 are asserted, one (`e809`) executes
-without an assertion, and 76 are absent. The independent RF-boundary checker
+Against the executable fixture, 523 are asserted, one (`e809`) executes
+without an assertion, and 70 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `f5bc` at first PC `4302`, `7595` at `a23a`, and `7690` at `0a62`.
+include `7690` at first PC `0a62`, `e904` at `3002`, and `f500` at `48ee`.
+Exact `f5bc`/`f4bc` check setting/clearing ST0.TC while preserving carry
+and ST1. Exact `f6b8`/`f7b8` check clearing/setting ST1.SXM while preserving
+OVM and ST0. All four check one-cycle execution between port markers.
+Exact `7595`/`7592` check independent AR5/AR2 port-write selection using
+distinct source values, pre-increment output, one pointer increment,
+preserved source/unrelated pointers and two-cycle execution.
 Exact `fd20` checks both TC outcomes for single-slot conditional execution,
 unchanged status/B, continuation PC and equal accepted/rejected cycle cost.
 Exact `6e82` checks zero/nonzero AR2 without modification, both executed

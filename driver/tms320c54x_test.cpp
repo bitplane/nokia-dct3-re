@@ -8144,6 +8144,39 @@ private:
 				data.read_word(0x0f22) == 0xbeef &&
 				m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
 				"ROM4 PORTW selects AR3 rather than AR2, preserves source/pointers and consumes the port extension in two cycles");
+			program.write_word(0x05e3, 0x7595); // PORTW *AR5+,0124h.
+			data.write_word(0x0f26, 0xcafe);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f26);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6551;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6551 || m_phase == 6552)
+		{
+			const bool ar2 = m_phase == 6552;
+			expect_opcode(ar2 ? 0x7592 : 0x7595,
+				m_middle_port_value == (ar2 ? 0xface : 0xcafe) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (ar2 ? 0x0f29 : 0x0f20) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f22 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f27 &&
+				data.read_word(ar2 ? 0x0f28 : 0x0f26) == (ar2 ? 0xface : 0xcafe) &&
+				m_port_writes == 3 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 PORTW selects AR2/AR5 independently, emits the pre-increment word, preserves source memory and increments once in two cycles");
+			if (!ar2)
+			{
+				program.write_word(0x05e3, 0x7592); // PORTW *AR2+,0124h.
+				data.write_word(0x0f28, 0xface);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f28);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6552;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e3, 0x61ea); // BITF *+AR2(5),#8000
 			program.write_word(0x05e4, 5);
 			program.write_word(0x05e5, 0x8000);
@@ -12045,26 +12078,35 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 533 && m_phase <= 536)
+		if ((m_phase >= 533 && m_phase <= 536) || (m_phase >= 6547 && m_phase <= 6550))
 		{
-			static constexpr u16 status_words[] = { 0xf6bd, 0xf6bf, 0xf7bd, 0xf7be };
-			static constexpr u16 before[] = { 0x2000, 0x8000, 0, 0 };
-			static constexpr u16 after[] = { 0, 0, 0x2000, 0x4000 };
-			const unsigned index = m_phase - 533;
-			expect_opcode(status_words[index],
-					m_cpu->state_int(tms320c54x_device::STATE_ST1) == after[index] &&
-					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+			struct status_case { u16 opcode, st0_before, st1_before, st0_after, st1_after; };
+			static constexpr status_case cases[] = {
+				{ 0xf6bd, 0x0800, 0x2000, 0x0800, 0 },
+				{ 0xf6bf, 0x0800, 0x8000, 0x0800, 0 },
+				{ 0xf7bd, 0x0800, 0, 0x0800, 0x2000 },
+				{ 0xf7be, 0x0800, 0, 0x0800, 0x4000 },
+				{ 0xf5bc, 0x0800, 0x0100, 0x1800, 0x0100 },
+				{ 0xf4bc, 0x1800, 0x0100, 0x0800, 0x0100 },
+				{ 0xf6b8, 0x1800, 0x0300, 0x1800, 0x0200 },
+				{ 0xf7b8, 0x1800, 0x0200, 0x1800, 0x0300 }
+			};
+			const unsigned index = m_phase >= 6547 ? m_phase - 6547 + 4 : m_phase - 533;
+			expect_opcode(cases[index].opcode,
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == cases[index].st1_after &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == cases[index].st0_after &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
-					"ROM4 RSBX/SSBX changes only the selected ST1 bit in one cycle");
-			if (m_phase < 536)
+					"ROM4 RSBX/SSBX changes only the selected ST0/ST1 bit in one cycle");
+			if (index < 7)
 			{
-				program.write_word(0x05e2, status_words[index + 1]);
+				program.write_word(0x05e2, cases[index + 1].opcode);
 				m_port_writes = 0;
-				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, before[index + 1]);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, cases[index + 1].st0_before);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, cases[index + 1].st1_before);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				++m_phase;
+				m_phase = index < 3 ? m_phase + 1 : index == 3 ? 6547 : m_phase + 1;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
