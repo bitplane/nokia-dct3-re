@@ -35,7 +35,26 @@ class SipFailureCheckTest(unittest.TestCase):
     def test_busy_and_unavailable_require_own_release(self):
         self.assertEqual(self.check()['sip_status'], 486)
         self.assertEqual(self.check(status=480,
-            log='outgoing termination consumed id=1 cause=18\n' + LOG)['sip_status'], 480)
+            log=LOG.replace('outcome=1', 'outcome=2\noutgoing termination consumed id=1 cause=18'))['sip_status'], 480)
+
+    def test_single_call_decision_must_follow_request_and_precede_release(self):
+        decision = 'outgoing decision consumed id=1 outcome=1\n'
+        without = LOG.replace(decision, '')
+        for misplaced in (decision + without, without + decision):
+            with self.assertRaises(RuntimeError):
+                self.check(log=misplaced)
+        with self.assertRaises(RuntimeError):
+            self.check(log=LOG.replace('consumed id=1 outcome=1', 'consumed id=2 outcome=1'))
+
+    def test_single_unavailable_requires_ordered_correlated_cause(self):
+        cause = 'outgoing termination consumed id=1 cause=18\n'
+        without = LOG.replace('outcome=1', 'outcome=2')
+        for misplaced in (cause + without, without + cause):
+            with self.assertRaises(RuntimeError):
+                self.check(status=480, log=misplaced)
+        ordered = without.replace('outcome=2\n', 'outcome=2\n' + cause)
+        with self.assertRaises(RuntimeError):
+            self.check(status=480, log=ordered.replace('termination consumed id=1', 'termination consumed id=2'))
 
     def test_unavailable_without_cause_is_rejected(self):
         with self.assertRaises(RuntimeError):

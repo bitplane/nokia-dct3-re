@@ -378,7 +378,10 @@ make verify-radio-outgoing-call-sip-timeout-response RUN_DIR=run_3210_sip_timeou
 ```
 
 These gates physically dial the 3210 into actual upstream PJSIP responses and
-require the correlated failure, firmware RELEASE/RELEASE COMPLETE and LAPDm
+require each request's busy decision or no-answer decision/termination cause
+after SETUP and the host request, before CC/RR release; an earlier or later
+matching event cannot satisfy the transaction. They also require firmware
+RELEASE/RELEASE COMPLETE and LAPDm
 release, with no SIP/GSM connection and zero executed bridge media. The 480
 gate additionally requires the GSM session to consume cause 18.
 The 403 gate additionally requires ordered consumption of the correlated

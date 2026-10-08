@@ -269,14 +269,12 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
             raise RuntimeError('missing correlated SIP failure for each handset attempt')
         patterns = [outgoing_setup_pattern(product),
                     rf'gsm_call_adapter: request id={request_id} epoch=1 digits={number}\b']
-        rejection_cause = {403: 21, 404: 1, 408: 102, 503: 41}.get(status)
+        rejection_cause = {403: 21, 404: 1, 408: 102, 480: 18, 503: 41}.get(status)
         if rejection_cause is not None:
             patterns += [rf'outgoing decision consumed id={request_id} outcome=2(?!\d)',
                          rf'outgoing termination consumed id={request_id} cause={rejection_cause}(?!\d)']
-        if calls > 1:
-            patterns += [rf'outgoing decision consumed id={request_id} outcome={1 if status in (486, 600) else 2}(?!\d)']
-            if status == 480:
-                patterns += [rf'outgoing termination consumed id={request_id} cause=18(?!\d)']
+        if status in (486, 600):
+            patterns += [rf'outgoing decision consumed id={request_id} outcome=1(?!\d)']
         patterns += [
             r'GSM service downlink kind=13 sapi=0 pd=03 message=25 length=5',
             # Bit 6 is the CC send-sequence flag; it is not another primitive.
@@ -289,10 +287,6 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
             if not match:
                 raise RuntimeError(f'missing SIP-failure firmware checkpoint: {pattern}')
             cursor += match.end()
-    if status == 480 and not re.search(r'outgoing termination consumed id=1 cause=18(?!\d)', log):
-        raise RuntimeError('SIP 480 did not deliver cause 18 through the GSM session')
-    if status in (486, 600) and not re.search(r'outgoing decision consumed id=1 outcome=1(?!\d)', log):
-        raise RuntimeError(f'SIP {status} did not deliver the GSM busy decision')
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': f'{product} HLE physical outgoing SIP failure and firmware release; no connection/media',
         'sip_status': status, 'completed_calls': calls,
