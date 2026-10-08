@@ -404,6 +404,12 @@ does not prove delivery. The removed implementation failed, but this
 experiment cannot reject the response layout on semantic grounds. A
 future test must establish notification, ring consumption, decoded class
 and task destination before interpreting the completion result.
+`tools/noki6250_measurement_delivery_check.py LOG` enforces these
+prerequisites for one isolated 166-byte candidate, using the passive
+route/post observations. It rejects the retained candidate specifically
+for missing notification; its PASS would establish delivery only, not
+reply semantics or registration. Later `8b` publications cannot supply
+evidence for an earlier candidate.
 
 ### Coherent laboratory registration
 
