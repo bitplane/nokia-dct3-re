@@ -249,6 +249,20 @@ def verify(image):
         raise ValueError('state-two 03ec record-bank selection differs')
     if instructions(0x2a1694, 4) != [('bl', '#0x2a1170')]:
         raise ValueError('state-two complementary bank consumer differs')
+    promotion_calls = []
+    for offset in range(0, len(image) - 4, 2):
+        if image[offset] & 0xf8 == 0xf0 and instructions(0x200000 + offset, 4) == [('bl', '#0x2a0dc8')]:
+            promotion_calls.append(0x200000 + offset)
+    if promotion_calls != [0x2a13d0, 0x2a1484, 0x2a193a, 0x2a1988]:
+        raise ValueError('direct queue-promotion candidate callsites differ')
+    if instructions(0x2a187a, 8) != [
+            ('cmp', 'r6, #2'), ('beq', '#0x2a197c'),
+            ('cmp', 'r6, #3'), ('beq', '#0x2a18bc')]:
+        raise ValueError('selector argument-two promotion dispatch differs')
+    if instructions(0x21d884, 6) != [('movs', 'r0, #2'), ('bl', '#0x2a1380')]:
+        raise ValueError('explicit queue-promotion selector caller differs')
+    if int.from_bytes(read(0x220198, 4), 'big') != 0x413:
+        raise ValueError('explicit queue-promotion event selector differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
