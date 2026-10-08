@@ -151,6 +151,25 @@ the state-4/state-6 zero-input decision: recover the condition that differs
 after CHV1 and the legitimate re-evaluation mechanism without forcing
 state or inventing a radio acknowledgement.
 
+The zero-input state-4 predicate at `3cb0a2..3cb0d6` requires context
+bytes 0/1/2 to equal 2/1/1, matching nonzero pointers through globals
+`16f91c` and `16f924`, and the detail object's signed halfword to equal
+`03ec`. In the PIN boot its failure target `3cb0ea` observes context bytes
+`02080100000001008105`, detail halfword `03eb`, and both pointer values
+`0011c770`: pointer equality is satisfied, but status byte 1 is 8, not 1.
+The detail comparison is therefore not reached in that invocation.
+
+Status helper `3caa64` uses accessor `38ea84`, which normalizes three
+nine-byte flag groups at `16f92c` and appends an any-set result to each
+temporary record. Passive writes show a concrete group-2 divergence after
+the zero-input refresh: the PIN run sets `16f942` (group offset 4) through
+`38e698`, continuation `38e50b`, at 10.364155 s; the no-PIN run instead
+sets `16f93f` (group offset 1), continuation `38e55b`, at 10.365222 s.
+No later writes to these 27 flag bytes appear through 16 s in either run,
+including the PIN run's successful VERIFY and late selector input 3.
+Recover the refresh predicates in `38e60a` and their backing state before
+interpreting either flag as a named SIM or network condition.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
