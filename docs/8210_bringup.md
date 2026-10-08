@@ -67,6 +67,23 @@ an answered SIP/media gate. Recover the product's active audio endpoints
 before promoting bidirectional speech acceptance. The normal machine and
 native-DSP limitations are unchanged.
 
+### Own audio endpoint evidence
+
+The complete three-volume NSM-3 service archive from
+[this mirror](https://www.eserviceinfo.com/downloadsm/5456/Nokia_8210.html)
+is acquired and passes `unrar t`; its PDFs are retained under
+`roms/research/nsm3/`. Do not infer the product from the misleading archive
+filename mentioning 8810: the inspected document headers identify NSM-3.
+`04ui.pdf`, UI Module issue 1 (12/1999), printed page 15, explicitly connects
+the built-in microphone to COBBA MIC2. Its table maps X300/2 MICP to MIC2N
+and X300/1 MICN to MIC2P; preserve that documented polarity rather than
+silently swapping labels. Printed page 4 identifies EARP/EARN receiver
+connections. These support MIC2/EAR as declared HLE endpoints, not decoded
+COBBA register policy. The page-15 32 dB gain is an electrical test condition,
+not a recovered runtime gain. No gain is promoted from that figure.
+SHA256 of `04ui.pdf`:
+`684b896015d1531f552d224742d957286d7869ecda2517910f1c5bfa88062c5e`.
+
 ## Physical power lifecycle
 
 `make verify-8210-power-cycle RUN_DIR=NEW_DIRECTORY` starts with private fresh
