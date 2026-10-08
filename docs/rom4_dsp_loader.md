@@ -661,6 +661,17 @@ identifies the C54x Simulator Getting Started manual (SPRU137), with DOS and
 Unix installations. That reference establishes historical software availability,
 not timer/pipeline accuracy or a presently obtainable binary. Neither referral
 provides a runnable differential oracle for the current timer probe.
+The acquired [SPRU099D debugger guide](https://www.ti.com/lit/ug/spru099d/spru099d.pdf)
+narrows this lead: sections 2.5/4.11 list timer simulation for `-mv540`
+through `-mv549`; section 8.8 exposes pipeline opcode/address pseudoregisters
+`p_ins/p_add`, `f_ins/f_add`, `d_ins/d_add`, `a_ins/a_add`, `r_ins/r_add`
+and `x_ins/x_add`. It places ARAU updates in operand-access-1. A comparison
+must therefore record Decode acceptance, auxiliary-register visibility and
+Execute timing separately, not infer them from the final stacked PC. This
+is a documented observation interface, not an acquired executable or measured
+timer result. The 419-page PDF is retained at
+`roms/reference-docs/c54x/ti_tms320c54x_debugger_spru099d.pdf`, SHA-256
+`20e6c1573d959f3752d9f32187bd6119dee2c4a848b020af66ddbf23f685c909`.
 CALLD and RETD likewise use two and three cycles respectively, rather than
 four each. A cycle-stamped call/return fixture checks both delay pairs and
 stack balance against SPRU172C pages 4-27 and 4-139. CALA/CALAD retain their
