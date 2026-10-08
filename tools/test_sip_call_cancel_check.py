@@ -90,6 +90,19 @@ class SipCancelCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check(log='\n'.join(reversed(LOG.splitlines())))
 
+    def test_handset_connection_is_rejected_even_with_zero_bridge_counters(self):
+        for state in ('incoming state', 'state'):
+            with self.subTest(state=state), self.assertRaises(RuntimeError):
+                self.check(log=LOG + f'gsm_call_adapter: {state} id=1 epoch=1 phase=connected\n',
+                           product='6210')
+
+    def test_accepted_handset_media_is_rejected_even_with_zero_bridge_counters(self):
+        for direction in ('uplink', 'downlink'):
+            with self.subTest(direction=direction), self.assertRaises(RuntimeError):
+                self.check(log=LOG + 'gsm_call_adapter: media '
+                           f'direction={direction} id=1 sequence=0 result=accepted\n',
+                           product='6210')
+
 
 if __name__ == '__main__':
     unittest.main()

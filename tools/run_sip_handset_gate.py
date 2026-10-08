@@ -385,8 +385,11 @@ def verify_cancel(root, remote_text, product='3210'):
         raise RuntimeError('missing real SIP CANCEL/487 exchange')
     if ('state changed to CONFIRMED' in remote_text or 'SIP confirmed' in bridge_text or
             'SIP physical answer' in bridge_text or
+            re.search(r'gsm_call_adapter: (?:incoming )?state id=\d+ epoch=\d+ phase=connected', log) or
             re.search(r'GSM service uplink sapi=0 pd=03 message=07', log)):
         raise RuntimeError('cancelled incoming SIP call falsely answered')
+    if re.search(r'gsm_call_adapter: media direction=\w+ id=\d+ .*result=accepted', log):
+        raise RuntimeError('cancelled incoming SIP call accepted handset media')
     match = re.search(r'SIP bridge ended (\{[^\n]+\})', bridge_text)
     if not match:
         raise RuntimeError('cancelled incoming call never completed handset release')

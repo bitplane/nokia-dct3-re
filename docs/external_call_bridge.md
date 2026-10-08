@@ -398,7 +398,9 @@ make verify-5210-radio-incoming-call-sip-cancel RUN_DIR=run_5210_sip_cancel
 The real SIP caller cancels only after the handset reports alerting. The gate
 requires CANCEL/487, exactly one correlated GSM termination, network DISCONNECT,
 firmware RELEASE COMPLETE, acknowledged LAPDm Channel Release and host `ended`,
-with no physical Answer, connection or bridge media on each product. CC completion
+with no physical Answer, connection or bridge media on each product. The checker
+also rejects connected handset states and accepted handset-media events even
+when the bridge's final counters are zero. CC completion
 must survive the subsequent RR release whether it arrives before or after the
 DISCONNECT acknowledgement; both orderings represent an already completed CC
 transaction. Stopping the traffic channel alone is not the cancellation gate's
