@@ -458,6 +458,13 @@ reviewed missed-call/idle pixels and physical Names/C Exit decoded as `15`
 are mandatory. Both the shared preparation and the manifest retain explicit
 non-native labels for audit-only shared ROM members. Answered SIP and speech
 have not inherited the other products' promotion.
+
+`verify-6250-sip-outgoing-busy` separately verifies physical `123`/Send,
+decoded own SETUP, real PJSIP 486 and the correlated busy decision. The
+pre-assignment signaling-channel release and own firmware confirmation must
+complete before resumed paging and exact registered-idle pixels. It retains
+the declared initial-record comparison, zero-media requirement and research-HLE
+scope; it does not promote answered calls or speech.
 `verify-6250-sip-idle-restore` separately requires exact idle architecture,
 ordered replay and matching pixels before a fresh INVITE. Its CANCEL/487
 result must use epoch 2 with zero media. The post-load observer is started

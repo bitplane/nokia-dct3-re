@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 549 gates: 387 generated from typed steps, 162 copied verbatim (shell).
+# 550 gates: 387 generated from typed steps, 163 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -48,7 +48,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-host-incoming-sms verify-8210-host-outgoing-sms \
 	verify-8210-host-rejected-sms verify-8210-host-silent-sms \
 	verify-8210-sip-idle-restore verify-8210-sip-cancel \
-	verify-6250-sip-idle-restore verify-6250-sip-cancel verify-6210-power-cycle \
+	verify-6250-sip-idle-restore verify-6250-sip-cancel \
+	verify-6250-sip-outgoing-busy verify-6210-power-cycle \
 	verify-8890-power-off-restore verify-8890-cold-clock verify-8890-power-cycle \
 	verify-8850-sip-idle-restore verify-8850-sip-cancel \
 	verify-8890-sip-idle-restore verify-8890-sip-cancel \
@@ -383,6 +384,11 @@ verify-6250-sip-idle-restore: build
 verify-6250-sip-cancel: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6250_sip_cancel.py $(RUN_DIR) --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP stack; physical NHM-3 outgoing busy on coherent carrier 19, no media
+verify-6250-sip-outgoing-busy: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6250_sip_cancel.py $(RUN_DIR) --outgoing-busy --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 verify-6210-power-cycle: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario power-cycle --mame $(MAME_DIR)/mame

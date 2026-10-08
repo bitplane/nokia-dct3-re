@@ -426,10 +426,22 @@ are checked independently before resumed paging.
 
 The reviewed 96x60 `1 missed call` screen must appear, followed by physical
 Names/C Exit decoded as own raw matrix value `15` and the reviewed operator
-idle frame. The generic SIP runner rejects answered, media and call/idle
-restore fixtures for this profile. This proves an unanswered external SIP
+idle frame. The generic SIP runner rejects answered/media and external-dialog
+restoration fixtures for this profile; the own idle-restore runner admits a
+fresh dialog only after handset restoration. This proves an unanswered external SIP
 lifecycle, not speech, native DSP, live RF or authentic factory PMM repair.
 The normal `noki6250` machine remains fail-closed.
+
+`verify-6250-sip-outgoing-busy` independently verifies physical `123`/Send
+against real local PJSIP 486 on the same declared initial-record composition.
+The checker decodes the product's SETUP digits, requires a correlated busy
+decision, complete CC/RR release and zero media. Because busy precedes traffic
+assignment, the release body is `041202000000001a600000130000000f00000000`,
+with firmware confirmation `body=00 input=0409 expected=01 pending=00`;
+the answered-call deconfiguration is not applicable. Repeated confirmation
+tuples are retained in outgoing fixtures to distinguish this release from
+registration. Resumed paging and reviewed registered-idle pixels are required.
+Answered SIP and speech remain unproved.
 
 ## Recovered hardware contracts
 

@@ -107,6 +107,14 @@ class SipFailureCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check(product='6210', status=480, log=log.replace('cause=18', 'cause=180'))
 
+    def test_6250_busy_requires_own_three_digit_setup(self):
+        log = LOG.replace('digits=5551234', 'digits=123').replace(
+            'length=15 data=03450401a05e0581551532f4150101',
+            'length=13 data=03450401a05e038121f3150101')
+        self.assertEqual(self.check(product='6250', log=log)['sip_status'], 486)
+        with self.assertRaises(RuntimeError):
+            self.check(product='6250')
+
     def test_false_connection_is_rejected(self):
         for extra in ('state changed to CONFIRMED',):
             with self.assertRaises(RuntimeError):

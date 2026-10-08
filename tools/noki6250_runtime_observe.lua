@@ -36,7 +36,8 @@ taps[#taps + 1] = memory:install_read_tap(0x464738, 0x46473b,
             expected, pending = memory:read_u8(context + 2), memory:read_u8(context + 3)
         end
         local key = string.format("%x:%x:%x:%x", body, input, expected, pending)
-        if channel_confirmations[key] then return end
+        -- Outgoing fixtures must observe a repeated signaling release after SETUP.
+        if channel_confirmations[key] and os.getenv('NOKIA_DCT3_6250_OUTGOING') ~= '1' then return end
         channel_confirmations[key] = true
         machine:logerror(string.format("6250_channel_confirmation: body=%02x input=%04x expected=%02x pending=%02x t=%.6f\n",
             body, input, expected, pending, machine.time:as_double()))
