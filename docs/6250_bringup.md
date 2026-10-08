@@ -299,6 +299,19 @@ firmware receive routing and decoder gating after channel confirmation.
 Do not infer that repeated SI was consumed and suppressed merely because
 the peer is intended to broadcast continuously.
 
+An otherwise identical 45-second run with existing `-verbose` transport
+diagnostics verifies continued type-80 BCCH publication after the late
+PIN transaction: at 44.175906 s the peer enqueues a class-50 SI4 block,
+at 44.480906 s SI1, and at 44.785906 s SI2. Interleaved type-83 reports
+and class-60 paging blocks also continue. FIQ0 notifications accompany
+these publications, and the logged consumer cursor advances between
+them (for example `095 -> 0a7 -> 0ac` at 44.775906..44.785906 s).
+The SI decoder observer still ends at 8.006310 s. This excludes a stopped
+peer broadcast loop and an entirely stuck RX ring for this run, but does
+not establish which firmware filter drops or reroutes class-50 packets.
+Next trace the actual lower decoder/recipient selection after the initial
+channel change; no new broadcast payload or reply is justified yet.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
