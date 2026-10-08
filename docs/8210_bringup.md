@@ -920,6 +920,13 @@ project (`tools/symbols/trace-names-nhm5.txt`) labels `1855`, `1856`, and
 specify the ROM6 type-`55`/`56`/`57` command lifetimes. Do not import a
 cancellation or periodic-measurement rule from that catalogue. Resolve
 the own-ROM request/control lifecycle or obtain a matching ROM6 trace.
+Own type-`56` construction is anchored at `2b2fe0`: it allocates `a4`
+bytes, sets payload length `a0`, message halfword 2 and type byte `56`,
+and initializes all 160 payload bytes to `ff`. Producer `286c48` calls
+this constructor, selects list population through `2869bc` or `286bc0`,
+then sends via `2b300e` to task 3. These are ROM-checked producer anchors,
+not a proof of measurement lifetime or cancellation semantics. Follow
+their caller's state/control transitions to settle that remaining question.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

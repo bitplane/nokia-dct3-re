@@ -158,6 +158,17 @@ def verify(image):
     if instructions(0x21ef4a, 10) != [
             ('ldr', 'r0, [r4, #8]'), ('bl', '#0x2a2250'), ('bl', '#0x21f900')]:
         raise ValueError('state-13 measurement recovery does not reevaluate queued request')
+    if instructions(0x2b2ff2, 12) != [
+            ('movs', 'r0, #0xa0'), ('strb', 'r0, [r4, #2]'),
+            ('movs', 'r0, #2'), ('strh', 'r0, [r4]'),
+            ('movs', 'r0, #0x56'), ('strb', 'r0, [r4, #3]')]:
+        raise ValueError('own candidate-list packet header differs')
+    if instructions(0x286c50, 6) != [('bl', '#0x2b2fe0'), ('adds', 'r7, r0, #0')]:
+        raise ValueError('candidate-list producer constructor differs')
+    if instructions(0x286c74, 8) != [
+            ('adds', 'r0, r7, #0'), ('bl', '#0x2b300e'),
+            ('pop', '{r4, r5, r6, r7, pc}')]:
+        raise ValueError('candidate-list producer send tail differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
