@@ -7192,6 +7192,55 @@ private:
 			expect_opcode(0x56f8, m_cpu->state_int(tms320c54x_device::STATE_A) == 0xffff801234ULL &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 DLD absolute reads high/low words and costs two cycles");
+			m_phase = 9215;
+		}
+		if (m_phase >= 9215 && m_phase <= 9219)
+		{
+			if (m_phase != 9215)
+			{
+				const unsigned index = m_phase - 9216;
+				const bool circular = index >= 2;
+				expect_opcode(circular ? 0x56d3 : 0x5685,
+					m_cpu->state_int(tms320c54x_device::STATE_A) == ((index & 1) ? 0xff801234ULL : 0xffff801234ULL) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f20 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == (circular ? 0x0f21 : 0x0f24) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 DLD stationary/circular sources respect SXM, long-pointer wrap, B/status preservation and one-cycle timing");
+			}
+			if (m_phase < 9219)
+			{
+				const unsigned index = m_phase - 9215;
+				program.write_word(0x05e3, index >= 2 ? 0x56d3 : 0x5685);
+				program.write_word(0x05e4, 0x75f8);
+				program.write_word(0x05e5, 0x0d00);
+				program.write_word(0x05e6, 0x0124);
+				program.write_word(0x05e7, 0xf5e1);
+				data.write_word(0x0f20, 0xff80);
+				data.write_word(0x0f21, 0x1234);
+				data.write_word(0x0f24, 0xff80);
+				data.write_word(0x0f25, 0x1234);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x76543210);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f20);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f24);
+				m_cpu->set_state_int(tms320c54x_device::STATE_BK, 5);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 1) ? 0 : 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 			program.write_word(0x05e3, 0x7213); // MVDM dmad,AR3
 			program.write_word(0x05e4, 0x0f20);
 			data.write_word(0x0f20, 0x1234);
