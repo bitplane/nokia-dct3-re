@@ -150,7 +150,16 @@ private:
 			{0x2e00, 0x8000, 0x8000, 0x0240, 0x0000007fffULL, 0xff80010000ULL, false, 2},
 			// SMUL is inert when either OVM or FRCT is clear.
 			{0x2a00, 0x8000, 0x8000, 0x0040, 0xffffff8000ULL, 0x0080000000ULL, true, 2},
-			{0x2a00, 0x8000, 0x8000, 0x0200, 0, 0x0040000000ULL, false, 2}
+			{0x2a00, 0x8000, 0x8000, 0x0200, 0, 0x0040000000ULL, false, 2},
+			// SMUL controls MAC/MAS pre-accumulation, not MPYR rounding.
+			{0x2200, 0x8000, 0x8000, 0x0240, 0, 0x007fffffffULL, true, 2},
+			{0x2200, 0x8000, 0x8000, 0x0040, 0, 0x0080000000ULL, true, 2},
+			{0x2200, 0x8000, 0x8000, 0x0200, 0, 0x0040000000ULL, false, 2},
+			{0x2200, 0x8000, 0x8000, 0, 0, 0x0040000000ULL, false, 2},
+			{0x2200, 1, 0x8000, 0, 0, 0, false, 2},
+			{0x2200, 1, 0x8000, 0x0040, 0, 0xffffff0000ULL, false, 2},
+			{0x2200, 1, 0x7fff, 0, 0, 0, false, 2},
+			{0x2200, 1, 0x4000, 0x0040, 0, 0x0000010000ULL, false, 2}
 		};
 		return cases[index];
 	}
@@ -1319,7 +1328,7 @@ private:
 			start_rounded_multiply_case(0);
 			return;
 		}
-		if (m_phase >= 6320 && m_phase < 6432)
+		if (m_phase >= 6320 && m_phase < 6496)
 		{
 			unsigned const index = m_phase - 6320;
 			auto const &test = rounded_multiply_vector(index / 8);
@@ -1338,8 +1347,8 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
 				"SPRU172C rounded multiplier signed boundaries preserve opposite accumulator, carry, TC, T and address");
-			if (index < 111) { start_rounded_multiply_case(index + 1); return; }
-			osd_printf_info("TMS320C54x rounded multiply boundaries: PASS vectors=14 destinations=2 addressing_modes=2 sticky_overflow_states=2\n");
+			if (index < 175) { start_rounded_multiply_case(index + 1); return; }
+			osd_printf_info("TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
