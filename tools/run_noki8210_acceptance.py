@@ -20,6 +20,7 @@ from tools.noki8210_staged_check import verify as verify_stage
 SCENARIOS = {
     'toolkit': ('toolkit_input', 43, 'toolkit_check'),
     'toolkit-inkey': ('toolkit_inkey_input', 43, 'toolkit_inkey_check'),
+    'toolkit-input': ('toolkit_input_digits', 50, 'toolkit_inkey_check'),
     'power-cycle': ('power_cycle_input', 73, 'power_check'),
     'ussd': ('ussd_input', 40, 'ussd_check'),
     'divert': ('divert_input', 40, 'divert_check'),
@@ -155,7 +156,7 @@ def main():
     try:
         mcu = (root / 'roms/noki8210/8210_5.31ppm_c.fls').read_bytes()
         pmm = (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes()
-        if args.scenario in ('ussd', 'divert', 'toolkit', 'toolkit-inkey'):
+        if args.scenario in ('ussd', 'divert', 'toolkit', 'toolkit-inkey', 'toolkit-input'):
             from tools.noki8210_ussd_check import verify_key_table
             verify_key_table(mcu)
         prepare_run(run, mcu, pmm)
@@ -169,11 +170,12 @@ def main():
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
         if config:
             shutil.copyfile(root / f'fixtures/{config}/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
-        if args.scenario in ('toolkit', 'toolkit-inkey'):
+        if args.scenario in ('toolkit', 'toolkit-inkey', 'toolkit-input'):
             config_tree = ET.Element('mameconfig', version='10')
             inputs = ET.SubElement(ET.SubElement(config_tree, 'system', name='nsm3hle'), 'input')
             ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
-                          mask='15', defvalue='0', value='2' if args.scenario == 'toolkit-inkey' else '1')
+                          mask='15', defvalue='0',
+                          value={'toolkit': '1', 'toolkit-inkey': '2', 'toolkit-input': '3'}[args.scenario])
             ET.ElementTree(config_tree).write(run / 'cfg/nsm3hle.cfg')
         if args.dcs1800:
             configure_dcs_topology(run / 'cfg/nsm3hle.cfg',
@@ -228,6 +230,8 @@ def main():
             verify_stage(pin_text, runtime=True, selftest=True, base_record=True)
             verify_pin_measurement_registration(pin_text, dcs1800=args.dcs1800)
         check = [sys.executable, str(root / f'tools/noki8210_{checker}.py'), str(run / 'error.log')]
+        if args.scenario == 'toolkit-input':
+            check.append('--get-input')
         storage = str(run / 'nvram/nsm3hle/sim_card')
         if args.scenario == 'power-cycle':
             check.extend([storage, str(run / 'snap')])
@@ -351,7 +355,7 @@ def main():
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
             'laboratory_carrier': 823 if args.dcs1800 else 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' or args.pin_enabled else None,
-            'sim_profile': 'Phase 2+ DISPLAY TEXT/GET INKEY laboratory card' if args.scenario == 'toolkit-inkey' else 'Phase 2+ DISPLAY TEXT laboratory card' if args.scenario == 'toolkit'
+            'sim_profile': 'Phase 2+ DISPLAY TEXT/GET INKEY/GET INPUT laboratory card' if args.scenario == 'toolkit-input' else 'Phase 2+ DISPLAY TEXT/GET INKEY laboratory card' if args.scenario == 'toolkit-inkey' else 'Phase 2+ DISPLAY TEXT laboratory card' if args.scenario == 'toolkit'
                 else 'PIN-enabled laboratory card' if args.pin_enabled else 'default laboratory card',
             'pin_start_seconds': (args.pin_start if args.pin_start is not None else 8)
                 if args.pin_enabled else None,

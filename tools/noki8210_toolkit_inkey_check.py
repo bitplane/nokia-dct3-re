@@ -24,32 +24,48 @@ FRAMES = {
     'inkey': '90351a3228bbcbd52db78482a153a49a3988869afdf35dcf0d74af02d43a0458',
     'inkey_complete': '08737c08772c99df2b41fc8560587820c2c209f5f74c12893a657bd6f623e555',
 }
+INPUT_EVENTS = EVENTS[:-1] + (
+    'proactive GET INPUT ready', 'SIM status ins=14 sw=911a',
+    'header cla=a0 ins=12 p1=00 p2=00 p3=1a',
+    '8210_toolkit_physical: action=input_4',
+    '8210_toolkit_physical: action=input_2',
+    '8210_toolkit_physical: action=input_confirm',
+    'header cla=a0 ins=14 p1=00 p2=00 p3=11',
+    'terminal-response data=8103032300020282810301000d03043432',
+    'SIM status ins=14 sw=9000',
+)
+INPUT_FRAMES = {key: FRAMES[key] for key in ('display', 'inkey')}
+INPUT_FRAMES.update({
+    'get_input': 'c26d453971ea775fd7bdee10235bba195eb70254ce522fda3fbc6cab13bc09f9',
+    'input_complete': FRAMES['inkey_complete'],
+})
 
 
-def verify_protocol(text):
+def verify_protocol(text, *, get_input=False):
     if '[LUA ERROR]' in text:
         raise ValueError('physical GET INKEY fixture failed')
-    require_in_order(text.replace('[:sim_card] ', ''), EVENTS)
+    require_in_order(text.replace('[:sim_card] ', ''), INPUT_EVENTS if get_input else EVENTS)
 
 
 def main():
     from PIL import Image
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
+    parser.add_argument('--get-input', action='store_true')
     args = parser.parse_args()
     run = args.log.parent
     try:
         text = args.log.read_text(errors='replace')
-        verify_protocol(text)
+        verify_protocol(text, get_input=args.get_input)
         verify_stage(text, runtime=True, selftest=True, base_record=True)
         verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
-        for phase, digest in FRAMES.items():
+        for phase, digest in (INPUT_FRAMES if args.get_input else FRAMES).items():
             with Image.open(run / f'snap/8210_toolkit_{phase}.png') as frame:
                 if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
                     raise ValueError('unreviewed GET INKEY frame: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 GET INKEY FAIL: {error}\n')
-    print('8210 physical GET INKEY and registered idle PASS')
+    print('8210 physical ' + ('GET INPUT' if args.get_input else 'GET INKEY') + ' and registered idle PASS')
 
 
 if __name__ == '__main__':

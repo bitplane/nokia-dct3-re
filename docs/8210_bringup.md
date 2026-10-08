@@ -657,6 +657,16 @@ location requirements and checks exact DISPLAY TEXT, GET INKEY and idle
 pixels. This proves GET INKEY in this composition, not other proactive
 commands or a change to the native-DSP boundary.
 
+`verify-8210-sim-toolkit-input` extends that same sequence with GET INPUT.
+The GET INKEY response advertises `91 1a`; firmware fetches 26 bytes and
+renders `Enter 42`. Physical digits 4, 2 and Menu/OK produce
+`8103032300020282810301000d03043432` and `90 00`, returning to registered
+idle. The extended gate checks both preceding commands, all three physical
+input actions, the GET INPUT prompt and the final idle pixels, along with
+unchanged own-product startup and persistent-location predicates. Its
+accepted response is two GSM-default-alphabet digits; arbitrary text,
+UCS2, cancellation, timeout and PIN/DCS combinations are not established.
+
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
 idle, compares a one-second reference interval with the restored interval,
