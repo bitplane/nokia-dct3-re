@@ -890,11 +890,11 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 495 are asserted, one (`e809`) executes
-without an assertion, and 98 are absent. The independent RF-boundary checker
+Against the executable fixture, 499 are asserted, one (`e809`) executes
+without an assertion, and 94 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `a249` at first PC `3369`, `e723` at `32fa`, and `7083` at `0a22`.
+include `74d4` at first PC `32cd`, `0092` at `4e10`, and `0192` at `4e11`.
 Exact `0881` now checks SUB through AR1 with both SXM settings, 32-bit
 no-borrow carry, unchanged B/source/pointers and one-cycle arithmetic.
 Exact `e4e9` checks loading T while storing old A, independent Y increment,
@@ -927,6 +927,12 @@ an explicit register read/write mode at its otherwise interrupting-read
 peripheral addresses `60/61`; these tests do not assign Nokia silicon meaning
 to those addresses. Exact `4fd2` checks high/low word order, a two-word circular
 AR2 advance, unchanged AR3/accumulators, and untouched adjacent memory cells.
+Exact `a249`/`a201` check signed dual-memory SUB into A, 32-bit carry,
+unchanged B/T/source and decrementing-X/incrementing-Y versus stationary
+pointers, with one-cycle execution. Exact `e723` distinguishes AR2-to-AR3
+from the adjacent AR5 source and checks source preservation and one-cycle
+execution. Exact `7083` checks dmad-to-AR3-indirect movement, preserved source
+and pointers, extension consumption and two-cycle execution.
 The next coverage task is to classify and assert these newly observed paths,
 not extend unobserved variants or fabricate RF samples. The gate deliberately
 retains its older fingerprint until the expanded execution is explained and
@@ -1012,10 +1018,11 @@ OVM clamps the overflowing accumulator result, and OVA is set without
 modifying T or AR3. It runs in one DARAM cycle.
 
 The coverage tool now separates fixture execution from explicit result
-assertions. All 457 observed ROM4 words have an `opassert` marker after a
-passing exact-word check; none are executed-only or absent. This closes the
-observed exact-word fixture gap for this captured boot, not unexecuted ROM4
-paths, unobserved encodings, or the instruction-family audit. Existing result
+assertions. All 457 narrower-baseline ROM4 words have an `opassert` marker
+after a passing exact-word check; none of that set are executed-only or absent.
+The fresh 594-word trace still has gaps quantified above. Neither result
+establishes unexecuted ROM4 paths, unobserved encodings, or the instruction-family
+audit. Existing result
 checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
 them from the executed-only class without changing CPU behavior. Observed

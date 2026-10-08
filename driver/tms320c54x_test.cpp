@@ -6888,6 +6888,24 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"ROM4 MVKD copies source to *AR2- in two cycles");
+			program.write_word(0x05e3, 0x7083); // MVKD dmad,*AR3.
+			data.write_word(0x0f23, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f23);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6520;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6520)
+		{
+			expect_opcode(0x7083,
+				data.read_word(0x0f23) == 0x5678 && data.read_word(0x0f20) == 0x5678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f23 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f20 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"ROM4 MVKD through AR3 consumes dmad, preserves source and pointers and costs two cycles");
 			program.write_word(0x05e0, 0x75d6);
 			program.write_word(0x05e1, 0x0124);
 			program.write_word(0x05e2, 0xec0e); // RPT #14
@@ -6932,6 +6950,24 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1234 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 MVMM copies AR5 to AR3 in one cycle");
+			program.write_word(0x05e2, 0xe723); // MVMM AR2,AR3.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6521;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6521)
+		{
+			expect_opcode(0xe723,
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x1234 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 MVMM selects AR2 rather than AR5, preserves source and costs one cycle");
 			program.write_word(0x05e2, 0x7194); // MVDK *AR4+,dmad
 			program.write_word(0x05e3, 0x0f22);
 			program.write_word(0x05e4, 0x75d6);
@@ -13176,6 +13212,47 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			program.write_word(0x05e2, 0xa249); // SUB *AR2-,*AR3+,A.
+			data.write_word(0x0f94, 0xfffb);
+			data.write_word(0x0f95, 7);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x5678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f94);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f95);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6522;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6522 || m_phase == 6523)
+		{
+			bool const modify = m_phase == 6522;
+			expect_opcode(modify ? 0xa249 : 0xa201,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffff40000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x5678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x4444 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (modify ? 0x0f93 : 0x0f94) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (modify ? 0x0f96 : 0x0f95) &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0c00) == 0x0800 &&
+				data.read_word(0x0f94) == 0xfffb && data.read_word(0x0f95) == 7 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 dual SUB shifts signed X/Y, updates carry at bit 32 and independently modifies its pointers");
+			if (modify)
+			{
+				program.write_word(0x05e2, 0xa201); // SUB *AR2,*AR3,A.
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f94);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f95);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6523;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
