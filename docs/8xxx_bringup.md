@@ -1483,6 +1483,13 @@ closure. Both require registration after PIN acceptance. Their permanent
 gates are `verify-8850-pin-host-outgoing-call` and
 `verify-8850-pin-host-outgoing-sms`; no native speech is claimed.
 
+`verify-8850-pin-phonebook` saves `A / 123` through physical keys with PIN
+enabled, then starts a second process on the same acquired PMM and SIM
+storage. It requires physical PIN acceptance again, retained-LAI/TMSI
+registration, byte-identical SIM storage after readback, no ADN rewrite,
+and the reviewed contact-detail pixels. The first process's trace is retained
+as `write.log`; the second process owns `error.log`.
+
 Run `noki8850_radio_observe.lua` for 60 simulated seconds with the isolated
 research invocation above, then check:
 

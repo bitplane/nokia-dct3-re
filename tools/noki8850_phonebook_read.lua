@@ -4,7 +4,8 @@ local directory = assert(source:match("^(.*[/])"))
 dofile(directory .. "noki8850_security_input.lua")
 local machine = manager.machine
 local input = coroutine.create(function()
-    if not emu.wait(29) then return end
+    local start = os.getenv('NOKIA_DCT3_8850_PIN_ENTRY') == '1' and 33 or 29
+    if not emu.wait(start) then return end
     local key = assert(machine.ioport.ports[":COL.1"].fields["Menu"])
     for _, stage in ipairs({"search_editor", "search_results", "contact"}) do
         machine:logerror("8850_phonebook_read_physical: action=" .. stage .. "\n")

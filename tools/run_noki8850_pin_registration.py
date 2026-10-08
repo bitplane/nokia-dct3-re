@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--without-pin', action='store_true',
                         help='run the original phone-code-only baseline')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
-                                              'host-outgoing-call', 'host-outgoing-sms'),
+                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook'),
                         default='registration')
     parser.add_argument('--port', type=int, default=18850)
     args = parser.parse_args()
@@ -52,7 +52,7 @@ def main():
         run.mkdir(parents=True, exist_ok=False)
         for directory in ('cfg', 'nvram/nsm2hle', 'snap'):
             (run / directory).mkdir(parents=True)
-        host = args.scenario != 'registration'
+        host = args.scenario.startswith('host-')
         sms = args.scenario.endswith('-sms')
         incoming = args.scenario.startswith('host-incoming-')
         script = {
@@ -61,6 +61,7 @@ def main():
             'host-incoming-sms': 'incoming_sms_input',
             'host-outgoing-call': 'outgoing_call_input',
             'host-outgoing-sms': 'outgoing_sms_input',
+            'phonebook': 'phonebook_input',
         }[args.scenario]
         if host:
             shutil.copyfile(root / 'fixtures/noki8850_host/nsm2hle.cfg', run / 'cfg/nsm2hle.cfg')
@@ -100,13 +101,39 @@ def main():
             validate(text, card.read_bytes(), 'verify', '1234')
             check_pin_inputs(text)
         errors = check_trace(text, runtime_hle=True, sim_reads=True)
-        if not host:
+        if args.scenario == 'registration':
             errors += check_physical_inputs(text) + check_navigation_frames(run / 'snap')
         if errors:
             raise ValueError('; '.join(errors))
         subprocess.run([sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                         str(run / 'error.log'), '--profile', 'nsm2'], check=True)
-        if sms and not incoming:
+        if args.scenario == 'phonebook':
+            original_card = card.read_bytes()
+            subprocess.run([sys.executable, str(root / 'tools/noki8850_phonebook_check.py'),
+                            'save', str(run / 'error.log'), str(card),
+                            str(run / 'snap/8850_phonebook_save.png')], check=True)
+            shutil.copyfile(run / 'error.log', run / 'write.log')
+            cold_command = command.copy()
+            cold_command[cold_command.index('-autoboot_script') + 1] = str(
+                root / 'tools/noki8850_phonebook_read.lua')
+            with (run / 'cold_console.log').open('w') as console:
+                subprocess.run(cold_command, cwd=run, env=environment, stdout=console,
+                               stderr=subprocess.STDOUT, check=True, timeout=180)
+            cold_text = (run / 'error.log').read_text(errors='replace')
+            if card.read_bytes() != original_card:
+                raise ValueError('cold phonebook read changed persistent SIM bytes')
+            if not args.without_pin:
+                validate(cold_text, card.read_bytes(), 'verify', '1234')
+                check_pin_inputs(cold_text)
+            cold_errors = check_trace(cold_text, runtime_hle=True, sim_reads=True)
+            if cold_errors:
+                raise ValueError('; '.join(cold_errors))
+            subprocess.run([sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
+                            str(run / 'error.log'), '--profile', 'nsm2', '--preserved'], check=True)
+            subprocess.run([sys.executable, str(root / 'tools/noki8850_phonebook_check.py'),
+                            'readback', str(run / 'error.log'), str(card),
+                            str(run / 'snap/8850_phonebook_contact.png')], check=True)
+        elif sms and not incoming:
             from tools.noki8850_outgoing_sms_check import verify
             verify(text)
             subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
