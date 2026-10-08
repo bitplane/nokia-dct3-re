@@ -373,6 +373,8 @@ make verify-radio-outgoing-call-sip-unavailable RUN_DIR=run_3210_sip_unavailable
 make verify-radio-outgoing-call-sip-forbidden RUN_DIR=run_3210_sip_forbidden
 make verify-radio-outgoing-call-sip-not-found RUN_DIR=run_3210_sip_not_found
 make verify-radio-outgoing-call-sip-service-unavailable RUN_DIR=run_3210_sip_service_unavailable
+make verify-radio-outgoing-call-sip-global-busy RUN_DIR=run_3210_sip_global_busy
+make verify-radio-outgoing-call-sip-timeout-response RUN_DIR=run_3210_sip_timeout_response
 ```
 
 These gates physically dial the 3210 into actual upstream PJSIP responses and
@@ -388,12 +390,17 @@ and require ordered no-answer decisions plus exact cause-1 and cause-41
 terminations, respectively, before clean firmware release. Numeric prefixes
 cannot satisfy cause or outcome checks. These remain HLE signaling gates,
 not public-network or native speech validation.
+The real local 600 response independently passes the cause-17 busy-decision
+route, complete firmware release and zero connection/media. An explicit
+local SIP 408 response independently passes ordered no-answer/cause-102
+termination and the same clean release. The latter does not measure SIP
+transaction timer expiry, dropped packets or an unreachable endpoint.
 The release checker admits either CC send-sequence bit value without changing
 the decoded
 primitive. These gates do not measure failure-screen presentation.
 
 The implemented mapping subset also covers 603 -> 21, 604 -> 1,
-408 -> 102 and 500 -> 41; these have pure mapping tests, not handset runtime
+and 500 -> 41; these have pure mapping tests, not handset runtime
 gates. Unhandled statuses use an explicit cause-41 fallback policy. Warning and
 Reason headers, authentication retries and full RFC 3398 interoperability are
 not implemented.

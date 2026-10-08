@@ -59,7 +59,7 @@ class SipFailureCheckTest(unittest.TestCase):
                 self.check(status=403, log=invalid)
 
     def test_missing_destination_and_service_failure_require_exact_cause(self):
-        for status, cause in ((404, 1), (503, 41)):
+        for status, cause in ((404, 1), (408, 102), (503, 41)):
             with self.subTest(status=status):
                 log = LOG.replace('outgoing decision consumed id=1 outcome=1',
                                   'outgoing decision consumed id=1 outcome=2\n'
@@ -68,6 +68,11 @@ class SipFailureCheckTest(unittest.TestCase):
                 for wrong in (18, cause * 10):
                     with self.assertRaises(RuntimeError):
                         self.check(status=status, log=log.replace(f'cause={cause}', f'cause={wrong}'))
+
+    def test_global_busy_requires_busy_decision(self):
+        self.assertEqual(self.check(status=600)['sip_status'], 600)
+        with self.assertRaises(RuntimeError):
+            self.check(status=600, log=LOG.replace('outcome=1', 'outcome=2'))
 
     def test_unhandled_attempt_and_missing_ended_state_are_rejected(self):
         for log in (LOG + 'gsm_call_adapter: request id=2 epoch=1 digits=5551234\n',
