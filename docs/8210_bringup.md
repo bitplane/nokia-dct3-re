@@ -17,6 +17,25 @@ Identity and record success replies remain unselected. This is research-HLE
 phone-service acceptance, not a promotion of the normal machine, complete
 hardware fidelity, speech, or authentic factory-default provisioning.
 
+### Documented PCM bus
+
+Nokia's NSM-3 System Module, issue 1 (12/1999), printed page 24,
+independently specifies COBBA-GJP-generated PCMDClk at 1 MHz (13 MHz / 13)
+and PCMSClk at 8 kHz (PCMDClk / 125). The inspected timing diagram shows
+a one-data-clock active-high sync pulse, MSB-first 16-bit words with bits
+15..13 extending the sign of the 13-bit sample, and data transitions at
+rising clock edges (falling-edge sampling). This closes the product's PCM
+specification gap, not working speech: the runtime profile has not yet been
+configured from it, and own speech-request selection and active microphone/
+output routing still require evidence. No audio acceptance follows from
+the diagram alone.
+
+The primary-authored PDF is acquired from
+[the service-manual mirror](https://www.eserviceinfo.com/downloadsm/228901/NOKIA_03sys.html)
+and retained as `roms/research/nsm3/nsm3-system-module.pdf` (ignored source
+collection), SHA256
+`dbd9e70549b6de726be9667a2451bda74b7317f84956b50e5c91fce3124939c0`.
+
 ## Physical power lifecycle
 
 `make verify-8210-power-cycle RUN_DIR=NEW_DIRECTORY` starts with private fresh
