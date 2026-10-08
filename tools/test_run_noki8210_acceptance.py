@@ -104,6 +104,14 @@ class IsolatedAcceptanceTest(unittest.TestCase):
         self.assertEqual(error.exception.code, 2)
         prepare.assert_not_called()
 
+    def test_dcs_host_outgoing_sms_admitted_without_pin(self):
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800',
+                               '--scenario', 'host-outgoing-sms']), \
+                patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                self.assertRaisesRegex(RuntimeError, 'admitted'):
+            runner.main()
+
     def test_dcs_idle_state_admitted_without_pin(self):
         with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'idle-state']), \
                 patch.object(runner.Path, 'read_bytes', return_value=b''), \

@@ -422,6 +422,12 @@ establish late-PIN recovery: the default eight-second DCS sequence remains
 an unresolved negative control.
 Standard isolated targets are `verify-8210-dcs-host-incoming-sms` and
 `verify-8210-dcs-early-pin-host-incoming-sms`; supply a new `RUN_DIR`.
+No-PIN host outgoing SMS independently passes with
+`tools/run_noki8210_acceptance.py RUN --scenario host-outgoing-sms --dcs1800`
+(`run_8210_dcs_host_outgoing_sms_01`). Physical composition of `A` to
+`5551234`, reviewed success pixels, correlated host decision, CP/RP closure
+and own DCS registration/EF_LOCI are all required. This does not establish
+PIN-enabled outgoing SMS or DCS host rejection/timeout recovery.
 
 The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
