@@ -84,17 +84,19 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                     self.assertRaisesRegex(RuntimeError, 'admitted'):
                 runner.main()
 
-    def test_dcs_host_incoming_sms_admitted_without_pin(self):
-        with patch('sys.argv', ['runner', 'unused', '--dcs1800',
-                               '--scenario', 'host-incoming-sms']), \
-                patch.object(runner.Path, 'read_bytes', return_value=b''), \
-                patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
-                self.assertRaisesRegex(RuntimeError, 'admitted'):
-            runner.main()
+    def test_dcs_host_incoming_sms_admits_physical_pin_ordering(self):
+        for options in ([], ['--pin-enabled', '--pin-start', '7']):
+            with self.subTest(options=options), \
+                    patch('sys.argv', ['runner', 'unused', '--dcs1800',
+                                       '--scenario', 'host-incoming-sms'] + options), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
 
-    def test_dcs_host_sms_does_not_claim_pin_coverage(self):
+    def test_dcs_outgoing_sms_does_not_claim_pin_coverage(self):
         with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--pin-enabled',
-                               '--scenario', 'host-incoming-sms']), \
+                               '--scenario', 'outgoing-sms']), \
                 patch('sys.stderr', new_callable=io.StringIO), \
                 patch.object(runner, 'prepare_run') as prepare, \
                 self.assertRaises(SystemExit) as error:

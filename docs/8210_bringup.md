@@ -415,7 +415,11 @@ No-PIN host incoming SMS is also verified on DCS823/824:
 host CP/RP acknowledgment, physical Read, SIM read-status persistence and
 the reviewed `hello` body pixels. The host checker requires ARFCN823;
 GSM900's ARFCN4 is not accepted as DCS evidence. PIN-enabled DCS host SMS
-is not yet admitted or claimed.
+also passes with `--pin-enabled --pin-start 7`
+(`run_8210_early_pin_dcs_host_sms_01`), including correlated measurement,
+VERIFY and registration checks before the SMS lifecycle. This does not
+establish late-PIN recovery: the default eight-second DCS sequence remains
+an unresolved negative control.
 
 The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
@@ -951,7 +955,8 @@ VERIFY `9804`; it is not evidence about registration recovery.
 
 Reproduce the valid control with
 `tools/run_noki8210_acceptance.py RUN --pin-enabled --dcs1800 --pin-start 7`.
-The option affects physical input only, is restricted to PIN registration or incoming-call fixtures,
+The option affects physical input only, is restricted to PIN registration,
+incoming-call or host incoming-SMS fixtures,
 and is recorded in successful run manifests. Next decode recovery when
 `03ec` arrives after the serving acknowledgement, rather than adjust peer
 latency or choose an earlier default input.
