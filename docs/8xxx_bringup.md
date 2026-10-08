@@ -1049,6 +1049,9 @@ using the handset's own phone/SIM NVRAM presents the security editor; physical
 time/date input. Reproduce with
 `tools/noki8890_clock_read.lua`, preserved NVRAM, fresh private cfg and
 32 seconds; it enters only the security code and captures at 12/21/30 seconds.
+`make verify-8890-cold-clock RUN_DIR=RUN` automates both isolated processes,
+pins the own MCU/PMM hashes, and requires the full reviewed 13:47 idle frame
+after both physical settlement and cold security entry.
 CCONT persists registers `07..0d`, upper IRQ mask and alarm-armed state
 separately from handset storage, without advancing offline host time. The
 own-ROM clock setter `0x2fd21c` writes minutes and hour-with-bit-7 through the

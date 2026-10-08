@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 515 gates: 355 generated from typed steps, 160 copied verbatim (shell).
+# 516 gates: 356 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -49,7 +49,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-host-rejected-sms verify-8210-host-silent-sms \
 	verify-8210-sip-idle-restore verify-8210-sip-cancel \
 	verify-6250-sip-idle-restore verify-6250-sip-cancel verify-6210-power-cycle \
-	verify-8890-power-off-restore verify-8890-power-cycle \
+	verify-8890-power-off-restore verify-8890-cold-clock verify-8890-power-cycle \
 	verify-8850-sip-idle-restore verify-8850-sip-cancel \
 	verify-8890-sip-idle-restore verify-8890-sip-cancel \
 	verify-8890-host-rejected-sms verify-8890-host-silent-sms \
@@ -370,6 +370,9 @@ verify-6210-power-cycle: build
 
 verify-8890-power-off-restore: build
 	$(PYTHON) tools/run_noki8890_power_cycle.py $(RUN_DIR) --restore-off --mame $(MAME_DIR)/mame
+
+verify-8890-cold-clock: build
+	$(VENV)/bin/python tools/run_noki8890_cold_clock.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-8890-power-cycle: build
 	$(PYTHON) tools/run_noki8890_power_cycle.py $(RUN_DIR) --mame $(MAME_DIR)/mame
