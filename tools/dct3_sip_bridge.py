@@ -332,6 +332,8 @@ async def bridge(args, pj):
                                             endpoint.answer(200)
                                             decision = True
                                             print(f'SIP physical answer identity={identity}', flush=True)
+                                    elif event.get('phase') == 'media_closed':
+                                        connected = False
                                     elif event.get('phase') in ('ended', 'expired'):
                                         endpoint.hangup()
                                         counts.update(pcm_transmitted=endpoint.media.transmitted,

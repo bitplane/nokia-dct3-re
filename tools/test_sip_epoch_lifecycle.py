@@ -40,6 +40,34 @@ class Codec:
 
 
 class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
+    async def test_media_closure_stops_downlink_without_ending_dialog(self):
+        async def host(socket):
+            async def send(kind, **fields):
+                await socket.send(json.dumps({'type': kind, 'epoch': 1, **fields}))
+            await send('call_adapter_ready', protocol_version=1)
+            await send('outgoing_call', request_id=1, digits='123')
+            await asyncio.wait_for(socket.recv(), 2)
+            await send('outgoing_call_state', request_id=1, phase='connected',
+                       media_downlink_sequence=0)
+            await send('outgoing_call_state', request_id=1, phase='media_closed')
+            await asyncio.sleep(0.03)
+            endpoint = Endpoint.instances[-1]
+            endpoint.media.put(endpoint.media.downlink, bytes(320))
+            with self.assertRaises(asyncio.TimeoutError):
+                await asyncio.wait_for(socket.recv(), 0.05)
+            self.assertEqual(endpoint.media.downlink.qsize(), 1)
+            self.assertEqual(endpoint.hangups, 0)
+            await send('outgoing_call_state', request_id=1, phase='ended')
+            await socket.wait_closed()
+
+        with patch.object(sip, 'SipEndpoint', Endpoint), patch.object(sip, 'GsmFrCodec', Codec):
+            async with websockets.serve(host, '127.0.0.1', 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                args = SimpleNamespace(url=f'ws://127.0.0.1:{port}', sip_port=0,
+                    destination='sip:probe@localhost', once=True, calls=1, require_frames=0)
+                await asyncio.wait_for(sip.bridge(args, None), 3)
+        self.assertEqual(Endpoint.instances[-1].hangups, 1)
+
     async def test_bounded_repeated_calls_do_not_stop_after_first_release(self):
         async def host(socket):
             await socket.send(json.dumps({'type': 'call_adapter_ready',

@@ -811,6 +811,10 @@ TIMER_CALLBACK_MEMBER(nokia_gsm_call_adapter_device::poll_host)
 				m_session->outgoing_request_id() : m_incoming_request_id);
 	else
 		m_voice_peer->end_host_media();
+	if (!connected && m_last_published_connected)
+		publish_state("media_closed");
+	if (!incoming_connected && m_last_incoming_connected)
+		publish_incoming_state("media_closed");
 	for (const auto &item : media)
 	{
 		if (item.epoch != m_transport_epoch.load())

@@ -64,7 +64,7 @@ it must not resend an `incoming_call` that MAME has already accepted.
 | MAME to host | `outgoing_call` | `epoch`, `request_id`, decimal `digits`; additive `decision_pending` boolean snapshots whether the session still needs a host decision |
 | Host to MAME | `outgoing_call_decision` | identity plus `decision`: `connect`, `busy`, or `no_answer` |
 | Host to MAME | `incoming_call` | identity plus 1..20 decimal `caller` digits |
-| MAME to host | `*_call_state` | identity and `phase`; an incoming request may terminate as `expired` before paging; connected snapshots also carry both media cursors; a `forwarded` incoming state carries `forwarding_reason` and the decoded decimal `forwarding_destination` |
+| MAME to host | `*_call_state` | identity and `phase`; `media_closed` stops media admission before final `ended` completes CC/RR teardown; an incoming request may terminate as `expired` before paging; connected snapshots also carry both media cursors; a `forwarded` incoming state carries `forwarding_reason` and the decoded decimal `forwarding_destination` |
 | MAME to host | `*_call_media_uplink` | identity, sequence, emulation timestamp, good/BFI flag, 33-octet GSM-FR frame as 66 lowercase hex characters |
 | Host to MAME | `*_call_media_downlink` | identity, host sequence, source timestamp, and one encoded GSM-FR frame |
 | Host to MAME | `*_call_terminate` | identity and GSM cause in `1..127` |
@@ -592,7 +592,7 @@ full own-product physical-End lifecycle: handset DISCONNECT, network RELEASE,
 handset RELEASE COMPLETE, RR release and return to paging. At least 100
 ordered handset-accepted frames and bidirectional bridge PCM counters are
 required. A terminal packet explicitly rejected as `session_closed` is safe
-only after radio release and with a matching `ended` poll; wrong requests,
+only after correlated `media_closed`, with later correlated `ended` and radio release; wrong requests,
 active-media failures, sequence gaps and post-closure acceptance still fail.
 This proves HLE media transport, not native or non-silent microphone speech.
 

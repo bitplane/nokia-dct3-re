@@ -102,10 +102,12 @@ Physical End emits DISCONNECT `036502e090`, network RELEASE, then handset
 RELEASE COMPLETE `032a`, RR release and return to paging. This is not the
 handset-RELEASE direction assumed by the older products' SIP fixtures.
 
-One in-flight downlink packet is safely rejected as `session_closed` at
-37.040 s after radio release, in the same adapter poll that publishes `ended`.
-The checker admits only an ordered terminal closure suffix with both these
-boundaries. Wrong requests, unclassified or active-media rejections, sequence
+The adapter publishes correlated `media_closed` when the connected session
+ends, before draining queued media; final `ended` follows CC/RR completion.
+The bridge stops downlink immediately on `media_closed` but retains the
+dialog until `ended`. A queued terminal packet may be rejected safely only
+after that explicit boundary, with correlated completion and radio release.
+Wrong requests, unclassified or active-media rejections, sequence
 gaps and accepted packets after closure remain failures. Adapter rejection
 reason fields are observational; no admission behavior changed. The common
 checker accepts exact PJSIP status 200 with reason `OK` or `Normal call clearing`.
@@ -115,14 +117,11 @@ non-silent microphone audio. Incoming answered SIP, recording, and external
 call restoration remain disabled for NSM-3. Provisioning remains the declared
 base-record comparison, not validated factory data.
 
-The matrix target is not yet repeatably green: `run_8210_sip_media_matrix`
-rejects an in-flight frame as `session_closed` at 37.030 s, before radio
-release at 37.038919 s and final `ended` at 37.040 s. This falsifies the
-checker's assumption that media closure and call completion always share
-a poll. Preserve the failure until an explicit media-closure boundary is
-published and independently checked; do not infer closure by permitting an
-arbitrary rejection-time tolerance. The earlier passing run remains evidence
-of transport execution, not proof of deterministic release acceptance.
+Fresh matrix run `run_8210_sip_media_closed` passes with explicit media
+closure at 37.030 s and completion at 37.040 s, with no rejected downlink.
+The separate boundaries replace the falsified same-poll assumption; no
+arbitrary rejection-time tolerance is used. A WebSocket transition test
+verifies closure stops downlink without prematurely terminating the dialog.
 
 ## Physical power lifecycle
 

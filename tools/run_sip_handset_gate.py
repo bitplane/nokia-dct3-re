@@ -152,6 +152,8 @@ async def run(args):
 
 
 def verify_downlink_lifecycle(log):
+    closure = re.search(
+        r'gsm_call_adapter: ((?:incoming )?state) id=1 epoch=(\d+) phase=media_closed\b', log)
     packets = list(re.finditer(
         r'gsm_call_adapter: media direction=downlink id=1 sequence=(\d+) '
         r'result=(accepted|rejected)([^\n]*)', log))
@@ -161,23 +163,24 @@ def verify_downlink_lifecycle(log):
     closing = False
     for packet in packets:
         if packet[2] == 'accepted':
-            if closing:
+            if closing or (closure and packet.start() > closure.start()):
                 raise RuntimeError('handset accepted media after closure')
             accepted += 1
             continue
         closing = True
-        stamp = re.search(r'\bt=(\d+\.\d+)\b', packet[3])
-        if not stamp or not re.search(r'\breason=session_closed\b', packet[3]):
+        if not re.search(r'\breason=session_closed\b', packet[3]):
             raise RuntimeError('unclassified or active-session SIP downlink rejection')
-        # Closure is published after the queued-media drain in the same poll.
-        # Require both independent radio release and that exact poll boundary.
-        if 'LAPDm service Channel Release acknowledged' not in log[:packet.start()]:
-            raise RuntimeError('closed-session rejection precedes radio release')
+        # Media closes before final CC/RR completion. Require the explicit
+        # correlated boundary, not a guessed interval around final release.
+        if closure is None or closure.start() >= packet.start():
+            raise RuntimeError('closed-session rejection precedes media closure')
         boundary = re.search(
-            r'gsm_call_adapter: (?:incoming )?state id=1 epoch=\d+ phase=ended'
-            r'[^\n]*\bt=' + re.escape(stamp[1]) + r'\b', log[packet.end():])
+            r'gsm_call_adapter: ' + re.escape(closure[1]) + r' id=1 epoch=' +
+            re.escape(closure[2]) + r' phase=ended\b', log[packet.end():])
         if boundary is None:
-            raise RuntimeError('closed-session rejection lacks matching closure poll')
+            raise RuntimeError('closed-session rejection lacks correlated completion')
+        if 'LAPDm service Channel Release acknowledged' not in log[:packet.end() + boundary.end()]:
+            raise RuntimeError('closed-session rejection lacks radio release')
     if accepted < 100:
         raise RuntimeError('handset did not accept a sustained ordered SIP downlink')
 
