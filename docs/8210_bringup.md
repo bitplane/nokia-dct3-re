@@ -914,6 +914,12 @@ legitimately cancels the earlier window's terminal measurement or whether
 that measurement remains independently owed. Current passing early-PIN
 and no-PIN runs do not decide this contract, and must not be used as proof
 that cancellation is correct.
+Reference scope: the recovered NHM-5 trace-name catalogue in the sibling
+project (`tools/symbols/trace-names-nhm5.txt`) labels `1855`, `1856`, and
+`1857` as `INVALID_MDI_MSG`. Its useful names for `188b` and `1802` do not
+specify the ROM6 type-`55`/`56`/`57` command lifetimes. Do not import a
+cancellation or periodic-measurement rule from that catalogue. Resolve
+the own-ROM request/control lifecycle or obtain a matching ROM6 trace.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
