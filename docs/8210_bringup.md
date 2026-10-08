@@ -1280,6 +1280,16 @@ The other non-task-12 `0411` references
 at `2ff402` and `30a086` are comparisons, not direct literal producers.
 Resolve the registered transport-callback family before assigning GSM semantics
 to `03f7` or synthesizing a peer message.
+The upstream packet family is DSP RX **9c**: dispatcher `306fae` subtracts
+`80`, then 3 at `306fb6`; after the `83..8f` table range, `306fbc`
+subtracts `17` (selecting 9a), then `306fc2` subtracts 2 (selecting 9c).
+The latter branch reaches `307008 -> 2ba010`, the sole aligned direct caller
+of the registered packet worker. The dispatch arithmetic and worker call are
+machine-checked. The current late-PIN trace has no type-9c publication.
+This establishes `9c -> registered callback -> 03f7 -> decoder -> 0411`
+as an eligible chain, not that ordinary DCS camping requires it or that it
+has a particular GSM message meaning. Packet lifetime, payload meaning and
+task-24 forwarding remain evidence requirements before implementing it.
 
 ## Evidence needed to resume
 

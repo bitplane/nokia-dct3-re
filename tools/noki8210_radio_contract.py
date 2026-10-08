@@ -413,6 +413,14 @@ def verify(image):
     if instructions(0x2ba074, 6) != [
             ('adds', 'r1, r4, #0'), ('mov', 'lr, pc'), ('bx', 'r3')]:
         raise ValueError('transport packet callback invocation differs')
+    if instructions(0x306fbc, 12) != [
+            ('subs', 'r0, #0x17'), ('cmp', 'r0, #0'),
+            ('beq', '#0x307010'), ('subs', 'r0, #2'),
+            ('cmp', 'r0, #0'), ('beq', '#0x307008')]:
+        raise ValueError('type-9c RX dispatcher arithmetic differs')
+    if instructions(0x307008, 8) != [
+            ('adds', 'r0, r4, #0'), ('bl', '#0x2ba010'), ('b', '#0x3070d0')]:
+        raise ValueError('type-9c transport callback worker route differs')
     default_selectors = (0x21bcdc, 0x21bce4, 0x21bd24,
                          0x21bd28, 0x21bd2c, 0x21bd7c)
     if [int.from_bytes(read(address, 4), 'big') for address in default_selectors] != [
