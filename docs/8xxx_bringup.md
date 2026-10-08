@@ -584,6 +584,15 @@ the own writer `2c338e` with selector 8. The control checker requires ordered
 physical inputs and own decoded keys, rejecting sibling writer addresses,
 wrong selectors and missing/incorrect disable. No PCM configuration was enabled.
 
+`verify-8890-incoming-speech-control` independently passes on a fresh
+host incoming call (`run_8890_incoming_speech_control_verified`), requiring
+physical Answer/End and own decoded keys around the same `860b`/`840a`
+selector-8 publications. The host signaling checker accepts either direct
+connected-to-ended notification or an explicit `media_closed` immediately
+before ended; both retain every preceding ordered state. This is bearer
+lifecycle notification, not proof of audio. Missing connection, reversed
+closure and unexpected states remain rejected. PCM framing remains open.
+
 ```sh
 .venv/bin/python -m tools.noki8890_speech_control_check \
   roms/noki8890/8890_12.20_ppmc.fls --log RUN/error.log

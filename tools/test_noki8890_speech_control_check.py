@@ -12,6 +12,15 @@ class SpeechControlTest(unittest.TestCase):
                 'dsp_control_write: data=840a pc=002c338e r4=00000008 rest\n')
         self.assertTrue(verify_call(text)['runtime_validated'])
         self.assertFalse(verify_call(text)['pcm_validated'])
+        incoming = text.replace('8890_call_physical: action=send',
+                                '8890_incoming_physical: action=Call / Send').replace(
+                                    '8890_call_physical: action=end',
+                                    '8890_incoming_physical: action=End')
+        self.assertTrue(verify_call(incoming, incoming=True)['runtime_validated'])
+        with self.assertRaises(ValueError):
+            verify_call(incoming)
+        with self.assertRaises(ValueError):
+            verify_call(text, incoming=True)
         for wrong in (text.replace('002c338e', '002cb3ca'),
                       text.replace('r4=00000008', 'r4=00000009'),
                       text.replace('key=0e', 'key=0f'),

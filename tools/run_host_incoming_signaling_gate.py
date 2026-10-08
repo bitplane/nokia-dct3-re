@@ -10,6 +10,12 @@ if __package__ in (None, ''):
 from tools.run_host_call_adapter_gate import connect
 
 
+def verify_phases(phases):
+    expected = ['queued', 'paging', 'alerting', 'connected']
+    if phases not in (expected + ['ended'], expected + ['media_closed', 'ended']):
+        raise RuntimeError(f'incomplete incoming lifecycle: {phases}')
+
+
 async def run(args):
     if args.ready_file.exists():
         raise RuntimeError('readiness artifact already exists; use a fresh run')
@@ -37,8 +43,7 @@ async def run(args):
                         raise RuntimeError('incoming identity/epoch mismatch')
                     if phases[-1:] != [message['phase']]:
                         phases.append(message['phase'])
-            if phases != ['queued', 'paging', 'alerting', 'connected', 'ended']:
-                raise RuntimeError(f'incomplete incoming lifecycle: {phases}')
+            verify_phases(phases)
         if await asyncio.wait_for(process.wait(), 90):
             raise RuntimeError('MAME exited unsuccessfully')
     finally:

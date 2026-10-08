@@ -54,12 +54,14 @@ def recover(image):
             'pcm_validated': False, 'native_speech_validated': False}
 
 
-def verify_call(text):
+def verify_call(text, *, incoming=False):
     cursor = 0
     for pattern in (
+        r'8890_incoming_physical: action=Call / Send\b' if incoming else
         r'8890_call_physical: action=send\b',
         r'8890_keypad_decoded: key=0e\b',
         r'dsp_control_write: data=860b pc=002c338e r4=00000008 ',
+        r'8890_incoming_physical: action=End\b' if incoming else
         r'8890_call_physical: action=end\b',
         r'8890_keypad_decoded: key=0f\b',
         r'dsp_control_write: data=840a pc=002c338e r4=00000008 ',
@@ -76,10 +78,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('rom', type=Path)
     parser.add_argument('--log', type=Path)
+    parser.add_argument('--incoming', action='store_true')
     args = parser.parse_args()
+    if args.incoming and not args.log:
+        parser.error('--incoming requires --log')
     print(recover(args.rom.read_bytes()))
     if args.log:
-        print(verify_call(args.log.read_text(errors='replace')))
+        print(verify_call(args.log.read_text(errors='replace'), incoming=args.incoming))
 
 
 if __name__ == '__main__':
