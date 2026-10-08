@@ -2877,6 +2877,42 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210,
 				"ROM4 DST through AR2 stores high/low words then wraps by two without changing accumulators or adjacent cells");
+			program.write_word(0x05e0, 0x74d6);
+			program.write_word(0x05e1, 0x0123);
+			program.write_word(0x05e2, 0x4f90); // DST B,*AR0+.
+			program.write_word(0x05e3, 0x74d6);
+			program.write_word(0x05e4, 0x0123);
+			program.write_word(0x05e5, 0xf5e1);
+			data.write_word(0x0e21, 0xbeef);
+			data.write_word(0x0e22, 0);
+			data.write_word(0x0e23, 0);
+			data.write_word(0x0e24, 0xcafe);
+			m_port_reads = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0x0e22);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6562;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6562)
+		{
+			expect_opcode(0x4f90,
+				data.read_word(0x0e22) == 0x7654 && data.read_word(0x0e23) == 0x3210 &&
+				data.read_word(0x0e21) == 0xbeef && data.read_word(0x0e24) == 0xcafe &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x0e24 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0e10 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e00 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xabcdef01ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e6 &&
+				m_port_reads == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 DST B through AR0 stores high then low, advances by two and preserves neighbors/accumulators/status in two cycles");
 			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
 			program.write_word(0x05e1, 0x0123);
 			program.write_word(0x05e2, 0x6ded); // MAR *+AR5(-7)
@@ -12996,30 +13032,34 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 598 && m_phase <= 601)
+		if ((m_phase >= 598 && m_phase <= 601) || m_phase == 6561)
 		{
 			struct shifted_sub_case { u16 opcode, st0_before, st0_after; u64 a_before, b_before, a_after, b_after; };
 			static constexpr shifted_sub_case cases[] = {
 				{ 0x4083, 0,      0,      0x30000, 0x5678, 0x10000,       0x5678 },
 				{ 0x4183, 0x0800, 0x0800, 0x30000, 0x5678, 0x30000,       0x10000 },
 				{ 0x4283, 0x0800, 0,      0x1234,  0x10000, 0xffffff0000, 0x10000 },
-				{ 0x4383, 0,      0,      0x1234,  0x30000, 0x1234,        0x10000 }
+				{ 0x4383, 0,      0,      0x1234,  0x30000, 0x1234,        0x10000 },
+				{ 0x4082, 0x0800, 0x0800, 0x40000, 0x5678, 0x10000,       0x5678 }
 			};
-			const unsigned index = m_phase - 598;
+			const unsigned index = m_phase == 6561 ? 4 : m_phase - 598;
 			const shifted_sub_case &row = cases[index];
 			expect_opcode(row.opcode,
 				m_cpu->state_int(tms320c54x_device::STATE_A) == row.a_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_B) == row.b_after &&
 				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x9abc &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				(index != 4 || (m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f92 &&
+					data.read_word(0x0f92) == 3)) &&
 				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) == row.st0_after &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"shifted SUB routing, borrow-only carry change, and one-cycle DARAM timing");
-			if (m_phase < 601)
+			if (index < 4)
 			{
 				const shifted_sub_case &next = cases[index + 1];
 				program.write_word(0x05e2, next.opcode);
 				data.write_word(0x0f90, 2);
+				data.write_word(0x0f92, 3);
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_A, next.a_before);
 				m_cpu->set_state_int(tms320c54x_device::STATE_B, next.b_before);
@@ -13027,9 +13067,10 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, next.st0_before);
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f90);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f92);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				++m_phase;
+				m_phase = index < 3 ? m_phase + 1 : 6561;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
