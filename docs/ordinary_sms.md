@@ -66,15 +66,26 @@ RP-ACK. `verify-radio-outgoing-sms-timeout` withholds CP-ACK. Firmware waits
 about 22.9 seconds, retransmits the segmented CP-DATA once, then uses an
 LAPDm poll after T200. The network RR response mirrors F=1 and stops the link-
 layer retry. After the second CP wait firmware renders `Message sending
-failed` and returns to the composer. Withholding RP after CP acknowledgement
-remains separately observed but is not yet an accepted oracle.
+failed` and returns to the composer.
+
+`verify-radio-outgoing-sms-rp-timeout` separately acknowledges CP but supplies
+no RP result. The firmware renders the same reviewed `Message sending failed`
+pixels and returns to its composer. At about 67.5 seconds after the single
+submission it sends main-link DISC; the network answers UA, the firmware
+deconfigures the channel and ordinary paging resumes. The gate requires the
+exact submission, exactly one CP-ACK, no RP-ACK/RP-ERROR, an observed 60--80
+second DISC window, ordered UA/deconfiguration/paging and the failure frame.
+That window is acceptance tolerance around this firmware observation, not a
+claimed physical clock or standards timer constant. No firmware state or
+completion event is supplied by the fixture.
 
 The originated-SMS contract covers accepted and rejected submits, CP silence
 with the firmware's bounded retry, service-centre editing, requested delivery
 reports, and save-state continuation during the CP wait. Firmware-owned
 `EF_SMS`/`EF_SMSP` writes are observed rather than synthesized by the network.
-RP silence after CP acknowledgement remains an observed, unpromoted outcome;
-it is outside this accepted contract.
+RP silence after CP acknowledgement is separately accepted by the gate above;
+it does not inherit the CP-wait save-state result or establish host-service
+reconnect behavior.
 
 Nokia 3210 v5.01 independently reaches the same MM service-type-4, mobile
 SAPI-3, CP/RP and RR-release lifecycle from physical composition. Its editor
