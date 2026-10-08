@@ -26,6 +26,25 @@ PCS_LOG = '\n'.join((
 
 
 class RegistrationTest(unittest.TestCase):
+    def configured_gsm(self):
+        text = PCS_LOG.replace('0258', '003c').replace('0259', '003d').replace('fffe20', 'fffe23')
+        return text.replace('TX packet type=02 payload=20 radio_phase=candidate_channel_change',
+            'RX enqueue type=80 payload=14 data=4012000004df003c000048005d00\n'
+            'TX packet type=02 payload=20 radio_phase=candidate_channel_change')
+
+    def test_configured_gsm_carrier_and_sch(self):
+        verify(self.configured_gsm(), configured_gsm900=True)
+        for text in (self.configured_gsm().replace('data=4012', 'data=5012'),
+                     self.configured_gsm().replace('00505000003c', '005050000001')):
+            with self.assertRaises(ValueError):
+                verify(text, configured_gsm900=True)
+
+    def test_network_compositions_are_not_interchangeable(self):
+        with self.assertRaises(ValueError):
+            verify(PCS_LOG, configured_gsm900=True)
+        with self.assertRaisesRegex(ValueError, 'distinct'):
+            verify(PCS_LOG, configured_gsm900=True, pcs1900=True)
+
     def test_missing_candidate(self):
         with self.assertRaisesRegex(ValueError, 'candidate window'):
             verify('')

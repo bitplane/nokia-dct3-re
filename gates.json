@@ -27,6 +27,18 @@
   },
   "gates": [
     {
+      "name": "verify-8890-host-incoming-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8890_host_sms.py",
+                 "arguments": ["$(RUN_DIR)", "--direction", "incoming", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8890-host-outgoing-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8890_host_sms.py",
+                 "arguments": ["$(RUN_DIR)", "--direction", "outgoing", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8850-ussd", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8xxx_supplementary.py",

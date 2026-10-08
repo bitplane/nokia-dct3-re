@@ -6,8 +6,8 @@ same capability family. A difference is not automatically a defect: a
 product with its own recovered contract legitimately runs its own
 checker. Entries are for adjudication, not automatic correction.
 
-Families with more than one product: 72
-Differences found: 113
+Families with more than one product: 74
+Differences found: 115
 
 ## ROM normalisation reachability
 
@@ -25,6 +25,8 @@ absent product is a coverage question, not a drifted gate.
 | `call-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `charger-wake` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
 | `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — | — | — | — |
+| `host-incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
+| `host-outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
 | `incoming-call` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
 | `incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
 | `keypad-controller` | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — |
@@ -121,6 +123,16 @@ absent product is a coverage question, not a drifted gate.
 - **3410**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **3610**: `tools/check_lcd_frame.py`, `tools/check_model_frontier_summary.py`
 - **5210**: `tools/check_lcd_frame.py`
+
+### `host-incoming-sms`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8890**: `tools/run_noki8890_host_sms.py`
+
+### `host-outgoing-sms`
+
+- **6210**: `tools/run_noki6210_acceptance.py`
+- **8890**: `tools/run_noki8890_host_sms.py`
 
 ### `incoming-call`
 

@@ -28,10 +28,19 @@ CHECKPOINTS = (
 )
 
 
-def verify(text, *, pcs1900=False):
+def verify(text, *, pcs1900=False, configured_gsm900=False):
     if '[LUA ERROR]' in text:
         raise ValueError('fixture error')
     checkpoints = list(CHECKPOINTS)
+    if pcs1900 and configured_gsm900:
+        raise ValueError('PCS1900 and configured GSM900 are distinct compositions')
+    if configured_gsm900:
+        checkpoints[1] = ('configured GSM900 candidate channel',
+            r'TX packet type=02 payload=20 .*radio_phase=candidate_channel_change data=04120200000000505000003c')
+        checkpoints[12] = ('configured GSM900 deconfiguration',
+            r'TX packet type=02 payload=20 .*radio_phase=release_channel_change data=041202000000001a6000003c0000000f00000000')
+        checkpoints.insert(1, ('configured carrier SCH',
+            r'RX enqueue type=80 payload=14 .*data=4012[0-9a-f]{8}003c000048'))
     if pcs1900:
         checkpoints[1] = ('PCS candidate channel',
             r'TX packet type=02 payload=20 .*radio_phase=candidate_channel_change data=041202000000005050000258')
@@ -59,9 +68,12 @@ if __name__ == '__main__':
     parser.add_argument('log', type=Path)
     parser.add_argument('--pcs1900', action='store_true',
                         help='require independent PCS scan, ARFCN 600 and SI1 band indication')
+    parser.add_argument('--configured-gsm900', action='store_true',
+                        help='require configured ARFCN60 SCH and recovered channel parameters')
     args = parser.parse_args()
     try:
-        verify(args.log.read_text(errors='replace'), pcs1900=args.pcs1900)
+        verify(args.log.read_text(errors='replace'), pcs1900=args.pcs1900,
+               configured_gsm900=args.configured_gsm900)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8890 registration FAIL: {error}\n')
     print('8890 laboratory registration/EF_LOCI/release/paging PASS; calls unproved')

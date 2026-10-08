@@ -121,6 +121,15 @@ The 8890 includes physical clock/date settlement; its localized frames
 are not inherited from the 8850. Divert coverage is inactive interrogation
 only, and these gates do not establish native resident DSP or speech.
 
+The 8890 additionally passes `verify-8890-host-incoming-sms` and
+`verify-8890-host-outgoing-sms` with unchanged own MCU/PMM and a configured
+ARFCN60 laboratory cell. Acceptance requires carrier-correlated SCH and
+host network state, external SMS request/decision ownership, own physical
+composition/read and firmware CP/RP/RR closure; received hello persists
+with read status and reviewed body pixels. The earlier default ARFCN1
+topology beside the firmware's ARFCN60 candidate is not this promotion.
+Native DSP, speech and hardware RF remain unproved.
+
 - Packet length similarity is not semantic evidence. NHM-5 type `0x20` is not
   NSE-8 type `0x1a`; each enabled radio profile uses its independently recovered
   command/report lifecycle.

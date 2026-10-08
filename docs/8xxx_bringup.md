@@ -557,6 +557,30 @@ injection or borrowed product verdict is part of these workflows.
 | Incoming/outgoing calls | Own incoming/outgoing call checkers; physical Answer/Send/End, correct called number and CC/RR closure on both bands |
 | Incoming/outgoing SMS | Own SMS checkers; physical composition/read, CP/RP closure, persistent hello and reviewed body pixels on both bands |
 | Physical USSD | `noki8890_ussd_check.py`; exact `*123#` request/response, reviewed result/idle frames, physical Back and persisted EF_LOCI |
+| Host incoming/outgoing SMS | `verify-8890-host-incoming-sms` and `verify-8890-host-outgoing-sms`; own configured ARFCN60, external request/decision correlation, physical composition/read and persistent received content |
+
+The host SMS gates use `fixtures/noki8890_host/nsb6hle.cfg` in fresh private
+storage with the unchanged own acquired MCU/PMM. The fixture enables the
+host adapter and an explicit laboratory GSM900 cell at ARFCN 60. Its SCH
+response organically produces channel prefix `041202`, and the strict
+`--configured-gsm900` registration check requires that carrier in both
+candidate configuration and release. This is a network composition, not a
+handset hardware property or a forced selection. The default/legacy and
+PCS1900 registration contracts remain separate.
+
+The host and receiver must agree on the serving carrier. Earlier default
+composition had the own firmware's ARFCN-60 candidate beside an ARFCN-1
+laboratory cell; the peer committed the unchanged receiver to 1. That
+composition can exercise UI/signaling but is not accepted by these
+carrier-correlated host SMS gates. Do not change the expected carrier to
+match that mismatch or infer hardware RF fidelity from its registration.
+
+Incoming acceptance requires external `hello` from 5551234, queued/delivered
+host states, complete firmware CP/RP/RR closure, physical reading, reviewed
+body pixels and persisted read status. Outgoing acceptance requires physical
+A/5551234 composition, exact host GSM7 data, rejection of wrong request IDs
+and duplicate decisions, one accepted result and firmware transport closure.
+These gates prove host SMS signaling, not SIP speech, native DSP or radio RF.
 
 For USSD, run `nsb6hle` for 64 seconds in fresh private working, config,
 NVRAM and snapshot directories with `-noreadconfig -debug -debugger none

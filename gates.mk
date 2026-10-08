@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 420 gates: 268 generated from typed steps, 152 copied verbatim (shell).
+# 422 gates: 270 generated from typed steps, 152 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -44,7 +44,8 @@ DCT3_PRESS_220_300 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_
 DCT3_PRESS_220_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_READY_KEY_GAP_MS=350
 
-.PHONY: verify-8850-ussd verify-8850-call-divert verify-8890-ussd \
+.PHONY: verify-8890-host-incoming-sms verify-8890-host-outgoing-sms \
+	verify-8850-ussd verify-8850-call-divert verify-8890-ussd \
 	verify-8890-call-divert verify-5510-package verify-6210-sip-cancel \
 	verify-6210-sip-idle-restore verify-6210-stage verify-6210-runtime \
 	verify-6210-outgoing-call verify-6210-incoming-call verify-6210-incoming-sms \
@@ -279,6 +280,12 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-incoming-call-sip-cancel \
 	verify-radio-incoming-call-sip-cancel verify-radio-outgoing-call-sip-busy \
 	verify-radio-outgoing-call-sip-unavailable
+
+verify-8890-host-incoming-sms: build
+	$(PYTHON) tools/run_noki8890_host_sms.py $(RUN_DIR) --direction incoming --mame $(MAME_DIR)/mame
+
+verify-8890-host-outgoing-sms: build
+	$(PYTHON) tools/run_noki8890_host_sms.py $(RUN_DIR) --direction outgoing --mame $(MAME_DIR)/mame
 
 verify-8850-ussd: build
 	$(PYTHON) tools/run_noki8xxx_supplementary.py 8850 $(RUN_DIR) --service ussd --mame $(MAME_DIR)/mame
