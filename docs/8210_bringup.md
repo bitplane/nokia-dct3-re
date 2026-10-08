@@ -1016,7 +1016,8 @@ promoter `2a0dc8`: `2a13d0`, `2a1484`, `2a193a`, `2a1988`. The last
 belongs to selector argument 2 (`2a187a -> 2a197c`), unlike argument 3's
 outcome/record predicates. Its sole direct selector caller is `21d886`.
 This is not an unconditional recovery entrance: `21fdd8` selects input
-`0413` through `220198`, requires timer-`81` test `287b38` to be nonzero,
+`0413` through `220198`, requires timer-`81` remaining-duration query
+`287b38` to be nonzero,
 and proceeds only with nonzero context `138140` or stored request `03ed`
 at root `137f64`. It then enters `21d84a` unless controller byte
 `137968+8` is `1a`. Own diagnostic labels are `PH_2000a2`, `PH_2500`,
@@ -1024,6 +1025,15 @@ and `PH_2500a2`. The failing cell-message trace does not observe input
 `0413`; that is not a static producer-absence proof. Trace the event's
 producer and timer/context lifecycle before treating it as a late-`03ec`
 recovery contract.
+The timer query returns a duration halfword, not a boolean armed flag.
+Its descriptor array starts at `11174c` with 12-byte entries, placing
+timer `81` at `111d58`. Descriptor state byte `+8` selects the queued
+calculation; the other branch reads duration halfword `+4`. The queued
+calculation accumulates timer deltas and subtracts elapsed ticks with a
+zero floor before returning the halfword. The static contract checker
+pins the descriptor roots, stride, state/duration reads and return.
+An expired timer and an absent event are therefore separate questions;
+neither justifies injecting `0413`.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

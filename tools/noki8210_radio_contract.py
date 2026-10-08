@@ -263,6 +263,24 @@ def verify(image):
         raise ValueError('explicit queue-promotion selector caller differs')
     if int.from_bytes(read(0x220198, 4), 'big') != 0x413:
         raise ValueError('explicit queue-promotion event selector differs')
+    if instructions(0x21fe00, 8) != [
+            ('bl', '#0x287b38'), ('cmp', 'r0, #0'),
+            ('bne', '#0x21fe0c')]:
+        raise ValueError('timer remaining-duration recovery guard differs')
+    if [int.from_bytes(read(address, 4), 'big') for address in
+            (0x287bd0, 0x287bd4)] != [0x11174c, 0x1115d0]:
+        raise ValueError('timer descriptor and clock roots differ')
+    if instructions(0x287b42, 18) != [
+            ('movs', 'r0, #0xc'), ('muls', 'r0, r4, r0'),
+            ('ldr', 'r1, [pc, #0x88]'), ('adds', 'r2, r1, r0'),
+            ('ldrb', 'r0, [r2, #8]'), ('cmp', 'r0, #2'),
+            ('beq', '#0x287b56'), ('ldrh', 'r1, [r2, #4]'),
+            ('ldr', 'r5, [pc, #0x80]')]:
+        raise ValueError('timer descriptor stride/state/duration reads differ')
+    if instructions(0x287c0a, 8) != [
+            ('mov', 'r0, sp'), ('ldrh', 'r0, [r0]'),
+            ('add', 'sp, #4'), ('pop', '{r4, r5, r6, pc}')]:
+        raise ValueError('timer query halfword return differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
