@@ -346,6 +346,14 @@ full digital reset to re-arm them. The 8890 gate checks at least six seconds
 of DSP/radio transport silence alongside continuous one-second RTC ticks.
 Complete per-block clock-gating outside this boundary remains unvalidated.
 
+`verify-8890-power-off-restore` separately saves with the rail off at 53 s,
+compares exact CPU PC/SP, full mapped RAM checksum and emulated time on
+load, and requires identical one-second RTC replay and blank LCD frames.
+Neither timeline may publish DSP/radio activity. The restored machine then
+completes the same physical PWRONX restart, own uploads, registration and
+security entry to idle. This validates emulator state restoration, not
+battery-backed persistence across process termination.
+
 CCONT watchdog expiry uses the same digital-baseband reset domain. It resets
 the CPU, MAD2 peripherals, GENSIO, MBUS, DSPIF/peer, SIMI/card protocol state
 and LCD controller while retaining CCONT, flash and EEPROM. MAD2 watchdog

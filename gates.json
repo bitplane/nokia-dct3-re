@@ -27,6 +27,12 @@
   },
   "gates": [
     {
+      "name": "verify-8890-power-off-restore", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8890_power_cycle.py",
+                 "arguments": ["$(RUN_DIR)", "--restore-off", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8890-power-cycle", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8890_power_cycle.py",

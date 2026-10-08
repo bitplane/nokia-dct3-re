@@ -1030,6 +1030,14 @@ radio endpoint stop their timers on rail-off; the normal full digital reset
 re-arms them on wake. Neither test claims native DSP speech, physical wake
 timing or power gating of every other peripheral.
 
+`verify-8890-power-off-restore` uses the same physical fixture but saves at
+53 s while the rail is off. PC/SP, mapped RAM checksum and emulator time
+must restore exactly; the abandoned and restored one-second windows must
+have identical RTC ticks, blank frames and no DSP/radio activity. The
+restored branch completes the ordinary PWRONX restart, both own native/HLE
+stages, retained-location registration and physical security entry to idle.
+This is an emulator save-state contract, not cold-process RTC persistence.
+
 Incoming-call signaling separately passes IMSI paging, Paging Response,
 contention UA, cipher/MM-information exchange, incoming SETUP, Call
 Confirmed/Alerting, own traffic configuration and Assignment Complete.

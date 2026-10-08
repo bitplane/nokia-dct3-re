@@ -31,7 +31,35 @@ def storage():
     return value
 
 
+def restored_sample():
+    marker = 'ccont_rtc: event=second time=12:00:54 day=0 status=13 mask=50 t=54.0\n'
+    saved = '8890_power_state: event=saved pc=00000000 sp=00123456 ram=abcdef01 t=53.000000000\n'
+    restored = saved.replace('event=saved', 'event=restored')
+    replay = saved + '8890_power_replay: phase=reference event=begin t=53.000000000\n' + marker
+    replay += '8890_power_replay: phase=reference event=end t=54.000000000\n' + restored
+    replay += '8890_power_replay: phase=restored event=begin t=53.000000000\n' + marker
+    replay += '8890_power_replay: phase=restored event=end t=54.000000000\n'
+    return sample().replace(marker, replay)
+
+
 class PowerTest(unittest.TestCase):
+    def test_off_state_replay_requires_exact_architecture_rtc_and_silence(self):
+        text = restored_sample()
+        self.check(text, restore_off=True)
+        with self.assertRaisesRegex(ValueError, 'unexpected off-state'):
+            self.check(text)
+        for broken in (
+                text.replace('event=restored pc=00000000', 'event=restored pc=00000001'),
+                text.replace('phase=restored event=end t=54.', 'phase=restored event=end t=55.'),
+                text.replace('event=restored', 'event=missing'),
+                text.replace('phase=restored event=begin t=53.000000000\n',
+                             'phase=restored event=begin t=53.000000000\ndspif_transport: FIQ0 notify\n'),
+                text.replace('phase=reference event=begin t=53.000000000\n',
+                             'phase=reference event=begin t=53.000000000\nradio_peer: LAPDm transmit\n'),
+                text.replace('time=12:00:54', 'time=12:00:55', 1)):
+            with self.subTest(text=broken), self.assertRaises(ValueError):
+                self.check(broken, restore_off=True)
+
     def test_endpoint_activity_or_missing_rtc_tick_fails_while_off(self):
         for marker in ('dspif_transport: RX enqueue type=03',
                        'dspif_transport: FIQ0 notify', 'dspif_transport: peer RAM W',
@@ -45,10 +73,10 @@ class PowerTest(unittest.TestCase):
             self.check(sample().replace('ccont_rtc: event=second time=12:00:54 day=0 status=13 mask=50 t=54.0\n', ''))
         with self.assertRaisesRegex(ValueError, 'too short'):
             self.check(sample().replace('wake cause=02 t=58.02', 'wake cause=02 t=52.02'))
-    def check(self, text, data=None):
+    def check(self, text, data=None, *, restore_off=False):
         with patch.object(check, 'verify_stage') as stage, \
                 patch.object(check, 'verify_registration') as registration:
-            check.verify(text, storage() if data is None else data)
+            check.verify(text, storage() if data is None else data, restore_off=restore_off)
             self.assertEqual(stage.call_count, 2)
             for call in stage.call_args_list:
                 self.assertEqual(call.kwargs, {'runtime': True, 'selftest': True})

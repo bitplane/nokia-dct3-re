@@ -117,6 +117,9 @@ Its second registration carries retained LAI and closes without redundant
 EF_LOCI writes, checked against a distinct strict grammar. Firmware itself
 resets seconds after wake. This does not prove cold-process RTC persistence,
 physical wake timing, all-block rail clock-gating or native speech.
+`verify-8890-power-off-restore` additionally proves exact CPU/RAM/time
+restoration while off, identical RTC replay and blank frames, sustained
+DSP/radio silence, and physical restart to registered idle after load.
 
 The 8850 v5.31 `nsm2hle` profile additionally passes
 `verify-8850-sip-cancel` with own acquired MCU/PMM: settled physical startup,

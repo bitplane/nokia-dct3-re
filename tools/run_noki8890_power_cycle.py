@@ -16,6 +16,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--restore-off', action='store_true',
+                        help='restore a rail-off save before physical restart')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -31,17 +33,20 @@ def main():
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki8890_power_cycle_observe.lua'),
+                   '-autoboot_script', str(root / 'tools' / (
+                       'noki8890_power_off_restore.lua' if args.restore_off else
+                       'noki8890_power_cycle_observe.lua')),
                    '-seconds_to_run', '89']
         with (run / 'console.log').open('w') as console:
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT,
                            check=True, timeout=240)
         check_output((run / 'console.log').read_text(errors='replace'))
         verify((run / 'error.log').read_text(errors='replace'),
-               (run / 'nvram/nsb6hle/sim_card').read_bytes())
-        check_frames(run / 'snap')
+               (run / 'nvram/nsb6hle/sim_card').read_bytes(), restore_off=args.restore_off)
+        check_frames(run / 'snap', restore_off=args.restore_off)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsb6hle', 'scenario': 'physical-power-restart',
+            'machine': 'nsb6hle', 'scenario': ('off-state-restore-physical-restart'
+                                             if args.restore_off else 'physical-power-restart'),
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 60,
             'native_dsp_complete': False, 'cold_rtc_persistence': False,

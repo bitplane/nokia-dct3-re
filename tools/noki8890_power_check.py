@@ -20,8 +20,43 @@ FRAMES = {
 }
 
 
-def verify(text, storage):
+def verify_off_restore(text):
+    states = list(re.finditer(r'8890_power_state: event=(saved|restored) '
+                             r'pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text))
+    if len(states) != 2 or [state[1] for state in states] != ['saved', 'restored']:
+        raise ValueError('missing unique off-state save/load observations')
+    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][5]) != 53:
+        raise ValueError('off-state architecture or save time differs')
+    windows = list(re.finditer(r'8890_power_replay: phase=(reference|restored) '
+                              r'event=(begin|end) t=([0-9.]+)', text))
+    if [(event[1], event[2]) for event in windows] != [
+            ('reference', 'begin'), ('reference', 'end'),
+            ('restored', 'begin'), ('restored', 'end')]:
+        raise ValueError('off-state replay windows absent or unordered')
+    if any(float(event[3]) != when for event, when in zip(windows, (53, 54, 53, 54))):
+        raise ValueError('off-state replay did not cover matching one-second windows')
+    reference = text[windows[0].end():windows[1].start()]
+    restored = text[windows[2].end():windows[3].start()]
+    rtc = r'ccont_rtc: event=second[^\r\n]+'
+    ticks = re.findall(rtc, reference)
+    if len(ticks) != 1 or ticks != re.findall(rtc, restored):
+        raise ValueError('off-state RTC replay differs or is absent')
+    # Validate both branches before removing the abandoned timeline for the
+    # ordinary power checker, which requires monotonically advancing RTC ticks.
+    forbidden = r'dspif_transport: (?:RX enqueue|FIQ0 notify|peer RAM W)|' \
+                r'rom4_(?:timing_port|port_write):|staged_dsp: publication|' \
+                r'radio_peer: LAPDm|dsp_hle: speech|ccont_power: event=wake'
+    if re.search(forbidden, reference + restored):
+        raise ValueError('off-state replay resumed powered endpoint activity')
+    return text[:states[0].start()] + text[states[1].start():]
+
+
+def verify(text, storage, *, restore_off=False):
     check_output(text)
+    if restore_off:
+        text = verify_off_restore(text)
+    elif '8890_power_state:' in text:
+        raise ValueError('unexpected off-state restoration in uninterrupted power gate')
     actions = list(re.finditer(r'8890_power_physical: action=([^\r\n]+)', text))
     if [event[1] for event in actions] != [
             'shutdown_press', 'shutdown_release', 'restart_press', 'restart_release']:
@@ -71,8 +106,12 @@ def verify(text, storage):
         raise ValueError('persistent SIM location lost laboratory registration')
 
 
-def check_frames(directory):
-    for name, (crop, expected) in FRAMES.items():
+def check_frames(directory, *, restore_off=False):
+    frames = dict(FRAMES)
+    if restore_off:
+        for phase in ('reference', 'restored'):
+            frames[f'8890_power_off_{phase}.png'] = FRAMES['8890_power_off.png']
+    for name, (crop, expected) in frames.items():
         with Image.open(directory / name) as frame:
             actual = hashlib.sha256(frame.convert('L').crop(crop).tobytes()).hexdigest()
             if frame.size != (84, 48) or actual != expected:
@@ -82,13 +121,14 @@ def check_frames(directory):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
+    parser.add_argument('--restore-off', action='store_true')
     args = parser.parse_args()
     try:
         run = args.run_directory
         check_output((run / 'console.log').read_text(errors='replace'))
         verify((run / 'error.log').read_text(errors='replace'),
-               (run / 'nvram/nsb6hle/sim_card').read_bytes())
-        check_frames(run / 'snap')
+               (run / 'nvram/nsb6hle/sim_card').read_bytes(), restore_off=args.restore_off)
+        check_frames(run / 'snap', restore_off=args.restore_off)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8890 physical power cycle FAIL: {error}\n')
     print('8890 physical shutdown/PWRONX restart/registered idle PASS; cold RTC/native speech unproved')
