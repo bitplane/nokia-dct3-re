@@ -66,7 +66,7 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                 runner.main()
 
     def test_dcs_does_not_promote_untested_services(self):
-        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'host-incoming-call']), \
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'host-outgoing-call']), \
                 patch('sys.stderr', new_callable=io.StringIO), \
                 patch.object(runner, 'prepare_run') as prepare, \
                 self.assertRaises(SystemExit) as error:
@@ -189,11 +189,23 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                 patch.object(runner, 'verify_stage') as stage:
             runner.check_host_registration(text, b'card')
             stage.assert_called_once_with(text, runtime=True, selftest=True, base_record=True)
-            registration.assert_called_once_with(text, b'card', configured_carrier=True)
+            registration.assert_called_once_with(text, b'card', configured_carrier=True, dcs1800=False)
             for wrong in ('', text.replace('arfcn=4', 'arfcn=1'),
                           text.replace('arfcn=4', 'arfcn=41')):
                 with self.subTest(text=wrong), self.assertRaises(ValueError):
                     runner.check_host_registration(wrong, b'card')
+
+    def test_host_dcs_requires_own_carrier_contract(self):
+        text = 'gsm_call_adapter: network registered=1 arfcn=823 t=12'
+        with patch.object(runner, 'verify_registration') as registration, \
+                patch.object(runner, 'verify_stage'):
+            runner.check_host_registration(text, b'card', dcs1800=True)
+            registration.assert_called_once_with(text, b'card', configured_carrier=False,
+                                                dcs1800=True)
+            for carrier in (4, 8230):
+                with self.subTest(carrier=carrier), self.assertRaises(ValueError):
+                    runner.check_host_registration(text.replace('823', str(carrier)),
+                                                   b'card', dcs1800=True)
 
     def test_wrong_product_rejected_before_creating_run(self):
         with tempfile.TemporaryDirectory() as directory:

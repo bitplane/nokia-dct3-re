@@ -943,10 +943,19 @@ VERIFY `9804`; it is not evidence about registration recovery.
 
 Reproduce the valid control with
 `tools/run_noki8210_acceptance.py RUN --pin-enabled --dcs1800 --pin-start 7`.
-The option affects physical input only, is restricted to PIN registration,
+The option affects physical input only, is restricted to PIN registration or incoming-call fixtures,
 and is recorded in successful run manifests. Next decode recovery when
 `03ec` arrives after the serving acknowledgement, rather than adjust peer
 latency or choose an earlier default input.
+
+Early-PIN DCS also passes host-triggered incoming call signaling:
+`tools/run_noki8210_acceptance.py RUN --scenario host-incoming-call --pin-enabled --pin-start 7 --dcs1800`.
+`run_8210_early_pin_dcs_host_incoming_03` verifies PIN, own DCS registration,
+persisted EF_LOCI, physical Answer/End and CC/RR release. The host waits for
+the registered-idle capture before calling; a fixed automatic call can collide
+with security-code input and is not an equivalent fixture. Host registration
+validation selects the DCS823 contract rather than the GSM900 ARFCN4 contract.
+Speech and late-PIN recovery remain unproved.
 Paired `run_8210_pin_dcs_{late,early}_queue_result_01` confirms the late
 request is not lost: `21f5aa` calls `2a1eaa`, which copies `03ec` into
 context `+0c`. Both physical timings then return 4 from the argument-3

@@ -58,11 +58,12 @@ def verify_pin_measurement_registration(text, *, dcs1800=False):
         raise ValueError('missing correlated measurement/PIN/registration sequence')
 
 
-def check_host_registration(text, storage):
+def check_host_registration(text, storage, *, dcs1800=False):
     verify_stage(text, runtime=True, selftest=True, base_record=True)
-    verify_registration(text, storage, configured_carrier=True)
-    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=4\b', text):
-        raise ValueError('host session lacks coherent ARFCN4 registration')
+    verify_registration(text, storage, configured_carrier=not dcs1800, dcs1800=dcs1800)
+    carrier = 823 if dcs1800 else 4
+    if not re.search(rf'gsm_call_adapter: network registered=1 arfcn={carrier}\b', text):
+        raise ValueError(f'host session lacks coherent ARFCN{carrier} registration')
 
 
 def prepare_run(run, mcu, pmm):
@@ -125,21 +126,21 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true',
                         help='test SIM PIN followed by phone security and registration')
     parser.add_argument('--pin-start', type=float,
-                        help='registration-only physical PIN entry start time (default 8 seconds)')
+                        help='registration/incoming-call physical PIN entry start time, including host calls (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
                         help='test registration or supported no-PIN scenarios on DCS1800 carriers 823/824')
     args = parser.parse_args()
     if args.pin_start is not None and (
-            not args.pin_enabled or args.scenario != 'registration' or
+            not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call') or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
-        parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'call-state', 'phonebook') or
-                        (args.scenario != 'registration' and args.pin_enabled)):
-        parser.error('--dcs1800 requires registration or a supported no-PIN scenario')
+        parser.error('--pin-start requires PIN registration/incoming-call and a time between 3.5 and 20 seconds')
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'call-state', 'phonebook') or
+                        (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call') and args.pin_enabled)):
+        parser.error('--dcs1800 requires registration, incoming-call or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
                                                  'host-outgoing-sms', 'phonebook',
-                                                 'idle-state', 'call-state', 'sms-state'):
+                                                 'idle-state', 'call-state', 'sms-state', 'incoming-call'):
         parser.error('--pin-enabled requires registration or a supported host service')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -217,7 +218,11 @@ def main():
         if args.scenario == 'power-cycle':
             check.extend([storage, str(run / 'snap')])
         elif args.scenario == 'host-incoming-call':
-            check.extend(['--frames', str(run / 'snap'), '--configured-carrier'])
+            if args.dcs1800:
+                verify_registration((run / 'error.log').read_text(errors='replace'),
+                                    (run / 'nvram/nsm3hle/sim_card').read_bytes(), dcs1800=True)
+            check.extend(['--frames', str(run / 'snap'),
+                          '--dcs1800' if args.dcs1800 else '--configured-carrier'])
         elif args.scenario == 'incoming-call' and args.dcs1800:
             verify_registration((run / 'error.log').read_text(errors='replace'),
                                 (run / 'nvram/nsm3hle/sim_card').read_bytes(),
@@ -319,7 +324,8 @@ def main():
                 raise ValueError('calculator result differs from reviewed 15 frame')
         if args.scenario.startswith('host-'):
             text = (run / 'error.log').read_text(errors='replace')
-            check_host_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
+            check_host_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                                    dcs1800=args.dcs1800)
             if args.scenario == 'host-outgoing-call':
                 from tools.radio_host_outgoing_connect_check import verify as check_host_call
                 check_host_call(text, '1234567')
