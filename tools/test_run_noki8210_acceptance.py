@@ -9,9 +9,9 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
-    def test_pin_host_services_are_explicitly_admitted(self):
+    def test_pin_service_fixtures_are_explicitly_admitted(self):
         for scenario in ('host-incoming-call', 'host-incoming-sms',
-                         'host-outgoing-call', 'host-outgoing-sms'):
+                         'host-outgoing-call', 'host-outgoing-sms', 'phonebook'):
             with self.subTest(scenario=scenario), \
                     patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--pin-enabled']), \
                     patch.object(runner.Path, 'read_bytes', return_value=b''), \

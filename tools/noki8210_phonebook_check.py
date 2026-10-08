@@ -1,6 +1,7 @@
 """Check NSM-3 physical save and cold SIM readback evidence."""
 
 import argparse
+import hashlib
 from pathlib import Path
 
 try:
@@ -28,11 +29,18 @@ def check(write_trace, read_trace, storage):
     validate_phonebook_storage(storage, b'A')
 
 
+def check_frame(frame):
+    if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != (
+            '08731884907b0d32d6820468be1b0ab99bdb9d7956b6d8d6434b7e661d0ffcf1'):
+        raise ValueError('cold contact frame differs from reviewed Number: 123')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('write_trace', type=Path)
     parser.add_argument('read_trace', type=Path)
     parser.add_argument('sim_nvram', type=Path)
+    parser.add_argument('--frame', type=Path)
     args = parser.parse_args()
     try:
         def events(path):
@@ -41,9 +49,14 @@ def main():
                                'phonebook_' in line or 'sim_device:' in line or
                                'SIM status' in line)
         check(events(args.write_trace), events(args.read_trace), args.sim_nvram.read_bytes())
+        if args.frame:
+            from PIL import Image
+            with Image.open(args.frame) as frame:
+                check_frame(frame)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 phonebook FAIL: {error}\n')
-    print('8210 physical SIM save and cold record readback PASS; inspect UI captures separately')
+    print('8210 physical SIM save and cold record readback PASS' +
+          ('; reviewed contact pixels verified' if args.frame else '; inspect UI captures separately'))
 
 
 if __name__ == '__main__':

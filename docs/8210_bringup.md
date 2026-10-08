@@ -288,6 +288,14 @@ correlated host submission decision, CP/RP closure and reviewed success UI.
 Both require the same PIN/phone-code and coherent-registration evidence as
 the incoming gates; no native speech claim follows from call signaling.
 
+`verify-8210-pin-phonebook` saves `A / 123`, starts a fresh MAME process using
+the saved card, repeats physical PIN and phone-code entry, and searches the
+contact through ordinary keys. It requires own upload/self-test evidence,
+one successful VERIFY per process, byte-identical card storage on readback,
+retained-LAI registration without rewriting valid location status, and the
+exact reviewed `Number: 123` image. The same image check also protects the
+ordinary no-PIN save/readback gate.
+
 The own ring dispatcher at `0x306fa6` selects the thirteen-entry
 `0x83..0x8f` table at `0x306fd4`. Type `8b` calls `0x2df484`, which posts
 to task 12 through `0x28845c`. Type `89` calls `0x2df210`; instructions

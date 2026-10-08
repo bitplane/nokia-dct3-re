@@ -1,12 +1,18 @@
 import unittest
+from PIL import Image
 
 try:
-    from tools.noki8210_phonebook_check import check
+    from tools.noki8210_phonebook_check import check, check_frame
 except ModuleNotFoundError:
-    from noki8210_phonebook_check import check
+    from noki8210_phonebook_check import check, check_frame
 
 
 class PhonebookCheckTest(unittest.TestCase):
+    def test_blank_or_wrong_geometry_is_not_contact_readback(self):
+        for size in ((84, 48), (96, 60)):
+            with self.subTest(size=size), self.assertRaisesRegex(ValueError, 'Number: 123'):
+                check_frame(Image.new('L', size, 255))
+
     def setUp(self):
         self.write = '\n'.join((
             '8210_phonebook_physical: action=save',

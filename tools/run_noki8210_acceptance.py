@@ -94,7 +94,7 @@ def main():
     args = parser.parse_args()
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
-                                                 'host-outgoing-sms'):
+                                                 'host-outgoing-sms', 'phonebook'):
         parser.error('--pin-enabled requires registration or a supported host service')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -159,6 +159,7 @@ def main():
             pin_text = (run / 'error.log').read_text(errors='replace')
             check_security(pin_text,
                            (run / 'nvram/nsm3hle/sim_card').read_bytes(), 'verify', '1234')
+            verify_stage(pin_text, runtime=True, selftest=True, base_record=True)
             if not re.search(
                     r'TX packet type=57 payload=4[^\n]*data=03050000.*?'
                     r'RX enqueue type=8b payload=166[^\n]*data=0010000400c4.*?'
@@ -182,12 +183,28 @@ def main():
                           '--recovery-frames', str(run / 'snap')])
         elif args.scenario == 'phonebook':
             shutil.copyfile(run / 'error.log', run / 'write.log')
+            saved_card = (run / 'nvram/nsm3hle/sim_card').read_bytes()
             cold = command.copy()
             cold[cold.index('-autoboot_script') + 1] = str(root / 'tools/noki8210_phonebook_read.lua')
             cold[cold.index('-seconds_to_run') + 1] = '28'
             execute(cold, 'cold_console.log')
+            if args.pin_enabled:
+                from tools.sim_security_trace_check import validate as check_security
+                cold_card = (run / 'nvram/nsm3hle/sim_card').read_bytes()
+                cold_text = (run / 'error.log').read_text(errors='replace')
+                if saved_card != cold_card:
+                    raise ValueError('PIN phonebook readback changed persisted SIM bytes')
+                check_security(cold_text, cold_card, 'verify', '1234')
+                verify_stage(cold_text, runtime=True, selftest=True, base_record=True)
+                verify_registration(cold_text, cold_card, configured_carrier=True)
+                retained = 'data=0080013f4905087200f110000133080910101032547698'
+                read = cold_text.find('read-binary fid=6f7e offset=0 length=11')
+                request = cold_text.find(retained)
+                if read < 0 or request < read or 'update-binary fid=6f7e offset=10 length=1' in cold_text:
+                    raise ValueError('PIN phonebook reboot did not preserve valid location state')
             check = [sys.executable, str(root / 'tools/noki8210_phonebook_check.py'),
-                     str(run / 'write.log'), str(run / 'error.log'), storage]
+                     str(run / 'write.log'), str(run / 'error.log'), storage,
+                     '--frame', str(run / 'snap/8210_phonebook_read_contact.png')]
         elif args.scenario in ('idle-state', 'call-state', 'sms-state'):
             check.append(str(run / 'snap'))
             if args.scenario == 'call-state':

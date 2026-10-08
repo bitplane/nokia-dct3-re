@@ -41,6 +41,9 @@ message storage, after that authenticated registration.
 The paired `verify-8210-pin-host-outgoing-call` and `-sms` gates additionally
 verify physical dialing/composition, correlated host decisions and firmware
 CC/RR or CP/RP completion after authentication.
+`verify-8210-pin-phonebook` separately proves save, new-process authentication,
+retained-location registration and exact contact readback with unchanged
+persisted card bytes.
 
 The 6210's `verify-6210-slow-pin-registration` additionally verifies physical
 late PIN acceptance followed by registration and persisted EF_LOCI on the
