@@ -29,6 +29,12 @@ and physical Back returns to the registered idle frame. The isolated runner's
 96x60 frames and persisted EF_LOCI. This is HLE network service acceptance,
 not native DSP or speech evidence.
 
+`verify-6210-ussd` repeats that acceptance. `verify-6210-call-divert` separately
+drives physical `*#21#` and Send: an exact InterrogateSS request for service
+`0x21` receives an inactive result, renders `Service not active`, releases RR
+and returns to registered idle after Back. These checks do not establish
+divert registration, activation, deactivation or persistence.
+
 ## Inputs
 
 `roms/noki6210/6210_556c.fls` is 0x3a0000 bytes with SHA-1
