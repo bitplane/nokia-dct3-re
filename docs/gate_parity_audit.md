@@ -25,10 +25,10 @@ absent product is a coverage question, not a drifted gate.
 | `call-divert` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `charger-wake` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
 | `frontier` | yes | yes | yes | yes | yes | yes | — | yes | — | — | — | — | — | — | — |
-| `host-incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
-| `host-outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
-| `host-rejected-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
-| `host-silent-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
+| `host-incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | yes |
+| `host-outgoing-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | yes |
+| `host-rejected-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | yes |
+| `host-silent-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | yes |
 | `incoming-call` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
 | `incoming-sms` | — | — | — | — | — | — | — | — | — | — | yes | — | yes | — | — |
 | `keypad-controller` | — | — | — | — | — | — | — | — | — | — | yes | yes | — | — | — |
@@ -132,21 +132,25 @@ absent product is a coverage question, not a drifted gate.
 ### `host-incoming-sms`
 
 - **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
 - **8890**: `tools/run_noki8890_host_sms.py`
 
 ### `host-outgoing-sms`
 
 - **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
 - **8890**: `tools/run_noki8890_host_sms.py`
 
 ### `host-rejected-sms`
 
 - **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
 - **8890**: `tools/run_noki8890_host_sms.py`
 
 ### `host-silent-sms`
 
 - **6210**: `tools/run_noki6210_acceptance.py`
+- **8210**: `tools/run_noki8210_acceptance.py`
 - **8890**: `tools/run_noki8890_host_sms.py`
 
 ### `incoming-call`

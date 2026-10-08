@@ -1,7 +1,9 @@
 """Verify physical NSM-3 A/5551234 submission using shared GSM checks."""
 import argparse
+import hashlib
 from pathlib import Path
 import sys
+from PIL import Image
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -16,6 +18,15 @@ def verify(text, *, rejected=False):
                       rejected=rejected)
 
 
+def check_sent_frame(path):
+    with Image.open(path) as frame:
+        # The envelope on the right is animated; retain the full success text.
+        if frame.size != (84, 48) or hashlib.sha256(
+                frame.convert('L').crop((0, 0, 64, 48)).tobytes()).hexdigest() != (
+                'b091782f84539a43810cc3ffd1e81697b21140078471cc2b3ea2fbda6a338ca3'):
+            raise ValueError('missing reviewed Message sent text')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -23,6 +34,7 @@ if __name__ == '__main__':
     outcome.add_argument('--rejected', action='store_true')
     outcome.add_argument('--rp-silence', action='store_true')
     parser.add_argument('--recovery-frames', type=Path)
+    parser.add_argument('--sent-frame', type=Path)
     args = parser.parse_args()
     try:
         with args.log.open(errors='replace') as stream:
@@ -41,6 +53,10 @@ if __name__ == '__main__':
                 raise ValueError('recovery frames require a failed transaction')
             check_recovery(text, args.recovery_frames, product='8210', key_separator=':',
                            rp_silence=args.rp_silence)
+        if args.sent_frame:
+            if args.rejected or args.rp_silence:
+                raise ValueError('success frame cannot validate a failed SMS')
+            check_sent_frame(args.sent_frame)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 outgoing SMS FAIL: {error}\n')
     print('8210 physical A/5551234 ' +

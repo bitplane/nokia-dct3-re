@@ -8,6 +8,18 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_host_sms_requires_coherent_registration_not_default_carrier(self):
+        text = 'gsm_call_adapter: network registered=1 arfcn=4 t=12'
+        with patch.object(runner, 'verify_registration') as registration, \
+                patch.object(runner, 'verify_stage') as stage:
+            runner.check_host_sms_registration(text, b'card')
+            stage.assert_called_once_with(text, runtime=True, selftest=True, base_record=True)
+            registration.assert_called_once_with(text, b'card', configured_carrier=True)
+            for wrong in ('', text.replace('arfcn=4', 'arfcn=1'),
+                          text.replace('arfcn=4', 'arfcn=41')):
+                with self.subTest(text=wrong), self.assertRaises(ValueError):
+                    runner.check_host_sms_registration(wrong, b'card')
+
     def test_wrong_product_rejected_before_creating_run(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory) / 'run'

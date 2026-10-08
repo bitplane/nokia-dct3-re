@@ -27,6 +27,30 @@
   },
   "gates": [
     {
+      "name": "verify-8210-host-incoming-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-incoming-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8210-host-outgoing-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-outgoing-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8210-host-rejected-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-rejected-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8210-host-silent-sms", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-silent-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8210-sip-idle-restore", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP stack; exact base-record idle restore before a fresh epoch-2 unanswered call",
       "recipe": [

@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -10,6 +11,8 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools.noki8210_pmm_check import base_record_fixture
+from tools.noki8210_registration_check import verify as verify_registration
+from tools.noki8210_staged_check import verify as verify_stage
 
 SCENARIOS = {
     'ussd': ('ussd_input', 40, 'ussd_check'),
@@ -34,6 +37,13 @@ SCENARIOS = {
 
 MCU_SHA1 = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
 PMM_SHA256 = '31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
+
+
+def check_host_sms_registration(text, storage):
+    verify_stage(text, runtime=True, selftest=True, base_record=True)
+    verify_registration(text, storage, configured_carrier=True)
+    if not re.search(r'gsm_call_adapter: network registered=1 arfcn=4\b', text):
+        raise ValueError('host SMS lacks coherent ARFCN4 registration')
 
 
 def prepare_run(run, mcu, pmm):
@@ -65,7 +75,8 @@ def main():
             from tools.noki8210_ussd_check import verify_key_table
             verify_key_table(mcu)
         prepare_run(run, mcu, pmm)
-        config = 'noki8210_host' if args.scenario.startswith('host-') else {
+        host_sms = args.scenario.startswith('host-') and args.scenario.endswith('-sms')
+        config = ('noki8210_host_gsm900' if host_sms else 'noki8210_host') if args.scenario.startswith('host-') else {
                   'incoming-call': 'radio_incoming_call_answered',
                   'incoming-sms': 'radio_incoming_sms',
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
@@ -105,6 +116,8 @@ def main():
         storage = str(run / 'nvram/nsm3hle/sim_card')
         if args.scenario == 'host-incoming-call':
             check.extend(['--frames', str(run / 'snap')])
+        elif args.scenario == 'host-outgoing-sms':
+            check.extend(['--sent-frame', str(run / 'snap/8210_sms_sent.png')])
         elif args.scenario in ('host-rejected-sms', 'host-silent-sms'):
             check.extend(['--rejected' if args.scenario == 'host-rejected-sms' else '--rp-silence',
                           '--recovery-frames', str(run / 'snap')])
@@ -128,11 +141,12 @@ def main():
                 check.extend(['--frame', str(run / 'snap/8210_sms_read_2.png')])
         if checker:
             subprocess.run(check, cwd=root, check=True)
-            if args.scenario in ('host-incoming-sms', 'host-outgoing-sms'):
+            if host_sms:
                 incoming = args.scenario == 'host-incoming-sms'
                 host_checker = 'radio_incoming_host_sms_trace_check' if incoming else 'radio_outgoing_host_sms_trace_check'
+                outcome = {'host-rejected-sms': 'rp_error', 'host-silent-sms': 'rp_silence'}.get(args.scenario, 'rp_ack')
                 subprocess.run([sys.executable, str(root / f'tools/{host_checker}.py')] +
-                               ([] if incoming else ['--octets', '1']) + [str(run / 'error.log')],
+                               (['--arfcn', '4'] if incoming else ['--octets', '1', '--outcome', outcome]) + [str(run / 'error.log')],
                                cwd=root, check=True)
         else:
             from PIL import Image
@@ -140,10 +154,14 @@ def main():
             digest = hashlib.sha256(frame.tobytes()).hexdigest()
             if frame.size != (84, 48) or digest != CALCULATOR_SHA256:
                 raise ValueError('calculator result differs from reviewed 15 frame')
+        if host_sms:
+            text = (run / 'error.log').read_text(errors='replace')
+            check_host_sms_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsm3hle', 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
+            'laboratory_carrier': 4 if host_sms else None,
             'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')

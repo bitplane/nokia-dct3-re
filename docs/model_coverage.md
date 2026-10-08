@@ -118,6 +118,11 @@ native speech are not promoted.
 pixels and ordered protocol replay before a fresh epoch-2 unanswered SIP
 call with the same release and physical-cleanup requirements. No external
 dialog is saved or restored.
+The four `verify-8210-host-*-sms` gates share that explicitly configured
+ARFCN4 cell: incoming persistent physical Read, outgoing success text,
+RP rejection and silence-timeout recovery each require coherent registration
+and their independent host/handset protocol checks. The invalid acquired
+PMM journal remains excluded only by the labelled base-record comparison.
 
 The 6210 passes `verify-6210-power-cycle` with unchanged own PMM: physical
 shutdown, blank display, at least eight seconds of retained RTC ticks and

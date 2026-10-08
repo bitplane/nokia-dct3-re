@@ -451,14 +451,22 @@ SIP request may precede the successful idle restore. The ordinary idle gate
 retains its independent physical Menu/Messages continuation. Provisioning
 and native-speech limitations remain unchanged.
 
-`host-incoming-sms` and `host-outgoing-sms` independently use the same
-host-only configuration and fresh storage. The incoming host supplies
+The four `verify-8210-host-*-sms` gates independently use fresh storage and
+`fixtures/noki8210_host_gsm900/nsm3hle.cfg`, shared with the SIP fixtures.
+It enables the host adapter and an external GSM900 cell pair 4/5, not an
+automatic call/SMS scenario. Every outcome requires ARFCN4 SCH, recovered
+candidate/release parameters, host registration on 4 and persistent EF_LOCI
+and the own native uploads/explicit HLE handoff/self-test in addition to
+its message-specific checks. Default-cell comparison gates
+and factory-provisioning limitations are not promoted.
+The incoming host supplies
 GSM-7 `hello` from `5551234`; acceptance requires queued/delivered request
 identity, handset CP/RP/RR closure, exactly one page, delivery/read-status
 SIM writes, persistent text and reviewed physical Read pixels. Outgoing
 physical Write/Send submits exact GSM-7 `A` to `5551234`; the host accepts
 the correlated request once while wrong-ID and duplicate decisions are
-rejected, and handset acknowledgement/release returns to paging. Each
+rejected, and handset acknowledgement/release returns to paging. Reviewed
+`Message sent` text is required independently of the animated envelope. Each
 runner checks both the host protocol and the own-product handset contract.
 These tests establish external software SMS transport, not external carrier
 delivery or native DSP execution. `--port` and a new run directory isolate

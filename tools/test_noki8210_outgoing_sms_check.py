@@ -1,6 +1,10 @@
 import unittest
+from pathlib import Path
+import tempfile
+from PIL import Image
 from tools.test_noki8850_outgoing_sms_check import GOOD, SILENCE
 from tools.noki8210_outgoing_sms_check import verify_silence
+from tools.noki8210_outgoing_sms_check import check_sent_frame
 
 try:
     from tools.noki8210_outgoing_sms_check import verify
@@ -9,6 +13,14 @@ except ModuleNotFoundError:
 
 
 class OutgoingSmsTest(unittest.TestCase):
+    def test_success_ui_rejects_blank_or_wrong_geometry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'sent.png'
+            for size, color in (((84, 48), 255), ((84, 48), 0), ((96, 60), 255)):
+                Image.new('L', size, color).save(path)
+                with self.subTest(size=size, color=color), self.assertRaisesRegex(ValueError, 'Message sent'):
+                    check_sent_frame(path)
+
     def test_rejected_submission_requires_error_result(self):
         trace = GOOD.replace('8850_', '8210_').replace(
             '8210_keypad_decoded key=', '8210_keypad_decoded: key=')

@@ -86,7 +86,7 @@ def main():
     try:
         prepare_run(run, (root / 'roms/noki8210/8210_5.31ppm_c.fls').read_bytes(),
                     (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes())
-        shutil.copyfile(root / 'fixtures/noki8210_sip_cancel/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
+        shutil.copyfile(root / 'fixtures/noki8210_host_gsm900/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
         handset = [str((args.mame or root / 'mame/mame').resolve()), 'nsm3hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
