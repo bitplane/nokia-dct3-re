@@ -782,8 +782,9 @@ The caller crop `(40,8,80,16)` contains the reviewed `5551234` text and
 is byte-identical to fresh GSM control `run_8210_gsm_incoming_call_pixels_01`;
 the retired wider crop included changing signal/battery/animation pixels
 and failed for both bands. Blank-caller negative tests remain enforced.
-No-PIN laboratory signaling only; native speech, external end-to-end calls,
-DCS host-backend services and late-PIN service coverage remain unproved.
+This gate proves no-PIN laboratory signaling only. DCS host services and
+early-PIN acceptance have separate gates above; late-PIN recovery, native
+speech and external end-to-end speech calls remain unproved.
 `verify-8210-dcs-phonebook` creates contact `A/123` through physical
 inputs, checks initial DCS registration/EF_LOCI, cold-boots preserved
 storage with the same own base-record comparison and carrier-823

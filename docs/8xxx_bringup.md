@@ -1188,10 +1188,12 @@ scenario enabled; check with `noki8890_outgoing_sms_check.py RUN/error.log`.
 The SMS recipient editor preserves digit ordering; the direct-call editor's
 rotation is not a general keypad wiring or numeric-entry defect.
 
-GSM900 and PCS1900 laboratory registration are verified separately;
-valid clock/date entry reaches ordinary idle; invalid-clock error cancellation
-and battery-backed RTC continuity remain separate presentation/reset-domain
-questions; preserved phone/SIM storage alone does not retain clock validity.
+GSM900 and PCS1900 laboratory registration are verified separately.
+Valid clock/date entry reaches ordinary idle; `verify-8890-cold-clock`
+additionally proves entered 13:47 survives a cold process when the CCONT
+clock/control domain and handset storage are both retained. Phone/SIM storage
+alone is insufficient. Offline calendar advance and battery-removal behavior
+remain unproved; invalid-clock cancellation has its separate presentation gate.
 Call signaling and SMS are verified on
 both bands; speech/media remains unproved.
 
