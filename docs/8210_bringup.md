@@ -990,6 +990,13 @@ validation selects the DCS823 contract rather than the GSM900 ARFCN4 contract.
 Speech and late-PIN recovery remain unproved.
 The corresponding standard target is
 `make verify-8210-dcs-early-pin-host-incoming-call RUN_DIR=NEW_DIRECTORY`.
+Outgoing DCS host signaling separately passes without PIN and with early
+PIN entry: `run_8210_dcs_host_outgoing_call_01` and
+`run_8210_early_pin_dcs_host_outgoing_call_01`. Both require physical
+`1234567` dialing, reviewed number/connected/idle crops, own DCS traffic
+and release parameters, correlated host Connect, physical End, registration
+and persisted EF_LOCI. Use `verify-8210-dcs-host-outgoing-call` or
+`verify-8210-dcs-early-pin-host-outgoing-call`; speech is not tested.
 Paired `run_8210_pin_dcs_{late,early}_queue_result_01` confirms the late
 request is not lost: `21f5aa` calls `2a1eaa`, which copies `03ec` into
 context `+0c`. Both physical timings then return 4 from the argument-3

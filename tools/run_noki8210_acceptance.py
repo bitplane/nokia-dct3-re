@@ -126,16 +126,16 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true',
                         help='test SIM PIN followed by phone security and registration')
     parser.add_argument('--pin-start', type=float,
-                        help='registration/incoming-call or host SMS physical PIN entry start time (default 8 seconds)')
+                        help='registration/call or host SMS physical PIN entry start time (default 8 seconds)')
     parser.add_argument('--dcs1800', action='store_true',
                         help='test registration or supported no-PIN scenarios on DCS1800 carriers 823/824')
     args = parser.parse_args()
     if args.pin_start is not None and (
-            not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-incoming-sms', 'host-outgoing-sms') or
+            not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms') or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
-        parser.error('--pin-start requires PIN registration/incoming-call or host SMS and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'host-incoming-sms', 'outgoing-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'call-state', 'phonebook') or
-                        (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-incoming-sms', 'host-outgoing-sms') and args.pin_enabled)):
+        parser.error('--pin-start requires PIN registration/call or host SMS and a time between 3.5 and 20 seconds')
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'host-incoming-sms', 'outgoing-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'call-state', 'phonebook') or
+                        (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms') and args.pin_enabled)):
         parser.error('--dcs1800 requires registration, incoming-call or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
@@ -229,7 +229,8 @@ def main():
                                 dcs1800=True)
             check.extend(['--dcs1800', '--frames', str(run / 'snap')])
         elif args.scenario == 'host-outgoing-call':
-            check.extend(['--configured-carrier', '--frames', str(run / 'snap')])
+            check.extend(['--dcs1800' if args.dcs1800 else '--configured-carrier',
+                          '--frames', str(run / 'snap')])
         elif args.scenario == 'outgoing-call' and args.dcs1800:
             verify_registration((run / 'error.log').read_text(errors='replace'),
                                 (run / 'nvram/nsm3hle/sim_card').read_bytes(),

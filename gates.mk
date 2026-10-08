@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 523 gates: 363 generated from typed steps, 160 copied verbatim (shell).
+# 525 gates: 365 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -77,7 +77,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-dcs-early-pin-host-incoming-call \
 	verify-8210-dcs-host-incoming-sms verify-8210-dcs-early-pin-host-incoming-sms \
 	verify-8210-dcs-host-outgoing-sms verify-8210-dcs-early-pin-host-outgoing-sms \
-	verify-8210-dcs-host-rejected-sms verify-8210-dcs-host-silent-sms \
+	verify-8210-dcs-host-rejected-sms verify-8210-dcs-host-outgoing-call \
+	verify-8210-dcs-early-pin-host-outgoing-call verify-8210-dcs-host-silent-sms \
 	verify-8210-pin-host-incoming-call verify-8210-pin-host-incoming-sms \
 	verify-8210-pin-host-outgoing-call verify-8210-pin-host-outgoing-sms \
 	verify-8210-pin-phonebook verify-8210-pin-state-idle \
@@ -581,6 +582,12 @@ verify-8210-dcs-early-pin-host-outgoing-sms: build
 
 verify-8210-dcs-host-rejected-sms: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-rejected-sms --dcs1800 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-host-outgoing-call: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-outgoing-call --dcs1800 --mame $(MAME_DIR)/mame
+
+verify-8210-dcs-early-pin-host-outgoing-call: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-outgoing-call --dcs1800 --pin-enabled --pin-start 7 --mame $(MAME_DIR)/mame
 
 verify-8210-dcs-host-silent-sms: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-silent-sms --dcs1800 --mame $(MAME_DIR)/mame

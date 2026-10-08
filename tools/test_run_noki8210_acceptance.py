@@ -66,13 +66,23 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                 runner.main()
 
     def test_dcs_does_not_promote_untested_services(self):
-        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'host-outgoing-call']), \
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'calculator']), \
                 patch('sys.stderr', new_callable=io.StringIO), \
                 patch.object(runner, 'prepare_run') as prepare, \
                 self.assertRaises(SystemExit) as error:
             runner.main()
         self.assertEqual(error.exception.code, 2)
         prepare.assert_not_called()
+
+    def test_dcs_host_outgoing_call_admits_physical_pin_ordering(self):
+        for options in ([], ['--pin-enabled', '--pin-start', '7']):
+            with self.subTest(options=options), \
+                    patch('sys.argv', ['runner', 'unused', '--dcs1800',
+                                       '--scenario', 'host-outgoing-call'] + options), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
 
     def test_dcs_host_incoming_admits_physical_pin_ordering(self):
         for options in ([], ['--pin-enabled', '--pin-start', '7']):
