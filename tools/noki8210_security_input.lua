@@ -6,6 +6,22 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_readiness_status_dispatch = memory:install_read_tap(0x2a21a4, 0x2a21a7,
+        'nsm3_readiness_status_dispatch', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2a21a4 then return end
+            local context = memory:read_u32(0x2a2218)
+            local object = memory:read_u32(context + 8)
+            if object < 0x100000 or object >= 0x17fffc then return end
+            machine:logerror(string.format('8210_readiness_status_dispatch: input=%04x state=%04x caller=%08x t=%.6f\n',
+                memory:read_u16(object), memory:read_u16(context + 2),
+                cpu.state['R14'].value, machine.time:as_double()))
+        end)
+    _G.nsm3_readiness_status_constructor = memory:install_read_tap(0x2a20b0, 0x2a20b3,
+        'nsm3_readiness_status_constructor', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2a20b0 or cpu.state['R0'].value ~= 0x07f0 then return end
+            machine:logerror(string.format('8210_readiness_status_constructor: input=%04x caller=%08x t=%.6f\n',
+                cpu.state['R0'].value, cpu.state['R14'].value, machine.time:as_double()))
+        end)
     _G.nsm3_readiness_prerequisite_constructor = memory:install_read_tap(0x2af30c, 0x2af30f,
         'nsm3_readiness_prerequisite_constructor', function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2af30c or cpu.state['R0'].value ~= 0x09fc then return end
@@ -64,7 +80,7 @@ if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
             local object = cpu.state['R1'].value
             if object < 0x100000 or object >= 0x17fffc then return end
             local input = memory:read_u16(object)
-            if input == 0x09c8 or input == 0x09cc or input == 0x09fc or input == 0x1587 then
+            if input == 0x09c8 or input == 0x09cc or input == 0x09fc or input == 0x1587 or input == 0x07f0 then
                 machine:logerror(string.format('8210_readiness_upstream_post: input=%04x task=%d object=%08x caller=%08x t=%.6f\n',
                     input, cpu.state['R0'].value, object,
                     cpu.state['R14'].value, machine.time:as_double()))

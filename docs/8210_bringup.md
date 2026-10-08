@@ -822,8 +822,19 @@ arguments 15 and 17 respectively; these are not subsystem names.
 `run_8210_pin_gsm_prerequisite_constructor_01` identifies `258c6e` as the
 original `09fc` constructor call. Its status cascade selects this input
 for `07f0` (`7f << 4`) at `258c1a`; the other branches construct
-`09f8`, `09f9` or `09fa`. The next boundary is the producer of `07f0`
-and why it is absent in DCS, not the final PIN readiness selector.
+`09f8`, `09f9` or `09fa`.
+The `07f0` source is now observed: constructor `2a20b0` is called through
+`2a21f4`, and its common send is `2a213a`. Dispatcher `2a21a4` reads the
+stored input object at context `137f58 +8`; `03eb` selects `07f0`.
+In paired `run_8210_pin_{dcs,gsm}_status_dispatch_01`, GSM calls this
+dispatcher from `21bffa` at 10.793016 with stored `03eb`, state 5; DCS
+does not call it. Both originally receive the same `03eb` request at
+3.182437 in task-12 state 8. Therefore the original request is present in
+DCS: the missing transition is the completion path reaching `21bffa`,
+not construction of the request or the final PIN readiness selector.
+GSM subsequently calls it again with `03ed`, state 0, at 12.896008.
+The next boundary is the entry predicate/message of that completion path,
+compared with the already-observed early DCS measurement completion.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

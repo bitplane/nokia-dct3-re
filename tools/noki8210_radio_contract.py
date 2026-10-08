@@ -112,6 +112,18 @@ def verify(image):
         raise ValueError('07f0 prerequisite producer literal differs')
     if instructions(0x258c6e, 4) != [('bl', '#0x2af30c')]:
         raise ValueError('09fc prerequisite constructor boundary differs')
+    if [int.from_bytes(read(address, 4), 'big') for address in
+            (0x2a2218, 0x2a2274)] != [0x137f58, 0x3ea]:
+        raise ValueError('selected-cell status dispatcher context/origin differs')
+    if instructions(0x2a21b6, 6) != [
+            ('subs', 'r0, #1'), ('cmp', 'r0, #0'), ('beq', '#0x2a21fa')]:
+        raise ValueError('03eb selected-cell publication selection differs')
+    if instructions(0x2a21fa, 6) != [
+            ('movs', 'r0, #0x7f'), ('lsls', 'r0, r0, #4'),
+            ('b', '#0x2a21f4')]:
+        raise ValueError('03eb to 07f0 status construction differs')
+    if instructions(0x21bffa, 4) != [('bl', '#0x2a21a4')]:
+        raise ValueError('observed selected-cell publication caller differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
