@@ -63,6 +63,7 @@ public:
 		bool band_scan_accepts_candidate_window = false;
 		bool split_gsm_pcs_scans = false;
 		bool background_band_measurements = false;
+		std::array<u8, 4> background_measurement_request{3, 5, 0, 0};
 
 		constexpr bool enabled() const
 		{

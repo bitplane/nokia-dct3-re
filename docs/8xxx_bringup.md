@@ -788,6 +788,16 @@ check decoded physical inputs and the arithmetic-area pixel oracle:
 
 #### 8890 Radio Contract
 
+`run_noki8890_pin_registration.py` independently verifies physical `1234`
+with VERIFY `9000` and registration afterwards on configured GSM900.
+Its delayed startup emits type `57:01140000` at 10.424 seconds. The own
+type-8b route delivers the response object to parser `2809fc`, also called
+from `29d020`; it consumes forty four-byte records, ARFCN at +6/+7 and
+signed RSSI at +9. This parser layout, not sibling payload identity, supports
+the product-configured late measurement response. Runtime correlation pins
+the same RX/parser object and ARFCN 60/RSSI -60 before Location Updating
+acceptance at 13.162 seconds. PMM remains unchanged; native speech is unproved.
+
 The own RX dispatcher at `30168e` selects type `80` at `301750`, calling
 `2dae9c`. Its thirteen-entry `83..8f` table at `3016bc` maps `8b` to
 `301710 -> 2db270`, which posts to task 12 through `28190c`.

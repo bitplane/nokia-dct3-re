@@ -1719,11 +1719,12 @@ void nokia_radio_peer_device::encode_random_access_info(u8 *payload)
 
 void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &packet)
 {
-	// NHM-3 requests this measurement before late SIM initialization finishes.
-	// It consumes ordinary 8b records without stopping the serving receiver.
+	// Product-owned late scans consume ordinary 8b records without stopping
+	// the serving receiver; the request grammar is independently configured.
 	if (m_protocol.background_band_measurements && packet.type == 0x57 &&
-			packet.length == 4 && packet.payload[0] == 3 &&
-			packet.payload[1] == 5 && packet.payload[2] == 0 && packet.payload[3] == 0)
+			packet.length == m_protocol.background_measurement_request.size() &&
+			std::equal(m_protocol.background_measurement_request.begin(),
+				m_protocol.background_measurement_request.end(), packet.payload.begin()))
 	{
 		m_background_measurement_pending = true;
 		return;

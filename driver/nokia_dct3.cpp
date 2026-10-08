@@ -3653,6 +3653,9 @@ void nokia_dct3_state::nsb6hle(machine_config &config)
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
 	runtime.radio = RADIO_NSB6;
+	// Own task-12 parser 2809fc consumes forty ARFCN/signed-RSSI records.
+	runtime.radio.background_band_measurements = true;
+	runtime.radio.background_measurement_request = {1, 0x14, 0, 0};
 	runtime.dsp_service = true;
 	runtime.external_service_transport = true;
 	// Own class-74 dispatcher 24373a calls 240938; command 0d at

@@ -35,6 +35,15 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 phone-code entry, own staged/HLE boundary, reviewed navigation pixels and
 persistent registration. Its existing type-55 scan suffices; the delayed
 type-57 response used by other products is not inherited.
+The `verify-8850-pin-host-*`, `verify-8850-pin-phonebook` and
+`verify-8850-pin-state-*` gates separately compose authentication with
+bidirectional host signaling/SMS, cold persistent contacts and exact
+idle/call/SMS restoration. These remain research-HLE contracts.
+
+`verify-8890-sim-pin-registration` independently proves delayed physical
+PIN acceptance and configured GSM900 registration through its own
+`57:01140000` measurement request and correlated type-8b consumer. It does
+not promote PIN-authenticated downstream services, PCS1900 or native speech.
 
 `verify-8210-slow-pin-registration` independently covers physical SIM PIN and
 phone-code entry, own task-12 background-measurement completion and persistent
