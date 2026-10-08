@@ -11682,6 +11682,40 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"four ROM4 accumulator stores preserve status and cost one cycle each");
+			m_phase = 9229;
+		}
+		if (m_phase >= 9229 && m_phase <= 9231)
+		{
+			if (m_phase != 9229)
+				expect_opcode(m_phase == 9230 ? 0x808c : 0x80d2,
+					data.read_word(0x0f23) == 0x1234 && data.read_word(0x0f22) == 0xbeef && data.read_word(0x0f24) == 0xcafe &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR4) == (m_phase == 9230 ? 0x0f22 : 0x0f23) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR2) == (m_phase == 9231 ? 0x0f20 : 0x0f23) &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f20 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x89ababcd &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e6 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+					"ROM4 low A store precedes decrement/circular wrap and preserves neighbors/accumulators/status in one cycle");
+			if (m_phase < 9231)
+			{
+				program.write_word(0x05e2, m_phase == 9229 ? 0x808c : 0x80d2);
+				program.write_word(0x05e3, 0x75d6);
+				program.write_word(0x05e4, 0x0124);
+				program.write_word(0x05e5, 0xf5e1);
+				data.write_word(0x0f22, 0xbeef);
+				data.write_word(0x0f23, 0);
+				data.write_word(0x0f24, 0xcafe);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0f23);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f23);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e2, 0x8815); // STLM A,AR5
 			program.write_word(0x05e3, 0xe552); // MVDD *AR3-,*AR4
 			program.write_word(0x05e4, 0xe754); // MVMM AR5,AR4
