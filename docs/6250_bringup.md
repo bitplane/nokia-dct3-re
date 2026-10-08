@@ -1137,11 +1137,15 @@ to COBBA under MAD2 control; the audio sections describe the speaker and
 microphone attachments. This supports the existing transport/codec boundary,
 not a particular PCM configuration.
 
-The preview has damaged font extraction: much prose is recoverable from
-the embedded character mapping, but numeric values are missing. It therefore
-does not establish PCM clock rates, sample framing, codec gains, or the
-internal microphone selector. The archive download-start endpoint returned
-an HTML landing page rather than its advertised RAR in the checked request.
-An intact PDF or product-owned register initialization remains necessary
-before enabling the 6250 speech cadence. Do not treat recoverable prose as
-evidence for absent numbers or substitute a sibling handset's configuration.
+The complete six-volume archive is now acquired and passes `unrar t`.
+Extracted documents live under the ignored
+`roms/research/nhm3/service-manual/` collection. The system-module PDF has
+SHA256 `be8080882c1014d885d5dd504167e59bd919d14fe3c1898081d458d3e9059414`.
+Use the public download-start flow for each file ID `26151..26156`, retaining
+its session cookie and following the advertised download link; the initial
+HTML is a landing page, not the archive. This retires the retrieval gap,
+not the audio contract gap. Font extraction remains damaged, and the reviewed
+material does not establish PCM clock rates, sample framing, codec gains or
+the selected internal microphone. Product-owned initialization or explicit
+timing documentation is still required before enabling speech cadence;
+do not substitute a sibling handset's configuration.
