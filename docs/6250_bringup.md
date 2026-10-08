@@ -68,6 +68,33 @@ speech and acquired PMM validity remain unchanged.
 
 ## Inputs
 
+### SIM PIN boundary
+
+A cold initial-record PMM comparison with a PIN-enabled laboratory card
+(`make_sim_card_profile.make_profile(pin_enabled=True)`) displays the
+96x60 `Enter PIN code:` prompt. Physical cells `(column,row)`
+`(2,1), (3,1), (4,1), (2,2), (1,1)` pressed for 150 ms at 8, 9, 10,
+11 and 12 s enter `1234` and confirm. Their observed raw codes are
+`07,08,09,0c,06`. The firmware sends `A0 20 00 01 08` (VERIFY CHV1),
+and the card returns `9000` with retries `3/3` and PIN still enabled.
+Another physical `(1,1)` press at 32 s opens Messages. This is SIM PIN
+verification, not the phone's EEPROM-owned security code.
+
+Reviewed full-frame grayscale SHA-256 values are
+`be6373a76dbb583af392c54f2252a8f03cd1e7541341f0b4969bf6157ab90734`
+(PIN prompt) and
+`67172dbab6f0c4ab41a80b08642a373f0ca37e6d1ce4e7efe518ae13d602ba2a`
+(Messages). Own native upload/HLE and initial-record validation checks pass.
+
+Post-PIN network continuation is **unresolved**: neither the erased-location
+card nor a separate card-only comparison carrying the existing laboratory
+LAI `00f1100001`, location status `01`, and BCCH `00` x 15 + `01`
+registers within 45 s. Both verify CHV1 successfully and remain physically
+interactive. Thus cached location alone does not explain the missing
+registration. These observations do not extend the PIN-disabled coherent
+registration gate to a PIN-enabled boot; recover the post-CHV1 MM/RR
+continuation before doing so. Phone PMM and firmware are unchanged.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
