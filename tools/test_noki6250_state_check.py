@@ -13,6 +13,23 @@ SMS_STORAGE = bytes(SMS_NVRAM_OFFSET) + bytes([1]) + FIRST_SMS_DELIVER_BODY + by
 
 
 class Nokia6250StateTest(unittest.TestCase):
+    def test_forwarding_requires_active_state_before_save_and_fresh_query(self):
+        active = ('gsm_ss: request=register transaction=1b invoke=1 service=21 '
+                  'number_length=5 active=1\n')
+        query = ('6250_divert_lifecycle_physical: transaction=2\n'
+                 'gsm_ss: request=interrogate transaction=1b invoke=2 service=21 active=1\n')
+        verify(active + GOOD + query, divert=True)
+        for trace in (GOOD + active + query, active + query + GOOD,
+                      active + GOOD + query.replace('active=1', 'active=0'),
+                      active + GOOD + query.replace('6250_', '6210_')):
+            with self.assertRaises(ValueError):
+                verify(trace, divert=True)
+
+    def test_forwarding_is_not_call_sms_or_sip_restore(self):
+        for options in ({'call': True}, {'sms': True}, {'fresh_sip': True}):
+            with self.assertRaisesRegex(ValueError, 'separate scenario'):
+                verify(GOOD, divert=True, **options)
+
     def sms_trace(self):
         before, after = SMS_LOG.rsplit('sim_device: update', 1)
         return (before + GOOD.replace('key=Menu', 'key=Read') +

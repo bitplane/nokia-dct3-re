@@ -104,7 +104,7 @@ def check_supplementary(text, frames, service):
 
 def prerequisite_trace(text, scenario):
     """A restored event cannot establish the prerequisites of the saved state."""
-    if scenario not in ('idle-state', 'call-state', 'sms-state'):
+    if scenario not in ('idle-state', 'call-state', 'sms-state', 'divert-state'):
         return text
     before, marker, _ = text.partition('6250_state: event=saved')
     if not marker:
@@ -165,7 +165,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "divert-lifecycle", "toolkit", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state",
+                                              "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state", "divert-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
                                               "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
@@ -246,6 +246,8 @@ def main():
             script = "noki6250_state_call.lua"
         if args.scenario == "sms-state":
             script = "noki6250_state_sms.lua"
+        if args.scenario == 'divert-state':
+            script = 'noki6250_state_divert.lua'
         if args.scenario == 'power-cycle':
             script = 'noki6250_power_input.lua'
         if args.scenario in ('ussd', 'divert', 'toolkit'):
@@ -261,7 +263,7 @@ def main():
         seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
         if args.scenario == 'power-cycle':
             seconds = '80'
-        if args.scenario == 'divert-lifecycle':
+        if args.scenario in ('divert-lifecycle', 'divert-state'):
             seconds = '80'
         if args.pin_enabled and args.scenario in ('host-outgoing-call', 'host-outgoing-sms'):
             seconds = '60'
@@ -349,13 +351,15 @@ def main():
                 checker.extend(["--outgoing", "--number", "123"])
             if args.coherent_cell:
                 checker.extend(['--configured-carrier', '--frames', str(run / 'snap')])
-        elif args.scenario in ("idle-state", "call-state", "sms-state"):
+        elif args.scenario in ("idle-state", "call-state", "sms-state", "divert-state"):
             checker = [sys.executable, str(root / "tools/noki6250_state_check.py"),
                        str(run / "error.log"), str(run / "snap")]
             if args.scenario == "call-state":
                 checker.append("--call")
             elif args.scenario == "sms-state":
                 checker.extend(["--sms", "--storage", str(run / "nvram/nhm3hle/sim_card")])
+            elif args.scenario == 'divert-state':
+                checker.append('--divert')
             if args.coherent_cell:
                 checker.append('--configured-carrier')
         elif args.scenario in ("host-rejected-sms", "host-silent-sms"):
@@ -407,6 +411,9 @@ def main():
         subprocess.run(checker, check=True)
         prerequisites = prerequisite_trace(
             (run / 'error.log').read_text(errors='replace'), args.scenario)
+        if args.scenario == 'divert-state':
+            from tools.radio_registration_trace_check import verify as check_saved_registration
+            check_saved_registration(prerequisites, 'nhm3')
         if args.coherent_cell and args.scenario in ('idle-state', 'call-state', 'sms-state'):
             from tools.radio_registration_trace_check import verify as check_saved_registration
             check_saved_registration(prerequisites, 'nhm3', configured_carrier=True)

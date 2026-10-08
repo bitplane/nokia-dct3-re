@@ -15,7 +15,9 @@ from tools.noki6250_sms_check import verify as verify_sms
 from tools.radio_sms_acceptance_common import require_single_transport, sms_record, FIRST_SMS_DELIVER_BODY
 
 
-def verify(text, *, call=False, sms=False, storage=None, fresh_sip=False, configured_carrier=False):
+def verify(text, *, call=False, sms=False, divert=False, storage=None, fresh_sip=False, configured_carrier=False):
+    if divert and (call or sms or fresh_sip):
+        raise ValueError('forwarding restoration is a separate scenario')
     if fresh_sip and (call or sms):
         raise ValueError('fresh SIP restoration requires idle')
     if '[LUA ERROR]' in text or '6250_state: FAIL' in text:
@@ -26,7 +28,18 @@ def verify(text, *, call=False, sms=False, storage=None, fresh_sip=False, config
     if states[0][1:] != states[1][1:]:
         raise ValueError('architectural state did not restore exactly')
     verify_roundtrip(text, ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:'),
-                     '6250 SMS' if sms else '6250 active call' if call else '6250 idle')
+                     '6250 forwarding' if divert else '6250 SMS' if sms else '6250 active call' if call else '6250 idle')
+    if divert:
+        from tools.radio_call_divert_lifecycle_trace_check import EVENTS
+        from tools.radio_call_lifecycle_common import require_ordered
+        require_ordered(text, (
+            ('active forwarding', EVENTS[0]),
+            ('save', re.compile(r'6250_state: event=saved')),
+            ('restore', re.compile(r'6250_state: event=restored')),
+            ('physical restored query', re.compile(r'6250_divert_lifecycle_physical: transaction=2\b')),
+            ('retained active forwarding', EVENTS[2]),
+        ), '6250 forwarding restore')
+        return
     if sms:
         if storage is None:
             raise ValueError('SMS restoration requires persistent SIM storage')
@@ -67,17 +80,21 @@ def verify(text, *, call=False, sms=False, storage=None, fresh_sip=False, config
         raise ValueError('missing post-load physical Menu scan')
 
 
-def check_frames(directory, *, call=False, sms=False, text=None, storage=None, fresh_sip=False):
+def check_frames(directory, *, call=False, sms=False, divert=False, text=None, storage=None, fresh_sip=False):
     def read(name):
         with Image.open(directory / name) as source:
             if source.size != (96, 60):
                 raise ValueError('unexpected handset frame geometry')
             return source.convert('L')
-    scenario = 'sms' if sms else 'call' if call else 'idle'
+    scenario = 'divert' if divert else 'sms' if sms else 'call' if call else 'idle'
     reference = read('6250_state_' + scenario + '_reference.png')
     restored = read('6250_state_' + scenario + '_restored.png')
     if reference.tobytes() != restored.tobytes():
         raise ValueError('saved-screen pixels did not replay exactly')
+    if divert:
+        from tools.run_noki6250_acceptance import check_divert_lifecycle
+        check_divert_lifecycle(text, directory)
+        return
     if sms:
         frame = read('6250_state_sms_read.png')
         verify_sms(text, storage, frame.tobytes(), frame.size)
@@ -101,16 +118,17 @@ if __name__ == '__main__':
     scenario = parser.add_mutually_exclusive_group()
     scenario.add_argument('--call', action='store_true')
     scenario.add_argument('--sms', action='store_true')
+    scenario.add_argument('--divert', action='store_true')
     parser.add_argument('--storage', type=Path)
     parser.add_argument('--configured-carrier', action='store_true')
     args = parser.parse_args()
     try:
         text = args.log.read_text(errors='replace')
         storage = args.storage.read_bytes() if args.storage else None
-        verify(text, call=args.call, sms=args.sms, storage=storage,
+        verify(text, call=args.call, sms=args.sms, divert=args.divert, storage=storage,
                configured_carrier=args.configured_carrier)
-        check_frames(args.frames, call=args.call, sms=args.sms, text=text, storage=storage)
+        check_frames(args.frames, call=args.call, sms=args.sms, divert=args.divert, text=text, storage=storage)
     except (OSError, ValueError) as error:
         parser.exit(1, f'6250 restoration FAIL: {error}\n')
-    print('6250 research ' + ('delivered-SMS' if args.sms else 'active-call' if args.call else 'idle') +
+    print('6250 research ' + ('forwarding' if args.divert else 'delivered-SMS' if args.sms else 'active-call' if args.call else 'idle') +
           ' restoration/replay/physical continuation PASS; original PMM/native DSP unproved')

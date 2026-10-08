@@ -2,12 +2,14 @@
 local source = debug.getinfo(1, 'S').source:sub(2)
 local call = _G.noki6250_state_call == true
 local sms = _G.noki6250_state_sms == true
-local scenario = sms and 'sms' or call and 'call' or 'idle'
+local divert = _G.noki6250_state_divert == true
+local scenario = divert and 'divert' or sms and 'sms' or call and 'call' or 'idle'
 local pin = os.getenv('NOKIA_DCT3_6250_PIN_ENTRY') == '1'
 _G.noki6250_call_hold = call
 if not _G.noki6250_runtime_observer_loaded then
     dofile(assert(source:match('^(.*[/])')) ..
-        (call and 'noki6250_call_observe.lua' or 'noki6250_runtime_observe.lua'))
+        (divert and 'noki6250_divert_lifecycle_input.lua' or
+         call and 'noki6250_call_observe.lua' or 'noki6250_runtime_observe.lua'))
     _G.noki6250_runtime_observer_loaded = true
 end
 if pin and not call then
@@ -42,6 +44,11 @@ local post_load = emu.add_machine_post_load_notifier(function()
         assert(emu.wait(1))
         machine:logerror(string.format('state_replay: phase=restored event=end t=%.9f\n', machine.time:as_double()))
         machine.screens[':screen']:snapshot('6250_state_' .. scenario .. '_restored.png')
+        if divert then
+            assert(_G.dct3_resume_divert)()
+            completed = true
+            return
+        end
         if _G.noki6250_sip_restore_idle then
             assert(not call and not sms, 'SIP restore must start from idle')
             completed = true
@@ -87,7 +94,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
 end)
 local runner = coroutine.create(function()
     -- Physical PIN entry delays SIM initialization and outgoing dialing.
-    assert(emu.wait(pin and (sms and 25 or 31) or (sms and 17 or 25)))
+    assert(emu.wait(divert and 36 or pin and (sms and 25 or 31) or (sms and 17 or 25)))
     machine:save('6250_' .. scenario)
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

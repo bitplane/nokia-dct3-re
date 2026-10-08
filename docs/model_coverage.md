@@ -332,7 +332,10 @@ default-cell signaling gate is not an ARFCN19/20 coherence promotion.
 physical result dismissal; it does not inherit the 6210 forwarding lifecycle.
 The separate `verify-6250-call-divert-lifecycle` validates its own physical
 register/query/deactivate/query session and reviewed frames; restoration
-and cold-process forwarding persistence remain unpromoted on NHM-3.
+is independently tested by `verify-6250-state-divert`: registration and
+activation precede save, exact architecture/protocol/pixels replay, and a
+fresh physical query after load proves active forwarding before deactivation.
+Cold-process forwarding persistence remains unpromoted on NHM-3.
 `verify-6250-sim-toolkit` independently verifies its nine-byte TERMINAL
 PROFILE, card-owned DISPLAY TEXT, physical OK, successful TERMINAL RESPONSE
 and reviewed idle recovery. Other proactive commands remain unpromoted.

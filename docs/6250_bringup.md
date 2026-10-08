@@ -48,6 +48,12 @@ within one coherent laboratory session. Protocol transitions and all four
 reviewed result frames plus product-local idle are checked independently.
 The active query renders `Done`, not a reviewed forwarding-number frame.
 This scenario does not establish save-state or cold-process persistence.
+`verify-6250-state-divert` separately saves active forwarding after ordinary
+registration, restores exact CPU/RAM/time, one-second protocol and pixel
+replay, then resumes physical query/deactivate/query and checks the same
+reviewed results/idle. It rejects an active query before restore as evidence
+of retained state. The network fixture's forwarding state is saved by MAME,
+not persisted to NVRAM across a new emulator process.
 
 `verify-6250-sim-toolkit` independently exercises a Phase-2+ card: the own
 firmware submits a nine-byte TERMINAL PROFILE, STATUS returns `91 16`, FETCH
