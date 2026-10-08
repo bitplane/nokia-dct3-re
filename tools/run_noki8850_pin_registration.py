@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -36,6 +37,9 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true',
                         help='run the original phone-code-only baseline')
+    parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms'),
+                        default='registration')
+    parser.add_argument('--port', type=int, default=18850)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -47,6 +51,10 @@ def main():
         run.mkdir(parents=True, exist_ok=False)
         for directory in ('cfg', 'nvram/nsm2hle', 'snap'):
             (run / directory).mkdir(parents=True)
+        host = args.scenario != 'registration'
+        sms = args.scenario == 'host-incoming-sms'
+        if host:
+            shutil.copyfile(root / 'fixtures/noki8850_host/nsm2hle.cfg', run / 'cfg/nsm2hle.cfg')
         card = run / 'nvram/nsm2hle/sim_card'
         card.write_bytes(make_profile(pin_enabled=not args.without_pin))
         environment = os.environ.copy()
@@ -58,27 +66,51 @@ def main():
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki8850_security_input.lua'),
-                   '-seconds_to_run', '46']
+                   '-autoboot_script', str(root / ('tools/noki8850_incoming_sms_input.lua' if sms else
+                                                   'tools/noki8850_host_incoming_input.lua'
+                                                   if host else 'tools/noki8850_security_input.lua')),
+                   '-seconds_to_run', '60' if host else '46']
+        host_command = None
+        if host:
+            command.extend(['-http', '-http_port', str(args.port)])
+            host_command = [sys.executable, str(root / ('tools/run_host_incoming_sms_gate.py'
+                            if sms else 'tools/run_host_incoming_signaling_gate.py')),
+                            '--port', str(args.port), '--cwd', str(run)]
+            if not sms:
+                host_command += ['--caller', '5551234', '--ready-file',
+                                 str(run / 'snap/8850_registered_idle.png')]
+            host_command += ['--'] + command
         with (run / 'console.log').open('w') as console:
-            subprocess.run(command, cwd=run, env=environment, stdout=console,
+            subprocess.run(host_command or command, cwd=run, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True, timeout=180)
         text = (run / 'error.log').read_text(errors='replace')
         if not args.without_pin:
             validate(text, card.read_bytes(), 'verify', '1234')
             check_pin_inputs(text)
-        errors = (check_trace(text, runtime_hle=True, sim_reads=True) +
-                  check_physical_inputs(text) + check_navigation_frames(run / 'snap'))
+        errors = check_trace(text, runtime_hle=True, sim_reads=True)
+        if not host:
+            errors += check_physical_inputs(text) + check_navigation_frames(run / 'snap')
         if errors:
             raise ValueError('; '.join(errors))
         subprocess.run([sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                         str(run / 'error.log'), '--profile', 'nsm2'], check=True)
+        if sms:
+            from tools.noki8850_sms_check import verify, verify_frame
+            verify(text, card.read_bytes())
+            verify_frame(run / 'snap/8850_sms_read_4.png')
+            subprocess.run([sys.executable, str(root / 'tools/radio_incoming_host_sms_trace_check.py'),
+                            str(run / 'error.log')], check=True)
+        elif host:
+            from tools.noki8850_incoming_call_check import verify, check_frames
+            verify(text)
+            check_frames(run / 'snap')
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsm2hle',
             'sim_profile': 'default laboratory card' if args.without_pin else 'PIN-enabled laboratory card',
             'provisioning': 'own acquired PMM unchanged',
             'native_dsp_complete': False, 'speech_tested': False,
             'command': command, 'result': 'pass',
+            'scenario': args.scenario, 'host_command': host_command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8850 PIN registration FAIL: {error}\n')

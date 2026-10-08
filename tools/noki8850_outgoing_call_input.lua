@@ -12,7 +12,8 @@ local function press(column, name, label)
     return emu.wait(0.35)
 end
 local input = coroutine.create(function()
-    if not emu.wait(29) then return end
+    -- PIN entry shifts the physical phone-code/menu sequence by four seconds.
+    if not emu.wait(os.getenv('NOKIA_DCT3_8850_PIN_ENTRY') == '1' and 33 or 29) then return end
     if not press(1, 'Names / C', 'idle') then return end
     machine.screens[':screen']:snapshot('8850_registered_idle.png')
     if _G.noki8850_call_idle_only then return end

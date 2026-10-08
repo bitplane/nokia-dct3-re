@@ -1461,6 +1461,21 @@ the existing `55` scan provides the ARFCN 1 measurements before authentication.
 ordinary phone-code-only composition. Acquired PMM is unchanged in both;
 native DSP runtime and speech remain unproved.
 
+The same isolated runner accepts `--scenario host-incoming-call`. It verifies
+physical answer/end input, the complete host-originated CC/RR exchange,
+traffic-channel assignment and release, and reviewed ringing/returned-idle
+pixels after PIN authentication. `--without-pin` passes the same call checks.
+The PIN fixture delays its menu-exit key by four seconds to match the added
+authentication sequence; firmware and peer timing are unchanged. This is
+research-HLE signaling coverage, not native speech.
+
+`--scenario host-incoming-sms` independently checks host delivery after PIN
+acceptance, CP/RP closure, exact read SIM storage, physical Read decoding and
+reviewed `hello` pixels. Its physical reader starts four seconds later only
+for PIN fixtures. Both incoming scenarios pass with `--without-pin` as well.
+Permanent gates are `verify-8850-pin-host-incoming-call` and
+`verify-8850-pin-host-incoming-sms`.
+
 Run `noki8850_radio_observe.lua` for 60 simulated seconds with the isolated
 research invocation above, then check:
 

@@ -1,7 +1,8 @@
 -- Physical read schedule, reusable after emulator restoration.
 local machine = manager.machine
 local input = coroutine.create(function()
-    local delay = 20 - machine.time:as_double()
+    local start = os.getenv('NOKIA_DCT3_8850_PIN_ENTRY') == '1' and 24 or 20
+    local delay = start - machine.time:as_double()
     if delay > 0 and not emu.wait(delay) then return end
     machine.screens[':screen']:snapshot('8850_sms_received.png')
     for index = 1, 4 do
