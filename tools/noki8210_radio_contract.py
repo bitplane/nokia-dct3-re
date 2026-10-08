@@ -179,6 +179,16 @@ def verify(image):
     if instructions(0x21fbb0, 6) != [
             ('cmp', 'r0, #0'), ('bne', '#0x21fbb6'), ('b', '#0x21fa68')]:
         raise ValueError('candidate-window zero-result retry differs')
+    if instructions(0x2b2dc8, 12) != [
+            ('movs', 'r0, #4'), ('strb', 'r0, [r4, #2]'),
+            ('movs', 'r0, #2'), ('strh', 'r0, [r4]'),
+            ('movs', 'r0, #0x55'), ('strb', 'r0, [r4, #3]')]:
+        raise ValueError('own scan-control packet header differs')
+    if instructions(0x2b2ddc, 8) != [
+            ('adds', 'r0, r6, #0'), ('adds', 'r1, r5, #0'), ('bl', '#0x2b2d52')]:
+        raise ValueError('scan-control selector mapping differs')
+    if int.from_bytes(read(0x2b30d0, 4), 'big') != 0x33e8a9 or read(0x33e8a9, 3) != bytes.fromhex('050303'):
+        raise ValueError('selector-three scan-control options differ')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

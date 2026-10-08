@@ -940,6 +940,15 @@ transport publications; caller-return taps replace it. No absence claim
 is based on the silent entry tap. The normal PIN run still fails the
 strict registration gate with the same empty-queue acknowledgement and
 later retained `03ec`.
+Own scan-control constructor `2b2db2` creates type `55` with four payload
+bytes and sends through task 3. Its first two bytes come from helper
+`2b2d52`: the first preserves selector 1..5; the second is indexed by a
+separate option in a selector-specific ROM table. Selector 3 uses the
+three-byte table `05 03 03` at `33e8a9`, so option 0 produces the observed
+`03 05`, while options 1/2 produce `03 03`. Direct caller candidates are
+`21f3d8` and `21fa52`. This mapping does not establish continuous versus
+one-shot measurement or an implicit cancellation command; those meanings
+remain unassigned pending lifecycle evidence.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
