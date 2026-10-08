@@ -1872,7 +1872,8 @@ during an unfinished CP/RP exchange.
 
 #### Incoming Call Acceptance
 
-The same isolated runner accepts `--outgoing-busy` for physical dialing
+`verify-8850-sip-outgoing-busy` uses the same isolated runner with
+`--outgoing-busy` for physical dialing
 of `5551234` against a real local SIP 486 response. A fresh own-PMM run
 reproduced the 18-byte SETUP
 `03450404600200815e0581551532f4150101`, correlated busy decision,
