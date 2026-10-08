@@ -38,6 +38,9 @@ declared base-record PMM comparison and research HLE boundary.
 Its `verify-8210-pin-host-incoming-call` and `-sms` gates independently add
 physical Answer/End and caller/idle presentation, or physical Read and durable
 message storage, after that authenticated registration.
+The paired `verify-8210-pin-host-outgoing-call` and `-sms` gates additionally
+verify physical dialing/composition, correlated host decisions and firmware
+CC/RR or CP/RP completion after authentication.
 
 The 6210's `verify-6210-slow-pin-registration` additionally verifies physical
 late PIN acceptance followed by registration and persisted EF_LOCI on the

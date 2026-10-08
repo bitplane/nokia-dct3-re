@@ -281,6 +281,13 @@ reviewed message-body pixels and persistent read-status storage. Host inputs
 are retained when selecting the PIN fixture's carrier pair; conflicting cell
 configuration is rejected rather than silently rewritten.
 
+`verify-8210-pin-host-outgoing-call` retains the physical `1234567` number,
+host connect decision, exact own CC/RR grammar and release/idle UI checks.
+`verify-8210-pin-host-outgoing-sms` retains physical `A` to `5551234`, the
+correlated host submission decision, CP/RP closure and reviewed success UI.
+Both require the same PIN/phone-code and coherent-registration evidence as
+the incoming gates; no native speech claim follows from call signaling.
+
 The own ring dispatcher at `0x306fa6` selects the thirteen-entry
 `0x83..0x8f` table at `0x306fd4`. Type `8b` calls `0x2df484`, which posts
 to task 12 through `0x28845c`. Type `89` calls `0x2df210`; instructions

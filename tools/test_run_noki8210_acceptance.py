@@ -1,4 +1,5 @@
 import hashlib
+import io
 from pathlib import Path
 import tempfile
 import unittest
@@ -8,6 +9,25 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_pin_host_services_are_explicitly_admitted(self):
+        for scenario in ('host-incoming-call', 'host-incoming-sms',
+                         'host-outgoing-call', 'host-outgoing-sms'):
+            with self.subTest(scenario=scenario), \
+                    patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--pin-enabled']), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
+
+    def test_pin_unsupported_fixture_is_rejected_before_preparation(self):
+        with patch('sys.argv', ['runner', 'unused', '--scenario', 'calculator', '--pin-enabled']), \
+                patch('sys.stderr', new_callable=io.StringIO), \
+                patch.object(runner, 'prepare_run') as prepare, \
+                self.assertRaises(SystemExit) as error:
+            runner.main()
+        self.assertEqual(error.exception.code, 2)
+        prepare.assert_not_called()
+
     def test_pin_topology_preserves_host_and_does_not_duplicate_carrier(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'nsm3hle.cfg'

@@ -93,8 +93,9 @@ def main():
                         help='test SIM PIN followed by phone security and registration')
     args = parser.parse_args()
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
-                                                 'host-incoming-sms'):
-        parser.error('--pin-enabled requires registration or a supported host incoming service')
+                                                 'host-incoming-sms', 'host-outgoing-call',
+                                                 'host-outgoing-sms'):
+        parser.error('--pin-enabled requires registration or a supported host service')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
