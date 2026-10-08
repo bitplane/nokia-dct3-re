@@ -142,9 +142,14 @@ arrives only at 12.495750 s, after successful VERIFY and subsequent SIM
 reads, and leaves state 6.
 
 The state-6 branch at `3caff0` sends every nonzero input directly to
-`3cb41e` with state 6; state 4 similarly retains state 4 for nonzero input
-at `3cb078`. Thus the late call is observed, not missing, and does not
-itself restart selection. This comparison establishes ordering, not that
+`3cb41e` with state 6; state 4 similarly records state 4 for nonzero input
+at `3cb078`. This is not the end of processing: the shared tail dispatches
+on the input. Input 3 reaches `3cb468`, calls status helper `3caa64`,
+stores its result in context byte 1, and tests a further completion
+predicate. It does not call flag-count rebuild `38e60a` along that path.
+Thus the late call is observed and refreshes derived status; retaining
+the selector state alone is not proof that the input was ignored.
+This comparison establishes ordering, not that
 the argument-3 call is sufficient for registration or that a timer should
 be delayed. The next boundary is the upstream continuation `2d1917` and
 the state-4/state-6 zero-input decision: recover the condition that differs
@@ -228,8 +233,10 @@ late messages contain identity bytes `00f110` and enter from continuation
 does not exclude every SIM-content distinction. It does exclude a wholly
 missing `03ec` post-PIN notification. Pre-cache helper `3cbddc` clears
 context fields 2/4/5 and invokes selector input 1; the continuation then
-updates the cache and invokes input 3. Neither nonzero input re-evaluates
-state 6. Follow the linked-record refresh and its consumer-side triggers
+updates the cache and invokes input 3. Input 1 resets selected contexts;
+input 3 refreshes derived status and checks completion through `3cb468`,
+but does not rebuild the record counts there. Follow the linked-record
+refresh and its consumer-side triggers
 after this real notification; do not add a duplicate synthetic message.
 
 ### Coherent laboratory registration
