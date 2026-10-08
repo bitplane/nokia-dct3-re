@@ -879,6 +879,15 @@ The option affects physical input only, is restricted to PIN registration,
 and is recorded in successful run manifests. Next decode recovery when
 `03ec` arrives after the serving acknowledgement, rather than adjust peer
 latency or choose an earlier default input.
+Paired `run_8210_pin_dcs_{late,early}_queue_result_01` confirms the late
+request is not lost: `21f5aa` calls `2a1eaa`, which copies `03ec` into
+context `+0c`. Both physical timings then return 4 from the argument-3
+selector, retaining current `03eb` and queued `03ec`, and continue through
+`21b8ea` rather than the result-3 path. The distinction is the next event:
+early PIN still receives the serving acknowledgement, whose argument-0
+selector returns 3 and promotes `03ec`; late PIN already consumed it with
+result 0 and an empty queue. Replaying the acknowledgement is not a fix.
+Determine the ordinary post-acknowledgement recovery event/continuation.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

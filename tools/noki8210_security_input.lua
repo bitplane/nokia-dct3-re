@@ -6,6 +6,24 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_cell_decision_results = {}
+    for _, address in ipairs({0x21f5ce, 0x21f90e}) do
+        _G.nsm3_cell_decision_results[#_G.nsm3_cell_decision_results + 1] = memory:install_read_tap(
+            address & ~3, (address & ~3) + 3, 'nsm3_cell_decision_result_' .. address,
+            function(offset, value, mask)
+                if cpu.state['PC'].value ~= address then return end
+                local context = memory:read_u32(0x2a16b8)
+                local current = memory:read_u32(context + 8)
+                local queued = memory:read_u32(context + 12)
+                local function input(pointer)
+                    if pointer >= 0x100000 and pointer < 0x17fffc then return memory:read_u16(pointer) end
+                    return 0
+                end
+                machine:logerror(string.format('8210_cell_decision_result: pc=%08x result=%02x state=%04x current=%04x queued=%04x t=%.6f\n',
+                    address, cpu.state['R0'].value, memory:read_u16(context + 2),
+                    input(current), input(queued), machine.time:as_double()))
+            end)
+    end
     _G.nsm3_cell_pending_requests = memory:install_read_tap(0x2a0dc8, 0x2a0dcb,
         'nsm3_cell_pending_requests', function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x2a0dc8 then return end

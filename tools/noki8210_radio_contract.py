@@ -134,6 +134,15 @@ def verify(image):
             ('ldr', 'r0, [r1, #0xc]'), ('movs', 'r4, #2'),
             ('str', 'r0, [r1, #8]'), ('movs', 'r0, #0'), ('str', 'r0, [r1, #0xc]')]:
         raise ValueError('replacement request promotion differs')
+    if instructions(0x21f5aa, 6) != [
+            ('ldr', 'r0, [r4, #8]'), ('bl', '#0x2a1eaa')]:
+        raise ValueError('late readiness request queue insertion differs')
+    if instructions(0x2a1ec0, 4) != [
+            ('ldrsh', 'r1, [r5, r1]'), ('strh', 'r1, [r0]')]:
+        raise ValueError('queued request input copy differs')
+    if instructions(0x21f5d6, 8) != [
+            ('cmp', 'r0, #3'), ('beq', '#0x21f5de'), ('bl', '#0x21b8ea')]:
+        raise ValueError('late readiness result continuation differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
