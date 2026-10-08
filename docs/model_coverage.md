@@ -39,6 +39,8 @@ not native DSP or speech evidence.
 `verify-6210-pin-host-incoming-call` additionally composes this authentication
 and registration lifecycle with host paging, physical Answer/End, exact
 NPE-3 call signaling and reviewed caller/registered-idle pixels.
+`verify-6210-pin-host-incoming-sms` also proves host delivery, physical Read,
+exact message-body pixels and persistent SIM content after authentication.
 
 The 6250's PIN-enabled gates independently cover delayed registration,
 incoming/outgoing host call signaling and SMS, and phonebook save followed by

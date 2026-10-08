@@ -270,6 +270,12 @@ NPE-3 CC/RR grammar, reviewed caller pixels and exact registered-idle recovery.
 It requires PIN acceptance and location persistence before validating the call.
 This proves host call signaling, not speech or native DSP execution.
 
+`verify-6210-pin-host-incoming-sms` independently composes the same physical
+authentication and registration with host SMS delivery, CP/RP acknowledgments,
+physical Read, the existing exact message-body image and persistent read-status
+SIM record. The host checker is explicitly bound to ARFCN 35; the original
+no-PIN host SMS fixture remains on its default topology.
+
 All service runners start with new working directories; incoming network
 events are selected through MAME configuration, not firmware injection.
 No donor PMM, forced phone state or borrowed DSP verdict is used. The staged

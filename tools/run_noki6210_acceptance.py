@@ -181,10 +181,11 @@ def main():
     parser.add_argument('--coherent-cell', action='store_true',
                         help='configure the laboratory network on ARFCNs 35/36')
     parser.add_argument('--pin-enabled', action='store_true',
-                        help='authenticate a PIN-enabled SIM before the host incoming call')
+                        help='authenticate a PIN-enabled SIM before the host incoming service')
     args = parser.parse_args()
-    if args.pin_enabled and (not args.coherent_cell or args.scenario != 'host-incoming-call'):
-        parser.error('--pin-enabled requires --coherent-cell and host-incoming-call')
+    if args.pin_enabled and (not args.coherent_cell or args.scenario not in
+                             ('host-incoming-call', 'host-incoming-sms')):
+        parser.error('--pin-enabled requires --coherent-cell and a host incoming service')
     root = Path(__file__).resolve().parents[1]
     try:
         contract = assess((root / 'roms/noki6210/6210_556c.fls').read_bytes(),
@@ -391,6 +392,8 @@ def main():
         if args.scenario in ('host-incoming-sms', 'host-outgoing-sms'):
             name = 'radio_incoming_host_sms_trace_check' if args.scenario == 'host-incoming-sms' else 'radio_outgoing_host_sms_trace_check'
             options = [] if args.scenario == 'host-incoming-sms' else ['--octets', '1']
+            if args.scenario == 'host-incoming-sms' and args.coherent_cell:
+                options.extend(['--arfcn', '35'])
             subprocess.run([sys.executable, str(root / f'tools/{name}.py'),
                             str(run / 'error.log')] + options, check=True)
         (run / 'acceptance.json').write_text(json.dumps({

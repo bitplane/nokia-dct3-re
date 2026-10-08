@@ -1,4 +1,5 @@
 import hashlib
+import io
 import unittest
 from unittest.mock import patch
 from PIL import Image
@@ -34,6 +35,14 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_pin_service_requires_coherent_network_and_supported_fixture(self):
+        for arguments in (['--scenario', 'host-incoming-sms', '--pin-enabled'],
+                          ['--scenario', 'menu', '--pin-enabled', '--coherent-cell']):
+            with self.subTest(arguments=arguments), patch('sys.argv', ['runner', 'unused'] + arguments), \
+                    patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit) as error:
+                runner.main()
+            self.assertEqual(error.exception.code, 2)
+
     def test_retained_location_is_product_specific_not_fresh_registration(self):
         text = '\n'.join((
             'read-binary fid=6f7e offset=0 length=11',
