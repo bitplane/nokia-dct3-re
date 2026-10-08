@@ -46,8 +46,26 @@ def recover(image):
         raise ValueError('field keep-mask or command encoding differs')
     if u32(0x427210) != 0x16ffe4 or u32(0x427578) != 0x16ffe6:
         raise ValueError('parameter-shadow ownership differs')
+    calls = []
+    for offset in range(0, len(image) - 3, 2):
+        first = int.from_bytes(image[offset:offset + 2], 'big')
+        second = int.from_bytes(image[offset + 2:offset + 4], 'big')
+        if first & 0xf800 != 0xf000 or second & 0xf800 != 0xf800:
+            continue
+        displacement = ((first & 0x7ff) << 12) | ((second & 0x7ff) << 1)
+        if displacement & 0x400000:
+            displacement -= 0x800000
+        address = 0x200000 + offset
+        if address + 4 + displacement == 0x426eb4:
+            calls.append(address)
+    expected_calls = [0x303278, 0x303c7c, 0x303c86, 0x41ab0e, 0x41b07a,
+                      0x420c0a, 0x420c3e, 0x420c66, 0x4272ae, 0x45dbfc, 0x46b9ee]
+    if calls != expected_calls:
+        raise ValueError('direct Thumb BL candidate inventory differs')
     return {'compiler': 0x426eb4, 'selector_count': 55,
             'field_selector': 0x11, 'field_mask': 0x0200,
             'keep_mask': 0xfdff, 'parameter_selector': 8,
             'parameter_shadow': 0x16ffe6,
+            'direct_bl_candidates': calls,
+            'indirect_call_coverage': False,
             'speech_semantics_validated': False}

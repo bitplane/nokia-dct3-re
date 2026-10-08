@@ -478,6 +478,18 @@ the call speech-enable operation. Next trace its callers and shadow writes
 across physical call setup/release, including why the observed call only
 publishes command-9 words while HLE speech control remains zero.
 
+The full halfword-aligned direct Thumb-BL scan yields 11 candidate callers:
+`303278`, `303c7c`, `303c86`, `41ab0e`, `41b07a`, `420c0a`, `420c3e`,
+`420c66`, `4272ae`, `45dbfc`, `46b9ee`. This excludes indirect calls and
+does not declare every encoded candidate executable. The paired publisher
+at `303c76` loads adjacent parameter shadows and calls selectors 8/9.
+Fresh physical outgoing calls still pass. Debugger probes armed at the
+compiler and mailbox produced no hits, but the existing transport ledger
+records mailbox writes at PC `42727c`; the negative debugger result is
+therefore invalid as absence evidence. Those ineffective probes were
+removed. Establish a working observation hook before using further null
+results to classify this active compiler or its field setter.
+
 `verify-6210-sip-outgoing-unavailable` independently passes against actual
 PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
 registered-idle recovery with the same physical number and own-PMM checks.

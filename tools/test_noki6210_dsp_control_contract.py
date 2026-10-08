@@ -16,6 +16,8 @@ class ControlContractTest(unittest.TestCase):
         self.assertEqual(result['field_mask'], 0x200)
         self.assertEqual(result['field_selector'], 0x11)
         self.assertFalse(result['speech_semantics_validated'])
+        self.assertEqual(len(result['direct_bl_candidates']), 11)
+        self.assertFalse(result['indirect_call_coverage'])
 
 
 if __name__ == '__main__':
