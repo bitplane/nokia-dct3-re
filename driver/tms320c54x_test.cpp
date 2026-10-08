@@ -6368,6 +6368,42 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05ef &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
 					"ROM4 BANZD branches on pre-decrement AR7 after delay words in two cycles");
+			program.write_word(0x05e2, 0x6e82); // BANZD pmad,*AR2 (no modification).
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6545;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6545 || m_phase == 6546)
+		{
+			const bool taken = m_phase == 6546;
+			expect_opcode(0x6e82,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 2 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (taken ? 1 : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == (taken ? 0x05ef : 0x05e9) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+				"ROM4 BANZD tests AR2 without modification, executes both delay words and selects the zero/nonzero continuation in two cycles");
+			if (!taken)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6546;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e0, 0x75d6);
 			program.write_word(0x05e1, 0x0124);
 			program.write_word(0x05e2, 0xf020); // LD #lk, A
@@ -12049,24 +12085,26 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase >= 537 && m_phase <= 542)
+		if ((m_phase >= 537 && m_phase <= 542) || m_phase == 6543 || m_phase == 6544)
 		{
 			static constexpr u16 xc_words[] = {
-				0xfd30, 0xfd30, 0xfd4b, 0xfd4b, 0xfd4d, 0xfd4d
+				0xfd30, 0xfd30, 0xfd4b, 0xfd4b, 0xfd4d, 0xfd4d, 0xfd20, 0xfd20
 			};
-			static constexpr u16 st0_values[] = { 0x1000, 0, 0, 0, 0, 0 };
+			static constexpr u16 st0_values[] = { 0x1000, 0, 0, 0, 0, 0, 0x0800, 0x1800 };
 			static constexpr u64 b_values[] = {
-				0, 0, 0xff00000000ULL, 0, 0, 1
+				0, 0, 0xff00000000ULL, 0, 0, 1, 0x12345678, 0x12345678
 			};
-			const unsigned index = m_phase - 537;
+			const unsigned index = m_phase >= 6543 ? m_phase - 6543 + 6 : m_phase - 537;
 			const bool accepted = (index & 1) == 0;
 			expect_opcode(xc_words[index],
 					m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
 						(accepted ? 0x0121 : 0x0120) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0_values[index] &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == b_values[index] &&
 					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-					"ROM4 XC 1 tests TC/BLT/BEQ and executes or rejects one MAR slot");
-			if (m_phase < 542)
+					"ROM4 XC 1 tests TC/NTC/BLT/BEQ, preserves status/B and executes or rejects one MAR slot");
+			if (index < 7)
 			{
 				program.write_word(0x05e2, xc_words[index + 1]);
 				m_port_writes = 0;
@@ -12076,7 +12114,7 @@ private:
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				++m_phase;
+				m_phase = index < 5 ? m_phase + 1 : index == 5 ? 6543 : 6544;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
