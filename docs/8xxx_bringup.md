@@ -1068,12 +1068,20 @@ sequence writes clear-status `50`, word-program `40`, a PMM halfword and
 read-array `ff` (command address `0x3fff00`). The date-confirmation tail writes
 `1134` then `1034` at `0x3d9654`, with surrounding payload writes retained in
 flash NVRAM. Thus the cold editor cannot be attributed to absent persistent
-writes alone. The unresolved boundary is the own-ROM journal reader's
-acceptance and restoration of the software clock/validity state. Record
-headers, logical offsets and payload encoding need independent decoding;
-the NSE-5 single-sector journal parser is not an established NSB-6 contract.
-These observations neither identify a malformed record nor justify modifying
-clock fields, checksums or validity flags.
+writes alone. The cold-reader observation `tools/noki8890_clock_nv_read.lua`
+further proves that `0x3064ac` reads the committed `1034/047c/d44b/1580`
+sequence through caller `0x2e8650`. The journal copies the two payload
+halfwords to cache `0x11ee94`; its last observed value is `d44b1580`.
+At startup, NV getter `0x2c641c` receives offset `047c`, destination
+`0x137420` and length 12 through wrapper `0x304cd0`. It copies three words
+from the cache through `0x3062cc` and returns **1**, with validity flags
+zero, at `0x2c6456`. The record is therefore restored successfully, not
+skipped or rejected at this boundary. The unresolved question is the
+application's interpretation of the restored block and selection of the
+cold time editor. The writer association does not yet establish each
+field's clock semantics. The NSE-5 single-sector journal parser is not an
+established NSB-6 contract; no clock field, checksum or validity flag
+should be changed from these observations alone.
 
 `verify-8890-power-cycle` covers the distinct in-process physical lifecycle.
 Its fresh private runner pins own MCU/PMM and the configured ARFCN60 cell,
