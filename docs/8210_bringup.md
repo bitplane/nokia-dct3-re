@@ -1059,6 +1059,18 @@ acknowledgement. The aligned direct-call scan found these two helper
 callers; indirect entrances remain unclosed. Next establish the
 ordinary transitions selecting states 23/24 and the compared fields,
 rather than replaying `89` into the existing state.
+The receive-state context is `138038` (pool `21bbd4`), with its state
+halfword at `13803a`; helper `21bdc4` stores its argument there before
+entering `21f48a`. Direct write-watch run
+`run_8210_pin_dcs_receive_state_01` observes cold initialization to
+state 8, then `8 -> 11` at 7.903565s (caller `21ee0f`),
+`11 -> 17` at 8.408569s (caller `21ef61`), and `17 -> 13`
+at 12.553509s (caller `21ee3d`). All later writes retain state 13
+through the 46-second run, including the late readiness input.
+No state-23/24 write occurs in this observed lifecycle. This bounds
+the timer route without closing static/data-driven entrances: the
+current failure is in state 13's request continuation, not an observed
+state-23/24 timer transaction waiting for its reply.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

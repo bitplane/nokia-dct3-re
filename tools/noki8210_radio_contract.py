@@ -297,6 +297,11 @@ def verify(image):
         raise ValueError('state-23 type-89 timer setup route differs')
     if instructions(0x21e906, 4) != [('bl', '#0x21bcec')]:
         raise ValueError('state-24 timer setup caller differs')
+    if int.from_bytes(read(0x21bbd4, 4), 'big') != 0x138038:
+        raise ValueError('task-12 receive-state context differs')
+    if instructions(0x21bdc4, 6) != [
+            ('strh', 'r0, [r4, #2]'), ('bl', '#0x21f48a')]:
+        raise ValueError('task-12 state-store continuation differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

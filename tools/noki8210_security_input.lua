@@ -6,6 +6,15 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_cell_receive_state = memory:install_write_tap(0x138038, 0x13803b,
+        'nsm3_cell_receive_state', function(offset, value, mask)
+            if (mask & 0x0000ffff) == 0 then return end
+            local previous = memory:read_u16(0x13803a)
+            local updated = (previous & (~mask & 0xffff)) | (value & mask & 0xffff)
+            machine:logerror(string.format('8210_cell_receive_state: previous=%04x updated=%04x pc=%08x caller=%08x t=%.6f\n',
+                previous, updated, cpu.state['PC'].value, cpu.state['R14'].value,
+                machine.time:as_double()))
+        end)
     _G.nsm3_recovery_timer_descriptor = memory:install_write_tap(0x111d58, 0x111d63,
         'nsm3_recovery_timer_descriptor', function(offset, value, mask)
             machine:logerror(string.format('8210_recovery_timer_descriptor: address=%08x value=%08x mask=%08x pc=%08x t=%.6f\n',
