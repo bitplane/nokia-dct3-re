@@ -903,6 +903,17 @@ subsequent traffic contains `83` and `03f9`, not a later `8b` completion.
 The open transport question is whether an already-issued measurement
 command requires such a later completion; the consumer alone does not
 authorize unsolicited periodic `8b` packets.
+The existing peer has a specific cancellation boundary to audit. The
+updated type-`56` window at 5.542080 produces SCH (`80`) at 7.897080;
+firmware then sends type `02` at 7.898223. With one window report remaining,
+`handle_acquisition_packet` replaces the candidate-measurement phase and
+pending `8b` with the candidate-channel-change `8f`/`89` transaction.
+There is no late type-`57` request in the failing run. Thus the missing
+completion is not an unanswered late request: establish whether type `02`
+legitimately cancels the earlier window's terminal measurement or whether
+that measurement remains independently owed. Current passing early-PIN
+and no-PIN runs do not decide this contract, and must not be used as proof
+that cancellation is correct.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
