@@ -94,6 +94,15 @@ def verify(image):
         raise ValueError('readiness producer context selector differs')
     if instructions(0x228052, 4) != [('bl', '#0x229224')]:
         raise ValueError('zero context selector readiness branch differs')
+    if int.from_bytes(read(0x2272e0, 4), 'big') != 0x1587:
+        raise ValueError('readiness selector setter input differs')
+    if instructions(0x227110, 10) != [
+            ('bl', '#0x225688'), ('adds', 'r7, r0, #0'),
+            ('ldr', 'r0, [pc, #0x1c8]'), ('cmp', 'r7, r0')]:
+        raise ValueError('readiness selector receive predicate differs')
+    if instructions(0x227124, 4) != [
+            ('movs', 'r0, #1'), ('strb', 'r0, [r4, #0x11]')]:
+        raise ValueError('readiness selector setter differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

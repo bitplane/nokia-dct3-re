@@ -6,6 +6,14 @@ local machine = manager.machine
 if os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_readiness_selector_writes = memory:install_write_tap(0x136afc, 0x136aff,
+        'nsm3_readiness_selector_writes', function(offset, value, mask)
+            -- Big-endian byte 136afd occupies bits 16..23 in this bus word.
+            if (mask & 0x00ff0000) == 0 then return end
+            machine:logerror(string.format('8210_readiness_selector_write: value=%02x pc=%08x caller=%08x t=%.6f\n',
+                (value >> 16) & 0xff, cpu.state['PC'].value,
+                cpu.state['R14'].value, machine.time:as_double()))
+        end)
     _G.nsm3_readiness_context = {}
     for _, address in ipairs({0x22803e, 0x2280c6, 0x229224}) do
         _G.nsm3_readiness_context[#_G.nsm3_readiness_context + 1] = memory:install_read_tap(

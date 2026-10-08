@@ -807,6 +807,17 @@ Evidence: `run_8210_pin_dcs_readiness_context_02` and
 DCS remains unregistered. Direct-store candidates in the local subsystem
 are `226ff6`, `22703a`, `22707a`, `227108`, `227126`, `227aca`, `22806e`,
 `228086` and `2281d0`; this syntactic scan is not exhaustive writer coverage.
+The paired `run_8210_pin_{dcs,gsm}_selector_writers_01` write watches find
+the concrete successful setter: GSM writes one through `227126` at
+10.795097 seconds, then clears it through `228086` at 12.694759. DCS
+only has the initial zeroing writes, not a later set or clear in this run.
+The setter loop calls input retrieval `225688` and requires `1587` before
+storing one. Own-ROM checks pin this predicate and store; the watch reports
+PC `227124`, the preceding instruction, not a different store site.
+The earlier GSM mapper observation of `09fc` at 10.794140 is a candidate
+predecessor (`209b90` maps that input to `1587`), but its mailbox delivery
+and original producer still need tracing. This is the current frontier;
+do not set the selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume
 
