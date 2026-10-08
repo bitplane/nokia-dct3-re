@@ -27,6 +27,27 @@ physical continuation. Idle uses Menu/Messages; the established call uses
 End and complete CC/RR release back to registered idle. Neither resolves the
 original PMM or native DSP boundaries below.
 
+### Physical power-cycle observation
+
+An isolated initial-record PMM comparison with the explicit ARFCN19/20
+configuration observes a four-second physical Power hold at 25 s, CCONT
+rail-off at 31.665598 s, and a physical PWRONX restart at 43 s with cause
+`02`. The off display is uniformly white (96x60); RTC seconds continue from
+12:00:32 through 12:00:42 with day 0. No known powered DSP/radio endpoint
+events occur between rail-off and wake. The firmware had set day 0 before
+shutdown; this is not a claim of a valid calendar or complete clock gating.
+
+After restart, the own native verifier/loaders and declared runtime-HLE
+checks pass again. A second Location Updating Accept is acknowledged at
+53.576663 s and the 75 s capture presents `DCT3 LAB`. This is an observation,
+not yet a permanent power acceptance gate: the single-boot registration
+checker requires an EF_LOCI status write absent from this warm transaction,
+and the passive NV-fault endpoint observer captures only the initial boot.
+The next gate must observe those second-boot endpoints and distinguish
+preserved valid location from a fresh status update, rather than weaken the
+fresh-registration contract. Normal `noki6250`, native speech and acquired
+PMM validity remain unchanged.
+
 ## Inputs
 
 ### Coherent laboratory registration
