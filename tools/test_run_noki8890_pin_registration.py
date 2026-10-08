@@ -5,14 +5,15 @@ from tools.run_noki8890_pin_registration import check_pin_inputs
 
 
 class PinRegistrationTest(unittest.TestCase):
-    def test_gsm_host_sms_failure_scenarios_admitted(self):
+    def test_gsm_and_pcs_host_sms_failure_scenarios_admitted(self):
         for scenario in ('host-rejected-sms', 'host-silent-sms'):
-            with self.subTest(scenario=scenario), \
-                    patch('sys.argv', ['runner', 'unused', '--scenario', scenario]), \
-                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
-                    patch.object(runner, 'verify_inputs', side_effect=RuntimeError('admitted')), \
-                    self.assertRaisesRegex(RuntimeError, 'admitted'):
-                runner.main()
+            for options in ([], ['--pcs1900']):
+                with self.subTest(scenario=scenario, options=options), \
+                        patch('sys.argv', ['runner', 'unused', '--scenario', scenario] + options), \
+                        patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                        patch.object(runner, 'verify_inputs', side_effect=RuntimeError('admitted')), \
+                        self.assertRaisesRegex(RuntimeError, 'admitted'):
+                    runner.main()
 
     def fixture(self):
         lines = []

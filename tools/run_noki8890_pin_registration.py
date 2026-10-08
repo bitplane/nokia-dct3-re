@@ -61,6 +61,7 @@ def main():
     try:
         if args.pcs1900 and args.scenario not in ('registration', 'host-incoming-call',
                 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms',
+                'host-rejected-sms', 'host-silent-sms',
                 'idle-state', 'call-state', 'sms-state'):
             raise ValueError('PCS downstream scenarios require separate acceptance coverage')
         roms = root / 'roms/noki8890'

@@ -830,7 +830,7 @@ host RP-error or full firmware-timeout closure, distinct reviewed failure
 text and physical End/Menu recovery. The observer follows the composer's
 existing four-second PIN input delay; no-PIN timing is unchanged. Evidence:
 `run_8890_pin_host_rejected_sms_02`, `run_8890_pin_host_silent_sms_01`.
-These gates do not establish PCS1900 authenticated failure recovery.
+PCS1900 authenticated failure recovery has separate acceptance below.
 
 `verify-8890-pin-phonebook` saves `A / 123` physically, then restarts on
 the same product-local PMM and SIM bytes. The cold process must enter PIN
@@ -1213,6 +1213,15 @@ SMS requires host correlation and exact CP/RP closure; incoming `hello`
 must additionally persist and render through physical Read. The private
 PCS config retains its carrier/band settings and adds only CALLHOST.
 No extra peer behavior is selected; signaling does not establish native speech.
+
+`verify-8890-pin-pcs-host-rejected-sms` and
+`verify-8890-pin-pcs-host-silent-sms` independently add authenticated PCS
+failure recovery (`run_8890_pin_pcs_rejected_sms_01`,
+`run_8890_pin_pcs_silent_sms_01`). Both require the own PCS measurement
+consumer, scan/SI1/registration/EF_LOCI contract, correlated host decision,
+RP-error or full timeout closure, distinct reviewed failure pixels and
+physical End/Menu recovery. GSM900 results do not substitute for these
+band-specific checks; protocol timers remain unchanged.
 
 Three `verify-8890-pin-pcs-state-*` gates independently add authenticated
 idle/call/SMS restoration with exact architecture, ordered protocol replay,
