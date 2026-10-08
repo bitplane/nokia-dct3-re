@@ -86,7 +86,7 @@ Reviewed full-frame grayscale SHA-256 values are
 `67172dbab6f0c4ab41a80b08642a373f0ca37e6d1ce4e7efe518ae13d602ba2a`
 (Messages). Own native upload/HLE and initial-record validation checks pass.
 
-Post-PIN network continuation is **unresolved**: neither the erased-location
+Slow-entry post-PIN network continuation is **unresolved**: neither the erased-location
 card nor a separate card-only comparison carrying the existing laboratory
 LAI `00f1100001`, location status `01`, and BCCH `00` x 15 + `01`
 registers within 45 s. Both verify CHV1 successfully and remain physically
@@ -193,6 +193,19 @@ Trace the first operand's linked-object source and its legitimate refresh
 after SIM initialization. These bytes resemble PLMN encoding, but byte
 shape alone does not establish object ownership or authorize substituting
 an identity.
+
+A discriminating physical-input experiment starts at the same known-visible
+8-second PIN prompt but uses 150 ms press / 50 ms release intervals instead
+of one-second key intervals. VERIFY returns `9000` with CHV retries 3/3;
+selector input 3 arrives at 9.296042 s, before zero-input selection at
+10.364181 s. Its comparison reads `00f110` on both sides, and the host
+adapter records `network registered=1 arfcn=19` at 11.020000 s. This
+establishes a PIN-enabled registration path without firmware or peer
+timing changes. It does not repair late PIN entry: ordinary users must
+not have to beat this decision. An earlier attempt beginning input at
+6 s produced no VERIFY and is not a valid registration comparison.
+The remaining question is legitimate re-evaluation after late SIM
+initialization, rather than inability to register any PIN-enabled card.
 
 ### Coherent laboratory registration
 
