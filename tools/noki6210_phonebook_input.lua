@@ -1,6 +1,9 @@
 -- Physical NPE-3 address-book entry; only host key fields are changed.
 local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(assert(source:match('^(.*[/])')) .. 'noki6210_staged_observe.lua')
+if os.getenv('NOKIA_DCT3_6210_PIN_ENTRY') == '1' then
+    dofile(assert(source:match('^(.*[/])')) .. 'noki6210_security_input.lua')
+end
 local machine = manager.machine
 local sequence = {
     {1, 'Right Softkey / C', 'names'}, {1, 'Scroll Down', 'add_entry'},

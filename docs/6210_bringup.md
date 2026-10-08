@@ -282,6 +282,13 @@ registration. `verify-6210-pin-host-outgoing-sms` verifies physical `A` to
 `5551234`, the host submit decision, CP/RP completion and reviewed Message sent
 text. Both retain the unchanged acquired PMM and explicit HLE boundary.
 
+`verify-6210-pin-phonebook` saves `A / 123` through physical keys, starts a
+new MAME process with the saved card and identical laboratory topology, enters
+PIN again, and verifies exact contact readback. It checks retained-location
+registration, one successful VERIFY per process, enabled CHV1/PIN/retry state
+and byte-identical card storage across readback. No session authorization is
+transferred between processes.
+
 All service runners start with new working directories; incoming network
 events are selected through MAME configuration, not firmware injection.
 No donor PMM, forced phone state or borrowed DSP verdict is used. The staged

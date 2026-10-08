@@ -185,8 +185,8 @@ def main():
     args = parser.parse_args()
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
                              ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call',
-                              'host-outgoing-sms')):
-        parser.error('--pin-enabled requires --coherent-cell and a supported host service')
+                              'host-outgoing-sms', 'phonebook')):
+        parser.error('--pin-enabled requires --coherent-cell and a supported service fixture')
     root = Path(__file__).resolve().parents[1]
     try:
         contract = assess((root / 'roms/noki6210/6210_556c.fls').read_bytes(),
@@ -259,13 +259,16 @@ def main():
             verify(text, runtime=runtime, selftest=runtime)
         if args.pin_enabled:
             from tools.radio_call_lifecycle_common import require_ordered
+            from tools.sim_security_trace_check import validate as check_security
             import re
             require_ordered(text, (
                 ('physical PIN', re.compile(r'6210_security_physical: action=confirm')),
                 ('accepted PIN', re.compile(r'SIM status ins=20 sw=9000')),
                 ('location acceptance', re.compile(r'LAPDm Location Updating Accept acknowledged nr=1')),
             ), '6210 PIN before host service')
-            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
+            card_bytes = (run / 'nvram/npe3hle/sim_card').read_bytes()
+            check_security(text, card_bytes, 'verify', '1234')
+            check_registration(text, card_bytes,
                                channel_header='1202')
         if args.scenario in ('menu', 'accessory'):
             from PIL import Image
@@ -293,15 +296,26 @@ def main():
             cold = run / 'cold'
             cold.mkdir()
             shutil.copytree(run / 'nvram', cold / 'nvram')
+            if args.coherent_cell:
+                shutil.copytree(run / 'cfg', cold / 'cfg')
             cold_command = command.copy()
             cold_command[cold_command.index('-autoboot_script') + 1] = str(root / 'tools/noki6210_phonebook_read.lua')
             cold_command[cold_command.index('-seconds_to_run') + 1] = '27'
             with (cold / 'console.log').open('w') as output:
                 subprocess.run(cold_command, cwd=cold, stdout=output, stderr=subprocess.STDOUT,
-                               check=True, timeout=180)
+                               check=True, timeout=180, env=environment)
             check_output((cold / 'console.log').read_text(errors='replace'))
             read_trace = events(cold / 'error.log')
             verify(read_trace, runtime=True, selftest=True)
+            if args.pin_enabled:
+                from tools.sim_security_trace_check import validate as check_security
+                saved_card = (run / 'nvram/npe3hle/sim_card').read_bytes()
+                cold_card = (cold / 'nvram/npe3hle/sim_card').read_bytes()
+                if saved_card != cold_card:
+                    raise ValueError('PIN phonebook readback changed persisted card bytes')
+                check_security(read_trace, cold_card, 'verify', '1234')
+                check_registration(read_trace, cold_card, preserved_location=True,
+                                   channel_header='1202')
             with Image.open(cold / 'snap/6210_phonebook_read_contact.png') as frame:
                 check_phonebook(text, read_trace,
                                (cold / 'nvram/npe3hle/sim_card').read_bytes(), frame)

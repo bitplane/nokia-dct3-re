@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 462 gates: 302 generated from typed steps, 160 copied verbatim (shell).
+# 463 gates: 303 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -65,15 +65,16 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-security verify-6210-slow-pin-registration \
 	verify-6210-pin-host-incoming-call verify-6210-pin-host-incoming-sms \
 	verify-6210-pin-host-outgoing-call verify-6210-pin-host-outgoing-sms \
-	verify-6210-registration verify-6210-calculator verify-6210-phonebook \
-	verify-6210-menu verify-8210-call-divert verify-8210-ussd \
-	verify-8210-registration verify-8210-outgoing-call verify-8210-incoming-call \
-	verify-8210-incoming-sms verify-8210-outgoing-sms verify-8210-calculator \
-	verify-8210-phonebook verify-7110-keypad-controller verify-sed1565 \
-	verify-7110-verifier verify-7110-bootstrap verify-6210-keypad-controller \
-	verify-6210-verifier verify-6210-bootstrap verify-8210-verifier \
-	verify-8210-bootstrap verify-gsm-fr-codec verify-gsm-tch-f-l1 verify-gsm-a3a8 \
-	verify-gsm-a5 verify-gsm-xcch-l1 verify-gsm-mobility verify-gsm-sms-transport \
+	verify-6210-pin-phonebook verify-6210-registration verify-6210-calculator \
+	verify-6210-phonebook verify-6210-menu verify-8210-call-divert \
+	verify-8210-ussd verify-8210-registration verify-8210-outgoing-call \
+	verify-8210-incoming-call verify-8210-incoming-sms verify-8210-outgoing-sms \
+	verify-8210-calculator verify-8210-phonebook verify-7110-keypad-controller \
+	verify-sed1565 verify-7110-verifier verify-7110-bootstrap \
+	verify-6210-keypad-controller verify-6210-verifier verify-6210-bootstrap \
+	verify-8210-verifier verify-8210-bootstrap verify-gsm-fr-codec \
+	verify-gsm-tch-f-l1 verify-gsm-a3a8 verify-gsm-a5 verify-gsm-xcch-l1 \
+	verify-gsm-mobility verify-gsm-sms-transport \
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
@@ -468,6 +469,9 @@ verify-6210-pin-host-outgoing-call: build
 
 verify-6210-pin-host-outgoing-sms: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario host-outgoing-sms --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame
+
+verify-6210-pin-phonebook: build
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario phonebook --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame
 
 verify-6210-registration: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario registration --mame $(MAME_DIR)/mame

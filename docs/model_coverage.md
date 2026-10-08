@@ -45,6 +45,9 @@ The paired `verify-6210-pin-host-outgoing-call` and
 `verify-6210-pin-host-outgoing-sms` gates independently verify physical dialing
 and composition, correlated host decisions and firmware CC/RR or CP/RP
 completion after PIN-enabled registration; speech remains unproved.
+`verify-6210-pin-phonebook` proves physical save, independent-process PIN
+reauthentication, retained-location registration and exact contact readback
+without changing the saved card bytes.
 
 The 6250's PIN-enabled gates independently cover delayed registration,
 incoming/outgoing host call signaling and SMS, and phonebook save followed by
