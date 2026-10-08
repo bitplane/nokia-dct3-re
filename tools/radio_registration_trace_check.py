@@ -103,9 +103,18 @@ COMMON_POST_ACCEPT_CHECKPOINTS = (
         r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}1506210001f0")),
 )
 
-def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
+def verify(text: str, profile: str = "nse8", preserved: bool = False, *, configured_carrier=False) -> None:
     if profile not in PROFILE_CHECKPOINTS:
         raise ValueError(f"unknown registration profile: {profile}")
+    if configured_carrier and profile != 'nhm3':
+        raise ValueError('configured carrier contract is only validated for NHM-3')
+    deconfig_prefix = '041202' if configured_carrier else PROFILE_DECONFIG_PREFIX[profile]
+    acquisition = (
+        ('configured SCH carrier 19', re.compile(
+            r'RX enqueue type=80 payload=14 .*data=4012[0-9a-f]{8}0013000048')),
+        ('configured candidate carrier 19', re.compile(
+            r'TX packet type=02 .*radio_phase=candidate_channel_change data=041202000000005050000013')),
+    ) if configured_carrier else ()
 
     if preserved and profile in ("nhm2", "nhm3"):
         after_accept = tuple(
@@ -119,12 +128,12 @@ def verify(text: str, profile: str = "nse8", preserved: bool = False) -> None:
         after_accept = COMMON_CHECKPOINTS_AFTER_ACCEPT
 
     checkpoints = (
-        COMMON_CHECKPOINTS_BEFORE_ACCEPT
+        acquisition + COMMON_CHECKPOINTS_BEFORE_ACCEPT
         + PROFILE_CHECKPOINTS[profile]
         + after_accept
         + (("RR channel deconfiguration", re.compile(
             r"TX packet type=02 .*radio_phase=release_channel_change "
-            rf"data={PROFILE_DECONFIG_PREFIX[profile]}000000001a6000"
+            rf"data={deconfig_prefix}000000001a6000"
             rf"{PROFILE_ARFCN[profile]}"
             r"0000000f00000000")),)
         + COMMON_POST_ACCEPT_CHECKPOINTS

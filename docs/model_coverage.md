@@ -31,6 +31,14 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 
 ## Promotion rules
 
+The 6250's `verify-6250-coherent-registration` independently verifies its
+declared initial-record HLE composition on external lab carriers 19/20:
+own native uploads, compact self-test, SCH/MCU/host carrier agreement,
+Location Updating/release/paging and persistent SIM location. Its older
+default-cell call/SMS tests remain bounded signaling comparisons because
+MCU carrier 19 and host carrier 1 do not agree. This new registration proof
+does not automatically promote those downstream lifecycles or native speech.
+
 The levels are cumulative:
 
 - **Booting**: the handset completes its evidenced flash, MAD2, CCONT, SIM and

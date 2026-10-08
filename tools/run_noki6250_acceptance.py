@@ -30,7 +30,7 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--scenario", choices=("calculator", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
-                                              "phonebook", "registration", "accessory", "idle-state", "call-state", "sms-state",
+                                              "phonebook", "registration", "coherent-registration", "accessory", "idle-state", "call-state", "sms-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
                                               "host-rejected-sms", "host-silent-sms", "host-outgoing-call"),
                         default="calculator")
@@ -88,12 +88,14 @@ def main():
             ET.SubElement(inputs, "port", tag=":CALLHOST", type="CONFIG",
                           mask="1", defvalue="0", value="1")
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
+        if args.scenario == 'coherent-registration':
+            shutil.copyfile(root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg', run / 'cfg/nhm3hle.cfg')
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
             script = "noki6250_sms_observe.lua"
         if args.scenario == "phonebook":
             script = "noki6250_phonebook_observe.lua"
-        if args.scenario in ("registration", "accessory"):
+        if args.scenario in ("registration", "coherent-registration", "accessory"):
             script = "noki6250_runtime_observe.lua"
         if args.scenario == "idle-state":
             script = "noki6250_state_idle.lua"
@@ -161,6 +163,7 @@ def main():
             "machine": "nhm3hle", "scenario": args.scenario, "command": command,
             "provisioning": "derived acquired initial-record PMM comparison",
             "audio": "not tested", "normal_machine_boot": "not tested",
+            "laboratory_carrier": 19 if args.scenario == 'coherent-registration' else None,
             "shared_rom_audit_members": audit_members,
             "accessory_contract": accessory_contract,
             "host_command": host_command,
@@ -204,6 +207,9 @@ def main():
                 raise ValueError(f"expected one save frame, found {len(frames)}")
             checker = [sys.executable, str(root / "tools/noki6250_phonebook_check.py"),
                        "save", str(run / "nvram/nhm3hle/sim_card"), str(frames[0])]
+        elif args.scenario == 'coherent-registration':
+            checker = [sys.executable, str(root / 'tools/noki6250_coherent_registration_check.py'),
+                       str(run / 'error.log'), str(run / 'nvram/nhm3hle/sim_card')]
         elif args.scenario in ("registration", "accessory"):
             checker = [sys.executable, str(root / "tools/radio_registration_trace_check.py"),
                        str(run / "error.log"), "--profile", "nhm3"]

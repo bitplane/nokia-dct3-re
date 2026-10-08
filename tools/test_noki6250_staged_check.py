@@ -38,6 +38,15 @@ class StagedBoundaryTest(unittest.TestCase):
     def test_reviewed_boundary(self):
         check(self.fixture())
 
+    def test_runtime_requires_own_uploads_and_exclusive_handoff(self):
+        runtime = self.fixture().replace('observation_halt pc=2c75 ownership_retained=1',
+                                        'runtime_hle_handoff pc=2c75 native_suspended=1')
+        check(runtime, runtime=True)
+        for broken in (self.fixture(), runtime.replace('words=613', 'words=623'),
+                       runtime + 'observation_halt pc=2c75 ownership_retained=1\n'):
+            with self.subTest(text=broken), self.assertRaises(ValueError):
+                check(broken, runtime=True)
+
     def test_missing_verification(self):
         with self.assertRaises(ValueError):
             check(self.fixture().replace("loader2_verified", "not_verified"))

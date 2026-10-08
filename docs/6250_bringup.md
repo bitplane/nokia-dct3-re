@@ -11,7 +11,10 @@ a physical row-1/column-1 press as raw key `06`. The research composition now
 enables the existing SIMI/card boundary: ATR, PPS and file reads run through
 the firmware, and a settled physical press opens the Messages menu. Ordinary
 fresh and preserved-location network registration and `DCT3 LAB` presentation
-are verified in the declared radio HLE. Physical incoming/outgoing call
+are verified in the declared radio HLE. A separately configured ARFCN19/20
+cell now verifies fresh registration with matching SCH, MCU and host carrier;
+the older default-cell gates are bounded signaling comparisons, not this
+coherence proof. Physical incoming/outgoing call
 signaling and complete release are verified, but speech/audio is not.
 SMS delivery, reading, deletion and reply submission are verified. An organic
 phonebook save and cold-start retrieval from SIM NVRAM are verified below. Normal `noki6250`
@@ -25,6 +28,30 @@ End and complete CC/RR release back to registered idle. Neither resolves the
 original PMM or native DSP boundaries below.
 
 ## Inputs
+
+### Coherent laboratory registration
+
+`make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
+declared initial-record PMM comparison, private fresh storage and
+`fixtures/noki6250_host_gsm900/nhm3hle.cfg`. `NEIGHBORCFG` bit 9 selects the
+external lab network's GSM900 pair 19/20; defaults remain 1/2 and no firmware
+state or product acquisition outcome is overridden.
+
+The gate checks the own 223-word verifier, 126-word loader, 124 selector-1
+requests and 613-word second loader before exclusive HLE handoff at absent
+resident `2c75`, then the initial-record compact self-test. Radio acceptance
+requires SCH `4012........0013000048`, candidate
+`041202000000005050000013`, complete Location Updating and release
+`041202000000001a600000130000000f00000000`, followed by paging. The host must
+report `registered=1 arfcn=19`, and SIM NVRAM must contain laboratory LAI
+`00f1100001` with updated location status.
+
+The older default-cell runs receive SCH for carrier 19 and publish zero-header
+candidate/release words while the host network reports carrier 1. Their
+signaling/UI evidence remains useful, but cannot be promoted to coherent RF
+selection. Call/SMS and SIP acceptance on the new configured cell require
+independent runs; native DSP, physical RF and speech are not established by
+this registration gate.
 
 ### Remaining goal boundary
 
