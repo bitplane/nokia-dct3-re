@@ -185,7 +185,7 @@ def main():
     args = parser.parse_args()
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
                              ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call',
-                              'host-outgoing-sms', 'phonebook', 'state-call',
+                              'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'phonebook', 'state-call',
                               'state-idle', 'state-sms')):
         parser.error('--pin-enabled requires --coherent-cell and a supported service fixture')
     root = Path(__file__).resolve().parents[1]

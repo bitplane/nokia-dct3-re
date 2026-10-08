@@ -282,6 +282,15 @@ registration. `verify-6210-pin-host-outgoing-sms` verifies physical `A` to
 `5551234`, the host submit decision, CP/RP completion and reviewed Message sent
 text. Both retain the unchanged acquired PMM and explicit HLE boundary.
 
+`verify-6210-pin-host-rejected-sms` and `verify-6210-pin-host-silent-sms`
+independently verify authenticated host RP error and full firmware-timeout
+recovery on the coherent ARFCN35/36 network. They require physical submission,
+one successful PIN VERIFY, own registration/EF_LOCI, correlated host outcome,
+the respective protocol closure, reviewed failure-screen pixels and physical
+End/Menu recovery. Fresh evidence is `run_6210_pin_host_rejected_sms_01`
+and `run_6210_pin_host_silent_sms_01`; neither requires timing overrides or
+firmware-state writes.
+
 `verify-6210-pin-phonebook` saves `A / 123` through physical keys, starts a
 new MAME process with the saved card and identical laboratory topology, enters
 PIN again, and verifies exact contact readback. It checks retained-location

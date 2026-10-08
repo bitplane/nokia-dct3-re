@@ -36,7 +36,8 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 class ApplicationAcceptanceTest(unittest.TestCase):
     def test_pin_phonebook_and_states_are_admitted_with_coherent_network(self):
-        for scenario in ('phonebook', 'state-idle', 'state-call', 'state-sms'):
+        for scenario in ('phonebook', 'state-idle', 'state-call', 'state-sms',
+                         'host-rejected-sms', 'host-silent-sms'):
             with self.subTest(scenario=scenario), \
                     patch('sys.argv', ['runner', 'unused', '--scenario', scenario,
                                       '--pin-enabled', '--coherent-cell']), \

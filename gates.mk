@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 531 gates: 371 generated from typed steps, 160 copied verbatim (shell).
+# 533 gates: 373 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -65,7 +65,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-security verify-6210-slow-pin-registration \
 	verify-6210-pin-host-incoming-call verify-6210-pin-host-incoming-sms \
 	verify-6210-pin-host-outgoing-call verify-6210-pin-host-outgoing-sms \
-	verify-6210-pin-phonebook verify-6210-pin-state-idle \
+	verify-6210-pin-phonebook verify-6210-pin-host-rejected-sms \
+	verify-6210-pin-host-silent-sms verify-6210-pin-state-idle \
 	verify-6210-pin-state-call verify-6210-pin-state-sms verify-6210-registration \
 	verify-6210-calculator verify-6210-phonebook verify-6210-menu \
 	verify-8210-call-divert verify-8210-ussd verify-8210-dcs-registration \
@@ -509,6 +510,12 @@ verify-6210-pin-host-outgoing-sms: build
 
 verify-6210-pin-phonebook: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario phonebook --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame
+
+verify-6210-pin-host-rejected-sms: build
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario host-rejected-sms --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame
+
+verify-6210-pin-host-silent-sms: build
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario host-silent-sms --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame
 
 verify-6210-pin-state-idle: build
 	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario state-idle --coherent-cell --pin-enabled --mame $(MAME_DIR)/mame
