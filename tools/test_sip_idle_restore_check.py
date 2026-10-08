@@ -47,6 +47,8 @@ class SipIdleRestoreCheckTest(unittest.TestCase):
     def test_3410_fresh_call_uses_own_protocol(self):
         log = LOG.replace('data=8347', 'data=8307').replace('data=032a0802e0d1', 'data=036a0802e0d1')
         self.check(log=log, product='3410')
+        self.check(log=log, product='5210')
+        self.check(log=log, product='3310')
 
     def test_bridge_call_and_answer_must_use_new_epoch(self):
         for bridge in (BRIDGE.replace('identity=(2, 1)', 'identity=(1, 1)'),

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 408 gates: 261 generated from typed steps, 147 copied verbatim (shell).
+# 410 gates: 263 generated from typed steps, 147 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -241,6 +241,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-incoming-call-sip-alerting-restore \
 	verify-3310-radio-outgoing-call-sip-busy-redial \
 	verify-3310-radio-outgoing-call-sip-unavailable-redial \
+	verify-3310-radio-incoming-call-sip-idle-restore \
+	verify-5210-radio-incoming-call-sip-idle-restore \
 	verify-3410-radio-incoming-call-sip-idle-restore \
 	verify-3330-radio-outgoing-call-sip-busy \
 	verify-3330-radio-outgoing-call-sip-unavailable \
@@ -3793,6 +3795,12 @@ verify-3310-radio-outgoing-call-sip-busy-redial:
 
 verify-3310-radio-outgoing-call-sip-unavailable-redial:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 SIP_HANDSET_KEYS=5,5,5,1,2,3,4,enter SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=70 SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--product 3310 --sip-response 480 --calls 2'
+
+verify-3310-radio-incoming-call-sip-idle-restore:
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3310 SIP_HANDSET_BIOS=639 SIP_HANDSET_KEYS= SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=200 SIP_HANDSET_KEY_GAP_MS=200 SIP_HANDSET_RUNNER_ARGS='--incoming --restore-idle --product 3310' SIP_HANDSET_SCRIPT=../tools/sip_3310_idle_state_roundtrip.lua SIP_HANDSET_SECONDS=48
+
+verify-5210-radio-incoming-call-sip-idle-restore: normalize-5210
+	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki5210 SIP_HANDSET_BIOS=540e SIP_HANDSET_KEYS= SIP_HANDSET_KEY_DELAY_MS=18000 SIP_HANDSET_KEY_DURATION_MS=220 SIP_HANDSET_KEY_GAP_MS=280 SIP_HANDSET_RUNNER_ARGS='--incoming --restore-idle --product 5210' SIP_HANDSET_SCRIPT=../tools/sip_5210_idle_state_roundtrip.lua SIP_HANDSET_SECONDS=48
 
 verify-3410-radio-incoming-call-sip-idle-restore: normalize-3410
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_MACHINE=noki3410 SIP_HANDSET_BIOS=546e SIP_HANDSET_KEYS=end SIP_HANDSET_KEY_DELAY_MS=1000 SIP_HANDSET_KEY_DURATION_MS=200 SIP_HANDSET_KEY_GAP_MS=300 SIP_HANDSET_RUNNER_ARGS='--incoming --restore-idle --product 3410' SIP_HANDSET_SCRIPT=../tools/sip_3410_idle_state_roundtrip.lua SIP_HANDSET_SECONDS=48

@@ -564,6 +564,17 @@ make verify-3410-radio-incoming-call-sip-idle-restore RUN_DIR=run_3410_sip_idle_
 The fixture changes only physical input selection and emulator save/load;
 it neither injects firmware messages nor restores an external SIP dialog.
 
+The 3310 v6.39 and 5210 v5.40E independently pass the same fresh-call-after-idle
+restore contract. Their fixtures press the declared product fields: 3310
+`:COL.3` / `Menu`, and 5210 `:COL.0` / `Send`. Both use fresh storage and no
+boot-time keypress; the shared fixture performs save/load and physical Answer.
+Neither profile inherits the 3210's Navi matrix location.
+
+```sh
+make verify-3310-radio-incoming-call-sip-idle-restore RUN_DIR=run_3310_sip_idle_restore_final
+make verify-5210-radio-incoming-call-sip-idle-restore RUN_DIR=run_5210_sip_idle_restore
+```
+
 The 3410 v5.46E independently passes physical outgoing busy (SIP 486 → GSM
 busy decision) and unavailable (SIP 480 → cause 18) fixtures. Each produces one
 attempt, complete CC/RR release, no CONNECT or accepted media, and no further
