@@ -907,6 +907,7 @@ prepare-run-files:
 	@if [ "$(PRESERVE_NVRAM)" != "1" ]; then \
 		rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/flash" \
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card" \
+			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/ccont" \
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 	fi
 	@if [ "$(PHONE)" = "noki3210" ]; then \

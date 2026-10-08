@@ -3,7 +3,7 @@
 #ifndef MAME_NOKIA_NOKIA_CCONT_H
 #define MAME_NOKIA_NOKIA_CCONT_H
 
-class nokia_ccont_device : public device_t
+class nokia_ccont_device : public device_t, public device_nvram_interface
 {
 public:
 	nokia_ccont_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock = 0);
@@ -25,6 +25,9 @@ protected:
 	virtual void device_start() override ATTR_COLD;
 	virtual void device_reset() override ATTR_COLD;
 	virtual void device_post_load() override;
+	virtual void nvram_default() override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
 
 private:
 	TIMER_CALLBACK_MEMBER(rtc_tick);

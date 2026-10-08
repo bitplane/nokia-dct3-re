@@ -103,14 +103,25 @@ removal. Both edges use the same firmware debounce path.
 
 The ROM IRQ dispatcher at `0x2b08c6` independently handles status bit 4 as the
 second source, bit 5 as the minute source, and bit 7 as the alarm source. The
-device advances from a fixed `day 1, 12:00:00` reset state rather than host
-wall-clock time, making runs and save states reproducible. Firmware helpers at
+device initializes fresh storage to fixed `day 1, 12:00:00`, rather than host
+wall-clock time. Its four raw counter bytes (`0x07..0x0a`) are persisted through
+the device NVRAM interface and survive digital reset. A new process resumes
+the counters without adding offline host time. Alarm/control/IRQ state is not
+persisted; save states retain the full live device state separately. Firmware helpers at
 `0x2b068c..0x2b080c` multiply the returned fields directly by 60 and 3600 and
 bound the seconds field at `0x3a`; this establishes binary rather than BCD
 encoding. The recovered alarm helper programs the minute/hour pair without a
 separate enable register. Alarm-hour bit 7 requests disable/update and clears
 after the latch settles; a normal hour write arms the one-shot comparison.
 Register `0xd` remains a clock-gate latch with unknown side effects.
+
+`tools/run_ccont_rtc_retention.py RUN_DIR` runs the existing mapped-register
+RTC/IRQ fixture, then a new isolated process with a private copy of its NVRAM.
+It requires retained minute/day values, the firmware-owned seconds reset,
+three ordered ticks and cleared alarm registers. This is MMIO conformance,
+not proof of battery-removal behavior or cold handset clock provisioning.
+The day/epoch byte may legitimately be zero after a firmware write; the
+storage format preserves register bytes rather than validating a calendar.
 
 The seconds register exposes bit 7 as the RTC-running status. Firmware checks
 that bit before accepting the physical clock, masks it from the numeric seconds,

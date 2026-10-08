@@ -357,7 +357,7 @@ class MachineProfileTest(unittest.TestCase):
         )[0]
         self.assertIn('if [ "$(PRESERVE_NVRAM)" != "1" ]; then', prepare)
         self.assertIn('NVRAM_SYSTEM :=', self.makefile)
-        for store in ("flash", "sim_card", "eeprom"):
+        for store in ("flash", "sim_card", "eeprom", "ccont"):
             self.assertIn(
                 f'"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/{store}"',
                 prepare,

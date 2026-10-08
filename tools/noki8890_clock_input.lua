@@ -23,8 +23,9 @@ local input = coroutine.create(function()
         if not press(1, 'Menu') then return end
         machine.screens[':screen']:snapshot('8890_clock_invalid_dismissed.png')
     end
-    for index, item in ipairs({{2, 'Keypad 1'}, {3, 'Keypad 2'},
-            {3, 'Keypad 0'}, {3, 'Keypad 0'}}) do
+    local clock_digits = _G.noki8890_clock_digits or {{2, 'Keypad 1'},
+        {3, 'Keypad 2'}, {3, 'Keypad 0'}, {3, 'Keypad 0'}}
+    for index, item in ipairs(clock_digits) do
         if not press(item[1], item[2]) then return end
         machine.screens[':screen']:snapshot('8890_clock_digit_' .. index .. '.png')
     end

@@ -36,6 +36,7 @@ constexpr uint8_t IRQ_RTC_ALARM = 0x80;
 
 nokia_ccont_device::nokia_ccont_device(const machine_config &mconfig, const char *tag, device_t *owner, uint32_t clock) :
 	device_t(mconfig, NOKIA_CCONT, tag, owner, clock),
+	device_nvram_interface(mconfig, *this),
 	m_irq_cb(*this),
 	m_power_cb(*this)
 {
@@ -62,6 +63,10 @@ void nokia_ccont_device::device_start()
 
 void nokia_ccont_device::device_reset()
 {
+	// Digital reset does not remove the RTC supply. NVRAM loading/defaulting
+	// owns the cold counter values; reset only the switched/control state.
+	uint8_t const rtc[] = {m_regs[RTC_SECOND], m_regs[RTC_MINUTE],
+		m_regs[RTC_HOUR], m_regs[RTC_DAY]};
 	m_cmd = 0;
 	m_watchdog = 0;
 	m_adc_result = 0;
@@ -72,19 +77,42 @@ void nokia_ccont_device::device_reset()
 	m_regs[IRQ_STATUS] = (m_ready ? RESET_READY : 0) | RESET_PWRONX;
 	m_powered = true;
 	m_charger_connected = false;
-	// Use a fixed epoch rather than the host clock.  The firmware consumes these
-	// registers as binary counters, and deterministic reset state keeps frames
-	// and save states reproducible across hosts.
-	m_regs[RTC_SECOND] = 0;
-	m_regs[RTC_MINUTE] = 0;
-	m_regs[RTC_HOUR] = 12;
-	m_regs[RTC_DAY] = 1;
+	std::copy(std::begin(rtc), std::end(rtc), &m_regs[RTC_SECOND]);
 	m_rtc_alarm_armed = false;
 	m_rtc_alarm_latch_timer->adjust(attotime::never);
 	m_data_cycle = false;
 	m_rtc_timer->adjust(attotime::from_seconds(1), 0, attotime::from_seconds(1));
 	m_irq_cb(0);
 	m_power_cb(1);
+}
+
+void nokia_ccont_device::nvram_default()
+{
+	// A fresh retained-supply fixture is deterministic, not host-clock seeded.
+	m_regs[RTC_SECOND] = 0;
+	m_regs[RTC_MINUTE] = 0;
+	m_regs[RTC_HOUR] = 12;
+	m_regs[RTC_DAY] = 1;
+}
+
+bool nokia_ccont_device::nvram_read(util::read_stream &file)
+{
+	uint8_t rtc[4];
+	auto const [err, actual] = util::read(file, rtc, sizeof(rtc));
+	if (err || actual != sizeof(rtc))
+		return false;
+	// Preserve register bytes, including the firmware's zero day/epoch value;
+	// this is not a serialized Gregorian calendar.
+	std::copy(std::begin(rtc), std::end(rtc), &m_regs[RTC_SECOND]);
+	return true;
+}
+
+bool nokia_ccont_device::nvram_write(util::write_stream &file)
+{
+	// Only the recovered counter domain is retained. Offline wall time and
+	// alarm/control retention are outside this emulation contract.
+	auto const [err, actual] = util::write(file, &m_regs[RTC_SECOND], 4);
+	return !err && actual == 4;
 }
 
 void nokia_ccont_device::device_post_load()

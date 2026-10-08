@@ -1047,12 +1047,18 @@ the security editor. Physical `12345` then reaches the empty time editor,
 not the previously settled idle frame. Reproduce with
 `tools/noki8890_clock_read.lua`, preserved NVRAM, fresh private cfg and
 32 seconds; it enters only the security code and captures at 12/21/30 seconds.
-CCONT's `device_reset()` deliberately resets its RTC to the fixed
-`12:00:00`, day-1 epoch and does not persist RTC registers in NVRAM.
-Therefore this experiment demonstrates repeatable cold clock provisioning,
-not battery-backed clock continuity. Save-state restoration and an emulated
-baseband rail cycle are distinct from a new process's CCONT reset and must
-be tested separately before assigning this behavior to physical silicon.
+CCONT now persists its raw second/minute/hour/day counters separately from
+handset storage, without advancing offline host time. The empty editor still
+appears with those counters retained; cold clock provisioning is therefore
+not explained by RTC counter reset alone. Physical `13:47` entry paints that
+time while the CCONT counters remain `12:00` and firmware resets only the
+day/epoch byte. The user clock includes firmware-owned software state/offset;
+its persistence/validity contract remains unresolved. Reproduce the distinct
+entry with `tools/noki8890_clock_retention_input.lua`, then the security-only
+cold fixture above, using private cfg directories and the same own storage.
+No software clock or validity flag is injected. Counter-domain retention is
+separately checked by `tools/run_ccont_rtc_retention.py`; this does not prove
+complete battery-backed calendar continuity.
 
 `verify-8890-power-cycle` covers the distinct in-process physical lifecycle.
 Its fresh private runner pins own MCU/PMM and the configured ARFCN60 cell,
