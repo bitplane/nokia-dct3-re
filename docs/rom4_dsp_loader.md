@@ -1134,6 +1134,12 @@ the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
+The consolidated 594-word checkpoint passes `make check-c54x-cross-rom`:
+native core conformance, ROM4 RF-boundary and observed coverage checks,
+3210 coherent frontier, native 5110 physical Phone book menu, and the
+3310/3330/3410 product frontiers. The sibling frontier checks retain their
+configured backend distinctions; this aggregate pass is regression evidence,
+not native DSP, RF acquisition or speech validation for every handset.
 That inventory matches top-level cases and opcode masks and reports the
 current number of matching words that do and do not execute in the fixture.
 Sixteen matching high-byte groups have no fixture word in the current report;
