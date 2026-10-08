@@ -1837,13 +1837,24 @@ The card acknowledges `90 00`; the same physical date-entry sequence
 finishes at the reviewed 84x48 DCT3LAB/12:00 idle frame (pixel SHA256
 `03cd1654572ac2cbe001a2fda57cdc3ead7b8d578d81efcaffe2af3350e0d6bc`).
 Own laboratory registration and persisted EF_LOCI remain required.
-Successful NSB-6 DISPLAY TEXT presentation/dismissal remains unproved.
-Separate retained-clock probes using only this handset's generated storage
-observed profile download and card readiness but no subsequent FETCH within
-43 seconds, including a physical Names press. This bounded observation is
-not proof that the firmware lacks a later proactive-command route. No
-polling interval, card-ready timing or firmware UI state was forced to
-produce a favorable result.
+Successful NSB-6 DISPLAY TEXT is independently observed after restarting
+with this handset's own physically entered clock/date storage. The ordinary
+STATUS poll at 62.016 seconds returns `91 16`; FETCH follows at 62.070
+seconds. Physical Menu at 71 seconds produces successful TERMINAL RESPONSE
+`810301218002028281030100` and `90 00`, then returns to DCT3LAB idle.
+The reviewed 84x48 DISPLAY TEXT pixel SHA256 is
+`6a0bd20bfe0a7f57ae82a570eceb3a0f29fdc8a9a1e047fb294e85d61e610f6f`;
+the post-dismissal 12:01 idle hash is
+`8187cbe68f4b7fe0a15cf10c16b742b3236f3240af3f79556c319d5ed337f2ee`.
+`noki8890_toolkit_retained_input.lua` supplies only physical security entry,
+snapshots and dismissal. The shared DISPLAY TEXT protocol checker passes
+the captured exchange. This retained-clock observation is not yet a
+self-contained two-process acceptance gate: fresh clock/date seeding,
+retained registration and storage predicates must be integrated before
+promoting it into the coverage matrix. The cold-start screen-busy gate
+remains unchanged. The earlier 43-second observation window missed this
+later poll; no polling interval, card-ready timing or firmware UI state was
+forced to obtain the result.
 
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first
