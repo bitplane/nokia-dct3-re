@@ -245,6 +245,20 @@ def verify(image):
     if instructions(0x21f2ae, 6) != [
             ('ldrb', 'r0, [r4]'), ('cmp', 'r0, #0x89'), ('bne', '#0x21f2c2')]:
         raise ValueError('state-ten acknowledgement class predicate differs')
+    if int.from_bytes(read(0x21bbe4 + 21 * 4, 4), 'big') != 0x21fc40:
+        raise ValueError('state-21 readiness dispatcher differs')
+    if instructions(0x21fc44, 10) != [
+            ('ldr', 'r0, [pc, #0x3a4]'), ('cmp', 'r1, r0'),
+            ('beq', '#0x21fc4e'), ('bl', '#0x21f2ec')]:
+        raise ValueError('state-21 alternate readiness entrance differs')
+    for pool, expected in ((0x21f434, 0x03e9), (0x21f528, 0x03eb),
+                           (0x21f544, 0x03ea)):
+        if int.from_bytes(read(pool, 4), 'big') != expected:
+            raise ValueError('alternate readiness input literal differs')
+    if instructions(0x21f354, 6) != [('movs', 'r0, #0'), ('bl', '#0x2a1380')]:
+        raise ValueError('alternate readiness is not argument-zero owned')
+    if instructions(0x21f552, 2) != [('b', '#0x21f5aa')]:
+        raise ValueError('shared forwarded readiness tail differs')
     if int.from_bytes(read(0x21bedc, 4), 'big') != 0x137db0:
         raise ValueError('generic measurement flag address differs')
     if instructions(0x21bb5a, 6) != [

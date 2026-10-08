@@ -1205,6 +1205,25 @@ as its recovery. Tail/data-driven/indirect entrances require separate closure;
 a missing BL cannot prove absence of a producer. The next decode is the
 shared state-13 forwarding route and ordinary events selecting the alternate
 argument-zero owner at `21f356`, rather than replaying acknowledgement packets.
+That alternate owner is now bounded to receive state 21: table entry
+`21bbe4 + 21*4` selects `21fc40`, which treats `03ed` specially and otherwise
+calls `21f2ec`. Its literal comparisons select `03eb`, `03ec` (`fb<<2`)
+and `03ea` for `21f314`; after the selected-object predicate, `21f348`
+queues the incoming request and `21f354/21f356` invoke argument zero.
+State 13's shared forwarding selects `03ec` through `21f542/21f54c`,
+then `21f552 -> 21f5aa`: it queues the request but evaluates argument 3
+at `21f5c8`, not this alternate path. Thus the argument-zero readiness owner
+exists, but is not selected by the observed late-PIN receive state.
+The next unresolved contract is the ordinary transition into state 21
+or a post-readiness state-13 measurement continuation; neither can be replaced
+by changing the callback/state selector in the emulator.
+An aligned direct-BL scan finds 19 candidates calling state setter `21bdc4`.
+Only one is immediately preceded by literal `movs r0,#21`:
+`21f30a -> 21f30c`, the unmatched-input tail of this same alternate handler.
+This is not an independent boot entrance. The scan does not cover computed
+arguments, tail branches, direct stores or indirect calls, and therefore does
+not prove state 21 unreachable. Resolve those entrance classes before claiming
+complete state ownership.
 
 ## Evidence needed to resume
 
