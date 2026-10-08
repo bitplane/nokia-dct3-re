@@ -1,11 +1,25 @@
 import unittest
 from tools.noki5510_bootstrap_check import (
     CHAIN, RUNTIME_CHAIN, verify, verify_serial_readiness, verify_input_lifecycle,
-    verify_input_timer,
+    verify_input_timer, verify_dsp_service_route,
 )
 
 
 class BootstrapCheckTest(unittest.TestCase):
+    def test_dsp_service_route_requires_forward_then_both_service_ingresses(self):
+        forward = ('5510_input_dsp_forward: caller=003a53f7 object=0012e9cc '
+                   'length=0a type=8e transport=1e destination=00 source=02 class=d0')
+        ingress = ('5510_input_serial_ingress: caller=002f58b1 object=0012eaac '
+                   'length=0001 transport=1e destination=00 source=02 class=')
+        text = '\n'.join((forward, ingress + '01', ingress + '04'))
+        verify_dsp_service_route(text)
+        for bad in (text.replace(forward, ''), text.replace(ingress + '04', ''),
+                    text.replace('source=02', 'source=28'),
+                    '\n'.join((ingress + '01', ingress + '04', forward)),
+                    text.replace('caller=003a53f7', 'caller=003a53f5')):
+            with self.assertRaises(ValueError):
+                verify_dsp_service_route(bad)
+
     def test_input_timer_requires_arm_then_delivery(self):
         armed = '5510_input_timer_armed: link=0010b824 delta=02ff flags=01 state=02 owner=1d'
         delivered = '5510_input_timer_dispatch: event=01e7'

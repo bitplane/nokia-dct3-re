@@ -331,6 +331,7 @@ Retained, ignored, under `roms/5510-mu4-reference/`:
 | Artifact | SHA256 |
 | --- | --- |
 | `5510-dsp-repair-tool_1.00_all.deb` | `1ac1261929fdf48829669ad00597f5d01a8f872d02ee6262acad9dcb9488776e` |
+| `5510_DSP_REPAIR_TOOL_v1.00_Windows.zip` | `56c4c6ee44aa106b78e5a48ae4b467d54b41538e8f77b60492ce5a95cf0ab6fb` |
 | `InitData_R060.a00` | `65118e00dfd8d78726a45e781e2c7c96714228ec025bc5ccb141d445d85db094` |
 | `InitData_R061.a00` | `fad9a4d8c340c91fc06355ba18b42cdff9f2682ed48abb88903344d281b89d99` |
 | `initdisk_R060.a00` | `8240fc14b3683dee1018426359e74fc9cb1bb5d0ed438685312015b14e79fe4c` |
@@ -345,6 +346,18 @@ with outgoing constructor `335a50`. It also describes unsolicited opcode
 consumer census, not sufficient evidence for normal key/startup replies.
 Music-DSP images are separate from MAD2's missing resident baseband mask
 code and are not MSP430 program dumps.
+
+The Linux package's `dsp_repair/fbus.py` (SHA256
+`9cfc318d185cbebb7bbad9a615adcd334e3ec56d40516c2eccb040620176f2fe`)
+and `ORIGINAL_PROTOCOL_ANALYSIS.md` independently agree with the MCU's
+`47 02` self-test request, unsolicited opcode `06` and five-component `6f`
+reply. The application acknowledges unsolicited frames and answers node
+`28`'s D0/04 service startup with D0 payload `05 01 41`. This is a
+service-tool session, not a recovered normal MA4/MU4 boot transcript.
+Neither acquired distribution includes the cited raw `com_log_00001/2`
+captures or the MSP430 program. The Windows archive matches the published
+hash; no executable was run. No startup greeting or PASS reply is inferred
+from its repaired/modified firmware variants.
 
 The primary MU4 manual page 8 identifies the music processor as
 TMS320DA150. TI's [Audio Solutions Guide](https://www.ti.com/download/vf/audio/audiosolutionsguide1.pdf)
@@ -2568,6 +2581,16 @@ jump table at `3a5304` covers `83..8f`; entries `8d` and `8e` both select
 posts the unchanged object to task 8 via `2ce88c`. The package checker pins
 these code bodies, task descriptor, shared-window literal and table entries.
 This is a static transport contract, not a runtime MU4 acceptance result.
+
+The positive runtime control is now executable through
+`noki5510_bootstrap_check.py --runtime --serial-readiness --input-lifecycle
+--dsp-service-route <error.log>` using `noki5510_input_observe.lua` and
+verbose logging. A fresh sixteen-second hybrid run observes task-4 caller
+`3a53f7` forwarding two type-`8e`, length-`0a`, source-`02` D0 frames,
+followed by sequenced ingress from `2f58b1` with classes `01/04`.
+The checker requires that order and exact route fields. Node-`28` sends
+and availability events remain absent in this bounded run. This validates
+the service transport with declared HLE traffic, not a physical MU4 backend.
 
 The remaining question is which physical receive mechanism delivers MU4's
 node-`28` bytes to this DSP-carried service ring, including its activation

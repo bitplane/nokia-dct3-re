@@ -1,6 +1,7 @@
 """Check own-upload execution, not graphical boot or fitted mask identity."""
 import argparse
 from pathlib import Path
+import re
 
 CHAIN = (
     '5510_startup_adc: sample=03ff',
@@ -85,6 +86,24 @@ def verify_input_timer(text):
         raise ValueError('missing subsequent MU4 timer delivery; extend observation window')
 
 
+def verify_dsp_service_route(text):
+    """Positive HLE discovery transport control; not a MU4 acceptance test."""
+    forward = re.search(
+        r'5510_input_dsp_forward: caller=003a53f7 object=[0-9a-f]{8} '
+        r'length=0a type=8e transport=1e destination=00 source=02 class=d0\b', text)
+    if forward is None:
+        raise ValueError('missing task-4 DSP service forwarding evidence')
+    cursor = forward.end()
+    for frame_class in ('01', '04'):
+        ingress = re.search(
+            r'5510_input_serial_ingress: caller=002f58b1 object=[0-9a-f]{8} '
+            r'length=0001 transport=1e destination=00 source=02 class=' + frame_class + r'\b',
+            text[cursor:])
+        if ingress is None:
+            raise ValueError('missing subsequent sequenced service ingress class ' + frame_class)
+        cursor += ingress.end()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
@@ -95,6 +114,8 @@ def main():
                         help='also require MU4 task initialization and receiver entry, not keys')
     parser.add_argument('--input-timer', action='store_true',
                         help='also require MU4 timer arm and delivery; observe at least 16 seconds')
+    parser.add_argument('--dsp-service-route', action='store_true',
+                        help='require task-4 forwarding then task-8 HLE discovery ingress, not MU4')
     args = parser.parse_args()
     try:
         text = args.log.read_text(errors='replace')
@@ -105,6 +126,8 @@ def main():
             verify_input_lifecycle(text)
         if args.input_timer:
             verify_input_timer(text)
+        if args.dsp_service_route:
+            verify_dsp_service_route(text)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5510 bootstrap FAIL: {error}\n')
     print('5510 own uploads PASS; ' + ('hybrid discovery/self-test consumed, not idle boot'
