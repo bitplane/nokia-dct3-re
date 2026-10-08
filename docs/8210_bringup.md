@@ -112,8 +112,7 @@ gaps and accepted packets after closure remain failures. Adapter rejection
 reason fields are observational; no admission behavior changed. The common
 checker accepts exact PJSIP status 200 with reason `OK` or `Normal call clearing`.
 
-This establishes outgoing HLE media transport, not native DSP speech. External
-call restoration remains disabled for NSM-3. Provisioning remains the declared
+This establishes outgoing HLE media transport, not native DSP speech. Provisioning remains the declared
 base-record comparison, not validated factory data.
 The outgoing runner accepts `--record-media --sound pulse` for explicit
 audio observation; recordings alone are not waveform acceptance.
@@ -147,6 +146,16 @@ microphone and 660 Hz earpiece recordings, full physical Answer/End, release
 and UI checks. Bridge counters are uplink 396, downlink 379, transmitted PCM
 396 and received PCM 400 (13 dropped). This verifies non-silent synthetic
 audio in both directions on an incoming HLE call, not native DSP speech.
+
+`make verify-8210-sip-outgoing-restore RUN_DIR=NEW_DIRECTORY` saves a connected
+physical outgoing call, verifies exact CPU/SP/RAM/time restoration using the
+existing architecture observer, then requires the external dialog to close
+with SIP BYE. The fresh epoch republishes the own `1234567` request; the bridge
+must clear it exactly once without redial and complete firmware CC/RR release.
+Fresh `run_8210_sip_outgoing_restore_probe` passes, restoring architecture at
+34.000 s and ending the epoch-2 call at 34.130 s. SIP dialog restoration,
+incoming/pending-call restoration and waveform continuity across load are
+not claimed. This fixture tests restoration, not media-quality acceptance.
 
 Fresh matrix run `run_8210_sip_media_closed` passes with explicit media
 closure at 37.030 s and completion at 37.040 s, with no rejected downlink.

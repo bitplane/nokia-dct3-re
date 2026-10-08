@@ -354,8 +354,19 @@ def verify_failure(root, remote_text, status, product='3210', calls=1):
 def verify_outgoing_restore(root, remote_text, connected=False, product='3210'):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
+    number = {'6210': '1234567', '6250': '123', '8210': '1234567', '8890': '1234567'}.get(product, '5551234')
     if not re.search(outgoing_setup_pattern(product), log):
         raise RuntimeError('restored outgoing call lacks the product SETUP frame')
+    if product in ('6210', '6250', '8210', '8850', '8890'):
+        try:
+            from tools.radio_outgoing_call_trace_check import SETUP, decode_called_digits
+        except ModuleNotFoundError:
+            from radio_outgoing_call_trace_check import SETUP, decode_called_digits
+        setups = list(SETUP.finditer(log))
+        if len(setups) != 1 or any(
+                len(bytes.fromhex(item['data'])) != int(item['length']) or
+                decode_called_digits(bytes.fromhex(item['data'])) != number for item in setups):
+            raise RuntimeError('restored outgoing SETUP differs from physical digits')
     markers = (('state changed to CONFIRMED', 'Request msg BYE/') if connected else
                ('Response msg 180/INVITE/', 'Request msg CANCEL/', 'Response msg 487/INVITE/'))
     remote_cursor = 0
@@ -377,12 +388,12 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210'):
     if len(re.findall(r'termination id=1 cause=41 result=accepted', log)) != 1:
         raise RuntimeError('restored outgoing call did not clear exactly once')
     cursor = 0
-    patterns = (r'gsm_call_adapter: request id=1 epoch=1 digits=5551234',)
+    patterns = (rf'gsm_call_adapter: request id=1 epoch=1 digits={number}\b',)
     if connected:
         patterns += (r'gsm_call_adapter: state id=1 epoch=1 phase=connected',)
     patterns += (
                     r'sip_state: saved', r'sip_state: restored',
-                    r'gsm_call_adapter: request id=1 epoch=2 digits=5551234')
+                    rf'gsm_call_adapter: request id=1 epoch=2 digits={number}\b')
     termination = (r'termination id=1 cause=41 result=accepted',
                    r'outgoing termination consumed id=1 cause=41')
     patterns += tuple(reversed(termination)) if connected else termination
@@ -524,9 +535,12 @@ def main():
                  args.sip_response == 200 and args.calls == 1 and
                  not args.restore_call and
                  not args.restore_idle and not args.restore_outgoing)
-    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and
+    nsm3_restore = (args.product == '8210' and not args.incoming and
+                    args.restore_outgoing and args.sip_response == 200 and
+                    not args.record_media and not args.restore_call and not args.restore_idle)
+    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm3_restore and
             (not args.incoming or not args.cancel_incoming)) or
-            (args.record_media and not nsm3_media) or args.restore_call or args.restore_idle or args.restore_outgoing):
+            (args.record_media and not nsm3_media) or args.restore_call or args.restore_idle or (args.restore_outgoing and not nsm3_restore)):
         parser.error(f'{args.product} requires unanswered incoming CANCEL or outgoing 480/486; media is unproved')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')

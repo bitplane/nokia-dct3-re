@@ -28,6 +28,16 @@ REMOTE = 'Response msg 180/INVITE/\nRequest msg CANCEL/\nResponse msg 487/INVITE
 
 
 class SipOutgoingRestoreCheckTest(unittest.TestCase):
+    def test_8210_uses_own_number_not_older_fixture_number(self):
+        log = LOG.replace('5551234', '1234567').replace(
+            '03450401a05e0581551532f4150101', '03450401a05e0581214365f7150101')
+        self.check(log=log, product='8210')
+        for wrong in (log.replace('digits=1234567', 'digits=5551234'),
+                      log.replace('03450401a05e0581214365f7150101',
+                                  '03450401a05e0581551532f4150101')):
+            with self.assertRaises(RuntimeError):
+                self.check(log=wrong, product='8210')
+
     def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, connected=False, product='3210'):
         if product == '3310':
             log = log.replace('length=15 data=03450401a05e0581551532f4150101',

@@ -117,6 +117,14 @@
       ]
     },
     {
+      "name": "verify-8210-sip-outgoing-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP; exact connected NSM-3 architecture restore, real SIP BYE and epoch-2 firmware clearing without redial",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --outgoing-media --restore-outgoing --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-8210-sip-cancel", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP stack; labelled acquired base-record comparison, coherent ARFCN4 cell and unanswered call",
       "recipe": [
