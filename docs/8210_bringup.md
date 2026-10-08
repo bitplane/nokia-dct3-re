@@ -763,6 +763,12 @@ the retired wider crop included changing signal/battery/animation pixels
 and failed for both bands. Blank-caller negative tests remain enforced.
 No-PIN laboratory signaling only; native speech, external end-to-end calls,
 DCS host-backend services and late-PIN service coverage remain unproved.
+`verify-8210-dcs-phonebook` creates contact `A/123` through physical
+inputs, checks initial DCS registration/EF_LOCI, cold-boots preserved
+storage with the same own base-record comparison and carrier-823
+configuration, then physically reads the contact. Run
+`run_8210_dcs_phonebook_01` passes record persistence and reviewed
+contact pixels. This does not add PIN-timing or host-backend coverage.
 
 **Current frontier:** DCS with physical PIN entry starting at eight seconds
 does not register; entry starting at seven seconds does. The passing

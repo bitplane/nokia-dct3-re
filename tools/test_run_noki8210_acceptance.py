@@ -123,6 +123,13 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, 'admitted'):
             runner.main()
 
+    def test_dcs_phonebook_admitted_without_pin(self):
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'phonebook']), \
+                patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                self.assertRaisesRegex(RuntimeError, 'admitted'):
+            runner.main()
+
     def test_dcs_idle_state_does_not_bypass_unresolved_pin(self):
         with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'idle-state', '--pin-enabled']), \
                 patch('sys.stderr', new_callable=io.StringIO), \

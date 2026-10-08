@@ -61,6 +61,9 @@ architecture, transport and pixel replay, then physical End/release.
 `verify-8210-dcs-incoming-call` independently proves paging, physical
 Answer/End, exact DCS CC/RR channel/release words, caller text and returned
 idle pixels. DCS host/backend and PIN service coverage are not inferred.
+`verify-8210-dcs-phonebook` covers physical SIM contact creation, cold
+reboot with the own provisioning/DCS topology, persisted record readback
+and reviewed contact pixels.
 
 `verify-8850-sim-pin-registration` independently proves physical SIM PIN and
 phone-code entry, own staged/HLE boundary, reviewed navigation pixels and

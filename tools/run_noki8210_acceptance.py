@@ -133,7 +133,7 @@ def main():
             not args.pin_enabled or args.scenario != 'registration' or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'call-state') or
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'outgoing-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'call-state', 'phonebook') or
                         (args.scenario != 'registration' and args.pin_enabled)):
         parser.error('--dcs1800 requires registration or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
@@ -243,10 +243,18 @@ def main():
         elif args.scenario == 'phonebook':
             shutil.copyfile(run / 'error.log', run / 'write.log')
             saved_card = (run / 'nvram/nsm3hle/sim_card').read_bytes()
+            if args.dcs1800:
+                verify_registration((run / 'write.log').read_text(errors='replace'),
+                                    saved_card, dcs1800=True)
             cold = command.copy()
             cold[cold.index('-autoboot_script') + 1] = str(root / 'tools/noki8210_phonebook_read.lua')
             cold[cold.index('-seconds_to_run') + 1] = '28'
             execute(cold, 'cold_console.log')
+            if args.dcs1800:
+                cold_text = (run / 'error.log').read_text(errors='replace')
+                verify_stage(cold_text, runtime=True, selftest=True, base_record=True)
+                if not re.search(r'TX packet type=02 .*data=041202[0-9a-f]{14}0337', cold_text):
+                    raise ValueError('DCS phonebook reboot lacks own carrier-823 configuration')
             if args.pin_enabled:
                 from tools.sim_security_trace_check import validate as check_security
                 cold_card = (run / 'nvram/nsm3hle/sim_card').read_bytes()
