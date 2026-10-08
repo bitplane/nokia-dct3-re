@@ -1886,11 +1886,23 @@ then stops with control `040a` after physical End. Reproduce the transport
 check with `--pcm` added to the command above; it rejects absent downlink,
 unsupported clocks, differing PCM/uplink counts and missing physical stop.
 
-This proves bidirectional HLE frame transport against the laboratory peer,
-not audible voice: the host microphone was silent and no waveform oracle
-was exercised. Real SIP bidirectional tones and save/restore media lifetime
-remain the next acceptance work. Native DSP speech and physical codec gains
-remain unverified.
+Real outgoing SIP HLE media transport is also verified by
+`run_8850_sip_media_verified`: physical dialing reaches SIP 200/confirmed,
+336 uplink and 326 downlink frames traverse the bridge, and physical End
+completes the full own-product release and return-to-paging checks. The
+bridge records 336 PCM transmitted and 371 received frames (37 dropped).
+The gate requires at least 100 executed frames in each direction, ordered
+downlink admission/closure, exact dialed digits, and the existing full
+`noki8850_outgoing_call_check` lifecycle rather than a generic release regex.
+
+```sh
+make verify-8850-sip-outgoing-media RUN_DIR=NEW_RUN
+```
+
+This proves bidirectional HLE frame transport, not audible voice: the host
+microphone was silent and no waveform oracle was exercised. SIP bidirectional
+tones and save/restore media lifetime remain the next acceptance work.
+Native DSP speech and physical codec gains remain unverified.
 
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot

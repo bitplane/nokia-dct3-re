@@ -10,6 +10,16 @@ from tools import run_noki8850_sip_cancel as check
 
 
 class SipCancelTest(unittest.TestCase):
+    def test_media_cannot_share_cancel_restore_or_failure(self):
+        for options in (['--outgoing-media', '--restore-idle'],
+                        ['--outgoing-media', '--outgoing-busy'],
+                        ['--outgoing-media', '--outgoing-unavailable']):
+            with self.subTest(options=options), \
+                    patch('sys.argv', ['runner', 'unused', '--pjsua', 'unused', *options]), \
+                    self.assertRaises(SystemExit) as result:
+                check.main()
+            self.assertEqual(result.exception.code, 2)
+
     def test_outgoing_send_must_follow_physical_input_on_own_carrier(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

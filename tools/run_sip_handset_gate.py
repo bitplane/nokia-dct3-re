@@ -229,6 +229,12 @@ def verify_success(root, remote_text, args):
                 raise RuntimeError(f'idle restoration lacks fresh-epoch SIP evidence: {marker}')
     cursor = 0
     product = getattr(args, 'product', '3210')
+    if product == '8850' and not args.incoming:
+        try:
+            from tools.noki8850_outgoing_call_check import verify as verify_8850_call
+        except ModuleNotFoundError:
+            from noki8850_outgoing_call_check import verify as verify_8850_call
+        verify_8850_call(log, number=number)
     if product == '8210':
         if args.incoming:
             try:
@@ -269,7 +275,8 @@ def verify_success(root, remote_text, args):
             r'LAPDm service Channel Release acknowledged')
     if args.restore_idle:
         patterns = (r'sip_state: saved', r'sip_state: restored') + patterns
-    for pattern in (() if product == '8210' else patterns):
+    for pattern in (() if product == '8210' or
+                    (product == '8850' and not args.incoming) else patterns):
         match = re.search(pattern, log[cursor:])
         if not match:
             raise RuntimeError(f'missing ordered firmware call checkpoint: {pattern}')
@@ -540,13 +547,18 @@ def main():
                  args.sip_response == 200 and args.calls == 1 and
                  not args.restore_call and
                  not args.restore_idle and not args.restore_outgoing)
+    nsm2_media = (args.product == '8850' and not args.incoming and
+                 args.sip_response == 200 and args.calls == 1 and
+                 not args.cancel_incoming and not args.record_media and
+                 not args.restore_call and not args.restore_idle and
+                 not args.restore_outgoing)
     nsm3_restore = (args.product == '8210' and not args.incoming and
                     args.restore_outgoing and args.sip_response in (180, 200) and
                     not args.record_media and not args.restore_call and not args.restore_idle)
     nsm3_incoming_restore = (args.product == '8210' and args.incoming and
                             args.restore_call and not args.cancel_incoming and
                             not args.record_media and not args.restore_outgoing and not args.restore_idle)
-    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm3_restore and not nsm3_incoming_restore and
+    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not nsm3_incoming_restore and
             (not args.incoming or not args.cancel_incoming)) or
             (args.record_media and not nsm3_media) or (args.restore_call and not nsm3_incoming_restore) or args.restore_idle or (args.restore_outgoing and not nsm3_restore)):
         parser.error(f'{args.product} requires unanswered incoming CANCEL or outgoing 480/486; media is unproved')

@@ -16,6 +16,7 @@ SETUP = {
     '5210': 'length=15 data=03450401a05e0581551532f4150101',
     '6210': 'length=15 data=03450401a05e0581214365f7150101',
     '8210': 'length=15 data=03450401a05e0581214365f7150101',
+    '8850': 'length=18 data=03450404600200815e0581551532f4150101',
 }
 
 
@@ -45,7 +46,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
 
     def test_own_product_setup_is_accepted(self):
         for product in SETUP:
-            if product == '8210':
+            if product in ('8210', '8850'):
                 continue  # Own physical-End lifecycle is tested separately.
             with self.subTest(product=product):
                 self.check(product, product)
@@ -58,6 +59,14 @@ class SipProductSetupCheckTest(unittest.TestCase):
             own_verify.assert_called_once()
             self.assertEqual(own_verify.call_args.kwargs,
                              {'number': '1234567', 'configured_carrier': True})
+
+    def test_8850_uses_full_own_product_lifecycle(self):
+        with self.assertRaisesRegex(ValueError, 'physical Send'):
+            self.check('8850', '8850')
+        with patch('tools.noki8850_outgoing_call_check.verify') as own_verify:
+            self.check('8850', '8850')
+            own_verify.assert_called_once()
+            self.assertEqual(own_verify.call_args.kwargs, {'number': '5551234'})
 
     def test_normal_clearing_status_wording(self):
         self.check('3210', '3210', reason='200 (Normal call clearing)')
@@ -109,7 +118,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
 
     def test_own_incoming_connect_and_release_are_accepted(self):
         for product in SETUP:
-            if product in ('6210', '8210'):
+            if product in ('6210', '8210', '8850'):
                 continue  # The outgoing research probe does not promote incoming Answer.
             with self.subTest(product=product):
                 self.check_incoming(product, product)
