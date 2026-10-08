@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 548 gates: 387 generated from typed steps, 161 copied verbatim (shell).
+# 549 gates: 387 generated from typed steps, 162 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -56,8 +56,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8890-host-incoming-sms verify-8890-host-outgoing-sms verify-8850-ussd \
 	verify-8850-call-divert verify-8890-ussd verify-8890-call-divert \
 	verify-5510-package verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
-	verify-6210-sip-idle-restore verify-6210-stage verify-6210-runtime \
-	verify-6210-outgoing-call verify-6210-incoming-call verify-6210-incoming-sms \
+	verify-6210-sip-outgoing-unavailable verify-6210-sip-idle-restore \
+	verify-6210-stage verify-6210-runtime verify-6210-outgoing-call \
+	verify-6210-incoming-call verify-6210-incoming-sms \
 	verify-6210-host-incoming-sms verify-6210-host-outgoing-sms \
 	verify-6210-host-rejected-sms verify-6210-host-silent-sms \
 	verify-6210-outgoing-sms verify-6210-accessory verify-6210-cold-repeat \
@@ -451,6 +452,11 @@ verify-6210-sip-cancel: build
 verify-6210-sip-outgoing-busy: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6210_sip_cancel.py $(RUN_DIR) --outgoing-busy --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional external PJSIP stack; physical NPE-3 outgoing cause-18 clearing with no media
+verify-6210-sip-outgoing-unavailable: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6210_sip_cancel.py $(RUN_DIR) --outgoing-unavailable --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 # shell: optional external PJSIP stack; exact idle restore before fresh unanswered call
 verify-6210-sip-idle-restore: build

@@ -100,6 +100,13 @@ class SipFailureCheckTest(unittest.TestCase):
                           'length=18 data=03450404600200815e0581551532f4150101')
         self.assertTrue(self.check(product='3330', log=log)['scope'].startswith('3330 HLE'))
 
+    def test_6210_unavailable_requires_cause_18(self):
+        log = LOG.replace('digits=5551234', 'digits=1234567').replace('551532f4', '214365f7')
+        log = log.replace('outcome=1', 'outcome=2\noutgoing termination consumed id=1 cause=18')
+        self.assertEqual(self.check(product='6210', status=480, log=log)['sip_status'], 480)
+        with self.assertRaises(RuntimeError):
+            self.check(product='6210', status=480, log=log.replace('cause=18', 'cause=180'))
+
     def test_false_connection_is_rejected(self):
         for extra in ('state changed to CONFIRMED',):
             with self.assertRaises(RuntimeError):

@@ -442,8 +442,12 @@ correlated busy decision and complete CC/RR release, rejects CONNECT and
 media, and checks exact registered-idle pixels afterward. The isolated
 research-HLE runner retains unchanged acquired PMM and own bootstrap,
 self-test, registration and persisted SIM-location checks. Only this
-outgoing failure is enabled for the 6210; answered calls, speech and
+outgoing busy failure and the unavailable fixture below are enabled for the 6210; answered calls, speech and
 outgoing SIP restoration remain unproved.
+
+`verify-6210-sip-outgoing-unavailable` independently passes against actual
+PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
+registered-idle recovery with the same physical number and own-PMM checks.
 
 `verify-6250-sip-cancel` independently covers NHM-3 v5.03 research HLE with
 the declared initial-record PMM comparison, not factory provisioning.

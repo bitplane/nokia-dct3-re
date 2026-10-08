@@ -356,7 +356,7 @@ returns to the exact registered-idle frame. Product-owned bootstrap,
 registration and persisted EF_LOCI are checked as well as SIP signaling.
 The runner refuses an existing run directory or stale readiness artifact.
 The generic SIP runner permits this unanswered scenario and the outgoing
-busy fixture below; answered SIP, speech and native DSP are not promoted.
+busy/unavailable fixtures below; answered SIP, speech and native DSP are not promoted.
 
 `make verify-6210-sip-idle-restore RUN_DIR=run_6210_sip_idle_restore` first
 performs the existing exact idle architecture/time and protocol-replay check.
@@ -384,6 +384,12 @@ The runner retains unchanged acquired PMM, private fresh storage, own upload
 and self-test checks, registration and persisted EF_LOCI checks. This is
 research-HLE failure signaling and recovery, not answered-call or speech
 acceptance.
+
+`make verify-6210-sip-outgoing-unavailable RUN_DIR=run_6210_sip_outgoing_unavailable`
+uses the same physical dial and isolated own-PMM preparation against real
+PJSIP 480. The firmware consumes the no-answer termination with cause 18,
+completes CC/RR release and returns to the exact registered-idle frame.
+CONNECT and bridge media are rejected, as in the busy fixture.
 
 ## Host SMS acceptance
 
