@@ -556,6 +556,24 @@ injection or borrowed product verdict is part of these workflows.
 | GSM900 and PCS1900 registration | `noki8890_registration_check.py`, with `--pcs1900` for strict carrier-600 acceptance |
 | Incoming/outgoing calls | Own incoming/outgoing call checkers; physical Answer/Send/End, correct called number and CC/RR closure on both bands |
 | Incoming/outgoing SMS | Own SMS checkers; physical composition/read, CP/RP closure, persistent hello and reviewed body pixels on both bands |
+| Physical USSD | `noki8890_ussd_check.py`; exact `*123#` request/response, reviewed result/idle frames, physical Back and persisted EF_LOCI |
+
+For USSD, run `nsb6hle` for 64 seconds in fresh private working, config,
+NVRAM and snapshot directories with `-noreadconfig -debug -debugger none
+-verbose -log -video none -sound none -nothrottle`, autoboot delay zero,
+and `tools/noki8890_ussd_input.lua`. It physically enters the security
+code and the own clock/date setup before issuing the service request.
+Check the resulting private run with:
+
+```sh
+.venv/bin/python tools/noki8890_ussd_check.py RUN
+```
+
+The own MCU and acquired PMM remain unchanged. Only key-sequence mechanics
+are shared with the 8850 fixture; own registration predicates, startup
+settlement, German response softkey and 12:01 DCT3LAB idle frame are
+independently checked. Shared DSP audit files remain a MAME run prerequisite,
+not evidence of a product-matched resident ROM6 mask or native execution.
 
 Native resident DSP execution, speech/media, identity/security-record
 replies, neighbour/handover contracts and normal-machine promotion remain
