@@ -274,6 +274,19 @@ and stores the transition result in context byte 6. The next boundary is
 the identity and producer of this incoming message family, and the
 transition decision in `4bb414`, not another search for flag-byte stores.
 
+The observed transition messages are `03f8`, with arguments in bytes
+`+7/+8`: bodies begin `03f800040000000100`,
+`03f87d340000000200`, `03f844440000000300`, and
+`03f800000000000001`. Passive heap writes identify constructors at
+`3bc620` and `3bc7ec`. The primary producer builds message ID as
+`7f << 3`, so a census limited to full-width literal `000003f8` misses
+it. Its decoder copies 24 bytes from a lower input object's `+0e`,
+requires input class byte `50`, checks payload protocol nibble 6, and
+dispatches on the lower six bits of payload byte 2. This places the
+transition family downstream of a decoded layer-3 packet, not an
+independent guessed DSP completion. Recover the exact system-information
+cases and their repeat-suppression conditions before changing the peer.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
