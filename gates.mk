@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 578 gates: 388 generated from typed steps, 190 copied verbatim (shell).
+# 580 gates: 388 generated from typed steps, 192 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -48,7 +48,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-host-incoming-sms verify-8210-host-outgoing-sms \
 	verify-8210-host-rejected-sms verify-8210-host-silent-sms \
 	verify-8210-sip-idle-restore verify-8210-sip-outgoing-busy \
-	verify-8210-sip-outgoing-unavailable verify-8890-incoming-speech-control \
+	verify-8210-sip-outgoing-unavailable verify-8890-pcs-incoming-speech-control \
+	verify-8890-pcs-speech-control verify-8890-incoming-speech-control \
 	verify-8890-speech-control verify-8850-sip-incoming-alerting-restore \
 	verify-8850-sip-incoming-restore verify-8850-sip-incoming-media \
 	verify-8850-sip-outgoing-pending-restore verify-8850-sip-outgoing-restore \
@@ -395,6 +396,16 @@ verify-8210-sip-outgoing-busy: build
 verify-8210-sip-outgoing-unavailable: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8210_sip_cancel.py $(RUN_DIR) --outgoing-unavailable --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: own PCS1900 registration and physical incoming Answer/End correlate NSB-6 control; not PCM or native speech
+verify-8890-pcs-incoming-speech-control: build
+	$(VENV)/bin/python tools/run_noki8890_pin_registration.py $(RUN_DIR) --without-pin --pcs1900 --scenario host-incoming-call --mame '$(abspath $(MAME_DIR))/mame'
+	$(VENV)/bin/python -m tools.noki8890_speech_control_check roms/noki8890/8890_12.20_ppmc.fls --log $(RUN_DIR)/error.log --incoming
+
+# shell: own PCS1900 registration and physical outgoing Send/End correlate NSB-6 control; not PCM or native speech
+verify-8890-pcs-speech-control: build
+	$(VENV)/bin/python tools/run_noki8890_pin_registration.py $(RUN_DIR) --without-pin --pcs1900 --scenario host-outgoing-call --mame '$(abspath $(MAME_DIR))/mame'
+	$(VENV)/bin/python -m tools.noki8890_speech_control_check roms/noki8890/8890_12.20_ppmc.fls --log $(RUN_DIR)/error.log
 
 # shell: own PMM, physical incoming host Answer/End and NSB-6 speech-control correlation; not PCM or native speech
 verify-8890-incoming-speech-control: build

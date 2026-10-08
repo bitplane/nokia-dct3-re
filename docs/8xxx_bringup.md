@@ -593,6 +593,20 @@ before ended; both retain every preceding ordered state. This is bearer
 lifecycle notification, not proof of audio. Missing connection, reversed
 closure and unexpected states remain rejected. PCM framing remains open.
 
+PCS1900 is independently verified by `verify-8890-pcs-speech-control` and
+`verify-8890-pcs-incoming-speech-control` on fresh own-PMM fixtures
+(`run_8890_pcs_speech_control_probe` and
+`run_8890_pcs_incoming_speech_control_probe`). Both retain organic carrier-600
+registration, full band-specific call acceptance and physical key decoding;
+selector 8 publishes the same `860b`/`840a` at `2c338e`. This establishes
+two-band MCU control consistency, not DSP speech or analogue codec behavior.
+
+An additional full-manual acquisition candidate is
+[Ciklon's NSB-6 service archive](https://www.ciklon.org/bg/downloads/download/346-nokia/43823-nokia-service-manual-8890-nsb-6),
+listed as `Nokia service manual 8890 NSB-6.zip`, 5.66 MB, MD5
+`6ba2da15107783919ee4e2df8bf89d92`. It requires an authenticated account and
+has not been acquired; its advertised checksum is not local validation.
+
 ```sh
 .venv/bin/python -m tools.noki8890_speech_control_check \
   roms/noki8890/8890_12.20_ppmc.fls --log RUN/error.log

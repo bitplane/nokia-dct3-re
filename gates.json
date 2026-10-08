@@ -87,6 +87,22 @@
       ]
     },
     {
+      "name": "verify-8890-pcs-incoming-speech-control", "prerequisites": ["build"], "variables": {},
+      "unstructured": "own PCS1900 registration and physical incoming Answer/End correlate NSB-6 control; not PCM or native speech",
+      "recipe": [
+        "\t$(VENV)/bin/python tools/run_noki8890_pin_registration.py $(RUN_DIR) --without-pin --pcs1900 --scenario host-incoming-call --mame '$(abspath $(MAME_DIR))/mame'",
+        "\t$(VENV)/bin/python -m tools.noki8890_speech_control_check roms/noki8890/8890_12.20_ppmc.fls --log $(RUN_DIR)/error.log --incoming"
+      ]
+    },
+    {
+      "name": "verify-8890-pcs-speech-control", "prerequisites": ["build"], "variables": {},
+      "unstructured": "own PCS1900 registration and physical outgoing Send/End correlate NSB-6 control; not PCM or native speech",
+      "recipe": [
+        "\t$(VENV)/bin/python tools/run_noki8890_pin_registration.py $(RUN_DIR) --without-pin --pcs1900 --scenario host-outgoing-call --mame '$(abspath $(MAME_DIR))/mame'",
+        "\t$(VENV)/bin/python -m tools.noki8890_speech_control_check roms/noki8890/8890_12.20_ppmc.fls --log $(RUN_DIR)/error.log"
+      ]
+    },
+    {
       "name": "verify-8890-incoming-speech-control", "prerequisites": ["build"], "variables": {},
       "unstructured": "own PMM, physical incoming host Answer/End and NSB-6 speech-control correlation; not PCM or native speech",
       "recipe": [
