@@ -24,6 +24,20 @@ def verify(image):
         raise ValueError('type 8b handler differs')
     if instructions(0x2df498, 6) != [('movs', 'r0, #0xc'), ('bl', '#0x28845c')]:
         raise ValueError('type 8b does not post to task 12')
+    if instructions(0x21ef4a, 6) != [('ldr', 'r0, [r4, #8]'), ('bl', '#0x2a2250')]:
+        raise ValueError('own task-12 measurement completion differs')
+    if instructions(0x2a2260, 4) != [('bl', '#0x28755e')]:
+        raise ValueError('own measurement parser differs')
+    if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
+        raise ValueError('measurement parser does not enumerate forty records')
+    if instructions(0x2875b4, 8) != [
+            ('ldrb', 'r0, [r5, #7]'), ('ldrb', 'r1, [r5, #6]'),
+            ('lsls', 'r1, r1, #8'), ('adds', 'r0, r0, r1')]:
+        raise ValueError('measurement ARFCN byte layout differs')
+    if instructions(0x2875c0, 6) != [
+            ('ldrb', 'r1, [r5, #9]'), ('lsls', 'r0, r1, #0x18'),
+            ('asrs', 'r0, r0, #0x18')]:
+        raise ValueError('measurement signed RSSI layout differs')
     if instructions(0x2df22e, 12) != [
             ('ldrb', 'r1, [r4, #4]'), ('lsls', 'r1, r1, #0x1f'),
             ('lsrs', 'r1, r1, #0x1f'), ('ldrb', 'r2, [r0, #2]'),

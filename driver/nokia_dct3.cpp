@@ -3773,6 +3773,9 @@ void nokia_dct3_state::nsm3hle(machine_config &config)
 	runtime.simi_controller = true;
 	runtime.synthetic_sim_card = true;
 	runtime.radio = RADIO_NSM3;
+	// Own task-12 8b completion 21ef4c -> 2a2250 -> 28755e
+	// consumes forty ARFCN/RSSI records; runtime delivery is gated separately.
+	runtime.radio.background_band_measurements = true;
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }

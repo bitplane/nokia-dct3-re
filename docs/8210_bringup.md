@@ -261,6 +261,18 @@ process replaces `error.log`. Handset-local contacts remain untested.
 
 ### Radio acquisition boundary
 
+SIM PIN is distinct from the phone security editor.
+`verify-8210-slow-pin-registration` enters physical `1234`/Menu at 8..12 seconds,
+then the phone code `12345`. It requires enabled CHV1, unchanged PIN, restored
+retries, the `57/03050000` background request, a receivable ARFCN 4 measurement,
+correlated own-ROM route/completion and the full registration/EF_LOCI contract.
+Type `8b` selects task 12, not NPE-3/NHM-3's task 14: completion
+`21ef4c -> 2a2250 -> 28755e` consumes forty four-byte records, ARFCN at offsets
+6/7 and signed RSSI at 9. The static radio-contract tool checks those own-ROM
+instructions. The configured ARFCN 4/5 laboratory network supplies the response;
+no phone PMM or firmware state is forced. Ordinary phone-code-only registration
+remains a separate regression, and native speech is not established.
+
 The own ring dispatcher at `0x306fa6` selects the thirteen-entry
 `0x83..0x8f` table at `0x306fd4`. Type `8b` calls `0x2df484`, which posts
 to task 12 through `0x28845c`. Type `89` calls `0x2df210`; instructions

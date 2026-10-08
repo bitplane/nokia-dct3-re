@@ -31,6 +31,11 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 
 ## Promotion rules
 
+`verify-8210-slow-pin-registration` independently covers physical SIM PIN and
+phone-code entry, own task-12 background-measurement completion and persistent
+registration on the coherent ARFCN 4/5 laboratory network. It retains the
+declared base-record PMM comparison and research HLE boundary.
+
 The 6210's `verify-6210-slow-pin-registration` additionally verifies physical
 late PIN acceptance followed by registration and persisted EF_LOCI on the
 explicit ARFCN 35/36 laboratory topology. The ordinary PIN/menu gate alone

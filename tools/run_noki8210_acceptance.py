@@ -2,11 +2,13 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -67,7 +69,11 @@ def main():
     parser.add_argument('--scenario', choices=SCENARIOS, default='registration')
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--port', type=int, default=18991)
+    parser.add_argument('--pin-enabled', action='store_true',
+                        help='test SIM PIN followed by phone security and registration')
     args = parser.parse_args()
+    if args.pin_enabled and args.scenario != 'registration':
+        parser.error('--pin-enabled currently requires registration')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
@@ -77,6 +83,9 @@ def main():
             from tools.noki8210_ussd_check import verify_key_table
             verify_key_table(mcu)
         prepare_run(run, mcu, pmm)
+        if args.pin_enabled:
+            from tools.make_sim_card_profile import make_profile
+            (run / 'nvram/nsm3hle/sim_card').write_bytes(make_profile(pin_enabled=True))
         host_sms = args.scenario.startswith('host-') and args.scenario.endswith('-sms')
         config = 'noki8210_host_gsm900' if args.scenario.startswith('host-') or args.scenario == 'power-cycle' else {
                   'incoming-call': 'radio_incoming_call_answered',
@@ -84,6 +93,18 @@ def main():
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
         if config:
             shutil.copyfile(root / f'fixtures/{config}/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
+        if args.pin_enabled:
+            config_tree = ET.Element('mameconfig', version='10')
+            system = ET.SubElement(config_tree, 'system', name='nsm3hle')
+            ports = ET.SubElement(system, 'input')
+            ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
+                          mask='256', defvalue='0', value='256')
+            ET.ElementTree(config_tree).write(run / 'cfg/nsm3hle.cfg', encoding='utf-8',
+                                             xml_declaration=True)
+        environment = os.environ.copy()
+        environment.pop('NOKIA_DCT3_8210_PIN_ENTRY', None)
+        if args.pin_enabled:
+            environment['NOKIA_DCT3_8210_PIN_ENTRY'] = '1'
         script, seconds, checker = SCENARIOS[args.scenario]
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsm3hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -93,7 +114,8 @@ def main():
                    '-video', 'none', '-sound', 'none', '-nothrottle', '-log', '-verbose']
         def execute(cmd, output):
             with (run / output).open('w') as console:
-                subprocess.run(cmd, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
+                subprocess.run(cmd, cwd=run, stdout=console, stderr=subprocess.STDOUT,
+                               check=True, env=environment)
         host_command = None
         if args.scenario.startswith('host-'):
             command.extend(['-http', '-http_port', str(args.port)])
@@ -116,6 +138,19 @@ def main():
             execute(host_command, 'console.log')
         else:
             execute(command, 'console.log')
+        if args.pin_enabled:
+            from tools.sim_security_trace_check import validate as check_security
+            pin_text = (run / 'error.log').read_text(errors='replace')
+            check_security(pin_text,
+                           (run / 'nvram/nsm3hle/sim_card').read_bytes(), 'verify', '1234')
+            if not re.search(
+                    r'TX packet type=57 payload=4[^\n]*data=03050000.*?'
+                    r'RX enqueue type=8b payload=166[^\n]*data=0010000400c4.*?'
+                    r'8210_pin_measurement_route: enabled=01 message=([0-9a-f]{8}).*?'
+                    r'8210_pin_measurement_completion: message=\1.*?'
+                    r'8210_pin_physical: key=Menu.*?SIM status ins=20 sw=9000.*?'
+                    r'LAPDm Location Updating Accept acknowledged nr=1', pin_text, re.S):
+                raise ValueError('missing correlated measurement/PIN/registration sequence')
         check = [sys.executable, str(root / f'tools/noki8210_{checker}.py'), str(run / 'error.log')]
         storage = str(run / 'nvram/nsm3hle/sim_card')
         if args.scenario == 'power-cycle':
@@ -145,6 +180,8 @@ def main():
                 check.extend(['--sms', '--storage', storage])
         elif args.scenario in ('registration', 'incoming-sms', 'host-incoming-sms'):
             check.append(storage)
+            if args.scenario == 'registration' and args.pin_enabled:
+                check.append('--configured-carrier')
             if args.scenario == 'host-incoming-sms':
                 check.extend(['--frame', str(run / 'snap/8210_sms_read_2.png')])
         if checker:
@@ -172,7 +209,8 @@ def main():
             'machine': 'nsm3hle', 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
-            'laboratory_carrier': 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' else None,
+            'laboratory_carrier': 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' or args.pin_enabled else None,
+            'sim_profile': 'PIN-enabled laboratory card' if args.pin_enabled else 'default laboratory card',
             'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')
