@@ -11292,6 +11292,45 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 ORM #lk,*AR3 preserves pointer and status in two cycles");
+			m_phase = 9220;
+		}
+		if (m_phase >= 9220 && m_phase <= 9222)
+		{
+			if (m_phase != 9220)
+				expect_opcode(m_phase == 9221 ? 0x6885 : 0x6985,
+					data.read_word(0x0f40) == (m_phase == 9221 ? 0x0f00 : 0x0ff0) &&
+					data.read_word(0x0f3f) == 0xbeef && data.read_word(0x0f41) == 0xcafe &&
+					data.read_word(0x0f33) == 0x0ff0 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR5) == 0x0f40 &&
+					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f33 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x76543210 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e7 &&
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+					"ROM4 AR5 immediate logical operation selects its word, preserves neighbors/accumulators/status/pointers and costs two cycles");
+			if (m_phase < 9222)
+			{
+				program.write_word(0x05e2, m_phase == 9220 ? 0x6885 : 0x6985);
+				program.write_word(0x05e3, m_phase == 9220 ? 0x0ff0 : 0x00f0);
+				if (m_phase == 9220)
+				{
+					data.write_word(0x0f3f, 0xbeef);
+					data.write_word(0x0f40, 0xff0f);
+					data.write_word(0x0f41, 0xcafe);
+					m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0f40);
+					m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+					m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x76543210);
+					m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				}
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			program.write_word(0x05e2, 0x6fd2); // LD *AR2+%,5,A
 			program.write_word(0x05e3, 0x0c45);
 			data.write_word(0x0f23, 0xff80);
