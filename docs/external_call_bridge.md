@@ -431,6 +431,17 @@ MM Information provides time only and its causal role is unproved.
 No firmware/name override is used. Answered SIP, speech and SIP restoration
 are not established on this product.
 
+`verify-8850-sip-idle-restore` adds exact idle PC/SP/RAM/time restoration,
+byte-identical reference/replayed LCD frames and ordered one-second
+transport/SIM replay. It saves at 32 seconds and admits a new INVITE at
+35 seconds only after replay completes. The call must use host epoch 2;
+the runner rejects pre-load paging or reuse of epoch 1. The same caller,
+CANCEL/487, zero-media, CC/RR, SIM-location and physical Exit predicates
+then apply. No external dialog exists at the save point. This is a fresh
+call after handset restoration, not restoration of a SIP dialog. The
+ordinary idle gate continues to require Menu; this variant independently
+requires notification dismissal after the fresh call.
+
 `verify-8890-sip-cancel` independently covers NSB-6 v12.20 research HLE
 with unchanged acquired MCU/PMM and the configured ARFCN60 laboratory cell.
 Its physical security and clock/date sequence settles before the fresh

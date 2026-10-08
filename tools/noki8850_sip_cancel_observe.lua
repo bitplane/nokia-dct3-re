@@ -1,13 +1,16 @@
 -- Physical startup and unanswered external call; no Answer or firmware writes.
 local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
-_G.noki8850_call_idle_only = true
-dofile(directory .. 'noki8850_outgoing_call_input.lua')
+if not _G.noki8850_sip_restore_idle then
+    _G.noki8850_call_idle_only = true
+    dofile(directory .. 'noki8850_outgoing_call_input.lua')
+end
 local machine = manager.machine
 local observation = coroutine.create(function()
-    if not emu.wait(32) then return end
+    local ready = _G.noki8850_sip_restore_idle and 35 or 32
+    if not emu.wait(ready - machine.time:as_double()) then return end
     machine.screens[':screen']:snapshot('8850_sip_registered_idle.png')
-    machine:logerror('8850_sip_cancel: ready t=32\n')
+    machine:logerror(string.format('8850_sip_cancel: ready t=%d\n', ready))
     if not emu.wait(20) then return end
     machine.screens[':screen']:snapshot('8850_sip_missed_call.png')
     local exit = assert(machine.ioport.ports[':COL.1'].fields['Names / C'])
@@ -19,4 +22,10 @@ local observation = coroutine.create(function()
     machine.screens[':screen']:snapshot('8850_sip_after_cancel.png')
 end)
 _G.noki8850_sip_cancel_observe = observation
-assert(coroutine.resume(observation))
+if _G.noki8850_sip_restore_idle then
+    _G.noki8850_sip_cancel_post_load = emu.add_machine_post_load_notifier(function()
+        assert(coroutine.resume(observation))
+    end)
+else
+    assert(coroutine.resume(observation))
+end

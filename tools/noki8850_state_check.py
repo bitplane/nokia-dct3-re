@@ -13,7 +13,7 @@ from tools.noki8850_outgoing_call_check import verify as verify_call, verify_fra
 from tools.noki8850_sms_check import verify as verify_sms, verify_frame as verify_sms_frame
 
 
-def verify(text, *, sms=False, idle=False, storage=None):
+def verify(text, *, sms=False, idle=False, storage=None, sip_cancel=False):
     if '[LUA ERROR]' in text or '8850_state: FAIL' in text:
         raise ValueError('state fixture did not complete')
     states = re.findall(r'8850_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
@@ -23,6 +23,16 @@ def verify(text, *, sms=False, idle=False, storage=None):
         raise ValueError('architectural state did not restore exactly')
     verify_roundtrip(text, ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:'),
                      '8850 SMS' if sms else '8850 active call')
+    if sip_cancel:
+        if not idle or sms:
+            raise ValueError('SIP cancellation requires idle restoration')
+        if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
+                         r'8850_sip_cancel: physical Exit[\s\S]*'
+                         r'8850_keypad_decoded key=1a\b', text):
+            raise ValueError('missing post-load physical SIP notification dismissal')
+        if '8850_call_physical: action=send' in text:
+            raise ValueError('idle fixture unexpectedly initiated a call')
+        return
     if sms:
         if storage is None:
             raise ValueError('SMS restoration requires persistent SIM storage')
@@ -48,7 +58,9 @@ def verify(text, *, sms=False, idle=False, storage=None):
         raise ValueError('missing post-load physical call release')
 
 
-def check_frames(directory, *, sms=False, idle=False):
+def check_frames(directory, *, sms=False, idle=False, sip_cancel=False):
+    if sip_cancel and (not idle or sms):
+        raise ValueError('SIP cancellation requires idle frames')
     if sms:
         verify_sms_frame(directory / '8850_sms_read_4.png')
     elif not idle:
@@ -64,6 +76,8 @@ def check_frames(directory, *, sms=False, idle=False):
         if hashlib.sha256(reference.crop((15, 0, 69, 16)).tobytes()).hexdigest() != (
                 '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'):
             raise ValueError('missing reviewed idle operator text')
+        if sip_cancel:
+            return
         with Image.open(directory / '8850_state_idle_menu.png') as source:
             menu = source.convert('L')
         if menu.size != (84, 48) or hashlib.sha256(

@@ -118,6 +118,11 @@ numeric PLMN `00101`. Both frames are checked separately, not treated as
 proof of retained operator text. Answered SIP, media and native speech
 remain unproved.
 
+`verify-8850-sip-idle-restore` separately verifies exact idle architectural
+state, byte-identical replayed LCD pixels and transport/SIM replay before
+a new epoch-2 incoming SIP call and the same cancellation/physical cleanup.
+It does not restore an external dialog or establish media.
+
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other

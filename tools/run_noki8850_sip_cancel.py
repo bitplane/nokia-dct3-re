@@ -33,7 +33,7 @@ def check_frames(directory):
                 raise ValueError('missing reviewed SIP cleanup frame: ' + name)
 
 
-def check_product_result(run):
+def check_product_result(run, restore_idle=False):
     text = (run / 'error.log').read_text(errors='replace')
     check_output(text)
     check_output((run / 'console.log').read_text(errors='replace'))
@@ -44,6 +44,16 @@ def check_product_result(run):
             ('Keypad 4', '04'), ('Keypad 5', '05'), ('Menu', '19'))))
     if errors:
         raise ValueError('; '.join(errors))
+    if restore_idle:
+        from tools.noki8850_state_check import verify as verify_state, check_frames as check_state_frames
+        verify_state(text, idle=True, sip_cancel=True)
+        check_state_frames(run / 'snap', idle=True, sip_cancel=True)
+        restored = text.find('state_roundtrip: result=pass scenario=8850_idle')
+        paging = text.find('gsm_call_adapter: incoming state id=1 epoch=')
+        if restored < 0 or paging <= restored:
+            raise ValueError('incoming SIP call did not follow exact idle restoration')
+        if json.loads((run / 'sip-result.json').read_text()).get('epoch') != 2:
+            raise ValueError('idle restore did not establish a fresh host epoch')
     verify_registration(text, 'nsm2')
     if not re.search(r'gsm_call_adapter: network registered=1 arfcn=1\b', text):
         raise ValueError('host registration lacks own laboratory carrier')
@@ -63,6 +73,8 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--pjsua', type=Path, required=True)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--restore-idle', action='store_true',
+                        help='restore idle before admitting the fresh unanswered SIP call')
     parser.add_argument('--http-port', type=int, default=18885)
     parser.add_argument('--sip-port', type=int, default=25885)
     args = parser.parse_args()
@@ -79,8 +91,12 @@ def main():
                    '-rompath', str(root / 'roms'), '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki8850_sip_cancel_observe.lua'),
-                   '-snapshot_directory', str(run / 'snap'), '-seconds_to_run', '57',
+                   '-autoboot_script', str(root / 'tools' / (
+                       'noki8850_sip_idle_restore.lua' if args.restore_idle else
+                       'noki8850_sip_cancel_observe.lua')),
+                   '-state_directory', str(run / 'sta'),
+                   '-snapshot_directory', str(run / 'snap'), '-seconds_to_run',
+                   '60' if args.restore_idle else '57',
                    '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
@@ -92,12 +108,13 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        check_product_result(run)
+        check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsm2hle', 'scenario': 'incoming-sip-cancel',
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 1,
             'native_dsp_complete': False, 'speech_tested': False,
+            'idle_restored': args.restore_idle,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

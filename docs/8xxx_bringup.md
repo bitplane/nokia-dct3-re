@@ -1643,6 +1643,14 @@ back to idle. The post-call operator label is `00101`, not the initial
 frame oracles. Its cause is not decoded. This adds unanswered signaling,
 not speech, answered SIP or save-state coverage of an external dialog.
 
+`verify-8850-sip-idle-restore` independently saves/restores settled idle
+before a fresh INVITE: exact PC/SP/RAM/time, identical reference/replayed
+pixels and one-second transport/SIM replay are required. Admission occurs
+after that window, using host epoch 2; pre-load paging and stale epoch 1
+are failures. The same own-product caller, cancellation, persistent SIM
+and physical Exit checks remain required. No dialog exists at save time,
+and no external SIP dialog or speech restoration is claimed.
+
 Host-originated incoming calls compose with settled physical startup. Copy
 `fixtures/noki8850_host/nsm2hle.cfg` into a private cfg directory; it enables
 the host adapter without an automatic laboratory incoming call. Launch

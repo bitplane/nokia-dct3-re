@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,6 +10,23 @@ from tools import run_noki8850_sip_cancel as check
 
 
 class SipCancelTest(unittest.TestCase):
+    def test_idle_restore_requires_fresh_epoch_after_load(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory)
+            (run / 'console.log').write_text('')
+            restored = 'state_roundtrip: result=pass scenario=8850_idle\n'
+            paging = 'gsm_call_adapter: incoming state id=1 epoch=2\n'
+            with patch.object(check, 'check_trace', return_value=[]), \
+                    patch.object(check, 'check_correlated_inputs', return_value=[]), \
+                    patch('tools.noki8850_state_check.verify'), \
+                    patch('tools.noki8850_state_check.check_frames'):
+                for text, epoch, message in ((paging + restored, 2, 'follow exact'),
+                                             (restored + paging, 1, 'fresh host epoch')):
+                    (run / 'error.log').write_text(text)
+                    (run / 'sip-result.json').write_text(json.dumps({'epoch': epoch}))
+                    with self.assertRaisesRegex(ValueError, message):
+                        check.check_product_result(run, restore_idle=True)
+
     def test_own_geometry_and_reviewed_content(self):
         with tempfile.TemporaryDirectory() as directory:
             frames = Path(directory)

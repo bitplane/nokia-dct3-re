@@ -95,7 +95,7 @@ absent product is a coverage question, not a drifted gate.
 | `sim-phonebook` | — | yes | — | — | — | — | — | yes | — | — | — | — | — | — | — |
 | `sim-toolkit` | — | yes | — | — | — | — | — | — | — | — | yes | — | — | — | — |
 | `sip-cancel` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | yes |
-| `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | yes | — | — | — | yes |
+| `sip-idle-restore` | — | — | — | — | — | — | — | — | — | — | yes | — | — | yes | yes |
 | `ussd` | — | — | — | — | — | — | — | — | — | — | — | — | yes | yes | yes |
 | `verifier` | — | — | — | — | — | — | — | — | — | — | yes | yes | yes | — | — |
 
@@ -446,6 +446,7 @@ absent product is a coverage question, not a drifted gate.
 ### `sip-idle-restore`
 
 - **6210**: `tools/run_noki6210_sip_cancel.py`
+- **8850**: `tools/run_noki8850_sip_cancel.py`
 - **8890**: `tools/run_noki8890_sip_cancel.py`
 
 ### `ussd`

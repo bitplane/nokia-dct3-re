@@ -1,6 +1,9 @@
 import unittest
+from pathlib import Path
+import tempfile
 from unittest.mock import patch
-from tools.noki8850_state_check import verify
+from PIL import Image
+from tools.noki8850_state_check import verify, check_frames
 
 
 GOOD = '''8850_state: event=saved pc=0000001c sp=00137000 ram=12345678 t=40.000000000
@@ -17,6 +20,32 @@ state_replay: phase=restored event=end t=41.000000000
 
 
 class StateTest(unittest.TestCase):
+    def test_sip_idle_requires_exact_replay_and_physical_exit(self):
+        text = GOOD + '8850_sip_cancel: physical Exit\n8850_keypad_decoded key=1a\n'
+        verify(text, idle=True, sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'dismissal'):
+            verify(text.replace('key=1a', 'key=19'), idle=True, sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'idle restoration'):
+            verify(text, sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'diverged'):
+            verify(text.replace('data=1234', 'data=5678', 1), idle=True, sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'initiated a call'):
+            verify(text + '8850_call_physical: action=send', idle=True, sip_cancel=True)
+
+    def test_sip_reference_and_restored_pixels_must_match(self):
+        with tempfile.TemporaryDirectory() as directory:
+            frames = Path(directory)
+            reference = Image.new('L', (84, 48), 255)
+            reference.save(frames / '8850_state_call_reference.png')
+            reference.save(frames / '8850_state_call_restored.png')
+            with patch('tools.noki8850_state_check.hashlib.sha256') as digest:
+                digest.return_value.hexdigest.return_value = '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'
+                check_frames(frames, idle=True, sip_cancel=True)
+                reference.putpixel((0, 0), 0)
+                reference.save(frames / '8850_state_call_restored.png')
+                with self.assertRaisesRegex(ValueError, 'pixels'):
+                    check_frames(frames, idle=True, sip_cancel=True)
+
     def test_idle_requires_postload_menu(self):
         idle = GOOD + '8850_state_physical: key=Menu\n8850_keypad_decoded key=19\n'
         verify(idle, idle=True)
