@@ -114,6 +114,25 @@ upstream owners before changing peer behavior. The peer already transmits
 continuous serving SI; absence of a one-shot repeated SI response is not
 an established cause. No guessed type-57/4a acknowledgement is installed.
 
+The type-57 object is constructed at `3f9d88`: an eight-byte allocation is
+zeroed, envelope halfword 2 and payload length 4 are set, and `57` is stored
+at object `+3` by `3f9da8`. Helper `3f9932` encodes its two arguments into
+payload bytes `+4/+5`; the remaining payload bytes remain zero. Passive
+entry observation identifies caller continuation `2d1dc3` and arguments
+`(3,0)` in the PIN-enabled boot, matching `03050000` without a guessed
+wire interpretation. The encoded aligned Thumb-BL scan finds calls only at
+`2d1dbe` and `2d36b6` among 98,084 BL-shaped halfword pairs. This does not
+cover computed/ARM calls or classify every code/data candidate.
+
+At the observed caller, `2d1d6e..2d1d76` reads field `+6` of the object
+pointed to by global `172a0c` and selects the constructor branch for value
+1. Its preceding path calls selector `3caf2c(0)` and stores that result
+back into field `+6`. Constructor arguments instead come from the separate
+object pointed to by `172a1c`: byte 0 supplies argument 0, and byte 9
+selects argument 1 as zero or two. These two contexts must not be conflated.
+The next software boundary is the state/input contract behind `3caf2c`
+and its post-CHV1 continuation, not the generic packet sender.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
