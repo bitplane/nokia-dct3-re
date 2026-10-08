@@ -137,6 +137,15 @@ Its warm registration rewrites LAI but not the valid status byte, unlike
 the 8890's no-rewrite lifecycle. Firmware resets RTC seconds after wake;
 cold-process persistence and native speech remain unproved.
 
+The 8210 separately passes `verify-8210-power-cycle` in its explicit
+base-record HLE comparison on coherent carrier 4: physical shutdown,
+blank LCD, at least eight seconds of continuous RTC and DSP/radio silence,
+PWRONX wake, independently verified own uploads/HLE/self-test/registration,
+retained-LAI Location Updating and decoded security entry back to idle.
+Like the 6210 it rewrites LAI but not valid location status. Firmware resets
+RTC seconds after wake; this does not establish native speech, factory PMM
+provisioning, cold RTC persistence or complete rail clock-gating.
+
 The 8890 additionally passes `verify-8890-power-cycle`: physical shutdown,
 blank LCD, six seconds of continuous CCONT RTC ticks with DSP/radio
 transport silence while CPU power is off, separate PWRONX restart,

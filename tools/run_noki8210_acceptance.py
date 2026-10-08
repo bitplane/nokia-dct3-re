@@ -15,6 +15,7 @@ from tools.noki8210_registration_check import verify as verify_registration
 from tools.noki8210_staged_check import verify as verify_stage
 
 SCENARIOS = {
+    'power-cycle': ('power_cycle_input', 73, 'power_check'),
     'ussd': ('ussd_input', 40, 'ussd_check'),
     'divert': ('divert_input', 40, 'divert_check'),
     'registration': ('registration_input', 46, 'registration_check'),
@@ -77,7 +78,7 @@ def main():
             verify_key_table(mcu)
         prepare_run(run, mcu, pmm)
         host_sms = args.scenario.startswith('host-') and args.scenario.endswith('-sms')
-        config = 'noki8210_host_gsm900' if args.scenario.startswith('host-') else {
+        config = 'noki8210_host_gsm900' if args.scenario.startswith('host-') or args.scenario == 'power-cycle' else {
                   'incoming-call': 'radio_incoming_call_answered',
                   'incoming-sms': 'radio_incoming_sms',
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
@@ -117,7 +118,9 @@ def main():
             execute(command, 'console.log')
         check = [sys.executable, str(root / f'tools/noki8210_{checker}.py'), str(run / 'error.log')]
         storage = str(run / 'nvram/nsm3hle/sim_card')
-        if args.scenario == 'host-incoming-call':
+        if args.scenario == 'power-cycle':
+            check.extend([storage, str(run / 'snap')])
+        elif args.scenario == 'host-incoming-call':
             check.extend(['--frames', str(run / 'snap'), '--configured-carrier'])
         elif args.scenario == 'host-outgoing-call':
             check.extend(['--configured-carrier', '--frames', str(run / 'snap')])
@@ -169,7 +172,7 @@ def main():
             'machine': 'nsm3hle', 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
-            'laboratory_carrier': 4 if args.scenario.startswith('host-') else None,
+            'laboratory_carrier': 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' else None,
             'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')

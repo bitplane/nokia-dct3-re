@@ -9,13 +9,35 @@ ownership and stops at absent resident DSP routine `0x2c75`. Physical-verdict
 equivalence and complete native DSP runtime are not claimed.
 
 The separate `nsm3hle` composition explicitly hands off at that missing-code
-call. With the acquired unchanged base-record storage fixture, seven fresh
+call. With the acquired unchanged base-record storage fixture, fresh
 isolated acceptance scenarios pass: graphical/physical security and menus,
 calculator, SIM initialization and cold-persistent phonebook, registration
 and operator idle, both call-signaling directions, and both SMS directions.
 Identity and record success replies remain unselected. This is research-HLE
 phone-service acceptance, not a promotion of the normal machine, complete
 hardware fidelity, speech, or authentic factory-default provisioning.
+
+## Physical power lifecycle
+
+`make verify-8210-power-cycle RUN_DIR=NEW_DIRECTORY` starts with private fresh
+storage, the declared base-record comparison and the configured ARFCN4 lab
+cell. Physical security entry reaches idle, a four-second Power press drives
+CCONT rail-off, and a later physical Power press wakes through PWRONX `02`.
+The gate requires a blank off screen, at least eight seconds of continuous
+CCONT RTC ticks and no DSP/radio transport activity during the off interval.
+It independently checks both own native-upload sequences, explicit HLE
+handoffs, compact self-tests and coherent registration; it does not infer the
+second boot from the first.
+
+After wake the firmware reads retained `EF_LOCI` before sending warm Location
+Updating with body `05087200f110000133080910101032547698`. It rewrites the LAI
+after acceptance but does not redundantly rewrite the already-valid location
+status byte. The security editor reappears; physical `12345` and Menu decode
+organically and return to reviewed operator-idle pixels. The RTC runs while
+off, but firmware writes seconds register `07=00` after wake. Cold-process RTC
+persistence, measured wake latency, all-peripheral rail gating and native
+speech remain unproved. No charger pulse, donor storage or firmware-state
+write participates in this fixture.
 
 The explicit-version fixture produces 6, while the collaborator bridge reports
 an 8210 verdict of `1eff`. A matching raw capture has not been recovered;
