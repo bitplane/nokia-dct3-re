@@ -130,8 +130,26 @@ pointed to by global `172a0c` and selects the constructor branch for value
 back into field `+6`. Constructor arguments instead come from the separate
 object pointed to by `172a1c`: byte 0 supplies argument 0, and byte 9
 selects argument 1 as zero or two. These two contexts must not be conflated.
-The next software boundary is the state/input contract behind `3caf2c`
-and its post-CHV1 continuation, not the generic packet sender.
+Selector `3caf2c` indexes a nine-entry branch table at `3caf48` by the
+signed halfword at `172a0a`; literal `3cb264` names the structure base
+`172a08`, not a pointer. Passive fresh 16-second comparisons show both
+boots enter state 8 and then state 4 at 3.676 s. The no-PIN boot calls
+`3caf2c(3)` from continuation `2d1917` at 9.874555 s, before its
+`3caf2c(0)` call at 10.365044 s, which leaves state 4. The PIN-enabled boot
+instead calls `(0)` at 10.364015 s, changes state 4 to 6 and constructs
+type 57 with arguments `(3,0)`. Its `(3)` call from the same continuation
+arrives only at 12.495750 s, after successful VERIFY and subsequent SIM
+reads, and leaves state 6.
+
+The state-6 branch at `3caff0` sends every nonzero input directly to
+`3cb41e` with state 6; state 4 similarly retains state 4 for nonzero input
+at `3cb078`. Thus the late call is observed, not missing, and does not
+itself restart selection. This comparison establishes ordering, not that
+the argument-3 call is sufficient for registration or that a timer should
+be delayed. The next boundary is the upstream continuation `2d1917` and
+the state-4/state-6 zero-input decision: recover the condition that differs
+after CHV1 and the legitimate re-evaluation mechanism without forcing
+state or inventing a radio acknowledgement.
 
 ### Coherent laboratory registration
 
