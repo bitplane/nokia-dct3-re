@@ -3966,6 +3966,11 @@ void nokia_dct3_state::npe3hle(machine_config &config)
 	// Own 8b handler 45835c and completion 3c9750/38b6ae recover the
 	// forty-record background measurement contract; late-PIN run verifies it.
 	runtime.radio.background_band_measurements = true;
+	// Own compiler 426eb4 selector 11 updates field 0200 with keep-mask
+	// fdff. Physical Send/End publish command-8 870b/850a at 42727c.
+	runtime.dsp_speech_control = {
+		0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0200, 0x0200 }
+	};
 	// Explicit research handoff after own uploads, before absent mask code.
 	// Own 3029fe..302a02 selects command 0d -> 302a52, requires
 	// flag 17fd99 bit 2 and consumes fault bits 0/1 from message byte 9.

@@ -495,11 +495,17 @@ fresh accepted physical outgoing calls publish `870b` at Send and `850a`
 after End, both at writer PC `42727c` with compiler selector 8. Bit `0200`
 is selected during the call and removed at teardown, independently matching
 the own static field encoding. `verify_call_field()` checks the ordered
-physical-input/control-write correspondence. This supplies a candidate
-NPE-3 HLE speech-request contract (command 8, mask/value `0200`), not PCM
-or native speech acceptance. Next configure it in the explicit runtime-HLE
-composition and rerun full bidirectional SIP media checks; reject any
-unsupported PCM link rather than fabricating uplink.
+physical-input/control-write correspondence. This supplies the NPE-3
+runtime-HLE speech-request contract (command 8, mask/value `0200`), now
+selected only in `npe3hle`, not PCM or native speech acceptance. The full
+media retry confirms control `070b` during the call and `050a` on release,
+but still fails with uplink/transmitted PCM zero (downlink 353, received
+PCM 400, dropped 39). The product's PCM bus profile is unspecified: frame
+clock defaults to zero, `block_period()` returns `never`, and the HLE speech
+timer cannot run. Normal answered SIP restrictions remain; temporary probe
+switches were removed. Recover NPE-3's own PCM clock/framing and COBBA route
+before configuring that link; do not fabricate uplink or inherit a sibling
+bus profile without evidence.
 
 `verify-6210-sip-outgoing-unavailable` independently passes against actual
 PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
