@@ -812,6 +812,12 @@
       ]
     },
     {
+      "name": "verify-8210-sim-toolkit", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "toolkit", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8210-ussd",
       "prerequisites": ["build"],
       "variables": {},

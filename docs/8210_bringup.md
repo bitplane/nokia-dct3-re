@@ -629,6 +629,22 @@ later USSD capture time. Both fixtures share input mechanics and boundary
 checks, not message payloads or frame oracles. This verifies interrogation
 of an inactive service, not activation, forwarding or delivery of a call.
 
+`verify-8210-sim-toolkit` independently enables the card-owned Phase 2+
+DISPLAY TEXT fixture on the same acquired base-record comparison. The own
+firmware reads EF_PHASE=3, publishes a nine-byte TERMINAL PROFILE, observes
+STATUS `91 16` and fetches `A0 12 00 00 16`. The reviewed 84x48 `DCT3 SAT`
+frame has pixel SHA256
+`0c609d0fc7f1f59534f7e29ccaa995d441ff52f701b76093661b2458380ff558`.
+Physical Menu/OK produces successful TERMINAL RESPONSE
+`810301218002028281030100`/`90 00` and restores numeric-PLMN idle (pixel
+SHA256 `d6d4b05af24a06c42a97e31c3134f7e497e149f4420f87f3d243613f06926300`).
+The gate requires own staged/self-test/base-record predicates and persisted
+laboratory registration. Only this proactive command and the default-cell,
+PIN-disabled composition are established; no DCS/PIN Toolkit combination,
+factory PMM or native DSP promotion follows. Accepted protocol ordering is
+shared through `dct3_toolkit_check.py`; startup, provisioning and frames
+remain product-owned.
+
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
 idle, compares a one-second reference interval with the restored interval,

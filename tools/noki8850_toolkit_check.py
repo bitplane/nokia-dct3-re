@@ -7,29 +7,16 @@ import sys
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.sim_toolkit_trace_check import require_in_order
+from tools.dct3_toolkit_check import display_text_events, verify_display_text
 from tools.radio_registration_trace_check import verify as verify_registration
 from tools.noki8850_ussd_check import IDLE
 
-EVENTS = (
-    'read-binary fid=6fae offset=0 length=1 first=03',
-    'header cla=a0 ins=10 p1=00 p2=00 p3=09',
-    'SIM status ins=10 sw=9000',
-    'proactive DISPLAY TEXT ready',
-    'SIM completion ins=f2 sw=9116',
-    'header cla=a0 ins=12 p1=00 p2=00 p3=16',
-    '8850_toolkit_physical: action=dismiss',
-    'header cla=a0 ins=14 p1=00 p2=00 p3=0c',
-    'terminal-response data=810301218002028281030100',
-    'SIM status ins=14 sw=9000',
-)
+EVENTS = display_text_events('8850')
 DISPLAY = '0c609d0fc7f1f59534f7e29ccaa995d441ff52f701b76093661b2458380ff558'
 
 
 def verify_protocol(text):
-    if '[LUA ERROR]' in text:
-        raise ValueError('NSM-2 physical Toolkit fixture failed')
-    require_in_order(text.replace('[:sim_card] ', ''), EVENTS)
+    verify_display_text(text, '8850')
 
 
 def verify(text, frames, storage):
