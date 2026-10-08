@@ -99,6 +99,8 @@ connected-call and delivered-SMS restoration on coherent lab carrier 19,
 including architectural/protocol replay and physical menu, hang-up or read
 continuation. `verify-6250-coherent-call-state` and
 `verify-6250-coherent-sms-state` cover the corresponding no-PIN lifecycles.
+Registration and, where enabled, PIN acceptance must precede the save
+boundary; events after reload cannot satisfy those prerequisites.
 These local-peer fixtures disable the host adapter, while still requiring
 handset Location Updating and persistent SIM location; host-service gates
 retain their separate host/carrier agreement requirement.

@@ -4,10 +4,18 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
-from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, main
+from tools.run_noki6250_acceptance import apply_coherent_config, prepare_run, prerequisite_trace, main
 
 
 class CoherentConfigTest(unittest.TestCase):
+    def test_saved_prerequisites_exclude_post_load_events(self):
+        text = 'before\n6250_state: event=saved pc=1\nafter\n'
+        for scenario in ('idle-state', 'call-state', 'sms-state'):
+            self.assertEqual(prerequisite_trace(text, scenario), 'before\n')
+            with self.assertRaisesRegex(ValueError, 'save boundary'):
+                prerequisite_trace('after only', scenario)
+        self.assertEqual(prerequisite_trace(text, 'host-incoming-call'), text)
+
     def test_pin_services_are_admitted_before_preparation(self):
         for scenario in ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call', 'host-outgoing-sms', 'phonebook', 'idle-state', 'call-state', 'sms-state'):
             with patch('sys.argv', ['runner', 'unused', '--scenario', scenario,

@@ -23,6 +23,16 @@ except ModuleNotFoundError:
     from noki6250_pmm_check import initial_record_fixture
 
 
+def prerequisite_trace(text, scenario):
+    """A restored event cannot establish the prerequisites of the saved state."""
+    if scenario not in ('idle-state', 'call-state', 'sms-state'):
+        return text
+    before, marker, _ = text.partition('6250_state: event=saved')
+    if not marker:
+        raise ValueError('restoration prerequisites lack a save boundary')
+    return before
+
+
 def apply_coherent_config(path, fixture):
     """Overlay lab carrier/host inputs without losing a physical Reply target."""
     source = ET.parse(fixture).getroot().find('system')
@@ -292,6 +302,15 @@ def main():
             checker = [sys.executable, str(root / "tools/noki6250_app_check.py"),
                        str(run / "error.log"), str(frames[0])]
         subprocess.run(checker, check=True)
+        prerequisites = prerequisite_trace(
+            (run / 'error.log').read_text(errors='replace'), args.scenario)
+        if args.coherent_cell and args.scenario in ('idle-state', 'call-state', 'sms-state'):
+            from tools.radio_registration_trace_check import verify as check_saved_registration
+            check_saved_registration(prerequisites, 'nhm3', configured_carrier=True)
+            if args.pin_enabled:
+                from tools.sim_security_trace_check import validate as check_saved_security
+                check_saved_security(prerequisites,
+                    (run / 'nvram/nhm3hle/sim_card').read_bytes(), 'verify', '1234')
         if args.pin_enabled:
             from tools.noki6250_slow_pin_check import verify as check_slow_pin
             check_slow_pin((run / 'error.log').read_text(errors='replace'),
