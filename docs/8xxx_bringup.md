@@ -1490,6 +1490,15 @@ registration, byte-identical SIM storage after readback, no ADN rewrite,
 and the reviewed contact-detail pixels. The first process's trace is retained
 as `write.log`; the second process owns `error.log`.
 
+Authenticated restoration is covered by `verify-8850-pin-state-idle`,
+`verify-8850-pin-state-call` and `verify-8850-pin-state-sms`. Physical PIN
+entry precedes registration; save points are 36, 44 and 23 seconds
+respectively. The call must already be connected, and SMS must already be
+stored with its channel released. Exact CPU/RAM/time, nonempty protocol
+replay and whole-screen equality are required, followed by physical Menu,
+End or message reading after load. These are emulator restoration contracts,
+not cold-clock persistence or native DSP speech.
+
 Run `noki8850_radio_observe.lua` for 60 simulated seconds with the isolated
 research invocation above, then check:
 

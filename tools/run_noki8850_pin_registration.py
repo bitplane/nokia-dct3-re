@@ -38,7 +38,8 @@ def main():
     parser.add_argument('--without-pin', action='store_true',
                         help='run the original phone-code-only baseline')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
-                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook'),
+                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
+                                              'idle-state', 'call-state', 'sms-state'),
                         default='registration')
     parser.add_argument('--port', type=int, default=18850)
     args = parser.parse_args()
@@ -50,11 +51,12 @@ def main():
         verify_inputs('8850', (roms / profile[1]).read_bytes(),
                       (roms / profile[3]).read_bytes())
         run.mkdir(parents=True, exist_ok=False)
-        for directory in ('cfg', 'nvram/nsm2hle', 'snap'):
+        for directory in ('cfg', 'nvram/nsm2hle', 'snap', 'sta'):
             (run / directory).mkdir(parents=True)
         host = args.scenario.startswith('host-')
         sms = args.scenario.endswith('-sms')
         incoming = args.scenario.startswith('host-incoming-')
+        state = args.scenario.endswith('-state')
         script = {
             'registration': 'security_input',
             'host-incoming-call': 'host_incoming_input',
@@ -62,9 +64,12 @@ def main():
             'host-outgoing-call': 'outgoing_call_input',
             'host-outgoing-sms': 'outgoing_sms_input',
             'phonebook': 'phonebook_input',
+            'idle-state': 'state_idle', 'call-state': 'state_call', 'sms-state': 'state_sms',
         }[args.scenario]
         if host:
             shutil.copyfile(root / 'fixtures/noki8850_host/nsm2hle.cfg', run / 'cfg/nsm2hle.cfg')
+        elif args.scenario == 'sms-state':
+            shutil.copyfile(root / 'fixtures/noki8850_incoming_sms/nsm2hle.cfg', run / 'cfg/nsm2hle.cfg')
         card = run / 'nvram/nsm2hle/sim_card'
         card.write_bytes(make_profile(pin_enabled=not args.without_pin))
         environment = os.environ.copy()
@@ -74,10 +79,11 @@ def main():
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsm2hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
+                   '-state_directory', 'sta',
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / f'tools/noki8850_{script}.lua'),
-                   '-seconds_to_run', '60' if host else '46']
+                   '-seconds_to_run', '60' if host or state else '46']
         host_command = None
         if host:
             command.extend(['-http', '-http_port', str(args.port)])
@@ -107,7 +113,20 @@ def main():
             raise ValueError('; '.join(errors))
         subprocess.run([sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                         str(run / 'error.log'), '--profile', 'nsm2'], check=True)
-        if args.scenario == 'phonebook':
+        if state:
+            before_save = text.split('8850_state: event=saved', 1)[0]
+            if args.scenario == 'call-state':
+                from tools.radio_outgoing_call_trace_check import CONNECT_ACKNOWLEDGE
+                if not CONNECT_ACKNOWLEDGE.search(before_save):
+                    raise ValueError('call was not connected before saving')
+            elif args.scenario == 'sms-state':
+                if ('sim_device: update fid=6f3c record=1 length=176' not in before_save or
+                        'LAPDm service Channel Release acknowledged' not in before_save):
+                    raise ValueError('SMS was not stored and released before saving')
+            options = {'idle-state': ['--idle'], 'call-state': [], 'sms-state': ['--sms', '--storage', str(card)]}[args.scenario]
+            subprocess.run([sys.executable, str(root / 'tools/noki8850_state_check.py'),
+                            str(run / 'error.log'), str(run / 'snap')] + options, check=True)
+        elif args.scenario == 'phonebook':
             original_card = card.read_bytes()
             subprocess.run([sys.executable, str(root / 'tools/noki8850_phonebook_check.py'),
                             'save', str(run / 'error.log'), str(card),
