@@ -640,11 +640,22 @@ Physical Menu/OK produces successful TERMINAL RESPONSE
 `810301218002028281030100`/`90 00` and restores numeric-PLMN idle (pixel
 SHA256 `d6d4b05af24a06c42a97e31c3134f7e497e149f4420f87f3d243613f06926300`).
 The gate requires own staged/self-test/base-record predicates and persisted
-laboratory registration. Only this proactive command and the default-cell,
+laboratory registration. These Toolkit gates establish the default-cell,
 PIN-disabled composition are established; no DCS/PIN Toolkit combination,
 factory PMM or native DSP promotion follows. Accepted protocol ordering is
 shared through `dct3_toolkit_check.py`; startup, provisioning and frames
 remain product-owned.
+
+`verify-8210-sim-toolkit-inkey` selects the existing card-owned GET INKEY
+sequence after DISPLAY TEXT. The first terminal response advertises the
+next command with `91 15`; firmware fetches its 21-byte payload and renders
+`Press 5`. Physical digit 5 enters the editor, and physical Menu/OK completes
+TERMINAL RESPONSE `8103022200020282810301000d020435`, followed by `90 00`
+and registered idle. Digit entry alone does not complete this NSM-3 UI
+transaction. The gate retains the own staged/self-test/base-record and SIM
+location requirements and checks exact DISPLAY TEXT, GET INKEY and idle
+pixels. This proves GET INKEY in this composition, not other proactive
+commands or a change to the native-DSP boundary.
 
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
