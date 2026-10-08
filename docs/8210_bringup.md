@@ -1086,6 +1086,19 @@ observed successful promotion owner, distinct from timer states
 and never observes this state-15 acknowledgement pairing. The
 control does not establish timing-independent PIN coverage or
 justify delaying/replaying the radio acknowledgement.
+Ordinary neighbour notifications `03f9` do not retry this queue in
+receive state 13. Its non-`1802/8b` route reaches `21ee30`, where
+only `0411` selects the special branch; other inputs re-store state
+13 through `21bdc4` and enter shared forwarding `21f48a`.
+That cascade has no `03f9` case and reaches default handler `21b954`.
+The default handler's selectors are `03fd`, `03fc` (constructed),
+`03fb`, `03fa`, `0422`, `041d`, and `0421`; unmatched `03f9` reaches
+`21b9ee -> 21b8ea`, the receive-loop tail. This explains the repeated
+state-13 writes accompanying observed neighbour notifications without
+queue promotion. It does not establish what a real DSP must publish:
+the remaining request-promotion candidate in this observed state is
+the separate `1802/8b -> 2a2250 -> 21f900` measurement continuation,
+whose post-acquisition production/lifetime contract is still unproved.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

@@ -311,6 +311,22 @@ def verify(image):
             ('beq', '#0x21f8fa'), ('bl', '#0x21ef54'),
             ('adr', 'r0, #0x36c'), ('bl', '#0x2d5dcc')]:
         raise ValueError('state-15 type-89 acknowledgement route differs')
+    if int.from_bytes(read(0x21f188, 4), 'big') != 0x411:
+        raise ValueError('state-13 alternate input selector differs')
+    if instructions(0x21ee30, 12) != [
+            ('ldr', 'r0, [pc, #0x354]'), ('cmp', 'r1, r0'),
+            ('beq', '#0x21ee4c'), ('movs', 'r0, #0xd'),
+            ('bl', '#0x21bdc4')]:
+        raise ValueError('state-13 default continuation differs')
+    default_selectors = (0x21bcdc, 0x21bce4, 0x21bd24,
+                         0x21bd28, 0x21bd2c, 0x21bd7c)
+    if [int.from_bytes(read(address, 4), 'big') for address in default_selectors] != [
+            0x3fd, 0x3fb, 0x3fa, 0x422, 0x41d, 0x421]:
+        raise ValueError('default receive-handler selectors differ')
+    if instructions(0x21b9e8, 8) != [
+            ('ldr', 'r0, [pc, #0x390]'), ('cmp', 'r1, r0'),
+            ('beq', '#0x21b9f0'), ('b', '#0x21b8ea')]:
+        raise ValueError('default receive-handler unmatched tail differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
