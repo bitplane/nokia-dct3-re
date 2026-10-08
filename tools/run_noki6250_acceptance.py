@@ -23,6 +23,29 @@ except ModuleNotFoundError:
     from noki6250_pmm_check import initial_record_fixture
 
 
+def apply_coherent_config(path, fixture):
+    """Overlay lab carrier/host inputs without losing a physical Reply target."""
+    source = ET.parse(fixture).getroot().find('system')
+    incoming = source.find('input') if source is not None else None
+    if source is None or source.get('name') != 'nhm3hle' or incoming is None:
+        raise ValueError('coherent NHM-3 fixture lacks inputs')
+    if path.exists():
+        config = ET.parse(path).getroot()
+        system = config.find('system')
+        inputs = system.find('input') if system is not None else None
+        if system is None or system.get('name') != 'nhm3hle' or inputs is None:
+            raise ValueError('existing NHM-3 configuration lacks inputs')
+    else:
+        config = ET.Element('mameconfig', version='10')
+        inputs = ET.SubElement(ET.SubElement(config, 'system', name='nhm3hle'), 'input')
+    for port in incoming:
+        for previous in list(inputs):
+            if previous.get('tag') == port.get('tag') and previous.get('mask') == port.get('mask'):
+                inputs.remove(previous)
+        inputs.append(ET.Element(port.tag, port.attrib))
+    ET.ElementTree(config).write(path, encoding='utf-8', xml_declaration=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path,
@@ -40,8 +63,8 @@ def main():
     parser.add_argument('--coherent-cell', action='store_true',
                         help='use explicit ARFCN19/20 network and require carrier coherence')
     args = parser.parse_args()
-    if args.coherent_cell and args.scenario not in ('host-incoming-call', 'host-outgoing-call'):
-        parser.error('coherent-cell downstream coverage currently requires a host call scenario')
+    if args.coherent_cell and not args.scenario.startswith('host-'):
+        parser.error('coherent-cell downstream coverage requires a host scenario')
     root = Path(__file__).resolve().parents[1]
     mame = (args.mame or root / "mame/mame").resolve()
     rompath = (args.rompath or root / "roms").resolve()
@@ -93,7 +116,7 @@ def main():
                           mask="1", defvalue="0", value="1")
             ET.ElementTree(config).write(config_path, encoding="utf-8", xml_declaration=True)
         if args.scenario == 'coherent-registration' or args.coherent_cell:
-            shutil.copyfile(root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg', run / 'cfg/nhm3hle.cfg')
+            apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
         script = "noki6250_call_observe.lua" if call else "noki6250_app_observe.lua"
         if sms:
             script = "noki6250_sms_observe.lua"
@@ -236,9 +259,13 @@ def main():
         if args.scenario == "host-outgoing-call":
             from tools.radio_host_outgoing_connect_check import verify as check_host
             check_host((run / "error.log").read_text(errors="replace"), "123")
-        if host_sms and args.scenario not in ("host-rejected-sms", "host-silent-sms"):
+        if host_sms:
             name = "radio_incoming_host_sms_trace_check.py" if host_incoming_sms else "radio_outgoing_host_sms_trace_check.py"
-            subprocess.run([sys.executable, str(root / "tools" / name), str(run / "error.log")], check=True)
+            options = ['--arfcn', '19'] if host_incoming_sms and args.coherent_cell else []
+            if not host_incoming_sms:
+                outcome = {'host-rejected-sms': 'rp_error', 'host-silent-sms': 'rp_silence'}.get(args.scenario, 'rp_ack')
+                options.extend(['--outcome', outcome])
+            subprocess.run([sys.executable, str(root / "tools" / name), *options, str(run / "error.log")], check=True)
         if args.scenario == "phonebook":
             shutil.copyfile(run / "error.log", run / "phonebook-save.log")
             saved_sim = (run / "nvram/nhm3hle/sim_card").read_bytes()

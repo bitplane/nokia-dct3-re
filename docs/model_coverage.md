@@ -41,8 +41,11 @@ does not automatically promote those downstream lifecycles or native speech.
 Separate `verify-6250-coherent-host-incoming-call` and
 `verify-6250-coherent-host-outgoing-call` now establish both physical call
 directions, exact configured traffic/release words, host identity correlation
-and reviewed caller/digits/connected/idle pixels on carrier 19. SMS, SIP and
-native speech do not inherit that promotion.
+and reviewed caller/digits/connected/idle pixels on carrier 19. Four separate
+`verify-6250-coherent-host-*-sms` gates now validate incoming persistent Read,
+physical outgoing success, RP rejection and unshortened silence-timeout
+recovery on the same coherent cell. SIP and native speech do not inherit
+that promotion.
 
 The levels are cumulative:
 

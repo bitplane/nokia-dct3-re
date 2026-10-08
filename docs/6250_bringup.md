@@ -49,9 +49,10 @@ report `registered=1 arfcn=19`, and SIM NVRAM must contain laboratory LAI
 The older default-cell runs receive SCH for carrier 19 and publish zero-header
 candidate/release words while the host network reports carrier 1. Their
 signaling/UI evidence remains useful, but cannot be promoted to coherent RF
-selection. The coherent host-call gates below independently validate both
-call directions; SMS and SIP acceptance on the new configured cell still
-require independent runs. Native DSP, physical RF and speech are not established by
+selection. The coherent host-call and host-SMS gates below independently
+validate both directions and SMS error/timeout recovery. SIP acceptance on
+the new configured cell still requires an independent run. Native DSP,
+physical RF and speech are not established by
 this registration gate.
 
 ### Remaining goal boundary
@@ -204,6 +205,25 @@ host request (observed near 110.6 seconds). The checker requires resumed paging,
 no RP success/error, the distinct reviewed timeout text and the same physical
 End/End/Menu recovery. The run lasts 135 emulated seconds; no firmware timeout
 is shortened. This is a separate failure contract from RP rejection.
+
+### Coherent Host SMS
+
+The four `verify-6250-coherent-host-*-sms` gates repeat incoming `hello`,
+physical `Hi` submission, RP-error and RP-silence recovery with
+`--coherent-cell`. Each requires the full own-upload/HLE/self-test,
+SCH/candidate/release, host carrier-19 and persistent `EF_LOCI` contract.
+The configuration overlay preserves the automatic incoming message only
+where it is the declared physical Reply target; host incoming SMS has no
+automatic delivery fixture.
+
+Incoming acceptance checks exact SIM payload/read status and reviewed
+message pixels. Outgoing success checks exact GSM7 `c834` for `5551234`,
+CP/RP closure and Message sent. Rejection and silence separately require
+their existing distinct failure frames, unchanged firmware timeout and
+decoded physical End/End/Menu recovery. Independent host checks require
+correlated decisions/outcomes and reject wrong IDs and duplicates. The
+default-cell gates remain available as comparisons; no native speech or
+factory provisioning is inferred from any of these HLE SMS tests.
 
 ## Recovered hardware contracts
 
