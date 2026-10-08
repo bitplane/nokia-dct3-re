@@ -38,7 +38,8 @@ def main():
     parser.add_argument('--without-pin', action='store_true',
                         help='run the original phone-code-only baseline')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
-                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
+                                              'host-outgoing-call', 'host-outgoing-sms',
+                                              'host-rejected-sms', 'host-silent-sms', 'phonebook',
                                               'idle-state', 'call-state', 'sms-state'),
                         default='registration')
     parser.add_argument('--port', type=int, default=18850)
@@ -63,6 +64,8 @@ def main():
             'host-incoming-sms': 'incoming_sms_input',
             'host-outgoing-call': 'outgoing_call_input',
             'host-outgoing-sms': 'outgoing_sms_input',
+            'host-rejected-sms': 'sms_reject_input',
+            'host-silent-sms': 'sms_silence_input',
             'phonebook': 'phonebook_input',
             'idle-state': 'state_idle', 'call-state': 'state_call', 'sms-state': 'state_sms',
         }[args.scenario]
@@ -83,7 +86,8 @@ def main():
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / f'tools/noki8850_{script}.lua'),
-                   '-seconds_to_run', '60' if host or state else '46']
+                   '-seconds_to_run', '125' if args.scenario == 'host-silent-sms' else
+                       '60' if host or state else '46']
         host_command = None
         if host:
             command.extend(['-http', '-http_port', str(args.port)])
@@ -95,6 +99,10 @@ def main():
                     ['--number', '5551234', '--decision', 'connect']),
                 'host-outgoing-sms': ('run_host_sms_gate',
                     ['--user-data', '41', '--user-data-length', '1']),
+                'host-rejected-sms': ('run_host_sms_gate',
+                    ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
+                'host-silent-sms': ('run_host_sms_gate',
+                    ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_silence']),
             }[args.scenario]
             host_command = [sys.executable, str(root / f'tools/{runner}.py'),
                             '--port', str(args.port), '--cwd', str(run)] + options
@@ -160,10 +168,17 @@ def main():
                             'readback', str(run / 'error.log'), str(card),
                             str(run / 'snap/8850_phonebook_contact.png')], check=True)
         elif sms and not incoming:
-            from tools.noki8850_outgoing_sms_check import verify
-            verify(text)
+            from tools.noki8850_outgoing_sms_check import verify, verify_silence, check_recovery
+            outcome = {'host-rejected-sms': 'rp_error', 'host-silent-sms': 'rp_silence'}.get(
+                args.scenario, 'rp_ack')
+            if outcome == 'rp_silence':
+                verify_silence(text)
+            else:
+                verify(text, rejected=outcome == 'rp_error')
+            if outcome != 'rp_ack':
+                check_recovery(text, run / 'snap', rp_silence=outcome == 'rp_silence')
             subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
-                            '--octets', '1', str(run / 'error.log')], check=True)
+                            '--octets', '1', '--outcome', outcome, str(run / 'error.log')], check=True)
         elif host and not incoming:
             from tools.noki8850_outgoing_call_check import verify, verify_frames
             verify(text)

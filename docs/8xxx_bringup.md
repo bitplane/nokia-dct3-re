@@ -1612,6 +1612,14 @@ closure. Both require registration after PIN acceptance. Their permanent
 gates are `verify-8850-pin-host-outgoing-call` and
 `verify-8850-pin-host-outgoing-sms`; no native speech is claimed.
 
+`verify-8850-pin-host-rejected-sms` and `verify-8850-pin-host-silent-sms`
+also pass own-PMM authenticated registration, physical composition, correlated
+host outcome, RP-error or full firmware-timeout closure, distinct reviewed
+failure pixels and physical End/Menu recovery. Fresh evidence is
+`run_8850_pin_host_rejected_sms_01` and `run_8850_pin_host_silent_sms_01`.
+Timeout uses 125 emulated seconds; protocol timers and handset state are
+not altered. Native DSP and speech remain unproved.
+
 `verify-8850-pin-phonebook` saves `A / 123` through physical keys with PIN
 enabled, then starts a second process on the same acquired PMM and SIM
 storage. It requires physical PIN acceptance again, retained-LAI/TMSI

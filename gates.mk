@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 535 gates: 375 generated from typed steps, 160 copied verbatim (shell).
+# 537 gates: 377 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -90,7 +90,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-pin-state-sms verify-8850-sim-pin-registration \
 	verify-8850-pin-host-incoming-call verify-8850-pin-host-incoming-sms \
 	verify-8850-pin-host-outgoing-call verify-8850-pin-host-outgoing-sms \
-	verify-8850-pin-phonebook verify-8850-pin-state-idle \
+	verify-8850-pin-phonebook verify-8850-pin-host-rejected-sms \
+	verify-8850-pin-host-silent-sms verify-8850-pin-state-idle \
 	verify-8850-pin-state-call verify-8850-pin-state-sms \
 	verify-8890-sim-pin-registration verify-8890-pin-host-incoming-call \
 	verify-8890-pin-host-incoming-sms verify-8890-pin-host-outgoing-call \
@@ -663,6 +664,12 @@ verify-8850-pin-host-outgoing-sms: build
 
 verify-8850-pin-phonebook: build
 	$(VENV)/bin/python tools/run_noki8850_pin_registration.py $(RUN_DIR) --scenario phonebook --mame $(MAME_DIR)/mame
+
+verify-8850-pin-host-rejected-sms: build
+	$(VENV)/bin/python tools/run_noki8850_pin_registration.py $(RUN_DIR) --scenario host-rejected-sms --mame $(MAME_DIR)/mame
+
+verify-8850-pin-host-silent-sms: build
+	$(VENV)/bin/python tools/run_noki8850_pin_registration.py $(RUN_DIR) --scenario host-silent-sms --mame $(MAME_DIR)/mame
 
 verify-8850-pin-state-idle: build
 	$(VENV)/bin/python tools/run_noki8850_pin_registration.py $(RUN_DIR) --scenario idle-state --mame $(MAME_DIR)/mame
