@@ -2715,6 +2715,46 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0c00 &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0cff,
 					"ROM4 e2e4 SQDST squares old A and loads signed vector difference");
+			program.write_word(0x05e0, 0xe245); // SQDST *AR2-,*AR3-.
+			data.write_word(0x0c10, 0xfffb);
+			data.write_word(0x0d10, 7);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x30000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x2222);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0c10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6506;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6506 || m_phase == 6507)
+		{
+			bool const fractional = m_phase == 6507;
+			expect_opcode(fractional ? 0xe249 : 0xe245,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffff40000ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (fractional ? 28 : 19) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x2222 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0c0f &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (fractional ? 0x0d11 : 0x0d0f) &&
+				data.read_word(0x0c10) == 0xfffb && data.read_word(0x0d10) == 7,
+				"ROM4 SQDST uses signed X-Y, squares old A with FRCT scaling and independently modifies X/Y");
+			if (!fractional)
+			{
+				program.write_word(0x05e0, 0xe249); // SQDST *AR2-,*AR3+.
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x30000);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 10);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0c10);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0d10);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6507;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
 			program.write_word(0x05e0, 0x74d6); // PORTR port, *AR6+%
 			program.write_word(0x05e1, 0x0123);
 			program.write_word(0x05e2, 0x4f81); // DST B, *AR1
@@ -12288,6 +12328,31 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			program.write_word(0x05e2, 0x4392); // SUB *AR2+,16,B,B.
+			data.write_word(0x0f92, 2);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x30000);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f92);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6505;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6505)
+		{
+			expect_opcode(0x4392,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x10000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x9abc &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f93 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f90 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0a00) &&
+				data.read_word(0x0f92) == 2 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 shifted SUB into B retains cleared carry on no borrow and postincrements AR2 in one cycle");
 			program.write_word(0x05e2, 0x5283); // DADD *AR3,B,A
 			data.write_word(0x0f90, 1);
 			data.write_word(0x0f91, 0xffff);
