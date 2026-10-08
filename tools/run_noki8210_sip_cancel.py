@@ -98,13 +98,17 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore registered handset idle before admitting the fresh SIP call')
-    parser.add_argument('--outgoing-busy', action='store_true',
+    outgoing = parser.add_mutually_exclusive_group()
+    outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='physically dial 1234567 against a real SIP 486 response')
+    outgoing.add_argument('--outgoing-unavailable', action='store_true',
+                          help='physically dial 1234567 against a real SIP 480 response')
     parser.add_argument('--http-port', type=int, default=18821)
     parser.add_argument('--sip-port', type=int, default=25821)
     args = parser.parse_args()
-    if args.restore_idle and args.outgoing_busy:
-        parser.error('--restore-idle cannot be combined with --outgoing-busy')
+    outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
+    if args.restore_idle and outgoing_failure:
+        parser.error('--restore-idle cannot be combined with outgoing failure')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
@@ -116,7 +120,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
-                       'noki8210_outgoing_call_input.lua' if args.outgoing_busy else
+                       'noki8210_outgoing_call_input.lua' if outgoing_failure else
                        'noki8210_sip_idle_restore.lua' if args.restore_idle else
                        'noki8210_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
@@ -127,7 +131,7 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8210',
-                   *(['--sip-response', '486'] if args.outgoing_busy else
+                   *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/8210_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
@@ -135,12 +139,13 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if args.outgoing_busy:
+        if outgoing_failure:
             check_outgoing_result(run)
         else:
             check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsm3hle', 'scenario': 'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel',
+            'machine': 'nsm3hle', 'scenario': ('outgoing-sip-unavailable' if args.outgoing_unavailable else
+                                             'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),
             'mcu_sha1': MCU_SHA1, 'acquired_pmm_sha256': PMM_SHA256,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
