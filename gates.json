@@ -588,6 +588,20 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "host-outgoing-sms", "--dcs1800", "--pin-enabled", "--pin-start", "7", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8210-dcs-host-rejected-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-rejected-sms", "--dcs1800", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8210-dcs-host-silent-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-silent-sms", "--dcs1800", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8210-pin-host-incoming-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

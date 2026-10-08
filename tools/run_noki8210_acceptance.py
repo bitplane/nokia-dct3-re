@@ -134,7 +134,7 @@ def main():
             not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-incoming-sms', 'host-outgoing-sms') or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires PIN registration/incoming-call or host SMS and a time between 3.5 and 20 seconds')
-    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'host-incoming-sms', 'outgoing-sms', 'host-outgoing-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'call-state', 'phonebook') or
+    if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'host-incoming-sms', 'outgoing-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'call-state', 'phonebook') or
                         (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-incoming-sms', 'host-outgoing-sms') and args.pin_enabled)):
         parser.error('--dcs1800 requires registration, incoming-call or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',

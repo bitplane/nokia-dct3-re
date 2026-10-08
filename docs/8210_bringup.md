@@ -432,7 +432,13 @@ also passes with `--pin-enabled --pin-start 7`
 measurement/VERIFY/registration sequence. Standard targets are
 `verify-8210-dcs-host-outgoing-sms` and
 `verify-8210-dcs-early-pin-host-outgoing-sms`. Neither proves late-PIN
-recovery or DCS host rejection/timeout recovery.
+recovery.
+No-PIN DCS host rejection and timeout are separately accepted by
+`verify-8210-dcs-host-rejected-sms` and `verify-8210-dcs-host-silent-sms`
+(`run_8210_dcs_host_rejected_sms_01`, `run_8210_dcs_host_silent_sms_01`).
+Each requires own DCS registration, correlated host outcome, the distinct
+RP-error or RP-silence protocol closure, reviewed failure-screen pixels and
+physical recovery. These do not establish PIN-enabled failure recovery.
 
 The original seven scenarios are standard gates: `make verify-8210-registration
 RUN_DIR=/tmp/8210-registration`, with corresponding `incoming-call`,
