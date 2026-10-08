@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki8890_calendar_check import verify
+from tools.noki8890_calendar_check import SCALARS, verify
 
 
 SEED = '\n'.join((
@@ -19,6 +19,22 @@ COLD = ('kind=app_write pc=003062cc address=00137420 data=d44c6700 mask=ffffffff
 class CalendarTest(unittest.TestCase):
     def test_complete_chain(self):
         verify(SEED, COLD)
+
+    def test_each_boundary_has_exact_one_day_and_cold_identity(self):
+        for boundary, (before, after) in SCALARS.items():
+            seed = SEED.replace('d44b1580', before).replace('d44c6700', after)
+            cold = COLD.replace('d44c6700', after)
+            with self.subTest(boundary=boundary):
+                self.assertEqual(int(after, 16) - int(before, 16), 86400)
+                verify(seed, cold, boundary=boundary)
+                with self.assertRaises(ValueError):
+                    verify(seed, cold.replace(after, before), boundary=boundary)
+
+    def test_leap_day_does_not_accept_ordinary_date(self):
+        with self.assertRaises(ValueError):
+            verify(SEED, COLD, boundary='leap-day')
+        with self.assertRaises(ValueError):
+            verify(SEED, COLD, boundary='unknown')
 
     def test_every_midnight_link_required(self):
         for line in SEED.splitlines():

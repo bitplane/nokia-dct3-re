@@ -32,9 +32,10 @@ local input = coroutine.create(function()
     if not press(1, 'Menu') then return end
     if not emu.wait(3) then return end
     machine.screens[':screen']:snapshot('8890_clock_after.png')
-    for _, item in ipairs({{3, 'Keypad 0'}, {2, 'Keypad 7'},
+    local date_digits = _G.noki8890_date_digits or {{3, 'Keypad 0'}, {2, 'Keypad 7'},
             {2, 'Keypad 1'}, {3, 'Keypad 0'}, {3, 'Keypad 2'},
-            {3, 'Keypad 0'}, {3, 'Keypad 2'}, {4, 'Keypad 6'}}) do
+            {3, 'Keypad 0'}, {3, 'Keypad 2'}, {4, 'Keypad 6'}}
+    for _, item in ipairs(date_digits) do
         if not press(item[1], item[2]) then return end
     end
     machine.screens[':screen']:snapshot('8890_date_entered.png')

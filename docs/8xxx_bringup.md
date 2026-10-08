@@ -1179,9 +1179,18 @@ the security code without time/date keys, and restores `d44c6700` through
 the own journal. Physical Menu/seven Down/Menu opens Calendar: its reviewed
 84x48 frame shows **8 October 2026, Thursday**. Both processes must also
 complete laboratory registration. This proves one ordinary midnight and
-same-supply cold persistence, not month/year/leap-day rollover, offline elapsed
-time or battery-removal behavior. CCONT supplies the elapsed-day counter;
+same-supply cold persistence, not offline elapsed time or battery-removal
+behavior. CCONT supplies the elapsed-day counter;
 the handset firmware owns the Gregorian date.
+
+`make verify-8890-calendar-leap-day RUN_DIR=RUN` independently starts
+from physical 23:59 and 28/02/2024. The same day-register read/clear
+sequence advances the scalar from `cf640180` to `cf655300`; a cold
+Calendar readback shows **29 February 2024, Thursday**. The checker
+requires this date's own scalar pair and full reviewed frame, not the
+ordinary October oracle. This validates entry into a leap day; leaving
+February, non-leap February, month/year boundaries and century rules
+remain outside the acceptance scope.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
