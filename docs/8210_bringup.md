@@ -90,46 +90,28 @@ five focused NSM-3/NPE-3 control tests pass. Actual answered SIP/RTP and
 non-silent physical audio remain unvalidated. Endpoint wiring does not
 promote native DSP execution or factory provisioning.
 
-A bounded outgoing SIP-200 probe (`run_8210_sip_media_probe_local`) confirms
-and normally clears an actual PJSIP dialog, with bridge counters uplink 365,
-downlink 354, transmitted PCM 365 and received PCM 399 (38 dropped).
-Handset downlink sequences 0..352 are accepted in order; sequence 353 is
-rejected at 37.040 s during physical-End teardown. The strict media gate
-therefore fails: substantial traffic is not full lifecycle acceptance or
-non-silent microphone proof. Temporary answered-probe runner switches were
-removed; normal signaling-only restrictions remain. Resolve release/media
-ordering before promoting an answered gate. The common checker accepts
-PJSIP's status-200 reason strings `OK` and `Normal call clearing` while
-retaining exact numeric status and all media checks.
+`tools/run_noki8210_sip_cancel.py --outgoing-media` validates one physical
+outgoing SIP-200 call on `nsm3hle`, with own PCM timing and endpoints.
+Fresh run `run_8210_sip_outgoing_media_verified` passes the shared media,
+full own-product CC/RR lifecycle and reviewed presentation checks. Bridge
+counters are uplink 365, downlink 353, transmitted PCM 365 and received PCM
+400 (39 dropped); handset sequences 0..351 are accepted in order.
+Physical End emits DISCONNECT `036502e090`, network RELEASE, then handset
+RELEASE COMPLETE `032a`, RR release and return to paging. This is not the
+handset-RELEASE direction assumed by the older products' SIP fixtures.
 
-The release boundary is now localized: `poll_host()` samples the session's
-connection state, calls `end_host_media()` when disconnected, processes queued
-downlink packets, and only then publishes `ended`. In the captured probe,
-sequence 353's rejection and the `ended` publication share timestamp
-37.040 s. The bridge can still have a packet in flight before receiving that
-notification. This is not evidence that active-call media was rejected, nor
-justification to accept media into a closed session. A lifecycle acceptance
-test needs an explicit closure boundary and must continue rejecting stale
-identities, malformed frames, and active-call sequence failures; a blanket
-allowance for rejected packets would conceal those defects. The existing
-strict active-media requirements remain in force.
-The adapter's downlink trace now appends `reason=accepted`, `wrong_request`,
-`session_closed`, or `media_validation` without changing admission behavior.
-This makes a fresh probe distinguish session closure from request mismatch
-and active-session sequence/queue failure; the old capture predates these
-reason fields and must not be retroactively classified as a passing run.
+One in-flight downlink packet is safely rejected as `session_closed` at
+37.040 s after radio release, in the same adapter poll that publishes `ended`.
+The checker admits only an ordered terminal closure suffix with both these
+boundaries. Wrong requests, unclassified or active-media rejections, sequence
+gaps and accepted packets after closure remain failures. Adapter rejection
+reason fields are observational; no admission behavior changed. The common
+checker accepts exact PJSIP status 200 with reason `OK` or `Normal call clearing`.
 
-A fresh probe (`run_8210_sip_media_boundary_probe`) accepts sequences 0..351,
-then rejects sequence 352 explicitly as `session_closed` at 37.040 s, after
-LAPDm Channel Release acknowledgement and in the same poll as `ended`.
-The shared checker now recognizes only this ordered terminal closure suffix;
-unclassified rejections, wrong requests, active-media failures, sequence gaps,
-and accepted media after closure still fail. Twelve focused checker tests pass.
-Full answered acceptance remains unproved: the next failing check assumes a
-handset RELEASE (`2d`), whereas this physical-End run emits DISCONNECT
-`036502e090` followed by RELEASE COMPLETE `032a`. Decode and test this own
-CC release direction before adding an answered gate; do not substitute a
-sibling handset's release pattern. Temporary probe-runner switches are removed.
+This establishes outgoing HLE media transport, not native DSP speech or
+non-silent microphone audio. Incoming answered SIP, recording, and external
+call restoration remain disabled for NSM-3. Provisioning remains the declared
+base-record comparison, not validated factory data.
 
 ## Physical power lifecycle
 

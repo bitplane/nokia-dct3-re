@@ -3,6 +3,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from tools.run_sip_handset_gate import verify_success
 
@@ -14,6 +15,7 @@ SETUP = {
     '3410': 'length=15 data=03450401a05e0581551532f4150101',
     '5210': 'length=15 data=03450401a05e0581551532f4150101',
     '6210': 'length=15 data=03450401a05e0581214365f7150101',
+    '8210': 'length=15 data=03450401a05e0581214365f7150101',
 }
 
 
@@ -32,7 +34,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
                     f'gsm_call_adapter: media direction=downlink id=1 sequence={accepted} result=rejected\n'
                     if rejected else ''))
             counts = dict.fromkeys(('uplink', 'downlink', 'pcm_transmitted', 'pcm_received'), 100)
-            number = '1234567' if product == '6210' else '5551234'
+            number = '1234567' if product in ('6210', '8210') else '5551234'
             (root / 'sip-bridge.log').write_text(
                 f'SIP dial digits={number}\nSIP confirmed status=200\n'
                 'SIP bridge ended ' + json.dumps(counts) + '\n')
@@ -43,8 +45,19 @@ class SipProductSetupCheckTest(unittest.TestCase):
 
     def test_own_product_setup_is_accepted(self):
         for product in SETUP:
+            if product == '8210':
+                continue  # Own physical-End lifecycle is tested separately.
             with self.subTest(product=product):
                 self.check(product, product)
+
+    def test_8210_uses_full_own_product_lifecycle(self):
+        with self.assertRaisesRegex(ValueError, 'physical Send'):
+            self.check('8210', '8210')
+        with patch('tools.noki8210_outgoing_call_check.verify') as own_verify:
+            self.check('8210', '8210')
+            own_verify.assert_called_once()
+            self.assertEqual(own_verify.call_args.kwargs,
+                             {'number': '1234567', 'configured_carrier': True})
 
     def test_normal_clearing_status_wording(self):
         self.check('3210', '3210', reason='200 (Normal call clearing)')
@@ -96,7 +109,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
 
     def test_own_incoming_connect_and_release_are_accepted(self):
         for product in SETUP:
-            if product == '6210':
+            if product in ('6210', '8210'):
                 continue  # The outgoing research probe does not promote incoming Answer.
             with self.subTest(product=product):
                 self.check_incoming(product, product)

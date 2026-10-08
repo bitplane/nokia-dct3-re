@@ -444,7 +444,9 @@ CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
 dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
-products `6210`, `6250`, `8210`, `8850` and `8890`.
+products `6210`, `6250`, `8850` and `8890`. The 8210 has a narrowly scoped
+single outgoing SIP-200 HLE media-transport fixture; incoming answered media,
+recording and call restoration are not enabled for that product.
 
 `verify-6210-sip-outgoing-busy` additionally proves physical `1234567`/Send
 against actual local PJSIP 486. It decodes the SETUP number, requires the
@@ -582,8 +584,16 @@ Answer/End and dial/Send/End, exact configured-cell traffic/release,
 coherent ARFCN4 registration, request/decision correlation and reviewed UI.
 They use the same labelled base-record comparison and require own native
 uploads before explicit HLE handoff. Answered host signaling is not an
-answered SIP/media acceptance: the 8210 SIP runner permits unanswered
-CANCEL and the outgoing failure fixtures below; no native speech is claimed.
+answered SIP/media acceptance. The 8210 SIP runner separately offers
+`--outgoing-media` for one physical outgoing call against SIP 200, in addition
+to unanswered CANCEL and the outgoing failure fixtures below. It reuses the
+full own-product physical-End lifecycle: handset DISCONNECT, network RELEASE,
+handset RELEASE COMPLETE, RR release and return to paging. At least 100
+ordered handset-accepted frames and bidirectional bridge PCM counters are
+required. A terminal packet explicitly rejected as `session_closed` is safe
+only after radio release and with a matching `ended` poll; wrong requests,
+active-media failures, sequence gaps and post-closure acceptance still fail.
+This proves HLE media transport, not native or non-silent microphone speech.
 
 `verify-8210-sip-outgoing-busy` physically dials `1234567` on configured
 carrier 4 against actual SIP 486. It requires the decoded SETUP number,
