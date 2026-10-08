@@ -455,6 +455,19 @@ self-test, registration and persisted SIM-location checks. Only this
 outgoing busy failure and the unavailable fixture below are enabled for the 6210; answered calls, speech and
 outgoing SIP restoration remain unproved.
 
+A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
+confirmed and released the real dialog, but failed full media acceptance:
+the bridge counted uplink 0, downlink 354, transmitted PCM 0 and received
+PCM 400 (38 dropped). The radio trace emitted bad uplink speech blocks,
+not valid handset frames. DSP-HLE doorbells retained `speech_control=0000`;
+the product composition selects no speech-control command/predicate, and
+`speech_requested()` deliberately rejects an absent contract. Host
+downlink queue acceptance therefore does not establish handset decoding
+or bidirectional speech. The temporary answered-probe switches were
+removed; normal answered/media restrictions remain. Recover the own
+MCU command compiler and call/release speech field before configuring
+this contract; do not import the 6250 predicate or synthesize uplink.
+
 `verify-6210-sip-outgoing-unavailable` independently passes against actual
 PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
 registered-idle recovery with the same physical number and own-PMM checks.

@@ -155,7 +155,9 @@ def verify_success(root, remote_text, args):
     if 'state changed to CONFIRMED' not in remote_text or 'DISCONNECTED [reason=200 (OK)]' not in remote_text:
         raise RuntimeError('remote SIP call did not confirm and release normally')
     bridge_text = (root / 'sip-bridge.log').read_text(errors='replace')
-    identity_marker = 'caller=5551234' if args.incoming else 'digits=5551234'
+    number = {'6210': '1234567', '6250': '123', '8210': '1234567', '8890': '1234567'}.get(
+        getattr(args, 'product', '3210'), '5551234')
+    identity_marker = 'caller=5551234' if args.incoming else f'digits={number}'
     if identity_marker not in bridge_text or 'SIP confirmed status=200' not in bridge_text:
         raise RuntimeError('missing reviewed physical dial/SIP acceptance')
     if args.incoming and 'SIP physical answer identity=' not in bridge_text:
@@ -168,6 +170,16 @@ def verify_success(root, remote_text, args):
             'uplink', 'downlink', 'pcm_transmitted', 'pcm_received')) < 100:
         raise RuntimeError('insufficient executed bidirectional media')
     log = (root / 'error.log').read_text(errors='replace')
+    if not args.incoming:
+        try:
+            from tools.radio_outgoing_call_trace_check import SETUP, decode_called_digits
+        except ModuleNotFoundError:
+            from radio_outgoing_call_trace_check import SETUP, decode_called_digits
+        setups = list(SETUP.finditer(log))
+        if len(setups) != 1 or any(
+                len(bytes.fromhex(match['data'])) != int(match['length']) or
+                decode_called_digits(bytes.fromhex(match['data'])) != number for match in setups):
+            raise RuntimeError('answered SIP SETUP differs from physically dialed number')
     downlink = re.findall(
         r'gsm_call_adapter: media direction=downlink id=1 sequence=(\d+) result=(accepted|rejected)', log)
     if (len(downlink) < 100 or any(result != 'accepted' for _, result in downlink) or
@@ -218,7 +230,7 @@ def verify_success(root, remote_text, args):
         cursor += match.end()
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': f'{getattr(args, "product", "3210")} research-HLE physical {"incoming" if args.incoming else "outgoing"} SIP signaling and media transport; not native DSP speech',
-        ('caller' if args.incoming else 'dialed_digits'): '5551234',
+        ('caller' if args.incoming else 'dialed_digits'): '5551234' if args.incoming else number,
         'media': counts, 'passed': True}, indent=2) + '\n')
     print('OK - physical handset call connected to SIP with bidirectional host media and release')
 

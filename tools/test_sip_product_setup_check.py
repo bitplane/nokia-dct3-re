@@ -13,6 +13,7 @@ SETUP = {
     '3330': 'length=18 data=03450404600200815e0581551532f4150101',
     '3410': 'length=15 data=03450401a05e0581551532f4150101',
     '5210': 'length=15 data=03450401a05e0581551532f4150101',
+    '6210': 'length=15 data=03450401a05e0581214365f7150101',
 }
 
 
@@ -31,8 +32,9 @@ class SipProductSetupCheckTest(unittest.TestCase):
                     f'gsm_call_adapter: media direction=downlink id=1 sequence={accepted} result=rejected\n'
                     if rejected else ''))
             counts = dict.fromkeys(('uplink', 'downlink', 'pcm_transmitted', 'pcm_received'), 100)
+            number = '1234567' if product == '6210' else '5551234'
             (root / 'sip-bridge.log').write_text(
-                'SIP dial digits=5551234\nSIP confirmed status=200\n'
+                f'SIP dial digits={number}\nSIP confirmed status=200\n'
                 'SIP bridge ended ' + json.dumps(counts) + '\n')
             verify_success(root, 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]',
                            SimpleNamespace(incoming=False, restore_idle=False, product=product))
@@ -45,7 +47,7 @@ class SipProductSetupCheckTest(unittest.TestCase):
                 self.check(product, product)
 
     def test_other_product_setup_is_not_substituted(self):
-        for product, other in (('3210', '3310'), ('3310', '3210')):
+        for product, other in (('3210', '3310'), ('3310', '3210'), ('6210', '3210')):
             with self.subTest(product=product), self.assertRaises(RuntimeError):
                 self.check(product, other)
 
@@ -88,6 +90,8 @@ class SipProductSetupCheckTest(unittest.TestCase):
 
     def test_own_incoming_connect_and_release_are_accepted(self):
         for product in SETUP:
+            if product == '6210':
+                continue  # The outgoing research probe does not promote incoming Answer.
             with self.subTest(product=product):
                 self.check_incoming(product, product)
 
