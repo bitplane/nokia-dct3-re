@@ -3614,6 +3614,25 @@ void nokia_dct3_state::nsm2hle(machine_config &config)
 	// Own dispatcher 243a42 routes class 74 to 240dbc; command 0d at
 	// 240e2c cancels the armed wait and reads two fault bits at body +9.
 	runtime.dsp_service_control = DSP_SERVICE_CONTROL_COMPACT;
+	// NSM-2 System Module issue 1 12/1999, p24: independent PCM timing.
+	runtime.cobba_pcm.data_clock = 1'000'000;
+	runtime.cobba_pcm.frame_clock = 8'000;
+	runtime.cobba_pcm.sample_bits = 13;
+	runtime.cobba_pcm.sync_clocks = 1;
+	runtime.cobba_pcm.word_clocks = 16;
+	runtime.cobba_pcm.msb_first = true;
+	runtime.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
+	// Own selector 17 updates 0200; selector 8 publishes at 2cb3ca.
+	// Physical Send/End independently verifies 860b -> 840a.
+	runtime.dsp_speech_control = {
+		0x08, nokia_dsp_hle_device::speech_request_predicate { 0x0200, 0x0200 }
+	};
+	// NSM-2 UI Module identifies internal MIC2 and EAR, not runtime gains.
+	runtime.cobba_hle_voice.microphone = nokia_cobba_device::mic2;
+	runtime.cobba_hle_voice.output = nokia_cobba_device::ear;
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(runtime);
 	subdevice<nokia_dsp_staged_device>("dsp_staged")->set_runtime_hle_after_loader(true);
 }

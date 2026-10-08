@@ -1816,8 +1816,8 @@ handset Connect Acknowledge, physical Disconnect, Release/Release Complete,
 RR release, the product-local channel transaction and confirmation, and
 return to paging. Reviewed operator-only pixel crops show numeric `001 01`
 before dialing and `DCT3 LAB` after release, excluding animated indicators.
-The wire also contains `860b`/`840a` speech-control commands, but no NSM-2
-speech-media contract is selected; this acceptance does not prove audio.
+This signaling acceptance alone does not prove audio; the independently
+validated NSM-2 PCM composition and its narrower result are described below.
 
 #### Own PCM Documentation
 
@@ -1876,11 +1876,21 @@ disable or incorrectly ordered physical actions:
   roms/noki8850/8850v531.fls --log RUN/error.log
 ```
 
-This establishes the research HLE predicate: command 8, mask/value `0200`.
-PCM and analogue routing are still disabled in the current configuration;
-select the independently documented NSM-2 bus and MIC2/EAR endpoints, then
-prove bidirectional media and physical waveform delivery before claiming
-working HLE audio. The result does not establish native speech or codec gains.
+The explicit `nsm2hle` research composition now selects command 8,
+mask/value `0200`, the independently documented NSM-2 PCM bus and MIC2/EAR
+endpoints at neutral HLE gain. Normal `noki8850` configuration is unchanged.
+A fresh isolated outgoing call (`run_8850_pcm_enabled_probe`) passes the
+full own-product signaling/frame acceptance after the change. It produces
+345 uplink and 338 downlink HLE speech frames on the 1 MHz/8 kHz PCM link,
+then stops with control `040a` after physical End. Reproduce the transport
+check with `--pcm` added to the command above; it rejects absent downlink,
+unsupported clocks, differing PCM/uplink counts and missing physical stop.
+
+This proves bidirectional HLE frame transport against the laboratory peer,
+not audible voice: the host microphone was silent and no waveform oracle
+was exercised. Real SIP bidirectional tones and save/restore media lifetime
+remain the next acceptance work. Native DSP speech and physical codec gains
+remain unverified.
 
 Active-call save/load is independently verified with
 `tools/noki8850_state_call.lua`, fresh private cfg/NVRAM/state/snapshot
