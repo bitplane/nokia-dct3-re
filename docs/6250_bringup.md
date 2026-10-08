@@ -207,6 +207,18 @@ not have to beat this decision. An earlier attempt beginning input at
 The remaining question is legitimate re-evaluation after late SIM
 initialization, rather than inability to register any PIN-enabled card.
 
+The late continuation calls message-cache updater `3cba56` before selector
+input 3. This updater owns the detail pointer at `172a14`, accepts message
+family `03ea..03ed` (literal `3cbe10 = 03ea`), and copies the incoming
+halfword to detail `+0`. For `03ec` it copies four bytes from message `+4`
+to detail `+4`, message byte `+8` to detail `+2`, sets detail `+3 = 1`, and
+copies message byte `+9` to detail `+10`. For `03eb` the copied identity
+is likewise from `+4`, while message `+9` controls detail `+3` and detail
+`+10` is cleared. The next observation should capture the actual incoming
+record at `3cba56` and the linked-record updates, not guess an additional
+DSP packet. The nearby `2d29ce` target is an internal dispatcher branch
+leading to its receive loop, not a standalone re-evaluation helper.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
