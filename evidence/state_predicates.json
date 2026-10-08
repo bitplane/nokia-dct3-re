@@ -5,7 +5,7 @@
     {
       "id": "c54x_nmi_idle_wake", "owner": "native_dsp_cpu", "status": "satisfied",
       "predicate": "An external NMI wakes each C54x idle mode and reaches vector 1 independently of INTM/IMR without consuming pending maskable IFR sources",
-      "current": "Twelve executable cases cross IDLE1/2/3 with both INTM values and empty/full IMR. After sleeping, simultaneous maskable IFR sources and NMI are presented. NMI selects IPTR vector 1, stacks the idle continuation, sets INTM and preserves IFR/IMR. Full core conformance is required. This is logical architectural acceptance; synchronizer/pulse timing, PLL restart, pending-NMI save replay, nested behavior and exact pipeline drain are not established, and no phone NMI wiring is invented.",
+      "current": "Twelve executable cases cross IDLE1/2/3 with both INTM values and empty/full IMR. After sleeping, simultaneous maskable IFR sources and NMI are presented. NMI selects IPTR vector 1, stacks the idle continuation, sets INTM and preserves IFR/IMR. Each case also saves after request latching with fixture-only instruction suspension, services NMI, restores pre-entry PC/SP/INTM and stack memory, and replays the identical single entry. Held-line checks reject duplicate delivery after restoration. Full core conformance is required. This is logical architectural acceptance; synchronizer/pulse timing, PLL restart, nested behavior and exact pipeline drain are not established, and no phone NMI wiring is invented.",
       "evidence": ["docs/rom4_dsp_loader.md", "cpu/tms320c54x/tms320c54x.cpp", "cpu/tms320c54x/tms320c54x.h", "driver/tms320c54x_test.cpp", "Makefile"]
     },
     {

@@ -1213,6 +1213,7 @@ check-c54x-core: build
 	@grep -q "TMS320C54x short immediate load conformance: PASS variants=512 sxm_settings=2" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0" /tmp/tms320c54x-core-check.log
+	@grep -q "TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0" /tmp/tms320c54x-core-check.log
 
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.

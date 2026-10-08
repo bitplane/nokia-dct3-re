@@ -1485,8 +1485,13 @@ idle mode and preserves maskable IFR bits when servicing NMI. Twelve
 executable cases cover IDLE1/2/3, both INTM values and empty/full IMR;
 simultaneous pending maskable sources do not displace NMI. Acceptance checks
 the vector, stacked idle continuation, unchanged IFR/IMR and ISR INTM state.
-`check-c54x-core` requires this result. Pending/line state is save-registered,
-but NMI-specific pending-state replay is not independently exercised here.
+`check-c54x-core` requires this result and twelve pending-request save/replay
+cases. The fixture suspends instruction execution after idle, presents NMI,
+and saves after the input has latched but before the vector/stack write.
+Restoration recovers the pre-entry PC, SP, original INTM and stack sentinel;
+resuming reaches the same ISR result exactly once. A repeated held assertion
+does not enqueue a second NMI after restoration. This fixture-only execution
+suspension is not a modeled physical clock-stop or interrupt latency.
 [SPRS039C's interrupt timing requirements](https://www.ti.com/lit/gpn/tms320lc543)
 describe the physical synchronizer and pulse qualification. These logical
 fixtures do not establish that timing, PLL restart, nested-NMI behavior or
