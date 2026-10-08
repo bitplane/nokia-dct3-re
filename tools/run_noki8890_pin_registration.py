@@ -42,7 +42,7 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
-                                              'host-outgoing-call', 'host-outgoing-sms'), default='registration')
+                                              'host-outgoing-call', 'host-outgoing-sms', 'phonebook'), default='registration')
     parser.add_argument('--port', type=int, default=18890)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -63,7 +63,7 @@ def main():
             environment['NOKIA_DCT3_8890_PIN_ENTRY'] = '1'
         script = {'registration': 'security_input', 'host-incoming-call': 'clock_incoming_input',
                   'host-incoming-sms': 'incoming_sms_input', 'host-outgoing-call': 'clock_call_input',
-                  'host-outgoing-sms': 'outgoing_sms_input'}[args.scenario]
+                  'host-outgoing-sms': 'outgoing_sms_input', 'phonebook': 'phonebook_input'}[args.scenario]
         command = [str((args.mame or root / 'mame/mame').resolve()), 'nsb6hle',
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
@@ -120,6 +120,29 @@ def main():
                             str(run / 'error.log')], check=True)
             subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
                             '--octets', '1', str(run / 'error.log')], check=True)
+        elif args.scenario == 'phonebook':
+            original_card = card.read_bytes()
+            subprocess.run([sys.executable, str(root / 'tools/noki8890_phonebook_check.py'),
+                            'save', str(run / 'error.log'), str(card),
+                            str(run / 'snap/8890_phonebook_save.png')], check=True)
+            shutil.copyfile(run / 'error.log', run / 'write.log')
+            cold_command = command.copy()
+            cold_command[cold_command.index('-autoboot_script') + 1] = str(
+                root / 'tools/noki8890_phonebook_read.lua')
+            with (run / 'cold_console.log').open('w') as console:
+                subprocess.run(cold_command, cwd=run, env=environment, stdout=console,
+                               stderr=subprocess.STDOUT, check=True, timeout=180)
+            cold_text = (run / 'error.log').read_text(errors='replace')
+            if card.read_bytes() != original_card:
+                raise ValueError('cold readback changed persistent SIM bytes')
+            if not args.without_pin:
+                validate(cold_text, card.read_bytes(), 'verify', '1234')
+                check_pin_inputs(cold_text)
+            verify_stage(cold_text, runtime=True, selftest=True)
+            verify_registration(cold_text, configured_gsm900=True, preserved_location=True)
+            subprocess.run([sys.executable, str(root / 'tools/noki8890_phonebook_check.py'),
+                            'readback', str(run / 'error.log'), str(card),
+                            str(run / 'snap/8890_phonebook_contact.png')], check=True)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsb6hle', 'sim_pin_enabled': not args.without_pin,
             'provisioning': 'own acquired PMM unchanged', 'command': command,

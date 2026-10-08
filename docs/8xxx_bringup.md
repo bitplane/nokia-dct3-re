@@ -823,6 +823,14 @@ acceptance and complete CP/RP/RR closure. Both require PIN acceptance before
 registration and preserve the no-PIN physical schedules. Native speech and
 PCS1900 authenticated parity remain separate.
 
+`verify-8890-pin-phonebook` saves `A / 123` physically, then restarts on
+the same product-local PMM and SIM bytes. The cold process must enter PIN
+again, read the persisted LAI before its exact retained-location request,
+register without rewriting EF_LOCI, and show the reviewed contact detail
+without ADN writes. The complete SIM file remains byte-identical across
+readback. `write.log` preserves the first process's evidence; `error.log`
+belongs to the cold process. The no-PIN composition is separately verified.
+
 The own RX dispatcher at `30168e` selects type `80` at `301750`, calling
 `2dae9c`. Its thirteen-entry `83..8f` table at `3016bc` maps `8b` to
 `301710 -> 2db270`, which posts to task 12 through `28190c`.

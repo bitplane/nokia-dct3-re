@@ -13,7 +13,8 @@ local sequence = {
     {1, 'Menu', 'save'},
 }
 local input = coroutine.create(function()
-    if not emu.wait(21) then return end
+    local start = os.getenv('NOKIA_DCT3_8890_PIN_ENTRY') == '1' and 25 or 21
+    if not emu.wait(start) then return end
     for _, item in ipairs(sequence) do
         local key = assert(machine.ioport.ports[':COL.' .. item[1]].fields[item[2]])
         machine:logerror(string.format('8890_phonebook_physical: action=%s key=%s t=%.6f\n',
