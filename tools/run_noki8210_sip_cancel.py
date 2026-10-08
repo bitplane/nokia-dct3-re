@@ -33,11 +33,23 @@ def check_frames(directory):
                 raise ValueError('missing reviewed NSM-3 SIP cleanup frame: ' + name)
 
 
-def check_product_result(run):
+def check_product_result(run, restore_idle=False):
     text = (run / 'error.log').read_text(errors='replace')
     check_output(text)
     check_output((run / 'console.log').read_text(errors='replace'))
     verify_stage(text, runtime=True, selftest=True, base_record=True)
+    if restore_idle:
+        from tools.noki8210_state_check import verify as verify_state, check_frames as check_state_frames
+        verify_state(text, sip_cancel=True)
+        check_state_frames(run / 'snap', sip_cancel=True)
+        restored = text.find('state_roundtrip: result=pass scenario=8210_idle')
+        paging = text.find('gsm_call_adapter: incoming state id=1 epoch=')
+        if restored < 0 or paging <= restored:
+            raise ValueError('incoming SIP call did not follow exact idle restoration')
+        if re.search(r'gsm_call_adapter: (?:incoming state id=|request id=)', text[:restored]):
+            raise ValueError('external host call existed before idle restoration')
+        if json.loads((run / 'sip-result.json').read_text()).get('epoch') != 2:
+            raise ValueError('idle restore did not establish a fresh host epoch')
     verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes(), configured_carrier=True)
     if not re.search(r'gsm_call_adapter: network registered=1 arfcn=4\b', text):
         raise ValueError('NSM-3 host registration lacks own laboratory carrier')
@@ -64,6 +76,8 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--pjsua', type=Path, required=True)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--restore-idle', action='store_true',
+                        help='restore registered handset idle before admitting the fresh SIP call')
     parser.add_argument('--http-port', type=int, default=18821)
     parser.add_argument('--sip-port', type=int, default=25821)
     args = parser.parse_args()
@@ -77,8 +91,12 @@ def main():
                    '-rompath', str(root / 'roms'), '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki8210_sip_cancel_observe.lua'),
-                   '-snapshot_directory', str(run / 'snap'), '-seconds_to_run', '57',
+                   '-autoboot_script', str(root / 'tools' / (
+                       'noki8210_sip_idle_restore.lua' if args.restore_idle else
+                       'noki8210_sip_cancel_observe.lua')),
+                   '-state_directory', str(run / 'sta'),
+                   '-snapshot_directory', str(run / 'snap'), '-seconds_to_run',
+                   '60' if args.restore_idle else '57',
                    '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
@@ -90,7 +108,7 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        check_product_result(run)
+        check_product_result(run, args.restore_idle)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsm3hle', 'scenario': 'incoming-sip-cancel',
             'mcu_sha1': MCU_SHA1, 'acquired_pmm_sha256': PMM_SHA256,
@@ -98,6 +116,7 @@ def main():
             'native_dsp_complete': False, 'speech_tested': False,
             'factory_provisioning_validated': False,
             'laboratory_carrier': 4,
+            'idle_restored': args.restore_idle,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

@@ -19,6 +19,19 @@ state_replay: phase=restored event=end t=33.000000000
 
 
 class Nokia8210StateTest(unittest.TestCase):
+    def test_sip_idle_continuation_requires_decoded_exit_after_replay(self):
+        sip = GOOD.replace('8210_state_physical: key=Menu\n8210_keypad_decoded: key=19',
+                           '8210_sip_cancel: physical Exit\n8210_keypad_decoded: key=1a')
+        verify(sip, sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'notification dismissal'):
+            verify(GOOD, sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'notification dismissal'):
+            verify(sip.replace('key=1a', 'key=19'), sip_cancel=True)
+        with self.assertRaisesRegex(ValueError, 'idle save'):
+            verify(sip, sip_cancel=True, call=True)
+        with self.assertRaisesRegex(ValueError, 'architectural state'):
+            verify(sip.replace('restored pc=0000001c', 'restored pc=00000020'), sip_cancel=True)
+
     def test_sms_requires_storage_and_delivered_save_boundary(self):
         with self.assertRaisesRegex(ValueError, 'persistent SIM storage'):
             verify(GOOD, sms=True)

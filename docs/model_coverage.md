@@ -114,6 +114,10 @@ INVITE/CANCEL/487, coherent ARFCN4 SCH/tuning/host registration, zero media,
 complete CC/RR release and physical missed-call dismissal to reviewed idle.
 It retains the labelled acquired base-record comparison; factory PMM and
 native speech are not promoted.
+`verify-8210-sip-idle-restore` additionally proves exact idle CPU/RAM/time,
+pixels and ordered protocol replay before a fresh epoch-2 unanswered SIP
+call with the same release and physical-cleanup requirements. No external
+dialog is saved or restored.
 
 The 6210 passes `verify-6210-power-cycle` with unchanged own PMM: physical
 shutdown, blank display, at least eight seconds of retained RTC ticks and

@@ -440,6 +440,17 @@ reports 1; they establish their documented signaling contracts but not this
 stronger carrier-coherence claim. This gate does not promote those gates,
 factory PMM validation, native resident DSP execution or speech/media.
 
+`verify-8210-sip-idle-restore` saves settled registered idle at 32 s and
+requires exact PC/SP/mapped-RAM checksum/time restoration, identical full
+idle pixels and nonempty ordered one-second radio/SIM replay. Only after
+that replay completes does the fixture publish a fresh readiness frame at
+35 s and admit one external SIP call under host epoch 2. The same coherent
+ARFCN4, CANCEL/487, zero-media, CC/RR, SIM-location and physical Exit checks
+remain mandatory. No external dialog is active at save or restored, and no
+SIP request may precede the successful idle restore. The ordinary idle gate
+retains its independent physical Menu/Messages continuation. Provisioning
+and native-speech limitations remain unchanged.
+
 `host-incoming-sms` and `host-outgoing-sms` independently use the same
 host-only configuration and fresh storage. The incoming host supplies
 GSM-7 `hello` from `5551234`; acceptance requires queued/delivered request

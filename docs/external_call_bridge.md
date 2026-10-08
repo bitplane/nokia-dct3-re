@@ -426,6 +426,13 @@ post-dismissal numeric `001 01` idle frame is reviewed separately from the
 initial `DCT3 LAB`; no name repaint is injected. Native DSP speech remains
 unproved.
 
+`verify-8210-sip-idle-restore` adds exact settled-idle architecture, time,
+pixels and nonempty one-second protocol replay before admitting a new
+epoch-2 SIP dialog. It retains the coherent ARFCN4 cell, declared base-record
+comparison, real CANCEL/487, zero-media and physical notification-dismissal
+requirements. No external call exists in the saved state and this gate does
+not claim restoration of a SIP dialog or native DSP speech.
+
 `verify-8850-sip-cancel` independently covers NSM-2 v5.31 research HLE
 with unchanged acquired MCU/PMM. Own physical security input settles the
 registered handset before INVITE at 32 seconds. Acceptance requires the

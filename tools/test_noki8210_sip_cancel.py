@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import re
 import tempfile
 import unittest
@@ -15,20 +16,42 @@ def sample():
 
 
 class SipCancelTest(unittest.TestCase):
-    def verify(self, text):
+    def verify(self, text, *, restore_idle=False, epoch=2):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)
             (run / 'error.log').write_text(text)
             (run / 'console.log').write_text('completed')
+            (run / 'sip-result.json').write_text(json.dumps({'epoch': epoch}))
             (run / 'nvram/nsm3hle').mkdir(parents=True)
             (run / 'nvram/nsm3hle/sim_card').write_bytes(b'card')
             with patch.object(check, 'verify_stage') as stage, \
                     patch.object(check, 'verify_registration') as registration, \
                     patch.object(check, 'INCOMING_SETUP', re.compile('SETUP caller=5551234')), \
-                    patch.object(check, 'check_frames'):
-                check.check_product_result(run)
+                    patch.object(check, 'check_frames'), \
+                    patch('tools.noki8210_state_check.verify') as state, \
+                    patch('tools.noki8210_state_check.check_frames') as frames:
+                check.check_product_result(run, restore_idle)
                 stage.assert_called_once_with(text, runtime=True, selftest=True, base_record=True)
                 registration.assert_called_once_with(text, b'card', configured_carrier=True)
+                if restore_idle:
+                    state.assert_called_once_with(text, sip_cancel=True)
+                    frames.assert_called_once_with(run / 'snap', sip_cancel=True)
+                else:
+                    state.assert_not_called()
+
+    def test_restored_idle_requires_fresh_epoch_after_restore(self):
+        restored = 'state_roundtrip: result=pass scenario=8210_idle\n'
+        paging = 'gsm_call_adapter: incoming state id=1 epoch=2 phase=paging\n'
+        text = restored + paging + sample()
+        self.verify(text, restore_idle=True)
+        for broken in (paging + restored + sample(), paging + sample()):
+            with self.assertRaisesRegex(ValueError, 'follow exact idle'):
+                self.verify(broken, restore_idle=True)
+        with self.assertRaisesRegex(ValueError, 'existed before idle'):
+            self.verify('gsm_call_adapter: request id=2 epoch=1 digits=123\n' + text,
+                        restore_idle=True)
+        with self.assertRaisesRegex(ValueError, 'fresh host epoch'):
+            self.verify(text, restore_idle=True, epoch=1)
 
     def test_declared_base_record_and_own_carrier_security_exit(self):
         self.verify(sample())

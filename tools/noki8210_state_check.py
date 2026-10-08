@@ -16,7 +16,9 @@ from tools.noki8210_incoming_sms_check import verify as verify_sms
 from tools.noki8210_incoming_sms_check import verify_frame as verify_sms_frame
 
 
-def verify(text, *, call=False, sms=False, storage=None):
+def verify(text, *, call=False, sms=False, storage=None, sip_cancel=False):
+    if sip_cancel and (call or sms):
+        raise ValueError('SIP cancellation continuation requires an idle save')
     if '[LUA ERROR]' in text or '8210_state: FAIL' in text:
         raise ValueError('state fixture did not complete')
     states = re.findall(r'8210_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
@@ -47,13 +49,21 @@ def verify(text, *, call=False, sms=False, storage=None):
                          r'8210_call_physical: action=end', text):
             raise ValueError('missing post-load physical call release')
         return
+    if sip_cancel:
+        if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
+                         r'8210_sip_cancel: physical Exit[\s\S]*'
+                         r'8210_keypad_decoded: key=1a\b', text):
+            raise ValueError('missing post-load physical SIP notification dismissal')
+        return
     if not re.search(r'state_replay: phase=restored event=end[\s\S]*'
                      r'8210_state_physical: key=Menu[\s\S]*'
                      r'8210_keypad_decoded: key=19\b', text):
         raise ValueError('missing post-load physical Menu input')
 
 
-def check_frames(directory, *, call=False, sms=False):
+def check_frames(directory, *, call=False, sms=False, sip_cancel=False):
+    if sip_cancel and (call or sms):
+        raise ValueError('SIP cancellation frames require an idle save')
     def read(name):
         with Image.open(directory / name) as source:
             if source.size != (84, 48):
@@ -74,7 +84,7 @@ def check_frames(directory, *, call=False, sms=False):
     if hashlib.sha256(operator.crop((15, 0, 69, 16)).tobytes()).hexdigest() != (
             '59b772b8dd4715490911ec43c4969b76a4cb57708473d2345b31f8e22fd77b7b'):
         raise ValueError('missing reviewed registered operator')
-    if not call and hashlib.sha256(read('8210_state_idle_menu.png').crop((0, 0, 72, 16)).tobytes()).hexdigest() != (
+    if not call and not sip_cancel and hashlib.sha256(read('8210_state_idle_menu.png').crop((0, 0, 72, 16)).tobytes()).hexdigest() != (
             '1e5c11fcea9aac5331e18c0070697e8795003d6de9a0250284b3d9605209e654'):
         raise ValueError('missing reviewed Messages menu')
 
