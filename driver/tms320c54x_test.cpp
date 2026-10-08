@@ -1948,6 +1948,59 @@ private:
 					((u64(1) << 40) - 5) &&
 					!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800),
 					"accumulator negate result and carry");
+			program.write_word(0x05e0, 0x75f8);
+			program.write_word(0x05e1, 0x0d00);
+			program.write_word(0x05e2, 0x0124);
+			program.write_word(0x05e3, 0xf684); // NEG B,A.
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xfffffffffeULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 9100;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 9100 && m_phase <= 9107)
+		{
+			const unsigned index = m_phase - 9100;
+			const bool b = BIT(index, 0);
+			const u64 source = index < 2 ? 0xfffffffffeULL : index < 4 ? 0 : 0xff80000000ULL;
+			const u64 result = index < 2 ? 2 : index < 4 ? 0 : index < 6 ? 0x80000000 : 0x7fffffff;
+			const u16 st0 = index < 2 ? 0x1000 : index < 4 ? 0x1800 : b ? 0x1200 : 0x1400;
+			const u16 st1 = index < 6 ? 0x0100 : 0x0300;
+			expect_opcode(b ? 0xf784 : 0xf684,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0x12345678 : result) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? result : source) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == st0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 NEG B selects A/B destination, preserves unrelated accumulator/TC, sets carry only for zero and obeys destination overflow/OVM in one cycle");
+			if (index < 7)
+			{
+				const unsigned next = index + 1;
+				program.write_word(0x05e3, BIT(next, 0) ? 0xf784 : 0xf684);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next < 2 ? 0xfffffffffeULL : next < 4 ? 0 : 0xff80000000ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, next < 6 ? 0x0100 : 0x0300);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 3);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
 			program.write_word(0x0448, 0xf4e3); // CALA A
 			program.write_word(0x0449, 0xf5e1);
 			program.write_word(0x0450, 0x76f8);
@@ -5984,6 +6037,35 @@ private:
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e11 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 MVDD wraps source AR2 and increments destination AR3 in one cycle");
+			program.write_word(0x05e2, 0xe5e9); // MVDD *AR4+0%,*AR3+.
+			data.write_word(0x0e04, 0x1357);
+			data.write_word(0x0e12, 0);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x0e04);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0e12);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x87654321);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6584;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6584)
+		{
+			expect_opcode(0xe5e9,
+				data.read_word(0x0e12) == 0x1357 && data.read_word(0x0e04) == 0x1357 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR4) == 0x0e00 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0e13 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0e00 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x87654321 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 MVDD reads old AR4 before circular wrap and increments AR3 independently while preserving source/accumulators/status in one cycle");
 			program.write_word(0x05e0, 0x75d6);
 			program.write_word(0x05e1, 0x0124);
 			program.write_word(0x05e2, 0xf0f8); // SFTL A,-8
