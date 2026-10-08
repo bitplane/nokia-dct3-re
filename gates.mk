@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 541 gates: 381 generated from typed steps, 160 copied verbatim (shell).
+# 542 gates: 382 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -60,21 +60,21 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-incoming-call verify-6210-incoming-sms \
 	verify-6210-host-incoming-sms verify-6210-host-outgoing-sms \
 	verify-6210-host-rejected-sms verify-6210-host-silent-sms \
-	verify-6210-outgoing-sms verify-6210-accessory verify-6210-state-idle \
-	verify-6210-state-call verify-6210-state-sms verify-6210-sim-toolkit \
-	verify-6210-security verify-6210-slow-pin-registration \
-	verify-6210-pin-host-incoming-call verify-6210-pin-host-incoming-sms \
-	verify-6210-pin-host-outgoing-call verify-6210-pin-host-outgoing-sms \
-	verify-6210-pin-phonebook verify-6210-pin-host-rejected-sms \
-	verify-6210-pin-host-silent-sms verify-6210-pin-state-idle \
-	verify-6210-pin-state-call verify-6210-pin-state-sms verify-6210-registration \
-	verify-6210-calculator verify-6210-phonebook verify-6210-menu \
-	verify-8210-call-divert verify-8210-ussd verify-8210-dcs-registration \
-	verify-8210-dcs-idle-state verify-8210-dcs-incoming-sms \
-	verify-8210-dcs-sms-state verify-8210-dcs-outgoing-sms \
-	verify-8210-dcs-outgoing-call verify-8210-dcs-call-state \
-	verify-8210-dcs-incoming-call verify-8210-dcs-phonebook \
-	verify-8210-slow-pin-registration \
+	verify-6210-outgoing-sms verify-6210-accessory verify-6210-cold-repeat \
+	verify-6210-state-idle verify-6210-state-call verify-6210-state-sms \
+	verify-6210-sim-toolkit verify-6210-security \
+	verify-6210-slow-pin-registration verify-6210-pin-host-incoming-call \
+	verify-6210-pin-host-incoming-sms verify-6210-pin-host-outgoing-call \
+	verify-6210-pin-host-outgoing-sms verify-6210-pin-phonebook \
+	verify-6210-pin-host-rejected-sms verify-6210-pin-host-silent-sms \
+	verify-6210-pin-state-idle verify-6210-pin-state-call \
+	verify-6210-pin-state-sms verify-6210-registration verify-6210-calculator \
+	verify-6210-phonebook verify-6210-menu verify-8210-call-divert \
+	verify-8210-ussd verify-8210-dcs-registration verify-8210-dcs-idle-state \
+	verify-8210-dcs-incoming-sms verify-8210-dcs-sms-state \
+	verify-8210-dcs-outgoing-sms verify-8210-dcs-outgoing-call \
+	verify-8210-dcs-call-state verify-8210-dcs-incoming-call \
+	verify-8210-dcs-phonebook verify-8210-slow-pin-registration \
 	verify-8210-dcs-early-pin-host-incoming-call \
 	verify-8210-dcs-host-incoming-sms verify-8210-dcs-early-pin-host-incoming-sms \
 	verify-8210-dcs-host-outgoing-sms verify-8210-dcs-early-pin-host-outgoing-sms \
@@ -480,6 +480,11 @@ verify-6210-outgoing-sms: build
 
 verify-6210-accessory: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario accessory --mame $(MAME_DIR)/mame
+
+verify-6210-cold-repeat: build
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR)/first --scenario accessory --mame $(MAME_DIR)/mame
+	$(VENV)/bin/python tools/run_noki6210_acceptance.py $(RUN_DIR)/second --scenario accessory --mame $(MAME_DIR)/mame
+	$(VENV)/bin/python tools/noki6210_cold_repeat_check.py $(RUN_DIR)/first $(RUN_DIR)/second
 
 verify-6210-state-idle: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario state-idle --mame $(MAME_DIR)/mame

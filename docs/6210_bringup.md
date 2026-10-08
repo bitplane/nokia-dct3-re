@@ -494,6 +494,8 @@ call/SMS save-load continuation, pass with this profile.
 
 Two independently fresh accessory scenarios also reproduce identical selected
 protocol traces, CCONT/flash/SIM persisted bytes and registered-idle/Menu pixels.
+`make verify-6210-cold-repeat RUN_DIR=RUN` creates both fresh scenarios
+sequentially under `RUN/first` and `RUN/second` and requires their comparison.
 Compare accepted runs with
 `tools/noki6210_cold_repeat_check.py FIRST_RUN SECOND_RUN` using the project
 Python environment. The checker rejects a shared directory, unaccepted
