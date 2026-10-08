@@ -975,7 +975,7 @@ VERIFY `9804`; it is not evidence about registration recovery.
 Reproduce the valid control with
 `tools/run_noki8210_acceptance.py RUN --pin-enabled --dcs1800 --pin-start 7`.
 The option affects physical input only, is restricted to PIN registration,
-incoming-call, host call/SMS or idle/call/SMS restoration fixtures,
+incoming-call, host call/SMS, phonebook or idle/call/SMS restoration fixtures,
 and is recorded in successful run manifests. Next decode recovery when
 `03ec` arrives after the serving acknowledgement, rather than adjust peer
 latency or choose an earlier default input.
@@ -1005,6 +1005,13 @@ ordered protocol replay, reviewed pixels and physical Menu/End/Read
 continuation. Standard targets are `verify-8210-dcs-early-pin-state-idle`,
 `verify-8210-dcs-early-pin-state-call` and
 `verify-8210-dcs-early-pin-state-sms`. These do not establish late-PIN recovery.
+Early-PIN DCS contact persistence separately passes a two-process Save and
+cold readback (`run_8210_early_pin_dcs_phonebook_01`). Both processes require
+own-ROM/base-record boot and authentication. The cold process also requires
+own carrier-823 registration, unchanged persisted SIM bytes, the retained
+EF_LOCI in its location-update request with DCS capability `30`, no invalidation
+write, and reviewed contact pixels after physical Search/Detail.
+Use `verify-8210-dcs-early-pin-phonebook` with a fresh `RUN_DIR`.
 Paired `run_8210_pin_dcs_{late,early}_queue_result_01` confirms the late
 request is not lost: `21f5aa` calls `2a1eaa`, which copies `03ec` into
 context `+0c`. Both physical timings then return 4 from the argument-3

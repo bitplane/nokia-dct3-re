@@ -131,11 +131,11 @@ def main():
                         help='test registration or supported no-PIN scenarios on DCS1800 carriers 823/824')
     args = parser.parse_args()
     if args.pin_start is not None and (
-            not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms', 'idle-state', 'call-state', 'sms-state') or
+            not args.pin_enabled or args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms', 'idle-state', 'call-state', 'sms-state', 'phonebook') or
             not math.isfinite(args.pin_start) or not 3.5 <= args.pin_start <= 20):
         parser.error('--pin-start requires a supported PIN fixture and a time between 3.5 and 20 seconds')
     if args.dcs1800 and (args.scenario not in ('registration', 'idle-state', 'incoming-sms', 'host-incoming-sms', 'outgoing-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'sms-state', 'outgoing-call', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'call-state', 'phonebook') or
-                        (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms', 'idle-state', 'call-state', 'sms-state') and args.pin_enabled)):
+                        (args.scenario not in ('registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call', 'host-incoming-sms', 'host-outgoing-sms', 'idle-state', 'call-state', 'sms-state', 'phonebook') and args.pin_enabled)):
         parser.error('--dcs1800 requires registration, incoming-call or a supported no-PIN scenario')
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
@@ -269,8 +269,10 @@ def main():
                     raise ValueError('PIN phonebook readback changed persisted SIM bytes')
                 check_security(cold_text, cold_card, 'verify', '1234')
                 verify_stage(cold_text, runtime=True, selftest=True, base_record=True)
-                verify_registration(cold_text, cold_card, configured_carrier=True)
-                retained = 'data=0080013f4905087200f110000133080910101032547698'
+                verify_registration(cold_text, cold_card, configured_carrier=not args.dcs1800,
+                                    dcs1800=args.dcs1800)
+                capability = '30' if args.dcs1800 else '33'
+                retained = f'data=0080013f4905087200f1100001{capability}080910101032547698'
                 read = cold_text.find('read-binary fid=6f7e offset=0 length=11')
                 request = cold_text.find(retained)
                 if read < 0 or request < read or 'update-binary fid=6f7e offset=10 length=1' in cold_text:

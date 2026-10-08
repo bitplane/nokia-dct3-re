@@ -29,7 +29,7 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                         ['--pin-enabled', '--pin-start', 'nan'],
                         ['--pin-enabled', '--pin-start', '2'],
                         ['--pin-enabled', '--pin-start', '21'],
-                        ['--pin-enabled', '--pin-start', '4', '--scenario', 'phonebook']):
+                        ['--pin-enabled', '--pin-start', '4', '--scenario', 'calculator']):
             with self.subTest(options=options), \
                     patch('sys.argv', ['runner', 'unused'] + options), \
                     patch('sys.stderr', new_callable=io.StringIO), \
@@ -190,8 +190,8 @@ class IsolatedAcceptanceTest(unittest.TestCase):
                 self.assertRaisesRegex(RuntimeError, 'admitted'):
             runner.main()
 
-    def test_dcs_phonebook_does_not_claim_pin_coverage(self):
-        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'phonebook', '--pin-enabled']), \
+    def test_dcs_local_outgoing_sms_does_not_claim_pin_coverage(self):
+        with patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario', 'outgoing-sms', '--pin-enabled']), \
                 patch('sys.stderr', new_callable=io.StringIO), \
                 patch.object(runner, 'prepare_run') as prepare, \
                 self.assertRaises(SystemExit) as error:
@@ -200,7 +200,7 @@ class IsolatedAcceptanceTest(unittest.TestCase):
         prepare.assert_not_called()
 
     def test_dcs_state_scenarios_admit_early_pin(self):
-        for scenario in ('idle-state', 'call-state', 'sms-state'):
+        for scenario in ('idle-state', 'call-state', 'sms-state', 'phonebook'):
             with self.subTest(scenario=scenario), \
                     patch('sys.argv', ['runner', 'unused', '--dcs1800', '--scenario',
                                        scenario, '--pin-enabled', '--pin-start', '7']), \
