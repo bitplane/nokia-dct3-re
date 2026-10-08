@@ -507,6 +507,28 @@ switches were removed. Recover NPE-3's own PCM clock/framing and COBBA route
 before configuring that link; do not fabricate uplink or inherit a sibling
 bus profile without evidence.
 
+Primary board evidence is retained in the ignored ROM research collection:
+`roms/research/npe3/npe3-system-module.pdf`, Nokia NPE-3 System Module,
+PAMS Technical Documentation, issue 1 (09/00), acquired from
+[the service-manual mirror](https://www.eserviceinfo.com/downloadsm/231281/NOKIA_sysmod.html).
+SHA256: `acaf85590cee30a1c8640f7411adf41f14fadf3de58cadb74e92be4d8d506d2e`.
+Printed page 24, table 8 identifies COBBA-GJP EARP/EARN outputs and
+MIC2P/MIC2N connections at system-connector pins 6/7. This establishes
+physical audio connections, not the selected internal microphone route,
+PCM word format or frame/data clocks. The document's 13 MHz RFI clock and
+3.25 MHz RF serial rates describe other interfaces and must not be used
+as PCM configuration. Those bus details remain unresolved.
+
+The acquired NPE-3 SD4 V19 schematic (version 1.0, 09.02.2001), sheet
+3/11, identifies N240 as `COBBA_GJP_V4.1`. Its explicit PCM net mapping is
+`PCM(0)` -> PCMTx/B5, `PCM(1)` -> PCMDCLK/C6,
+`PCM(2)` -> PCMSCLK/C5 and `PCM(3)` -> PCMRx/D5.
+This corroborates separate data/sync clocks and bidirectional serial data,
+but supplies neither clock rates nor edge/word format. The waveform on that
+sheet is attached to J200/COBBACLK (RFICLK), not PCMDCLK: it is not a PCM
+timing capture. Source: `roms/research/npe3/npe3-schematics-v1.pdf`, SHA256
+`559e9718a9dad703694f17d349383f75af4237b1c26cf94ecdb4aafe641f1e43`.
+
 `verify-6210-sip-outgoing-unavailable` independently passes against actual
 PJSIP 480, requiring cause 18, complete CC/RR release, zero media and exact
 registered-idle recovery with the same physical number and own-PMM checks.
