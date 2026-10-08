@@ -1083,6 +1083,24 @@ field's clock semantics. The NSE-5 single-sector journal parser is not an
 established NSB-6 contract; no clock field, checksum or validity flag
 should be changed from these observations alone.
 
+The restored block belongs to context `0x137410`: NV data occupy `+10..+1b`.
+Original initializer `0x2dff5c` consumes the restored alarm deadline at `+14`
+and snapshot bytes at `+18/+19/+1a`. Its helpers `0x2fd32e`, `0x2fd3f2`
+and `0x2fd370` read the upper CCONT IRQ mask, hardware alarm seconds-of-day,
+and physical register `0x0d`, respectively. These are descriptor-derived
+physical registers, not identical logical descriptor indices. Disabled
+deadline `7fffffff` expects hardware alarm scalar `0x1a5e0` (hour 30,
+minute zero). The physical clock-entry run actually programs alarm `00/1e`
+and IRQ mask `50`; its saved register-`0x0d` snapshot is `0b`.
+On cold boot the restored snapshot is `0b/05/aa`, but these controller
+fields reset. The initializer consequently stores state `34` at `0x137414`
+and enters `0x2e0124` reinitialization. Time getter `0x2dfc28` requires
+state `2a`; state `34` takes its invalid-time result. Thus counter-only
+CCONT persistence is insufficient for the firmware's retained-clock
+validation contract. The next correction belongs to the controller's
+retained alarm/control/mask domain, with fresh defaults and legacy counter
+storage migration tested separately; no application-state override is needed.
+
 `verify-8890-power-cycle` covers the distinct in-process physical lifecycle.
 Its fresh private runner pins own MCU/PMM and the configured ARFCN60 cell,
 physically enters security/time/date, holds Power for four seconds, observes
