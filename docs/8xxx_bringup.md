@@ -1139,6 +1139,15 @@ both bands; speech/media remains unproved.
 
 ### 8890 PCS1900 Acquisition Contract
 
+`verify-8890-pin-pcs-registration` independently covers physical PIN `1234`
+and PCS registration after VERIFY acceptance. The handset's GSM scan is
+empty; its subsequent `55:04080000` receives 600/601, with the same response
+object reaching own parser `2809fc` as ARFCN `0258`/RSSI `c3`. Acceptance
+requires the complete existing PCS scan/SI1/channel/EF_LOCI/release contract,
+not the GSM900 type-57 response. No additional peer behavior is selected.
+The no-PIN PCS composition also passes. Authenticated PCS calls, SMS and
+restoration require separate gates and are not inherited.
+
 Current result: fresh own PMM reaches PCS1900 registration on ARFCN 600,
 writes EF_LOCI, acknowledges release and returns to paging. This uses the
 explicit runtime research HLE, not a completed native DSP. The handset

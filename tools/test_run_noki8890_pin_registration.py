@@ -36,6 +36,15 @@ class PinRegistrationTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'consumer correlation'):
             check_pin_inputs(self.fixture().replace('parse: object=001168e8', 'parse: object=001168ec'))
 
+    def test_pcs_own_response(self):
+        text = self.fixture().replace('type=57', 'type=55').replace('01140000', '04080000')
+        text = text.replace('0010003c00c4', '0010025800c3025900b9').replace('003c rssi=c4', '0258 rssi=c3')
+        check_pin_inputs(text, gsm900_measurements=False)
+
+    def test_gsm_response_is_not_pcs_evidence(self):
+        with self.assertRaisesRegex(ValueError, 'PCS measurement'):
+            check_pin_inputs(self.fixture(), gsm900_measurements=False)
+
 
 if __name__ == '__main__':
     unittest.main()

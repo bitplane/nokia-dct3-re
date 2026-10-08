@@ -18,7 +18,7 @@ from tools.noki8890_staged_check import verify as verify_stage
 from tools.noki8890_registration_check import verify as verify_registration
 
 
-def check_pin_inputs(text):
+def check_pin_inputs(text, *, gsm900_measurements=True):
     position = 0
     for key, code in (('Keypad 1', '01'), ('Keypad 2', '02'),
                       ('Keypad 3', '03'), ('Keypad 4', '04'), ('Menu', '19')):
@@ -30,11 +30,17 @@ def check_pin_inputs(text):
     if not re.search(r'SIM status ins=20 sw=9000.*?'
                      r'LAPDm Location Updating Accept acknowledged nr=1', text[position:], re.S):
         raise ValueError('registration did not follow physical PIN acceptance')
-    if not re.search(r'TX packet type=57 payload=4 .*data=01140000.*?'
+    if gsm900_measurements and not re.search(r'TX packet type=57 payload=4 .*data=01140000.*?'
                      r'RX enqueue type=8b payload=166 .*data=0010003c00c4.*?'
                      r'8890_band_rx: object=([0-9a-f]+).*?'
                      r'8890_band_parse: object=\1 arfcn=003c rssi=c4', text, re.S):
         raise ValueError('missing own late measurement response/consumer correlation')
+    if not gsm900_measurements and not re.search(
+            r'TX packet type=55 payload=4 .*data=04080000.*?'
+            r'RX enqueue type=8b payload=166 .*data=0010025800c3025900b9.*?'
+            r'8890_band_rx: object=([0-9a-f]+).*?'
+            r'8890_band_parse: object=\1 arfcn=0258 rssi=c3', text, re.S):
+        raise ValueError('missing own PCS measurement response/consumer correlation')
 
 
 def main():
@@ -42,6 +48,7 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--without-pin', action='store_true')
+    parser.add_argument('--pcs1900', action='store_true', help='independent PCS registration only')
     parser.add_argument('--scenario', choices=('registration', 'host-incoming-call', 'host-incoming-sms',
                                               'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
                                               'idle-state', 'call-state', 'sms-state'), default='registration')
@@ -51,12 +58,15 @@ def main():
     run = args.run_directory.resolve()
     profile = PROFILES['8890']
     try:
+        if args.pcs1900 and args.scenario != 'registration':
+            raise ValueError('PCS downstream scenarios require separate acceptance coverage')
         roms = root / 'roms/noki8890'
         verify_inputs('8890', (roms / profile[1]).read_bytes(), (roms / profile[3]).read_bytes())
         run.mkdir(parents=True, exist_ok=False)
         for directory in ('cfg', 'nvram/nsb6hle', 'snap', 'sta'):
             (run / directory).mkdir(parents=True)
-        shutil.copyfile(root / 'fixtures/noki8890_host/nsb6hle.cfg', run / 'cfg/nsb6hle.cfg')
+        shutil.copyfile(root / ('fixtures/noki8890_pcs1900/nsb6hle.cfg' if args.pcs1900 else
+                               'fixtures/noki8890_host/nsb6hle.cfg'), run / 'cfg/nsb6hle.cfg')
         state = args.scenario.endswith('-state')
         if state:
             configuration = ET.parse(run / 'cfg/nsb6hle.cfg')
@@ -109,9 +119,9 @@ def main():
         text = (run / 'error.log').read_text(errors='replace')
         if not args.without_pin:
             validate(text, card.read_bytes(), 'verify', '1234')
-            check_pin_inputs(text)
+            check_pin_inputs(text, gsm900_measurements=not args.pcs1900)
         verify_stage(text, runtime=True, selftest=True)
-        verify_registration(text, configured_gsm900=True)
+        verify_registration(text, configured_gsm900=not args.pcs1900, pcs1900=args.pcs1900)
         if state:
             from tools.noki8890_state_check import verify, check_frames
             call = args.scenario == 'call-state'
@@ -176,6 +186,7 @@ def main():
             'provisioning': 'own acquired PMM unchanged', 'command': command,
             'native_dsp_complete': False, 'speech_tested': False, 'result': 'pass',
             'scenario': args.scenario, 'host_command': host_command,
+            'band': 'PCS1900' if args.pcs1900 else 'GSM900',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8890 PIN registration FAIL: {error}\n')
