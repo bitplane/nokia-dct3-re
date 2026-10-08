@@ -372,6 +372,19 @@ recover the own-ROM `8b` routing and subscription contract next. The
 independent NHM-2 type-57 alias falsification is corroborating negative
 knowledge, not proof that every NHM-3 response has the same outcome.
 
+The own-ROM RX dispatch at `504572` subtracts `80`, then `03`, and
+indexes the thirteen-entry big-endian table at `504598` for types
+`83..8f`. Entry `8b` is `5045ec`, which calls `4649ac` (not the adjacent
+`8a` handler `4646c0`). Handler `4649ac` reads byte `1721e0` through
+literal pool `464a1c`: only value 1 forwards the existing envelope to
+task 14 through `3c348c`; other values free it through `3c3c34`.
+This is a delivery prerequisite, not evidence that the rejected response
+was valid or that this flag was zero during that experiment. The next
+question is who owns this flag and its value when late-PIN recovery runs.
+A passive fresh no-PIN comparison through 16 s observes `1802` envelopes
+of classes `80/83/84/89/8f` reaching task 14, but no `8b` post. Absence of
+an `8b` post in this comparison alone does not identify its cause.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
