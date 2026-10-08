@@ -94,7 +94,8 @@ def main():
     args = parser.parse_args()
     if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
                                                  'host-incoming-sms', 'host-outgoing-call',
-                                                 'host-outgoing-sms', 'phonebook'):
+                                                 'host-outgoing-sms', 'phonebook',
+                                                 'idle-state', 'call-state', 'sms-state'):
         parser.error('--pin-enabled requires registration or a supported host service')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -207,6 +208,10 @@ def main():
                      '--frame', str(run / 'snap/8210_phonebook_read_contact.png')]
         elif args.scenario in ('idle-state', 'call-state', 'sms-state'):
             check.append(str(run / 'snap'))
+            if args.pin_enabled:
+                check.append('--configured-carrier')
+                verify_registration(pin_text, (run / 'nvram/nsm3hle/sim_card').read_bytes(),
+                                    configured_carrier=True)
             if args.scenario == 'call-state':
                 check.append('--call')
             elif args.scenario == 'sms-state':

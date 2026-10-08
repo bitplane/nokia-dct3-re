@@ -44,6 +44,9 @@ CC/RR or CP/RP completion after authentication.
 `verify-8210-pin-phonebook` separately proves save, new-process authentication,
 retained-location registration and exact contact readback with unchanged
 persisted card bytes.
+The three `verify-8210-pin-state-*` gates independently verify authenticated
+idle/call/SMS restoration, exact architecture/protocol/pixels and post-load
+physical Menu, call release or SMS reading.
 
 The 6210's `verify-6210-slow-pin-registration` additionally verifies physical
 late PIN acceptance followed by registration and persisted EF_LOCI on the

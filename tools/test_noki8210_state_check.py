@@ -56,6 +56,16 @@ class Nokia8210StateTest(unittest.TestCase):
             verify('GSM service uplink sapi=0 pd=03 message=0f length=2 data=030f\n' + call,
                    call=True)
 
+    def test_call_forwards_explicit_carrier_without_weakening_state_checks(self):
+        call = ('GSM service uplink sapi=0 pd=03 message=0f length=2 data=030f\n' +
+                GOOD + '8210_call_physical: action=end\n')
+        with patch('tools.noki8210_state_check.verify_call') as check_call:
+            verify(call, call=True, configured_carrier=True)
+            check_call.assert_called_once_with(call, configured_carrier=True)
+        with self.assertRaisesRegex(ValueError, 'architectural state'):
+            verify(call.replace('restored pc=0000001c', 'restored pc=00000020'),
+                   call=True, configured_carrier=True)
+
     def test_call_requires_post_load_release(self):
         call = 'GSM service uplink sapi=0 pd=03 message=0f length=2 data=030f\n' + GOOD
         with patch('tools.noki8210_state_check.verify_call'):

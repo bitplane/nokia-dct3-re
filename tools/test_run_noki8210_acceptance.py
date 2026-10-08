@@ -11,7 +11,8 @@ from tools import run_noki8210_acceptance as runner
 class IsolatedAcceptanceTest(unittest.TestCase):
     def test_pin_service_fixtures_are_explicitly_admitted(self):
         for scenario in ('host-incoming-call', 'host-incoming-sms',
-                         'host-outgoing-call', 'host-outgoing-sms', 'phonebook'):
+                         'host-outgoing-call', 'host-outgoing-sms', 'phonebook',
+                         'idle-state', 'call-state', 'sms-state'):
             with self.subTest(scenario=scenario), \
                     patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--pin-enabled']), \
                     patch.object(runner.Path, 'read_bytes', return_value=b''), \

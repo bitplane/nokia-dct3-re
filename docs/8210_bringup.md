@@ -296,6 +296,15 @@ retained-LAI registration without rewriting valid location status, and the
 exact reviewed `Number: 123` image. The same image check also protects the
 ordinary no-PIN save/readback gate.
 
+The `verify-8210-pin-state-idle`, `-call` and `-sms` gates independently
+restore authenticated sessions. They require exact CPU/RAM/emulated-time,
+matched protocol replay and identical saved/restored pixels. Physical Menu,
+End or Read must work after load; the call gate requires an established-call
+save boundary and registered idle after release, while SMS checks delivered
+storage before save and persistent read status afterward. Enabled CHV1/PIN
+and exactly one successful startup VERIFY are retained. Native DSP restoration
+is outside these research-HLE gates.
+
 The own ring dispatcher at `0x306fa6` selects the thirteen-entry
 `0x83..0x8f` table at `0x306fd4`. Type `8b` calls `0x2df484`, which posts
 to task 12 through `0x28845c`. Type `89` calls `0x2df210`; instructions

@@ -16,7 +16,8 @@ from tools.noki8210_incoming_sms_check import verify as verify_sms
 from tools.noki8210_incoming_sms_check import verify_frame as verify_sms_frame
 
 
-def verify(text, *, call=False, sms=False, storage=None, sip_cancel=False):
+def verify(text, *, call=False, sms=False, storage=None, sip_cancel=False,
+           configured_carrier=False):
     if sip_cancel and (call or sms):
         raise ValueError('SIP cancellation continuation requires an idle save')
     if '[LUA ERROR]' in text or '8210_state: FAIL' in text:
@@ -41,7 +42,7 @@ def verify(text, *, call=False, sms=False, storage=None, sip_cancel=False):
             raise ValueError('missing post-load physical SMS read')
         return
     if call:
-        verify_call(text)
+        verify_call(text, configured_carrier=configured_carrier)
         before_save = text.split('8210_state: event=saved', 1)[0]
         if not CONNECT_ACKNOWLEDGE.search(before_save) or DISCONNECT.search(before_save):
             raise ValueError('save was not inside an established active call')
@@ -97,10 +98,12 @@ if __name__ == '__main__':
     scenario.add_argument('--call', action='store_true')
     scenario.add_argument('--sms', action='store_true')
     parser.add_argument('--storage', type=Path)
+    parser.add_argument('--configured-carrier', action='store_true')
     args = parser.parse_args()
     try:
         verify(args.log.read_text(errors='replace'), call=args.call, sms=args.sms,
-               storage=args.storage.read_bytes() if args.storage else None)
+               storage=args.storage.read_bytes() if args.storage else None,
+               configured_carrier=args.configured_carrier)
         check_frames(args.frames, call=args.call, sms=args.sms)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 restoration FAIL: {error}\n')
