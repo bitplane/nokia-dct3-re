@@ -25,10 +25,12 @@ and PCMSClk at 8 kHz (PCMDClk / 125). The inspected timing diagram shows
 a one-data-clock active-high sync pulse, MSB-first 16-bit words with bits
 15..13 extending the sign of the 13-bit sample, and data transitions at
 rising clock edges (falling-edge sampling). This closes the product's PCM
-specification gap, not working speech: the runtime profile has not yet been
-configured from it, and own speech-request selection and active microphone/
-output routing still require evidence. No audio acceptance follows from
-the diagram alone.
+specification gap, not working speech. The product configuration now records
+those independently evidenced bus fields. A fresh rebuilt physical
+outgoing-call gate (`run_8210_pcm_profile_regression`) preserves own-number
+dialing and CC/RR release. Own speech-request selection and active microphone/
+output routing still require evidence; this signaling regression is not an
+audio acceptance test.
 
 The primary-authored PDF is acquired from
 [the service-manual mirror](https://www.eserviceinfo.com/downloadsm/228901/NOKIA_03sys.html)

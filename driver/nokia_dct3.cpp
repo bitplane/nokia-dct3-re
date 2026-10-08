@@ -1026,6 +1026,16 @@ constexpr nokia_product_config make_8210_config()
 {
 	nokia_product_config result = make_conservative_config({ 4, 0x10 });
 	result.gensio_wiring = GENSIO_NSM3;
+	// NSM-3 System Module issue 1 12/1999, page 24 independently defines
+	// COBBA-GJP's 1 MHz/8 kHz serial bus and sign-extended 13-in-16 word.
+	// This does not select a speech request, analogue route or codec gain.
+	result.cobba_pcm.data_clock = 1'000'000;
+	result.cobba_pcm.frame_clock = 8'000;
+	result.cobba_pcm.sample_bits = 13;
+	result.cobba_pcm.sync_clocks = 1;
+	result.cobba_pcm.word_clocks = 16;
+	result.cobba_pcm.msb_first = true;
+	result.cobba_pcm.data_edge = nokia_mad2_pcm_device::clock_edge::falling;
 	// The stock package selects this same MCU for ROM5 and ROM6. Model the
 	// latter: 0x2cad46 accepts 6 in the parked silicon-identity cell before
 	// alternating ownership handoffs. Final verification stays unmodelled.
