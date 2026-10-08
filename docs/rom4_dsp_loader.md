@@ -890,11 +890,15 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 585 are asserted, none execute without an
-assertion, and nine are absent. The independent RF-boundary checker
+Against the executable fixture, 590 are asserted, none execute without an
+assertion, and four are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
 include `5086` at first PC `0af6`, `f3e6` at `403d`, and `f640` at `4047`.
+Exact `f677`, `f762`, `f767`, `f77c` and `f77e` check B-source shifts by
+-9, +2, +7, -4 and -2, including cross-accumulator destination selection,
+SXM clear/set right shifts, shifted-out carry, preserved TC/unrelated
+accumulator/ST1 and one-cycle execution.
 Exact `f462`, `f47c`, `f47e` and `f57a` check A-source shifts by +2, -4,
 -2 and -6, including cross-accumulator destination selection, SXM clear/set
 right shifts, shifted-out carry, preserved TC/unrelated accumulator/ST1 and

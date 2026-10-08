@@ -12929,7 +12929,7 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583) || (m_phase >= 9232 && m_phase <= 9238))
+		if ((m_phase >= 543 && m_phase <= 547) || (m_phase >= 6576 && m_phase <= 6583) || (m_phase >= 9232 && m_phase <= 9246))
 		{
 			struct shift_case { u16 opcode; u64 a_before; u64 b_before; u64 a_after; u64 b_after; u16 st0_before; u16 st0_after; u16 st1 = 0x0100; };
 			static constexpr shift_case cases[] = {
@@ -12952,7 +12952,15 @@ private:
 				{ 0xf47e, 0xff80000002ULL, 0x1234, 0xffe0000000ULL, 0x1234, 0x1000, 0x1800 },
 				{ 0xf47e, 0xff80000002ULL, 0x1234, 0x3fe0000000ULL, 0x1234, 0x1000, 0x1800, 0 },
 				{ 0xf57a, 0xff80000020ULL, 0x1234, 0xff80000020ULL, 0xfffe000000ULL, 0x1000, 0x1800 },
-				{ 0xf57a, 0xff80000020ULL, 0x1234, 0xff80000020ULL, 0x03fe000000ULL, 0x1000, 0x1800, 0 }
+				{ 0xf57a, 0xff80000020ULL, 0x1234, 0xff80000020ULL, 0x03fe000000ULL, 0x1000, 0x1800, 0 },
+				{ 0xf677, 0x1234, 0xff80000100ULL, 0xffffc00000ULL, 0xff80000100ULL, 0x1000, 0x1800 },
+				{ 0xf677, 0x1234, 0xff80000100ULL, 0x007fc00000ULL, 0xff80000100ULL, 0x1000, 0x1800, 0 },
+				{ 0xf762, 0x1234, 0x1001, 0x1234, 0x4004, 0x1800, 0x1000 },
+				{ 0xf767, 0x1234, 0x1001, 0x1234, 0x80080, 0x1800, 0x1000 },
+				{ 0xf77c, 0x1234, 0xff80000008ULL, 0x1234, 0xfff8000000ULL, 0x1000, 0x1800 },
+				{ 0xf77c, 0x1234, 0xff80000008ULL, 0x1234, 0x0ff8000000ULL, 0x1000, 0x1800, 0 },
+				{ 0xf77e, 0x1234, 0xff80000002ULL, 0x1234, 0xffe0000000ULL, 0x1000, 0x1800 },
+				{ 0xf77e, 0x1234, 0xff80000002ULL, 0x1234, 0x3fe0000000ULL, 0x1000, 0x1800, 0 }
 			};
 			const unsigned index = m_phase >= 9232 ? m_phase - 9232 + 13 : m_phase >= 6576 ? m_phase - 6576 + 5 : m_phase - 543;
 			const shift_case &row = cases[index];
