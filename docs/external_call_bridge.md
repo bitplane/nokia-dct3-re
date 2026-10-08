@@ -523,8 +523,16 @@ shows `DCT3 LAB`; the two images deliberately have different oracles.
 Registration and persisted EF_LOCI remain valid. This is an observed
 presentation difference, not proof of network-name retention; the current
 MM Information provides time only and its causal role is unproved.
-No firmware/name override is used. Answered SIP, speech and SIP restoration
-are not established on this product.
+No firmware/name override is used. Answered SIP, speech and external-dialog
+restoration are not established on this product.
+
+`verify-8850-sip-outgoing-busy` and
+`verify-8850-sip-outgoing-unavailable` additionally exercise physical
+`5551234`/Send against actual SIP 486 and 480. The latter requires consumed
+cause 18; both require correlated firmware clearing with no CONNECT/media.
+Own loader/HLE, carrier-1 and decoded-Send checks remain enforced. The
+existing operator-text crops must reproduce after release; this is not a
+whole-screen idle-pixel claim. Unchanged own PMM is retained.
 
 `verify-8850-sip-idle-restore` adds exact idle PC/SP/RAM/time restoration,
 byte-identical reference/replayed LCD frames and ordered one-second
@@ -549,6 +557,19 @@ decoded physical Exit, registered-idle content before/after and persisted
 SIM location. Frame comparison excludes the advancing top-row clock,
 not notification text or softkeys. This is real SIP signaling only;
 answered SIP, PCM and native speech are not promoted.
+
+`verify-8890-sip-outgoing-busy` independently uses physical `1234567`/Send
+against real SIP 486 on the configured carrier-60 composition. It checks
+the firmware SETUP number, correlated busy, complete CC/RR release and
+restored reviewed idle content excluding only the top-row clock. Native
+upload/HLE and self-test ownership remain required; no CONNECT/media or
+answered-call capability is inferred.
+
+`verify-8890-sip-outgoing-unavailable` retains those product checks and
+instead requires actual SIP 480, correlated no-answer and consumed cause
+18 before release. Fresh busy, unavailable and incoming-CANCEL runs each
+pass independently. This is signaling/idle restoration, not speech or
+restoration of an external outgoing dialog.
 
 `verify-8890-sip-idle-restore` uses the same own physical setup and idle
 fixture, saves at 42 seconds, then requires exact PC/SP/RAM/time restoration
