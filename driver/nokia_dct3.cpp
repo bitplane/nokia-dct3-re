@@ -3617,6 +3617,9 @@ void nokia_dct3_state::nsb6stage(machine_config &config)
 {
 	noki8xxx(config);
 	nokia_product_config research = PRODUCT_8XXX;
+	// Own acquired PMM occupies 3d0000..3fffff. Reuse the passive
+	// persistent-flash bus census; it never changes read/write results.
+	research.flash_persistent_start = 0x003d0000;
 	research.dsp_reset_wiring = { 0x10, 0x01 };
 	// Own consumer 2c2dbc requires matching non-sentinel identity words.
 	// Six is the acquired fragment's ROM input, not measured NSB-6 silicon.

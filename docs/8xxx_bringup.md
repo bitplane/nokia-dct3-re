@@ -1060,6 +1060,21 @@ No software clock or validity flag is injected. Counter-domain retention is
 separately checked by `tools/run_ccont_rtc_retention.py`; this does not prove
 complete battery-backed calendar continuity.
 
+NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
+verbose logging, using the existing bus observer rather than firmware-state
+hooks. Physical time confirmation near 25 seconds and date confirmation near
+37 seconds both reach RAM-resident programmer PC `0x13d72a`. Its command
+sequence writes clear-status `50`, word-program `40`, a PMM halfword and
+read-array `ff` (command address `0x3fff00`). The date-confirmation tail writes
+`1134` then `1034` at `0x3d9654`, with surrounding payload writes retained in
+flash NVRAM. Thus the cold editor cannot be attributed to absent persistent
+writes alone. The unresolved boundary is the own-ROM journal reader's
+acceptance and restoration of the software clock/validity state. Record
+headers, logical offsets and payload encoding need independent decoding;
+the NSE-5 single-sector journal parser is not an established NSB-6 contract.
+These observations neither identify a malformed record nor justify modifying
+clock fields, checksums or validity flags.
+
 `verify-8890-power-cycle` covers the distinct in-process physical lifecycle.
 Its fresh private runner pins own MCU/PMM and the configured ARFCN60 cell,
 physically enters security/time/date, holds Power for four seconds, observes
