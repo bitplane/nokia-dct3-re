@@ -890,11 +890,16 @@ recognizes a Nokia address or loader byte pattern.
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
 `5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, 523 are asserted, one (`e809`) executes
-without an assertion, and 70 are absent. The independent RF-boundary checker
+Against the executable fixture, 529 are asserted, none execute without an
+assertion, and 65 are absent. The independent RF-boundary checker
 passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
 writes; this is not acquisition or speech evidence. Highest-use absent words
-include `7690` at first PC `0a62`, `e904` at `3002`, and `f500` at `48ee`.
+include `7690` at first PC `0a62`, `f500` at `48ee`, and `f689` at `4326`.
+The short-immediate load fixture asserts all 512 `e800..e9ff` encodings
+with SXM clear and set: unsigned byte values, independent A/B destination,
+preserved other accumulator/status, continuation PC and one-cycle loads.
+This closes the formerly executed-only `e809`; it does not establish
+long-immediate or memory-load behavior, which have separate fixtures.
 Exact `f5bc`/`f4bc` check setting/clearing ST0.TC while preserving carry
 and ST1. Exact `f6b8`/`f7b8` check clearing/setting ST1.SXM while preserving
 OVM and ST0. All four check one-cycle execution between port markers.

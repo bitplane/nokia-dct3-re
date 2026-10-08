@@ -8026,8 +8026,57 @@ private:
 			expect_opcode(0x13f8, m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8001 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 					"absolute LDU B zero-extends even with SXM set in two cycles");
+			program.write_word(0x05e3, 0xe800); // LD #k8,A/B.
+			program.write_word(0x05e4, 0x75f8);
+			program.write_word(0x05e5, 0x0d00);
+			program.write_word(0x05e6, 0x0124);
+			program.write_word(0x05e7, 0xf5e1);
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x11111111);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x22222222);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 8000;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 8000 && m_phase <= 9023)
+		{
+			const unsigned index = m_phase - 8000;
+			const u16 opcode = 0xe800 | (index & 0x1ff);
+			const bool b = BIT(index, 8);
+			const u16 st1 = index >= 512 ? 0x0100 : 0;
+			expect_opcode(opcode,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (b ? 0x11111111 : index & 0xff) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (b ? index & 0xff : 0x22222222) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == st1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x05e8 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"LD #k8 selects A/B, zero-extends all byte immediates with either SXM setting and preserves other accumulator/status in one cycle");
+			if (index < 1023)
+			{
+				program.write_word(0x05e3, 0xe800 | ((index + 1) & 0x1ff));
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x11111111);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x22222222);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, index + 1 >= 512 ? 0x0100 : 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			osd_printf_info("TMS320C54x short immediate load conformance: PASS variants=512 sxm_settings=2\n");
 			program.write_word(0x05e3, 0x81f8); // STL B,*(0f21h)
 			program.write_word(0x05e4, 0x0f21);
+			program.write_word(0x05e5, 0x75f8);
+			program.write_word(0x05e6, 0x0d00);
+			program.write_word(0x05e7, 0x0124);
+			program.write_word(0x05e8, 0xf5e1);
 			data.write_word(0x0f21, 0);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234beef);
