@@ -427,6 +427,12 @@ presses physical End and verifies release and resumed paging; the SMS fixture
 opens the delivered message and verifies its persistent read status and frame.
 These remain signaling/storage checks, not speech validation.
 
+All three scenarios reproduce on the post-594-word native-core checkpoint
+(`bce95f0`) using the current built emulator and the project's Capstone-enabled
+Python environment. For Make invocations, pass an absolute `PYTHON` path:
+the nested MAME build changes working directory. These gates select the
+research-HLE composition, not normal NPE-3 native verification.
+
 MAME cancels pending Lua waits when loading a state. The host fixture therefore
 explicitly resumes its physical input schedule after the replay interval;
 it does not restore or inject handset state. ARM7's named `PC` is a debugger
