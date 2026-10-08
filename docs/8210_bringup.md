@@ -1034,6 +1034,20 @@ zero floor before returning the halfword. The static contract checker
 pins the descriptor roots, stride, state/duration reads and return.
 An expired timer and an absent event are therefore separate questions;
 neither justifies injecting `0413`.
+Two explicit setup candidates are `21bca6` and `21bcf6`; both pass
+timer `81` and duration `075a` from pool `21c018`. The first only starts
+it when the preceding remaining-duration query returns zero. Adjacent
+`2d5ae8` calls format diagnostic output; they are not event producers.
+In `run_8210_pin_dcs_recovery_timer_02`, a direct write-watch covering
+all 12 descriptor bytes sees cold clearing at 0.004714s and initialization
+at 1.117176..1.117178s, but no later descriptor writes. Initialization
+sets duration zero, byte `+6=0c`, byte `+7=03`, state byte `+8=01`,
+and timer id halfword `+a=0081`. Neither setup return tap is observed.
+The physical-PIN DCS registration check still fails as expected. This
+does not close indirect setup/event producers, but it establishes that
+the observed boot never changes this descriptor after initialization.
+Find the lifecycle selecting the setup sites before treating timer
+expiry as a missing late-request recovery event.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

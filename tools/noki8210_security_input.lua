@@ -6,6 +6,22 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_recovery_timer_descriptor = memory:install_write_tap(0x111d58, 0x111d63,
+        'nsm3_recovery_timer_descriptor', function(offset, value, mask)
+            machine:logerror(string.format('8210_recovery_timer_descriptor: address=%08x value=%08x mask=%08x pc=%08x t=%.6f\n',
+                offset, value, mask, cpu.state['PC'].value, machine.time:as_double()))
+        end)
+    _G.nsm3_recovery_timer_setups = {}
+    for _, address in ipairs({0x21bcaa, 0x21bcfa}) do
+        _G.nsm3_recovery_timer_setups[#_G.nsm3_recovery_timer_setups + 1] = memory:install_read_tap(
+            address & ~3, (address & ~3) + 3, 'nsm3_recovery_timer_setup_' .. address,
+            function(offset, value, mask)
+                if cpu.state['PC'].value ~= address then return end
+                machine:logerror(string.format('8210_recovery_timer_setup: return=%08x duration=%04x state=%02x t=%.6f\n',
+                    address, memory:read_u16(0x111d5c), memory:read_u8(0x111d60),
+                    machine.time:as_double()))
+            end)
+    end
     _G.nsm3_measurement_terminal = memory:install_read_tap(0x287638, 0x28763b,
         'nsm3_measurement_terminal', function(offset, value, mask)
             if cpu.state['PC'].value ~= 0x287638 then return end

@@ -281,6 +281,13 @@ def verify(image):
             ('mov', 'r0, sp'), ('ldrh', 'r0, [r0]'),
             ('add', 'sp, #4'), ('pop', '{r4, r5, r6, pc}')]:
         raise ValueError('timer query halfword return differs')
+    for address, literal_offset in ((0x21bca2, '#0x370'), (0x21bcf2, '#0x320')):
+        if instructions(address, 8) != [
+                ('movs', 'r0, #0x81'), ('ldr', f'r1, [pc, {literal_offset}]'),
+                ('bl', '#0x2879fe')]:
+            raise ValueError('explicit timer-81 setup candidate differs')
+    if int.from_bytes(read(0x21c018, 4), 'big') != 0x75a:
+        raise ValueError('timer-81 setup duration differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
