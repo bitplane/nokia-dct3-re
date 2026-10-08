@@ -35,6 +35,9 @@ but a material hardware contract remains calibrated, opaque, or unverified.
 phone-code entry, own task-12 background-measurement completion and persistent
 registration on the coherent ARFCN 4/5 laboratory network. It retains the
 declared base-record PMM comparison and research HLE boundary.
+Its `verify-8210-pin-host-incoming-call` and `-sms` gates independently add
+physical Answer/End and caller/idle presentation, or physical Read and durable
+message storage, after that authenticated registration.
 
 The 6210's `verify-6210-slow-pin-registration` additionally verifies physical
 late PIN acceptance followed by registration and persisted EF_LOCI on the

@@ -273,6 +273,14 @@ instructions. The configured ARFCN 4/5 laboratory network supplies the response;
 no phone PMM or firmware state is forced. Ordinary phone-code-only registration
 remains a separate regression, and native speech is not established.
 
+`verify-8210-pin-host-incoming-call` and `verify-8210-pin-host-incoming-sms`
+compose that authentication lifecycle with the existing coherent host fixture.
+The call gate checks caller pixels, physical Answer/End, own CC/RR signaling
+and registered-idle recovery. The SMS gate checks CP/RP closure, physical Read,
+reviewed message-body pixels and persistent read-status storage. Host inputs
+are retained when selecting the PIN fixture's carrier pair; conflicting cell
+configuration is rejected rather than silently rewritten.
+
 The own ring dispatcher at `0x306fa6` selects the thirteen-entry
 `0x83..0x8f` table at `0x306fd4`. Type `8b` calls `0x2df484`, which posts
 to task 12 through `0x28845c`. Type `89` calls `0x2df210`; instructions

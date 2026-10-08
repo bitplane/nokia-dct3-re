@@ -63,6 +63,26 @@ def prepare_run(run, mcu, pmm):
     (run / 'nvram/nsm3hle/flash').write_bytes(mcu + fixture)
 
 
+def configure_pin_topology(config_path):
+    """Retain host inputs while selecting the independently configured cell."""
+    if config_path.exists():
+        config_tree = ET.parse(config_path).getroot()
+        ports = config_tree.find("./system[@name='nsm3hle']/input")
+        if ports is None:
+            raise ValueError('product host configuration lacks its input section')
+    else:
+        config_tree = ET.Element('mameconfig', version='10')
+        system = ET.SubElement(config_tree, 'system', name='nsm3hle')
+        ports = ET.SubElement(system, 'input')
+    carrier = ports.find("./port[@tag=':NEIGHBORCFG']")
+    if carrier is None:
+        ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
+                      mask='256', defvalue='0', value='256')
+    elif carrier.get('mask') != '256' or carrier.get('value') != '256':
+        raise ValueError('PIN fixture requires coherent ARFCN4/5 topology')
+    ET.ElementTree(config_tree).write(config_path, encoding='utf-8', xml_declaration=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
@@ -72,8 +92,9 @@ def main():
     parser.add_argument('--pin-enabled', action='store_true',
                         help='test SIM PIN followed by phone security and registration')
     args = parser.parse_args()
-    if args.pin_enabled and args.scenario != 'registration':
-        parser.error('--pin-enabled currently requires registration')
+    if args.pin_enabled and args.scenario not in ('registration', 'host-incoming-call',
+                                                 'host-incoming-sms'):
+        parser.error('--pin-enabled requires registration or a supported host incoming service')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
@@ -94,13 +115,7 @@ def main():
         if config:
             shutil.copyfile(root / f'fixtures/{config}/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
         if args.pin_enabled:
-            config_tree = ET.Element('mameconfig', version='10')
-            system = ET.SubElement(config_tree, 'system', name='nsm3hle')
-            ports = ET.SubElement(system, 'input')
-            ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
-                          mask='256', defvalue='0', value='256')
-            ET.ElementTree(config_tree).write(run / 'cfg/nsm3hle.cfg', encoding='utf-8',
-                                             xml_declaration=True)
+            configure_pin_topology(run / 'cfg/nsm3hle.cfg')
         environment = os.environ.copy()
         environment.pop('NOKIA_DCT3_8210_PIN_ENTRY', None)
         if args.pin_enabled:

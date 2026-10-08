@@ -8,6 +8,30 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_pin_topology_preserves_host_and_does_not_duplicate_carrier(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'nsm3hle.cfg'
+            path.write_text('<mameconfig><system name="nsm3hle"><input>'
+                            '<port tag=":CALLHOST" mask="1" value="1"/>'
+                            '</input></system></mameconfig>')
+            runner.configure_pin_topology(path)
+            runner.configure_pin_topology(path)
+            ports = runner.ET.parse(path).findall('./system/input/port')
+            self.assertEqual(len(ports), 2)
+            self.assertEqual(ports[0].get('tag'), ':CALLHOST')
+            self.assertEqual(ports[0].get('value'), '1')
+            self.assertEqual(ports[1].get('mask'), '256')
+            self.assertEqual(ports[1].get('value'), '256')
+
+    def test_pin_topology_rejects_conflicting_cell_without_rewriting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'nsm3hle.cfg'
+            original = '<mameconfig><system name="nsm3hle"><input><port tag=":NEIGHBORCFG" mask="256" value="0"/></input></system></mameconfig>'
+            path.write_text(original)
+            with self.assertRaisesRegex(ValueError, 'ARFCN4/5'):
+                runner.configure_pin_topology(path)
+            self.assertEqual(path.read_text(), original)
+
     def test_host_sms_requires_coherent_registration_not_default_carrier(self):
         text = 'gsm_call_adapter: network registered=1 arfcn=4 t=12'
         with patch.object(runner, 'verify_registration') as registration, \

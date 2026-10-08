@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 467 gates: 307 generated from typed steps, 160 copied verbatim (shell).
+# 469 gates: 309 generated from typed steps, 160 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -69,6 +69,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-pin-state-call verify-6210-pin-state-sms verify-6210-registration \
 	verify-6210-calculator verify-6210-phonebook verify-6210-menu \
 	verify-8210-call-divert verify-8210-ussd verify-8210-slow-pin-registration \
+	verify-8210-pin-host-incoming-call verify-8210-pin-host-incoming-sms \
 	verify-8210-registration verify-8210-outgoing-call verify-8210-incoming-call \
 	verify-8210-incoming-sms verify-8210-outgoing-sms verify-8210-calculator \
 	verify-8210-phonebook verify-7110-keypad-controller verify-sed1565 \
@@ -505,6 +506,12 @@ verify-8210-ussd: build
 
 verify-8210-slow-pin-registration: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario registration --pin-enabled --mame $(MAME_DIR)/mame
+
+verify-8210-pin-host-incoming-call: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-call --pin-enabled --mame $(MAME_DIR)/mame
+
+verify-8210-pin-host-incoming-sms: build
+	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-sms --pin-enabled --mame $(MAME_DIR)/mame
 
 verify-8210-registration: build
 	$(PYTHON) tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario registration --mame $(MAME_DIR)/mame
