@@ -10289,6 +10289,29 @@ private:
 					(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
 					"ROM4 LDM AR2,B zero-extends despite SXM in one cycle");
+			program.write_word(0x05e3, 0x4911); // LDM AR1,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0xabcd);
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6560;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6560)
+		{
+			expect_opcode(0x4911,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x9abc &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0100 &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
+				"ROM4 LDM AR1,B selects AR1 rather than AR2, zero-extends despite SXM and preserves A/status/source in one cycle");
 			program.write_word(0x05e3, 0x730b); // MVMD BL,dmad
 			program.write_word(0x05e4, 0x0fa0);
 			program.write_word(0x05e5, 0x75d6);
@@ -15269,6 +15292,43 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x1234 &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"MACA T preserves old A as multiplicand and accumulator source");
+			program.write_word(0x05e2, 0xf689); // MACAR T,B,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffe0000ULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x800c);
+			m_cpu->set_state_int(tms320c54x_device::STATE_T, 4);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 6558;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 6558 || m_phase == 6559)
+		{
+			const bool fractional = m_phase == 6559;
+			expect_opcode(0xf689,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (fractional ? 0 : 0x10000) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x800c &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x1800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (fractional ? 0x0040 : 0) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ROM4 MACAR uses signed old A high word and old B source, doubles under FRCT before rounding and preserves B/T/status in one cycle");
+			if (!fractional)
+			{
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffe0000ULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0040);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 6559;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x1234);
 			program.write_word(0x05e2, 0xf48b); // MASAR T,A,A.
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
