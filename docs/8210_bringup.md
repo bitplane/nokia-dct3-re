@@ -983,6 +983,18 @@ and one at 7.908521 and 12.261757 (writer PC `2eafbc`, channel-acknowledgement
 times). The late request still returns 4. Thus a missing set of this byte
 is not the late-PIN defect. The address is shared by other offset-bearing
 consumers; it is not assigned a general subsystem name from this one use.
+Outcome 4 is not an empty-candidate diagnosis in this run. Read-only
+`run_8210_pin_dcs_outcome_terminal_01` observes terminal branch `287638`
+with object `11324c`, halfword counts at `+4/+6/+8` equal to `0,2,0`,
+skip flag `sl=0`, and final signed RSSI `fp=-127` (`ffffff81`). The
+parser's `sample + 104 < 0` test selects this branch; with no skipped
+entries it stores 4 at `287640`. With a skipped entry the same terminal
+branch stores 3. A separate route can also select 4, so do not generalize
+the enum name beyond this decoded branch. Here two entries were counted
+before the sentinel: the persistent outcome reflects this completed scan,
+not absence of radio candidates. Late readiness must be explained through
+the subsequent lifecycle rather than by synthesizing a stronger RSSI or
+changing the outcome value.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

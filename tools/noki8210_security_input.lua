@@ -6,6 +6,16 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    _G.nsm3_measurement_terminal = memory:install_read_tap(0x287638, 0x28763b,
+        'nsm3_measurement_terminal', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x287638 then return end
+            local object = cpu.state['R4'].value
+            if object < 0x100000 or object >= 0x17fff4 then return end
+            machine:logerror(string.format('8210_measurement_terminal: object=%08x counts=%d,%d,%d skipped=%d sample=%08x t=%.6f\n',
+                object, memory:read_u16(object + 4), memory:read_u16(object + 6),
+                memory:read_u16(object + 8), cpu.state['R10'].value,
+                cpu.state['R11'].value, machine.time:as_double()))
+        end)
     _G.nsm3_measurement_recovery_flag = memory:install_write_tap(0x137db0, 0x137db3,
         'nsm3_measurement_recovery_flag', function(offset, value, mask)
             if (mask & 0xff000000) == 0 then return end

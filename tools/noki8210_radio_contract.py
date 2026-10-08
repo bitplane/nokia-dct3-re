@@ -224,6 +224,15 @@ def verify(image):
             ('cmp', 'r0, #2'), ('bne', '#0x2865f2'),
             ('movs', 'r0, #0'), ('str', 'r0, [r1]'), ('mov', 'pc, lr')]:
         raise ValueError('measurement flag outcome normalization differs')
+    if instructions(0x287606, 8) != [
+            ('movs', 'r1, #0x68'), ('mov', 'r0, fp'),
+            ('cmn', 'r1, r0'), ('bmi', '#0x287638')]:
+        raise ValueError('measurement terminal signed RSSI predicate differs')
+    if instructions(0x287634, 16) != [
+            ('movs', 'r0, #4'), ('b', '#0x287640'),
+            ('mov', 'r0, sl'), ('cmp', 'r0, #0'), ('beq', '#0x287634'),
+            ('movs', 'r0, #3'), ('ldr', 'r5, [pc, #0x104]'), ('str', 'r0, [r4]')]:
+        raise ValueError('measurement terminal skipped-entry outcome differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
