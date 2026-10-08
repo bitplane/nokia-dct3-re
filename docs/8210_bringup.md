@@ -355,9 +355,10 @@ clean RR release, the firmware's `Nokia test network` screen, and physical
 Back to registered idle. It also requires persisted laboratory EF_LOCI.
 The NSM-3 normal decoder at `307dbe..307df4` reads pointer `33ee78` from
 literal `307e40`; its last row is `10 1a 0c 0a 0b`. Thus Star occupies
-column 2 and Hash column 4, opposite the previously inherited NSB-6 labels.
-The research composition now uses a product-local port override, while the
-shared controller and other products' mappings remain unchanged. This is
+column 2 and Hash column 4. The own NSM-2 table at `33f504` and NSB-6 table
+at `339f4c` contain the same 25 bytes, so these research compositions share
+the corrected port labels without a product-local override. Matrix bits and
+controller behavior are unchanged. This is
 physical firmware input and laboratory supplementary-service coverage,
 not native DSP or factory-PMM promotion.
 
