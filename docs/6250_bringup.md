@@ -219,6 +219,19 @@ record at `3cba56` and the linked-record updates, not guess an additional
 DSP packet. The nearby `2d29ce` target is an internal dispatcher branch
 leading to its receive loop, not a standalone re-evaluation helper.
 
+Actual cache-entry observations confirm both boots first receive
+`03eb476215f520bf240100000016c144` at 3.675851 s. The ordinary boot later
+receives `03ec7dd900f110bf2001050b08000000` at 9.874504 s; the slow-PIN
+boot receives `03ec7dd900f110bf2001000008000000` at 12.495698 s. Both
+late messages contain identity bytes `00f110` and enter from continuation
+`2d18f9`; the body is not wholly identical (bytes 10/11 differ), so this
+does not exclude every SIM-content distinction. It does exclude a wholly
+missing `03ec` post-PIN notification. Pre-cache helper `3cbddc` clears
+context fields 2/4/5 and invokes selector input 1; the continuation then
+updates the cache and invokes input 3. Neither nonzero input re-evaluates
+state 6. Follow the linked-record refresh and its consumer-side triggers
+after this real notification; do not add a duplicate synthetic message.
+
 ### Coherent laboratory registration
 
 `make verify-6250-coherent-registration RUN_DIR=NEW_DIRECTORY` uses the
