@@ -56,6 +56,25 @@ def verify(image):
         raise ValueError('07d4 readiness input construction differs')
     if instructions(0x258afc, 4) != [('bl', '#0x2aede0')]:
         raise ValueError('readiness constructor boundary differs')
+    if int.from_bytes(read(0x209e44, 4), 'big') != 0x9c6:
+        raise ValueError('upstream readiness cascade origin differs')
+    if instructions(0x209b9a, 28) != [
+            ('subs', 'r0, #1'), ('cmp', 'r0, #0'), ('beq', '#0x209bdc'),
+            ('subs', 'r0, #1'), ('cmp', 'r0, #0'), ('beq', '#0x209bd8'),
+            ('subs', 'r0, #4'), ('cmp', 'r0, #0'), ('beq', '#0x209bd4'),
+            ('subs', 'r0, #0x2c'), ('cmp', 'r0, #0'), ('beq', '#0x209bd0'),
+            ('subs', 'r0, #1'), ('cmp', 'r0, #0')]:
+        raise ValueError('upstream readiness cascade arithmetic differs')
+    if [int.from_bytes(read(address, 4), 'big') for address in
+            (0x209c2c, 0x209e58)] != [0x7d4, 0x7da]:
+        raise ValueError('09c8/09cc readiness mapping literals differ')
+    if instructions(0x209bd4, 8) != [
+            ('ldr', 'r0, [pc, #0x280]'), ('b', '#0x209be2'),
+            ('ldr', 'r0, [pc, #0x50]'), ('b', '#0x209be2')]:
+        raise ValueError('09c8/09cc readiness mapping branches differ')
+    if instructions(0x209be2, 6) != [
+            ('movs', 'r1, #0'), ('bl', '#0x20925c')]:
+        raise ValueError('upstream readiness publication boundary differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [

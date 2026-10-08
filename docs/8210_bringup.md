@@ -762,6 +762,19 @@ byte at message `+3` differs too, but this constructor does not demonstrably
 initialize it as a class, so its observed `c7`/`3b` bytes have no assigned
 semantics. Do not substitute `03ed` or alter the selected-cell links.
 
+The own-ROM status mapper at `209b90` provides a concrete upstream candidate:
+its subtract cascade starts at `09c6`, maps `09c8 -> 07d4` and
+`09cc -> 07da`, and publishes through `20925c` with argument zero.
+The cascade arithmetic, branch targets and aligned pool literals are checked
+by `noki8210_radio_contract.py`. This is a static mapping, not proof that this
+routine supplies the statuses in the paired runs: other literal references
+exist. The next observation should establish whether `209b90` receives those
+inputs, its callers, and the producer of the differing input before assigning
+protocol semantics or changing peer behavior.
+A linear Thumb decode finds direct `bl 209b90` candidates at `20cc9a`,
+`210fd2` and `211048`. These are investigation anchors, not an exhaustive
+producer census: linear decoding can include data and misses indirect calls.
+
 ## Evidence needed to resume
 
 The software-accessible stock upload, operand decoding, existing COBBA model
