@@ -888,6 +888,12 @@ early PIN still receives the serving acknowledgement, whose argument-0
 selector returns 3 and promotes `03ec`; late PIN already consumed it with
 result 0 and an empty queue. Replaying the acknowledgement is not a fix.
 Determine the ordinary post-acknowledgement recovery event/continuation.
+The result-4 continuation itself is passive: `21b8ea` logs
+`PH_9000_ENTER`, branches directly to `21bb8c`, disposes the consumed
+message through `288e44`, and receives again through `2886b0`. It does
+not issue a radio request or arm a retry on this path. Therefore trace
+subsequent receive events and their queued-request consumers; do not
+interpret the PH9000 label alone as an active recovery operation.
 Do not set that selector or inject `1587` to obtain authenticated DCS coverage.
 
 ## Evidence needed to resume

@@ -143,6 +143,12 @@ def verify(image):
     if instructions(0x21f5d6, 8) != [
             ('cmp', 'r0, #3'), ('beq', '#0x21f5de'), ('bl', '#0x21b8ea')]:
         raise ValueError('late readiness result continuation differs')
+    if instructions(0x21b8ea, 8) != [
+            ('adr', 'r0, #0x2d4'), ('bl', '#0x2d5dcc'), ('b', '#0x21bb8c')]:
+        raise ValueError('PH9000 alternate does not return directly to receive loop')
+    if instructions(0x21bb92, 10) != [
+            ('ldr', 'r0, [r4, #8]'), ('bl', '#0x288e44'), ('bl', '#0x2886b0')]:
+        raise ValueError('PH9000 message disposal and receive boundary differs')
     if instructions(0x28758e, 4) != [('movs', 'r1, #0x27'), ('mvns', 'r6, r1')]:
         raise ValueError('measurement parser does not enumerate forty records')
     if instructions(0x2875b4, 8) != [
