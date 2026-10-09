@@ -41,7 +41,11 @@ physical Stop returning to registered idle. Its seed is a fresh physically
 entered Calendar/time fixture, not donor storage or register injection.
 Reviewed frames and ordered hardware/input checks cover alarm-on, active
 alarm and post-Stop idle; buzzer programming is checked but audible output,
-Snooze, armed-alarm cold persistence and powered-off wake are not promoted.
+Snooze and powered-off wake are not promoted. `verify-6210-alarm-cold`
+independently proves physical arming followed by retained-register reads,
+natural expiry and Stop in a new process with no clock/alarm entry. Its
+armed-idle, active-alarm and stopped frames are reviewed and reproducible.
+Seconds restart at zero; offline elapsed time is not inferred.
 
 `verify-6210-calendar-cold` independently proves physical Menu-8 Calendar
 entry, firmware-owned CCONT programming to 13:47, physical date entry and
