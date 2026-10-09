@@ -71,8 +71,14 @@ Native execution independently exposes missing CPU instructions: the ROM4
 compatibility run stopped at `ADDS *AR7,B` (`0x0387`, PC `0x21a9`). Implementing
 the unsigned-memory B form, with executable accumulator-preservation, carry,
 SXM and cycle checks, passes the full C54x conformance suite. A fresh 40-second
-menu run then reaches unsupported `0xf4cf` at `0x21b6`, while the restart near
-32 seconds persists. CCONT clock control remains `0x56` before restart.
+menu run then reaches `TRAP 15` (`0xf4cf`) at `0x21b6`. Implementing TRAP's
+three-cycle vector transfer with unchanged INTM/IFR, verified over all 32
+vectors and both masking states, advances a fresh run to unsupported `0x8dd2`
+at `0x1caf`. After the restart it instead encounters `0xfce7` at `0x06ce`.
+The restart near 32 seconds persists. CCONT clock control remains `0x56`
+before restart. The differing post-reset execution requires checking retained
+state and instruction-stream provenance, not assuming every encountered word
+is a missing instruction.
 This advances native execution; it does not yet prove the stalled DSP causes
 the reset or establish compatibility with the handset's fitted DSP mask.
 The late phonebook-save attempt crosses this restart boundary, so persistence

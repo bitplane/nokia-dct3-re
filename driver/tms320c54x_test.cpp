@@ -92,6 +92,7 @@ private:
 			{0xf5b0, 1 | dasm::SUPPORTED, "SSBX    0, 0"},
 			{0xf7bb, 1 | dasm::SUPPORTED, "SSBX    1, 11"},
 			{0xf7c1, 1 | dasm::SUPPORTED | dasm::STEP_OVER, "INTR    1"},
+			{0xf4cf, 1 | dasm::SUPPORTED | dasm::STEP_OVER, "TRAP    15"},
 			{0xf884, 2 | dasm::SUPPORTED, "FB      $042345"},
 			{0xf984, 2 | dasm::SUPPORTED | dasm::STEP_OVER, "FCALL   $042345"},
 			{0xfa84, 2 | dasm::SUPPORTED, "FBD     $042345"},
@@ -620,13 +621,13 @@ private:
 		m_phase = 2765 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
-	void start_software_interrupt_case(unsigned index)
+	void start_software_interrupt_case(unsigned index, bool trap = false)
 	{
 		unsigned const vector = index & 31;
 		u16 const base = (index & 1) ? 0x4000 : 0x2000;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		program.write_word(0x0109d0, 0x75d6); program.write_word(0x0109d1, 0x0124);
-		program.write_word(0x0109d2, 0xf7c0 | vector);
+		program.write_word(0x0109d2, (trap ? 0xf4c0 : 0xf7c0) | vector);
 		program.write_word(0x10000 | (base + vector * 4), 0x75d6);
 		program.write_word(0x10000 | (base + vector * 4 + 1), 0x0124);
 		program.write_word(0x10000 | (base + vector * 4 + 2), 0xf4e1);
@@ -639,7 +640,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1100);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_port_writes = 0;
-		m_phase = 2701 + index;
+		m_phase = (trap ? 92000 : 2701) + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 	void start_return_alt_case(unsigned index)
@@ -18185,6 +18186,27 @@ private:
 			if (index < 63) { start_software_interrupt_case(index + 1); return; }
 			osd_printf_info("TMS320C54x software interrupt conformance: PASS variants=64\n");
 			osd_printf_info("TMS320C54x software interrupt fast return: PASS variants=64\n");
+			start_software_interrupt_case(0, true);
+			return;
+		}
+		if (m_phase >= 92000 && m_phase < 92064)
+		{
+			unsigned const index = m_phase - 92000;
+			unsigned const vector = index & 31;
+			u16 const base = (index & 1) ? 0x4000 : 0x2000;
+			expect_opcode(0xf4c0 | vector,
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == (0x10000 | (base + vector * 4 + 3)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+				data.read_word(0x0fff) == 0x09d3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == ((index & 32) ? 0x0980 : 0x0180) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IMR) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0xffff &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
+				"TRAP selects IPTR:K, pushes next PC, preserves INTM/IFR and costs three cycles");
+			if (index < 63) { start_software_interrupt_case(index + 1, true); return; }
+			osd_printf_info("TMS320C54x TRAP conformance: PASS variants=64\n");
 			start_compact_store_case(0);
 			return;
 		}

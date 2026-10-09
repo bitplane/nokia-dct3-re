@@ -37,9 +37,9 @@ public:
 		u16 const op = opcodes.r16(pc);
 		auto const next_word = [&]() { return opcodes.r16((pc & 0x7f0000) | u16(pc + 1)); };
 		auto const target = [&]() { return (pc & 0x7f0000) | next_word(); };
-		if ((op & 0xffe0) == 0xf7c0)
+		if ((op & 0xffe0) == 0xf7c0 || (op & 0xffe0) == 0xf4c0)
 		{
-			util::stream_format(stream, "INTR    %u", op & 31);
+			util::stream_format(stream, "%s    %u", BIT(op, 8) ? "INTR" : "TRAP", op & 31);
 			return 1 | SUPPORTED | STEP_OVER;
 		}
 		if (m_extended && (op & 0xfc80) == 0xf880)
@@ -929,6 +929,13 @@ bool tms320c54x_device::service_interrupt()
 void tms320c54x_device::execute_one(u16 op)
 {
 	const u8 low = op;
+	if ((op & 0xffe0) == 0xf4c0) // TRAP K (SPRU172C 4-195): no status changes.
+	{
+		push(m_pc);
+		m_pc = (m_pmst & 0xff80) | ((op & 31) << 2);
+		m_icount -= 2;
+		return;
+	}
 	if ((op & 0xffe0) == 0xf7c0) // INTR K, independent of IMR/INTM (SPRU172C 4-65).
 	{
 		unsigned const vector = op & 31;
