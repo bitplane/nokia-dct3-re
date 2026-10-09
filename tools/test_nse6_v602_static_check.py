@@ -96,6 +96,8 @@ class Nse6StaticTests(unittest.TestCase):
         self.assertFalse(result["runtime_acceptance"])
         self.assertEqual(result["acquisition"]["source7_selector"], 2)
         self.assertEqual(result["acquisition"]["source8_cache"], "0x12158c")
+        self.assertEqual(result["acquisition"]["cache_writer"], "0x2e09d6")
+        self.assertEqual(result["acquisition"]["cache_selectors"], [2, 1])
         self.assertFalse(result["acquisition"]["physical_units_proven"])
         self.assertEqual(result["eeprom_tx"]["scl_bit"], 2)
         self.assertFalse(result["dsp_verifier"]["resident_mask_proven"])

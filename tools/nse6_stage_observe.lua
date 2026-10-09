@@ -8,6 +8,16 @@ local result_readers = {}
 local report_events = {}
 local report_raw_messages = {}
 local mask_writes = 0
+local cache_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x12158c, 0x12158f,
+    'nse6_source_cache', function(offset, value, mask)
+        cache_writes = cache_writes + 1
+        if cache_writes > 16 then return end
+        machine:logerror(string.format(
+            'nse6_source_cache_write: value=%08x mask=%08x pc=%08x source=%08x t=%.9f\n',
+            value, mask, cpu.state['PC'].value, cpu.state['R4'].value,
+            machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_write_tap(0x20030, 0x20033,
     'nse6_keypad_mask', function(offset, value, mask)
         if (mask & 0xff) == 0 or mask_writes >= 32 then return end

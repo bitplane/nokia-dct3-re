@@ -130,6 +130,27 @@ schematic/CCONT transfer specification, plus the writer of the source-8 cache.
 Until then these fields establish a digital contract, not a physically
 calibrated NSE-6 battery model or authenticated provisioning.
 
+The cache writer is now identified: `0x2e09c4` loads table `0x3033e0`,
+indexes by `source - 8`, calls ADC reader `0x2e5db8`, and stores at
+`0x2e09d6` into `0x121588 + 2*source - 12`. The two selector bytes are
+`02 01`, so cached source 8 also uses ADC channel 2, while source 9 uses
+channel 1. This is a recovered writer, not an exhaustive store census.
+Initializer `0x2e0b5a` sets both cache halfwords to sentinel `0x8000`.
+A fresh 12-second run observes only zero-fill and those two sentinel writes;
+there is no observed conversion-result store in that window.
+
+Acquisition `0x293cc0` checks flag bit 0 before consulting source 8. Its
+other branch derives the second value from the transformed first sample
+minus context halfword `+0x3a` (`0x293d00..0x293d04`). Thus absence of a
+cache update is not itself evidence of the current failure; do not fabricate
+one. Both observed rejected samples remain `0x19d6`.
+
+The original [NSE-6 circuit appendix](https://www.eserviceinfo.com/preview_html.php?fileid=5448&previewid=3001)
+identifies the power-supply schematic as page 3/A3-5 (version 7.0, edit 257,
+layout 07). Its text preview omits the drawing, so it does not yet prove the
+ADC pin connection. Obtain/view that drawing or an independent CCONT
+transfer specification before choosing an electrical channel-2 fixture.
+
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
 (32 KiB). These are physical capacities, not a complete BUSC alias map.
