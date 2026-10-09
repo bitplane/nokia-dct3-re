@@ -19,6 +19,15 @@ if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' th
                 cpu.state['R14'].value, cpu.state['R0'].value, context,
                 memory:read_u16(context + 6), memory:read_u32(context + 12),
                 machine.time:as_double()))
+            local updated = memory:read_u32(0x137224)
+            if updated >= 0x100000 and updated < 0x17fff0 then
+                machine:logerror(string.format(
+                    '8210_neighbour_context_pair: selected=%08x updated=%08x alias=%u selected_carrier=%04x updated_carrier=%04x selected_control=%08x updated_control=%08x t=%.6f\n',
+                    context, updated, context == updated and 1 or 0,
+                    memory:read_u16(context + 6), memory:read_u16(updated + 6),
+                    memory:read_u32(context + 12), memory:read_u32(updated + 12),
+                    machine.time:as_double()))
+            end
         end)
     _G.nsm3_neighbour_constructor = memory:install_read_tap(0x2b3024, 0x2b3027,
         'nsm3_neighbour_constructor', function(offset, value, mask)

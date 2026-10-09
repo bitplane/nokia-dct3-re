@@ -1645,10 +1645,16 @@ slot `137224`, whereas mode-selection helper `286d4a` dereferences `137228`.
 The updater tests received-block payload error byte `+4`: zero selects the
 record's control nibble 3; a nonzero error selects nibble 1 when its byte
 `+b` counter remains nonzero. Neither branch directly selects nibble 2.
-These are distinct pointer slots, not proof of distinct runtime objects.
-Observe both pointers and their target control words at the failing call
-before attributing its mode-4 selector to this receive update. The own-ROM
-contract verifier pins the roots and update instructions.
+Passive paired observation in `run_8210_context_pair_20261009` resolves
+aliasing at the failing call: selected record `1196a0` carries ARFCN 824 and
+control `ffc22664`; updated record `119690` carries ARFCN 823 and control
+`00c5c60c`, at 12.262144s. They are different records. Thus the received-block
+update must not be attributed to the mode-4 target. The independent
+seven-second-PIN control `run_8210_context_pair_early_20261009` registers
+organically at 12.890600s and never invokes this selector; the eight-second
+case retains the registration failure. The late request lifecycle remains
+the next target, not pointer aliasing. The own-ROM contract verifier pins
+the roots and update instructions; the harness observation changes no state.
 
 Public-reference coverage is bounded. Gammu's
 [NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)
