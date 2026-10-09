@@ -40,6 +40,7 @@ distinction.
 | `model_coverage.md` | Evidence-gated per-product compatibility and fidelity matrix. |
 | `6110_bringup.md` | Authoritative NSE-3 hardware/firmware map and blocked resumption boundary. |
 | `6150_bringup.md` | Acquired NSM-1 v5.23 reset/verifier contract and matching storage/DSP prerequisites. |
+| `8810_bringup.md` | Acquired NSE-6 v6.02 image/reset facts and unresolved RAM decoding before runtime configuration. |
 | `5210_bringup.md` | Validated NSM-5 v5.40 product contracts and remaining scope. |
 | `5510_bringup.md` | NPM-5 staged DSP/service frontier, erased NV journal and separate MU4/FBUS input ownership. |
 | `8210_bringup.md` | NSM-3 normal/native boundary, acquired base-record research-HLE phone services, own PCM/audio and restoration acceptance. |
