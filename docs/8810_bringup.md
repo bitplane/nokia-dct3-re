@@ -6,7 +6,8 @@ The acquired v6.02 PPM A package normalizes to a complete, contiguous 2 MiB
 CPU-big-endian flash image. Research machine `nse6stage` now executes its own
 reset/initialization and reaches the verifier's first DSP acknowledgement wait.
 The ROM4 compatibility fixture now has graphical security-editor and physical
-digit-entry acceptance, but no idle/card/service acceptance. Other products'
+digit-entry acceptance. An initialized synthetic retry count permits default
+code acceptance and a Menu / Names frame; card/service parity remains unproved. Other products'
 provisioning and DSP publications are not evidence for this handset.
 
 The reset stack base `0x125f30` fits the documented 256 KiB SRAM window starting
@@ -26,9 +27,10 @@ entries by 28 seconds. This proves input execution, not the inherited host
 labels beyond those exercised. `tools/nse6_security_fixture.lua` enters five
 digits through physical contacts: the 12.5-second snapshot shows five masked
 characters, and OK produces Code error at 13.5 seconds. The late frame returns
-to the editor. The erased security contents do not establish that 12345 is a
-valid code; no donor code or lock state is supplied. The current boundary is
-the own-phone security/provisioning contract and subsequent idle lifecycle.
+to the editor in the erased-retry negative control. Initializing the synthetic
+retry count permits the same physical code to be accepted, reaching a Menu /
+Names frame. The current boundary is menu lifecycle and card/service execution.
+No donor identity or lock state is supplied.
 
 The display-transport observer records 15,684 data bytes, 2,774 nonzero,
 and 584 commands by 28 seconds in the digit/softkey/navigation fixture.
@@ -45,6 +47,42 @@ transfer (6.4–6.6 limits). Thus `round(3600 / 6.5) = 554`; the own-ROM identit
 calibration transforms this to `3581`, inside its acquisition interval.
 This uses the silicon VBAT input specification, not the 3210's different
 board-level battery routing. Other ADC channels remain research defaults.
+
+### Security Storage Observation
+
+Own loader `0x28cc7e` reads three BCD bytes from EEPROM `0x0038`; invalid
+digits select the literal `12345` at `0x28d09c`. Codec `0x2dd17c` uses its own
+four-byte table `0x303704`, not the 3210 table. Startup derives the cached
+code, and the physical submission reaches comparator `0x2dd398`.
+The negative control observes a match (`r0=1`) at retry gate `0x2dd344`, but
+RAM retry byte `0x1215b4` is `0xff` and the gate rejects counts >=5.
+An eight-byte read from EEPROM `0x17f4` into `0x1215b0` establishes this byte's
+storage offset `0x17f8`.
+
+`nse6_integrity_fixture --config-integrity --initialized-retry` changes only
+that retry byte in addition to the six integrity bytes. Identity and code
+remain erased; firmware chooses and validates its own default code. The
+positive run observes match one, retry count zero, and a Menu / Names frame
+at 28 seconds after physical submission. This is synthetic initialization,
+not recovery of authentic handset provisioning or bypass of a real lock.
+
+Own block-read wrapper `0x2dd07e` receives EEPROM address, destination and
+length in r0/r1/r2. The 30-second physical-code fixture records 638 calls,
+below the observer's 4096-call cap. During submission it rereads eight bytes
+at `0x000c` at 13.020477615 seconds, via identity formatter `0x28ced8` and
+its caller return `0x28cef7`; no separate code-record read is observed then.
+This does not prove absence of a cached verifier or another storage path.
+The formatter has three syntactic direct Thumb BL callers in the MCU extent;
+it is not a security-only function.
+
+The descriptor reader `0x2d6f28` resolves records before calling that block
+wrapper. Its bounded 6–7-second trace maps selector `0x0707` to eight bytes
+at `0x1884` (caller return `0x295cf5`), `0x0706` to one byte at `0x188c`
+(`0x295acd`), and `0x0705` to five eight-byte records at `0x185c..0x187c`
+(`0x295aeb`). These are address/ownership observations only: none is yet
+classified as the phone-lock verifier. Do not import the 3210's `0x06c8`
+security-state format or provision these records without decoding their own
+consumers.
 
 ### Report-0x14 Producer Boundary
 

@@ -9,6 +9,7 @@ local report_events = {}
 local report_raw_messages = {}
 local mask_writes = 0
 local cache_writes = 0
+local eeprom_blocks = 0
 local lcd_data_count, lcd_nonzero_count, lcd_command_count = 0, 0, 0
 handles[#handles + 1] = memory:install_write_tap(0x20028, 0x2002b,
     'nse6_lcd_data', function(offset, value, mask)
@@ -115,7 +116,8 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
         0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a,
         0x21fb1e, 0x21fb94, 0x21fb98, 0x2dca88, 0x294c90,
-        0x222532, 0x22254e, 0x21e012, 0x293da2, 0x293ccc, 0x293d0e}) do
+        0x222532, 0x22254e, 0x21e012, 0x293da2, 0x293ccc, 0x293d0e,
+        0x2dd07e, 0x2d6f28, 0x28ced8, 0x2c90c2, 0x2dd18a, 0x2dd344}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
@@ -196,6 +198,53 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
                     'nse6_security_gate: computed=%04x stored11e=%04x stored90=%04x t=%.9f\n',
                     cpu.state['R9'].value & 0xffff, memory:read_u16(sp + 4),
                     memory:read_u16(sp + 6), machine.time:as_double()))
+            end
+            if address == 0x2dd07e then
+                eeprom_blocks = eeprom_blocks + 1
+            if eeprom_blocks <= 4096 then
+                machine:logerror(string.format(
+                    'nse6_eeprom_block: address=%08x buffer=%08x length=%08x lr=%08x t=%.9f\n',
+                    cpu.state['R0'].value, cpu.state['R1'].value,
+                    cpu.state['R2'].value, cpu.state['R14'].value,
+                    machine.time:as_double()))
+            end
+            end
+            if address == 0x2d6f28 and machine.time:as_double() >= 6
+                    and machine.time:as_double() <= 7 then
+                machine:logerror(string.format(
+                    'nse6_nv_record: buffer=%08x selector=%08x index=%08x lr=%08x t=%.9f\n',
+                    cpu.state['R0'].value, cpu.state['R1'].value,
+                    cpu.state['R2'].value, cpu.state['R14'].value,
+                    machine.time:as_double()))
+            end
+            if address == 0x28ced8 or address == 0x2c90c2 then
+                machine:logerror(string.format(
+                    'nse6_identity_formatter: entry=%08x buffer=%08x flags=%08x lr=%08x t=%.9f\n',
+                    address, cpu.state['R0'].value, cpu.state['R1'].value,
+                    cpu.state['R14'].value, machine.time:as_double()))
+            end
+            if address == 0x2dd18a then
+                local bytes, input_bytes, stored_bytes = {}, {}, {}
+                local sp = cpu.state['R13'].value
+                for index = 0, 15 do
+                    bytes[#bytes + 1] = string.format('%02x', memory:read_u8(sp + index))
+                end
+                for index = 0, 7 do
+                    input_bytes[#input_bytes + 1] = string.format('%02x',
+                        memory:read_u8(cpu.state['R5'].value + index))
+                    stored_bytes[#stored_bytes + 1] = string.format('%02x',
+                        memory:read_u8(0x1215b0 + index))
+                end
+                machine:logerror(string.format(
+                    'nse6_code_identity: bytes=%s entered=%s stored=%s input=%08x output=%08x t=%.9f\n',
+                    table.concat(bytes), table.concat(input_bytes), table.concat(stored_bytes), cpu.state['R5'].value,
+                    cpu.state['R4'].value, machine.time:as_double()))
+            end
+            if address == 0x2dd344 then
+                machine:logerror(string.format(
+                    'nse6_code_retry: matched=%08x attempts=%02x t=%.9f\n',
+                    cpu.state['R0'].value, memory:read_u8(0x1215b4),
+                    machine.time:as_double()))
             end
             if address == 0x2dcef0 and counts[address] <= 32 then
                 machine:logerror(string.format(

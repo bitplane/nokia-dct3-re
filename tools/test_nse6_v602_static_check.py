@@ -6,6 +6,15 @@ from tools.nse6_integrity_fixture import fixture
 
 
 class Nse6StaticTests(unittest.TestCase):
+    def test_retry_fixture_only_initializes_own_record_count(self):
+        baseline = fixture(config_integrity=True)
+        initialized = fixture(config_integrity=True, initialized_retry=True)
+        self.assertEqual([index for index, (old, new) in enumerate(
+            zip(baseline, initialized)) if old != new], [0x17F8])
+        self.assertEqual(initialized[0x17F8], 0)
+        self.assertEqual(initialized[0xC:0x14], b"\xff" * 8)
+        self.assertEqual(initialized[0x38:0x3B], b"\xff" * 3)
+
     def test_identity_sample_acceptance_boundaries_not_physical_units(self):
         accepted = [raw for raw in range(1024)
                     if 0x708 <= check.identity_sample(raw) <= 0x157C]
