@@ -918,6 +918,17 @@ CCS 3.3.83.20 public archive paths currently return HTTP 404; no runnable C54x
 simulator engine has been obtained or executed. The acquired SR12 update
 described below is not that engine. This does not exhaust software-only
 evidence or establish a physical-hardware requirement.
+TI's [C5400 scripting support answer](https://e2e.ti.com/support/tools/code-composer-studio-group/ccs/f/code-composer-studio-forum/1026307/code-composer-c5400-debugging-with-dss-api)
+also rules out a modern DSS-based shortcut: C54x simulation ends at CCS
+3.3, whereas DSS begins at CCS 4. TI explicitly states that no version
+supports both. An acquired legacy simulator therefore needs its original
+automation interface, not a modern target-configuration transplant.
+TI's [C54x design workshop](https://e2echina.ti.com/cfs-file/__key/telligent-evolution-components-attachments/00-120-00-00-00-00-18-64/TI-TMS320C54x-DSP-_BE8BA18B0763FC5B_.pdf)
+documents GEL-based simulator initialization as a legacy automation lead;
+it is not an acquired engine or an executed differential test. The separate
+[CODECOMPOSER product](https://www.ti.com/tool/CODECOMPOSER) page concerns
+older C2x/C5x/C3x/C4x products and offers only a C3x/C4x service pack,
+not a replacement C54x simulator download.
 Two publicly accessible alternatives do not cover this boundary:
 [gDSPsim 0.30](https://sourceforge.net/projects/gdspsim/files/gdspsim/gdspsim-0.30/)
 has a staged C54x pipeline and software INTR implementation, but the inspected
