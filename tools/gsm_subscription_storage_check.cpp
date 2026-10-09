@@ -35,15 +35,40 @@ int main()
 	other[11] = 1;
 	assert(!decode(bytes, other, restored));
 	assert(encode(subscriber, restored) == bytes);
-	for (auto offset : {20U, 21U, 22U})
+	auto reject_with_valid_crc = [&](image changed)
 	{
-		auto changed = bytes;
-		changed[offset] = 0xff;
 		const auto crc = checksum(changed);
 		for (unsigned i = 0; i < 4; ++i)
 			changed[changed.size() - 4 + i] = std::uint8_t(crc >> (i * 8));
 		assert(!decode(changed, subscriber, restored));
 		assert(encode(subscriber, restored) == bytes);
+	};
+	for (unsigned condition = 0; condition < condition_count; ++condition)
+	{
+		const unsigned base = 20 + condition * 21;
+		for (unsigned field = 0; field < 3; ++field)
+		{
+			auto changed = bytes;
+			changed[base + field] = 0xff;
+			reject_with_valid_crc(changed);
+		}
+		for (unsigned flags : {0U, 2U})
+		{
+			auto changed = bytes;
+			changed[base] = flags;
+			if (flags == 2)
+				changed[base + 1] = 0; // Isolate active-without-registration.
+			reject_with_valid_crc(changed);
+		}
+		auto changed = bytes;
+		changed[base + 1] = 0;
+		reject_with_valid_crc(changed);
+	}
+	for (unsigned field = 0; field < 20; ++field)
+	{
+		auto changed = bytes;
+		changed[field] ^= 1;
+		reject_with_valid_crc(changed);
 	}
 	const auto empty = encode(subscriber, records{});
 	assert(decode(empty, subscriber, restored));
