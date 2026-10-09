@@ -28,6 +28,23 @@ not fabricated. Their Nokia DSP-side ownership remains an evidence question,
 but the standards-defined Layer 1 transport and scheduling contract is ready
 for those 184 information bits.
 
+## Error verdict limits
+
+`verify-gsm-tch-f-l1` exercises the laboratory profile of four inverted
+traffic bursts every 144 with three valid source-bit patterns and matched
+clean controls. Over 576 bursts, each stream decodes 143 frames. The clean
+controls preserve every payload. Each impaired stream changes seven decoded
+payloads; all-one and patterned source bits produce seven bad verdicts,
+whereas all-zero source bits produce none. These are reproducible decoder
+observations, not an independent standards conformance vector or a measured
+radio error distribution. A parity/tail pass cannot establish bit equality.
+
+Consequently, impairment counters plus network concealment counts do not
+alone prove corruption-induced uplink BFI: startup and FACCH can also cause
+concealment. Runtime evidence must distinguish these from corruption, and
+the 3410 outgoing gate retains this scope limit. No payload-dependent forced
+BFI is added to make the diagnostic profile fail decoding.
+
 The parallel SDCCH boundary is documented in `gsm_a5_ciphering.md`. LAPDm
 blocks now cross the same 184-bit xCCH encoder/decoder and four ciphered normal
 bursts rather than applying A5 to decoded Layer 3.

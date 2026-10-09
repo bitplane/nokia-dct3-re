@@ -211,6 +211,46 @@ void test_stateful_diagonal_stream()
 	assert(!erased->speech.good);
 }
 
+void test_periodic_hard_errors_depend_on_speech_content()
+{
+	// The laboratory peer inverts four consecutive traffic bursts every 144.
+	// A decoder verdict is not a payload equality guarantee: the limited
+	// speech parity can accept a corrupted word for particular source bits.
+	for (unsigned pattern = 0; pattern < 3; ++pattern)
+	{
+		speech_bits bits{};
+		for (unsigned k = 0; k < bits.size(); ++k)
+			bits[k] = pattern == 0 ? 0 : pattern == 1 ? 1 :
+					((k * 73 + 19) % 101) < 49;
+		const auto frame = pack_speech(bits);
+		for (bool impaired : {false, true})
+		{
+			diagonal_transmitter transmitter;
+			diagonal_receiver receiver;
+			unsigned total = 0, bad = 0, changed = 0;
+			for (unsigned burst = 0; burst < 576; ++burst)
+			{
+				if (!(burst % 4))
+					assert(transmitter.enqueue(
+							{encode_speech(frame), traffic_block_kind::speech}));
+				auto payload = transmitter.next_burst();
+				if (impaired && burst % 144 < 4)
+					invert_data_bits(payload);
+				const auto decoded = receiver.receive(payload);
+				if (!decoded)
+					continue;
+				assert(decoded->kind == traffic_block_kind::speech);
+				++total;
+				bad += !decoded->speech.good;
+				changed += decoded->speech.frame != frame;
+			}
+			assert(total == 143);
+			assert(changed == (impaired ? 7 : 0));
+			assert(bad == (impaired && pattern != 0 ? 7 : 0));
+		}
+	}
+}
+
 void test_diagonal_snapshot_continuation()
 {
 	const auto speech_frame = patterned_frame();
@@ -413,6 +453,7 @@ int main()
 	test_interleaving_and_bursts();
 	test_facch_control_coding();
 	test_stateful_diagonal_stream();
+	test_periodic_hard_errors_depend_on_speech_content();
 	test_diagonal_snapshot_continuation();
 	test_full_rate_schedule();
 	test_stateful_sacch_stream();
