@@ -5,19 +5,8 @@ local outgoing = _G.noki8890_sip_restore_outgoing == true
 dofile(directory .. (outgoing and 'noki8890_outgoing_call_input.lua' or 'noki8890_sip_cancel_observe.lua'))
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
-local memory = cpu.spaces['program']
 local saved, completed
-local function snapshot(event)
-    local sum = 0
-    for address = 0x100000, 0x17fffc, 4 do
-        sum = ((sum << 5) - sum + memory:read_u32(address)) & 0xffffffff
-    end
-    local state = {machine.time:as_double(), cpu.state['R15'].value,
-        cpu.state['R13'].value, sum}
-    machine:logerror(string.format('8890_state: event=%s pc=%08x sp=%08x ram=%08x t=%.9f\n',
-        event, state[2], state[3], state[4], state[1]))
-    return state
-end
+local snapshot = dofile(directory .. 'dct3_state_snapshot.lua')(machine, cpu, '8890_state')
 local pre_save = emu.add_machine_pre_save_notifier(function()
     saved = snapshot('saved')
     machine:logerror('sip_state: saved\n')

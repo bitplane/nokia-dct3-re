@@ -608,6 +608,17 @@ ordered replay and matching pixels before a fresh INVITE. Its CANCEL/487
 result must use epoch 2 with zero media. The post-load observer is started
 only after replay completes; no existing SIP dialog is restored.
 
+`verify-6250-sip-alerting-incoming-restore` saves an organically ringing
+NHM-3 handset at 40 seconds after the INVITE admitted at 32 seconds. Exact
+R15/R13, complete-RAM digest and emulated time must restore. The external
+INVITE is rejected, not replayed, followed by one cause-41 clear under
+epoch 2. Own carrier-19 deconfiguration/confirmation, resumed paging,
+reviewed missed-call pixels, physical Names/C Exit decoded as `15` and
+reviewed idle recovery remain required. Answer, CONNECT and accepted media
+are forbidden. The shared read-only snapshot helper carries no product
+radio, input or provisioning assumptions. This is unanswered restoration,
+not native speech or connected SIP coverage.
+
 `verify-8210-sip-cancel` covers NSM-3 v5.31 research HLE with the explicitly
 labelled acquired base-record comparison (invalid later journal omitted),
 not factory provisioning. Physical startup precedes a real INVITE/CANCEL/487

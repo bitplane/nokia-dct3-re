@@ -459,11 +459,21 @@ are checked independently before resumed paging.
 
 The reviewed 96x60 `1 missed call` screen must appear, followed by physical
 Names/C Exit decoded as own raw matrix value `15` and the reviewed operator
-idle frame. The generic SIP runner rejects answered/media and external-dialog
+idle frame. The generic SIP runner rejects answered/media and connected-dialog
 restoration fixtures for this profile; the own idle-restore runner admits a
 fresh dialog only after handset restoration. This proves an unanswered external SIP
 lifecycle, not speech, native DSP, live RF or authentic factory PMM repair.
 The normal `noki6250` machine remains fail-closed.
+
+`verify-6250-sip-alerting-incoming-restore` separately saves the ringing
+handset at 40 s and restores exact architectural R15/R13, full-RAM digest
+and time. The external INVITE is rejected and one cause-41 clear completes
+CC/RR release under epoch 2. Own release grammar, resumed paging, the same
+missed-call frame and decoded physical Exit to reviewed idle are required.
+Answer, CONNECT and media remain forbidden. The external dialog is cleared,
+not saved; no passive replay interval is asserted during its invalidation.
+Lua waits cancelled by loading return normally, while the restore notifier
+explicitly starts the post-load physical cleanup schedule.
 
 `verify-6250-sip-outgoing-busy` independently verifies physical `123`/Send
 against real local PJSIP 486 on the same declared initial-record composition.

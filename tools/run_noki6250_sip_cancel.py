@@ -43,11 +43,28 @@ def check_frames(directory):
                 raise ValueError('NHM-3 reviewed SIP cleanup pixels differ: ' + name)
 
 
-def check_product_result(run, *, restore_idle=False):
+def check_alerting_restoration(text):
+    states = re.findall(r'6250_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
+    if (len(states) != 2 or [state[0] for state in states] != ['saved', 'restored'] or
+            states[0][1:] != states[1][1:] or '6250_state: FAIL' in text):
+        raise ValueError('NHM-3 ringing architecture did not restore exactly')
+    cursor = 0
+    for marker in ('incoming state id=1 epoch=1 phase=alerting', 'sip_state: saved',
+                   'sip_state: restored', 'state_roundtrip: result=pass scenario=6250_incoming_alerting',
+                   '6250_sip_cancel: physical Exit'):
+        position = text.find(marker, cursor)
+        if position < 0:
+            raise ValueError('missing ordered NHM-3 restoration checkpoint: ' + marker)
+        cursor = position + len(marker)
+
+
+def check_product_result(run, *, restore_idle=False, restore_alerting=False):
     text = (run / 'error.log').read_text(errors='replace')
     check_output(text)
     check_output((run / 'console.log').read_text(errors='replace'))
     check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
+    if restore_alerting:
+        check_alerting_restoration(text)
     if restore_idle:
         from tools.noki6250_state_check import verify, check_frames as check_state_frames
         verify(text, fresh_sip=True)
@@ -82,28 +99,33 @@ def main():
     outgoing = parser.add_mutually_exclusive_group()
     outgoing.add_argument('--outgoing-busy', action='store_true')
     outgoing.add_argument('--outgoing-unavailable', action='store_true')
+    outgoing.add_argument('--restore-incoming-alerting', action='store_true')
     args = parser.parse_args()
     outgoing_status = 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
-    if outgoing_status and args.restore_idle:
+    if (outgoing_status or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
         accessory, audit = prepare_run(run, root)
         apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
-        script = ('noki6250_call_observe.lua' if outgoing_status else
+        script = ('noki6250_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
+                  'noki6250_call_observe.lua' if outgoing_status else
                   'noki6250_sip_idle_restore.lua' if args.restore_idle else 'noki6250_sip_cancel_observe.lua')
         handset = [str((args.mame or root / 'mame/mame').resolve()), 'nhm3hle',
                    '-rompath', f"{run / 'roms'};{root / 'roms'}", '-nvram_directory', str(run / 'nvram'),
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / script),
                    '-snapshot_directory', str(run / 'snap'), '-seconds_to_run', '57',
+                   '-state_directory', str(run / 'sta'),
                    '-video', 'none', '-sound', 'none', '-throttle', '-log', '-verbose',
                    '-http', '-http_port', str(args.http_port)]
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6250',
                    *(['--sip-response', str(outgoing_status)] if outgoing_status else
+                     ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
+                      str(run / 'snap/6250_sip_registered_idle.png')] if args.restore_incoming_alerting else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/6250_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port), '--', *handset]
@@ -140,15 +162,18 @@ def main():
                         frame.convert('L').crop((0, 8, 96, 60)).tobytes()).hexdigest() != FRAMES['6250_sip_after_cancel.png']:
                     raise ValueError('NHM-3 registered idle after failure differs')
         else:
-            check_product_result(run, restore_idle=args.restore_idle)
+            check_product_result(run, restore_idle=args.restore_idle,
+                                 restore_alerting=args.restore_incoming_alerting)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nhm3hle',
-            'scenario': ('outgoing-sip-busy' if outgoing_status == 486 else
+            'scenario': ('incoming-sip-alerting-restore' if args.restore_incoming_alerting else
+                         'outgoing-sip-busy' if outgoing_status == 486 else
                          'outgoing-sip-unavailable' if outgoing_status else 'incoming-sip-cancel'),
             'provisioning': 'derived acquired initial-record PMM comparison',
             'shared_rom_audit_members': audit, 'accessory_contract': accessory,
             'native_dsp_complete': False, 'speech_tested': False,
             'idle_restored_before_fresh_sip': args.restore_idle,
+            'incoming_alerting_restored': args.restore_incoming_alerting,
             'external_dialog_restored': False,
             'laboratory_carrier': 19, 'command': command, 'result': 'pass',
         }, indent=2) + '\n')

@@ -10,6 +10,21 @@ from tools import run_noki6250_sip_cancel as check
 
 
 class SipCancelTest(unittest.TestCase):
+    def test_ringing_restoration_requires_exact_snapshot_and_phase(self):
+        state = 'pc=00412345 sp=00170000 ram=12345678 t=40.000000000'
+        text = ('incoming state id=1 epoch=1 phase=alerting\n'
+                '6250_state: event=saved ' + state + '\nsip_state: saved\n'
+                '6250_state: event=restored ' + state + '\nsip_state: restored\n'
+                'state_roundtrip: result=pass scenario=6250_incoming_alerting\n'
+                '6250_sip_cancel: physical Exit\n')
+        check.check_alerting_restoration(text)
+        for invalid in (text.replace('phase=alerting', 'phase=connected'),
+                        text.replace('event=restored pc=00412345', 'event=restored pc=00412346'),
+                        text.replace('sip_state: restored', ''),
+                        text + '6250_state: FAIL incomplete\n'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                check.check_alerting_restoration(invalid)
+
     def test_restored_dialog_requires_fresh_epoch_and_no_media(self):
         good = {'passed': True, 'sip_status': 487, 'epoch': 2,
                 'media': dict.fromkeys(('uplink', 'downlink', 'pcm_transmitted', 'pcm_received', 'dropped'), 0)}
@@ -60,13 +75,15 @@ class SipCancelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             for options in ([], ['--incoming'], ['--incoming', '--cancel-incoming', '--record-media'],
                             ['--incoming', '--cancel-incoming', '--restore-idle'],
-                            ['--incoming', '--cancel-incoming', '--restore-call']):
+                            ['--incoming', '--cancel-incoming', '--restore-call'],
+                            ['--incoming', '--restore-call', '--restore-phase', 'connected'],
+                            ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--record-media']):
                 result = subprocess.run([sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                     '--pjsua', 'absent', '--run-dir', directory, '--product', '6250', *options],
                     capture_output=True, text=True)
                 with self.subTest(options=options):
                     self.assertEqual(result.returncode, 2)
-                    self.assertIn('limited to unanswered incoming CANCEL', result.stderr)
+                    self.assertIn('media is unproved', result.stderr)
 
 
 if __name__ == '__main__':
