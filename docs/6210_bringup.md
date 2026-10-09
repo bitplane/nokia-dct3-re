@@ -611,6 +611,22 @@ next-day hashes are profile data in `run_noki6210_calendar.py`, not borrowed
 from another handset. These cases do not establish non-leap February, every
 month boundary, offline elapsed time, alarms or native speech.
 
+## Physical alarm probe
+
+`noki6210_alarm_input.lua` physically follows Settings -> Alarm clock
+(Menu 4-1 in the [Nokia-authored user guide](https://manuals.plus/m/6bb77733be85dbf473e9cdb264eefd193dbc61e6ef4bd6382a5fef5d30ca7144.pdf)).
+On retained storage created by this product's physical Calendar entry at
+13:47, keypad `13:48` and OK program CCONT registers `0b/0c` to `30/0d`.
+Natural RTC advance to 13:48 produces the firmware's `Alarm! 13:48` screen
+with Stop/Snooze softkeys and PUP buzzer programming. Physical Stop returns
+to `DCT3 LAB` idle and disables the buzzer. Own staged/self-test and
+retained-location registration checks pass independently.
+
+This is a retained manual probe, not a named acceptance gate: frame hashes,
+event-order rejection tests and a self-contained runner remain to be added.
+It does not establish audible output, Snooze, alarm cold persistence,
+powered-off wake or native DSP behavior.
+
 ## Unattached accessory input
 
 The NPE-3 schematic sheets 2/3 connect `HEADDET` to CCONT's EAD pin A2
