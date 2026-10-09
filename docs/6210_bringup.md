@@ -573,9 +573,13 @@ presses physical End and verifies release and resumed paging; the SMS fixture
 opens the delivered message and verifies its persistent read status and frame.
 These remain signaling/storage checks, not speech validation.
 
-All three scenarios reproduce on the built `0e4649a` source checkpoint,
-including the C54x XF-output changes. Independently fresh accessory boots
-also pass the cold-repeat comparison on that build. The acceptance covers
+All three scenarios reproduce on the built `f3d15b3` source checkpoint,
+including the bounded cipher-observation and physical-capture harness changes.
+Independently fresh accessory boots also pass the cold-repeat comparison on
+that build, including identical protocol, CCONT/flash/SIM storage and idle/Menu
+pixels. Each state scenario requires a distinct evidence directory; the
+runner refuses an existing directory rather than overwriting a previous run.
+The acceptance covers
 exact saved architectural state/time, selected protocol replay and the
 scenario-specific physical-input continuation; it does not establish
 cross-host determinism, connected SIP restoration or native speech.
