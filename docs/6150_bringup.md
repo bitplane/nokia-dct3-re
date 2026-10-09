@@ -337,8 +337,22 @@ measurement against `0x01fe`. Subsequent states four and three retain
 their own retry/timer branches. Their hardware meanings remain unassigned;
 do not choose analog values merely to steer them toward the report branch.
 
-Next: find the legitimate producer of task-20 scalar initialization input
-`0x21` and establish its startup scheduling/delivery boundary,
+The bounded direct-call inventory contains 117 Thumb candidates for scalar
+sender `0x275cb0`. Recovering adjacent literal argument pairs finds task
+20/input `0x21` at `0x224e34` and `0x225348`. Both are task-20 lifecycle
+self-posts. The similar input at `0x26b7f4` targets task eight and is not
+this contract. This argument pattern is deliberately narrow: computed,
+indirect and table-driven producers are not closed.
+
+Producer `0x224e34` belongs to block `0x224e10`, entered on transformed
+input `0x42` in state ten (`0x224e06`) or fourteen (`0x22586a`). Producer
+`0x225348` belongs to block `0x22530c`, selected by `0x42` in states
+28/29 (`0x223bd8` / `0x223c12`). The observed retry states do not select
+these branches. This establishes an additional state/input dependency;
+it does not establish that the analog inputs should be changed to select it.
+
+Next: recover transformed input `0x42`'s producer and the evidenced entry
+into these task-20 lifecycle states, including computed/table-driven sends,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct

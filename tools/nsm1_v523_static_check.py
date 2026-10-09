@@ -387,6 +387,13 @@ def verify(image: bytes) -> dict:
                              "bit": 1, "wrapper": 0x2BC4D4,
                              "scalar_sender": 0x275CB0,
                              "call_candidates": direct_call_candidates(image, 0x2BC4D4)},
+                         "scalar_init_producers": {
+                             "sender": 0x275CB0,
+                             "direct_call_candidates": len(direct_call_candidates(image, 0x275CB0)),
+                             "task": 0x14, "input": 0x21,
+                             "adjacent_literal_sites": [0x224E34, 0x225348],
+                             "same_input_other_task": {"site": 0x26B7F4, "task": 8},
+                             "all_producers_closed": False},
                          "descriptor_event": {
                              "pointer_column": literal(image, 0x275FAC),
                              "stride": 8, "index": 0xE3,
