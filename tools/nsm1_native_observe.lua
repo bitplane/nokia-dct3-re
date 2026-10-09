@@ -4,6 +4,16 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
+local format_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x11fdd0, 0x11fdd3,
+    'nsm1_record_format', function(offset, value, mask)
+        if format_writes >= 32 then return end
+        format_writes = format_writes + 1
+        machine:logerror(string.format(
+            'nsm1_record_format: pc=%08x value=%08x mask=%08x caller=%08x task=%02x t=%.9f\n',
+            cpu.state['PC'].value, value, mask, cpu.state['R14'].value,
+            memory:read_u8(0x100022), machine.time:as_double()))
+    end)
 local record_requests = 0
 for _, sender in ipairs({0x275cb0, 0x275b60, 0x27641c}) do
     handles[#handles + 1] = memory:install_read_tap(sender, sender + 3,

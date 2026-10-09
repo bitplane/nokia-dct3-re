@@ -597,6 +597,15 @@ exchanges. Recover the source and meaning of the format flag and record
 bytes before choosing any external-storage fixture; these tests alone
 do not identify a valid phone identity or lock policy.
 
+The format flag is firmware-owned initialization, not the DSP verdict:
+task 2 sets `r5=0x11fd68`, `r6=0x69`, then unconditionally ORs bit 6
+into `[r5+r6]` at `0x23fa60..0x23fa66`. The write watch observes
+`0x00 -> 0x08 -> 0x48 -> 0xc8` before the first response, with further
+bit-2 changes during the dialogue; restart initialization retains bit 6.
+This rules out treating the format selection as a missing DSP publication
+or repairing it by clearing that flag. Static anchors protect the base,
+offset, unconditional store and carry-based validator selection.
+
 Next: recover the NSM-1 record semantics and task-2 validation contract,
 including the retained-marker transform and the compatibility required
 between the own repair template and modeled COBBA. Keep the SIM/readiness backtrace

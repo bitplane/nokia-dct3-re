@@ -5,6 +5,24 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_record_format_flag_is_firmware_initialized_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        self.assertEqual(0x11FDD1, check.literal(data, 0x27E688))
+        self.assertEqual(0x11FD68, check.literal(data, 0x23F9CC))
+        for address, mnemonic, operands in (
+                (0x23F9CA, "movs", "r6, #0x69"),
+                (0x23FA60, "ldrb", "r1, [r6, r5]"),
+                (0x23FA62, "movs", "r0, #0x40"),
+                (0x23FA64, "orrs", "r0, r1"),
+                (0x23FA66, "strb", "r0, [r6, r5]"),
+                (0x27E68C, "lsrs", "r0, r0, #7"),
+                (0x27E68E, "blo", "#0x27e75a")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_own_record_request_offsets_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():
