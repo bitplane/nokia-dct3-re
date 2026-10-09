@@ -49,6 +49,41 @@ class AlarmChecks(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_alarm(self.text + '6210_calendar_probe: action=time_confirm\n')
 
+    def cold_text(self):
+        expiry = self.text[self.text.index('event=second time=13:48:00'):]
+        return ('event=read reg=0b data=30 t=0.06\n'
+                'event=read reg=0c data=0d t=0.06\n'
+                'event=second time=13:47:01 day=0 status=31\n'
+                '6210_alarm_probe: cold_observe=1\n' + expiry)
+
+    def test_cold_lifecycle(self):
+        check_alarm(self.cold_text(), cold=True)
+
+    def test_cold_requires_own_observation_and_clock(self):
+        for token in ['time=13:47:01', '6210_alarm_probe: cold_observe=1\n',
+                      'event=read reg=0b data=30 ', 'event=read reg=0c data=0d ']:
+            with self.subTest(token=token), self.assertRaises(ValueError):
+                check_alarm(self.cold_text().replace(token, ''), cold=True)
+
+    def test_cold_rejects_alarm_reentry(self):
+        for action in ['confirm', 'time_1']:
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                check_alarm(self.cold_text() + f'6210_alarm_probe: action={action}\n', cold=True)
+
+    def test_cold_requires_natural_expiry_and_stop(self):
+        for line in self.cold_text().splitlines(keepends=True)[4:]:
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                check_alarm(self.cold_text().replace(line, '', 1), cold=True)
+
+    def test_cold_rejects_replaced_clock(self):
+        with self.assertRaises(ValueError):
+            check_alarm(self.cold_text() + '6210_calendar_probe: action=time_confirm\n', cold=True)
+
+    def test_cold_rejects_wrong_first_tick(self):
+        with self.assertRaises(ValueError):
+            check_alarm('event=second time=00:00:01 day=0 status=31\n' +
+                        self.cold_text(), cold=True)
+
 
 if __name__ == '__main__':
     unittest.main()

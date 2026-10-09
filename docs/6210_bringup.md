@@ -638,8 +638,18 @@ CCONT programming, natural 13:48:00, alarm-cause read/acknowledgement, buzzer
 enable/disable, all three reviewed 96x60 frames and retained-location
 registration. Negative tests reject missing/reordered evidence, wrong time
 or alarm cause, clock replacement and a buzzer left enabled after Stop.
-It does not establish audible output, Snooze, retention of an armed alarm
-across a cold boot, powered-off wake or native DSP behavior.
+`verify-6210-alarm-cold` adds an independent armed cold boot. Physical input
+sets 13:48, then exits before expiry; a new process retains only that run's
+NVRAM and supplies no clock/alarm entry. Startup reads CCONT `0b/0c=30/0d`,
+the first natural tick is 13:47:01, and expiry at 13:48 produces the same
+reviewed alarm frame. Physical Stop restores the reviewed operator frame
+and disables the buzzer. The alarm capture is at 77 seconds in both gates;
+an earlier 70-second capture differs and is not used to re-bank the oracle.
+Cold restoration retains hour/minute with seconds starting at zero; no
+offline elapsed time is claimed. Negative tests also reject missing retained
+register reads, cold observation, clock restoration, or replacement alarm entry.
+Neither gate establishes audible output, Snooze, powered-off wake or native
+DSP behavior.
 
 ## Unattached accessory input
 

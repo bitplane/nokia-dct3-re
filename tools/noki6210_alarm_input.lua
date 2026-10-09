@@ -26,6 +26,13 @@ local input = coroutine.create(function()
     end
     if not press(1, 'Left Softkey / Menu', 'confirm') then return end
     if not press(0, 'End', 'idle') then return end
+    if _G.noki6210_alarm_arm_only then
+        if not emu.wait(3) then return end
+        machine:logerror('6210_alarm_probe: armed_checkpoint=1\n')
+        machine.screens[':screen']:snapshot('6210_alarm_armed.png')
+        machine:exit()
+        return
+    end
     if not emu.wait(45) then return end
     machine.screens[':screen']:snapshot('6210_alarm_elapsed.png')
     if not press(1, 'Left Softkey / Menu', 'stop') then return end
