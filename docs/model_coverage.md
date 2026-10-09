@@ -35,6 +35,14 @@ requirement.
 
 ## Promotion rules
 
+`verify-6250-calendar-cold` independently proves physical NHM-3 Calendar
+time/date entry, the reviewed 7 October 2026 Wednesday frame, and the same
+frame in a separate process retaining only its own saved NVRAM/configuration.
+CCONT retains 13:47 and both processes register; the cold phase uses the
+persisted LAI/TMSI contract and supplies no replacement time/date input.
+This remains the declared initial-record PMM research comparison, not normal
+machine support, offline calendar advance or native DSP/audio acceptance.
+
 `verify-8890-alarm` independently proves physical Settings 4-1 alarm entry
 on NSB-6, own `13:48` CCONT programming, natural expiry, alarm-cause `b3`
 consumption and `a0` acknowledgement, buzzer control and physical Stop back

@@ -1230,3 +1230,26 @@ than this NHM-3 manual. Do not treat their timebases as measured 6250-specific
 latencies or transplant them into an HLE scheduler. The single-bit flag also
 cannot recover the missing native DSP `IMR` activation state. Review the
 rendered pages: damaged text extraction loses diagram labels and scope data.
+
+## Physical Calendar And Cold Storage
+
+`make verify-6250-calendar-cold RUN_DIR=NEW_RUN` uses the established NHM-3
+initial-record PMM comparison and otherwise fresh private storage. Physical
+Menu, seven Down presses and Select reach this product's Calendar (menu 8).
+Physical `1347` and `07102026` entries produce **7 October 2026, Wednesday**.
+Time confirmation organically writes CCONT alarm-register transport values
+`0b=2f`, then `0c=8d`; the running RTC subsequently reports 13:47.
+These register values describe the observed programming path, not a new
+interpretation of alarm ownership or physical RTC timing.
+
+A separate cold process receives only the first process's saved NVRAM and
+input configuration. It navigates to Calendar without time/date digits,
+reads CCONT hour `0d` and minute `2f`, and presents the identical reviewed
+96x60 grayscale frame (SHA-256
+`fcf0327cc0cc4edb952d0dc37621e467c0810b867738de6c91f39354a9c3a3b3`).
+Both processes independently pass laboratory registration; the second uses
+the preserved LAI/TMSI contract rather than requiring a fresh EF_LOCI write.
+The fixture checks exact physical action order, RTC programming/retention,
+absence of replacement cold input and exact pixels. This proves own-phone
+persistence and cold presentation in research HLE, not offline elapsed
+time, calendar rollover, native DSP execution or factory provisioning.
