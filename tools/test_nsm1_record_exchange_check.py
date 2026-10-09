@@ -49,6 +49,40 @@ class Nsm1RecordExchangeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "transform/echo"):
             check.check(self.transcript().replace("20673cc1", "21673cc1"), minimum=1)
 
+    def validation_trace(self):
+        return "\n".join(
+            f"nsm1_record_validation: pc={pc:08x} r0={value:08x} "
+            "r1=00112f50 r5=00000001 object=00102030"
+            for pc, value in ((0x27E688, 0x32), (0x27E6B0, 0xEC),
+                              (0x27E6EA, 0xEC), (0x27E796, 0xB8)))
+
+    def test_observed_validation_rejection_is_classified(self):
+        result = check.check(self.transcript() + "\n" + self.validation_trace(), minimum=1)
+        self.assertEqual(1, result["validation_trace"]["rejections"])
+        self.assertIn("not boot acceptance", result["validation_trace"]["scope"])
+
+    def test_missing_validation_trace_is_explicit(self):
+        result = check.check(self.transcript(), minimum=1)
+        self.assertEqual({"observed": False}, result["validation_trace"])
+
+    def test_partial_validation_trace_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "incomplete or changed"):
+            check.check(self.transcript() + "\n" + self.validation_trace().splitlines()[0], minimum=1)
+
+    def test_validation_byte_must_match_native_reply(self):
+        trace = self.validation_trace().replace("r0=000000b8", "r0=000000b9")
+        with self.assertRaisesRegex(ValueError, "inputs disagree"):
+            check.check(self.transcript() + "\n" + trace, minimum=1)
+
+    def test_validation_format_drift_is_not_missing_observation(self):
+        with self.assertRaisesRegex(ValueError, "unrecognized"):
+            check.check(self.transcript() + "\nnsm1_record_validation: changed format", minimum=1)
+
+    def test_validation_path_change_is_not_silently_accepted(self):
+        trace = self.validation_trace().replace("pc=0027e796", "pc=0027e75a")
+        with self.assertRaisesRegex(ValueError, "path/object"):
+            check.check(self.transcript() + "\n" + trace, minimum=1)
+
     def test_wrong_flash_value_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "flash value"):
             check.check(self.transcript().replace("13049a1870dd", "13049a1870de"), minimum=1)

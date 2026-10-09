@@ -22,6 +22,34 @@ from tools.nse5_transform_trace_check import inverse_transform_words
 
 REQUEST = re.compile(r"nsm1_record_request: .*?bytes=([0-9a-f]+)\b")
 REPLY = re.compile(r"nsm1_restart_packet: .*?bytes=([0-9a-f]+)\b")
+VALIDATION = re.compile(r"nsm1_record_validation: pc=([0-9a-f]+) r0=([0-9a-f]+) "
+                        r"r1=[0-9a-f]+ r5=([0-9a-f]+) object=([0-9a-f]+)\b")
+
+
+def check_validation(text: str, records: list[dict]) -> dict:
+    steps = [tuple(int(value, 16) for value in match.groups())
+             for match in VALIDATION.finditer(text)]
+    if len(steps) != sum("nsm1_record_validation:" in line for line in text.splitlines()):
+        raise ValueError("unrecognized record-validation trace format")
+    if not steps:
+        return {"observed": False}
+    path = (0x27E688, 0x27E6B0, 0x27E6EA, 0x27E796)
+    if len(steps) != len(records) * len(path):
+        raise ValueError("incomplete or changed record-validation path")
+    for index, record in enumerate(records):
+        group = steps[index * 4:(index + 1) * 4]
+        decoded = bytes.fromhex(record["decoded"])
+        if tuple(step[0] for step in group) != path or len({step[3] for step in group}) != 1:
+            raise ValueError("changed record-validation path/object")
+        if any(step[2] != 1 for step in group):
+            raise ValueError("record validity changed before the classified rejection")
+        if (group[0][1], group[1][1], group[2][1], group[3][1]) != (
+                0x32, decoded[9], decoded[9], decoded[21]):
+            raise ValueError("record-validation inputs disagree with decoded response")
+        if 0x78 <= decoded[21] < 0x80:
+            raise ValueError("classified rejecting byte is inside the accepted range")
+    return {"observed": True, "rejections": len(records), "path": [hex(pc) for pc in path],
+            "scope": "known incompatible-template rejection, not boot acceptance"}
 
 
 def retained_record_transform(record: bytes, identity_record: bytes) -> bytes:
@@ -117,6 +145,7 @@ def check(text: str, *, minimum: int = 2) -> dict:
     if pending is not None or len(records) < minimum or len(identities) != len(records):
         raise ValueError("missing or incomplete identity/record exchanges")
     return {"identity_completions": identities, "record_completions": records,
+            "validation_trace": check_validation(text, records),
             "scope": "ROM4 arithmetic/transport comparison; no fitted-mask or EEPROM acceptance"}
 
 

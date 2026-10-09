@@ -62,7 +62,7 @@ and data files declared in the driver:
   -autoboot_script ../tools/nsm1_native_observe.lua
 ```
 
-### Current unresolved predicate
+### Downstream readiness observation
 
 Own supervisor `0x2b6180` repeatedly calls readiness predicate `0x29ed4c`.
 It requires nonzero bytes at `0x111ea0` and `0x10e6d0`, plus selector helper
@@ -74,8 +74,8 @@ software states, not yet identified physical input semantics.
 
 Fresh native observation at eight seconds gives first/selector/second/third
 `01/ff/00/01`: **the second input alone is false**. The remaining question
-is which legitimate firmware lifecycle writes `0x10e6ce`, and what supplies
-its prerequisite. The literal scan identifies references to selector
+is downstream of the earlier storage rejection: which legitimate firmware
+lifecycle writes `0x10e6ce`, and what supplies its prerequisite. The literal scan identifies references to selector
 `0x10be8c`, including message-driven stores at `0x2009a0` and `0x2038f4`;
 this does not establish an EEPROM field or justify changing provisioning.
 
@@ -555,6 +555,10 @@ against the recovered ROM4 record transform, using the measured chip field.
 Both agree byte-for-byte, including the echoed 24-byte input and the removal
 of each decoded block's two private marker bytes. It also checks identity
 ordering, the requested flash value and complete request/response sizes.
+When validator taps are present, it also checks both observed rejection
+paths and their inputs against the corresponding decoded replies.
+Absent taps are explicitly reported as unobserved; malformed, incomplete
+or changed paths fail rather than silently preserving the old conclusion.
 The first request is `ac9db72cdc5386529fa4ad4946dbdaf7c70f006dd16407d9`;
 after restart it is the raw EEPROM pair
 `73654ae2a7cad1f10e8752b699232739bc9657ce4047f826`. Neither decoded record
