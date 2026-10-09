@@ -130,24 +130,25 @@ generated EEPROM observed the following sequence:
 | Data `0021` | Self-test transmit `0aaa` | `0e31` |
 | Data `0020` | Self-test receive `0aaa` | `0e5d` |
 | I/O `0021` | Initialization writes `1482`, `1482`, `0482` | `4555`, `4559`, `455d` |
-| I/O `0021` | Repeated reads `0aaa`, writes `0eaa` / `02aa` | `3221` / `3228`, `33f6` / `33fd` |
+| I/O `0021` | Repeated reads `0482` / `0c82`, writes `0c82` / `0482` | `3221` / `3228`, `33f6` / `33fd` |
 
 The PC is sampled during the memory callback, after operand fetch; it is not
 automatically the instruction's start address. Reproduce with `-log`, an
 isolated NVRAM directory and `-autoboot_script tools/c54x_rom4_codec_observe.lua`.
 The audit's output cap limits observations, not execution.
 
-The repeated I/O reads expose a remaining contract question: `io_r(0021)`
-returns COBBA's retained self-test receive latch even after acknowledgement,
-whereas data `0020` consumes the ready echo only. This is an observed model
-behavior, not evidence that real hardware reuses the self-test sample during
-ordinary audio processing. Conversely, read/modify/write-shaped firmware
-accesses do not prove that I/O `0021` is a control register: the independent
-ROM4 analysis identifies it as bidirectional PCM. Do not replace it with
-control-register readback on that inference. Establish the operational sample
-source, frame cadence and readiness separately from the boot echo before
-promoting native microphone/earpiece behavior. The four-second audit does not
-prove absence of other register paths or validate physical serial timing.
+The backend keeps I/O `0021` in its opaque saved I/O bank, independently of
+data `0020/0021` and COBBA's boot echo. Firmware initializes the I/O word to
+`0482`, sets bits `0c00` on frame entry and clears `0800` on exit; the observer
+therefore records `0482 -> 0c82 -> 0482`. I/O writes do not transmit codec
+samples. The removed mapping returned the retained `0aaa` self-test echo at
+every I/O read and discarded firmware bitfield preservation. That alias was
+not an evidenced microphone input. This partial register-storage model still
+does not decode hardware status transitions or establish silicon ownership.
+Establish operational sample source, frame cadence and readiness separately
+from the boot echo before promoting native microphone/earpiece behavior. The
+four-second audit does not prove absence of other register paths or validate
+physical serial timing.
 
 The local ROM also makes the bit operations explicit. At `321e`, `PORTR 21`
 loads accumulator-low data cell `0008`, `OR #0c00` modifies it, and `PORTW`
@@ -174,6 +175,15 @@ sites. The checker rejects additional candidate sites rather than silently
 claiming complete coverage after the image changes. This quantified scope
 excludes dynamic port addressing, flash uploads and other product masks;
 raw-word census matches alone are not proof of instruction reachability.
+
+Passing `--trace LOG` to the codec contract checker additionally verifies the
+data-space `0aaa` self-test and three ordered operational I/O readback cycles.
+The correction was checked with a fresh four-second native RF-boundary run
+(865 frames), a fresh thirty-second no-cell processing run (6033 mode-1
+frames), and physical Menu input against the existing exact Phone book frame
+oracle. These establish regression preservation and register separation, not
+native speech or physical audio clocks. The I/O bank already participates in
+native backend save states; no new unsaved latch is introduced.
 
 ## Physical capture option
 

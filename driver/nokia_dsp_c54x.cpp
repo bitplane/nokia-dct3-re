@@ -368,13 +368,6 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 		return m_transport->shared_word(0x0aa / 2);
 	case 0x0d:
 		return frame_counter();
-	case 0x21:
-	{
-		const u16 value = m_cobba->codec_serial_receive();
-		if (m_cobba->codec_serial_receive_ready())
-			m_cobba->codec_serial_receive_ack();
-		return value;
-	}
 	case 0x27:
 		if (m_rf_trace_count++ < 16)
 			machine().logerror("rom4_rf_read: sample=%u pc=%04x frame=%llu t=%.6f\n",
@@ -392,6 +385,9 @@ u16 nokia_dsp_c54x_device::io_r(offs_t offset)
 	case 0x2d:
 		return m_cobba->control_data_r();
 	default:
+		// Resident ROM4 accesses I/O 21 as a mask/write-back word. Keep its
+		// opaque saved state separate from data-space BDXR/BDRR self-test echo;
+		// operational field meanings and hardware status transitions are open.
 		return m_io[offset & 0xff];
 	}
 }
@@ -427,10 +423,6 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 		++m_completion_strobes;
 		update_host_command_line();
 		m_transport->notify_rx();
-	}
-	else if (port == 0x21)
-	{
-		m_cobba->codec_serial_transmit(data);
 	}
 	else if (port == 0x27)
 	{

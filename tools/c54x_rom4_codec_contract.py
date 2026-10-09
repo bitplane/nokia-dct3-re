@@ -3,6 +3,7 @@
 
 import argparse
 from pathlib import Path
+import re
 
 if __package__ in (None, ""):
     import sys
@@ -79,16 +80,45 @@ def check(image: bytes) -> list[str]:
     return results
 
 
+def check_trace(text: str) -> None:
+    records = re.findall(
+        r"rom4_serial_audit: space=(data|io) direction=(read|write) "
+        r"address=([0-9a-f]{4}) value=([0-9a-f]{4}) mask=ffff "
+        r"pc=([0-9a-f]{4}) t=([0-9.]+)", text)
+    echo = [(direction, address, value, pc)
+            for space, direction, address, value, pc, _ in records
+            if space == "data" and address in ("0020", "0021")]
+    if echo != [("write", "0021", "0aaa", "0e31"),
+                ("read", "0020", "0aaa", "0e5d")]:
+        raise ValueError("data-space boot echo missing, duplicated or changed")
+    io = [(direction, value, pc) for space, direction, address, value, pc, _ in records
+          if space == "io" and address == "0021"]
+    expected = [("write", "1482", "4555"), ("write", "1482", "4559"),
+                ("write", "0482", "455d")]
+    expected += [("read", "0482", "3221"), ("write", "0c82", "3228"),
+                 ("read", "0c82", "33f6"), ("write", "0482", "33fd")] * 3
+    if io[:len(expected)] != expected:
+        raise ValueError("I/O control readback does not preserve initialization/frame masks")
+    if "Lua error" in text:
+        raise ValueError("Lua observation failed")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
+    parser.add_argument("--trace", type=Path,
+                        help="check a fresh four-second passive codec observer log")
     args = parser.parse_args()
     try:
         results = check(args.image.read_bytes())
+        if args.trace is not None:
+            check_trace(args.trace.read_text(errors="replace"))
     except (OSError, ValueError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print("PASS: " + ", ".join(results))
     print("Candidate immediate-port coverage: reads=9/9 writes=12/12; uploads excluded.")
+    if args.trace is not None:
+        print("Native echo and three operational control readback cycles: PASS")
     print("Bounded ROM sequences only; physical port ownership remains unresolved.")
     return 0
 
