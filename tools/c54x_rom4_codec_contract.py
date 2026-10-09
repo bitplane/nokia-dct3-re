@@ -126,6 +126,37 @@ def check_restore(text: str) -> None:
         raise ValueError("native restore harness failed")
 
 
+def check_tone(text: str) -> None:
+    check_trace(text)
+    press = re.findall(r"input-press: t=([0-9.]+) name=1\b", text)
+    release = re.findall(r"input-release: t=([0-9.]+) name=1\b", text)
+    if len(press) != 1 or len(release) != 1:
+        raise ValueError("expected one physical numeric-key press/release")
+    start, end = float(press[0]), float(release[0])
+    events = re.findall(
+        r"rom4_tone_access: owner=(mcu|dsp) direction=(read|write) "
+        r"address=([0-9a-f]{6}) value=([0-9a-f]+) mask=([0-9a-f]+) "
+        r"pc=([0-9a-f]{6}) t=([0-9.]+)", text)
+    required = [("mcu", "write", "0100ac", "e10000", "ffff0000", "272034"),
+                ("dsp", "read", "000856", "00e1", "ffff", "00a59a"),
+                ("dsp", "write", "0000fe", "00e1", "ffff", "00a5de")]
+    cursor = start
+    for event in required:
+        matches = [float(time) for *fields, time in events
+                   if tuple(fields) == event and cursor <= float(time) < end]
+        if not matches:
+            raise ValueError("missing ordered organic tone command/initializer: " + str(event))
+        cursor = matches[0]
+    summaries = re.findall(
+        r"rom4_tone_summary: tx_words=(\d+) rx_reads=(\d+) tone_reads=(\d+) "
+        r"tone_copies=(\d+) t=([0-9.]+)", text)
+    if len(summaries) != 1:
+        raise ValueError("missing uncapped native tone summary")
+    tx, rx, reads, copies, time = summaries[0]
+    if (int(tx), int(rx)) != (1, 1) or int(reads) == 0 or int(copies) == 0 or float(time) < 11:
+        raise ValueError("native tone/serial boundary changed; review actual sample activity")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
@@ -133,6 +164,8 @@ def main() -> int:
                         help="check a fresh four-second passive codec observer log")
     parser.add_argument("--restore-log", type=Path,
                         help="check exact native I/O-word restoration snapshots")
+    parser.add_argument("--tone-log", type=Path,
+                        help="check physical numeric-key tone delivery and serial totals")
     args = parser.parse_args()
     try:
         results = check(args.image.read_bytes())
@@ -140,6 +173,8 @@ def main() -> int:
             check_trace(args.trace.read_text(errors="replace"))
         if args.restore_log is not None:
             check_restore(args.restore_log.read_text(errors="replace"))
+        if args.tone_log is not None:
+            check_tone(args.tone_log.read_text(errors="replace"))
     except (OSError, ValueError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print("PASS: " + ", ".join(results))
@@ -148,6 +183,8 @@ def main() -> int:
         print("Native echo and three operational control readback cycles: PASS")
     if args.restore_log is not None:
         print("Native I/O word, CPU registers and save-time restoration: PASS")
+    if args.tone_log is not None:
+        print("Organic tone initialization: PASS; operational_serial_samples=0 native_audio_claim=0")
     print("Bounded ROM sequences only; physical port ownership and codec clock remain unresolved.")
     return 0
 

@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_codec_contract import SEQUENCES, check, check_trace, check_restore
+from tools.c54x_rom4_codec_contract import SEQUENCES, check, check_trace, check_restore, check_tone
 
 
 class CodecContractTests(unittest.TestCase):
@@ -107,6 +107,37 @@ class CodecRestoreTests(unittest.TestCase):
     def test_failed_harness_rejected(self):
         with self.assertRaisesRegex(ValueError, "harness failed"):
             check_restore(self.trace().replace("result=pass", "result=fail"))
+
+
+class NativeToneTests(unittest.TestCase):
+    def trace(self):
+        return CodecTraceTests().trace() + "\n" + "\n".join([
+            "input-press: t=8.0 name=1 port=1f",
+            "rom4_tone_access: owner=mcu direction=write address=0100ac value=e10000 mask=ffff0000 pc=272034 t=8.07",
+            "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
+            "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.09",
+            "input-release: t=8.22 name=1 port=1d",
+            "rom4_tone_summary: tx_words=1 rx_reads=1 tone_reads=29 tone_copies=7 t=11.01",
+        ])
+
+    def test_organic_tone_boundary(self):
+        check_tone(self.trace())
+
+    def test_missing_command_rejected(self):
+        with self.assertRaisesRegex(ValueError, "organic tone"):
+            check_tone(self.trace().replace("value=e10000", "value=0000"))
+
+    def test_early_boot_copy_does_not_prove_key_response(self):
+        with self.assertRaisesRegex(ValueError, "organic tone"):
+            check_tone(self.trace().replace("t=8.09", "t=1.59"))
+
+    def test_new_audio_activity_requires_review(self):
+        with self.assertRaisesRegex(ValueError, "boundary changed"):
+            check_tone(self.trace().replace("tx_words=1", "tx_words=2"))
+
+    def test_missing_uncapped_counts_rejected(self):
+        with self.assertRaisesRegex(ValueError, "uncapped"):
+            check_tone("\n".join(self.trace().splitlines()[:-1]))
 
 
 if __name__ == "__main__":

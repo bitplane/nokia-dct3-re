@@ -217,6 +217,36 @@ firmware's serial readiness/enable contract before introducing a codec clock;
 neither a fixed interrupt cadence nor shared tone-cell writes may be added
 merely to make this routine run.
 
+### Organic tone request boundary
+
+`tools/c54x_rom4_tone_observe.lua` combines the physical-input harness with
+passive MCU/DSP tone-cell taps and the serial-word observer. ARM taps span the
+complete 32-bit bus word `100ac..100af` and retain the raw byte mask; the upper
+halfword corresponds to DSP shared cell `0856`, not its neighboring parameter.
+Boot and interactive records have separate caps, and final serial counters
+are uncapped.
+
+In a fresh eleven-second NSE-1 run, physical key `1` at 8 s produces an MCU
+upper-halfword `00e1` write at 8.076714462 s, followed by native reads of `0856`
+and a copy to data `00fe` at `a5de` by 8.076919730 s. Release at 8.22 s is
+followed by control `00e0`, then `0001` and its native initializer copy. Total
+tone-cell reads/copies are 29/7, while total data-space serial writes/reads are
+1/1: only the boot `0aaa` exchange, no operational samples. `--tone-log LOG`
+checks the physical key, ordered post-key command/initializer, intact boot
+echo, control readback and uncapped final counts; it refuses to use an earlier
+boot initializer as evidence of a key response. These observations rule out
+missing MCU tone delivery for this fixture, not missing serial clocks on real
+hardware or tone support in other images.
+
+The next native implementation boundary is therefore serial enable/readiness
+and externally clocked word delivery, not a synthesized tone command. TI's
+[C54x Applications Guide, BSPC configuration example](https://www.ti.com/lit/ug/spru173/spru173.pdf)
+(section 3, p. 3-38) defines receiver/transmitter reset bits and receive/transmit
+ready flags separately. That primary reference supplies generic peripheral
+semantics; it does not establish the MAD2/COBBA frame-clock rate, pin mapping,
+or whether every native data `0022` write is the generic BSPC interface.
+Keep those product attachments explicit before promoting operational audio.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair
