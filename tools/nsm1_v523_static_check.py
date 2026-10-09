@@ -382,6 +382,11 @@ def verify(image: bytes) -> dict:
                              "object": literal(image, 0x27A4FA),
                              "id": literal(image, 0x27A4F2),
                              "call_candidates": direct_call_candidates(image, 0x27A4F0)},
+                         "missing_startup_report": {
+                             "state": literal(image, 0x281206), "report": 0x14,
+                             "bit": 1, "wrapper": 0x2BC4D4,
+                             "scalar_sender": 0x275CB0,
+                             "call_candidates": direct_call_candidates(image, 0x2BC4D4)},
                          "descriptor_event": {
                              "pointer_column": literal(image, 0x275FAC),
                              "stride": 8, "index": 0xE3,

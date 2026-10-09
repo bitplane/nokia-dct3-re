@@ -294,9 +294,17 @@ The observed normal path therefore fails the second nibble comparison,
 before either helper or completion publication. This is a runtime gate
 finding, not evidence for synthesizing a missing report or changing the byte.
 
-Next: inventory writers of low-nibble state `0x1126c1` and identify the
-legitimate missing transition from `0xe` to `0xf`, keeping the alternate
-scalar `0xc7` lifecycle separate,
+The write watch identifies task-1 store `0x28120c` as the observed nibble
+writer. Its subtract-free comparisons map scalar reports `0x17 -> bit 3`,
+`0x16 -> bit 1`, `0x15 -> bit 2`, and `0x14 -> bit 0`; all OR into
+`0x1126c1`. The cold run observes the first three, matching `8/a/e`, but
+not `0x14`. Own report wrapper `0x2bc4d4` posts task 1/value `0x14` via
+scalar sender `0x275cb0` at `0x2bc4e2`. The bounded direct call scan finds
+one candidate at `0x223a74`. This closes the missing-bit interpretation,
+not the report's hardware ownership or all indirect producers.
+
+Next: decode and trace report-`0x14` caller `0x223a74` and its prerequisite,
+keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1

@@ -40,6 +40,16 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         self.assertEqual([0x281376, 0x2BC146], completion["call_candidates"])
         self.assertEqual(bytes.fromhex("1587"),
                          data[completion["object"] - check.BASE:completion["object"] - check.BASE + 2])
+        report = check.verify(data)["sim_delivery"]["missing_startup_report"]
+        self.assertEqual(0x1126C1, report["state"])
+        self.assertEqual([0x223A74], report["call_candidates"])
+        for address, mnemonic, operands in (
+                (0x281220, "movs", "r0, #1"),
+                (0x2BC4DE, "movs", "r0, #1"),
+                (0x2BC4E0, "movs", "r1, #0x14"),
+                (0x2BC4E2, "bl", "#0x275cb0")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
 
     def test_own_descriptor_event_delivery_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"

@@ -10,6 +10,16 @@ local application_receives = 0
 local lifecycle_receives = 0
 local scalar_receives = 0
 local completion_gates = 0
+local readiness_nibble_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x1126c0, 0x1126c3,
+    'nsm1_readiness_nibble', function(offset, value, mask)
+        if readiness_nibble_writes >= 64 then return end
+        readiness_nibble_writes = readiness_nibble_writes + 1
+        machine:logerror(string.format(
+            'nsm1_readiness_nibble: value=%08x mask=%08x pc=%08x task=%02x t=%.9f\n',
+            value, mask, cpu.state['PC'].value, memory:read_u8(0x100022),
+            machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_read_tap(0x281298, 0x28129b,
     'nsm1_completion_gate', function(offset, value, mask)
         if cpu.state['PC'].value ~= 0x28129a or completion_gates >= 16 then return end
