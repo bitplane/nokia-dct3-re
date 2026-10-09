@@ -23,6 +23,24 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
             decoded = check.instruction(data, address)
             self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
 
+    def test_record_summary_status_bit_consumers_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        self.assertEqual(0x11FDD1, check.literal(data, 0x23FDA8))
+        for address, mnemonic, operands in (
+                (0x23FD4E, "ldrb", "r1, [r4, #8]"),
+                (0x23FDDC, "ldrb", "r0, [r4, #9]"),
+                (0x23FDE0, "lsrs", "r2, r0, #1"),
+                (0x23FDEC, "movs", "r0, #0xbf"),
+                (0x23FDF2, "strb", "r0, [r5]"),
+                (0x23FDF6, "lsrs", "r0, r0, #2"),
+                (0x23FE08, "movs", "r1, #0xbf"),
+                (0x23FE0E, "strb", "r1, [r5]")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_own_record_request_offsets_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

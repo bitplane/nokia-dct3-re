@@ -606,6 +606,17 @@ This rules out treating the format selection as a missing DSP publication
 or repairing it by clearing that flag. Static anchors protect the base,
 offset, unconditional store and carry-based validator selection.
 
+The task-2 response dispatcher is `0x23fd34`, reading command at object
+`+8`. Its subtract cascade maps `0x34` to `0x27e424`, `0x35` to
+`0x27e618`, `0x36` to `0x27e4c2`, and `0x0d` to `0x23fda8`.
+The captured stream has no separate reply to requests `0x14` / `0x15`;
+after `0x35` it carries `0x0d/0x00`. In the `0x0d` handler, status byte
+`+9` bits 0 and 1 select retained status values `0x10` / `0x11` and
+clear format bit 6 when set (`0x23fde8..0x23fe0e`). Both are clear in
+the observed reply, so this path preserves bit 6. This is a measured
+status-bit contract, not proof of the semantic validity of all EEPROM
+records or an identification of what the DSP tested for those bits.
+
 Next: recover the NSM-1 record semantics and task-2 validation contract,
 including the retained-marker transform and the compatibility required
 between the own repair template and modeled COBBA. Keep the SIM/readiness backtrace
