@@ -107,6 +107,11 @@ activation. The fresh process retains the existing inactive-result and idle
 oracles. Each process owns its working directory and logs; no runtime
 subscription is injected. This promotes NHM-3 research-HLE persistence,
 not native speech, RF or another product's UI acceptance.
+`make verify-6210-call-divert-cold RUN_DIR=run_6210_divert_cold` independently
+passes the same three-process contract with unchanged NPE-3 provisioning,
+its own physical-input fixture and separately reviewed active-idle frame.
+The shared runner retains product-specific preparation and frame acceptance;
+only the established subscription/query/routing checks are shared.
 Do not reconstruct registration from handset UI state, inject
 supplementary results, or change SIM files to make a query pass.
 

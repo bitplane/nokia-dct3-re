@@ -47,9 +47,16 @@ cold-process forwarding persistence are not covered by this scenario.
 CPU/RAM/time and compares the one-second observed protocol replay. Only after
 load does a fresh physical query establish retained active forwarding; physical
 deactivation and a final inactive query complete normally with the same four
-reviewed result frames. The laboratory network retains forwarding through
-MAME save/load, not through NVRAM: a new emulator process starts a new network
-fixture. No cold-process persistence is claimed.
+reviewed result frames. This scenario establishes save/load, independently of
+cold-process persistence.
+
+`verify-6210-call-divert-cold` runs three independent processes with unchanged
+own provisioning: physical registration, retained-storage active interrogation
+and external incoming-call forwarding without handset paging, then a separate
+fresh-storage inactive interrogation. The network-owned subscription file stays
+byte-identical during the retained query. Result and idle frames are reviewed
+6210 oracles; the fixture does not import another product's provisioning or
+claim native speech.
 
 ## Inputs
 
