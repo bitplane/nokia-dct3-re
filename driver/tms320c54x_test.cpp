@@ -336,8 +336,10 @@ private:
 		m_phase = 6200 + index * 2;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
-	void start_timer_boundary_probe(bool short_period)
+	void start_timer_boundary_probe(unsigned index)
 	{
+		bool const short_period = !(index & 1);
+		bool const direct_mask = index >= 2;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		// Synthetic timer reload followed by IMR masking. No handset image.
@@ -346,6 +348,14 @@ private:
 			0x6881, 0xfff7, 0x76f8, 0x0501, 1, 0xf073, 0x060f};
 		for (unsigned i = 0; i < std::size(code); ++i)
 			program.write_word(0x010600 + i, code[i]);
+		// Direct IMR addressing removes the post-reload pointer setup only.
+		if (direct_mask)
+		{
+			program.write_word(0x010608, 0x68f8); // ANDM #fff7,*(0000)
+			program.write_word(0x010609, 0x0000);
+			program.write_word(0x01060a, 0xfff7);
+			program.write_word(0x01060b, 0xf495); // NOP; keep the marker location unchanged.
+		}
 		program.write_word(0x01004c, 0x4a1e); // Save XPC, as a far-return ISR requires.
 		program.write_word(0x01004d, 0xf4e5); // FRETE
 		data.write_word(0x0501, 0);
@@ -358,7 +368,7 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, 0x010600);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = short_period ? 7000 : 7001;
+		m_phase = 7000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 	void start_intm_protection_case(unsigned index)
@@ -878,7 +888,7 @@ private:
 		if (!strcmp(machine().system().name, "tms54test") &&
 				!strcmp(machine().options().bios(), "timer"))
 		{
-			start_timer_boundary_probe(true);
+			start_timer_boundary_probe(0);
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4"))
@@ -1587,20 +1597,22 @@ private:
 			start_idle_nmi_case(0);
 			return;
 		}
-		if (m_phase == 7000 || m_phase == 7001)
+		if (m_phase >= 7000 && m_phase <= 7003)
 		{
-			bool const short_period = m_phase == 7000;
+			unsigned const index = m_phase - 7000;
+			bool const short_period = !(index & 1);
 			u16 const marker = m_cpu->space(AS_DATA).read_word(0x0501);
-			osd_printf_info("TMS320C54x timer boundary probe: period=%u mask_reached=%u pc=%06x sp=%04x imr=%04x ifr=%04x correctness_claim=0\n",
-				short_period ? 1 : 0x0100, marker, unsigned(m_cpu->state_int(STATE_GENPC)),
+			osd_printf_info("TMS320C54x timer boundary probe: period=%u mask_addressing=%s mask_reached=%u pc=%06x sp=%04x imr=%04x ifr=%04x correctness_claim=0\n",
+				short_period ? 1 : 0x0100, index >= 2 ? "direct" : "indirect", marker, unsigned(m_cpu->state_int(STATE_GENPC)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)));
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Timer probe executes supported synthetic instructions");
-			if (short_period) { start_timer_boundary_probe(false); return; }
-			expect(marker == 1 && !(m_cpu->state_int(tms320c54x_device::STATE_IMR) & 8),
+			if (!short_period)
+				expect(marker == 1 && !(m_cpu->state_int(tms320c54x_device::STATE_IMR) & 8),
 				"Long-period control reaches the IMR mask before first timer expiry");
-			osd_printf_info("TMS320C54x timer boundary probe: complete cases=2 fidelity_acceptance=0\n");
+			if (index < 3) { start_timer_boundary_probe(index + 1); return; }
+			osd_printf_info("TMS320C54x timer boundary probe: complete cases=4 fidelity_acceptance=0\n");
 			machine().schedule_exit();
 			return;
 		}

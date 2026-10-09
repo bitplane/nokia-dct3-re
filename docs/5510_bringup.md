@@ -2220,6 +2220,25 @@ control reaches the IMR mask. This excludes NAND, codec and serial work as
 necessary causes of the stall, but is not proof of the exact physical
 interrupt latency. See [the CPU contract](rom4_dsp_loader.md) for scope.
 
+On the current build the short-period synthetic case stops at `01:0608`
+with SP `1000`, IMR `0008`, IFR `0008` and its completion marker clear.
+That PC is the `LD #0,AR1` immediately after the indirect TCR reload,
+before the indirect IMR mask at `01:060a`; the ISR restores the stack but
+the mask's address setup never completes. The PRD `0100` control reaches
+`01:060f`, sets the marker and clears IMR bit 3 while IFR bit 3 remains
+latched. Thus the discriminator is execution reaching the mask, not
+whether the timer flag can latch while masked. These are observations of
+the current core, not physical timing acceptance criteria.
+
+The probe also substitutes a direct `ANDM #fff7,*(0000)` at `01:0608`
+for the pointer setup and indirect mask, retaining the completion marker's
+address. Both short-period cases leave the marker clear; both long-period
+controls set it and mask TINT. In the direct short-period observation the
+CPU is at vector `01:004c` with SP `0fff`. This excludes the extra pointer
+setup instruction as the sole cause, without establishing a physical
+interrupt delay or changing the CPU implementation. The diagnostic now
+reports four cases and still declares `fidelity_acceptance=0`.
+
 The CPU's MOD4/MOD7 addressing modes require reverse carry/borrow when
 subtracting/adding AR0, not linear arithmetic ([TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
 section 5.5.3.5 and table 5-4). Linear `*AR+0B` indexing made the codec
