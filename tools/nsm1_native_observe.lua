@@ -23,6 +23,16 @@ handles[#handles + 1] = memory:install_read_tap(0x221ee4, 0x221ee7,
     end)
 local readiness_nibble_writes = 0
 local input_state_writes = 0
+local owner_state_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x111c68, 0x111c6b,
+    'nsm1_owner_state', function(offset, value, mask)
+        if owner_state_writes >= 32 then return end
+        owner_state_writes = owner_state_writes + 1
+        machine:logerror(string.format(
+            'nsm1_owner_state: value=%08x mask=%08x pc=%08x task=%02x t=%.9f\n',
+            value, mask, cpu.state['PC'].value, memory:read_u8(0x100022),
+            machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_write_tap(0x1127d8, 0x1127db,
     'nsm1_input_state', function(offset, value, mask)
         if input_state_writes >= 32 then return end

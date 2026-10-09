@@ -401,8 +401,24 @@ This path cannot yet be treated as the normal startup publication: its
 scheduling lifecycle remains unresolved. The pending notification alone
 does not prove a missing timer implementation.
 
-Next: inspect task-20's initial lifecycle selection and computed/table-driven
-initialization sources before assuming the later countdown is a boot dependency,
+The initial task-20 state is own firmware data, not a runtime peripheral
+selection: the write watch sees byte `0x111c69 = 0x18` copied by initializer
+`0x200148` before task entry, on both sides of the early reset. Entry
+`0x223520` loads context `0x111c34` then dispatches its existing halfword
+`+52` via `0x22640a` without choosing a new mode.
+
+State `0x18` handler `0x2258e4` validates/clamps stored parameters,
+initializes local state, primes selectors four/three/two, and falls through
+state-`0x19` handler `0x225a96`. The latter arms timer index `0xd8` with
+delay `0x1b7`, sets retry count four, then receives. In the cold run its
+first received value `0xb1` does not map to transformed timer input `0x49`,
+so state `0x1a` is recorded at `0x22362c`. Repeated periodic returns retain
+that state before the previously observed retry progression. The initialized
+state therefore has an explicit own-ROM explanation; it is not evidence for
+changing calibration or hardware identity to reach another state.
+
+Next: inventory remaining computed/table-driven initialization sends and
+the first external transition of this own-ROM startup lifecycle,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
