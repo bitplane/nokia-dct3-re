@@ -149,6 +149,19 @@ source, frame cadence and readiness separately from the boot echo before
 promoting native microphone/earpiece behavior. The four-second audit does not
 prove absence of other register paths or validate physical serial timing.
 
+The local ROM also makes the bit operations explicit. At `321e`, `PORTR 21`
+loads accumulator-low data cell `0008`, `OR #0c00` modifies it, and `PORTW`
+writes it back. At `33f3`, the same port is read, masked with `f7ff` (clearing
+bit `0800`), and written back. Initialization at `454e` builds two words in
+adjacent memory and emits `1482`, `1482`, `0482` using post-decrement
+addressing. `tools/c54x_rom4_codec_contract.py` checks all words in these three
+bounded sequences against the acquired big-endian program image; its tests
+reject a mutation at every checked word. This is not a whole-ROM ownership
+census. These control-shaped sequences challenge the imported simple PCM
+label but do not by themselves identify a MAD2 register or prove that no
+operational sample path uses the port. Preserve the independent claim as a
+hypothesis, not an implemented microphone contract.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair
