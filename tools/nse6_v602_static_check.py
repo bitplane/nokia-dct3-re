@@ -41,6 +41,13 @@ def verifier_stream(image):
                     for offset in range(0x40, len(image), 32)) + b"\xff\xff" * 2
 
 
+def integrity_arithmetic(block, excluded_word):
+    """Arithmetic before the service callback, not an identity validator."""
+    if len(block) not in (0xDE, 0x9E) or not 0 <= excluded_word <= 0xFFFF:
+        raise ValueError("unsupported NSE-6 integrity arithmetic input")
+    return (sum(block) - (excluded_word >> 8) - (excluded_word & 0xFF)) & 0xFFFF
+
+
 def read32(image, address):
     offset = address - BASE
     if offset < 0 or offset + 4 > len(image):

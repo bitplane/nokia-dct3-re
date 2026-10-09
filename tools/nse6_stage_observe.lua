@@ -34,11 +34,18 @@ handles[#handles + 1] = memory:install_read_tap(0x1205c8, 0x1205cf,
     end)
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
-        0x2e1194, 0x2de164, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e}) do
+        0x2e1194, 0x2de164, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
+        0x240992, 0x240b94}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if (address == 0x240992 or address == 0x240b94)
+                    and counts[address] <= 4 then
+                machine:logerror(string.format(
+                    'nse6_integrity_return: pc=%08x value=%08x t=%.9f\n',
+                    address, cpu.state['R0'].value, machine.time:as_double()))
+            end
             if address == 0x240c1e and counts[address] == 1 then
                 local sp = cpu.state['R13'].value
                 machine:logerror(string.format(

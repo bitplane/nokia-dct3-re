@@ -274,6 +274,18 @@ Next recover the calculator/helper and protected fields completely before
 choosing any own-storage fixture; no donor record or firmware flag override is
 permitted.
 
+The observed allocated path's arithmetic is reproduced independently: sum
+EEPROM bytes `0x40..0x11d`, subtract the high and low bytes returned by
+`0x2c0ac8`, then wrap to 16 bits. That helper returns zero at 0.507807231 s;
+the calculator returns `0xdb24` at 0.507815538 s. The persisted own EEPROM is
+32,768 bytes, with `0x74..0x75=0000` written by firmware, sum `0xdb24`, and
+both stored comparison words still `ffff`. Thus the arithmetic explains the
+runtime value without assuming the two written bytes remained erased. The
+calculator calls service primitive `0x2dfe9e` before returning, so the pure
+arithmetic helper does not claim to model all service-side transformations.
+Tests cover both allocation lengths, excluded-byte subtraction and modular
+underflow; they do not establish semantic validity of protected identity data.
+
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
 `nse1_rom4_dsp_program.bin` and `nse1_rom4_dsp_data.bin` declared in the driver.

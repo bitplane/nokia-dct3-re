@@ -5,6 +5,20 @@ from tools import nse6_v602_static_check as check
 
 
 class Nse6StaticTests(unittest.TestCase):
+    def test_integrity_arithmetic_and_allocation_paths(self):
+        block = bytearray(b"\xff" * 0xDE)
+        block[0x74 - 0x40:0x76 - 0x40] = b"\0\0"
+        self.assertEqual(check.integrity_arithmetic(block, 0), 0xDB24)
+        self.assertEqual(check.integrity_arithmetic(b"\xff" * 0xDE, 0xFFFF),
+                         0xDB24)
+        self.assertEqual(check.integrity_arithmetic(b"\xff" * 0x9E, 0xFFFF),
+                         0x9B64)
+        self.assertEqual(check.integrity_arithmetic(bytes(0xDE), 1), 0xFFFF)
+        for block, word in ((bytes(2), 0), (bytes(0xDE), -1),
+                            (bytes(0xDE), 0x10000)):
+            with self.assertRaises(ValueError):
+                check.integrity_arithmetic(block, word)
+
     def test_verifier_stream_stride_lane_and_terminators(self):
         image = bytearray(0x200000)
         image[0x40:0x44] = bytes.fromhex("12345678")
