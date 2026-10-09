@@ -46,6 +46,10 @@ autonomous RTC rail wake, physical Stop/activation choice and either return
 to rail-off or firmware-owned warm restart to the exact registered idle
 frame. Warm SRAM retention and distinct cold/software reset status are
 verified at firmware consumers; native DSP and silicon timing are not inferred.
+`verify-6210-alarm-off-restore` additionally proves exact CPU/SRAM/time
+restoration during the powered-off countdown, matching RTC replay and blank
+frames, then natural deadline wake and physical Stop/No. It injects no alarm
+cause or clock value and does not establish audible output.
 `verify-6210-alarm-snooze` additionally proves physical Snooze, firmware's
 five-minute reprogramming, natural recurrence, IRQ acknowledgement, renewed
 buzzer control and physical Stop. Exact frames additionally cover `Snooze
@@ -73,7 +77,10 @@ automatic redraw of an already-open Calendar window.
 exercise physical 28 February 2024 -> 29 February 2024 and 31 December 2026
 -> 1 January 2027. Each checks both date frames, organic midnight/day
 consumption and a retained cold Calendar with registration. Non-leap
-February and other calendar boundaries remain outside these cases.
+February is independently covered by `verify-6210-calendar-nonleap`: physical
+28 February 2023 -> 1 March 2023, exact reviewed before/after pixels, hardware
+day consumption and retained cold Calendar with registration. Century rules
+and other untested calendar boundaries remain outside these cases.
 
 The 6210 research-HLE pending-outgoing and alerting-incoming SIP restore
 gates independently prove exact architectural restoration, external-dialog

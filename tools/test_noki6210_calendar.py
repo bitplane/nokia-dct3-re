@@ -1,9 +1,19 @@
 import unittest
 
-from tools.run_noki6210_calendar import check_cold, check_entry, check_midnight, check_rtc
+from tools.run_noki6210_calendar import BOUNDARIES, check_cold, check_entry, check_midnight, check_rtc
 
 
 class CalendarChecks(unittest.TestCase):
+    def test_boundary_profiles_have_reviewed_distinct_frames_and_physical_scripts(self):
+        from pathlib import Path
+        scripts = Path(__file__).resolve().parent
+        for name, profile in BOUNDARIES.items():
+            with self.subTest(name=name):
+                self.assertRegex(profile['before'], r'^[0-9a-f]{64}$')
+                self.assertRegex(profile['after'], r'^[0-9a-f]{64}$')
+                self.assertNotEqual(profile['before'], profile['after'])
+                self.assertTrue((scripts / ('noki6210_' + profile['script'] + '.lua')).is_file())
+
     def setUp(self):
         self.rtc = bytes((19, 47, 13, 0, 0, 30, 2, 48, 1))
         actions = ['menu'] + [f'menu_{i}' for i in range(2, 9)] + ['selected']

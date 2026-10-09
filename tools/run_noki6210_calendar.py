@@ -17,6 +17,12 @@ from tools.noki6210_staged_check import verify as verify_stage
 CALENDAR_SHA256 = 'fcf0327cc0cc4edb952d0dc37621e467c0810b867738de6c91f39354a9c3a3b3'
 MIDNIGHT_SHA256 = 'a04551d523cb8e0adf4efe4da7e6bdcc6ec683dc264a8e791aed57ae798d4d01'
 BOUNDARIES = {
+    'non-leap-february': {
+        'script': 'calendar_nonleap_input',
+        'before': '3f0fceeae6ee242b668c58acab5fd5ad05b8d570c6e2f6f59fe7c55bf7d8ece8',
+        'after': 'a6a9ce3243621f82cc526f5d2491a16e1b7796a72eda5f30ef362a59fe9b8f1d',
+        'description': '28 February -> 1 March 2023',
+    },
     'leap-day': {
         'script': 'calendar_leap_input',
         'before': 'ed6aad596773e123f80db40fe8034ea55cc8fb78b1346766437814658b12b7db',

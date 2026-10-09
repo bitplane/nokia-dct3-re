@@ -609,20 +609,23 @@ remains on its selected date until navigation; this gate proves the
 leave/reopen path, not automatic redraw of that window. No host-clock
 advance, RTC register fixture or Gregorian date state is injected.
 
-Two date-only variants reuse that same physical clock/day-consumption/cold
+Three date-only variants reuse that same physical clock/day-consumption/cold
 runner and the product's own flash journal:
 
 | Gate | Physical date at 23:59 | Reopened and cold-retained Calendar |
 | --- | --- | --- |
 | `verify-6210-calendar-leap-day` | 28 February 2024, Wednesday | 29 February 2024, Thursday |
+| `verify-6210-calendar-nonleap` | 28 February 2023, Tuesday | 1 March 2023, Wednesday |
 | `verify-6210-calendar-year-end` | 31 December 2026, Thursday | 1 January 2027, Friday |
 
 Each checks independently reviewed pixels both before and after midnight,
 hardware day increment/firmware rebase, retained RTC hour/minute, own staged
 verification and fresh/retained-location registration. The original and
 next-day hashes are profile data in `run_noki6210_calendar.py`, not borrowed
-from another handset. These cases do not establish non-leap February, every
-month boundary, offline elapsed time, alarms or native speech.
+from another handset. Non-leap February additionally passes in
+`run_6210_calendar_nonleap_acceptance` after independent review of both date
+frames. These cases do not establish century rules, every month boundary,
+offline elapsed time, alarms or native speech.
 
 ## Physical alarm acceptance
 

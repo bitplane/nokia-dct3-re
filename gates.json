@@ -15284,6 +15284,14 @@
                  "arguments": ["$(RUN_DIR)", "--boundary", "leap-day", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-calendar-nonleap",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6210_calendar.py",
+                 "arguments": ["$(RUN_DIR)", "--boundary", "non-leap-february", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-calendar-year-end",
       "prerequisites": ["build"],
       "variables": {},
