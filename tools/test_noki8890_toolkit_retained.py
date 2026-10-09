@@ -41,6 +41,16 @@ class RetainedToolkitTest(unittest.TestCase):
             with self.subTest(old=old), self.assertRaises(ValueError):
                 verify_interactive_protocol(trace.replace(old, new), menu=True)
 
+    def test_sms_requires_menu_and_network_completion(self):
+        with self.assertRaisesRegex(ValueError, 'card-menu'):
+            verify_interactive_protocol('', sms=True)
+        trace = '\n'.join(menu_events('8890', selection_status='9124')).replace(
+            '8890_toolkit_interactive: action=inkey_5',
+            '8890_toolkit_interactive: action=inkey_5\n'
+            '8890_toolkit_interactive: action=inkey_confirm')
+        with self.assertRaisesRegex(ValueError, 'menu selection item=1 accepted'):
+            verify_interactive_protocol(trace, menu=True, sms=True)
+
     def test_protocol_storage_and_both_frames_required(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

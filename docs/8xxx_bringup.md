@@ -2129,7 +2129,19 @@ selection emits ENVELOPE `d30702020181100101` for item 1 and receives `9000`.
 Physical End restores registered idle. Four additional own localized 84x48
 frames pin menu entry, item list, selection result and idle. The gate retains
 the NSB-6 INKEY OK requirement and independent registration/SIM-location
-checks. Card-menu selection does not establish network proactive commands.
+checks. Card-menu selection alone does not establish network proactive commands.
+
+`verify-8890-sim-toolkit-sms` independently selects card profile 5 after
+the same own physical clock seed. Item-1 ENVELOPE returns `9124`, firmware
+FETCHes the card-owned SEND SHORT MESSAGE at length `24`, and submits exactly
+one 8-bit `SAT` message to `5551234`. The checker pins the full GSM payload,
+observed CP identifier `39`/message reference `01`, CP-ACK/RP-ACK, successful
+TERMINAL RESPONSE `810305130002028281030100`, final CP-ACK and RR release.
+Ten own 84x48 frames cover interactive input, card menu, post-network menu
+and physical End to 12:02 idle (the network wait crosses a minute boundary).
+The earlier menu gate retains its separate 12:01 oracle. The extra INKEY OK, retained registration and SIM
+location remain independently required. This is laboratory SMS signaling,
+not public delivery, Toolkit call consent or native DSP speech.
 
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first

@@ -34,8 +34,16 @@ MENU_FRAMES = {
 }
 
 
-def verify_interactive_protocol(text, *, menu=False):
-    (verify_menu if menu else verify_interactive)(text, '8890')
+def verify_interactive_protocol(text, *, menu=False, sms=False):
+    if sms and not menu:
+        raise ValueError('Toolkit SMS requires physical card-menu selection')
+    if menu:
+        verify_menu(text, '8890', selection_status='9124' if sms else '9000')
+    else:
+        verify_interactive(text, '8890')
+    if sms:
+        from tools.sim_toolkit_sms_trace_check import verify as verify_sms
+        verify_sms(text, cp=0x39, message_reference=1)
     actions = re.findall(r'8890_toolkit_interactive: action=(\w+)\b', text)
     expected = ['dismiss', 'inkey_5', 'inkey_confirm', 'input_4', 'input_2', 'confirm']
     if menu:
@@ -51,13 +59,15 @@ def verify_interactive_protocol(text, *, menu=False):
     ])
 
 
-def verify(run, *, interactive=False, menu=False):
+def verify(run, *, interactive=False, menu=False, sms=False):
     from PIL import Image
     text = (run / 'error.log').read_text(errors='replace')
+    if sms and not menu:
+        raise ValueError('Toolkit SMS requires the card-menu scenario')
     if menu and not interactive:
         raise ValueError('card-menu acceptance requires interactive prerequisites')
     if interactive:
-        verify_interactive_protocol(text, menu=menu)
+        verify_interactive_protocol(text, menu=menu, sms=sms)
     else:
         verify_display_text(text, '8890')
     verify_registration(text, preserved_location=True)
@@ -67,6 +77,10 @@ def verify(run, *, interactive=False, menu=False):
     expected_frames = dict(INTERACTIVE_FRAMES if interactive else FRAMES)
     if menu:
         expected_frames.update(MENU_FRAMES)
+    if sms:
+        expected_frames['8890_toolkit_network_result.png'] = MENU_FRAMES['8890_toolkit_menu_items.png']
+        # The network wait crosses the retained clock's next minute boundary.
+        expected_frames['8890_toolkit_menu_idle.png'] = 'f3785458b0b7e3fb6017a0b523b1fbad2c5a5a32c6d2ace53bba4ee3ba8fb756'
     for name, digest in expected_frames.items():
         with Image.open(run / 'snap' / name) as frame:
             if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
@@ -81,7 +95,11 @@ def main():
                         help='require own GET INKEY/GET INPUT physical replies')
     parser.add_argument('--menu', action='store_true',
                         help='extend interactive replies with physical card-menu selection')
+    parser.add_argument('--sms', action='store_true',
+                        help='require card-requested SMS through laboratory GSM transport')
     args = parser.parse_args()
+    if args.sms:
+        args.menu = True
     if args.menu:
         args.interactive = True
     root = Path(__file__).resolve().parents[1]
@@ -105,21 +123,24 @@ def main():
             port = config.find("./system/input/port[@tag=':SATCFG']")
             if port is None:
                 raise ValueError('retained seed lacks the card-profile configuration')
-            port.set('value', '4' if args.menu else '3')
+            port.set('value', '5' if args.sms else '4' if args.menu else '3')
             config.write(config_path, encoding='utf-8', xml_declaration=True)
         command = json.loads((seed / 'acceptance.json').read_text())['command']
         script = 'noki8890_toolkit_interactive_input.lua' if args.interactive else 'noki8890_toolkit_retained_input.lua'
         if args.menu:
             script = 'noki8890_toolkit_menu_input.lua'
+        if args.sms:
+            script = 'noki8890_toolkit_sms_input.lua'
         command[command.index('-autoboot_script') + 1] = str(root / 'tools' / script)
-        command[command.index('-seconds_to_run') + 1] = '120' if args.menu else '105' if args.interactive else '80'
+        command[command.index('-seconds_to_run') + 1] = '140' if args.sms else '120' if args.menu else '105' if args.interactive else '80'
         with (warm / 'console.log').open('w') as console:
             subprocess.run(command, cwd=warm, stdout=console, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        verify(warm, interactive=args.interactive, menu=args.menu)
+        verify(warm, interactive=args.interactive, menu=args.menu, sms=args.sms)
         (run / 'acceptance.json').write_text(json.dumps({
             'product': '8890', 'result': 'pass', 'seed': 'fresh physical clock/date; own acquired PMM',
-            'scope': ('retained-clock DISPLAY TEXT/GET INKEY/GET INPUT/SET UP MENU' if args.menu else
+            'scope': ('retained-clock interactive Toolkit with laboratory SEND SHORT MESSAGE' if args.sms else
+                      'retained-clock DISPLAY TEXT/GET INKEY/GET INPUT/SET UP MENU' if args.menu else
                       'retained-clock DISPLAY TEXT/GET INKEY/GET INPUT' if args.interactive else
                       'retained-clock DISPLAY TEXT') + ' and laboratory registration; research HLE, not native speech',
             'command': command,

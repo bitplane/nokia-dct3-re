@@ -454,8 +454,11 @@ an additional physical OK after the INKEY digit; the checker enforces that
 product difference. Both gates seed the clock physically from own PMM and
 require retained registration/SIM location. `verify-8890-sim-toolkit-menu`
 additionally proves SET UP MENU, physical navigation and item-1 selection,
-exact ENVELOPE and four own localized menu/recovery frames. Network proactive
-commands and native DSP speech remain unpromoted for this product.
+exact ENVELOPE and four own localized menu/recovery frames.
+`verify-8890-sim-toolkit-sms` additionally proves card-requested SMS through
+exact laboratory CP/RP submission/acknowledgements, terminal success and RR
+release, with physical idle recovery. Toolkit call consent and native DSP
+speech remain unpromoted for this product.
 
 The 6210 additionally passes `verify-6210-sim-toolkit-interactive`, proving
 physical `5`/`42` GET INKEY/GET INPUT replies, exact successful text TLVs,
