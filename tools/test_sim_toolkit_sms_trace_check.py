@@ -29,6 +29,19 @@ class SimToolkitSmsTraceCheckTest(unittest.TestCase):
     def test_complete_lifecycle_passes(self):
         check.verify(GOOD)
 
+    def primary_trace(self):
+        return GOOD.replace('data=2901', 'data=3901').replace('cp=29', 'cp=39').replace(
+            'data=2904', 'data=3904').replace('090e01000781', '090e01010781')
+
+    def test_primary_identifiers(self):
+        check.verify(self.primary_trace(), cp=0x39, message_reference=1)
+
+    def test_wrong_primary_identifiers_or_payload_rejected(self):
+        for text in (GOOD, self.primary_trace().replace('cp=39', 'cp=29'),
+                     self.primary_trace().replace('3534154', '3534155')):
+            with self.assertRaises(ValueError):
+                check.verify(text, cp=0x39, message_reference=1)
+
     def test_missing_network_ack_fails(self):
         with self.assertRaisesRegex(ValueError, "downlink kind=18"):
             check.verify(GOOD.replace(

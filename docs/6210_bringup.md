@@ -394,7 +394,19 @@ Physical Menu/Scroll Up opens `DCT3 menu`; selecting Continue sends menu-item
 Physical End returns to the reviewed registered idle. Four extra own frames
 cover the menu entry, items, selection result and idle, independently of the
 existing five interactive frames. No callbacks or menu objects are injected.
-Menu-triggered SMS/calls and the second item's behavior remain unvalidated.
+The second item's behavior remains unvalidated.
+
+`verify-6210-sim-toolkit-sms` independently uses laboratory card profile 5.
+Physical Continue selection returns `9124`; firmware FETCHes the card's SEND
+SHORT MESSAGE and sends exactly one SMS-SUBMIT to `5551234` with 8-bit text
+`SAT`. Own observed CP identifier `39` and TP message reference `01` are
+checked explicitly. Network CP/RP success precedes successful card response
+`810305130002028281030100`, CP acknowledgement and RR channel release.
+The physical End returns to reviewed idle only after the network wait.
+All earlier interactive/menu frames, the completion frame, physical sequence,
+own upload/registration and persisted location are checked independently.
+This is laboratory research-HLE signaling, not external SMS delivery or
+native-DSP execution. Menu-triggered call behavior remains unvalidated.
 
 This establishes these command lifecycles, not all Toolkit commands or native
 DSP execution. The completion trace records the status bytes actually appended

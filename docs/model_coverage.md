@@ -452,7 +452,11 @@ five independently reviewed frames and own registration/storage checks.
 `verify-6210-sim-toolkit-menu` separately proves SET UP MENU installation,
 physical ordinary-menu navigation, successful item-1 ENVELOPE and physical
 End to registered idle, with four additional own frames. It does not promote
-menu-triggered network services.
+menu-triggered network services by itself. `verify-6210-sim-toolkit-sms`
+independently proves physical item selection, card-owned SEND SHORT MESSAGE,
+one exact `SAT` SMS to `5551234`, CP/RP success, successful terminal response,
+RR release and physical return to reviewed idle. External SMS delivery and
+native DSP remain unpromoted.
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other

@@ -49,7 +49,9 @@ def verify_interactive(text, product, profile_length=9):
                      interactive_events(product, profile_length))
 
 
-def menu_events(product, profile_length=9):
+def menu_events(product, profile_length=9, selection_status='9000'):
+    if selection_status not in ('9000', '9124'):
+        raise ValueError('unsupported observed Toolkit menu selection status')
     return (*interactive_events(product, profile_length)[:-1],
             'proactive SET UP MENU ready', 'SIM status ins=14 sw=9128',
             'header cla=a0 ins=12 p1=00 p2=00 p3=28',
@@ -60,11 +62,11 @@ def menu_events(product, profile_length=9):
             f'{product}_toolkit_interactive: action=menu_open',
             f'{product}_toolkit_interactive: action=menu_select',
             'header cla=a0 ins=c2 p1=00 p2=00 p3=09',
-            'envelope data=d30702020181100101', 'SIM status ins=c2 sw=9000',
+            'envelope data=d30702020181100101', f'SIM status ins=c2 sw={selection_status}',
             f'{product}_toolkit_interactive: action=menu_exit')
 
 
-def verify_menu(text, product, profile_length=9):
+def verify_menu(text, product, profile_length=9, selection_status='9000'):
     if '[LUA ERROR]' in text:
         raise ValueError(f'{product} physical Toolkit menu fixture failed')
-    require_in_order(text.replace('[:sim_card] ', ''), menu_events(product, profile_length))
+    require_in_order(text.replace('[:sim_card] ', ''), menu_events(product, profile_length, selection_status))
