@@ -74,6 +74,33 @@ of those service codes. NSE-8 organically exposes the single-Star registration
 forms used by the routing gates; the other operation/condition combinations
 remain protocol-conformance support unless an organic product route is named.
 
+### Subscription lifetime
+
+Forwarding records currently belong to `nokia_gsm_network_device` and are
+registered with `save_item`: register/active flags, destination and length,
+BasicService kind/code and no-reply duration for each condition. They are
+not handset EEPROM or SIM files. The network device has no NVRAM interface,
+so a new emulator process starts with an empty subscription even when the
+handset's flash and SIM storage are retained. Save/load acceptance does not
+establish cold-process forwarding persistence on any product.
+
+The software-only completion boundary is a network-owned, versioned
+subscription store bound to the configured subscriber identity. Restore
+must validate format, identity and record lengths before publishing any
+state; mismatched or malformed storage must not partially change records.
+Persist registration/activation and service scope, not live call, RR or
+pending host-request state. Fresh-run preparation must clear this server
+store alongside product-local storage, while explicit cold-restart tests
+retain it. Do not reconstruct registration from handset UI state, inject
+supplementary results, or change SIM files to make a query pass.
+
+Acceptance must register forwarding through physical input in one process,
+exit normally, then cold-start a second process retaining only its own
+storage and physically interrogate the service. Require the actual
+RegisterSS/InterrogateSS exchange, returned destination/status, registered
+idle recovery and normal incoming-call routing. A third fresh-storage run
+must report inactive; save-state replay is an independent gate.
+
 Speech routing honors an omitted BasicService, all-speech teleservice `0x10`
 and telephony `0x11`. Other teleservices and all bearer-service selectors do
 not divert a speech call. This applicability rule is an isolated, exhaustively
