@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 649 gates: 451 generated from typed steps, 198 copied verbatim (shell).
+# 650 gates: 452 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -198,23 +198,24 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle \
 	verify-3330-radio-incoming-call-lifecycle \
 	verify-3410-radio-incoming-call-lifecycle verify-3410-radio-a5-1-degraded \
-	verify-3410-radio-a5-1-incoming-call verify-3330-radio-media-resilience \
-	verify-3310-radio-media-resilience verify-radio-incoming-call \
-	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
-	verify-radio-incoming-call-lifecycle verify-radio-handover \
-	verify-radio-handover-failure-state verify-3310-radio-handover \
-	verify-3310-radio-handover-failure-state verify-3330-radio-handover \
-	verify-3330-radio-handover-failure-state verify-3410-radio-handover \
-	verify-3410-radio-handover-failure-state verify-radio-a5-1-handover \
-	verify-radio-a5-1-handover-failure-state verify-3310-radio-a5-1-handover \
-	verify-3310-radio-a5-1-handover-failure-state verify-3330-radio-a5-1-handover \
-	verify-3330-radio-a5-1-handover-failure-state verify-3410-radio-a5-1-handover \
-	verify-3410-radio-a5-1-handover-failure-state verify-radio-supplementary-call \
-	verify-radio-two-call verify-radio-second-outgoing-call \
-	verify-radio-call-divert verify-radio-call-divert-lifecycle \
-	verify-radio-call-divert-incoming verify-radio-call-divert-busy \
-	verify-radio-call-divert-unreachable verify-radio-call-divert-no-reply \
-	verify-radio-ussd verify-radio-ussd-outcomes verify-radio-network-ussd \
+	verify-3410-radio-a5-1-degraded-state verify-3410-radio-a5-1-incoming-call \
+	verify-3330-radio-media-resilience verify-3310-radio-media-resilience \
+	verify-radio-incoming-call verify-radio-incoming-ringing \
+	verify-radio-incoming-call-answered verify-radio-incoming-call-lifecycle \
+	verify-radio-handover verify-radio-handover-failure-state \
+	verify-3310-radio-handover verify-3310-radio-handover-failure-state \
+	verify-3330-radio-handover verify-3330-radio-handover-failure-state \
+	verify-3410-radio-handover verify-3410-radio-handover-failure-state \
+	verify-radio-a5-1-handover verify-radio-a5-1-handover-failure-state \
+	verify-3310-radio-a5-1-handover verify-3310-radio-a5-1-handover-failure-state \
+	verify-3330-radio-a5-1-handover verify-3330-radio-a5-1-handover-failure-state \
+	verify-3410-radio-a5-1-handover verify-3410-radio-a5-1-handover-failure-state \
+	verify-radio-supplementary-call verify-radio-two-call \
+	verify-radio-second-outgoing-call verify-radio-call-divert \
+	verify-radio-call-divert-lifecycle verify-radio-call-divert-incoming \
+	verify-radio-call-divert-busy verify-radio-call-divert-unreachable \
+	verify-radio-call-divert-no-reply verify-radio-ussd \
+	verify-radio-ussd-outcomes verify-radio-network-ussd \
 	verify-radio-two-call-negatives verify-radio-a5-1-incoming-call \
 	verify-radio-a5-1-state verify-radio-a5-1-sdcch-state \
 	verify-radio-a5-1-outgoing-call verify-radio-outgoing-call-lifecycle \
@@ -1990,6 +1991,15 @@ verify-3410-radio-incoming-call-lifecycle: normalize-3410
 verify-3410-radio-a5-1-degraded: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait10000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)/error.log
+
+verify-3410-radio-a5-1-degraded-state: normalize-3410
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.51 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log

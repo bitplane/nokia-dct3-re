@@ -44,8 +44,17 @@ directions, BFI concealment and media recovery, plus four-phase SACCH/TF
 rotation while bidirectional speech continues.
 It uses NHM-2's evidenced 1 MHz/8 kHz, 125-clock, 16-bit PCM contract and
 external network fault selectors, not firmware state forcing. This gate
-does not establish native DSP speech, encrypted active-call restoration,
-or physical host duplex under impairment.
+does not establish native DSP speech or physical host duplex under impairment.
+`verify-3410-radio-a5-1-degraded-state` separately saves the active encrypted
+call at 18.51 seconds, compares two-second reference/restored digital media
+records exactly, and requires post-load physical End plus clean release.
+It also independently requires cipher, degraded-media, FACCH and SACCH
+checks. The ordinary physical input plan finishes before save/load; the
+replay coroutine owns the later End key, explicitly selecting NHM-2 `end`
+rather than the historical NSE-8 `enter` default. Lua coroutines are not
+emulator-saved state, so an outstanding ordinary input wait must not be used
+to terminate the comparison interval. This is HLE deterministic replay,
+not native DSP execution or proof of every possible active-call save point.
 
 `verify-6250-calendar-cold` independently proves physical NHM-3 Calendar
 time/date entry, the reviewed 7 October 2026 Wednesday frame, and the same
