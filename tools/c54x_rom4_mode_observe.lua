@@ -12,10 +12,29 @@ for _, address in ipairs(addresses) do
                 machine.time:as_double(), cpu.state["PC"].value, offset, data, mask))
         end)
 end
+-- Include a known executed copy instruction so zero candidate counts are
+-- not mistaken for evidence when opcode-fetch observation is unavailable.
+local program = cpu.spaces["program"]
+local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2}
+local counts = {}
+for _, address in ipairs(sites) do
+    counts[address] = 0
+    taps[#taps + 1] = program:install_read_tap(address, address,
+        string.format("dispatch_%04x", address), function(offset, data)
+            local pc = cpu.state["PC"].value
+            if pc == offset or pc == offset + 1 then
+                counts[address] = counts[address] + 1
+            end
+        end)
+end
 local stop = emu.add_machine_stop_notifier(function()
     for _, address in ipairs(addresses) do
         machine:logerror(string.format("rom4_mode_final: address=%04x data=%04x\n",
             address, memory:read_u16(address)))
     end
+    for _, address in ipairs(sites) do
+        machine:logerror(string.format("rom4_dispatch_count: address=%04x count=%d\n",
+            address, counts[address]))
+    end
 end)
-assert(#taps == #addresses and stop)
+assert(#taps == #addresses + #sites and stop)

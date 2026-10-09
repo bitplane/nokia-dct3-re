@@ -369,6 +369,18 @@ assuming that the older relative-compare timing still applies. It does not
 close the writer census or prove these routines are the cell-search path.
 Preserved-NVRAM runs have a different RF sequence and must not be checked
 against that gate's fresh-profile port-sequence expectation.
+
+A separate fresh 30-second opcode-fetch watch records zero fetches at the
+candidate stores `4ef9/5006`, their common predecessor `23d0`, and its branch
+target `2626`. The positive control at `3da2` records 31 fetches of the
+search-list copy instruction `e5ca`; this validates cached instruction-fetch
+observation rather than treating an untested tap's silence as absence.
+`23d0` contains `f073 2626` (a branch veneer); the recovered `2626` routine
+contains guarded comparisons and branch tails, not a direct mode assignment.
+These four candidate sites therefore do not execute in this no-cell boot.
+They remain static candidates in other lifecycles, not missing peer responses
+or proven ordinary cell-search initializers. The passive observer includes
+the positive control and these candidate counts for reproduction.
 The DROM function-list mechanism is an immediate call walker, not a persistent
 frame schedule. Routine `0x9a56` calls `0x771c`; the recovered data ROM contains
 `0x9a56` in 17 `0x00ff`-terminated lists between `0xedf7` and `0xeee6`.
