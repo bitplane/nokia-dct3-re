@@ -90,6 +90,14 @@ private:
 			{0xfb84, 2 | dasm::SUPPORTED, "FCALLD  $042345"},
 			{0xf4e4, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "FRET"},
 			{0xf6e5, 1 | dasm::SUPPORTED, "FRETED"},
+			{0xf4e6, 1 | dasm::SUPPORTED, "FBACC   A"},
+			{0xf5e6, 1 | dasm::SUPPORTED, "FBACC   B"},
+			{0xf6e6, 1 | dasm::SUPPORTED, "FBACCD  A"},
+			{0xf7e6, 1 | dasm::SUPPORTED, "FBACCD  B"},
+			{0xf4e7, 1 | dasm::SUPPORTED | dasm::STEP_OVER, "FCALA   A"},
+			{0xf5e7, 1 | dasm::SUPPORTED | dasm::STEP_OVER, "FCALA   B"},
+			{0xf6e7, 1 | dasm::SUPPORTED, "FCALAD  A"},
+			{0xf7e7, 1 | dasm::SUPPORTED, "FCALAD  B"},
 			{0xffff, 1, ".word   $FFFF"},
 		};
 		auto &decoder = m_cpu->get_disassembler();
@@ -104,7 +112,7 @@ private:
 				expect(result == test.result && text.str() == test.text,
 					"control disassembly preserves mnemonic, operand, word length, page and bounded stepping flags");
 			}
-		osd_printf_info("TMS320C54x control disassembler: PASS vectors=38 pages=2\n");
+		osd_printf_info("TMS320C54x control disassembler: PASS vectors=46 pages=2\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

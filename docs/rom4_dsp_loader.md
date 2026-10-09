@@ -892,7 +892,8 @@ recognizes a Nokia address or loader byte pattern.
 ### Debugger control-flow decoding
 
 The native core disassembler decodes the reviewed branch/call/return,
-repeat, idle, interrupt and status-bit forms. `check-c54x-core` checks 38
+repeat, idle, interrupt and status-bit forms, including extended accumulator
+branches and calls. `check-c54x-core` checks 46
 exact encodings at two program addresses, including an extension word crossing
 the 16-bit page boundary. Near targets retain their program page; far targets
 carry their explicit extended address. The native 5110 Phone book menu gate

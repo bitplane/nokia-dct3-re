@@ -56,6 +56,13 @@ public:
 			util::stream_format(stream, "%s%s", BIT(op, 0) ? "FRETE" : "FRET", delayed ? "D" : "");
 			return 1 | SUPPORTED | (delayed ? 0 : STEP_OUT);
 		}
+		if (m_extended && (op & 0xfcfe) == 0xf4e6)
+		{
+			bool const call = BIT(op, 0), delayed = BIT(op, 9);
+			const char *name = call ? (delayed ? "FCALAD" : "FCALA") : (delayed ? "FBACCD" : "FBACC");
+			util::stream_format(stream, "%-8s%c", name, BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED | (call && !delayed ? STEP_OVER : 0);
+		}
 		if ((op & 0xfdfe) == 0xf802 || (op & 0xfdfb) == 0xf808)
 		{
 			const char *condition = (op & 0xfdfe) == 0xf802 ?
