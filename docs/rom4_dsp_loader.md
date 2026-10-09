@@ -768,7 +768,14 @@ has a staged C54x pipeline and software INTR implementation, but the inspected
 C54x/common source has only register-display uses of IMR/IFR and no hardware
 timer or maskable-request delivery implementation. Its source RPM SHA-256 is
 `a57eda4aa6402aba0439146ddcc60ff8665ed1d116b82d4c2158e1d211b1bb7b`;
-it has not been built or run, and no code is imported into this core.
+the supplied C54x build was attempted but failed on unavailable legacy
+`gnome`/`gtk+` pkg-config dependencies. Using the installed modern GLib
+headers alone still fails because instruction and pipeline headers include
+`gtk/gtk.h`; the supplied build does not provide a headless target. No
+simulator execution has been obtained, and no code is imported into this
+core. A headless port would be a separate comparison-tool project, not a
+hardware-interrupt oracle: adding our own timer/request model would remove
+the independence needed to validate that model.
 [DSPsim](https://mpcomplete.org/proj/dspsim/) instead implements a C audio
 interface, not instruction execution. Neither is a differential oracle for
 the short-period timer probe. The TI legacy simulator remains an acquisition
