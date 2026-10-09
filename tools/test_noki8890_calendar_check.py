@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki8890_calendar_check import SCALARS, verify
+from tools.noki8890_calendar_check import SCALARS, verify, verify_restore
 
 
 SEED = '\n'.join((
@@ -14,6 +14,51 @@ SEED = '\n'.join((
 COLD = ('kind=app_write pc=003062cc address=00137420 data=d44c6700 mask=ffffffff\n'
         '8890_clock_nv_result: result=00000001 flags=00\n' +
         '\n'.join(f'8890_calendar_physical: step={index}' for index in range(1, 10)))
+
+
+def restoration_fixture():
+    cpu = ','.join(['00000001'] * 37)
+    lines = []
+    for event, time, date in (('saved', 80, 'd44b1580'), ('reference', 100, 'd44c6700'),
+                              ('restored', 80, 'd44b1580'), ('replayed', 100, 'd44c6700')):
+        lines.append(f'8890_calendar_restore: event={event} t={time:.9f} '
+                     f'pc=0000001c sp=00137b6c ram=12345678 cpu={cpu} date={date}')
+        if event in ('saved', 'restored'):
+            lines.extend(SEED.splitlines()[2:5])
+    lines.append('8890_calendar_restore: result=pass elapsed=20 native_speech=0')
+    return '\n'.join(lines)
+
+
+class CalendarRestorationTest(unittest.TestCase):
+    def test_exact_replay(self):
+        verify_restore(restoration_fixture())
+
+    def test_each_state_observation_required(self):
+        text = restoration_fixture()
+        for line in text.splitlines():
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                verify_restore(text.replace(line, '', 1))
+
+    def test_changed_architecture_rejected(self):
+        text = restoration_fixture()
+        for old, new in (('ram=12345678', 'ram=12345679'),
+                         ('pc=0000001c', 'pc=00000020'),
+                         ('cpu=00000001', 'cpu=00000002'),
+                         ('date=d44b1580', 'date=d44c6700')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_restore(text.replace(old, new, 1))
+
+    def test_incomplete_architecture_rejected(self):
+        with self.assertRaises(ValueError):
+            verify_restore(restoration_fixture().replace('cpu=' + ','.join(['00000001'] * 37),
+                                                        'cpu=00000001'))
+
+    def test_duplicate_or_runtime_failure_rejected(self):
+        text = restoration_fixture()
+        for extra in (text.splitlines()[0], '[LUA ERROR] failed',
+                      '8890_calendar_restore: FAIL incomplete'):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                verify_restore(text + '\n' + extra)
 
 
 class CalendarTest(unittest.TestCase):

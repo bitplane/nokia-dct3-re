@@ -11,6 +11,37 @@ SCALARS = {
 }
 
 
+def verify_restore(text):
+    if re.search(r'LUA ERROR|LUA error|calendar_restore: FAIL', text):
+        raise ValueError('Calendar restoration fixture failed')
+    pattern = (r'8890_calendar_restore: event=(saved|reference|restored|replayed) '
+               r't=([0-9.]+) pc=([0-9a-f]{8}) sp=([0-9a-f]{8}) '
+               r'ram=([0-9a-f]{8}) cpu=([0-9a-f,]+) date=([0-9a-f]{8})')
+    records = re.findall(pattern, text)
+    if [record[0] for record in records] != ['saved', 'reference', 'restored', 'replayed']:
+        raise ValueError('missing or duplicated Calendar restoration observations')
+    if records[0][1:] != records[2][1:] or records[1][1:] != records[3][1:]:
+        raise ValueError('Calendar CPU/RAM/time/date replay differs')
+    for record in records:
+        if len(record[5].split(',')) != 37:
+            raise ValueError('incomplete banked ARM architecture')
+    if (records[0][1], records[1][1], records[0][6], records[1][6]) != (
+            '80.000000000', '100.000000000', 'd44b1580', 'd44c6700'):
+        raise ValueError('Calendar checkpoint does not cross the reviewed midnight')
+    for start, end in (('saved', 'reference'), ('restored', 'replayed')):
+        window = text.split('8890_calendar_restore: event=' + start, 1)[1].split(
+            '8890_calendar_restore: event=' + end, 1)[0]
+        cursor = 0
+        for event in ('event=second time=00:00:00 day=1 status=33 mask=50',
+                      'event=read reg=0a data=01', 'event=counter_write reg=0a data=00'):
+            position = window.find(event, cursor)
+            if position < 0:
+                raise ValueError('missing ordered RTC midnight replay: ' + event)
+            cursor = position + len(event)
+    if text.count('8890_calendar_restore: result=pass elapsed=20 native_speech=0') != 1:
+        raise ValueError('Calendar restoration completion absent or duplicated')
+
+
 def verify(seed, cold, *, boundary='ordinary'):
     if boundary not in SCALARS:
         raise ValueError('unknown calendar boundary')

@@ -9,7 +9,7 @@ import sys
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.noki8890_calendar_check import verify
+from tools.noki8890_calendar_check import verify, verify_restore
 from tools.noki8890_registration_check import verify as verify_registration
 from tools.run_noki8xxx_supplementary import PROFILES, verify_inputs
 
@@ -30,11 +30,17 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--boundary', choices=BOUNDARIES, default='ordinary')
+    parser.add_argument('--restore', action='store_true',
+                        help='replay the ordinary midnight from an exact pre-midnight save')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     profile = PROFILES['8890']
     script, expected_date, expected_frame = BOUNDARIES[args.boundary]
+    if args.restore:
+        if args.boundary != 'ordinary':
+            parser.error('--restore currently requires the independently tested ordinary boundary')
+        script = 'noki8890_calendar_restore.lua'
     try:
         from PIL import Image
         roms = root / 'roms/noki8890'
@@ -68,6 +74,16 @@ def main():
                 (run / leg / 'console.log').read_text(errors='replace')
                 for leg in ('seed', 'cold')]
         verify(*logs, boundary=args.boundary)
+        if args.restore:
+            verify_restore(logs[0])
+            pixels = []
+            for name in ('reference', 'replayed'):
+                with Image.open(run / 'seed/snap' / ('8890_calendar_restore_' + name + '.png')) as frame:
+                    if frame.size != (84, 48):
+                        raise ValueError('Calendar restoration frame geometry differs')
+                    pixels.append(frame.convert('L').tobytes())
+            if pixels[0] != pixels[1] or not any(pixels[0]):
+                raise ValueError('Calendar restoration pixels differ or are blank')
         verify_registration(logs[0])
         verify_registration(logs[1], preserved_location=True)
         with Image.open(run / 'cold/snap/8890_calendar_cold.png') as frame:
@@ -79,6 +95,7 @@ def main():
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'scope': 'physical midnight, own-journal cold date, laboratory registration',
             'calendar_boundary': args.boundary, 'expected_date': expected_date,
+            'midnight_state_restore': args.restore,
             'offline_elapsed_time': False, 'native_dsp_speech': False,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

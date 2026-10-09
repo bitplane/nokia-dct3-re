@@ -1254,6 +1254,18 @@ same-supply cold persistence, not offline elapsed time or battery-removal
 behavior. CCONT supplies the elapsed-day counter;
 the handset firmware owns the Gregorian date.
 
+`verify-8890-calendar-restore` additionally saves at 80 seconds before that
+midnight and runs to 100 seconds, then restores and repeats the same 20-second
+interval. The checkpoint and replay each require identical emulated time,
+all 37 ARM/banked registers, RAM digest and own date scalar. Both intervals
+must organically produce midnight, firmware day-counter read and clear;
+reference/replayed 84x48 pixels must match. A separate cold process then
+proves the same reviewed 8 October Calendar frame and own-journal date,
+with registration verified in both processes. The isolated run
+`run_8890_calendar_restore_acceptance_20261009` passes. This is save-state
+continuation of the research-HLE composition, not offline elapsed time,
+battery-removal retention or native DSP/speech validation.
+
 `make verify-8890-calendar-leap-day RUN_DIR=RUN` independently starts
 from physical 23:59 and 28/02/2024. The same day-register read/clear
 sequence advances the scalar from `cf640180` to `cf655300`; a cold
