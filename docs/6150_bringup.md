@@ -388,11 +388,11 @@ Task-1 dispatch selects countdown initialization `0x280ac0` on scalar
 `0xcf` (`0x280656..0x28065a`) and countdown stepping `0x280ae4` on
 transformed input `0x52` (`0x28064a..0x28064e`). Receiver `0x28029c`
 maps raw `0xd0` to `0x52`. Own RTOS descriptor pointer-column entries
-15 and 16 contain scalar `0xcf` and `0xd0`, respectively: the countdown
+`0x0f` and `0x10` contain scalar `0xcf` and `0xd0`, respectively: the countdown
 is timer/event driven, not an undiscovered object-message handler.
 The bounded adjacent-argument timer-call scan finds an index-15 schedule
-at `0x281864`; a nearby-looking index-15 literal at `0x2a7b14` belongs to
-a different call and the actual timer at `0x2a7b1e` schedules index 21.
+at `0x281864`; a nearby-looking index-`0x0f` literal at `0x2a7b14` belongs to
+a different call and the actual timer at `0x2a7b1e` schedules index `0x15`.
 Do not promote a literal found near a call into its recovered argument.
 
 The cold task-1 scalar trace contains neither `0xcf` nor `0xd0` before
@@ -455,8 +455,26 @@ supported by this firmware. State `0x1a` eventually consumes timer input
 `0x01fe`, then enters the voltage-setting/disconnected path. No threshold
 input should be changed merely to escape these states.
 
-Next: determine which ordinary power/startup input selects the separate
-task-20 initialization that publishes report `0x14`; distinguish that from
+The separate input-`0x21` branch at `0x2239f2` names its operation
+`Start limited fast VBAT reads` (own string `0x223ad8`). It resets local
+sampling fields, arms timer `0xdd`, calls `0x28b760`, then publishes report
+`0x14` through `0x2bc4d4`. Its proven behavior is therefore a fast-VBAT
+sampling request followed by a report, not an independently established
+generic startup-initialization command. The task-1 readiness bit depends
+on that report in this run, but that consumer dependency does not establish
+the full product meaning of either input `0x21` or report `0x14`.
+
+Selector 5 in state helper `0x2bf1a0` has a direct transport interpretation:
+`0x2c32f4` sends CCONT command `0x00` (table byte `0x2e0c52`) followed by
+`(selector << 4) | 8 | (byte[0x1126e0] & 0x87)`. It reads command bytes
+`0x14` and `0x1c` from table `0x2e0c40`, combining the first response byte
+with the second response's low two bits as a ten-bit sample. Thus this
+helper samples CCONT ADC selector 5 through GENSIO, not a DSP-owned value.
+The physical pin/source and units remain unproved for NSM-1; do not import
+another product's channel name or alter its sample to trigger the report.
+
+Next: determine which ordinary power/startup input selects fast-VBAT
+sampling and its report `0x14`; distinguish that from
 the charging initialization now identified. Check any additional
 initialization input against the own-ROM startup source,
 keeping the alternate scalar `0xc7` lifecycle separate,

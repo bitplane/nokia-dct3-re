@@ -5,12 +5,33 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_state_selector_uses_ccont_adc_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        self.assertEqual(0x2E0C52, check.literal(data, 0x2C3326))
+        self.assertEqual(0, data[0x2E0C52 - check.BASE])
+        self.assertEqual(0x2E0C40, check.literal(data, 0x2C333A))
+        self.assertEqual((0x14, 0x1C),
+                         (data[0x2E0C42 - check.BASE] | 4,
+                          data[0x2E0C44 - check.BASE] | 4))
+        for address, mnemonic, operands in (
+                (0x2BF1B4, "movs", "r0, #5"),
+                (0x2BF1B6, "bl", "#0x2c32f4"),
+                (0x2C3316, "lsls", "r3, r4, #4"),
+                (0x2C3374, "lsls", "r0, r0, #8"),
+                (0x2C3376, "adds", "r0, r4, r0")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_own_charging_lifecycle_strings_and_common_branch_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():
             self.skipTest("acquired NSM-1 input not present")
         data = image.read_bytes()
         for address, text in (
+                (0x2239F2, b"Start limited fast VBAT reads"),
                 (0x225B98, b"DO INIT CHARGING"),
                 (0x225BBC, b"BOOT UP CHARGE"),
                 (0x225BE2, b"WAIT CHARGER VOLTAGE SETTING"),
