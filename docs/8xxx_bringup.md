@@ -35,6 +35,22 @@ inconclusive; feature acceptance cannot begin until a coherent boot advances.
 
 ### 8250 missing-evidence boundary
 
+An additional own-product input is normalized from the acquired
+`roms/archive-dct3-packages/nsm-3d_v6.00.exe`: MCU `nsm3dx_6.000`
+covers `0x200000..0x3366ff`, and PPM K `nsm3dx_6.00k` covers
+`0x340000..0x3cffff`. The original INI erase limit is `0x3cffff`;
+the archive supplies no PMM component. The canonical parser produces
+`roms/research/nsm3d/8250-v600-ppmk.bin` (size `0x1d0000`, SHA-1
+`e5e8711870527fb590ad76b4a50fadd341313549`), without appending storage.
+An exhaustive exact-byte search finds one complete descriptor/payload copy
+of the v5.02 fragment at raw offset `0x117be0` and one of its verifier at
+`0x118dc8`. The complete loader descriptor occurs once at `0x1121f4`,
+but its 638-word payload differs (SHA-1
+`15da89872f54fc7e0c2ca8f1f9707054aedb2508`). The changed loader is a
+remaining software comparison target, not evidence that resident ROM6
+code or matching provisioning is present. No v6.00 boot is established,
+and the v5.02 hash-pinned extraction contract is unchanged.
+
 Fresh stock and runtime-comparison runs reproduce the protected upload and
 record-rejection contracts. Selector ownership, direct MCU input copying,
 both codec directions and the actual PMM extent do not provide a correction
