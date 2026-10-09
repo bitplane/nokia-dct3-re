@@ -13,6 +13,7 @@ struct tms320c54x_bsp_state
 	std::uint16_t control = 0, receive = 0, transmit = 0;
 	bool receive_ready = false, transmit_ready = true;
 	bool transmit_pending = false, receive_overrun = false;
+	bool transmit_loaded = false;
 
 	void reset() { *this = {}; }
 	void control_w(std::uint16_t value)
@@ -27,6 +28,7 @@ struct tms320c54x_bsp_state
 		{
 			transmit_ready = true;
 			transmit_pending = false;
+			transmit_loaded = false;
 		}
 	}
 	std::uint16_t control_r() const
@@ -40,13 +42,16 @@ struct tms320c54x_bsp_state
 		if (control & 0x0040)
 		{
 			transmit_pending = true;
+			transmit_loaded = true;
 			transmit_ready = false;
 		}
 	}
 	bool frame_transmit(std::uint16_t &value)
 	{
-		if (!(control & 0x0040) || !transmit_pending)
+		if (!(control & 0x0040) || !transmit_loaded)
 			return false;
+		// External FSX retransmits the retained DXR on underrun (SPRU131G
+		// 9.2.4). Only a new write drops XRDY before the next frame.
 		value = transmit;
 		transmit_pending = false;
 		transmit_ready = true;

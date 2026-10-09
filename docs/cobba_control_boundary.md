@@ -337,6 +337,10 @@ RRDY, XRDY and receive-overrun status derive from receive, transmit and reset
 transitions rather than firmware writes. An unread receive word is preserved
 on overrun, reception resumes after its acknowledgement, and transmit
 readiness returns at an explicit frame transfer. Executable C++ tests cover
+transmit overwrite before a delayed frame and retained-word retransmission
+on externally clocked underrun (TI section 9.2.4): repeated frames do not
+invent a new XRDY transition. Reset cancels the valid loaded-word state;
+reset-time preloading remains outside the established subset. Tests cover
 all 65,536 control-write values and these transitions. Fresh native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The
