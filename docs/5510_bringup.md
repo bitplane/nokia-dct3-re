@@ -316,6 +316,16 @@ The current MAME source tree has no MSP430 CPU core. A faithful native MU4
 backend therefore needs both a core and the matching program; an explicitly
 declared serial-boundary HLE still requires recovered message semantics.
 
+The retained `04-npm5-userif.pdf`, printed pages 7/8, additionally specifies
+the MU4 startup contract: VBB enables its MCU regulator; low PURX holds the
+module in reset. The MCU samples MBUS no later than 1.5 ms after PURX release
+and must remain reset when MBUS is low, identifying a phone-programming
+connection. During normal operation the module can sleep and wake on either
+a keypress or a received serial message; phone power-off removes MU4 power.
+These are manufacturer constraints for a future MU4 backend, not measured
+timing for the current MA4 MBUSTIM model. They do not supply FBUS baud,
+keyboard message IDs, acknowledgement rules or startup GPIO levels.
+
 ### Software-accessible MU4 references
 
 The [original EXT_UI flashing-tool guide](https://files.elektroda.pl/12624,5510%2Bui%2Bdsp%2Bsoftware%2Bflashing%2Btool.html)
