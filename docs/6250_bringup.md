@@ -1316,7 +1316,13 @@ firmware behavior changed. `verify-6250-alarm-off-snooze-yes` independently
 passes the same two-wake lifecycle in `run_6250_off_snooze_yes_20261009`:
 physical Yes subsequently registers and returns to the reviewed idle frame,
 without registration during either alarm-only wake. Powered-off Snooze
-save/load remains unpromoted, and audible/native speech is not established.
+restoration is independently covered by `verify-6250-alarm-off-snooze-restore`
+(`run_6250_off_snooze_restore_20261009`): the initial off-rail countdown
+restores all 37 exported ARM/banked registers, RAM digest and time at second
+49, reproduces the 1.25-second RTC/blank-frame window, and then completes
+both natural wakes, physical Snooze/Stop/No and final rail-off. This is not
+a save/load inside the later Snooze interval or an awake editor transaction.
+Restored Yes and audible/native speech remain unpromoted.
 
 `verify-6250-alarm-off-restore` and `-restore-yes` save the powered-off
 countdown at emulated second 49. All 37 exported ARM/banked registers,

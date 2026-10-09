@@ -182,8 +182,6 @@ def main():
     args = parser.parse_args()
     if args.restore_off and not args.power_choice:
         parser.error("off-state restoration requires an explicit activation choice")
-    if args.restore_off and args.snooze:
-        parser.error("powered-off Snooze restoration is not validated")
     if args.cold and (args.snooze or args.restore_off or args.power_choice):
         parser.error("cold alarm is an independent awake lifecycle")
     root = Path(__file__).resolve().parents[1]

@@ -104,7 +104,10 @@ physical Snooze/Stop/No, silent intervening rail-off intervals, independent
 verifier/uploads on each wake and exact recurrence/final-off frames.
 `verify-6250-alarm-off-snooze-yes` independently proves physical activation
 and preserved registration after the same two alarm-only wakes.
-Powered-off Snooze restoration and audible/native media remain unproved.
+`verify-6250-alarm-off-snooze-restore` additionally proves exact architecture
+and off-rail RTC replay from the initial countdown, followed by the complete
+two-wake Snooze/Stop/No continuation. Save/load during Snooze, restored Yes
+and audible/native media remain unproved.
 `verify-6250-alarm-cold` additionally proves own physically saved alarm
 reconstruction in a new process, natural expiry and Stop, with independent
 uploaded-stage/registration checks and exact retained-alarm frames. It does
