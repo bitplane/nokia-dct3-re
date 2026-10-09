@@ -864,14 +864,31 @@ has a staged C54x pipeline and software INTR implementation, but the inspected
 C54x/common source has only register-display uses of IMR/IFR and no hardware
 timer or maskable-request delivery implementation. Its source RPM SHA-256 is
 `a57eda4aa6402aba0439146ddcc60ff8665ed1d116b82d4c2158e1d211b1bb7b`;
-the supplied C54x build was attempted but failed on unavailable legacy
-`gnome`/`gtk+` pkg-config dependencies. Using the installed modern GLib
-headers alone still fails because instruction and pipeline headers include
-`gtk/gtk.h`; the supplied build does not provide a headless target. No
-simulator execution has been obtained, and no code is imported into this
-core. A headless port would be a separate comparison-tool project, not a
-hardware-interrupt oracle: adding our own timer/request model would remove
-the independence needed to validate that model.
+the supplied GUI build requires unavailable legacy `gnome`/`gtk+`
+dependencies. The repository-owned adapter in `tools/gdspsim_reference/`
+instead compiles the original execution sources unchanged with modern GLib,
+opaque GTK widget types and no-op display callbacks. It preserves the
+original memory preference defaults and aborts on file-I/O execution.
+No external execution code is imported into the MAME core.
+
+Reproduce the bounded comparison with:
+
+```sh
+.venv/bin/python tools/gdspsim_reference/build.py \
+  /path/to/gdspsim-0.30 run_gdspsim_reference
+```
+
+The NOP fixture advances PC from `0100` to `0120` in 32 pipeline steps,
+leaving ST1 `2900`. The XF fixture places `f6bd` at `0100` and `f7bd` at
+`0108`; ST1 becomes `0900` at step 6 and `2900` at step 14. These status
+results agree with TI's bit-13 contract and the native core's XF fixtures.
+The five-step publication delay describes this simulator's pipeline, not
+a Nokia device latency or independently established MAME cycle correction.
+The runner rejects the reference's unknown-opcode-to-NOP fallback and
+retains each fixture's output in the isolated build directory. Only these
+two fixtures are validated; arithmetic, software INTR and hardware IRQ
+timing are not. Adding our own timer/request model would remove the
+independence needed to validate that model.
 [DSPsim](https://mpcomplete.org/proj/dspsim/) instead implements a C audio
 interface, not instruction execution. Neither is a differential oracle for
 the short-period timer probe. The TI legacy simulator remains an acquisition
