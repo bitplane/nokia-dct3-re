@@ -21,6 +21,7 @@ REQUIRED = [
     "TMS320C54x TRN store conformance: PASS variants=12",
     "TMS320C54x indirect PSHM conformance: PASS variants=8",
     "TMS320C54x parallel load multiply conformance: PASS variants=64",
+    "TMS320C54x rounded load conformance: PASS variants=64",
     "TMS320C54x immediate repeat conformance: PASS variants=256",
     "TMS320C54x short immediate load conformance: PASS variants=512 sxm_settings=2",
     "TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2",

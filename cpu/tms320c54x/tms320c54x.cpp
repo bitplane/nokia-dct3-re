@@ -1653,6 +1653,10 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x1500: // LD Smem, TS, B
 		accumulator(BIT(op, 8)) = shifted_by_t(alu_smem());
 		return;
+	case 0x1600: // LDR Smem, A
+	case 0x1700: // LDR Smem, B (SPRU172C 4-78)
+		accumulator(BIT(op, 8)) = ((data_operand(alu_smem()) << 16) | 0x8000) & ACC_MASK;
+		return;
 	case 0x1800: // AND Smem, A
 		m_a &= alu_smem();
 		return;
