@@ -92,6 +92,31 @@ def check_alarm(text, power_choice=None, snooze=False):
             require_endpoint_silence(text[off[1].end():], "NHM-3 declined activation interval")
 
 
+def check_cold_alarm(text):
+    if "[LUA ERROR]" in text or "6250_alarm_physical:" in text:
+        raise ValueError("cold alarm must not replay arming inputs")
+    if re.findall(r"6250_alarm_cold: action=(\w+)", text) != ["stop"]:
+        raise ValueError("cold alarm requires exactly one physical Stop")
+    cursor = 0
+    for pattern in (
+        r"ccont_rtc: event=alarm_write reg=0b data=30 armed=1\b",
+        r"ccont_rtc: event=alarm_write reg=0c data=0d armed=1\b",
+        r"6250_alarm_cold: event=armed_observed\b",
+        r"ccont_rtc: event=second time=13:48:00 day=0 status=b1 mask=30\b",
+        r"ccont_rtc: event=status_ack data=81 old=b1\b",
+        r"buzzer: enabled=1 divider=\d+ frequency=\d+ volume=[1-9]\d*\b",
+        r"6250_alarm_cold: action=stop\b",
+        r"buzzer: enabled=0 divider=0 frequency=0\b",
+        r"6250_alarm_cold: event=stopped_observed\b",
+    ):
+        match = re.search(pattern, text[cursor:])
+        if not match:
+            raise ValueError("missing/out-of-order NHM-3 cold alarm boundary: " + pattern)
+        cursor += match.end()
+    if "buzzer: enabled=1" in text[cursor:]:
+        raise ValueError("cold alarm buzzer resumed after Stop")
+
+
 def check_restore(text):
     from tools.power_domain_contract import require_endpoint_silence
     states = list(re.finditer(
@@ -130,11 +155,14 @@ def main():
                         help="power off before expiry, then physically choose activation")
     parser.add_argument("--snooze", action="store_true")
     parser.add_argument("--restore-off", action="store_true")
+    parser.add_argument("--cold", action="store_true")
     args = parser.parse_args()
     if args.snooze and args.power_choice:
         parser.error("Snooze/off combination is not validated")
     if args.restore_off and not args.power_choice:
         parser.error("off-state restoration requires an explicit activation choice")
+    if args.cold and (args.snooze or args.restore_off or args.power_choice):
+        parser.error("cold alarm is an independent awake lifecycle")
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     mame = (args.mame or root / "mame/mame").resolve()
@@ -152,7 +180,7 @@ def main():
                    "-cfg_directory", "cfg", "-noreadconfig", "-autoboot_script",
                    str(root / "tools" / ("noki6250_alarm_restore.lua" if args.restore_off
                                          else "noki6250_alarm_input.lua")), "-autoboot_delay", "0",
-                   "-seconds_to_run", "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
+                   "-seconds_to_run", "40" if args.cold else "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
                    "-nothrottle", "-log", "-verbose"]
         environment = os.environ.copy()
         for key in ("NOKIA_DCT3_6250_ALARM_POWER_OFF", "NOKIA_DCT3_6250_ALARM_POWER_CHOICE",
@@ -167,6 +195,45 @@ def main():
             subprocess.run(command, cwd=phase, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
         text = (phase / "error.log").read_text(errors="replace")
+        if args.cold:
+            from tools.noki6250_staged_check import check as check_uploads
+            from tools.radio_registration_trace_check import verify
+            if "action=stop" in text or "event=second time=13:48:00" in text:
+                raise ValueError("cold alarm seed expired or was dismissed")
+            # The arming process exits before expiry; it has no Stop tail.
+            prefix = text.split("6250_alarm_physical: action=idle", 1)[0]
+            expected = ["menu", *[f"down_{i}" for i in range(1, 10)], "clock",
+                        "clock_down_1", "alarm", *[f"time_{i}" for i in range(1, 5)],
+                        "confirm", "idle"]
+            actions = re.findall(r"6250_alarm_physical: action=(\w+)\b", text)
+            programming = re.search(
+                r"action=confirm\b.*?alarm_write reg=0b data=30 armed=1\b.*?"
+                r"alarm_write reg=0c data=0d armed=1\b", prefix, re.S)
+            if "[LUA ERROR]" in text or actions != expected or programming is None:
+                raise ValueError("cold alarm seed did not physically arm the own deadline")
+            check_uploads(text, runtime=True)
+            verify(text, "nhm3", preserved=True)
+            check_frame(phase / "snap/6250_alarm_confirm.png", FRAMES["confirm"])
+            check_frame(phase / "snap/6250_alarm_idle.png", FRAMES["idle"])
+            cold = run / "cold"
+            prepare_run(cold, root)
+            for name in ("nvram", "cfg"):
+                shutil.copytree(phase / name, cold / name, dirs_exist_ok=True)
+            command[command.index("-rompath") + 1] = f"{cold / 'roms'};{root / 'roms'}"
+            command[command.index("-autoboot_script") + 1] = str(root / "tools/noki6250_alarm_cold.lua")
+            command[command.index("-seconds_to_run") + 1] = "80"
+            with (cold / "console.log").open("w") as console:
+                subprocess.run(command, cwd=cold, env=environment, stdout=console,
+                               stderr=subprocess.STDOUT, check=True)
+            retained = (cold / "error.log").read_text(errors="replace")
+            check_cold_alarm(retained)
+            check_uploads(retained, runtime=True)
+            verify(retained, "nhm3", preserved=True)
+            for name, digest in (("armed", FRAMES["idle"]), ("elapsed", FRAMES["elapsed"]),
+                                 ("stopped", FRAMES["stopped"])):
+                check_frame(cold / "snap" / f"6250_alarm_cold_{name}.png", digest)
+            print("6250 research-HLE retained cold alarm and physical Stop PASS; native/audio not tested")
+            return
         if args.restore_off:
             text = check_restore(text)
             for name in ("reference", "restored"):

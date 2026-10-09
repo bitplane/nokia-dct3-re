@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 632 gates: 434 generated from typed steps, 198 copied verbatim (shell).
+# 633 gates: 435 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -364,17 +364,18 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-idle-state verify-6250-coherent-call-state \
 	verify-6250-coherent-sms-state verify-6250-pin-state-idle \
 	verify-6250-pin-state-call verify-6250-pin-state-sms verify-6250-alarm \
-	verify-6250-alarm-off-restore verify-6250-alarm-off-restore-yes \
-	verify-6250-alarm-snooze verify-6250-alarm-off-no verify-6250-alarm-off-yes \
-	verify-6250-calendar-cold verify-6250-power-cycle verify-6250-ussd \
-	verify-6250-call-divert verify-6250-sim-toolkit \
-	verify-6250-call-divert-lifecycle verify-6250-call-divert-cold \
-	verify-6210-call-divert-cold verify-6250-state-divert \
-	verify-6250-coherent-registration verify-6250-slow-pin-registration \
-	verify-6250-pin-host-incoming-call verify-6250-pin-host-incoming-sms \
-	verify-6250-pin-host-outgoing-call verify-6250-pin-host-outgoing-sms \
-	verify-6250-pin-phonebook verify-6250-pin-host-rejected-sms \
-	verify-6250-pin-host-silent-sms verify-6250-coherent-host-incoming-call \
+	verify-6250-alarm-cold verify-6250-alarm-off-restore \
+	verify-6250-alarm-off-restore-yes verify-6250-alarm-snooze \
+	verify-6250-alarm-off-no verify-6250-alarm-off-yes verify-6250-calendar-cold \
+	verify-6250-power-cycle verify-6250-ussd verify-6250-call-divert \
+	verify-6250-sim-toolkit verify-6250-call-divert-lifecycle \
+	verify-6250-call-divert-cold verify-6210-call-divert-cold \
+	verify-6250-state-divert verify-6250-coherent-registration \
+	verify-6250-slow-pin-registration verify-6250-pin-host-incoming-call \
+	verify-6250-pin-host-incoming-sms verify-6250-pin-host-outgoing-call \
+	verify-6250-pin-host-outgoing-sms verify-6250-pin-phonebook \
+	verify-6250-pin-host-rejected-sms verify-6250-pin-host-silent-sms \
+	verify-6250-coherent-host-incoming-call \
 	verify-6250-coherent-host-outgoing-call \
 	verify-6250-coherent-host-incoming-sms verify-6250-coherent-host-outgoing-sms \
 	verify-6250-coherent-host-rejected-sms verify-6250-coherent-host-silent-sms \
@@ -4650,6 +4651,9 @@ verify-6250-pin-state-sms: build
 
 verify-6250-alarm: build
 	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --mame $(MAME_DIR)/mame
+
+verify-6250-alarm-cold: build
+	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --cold --mame $(MAME_DIR)/mame
 
 verify-6250-alarm-off-restore: build
 	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --power-choice no --restore-off --mame $(MAME_DIR)/mame

@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6250_alarm import check_alarm, check_restore
+from tools.run_noki6250_alarm import check_alarm, check_restore, check_cold_alarm
 
 
 class AlarmCheckTest(unittest.TestCase):
@@ -25,6 +25,34 @@ class AlarmCheckTest(unittest.TestCase):
 
     def test_own_alarm_contract(self):
         check_alarm(self.trace())
+
+    def cold_trace(self):
+        return "\n".join((
+            "ccont_rtc: event=alarm_write reg=0b data=30 armed=1",
+            "ccont_rtc: event=alarm_write reg=0c data=0d armed=1",
+            "6250_alarm_cold: event=armed_observed",
+            "ccont_rtc: event=second time=13:48:00 day=0 status=b1 mask=30",
+            "ccont_rtc: event=status_ack data=81 old=b1",
+            "buzzer: enabled=1 divider=5202 frequency=2499 volume=5",
+            "6250_alarm_cold: action=stop",
+            "buzzer: enabled=0 divider=0 frequency=0",
+            "6250_alarm_cold: event=stopped_observed")) + "\n"
+
+    def test_cold_reconstructed_alarm(self):
+        check_cold_alarm(self.cold_trace())
+
+    def test_cold_requires_deadline_reconstruction_and_ack(self):
+        for old, new in (("data=30", "data=31"), ("13:48:00", "13:49:00"),
+                         ("data=81", "data=01")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_cold_alarm(self.cold_trace().replace(old, new))
+
+    def test_cold_rejects_arming_input_and_resumed_buzzer(self):
+        for suffix in ("6250_alarm_physical: action=confirm\n",
+                       "6250_alarm_cold: action=stop\n",
+                       "buzzer: enabled=1 divider=5202 frequency=2499 volume=5\n"):
+            with self.assertRaises(ValueError):
+                check_cold_alarm(self.cold_trace() + suffix)
 
     def power_trace(self, choice):
         text = self.trace().replace(

@@ -55,6 +55,10 @@ frames. `verify-6250-alarm-off-restore` and `-restore-yes` additionally
 check exact 37-register ARM/RAM/time restoration and off-rail RTC replay,
 then natural deadline wake and the respective physical activation choice.
 Powered-off Snooze and audible/native media remain unproved.
+`verify-6250-alarm-cold` additionally proves own physically saved alarm
+reconstruction in a new process, natural expiry and Stop, with independent
+uploaded-stage/registration checks and exact retained-alarm frames. It does
+not establish offline RTC advancement.
 
 `verify-8890-alarm` independently proves physical Settings 4-1 alarm entry
 on NSB-6, own `13:48` CCONT programming, natural expiry, alarm-cause `b3`

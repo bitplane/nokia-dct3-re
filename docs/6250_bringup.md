@@ -1309,3 +1309,14 @@ The restored RTC deadline then drives the ordinary alarm boot and physical
 Stop/No or Stop/Yes lifecycle; only the abandoned reference interval is
 excluded from subsequent lifecycle checks. This does not establish offline
 clock advance or native-DSP state/audio correctness.
+
+`verify-6250-alarm-cold` physically arms 13:48 in an own Calendar-seeded
+process that exits at second 40, before expiry or Stop. A fresh process
+receives only that phase's NVRAM/config. Firmware reconstructs the same
+CCONT deadline during boot, naturally expires it at 13:48, acknowledges it
+and programs the buzzer; physical Stop returns to reviewed registered idle.
+Own uploaded-stage and preserved-registration checks run independently in
+both phases. Exact cold frames cover armed idle, active alarm and Stop.
+The cold input script contains no clock/alarm entry or memory/register writes.
+This proves retained firmware settings, not clock advancement while the
+emulator is closed.
