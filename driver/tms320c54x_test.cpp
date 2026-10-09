@@ -16593,6 +16593,44 @@ private:
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"ADD A,ASM left-shifts its source without modifying B in one cycle");
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100); // SXM, ASM=0, OVM clear.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 40001;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 40001 && m_phase <= 40004)
+		{
+			const unsigned index = m_phase - 40001;
+			const bool negative = index >= 2;
+			const bool saturate = BIT(index, 0);
+			const u64 expected = negative ?
+				(saturate ? 0xff80000000ULL : 0xff00000000ULL) :
+				(saturate ? 0x007fffffffULL : 0x00fffffffeULL);
+			expect_opcode(0xf480,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == expected &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x123456789aULL &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0e00) == (negative ? 0x0c00 : 0x0400) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ADD A,ASM distinguishes signed overflow, carry and OVM saturation in one cycle");
+			if (index < 3)
+			{
+				const unsigned next = index + 1;
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next >= 2 ? 0xff80000000ULL : 0x7fffffff);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100 | (BIT(next, 0) ? 0x0200 : 0));
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			osd_printf_info("TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4\n");
 			program.write_word(0x05e2, 0xf58c); // MPYA T,B.
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080000000ULL);

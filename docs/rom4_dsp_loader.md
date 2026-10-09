@@ -2950,7 +2950,7 @@ working. The core now shifts the selected source by ST1.ASM with SXM-controlled
 right fill, then performs the signed addition/subtraction into the selected
 destination. Fixture-only `f480` checks negative ASM, sign fill and carry;
 `f681` checks B-to-A subtraction, unchanged B and borrow. Other ASM values
-and saturation boundaries remain unasserted.
+and SUB saturation boundaries remain unasserted.
 An additional exact `f480` vector checks ASM=3: A=1 becomes 9, B's full
 40-bit sentinel remains unchanged, carry stays clear, and the instruction
 retains its one-cycle cost. The native `tms54test` suite passes after this
@@ -2958,6 +2958,13 @@ extension (`run_c54x_asm_core_retry_20261009.log`). This asserts one positive
 left-shift outcome, not all ASM values, saturation, Nokia RF behavior or
 native speech. The suite deliberately exits via its completion exception
 after printing `TMS320C54x core conformance: PASS`.
+Four additional ASM=0 `f480` vectors cover positive and negative 32-bit
+overflow with OVM clear/set: guard-preserving 40-bit results versus signed
+32-bit saturation, A-owned sticky overflow, low-word carry, unchanged B and
+one-cycle cost. `check-c54x-core` requires their dedicated pass marker.
+The complete native suite reproduces in
+`run_c54x_asm_overflow_core_20261009.log`; these selected outcomes do not
+establish other accumulator selections, ASM values or speech behavior.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
