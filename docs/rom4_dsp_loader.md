@@ -1338,6 +1338,21 @@ linear rather than control-flow complete; pre-seed constants, computed
 indexes, table pointers, ARM-mode code and other address windows remain
 outside this result. Do not promote a candidate to silicon ownership
 without checking its branch path and observed transaction.
+A wider literal-seeded Thumb scan over `000000..0fffff` yields 942
+linear candidates from 6,029 seeds
+(`run_5110_internal_window_census_20261009.json`). Candidates above
+`040000` originate at seeds `2a8026` and `2ab3b2`, in data-like instruction
+streams; they are not established executable MMIO paths. Passive taps on
+`040000..07ffff` during an isolated 30-second native boot observe just one
+32-bit MCUIF write at `040000`, data `6a0f6120`, reported PC `20005c`.
+The separate DSPIF `030000..030003` positive control observes 20 writes.
+No wider candidate transaction is observed; the RF gate still reports
+6,499 frames and 207,040 reads
+(`run_5110_internal_window_runtime_20261009/error.log`). This bounds that
+boot lifecycle only, not all internal windows or dormant SCU behavior.
+The boot write itself demonstrates why the Thumb census cannot close
+ARM-mode initialization ownership. DSP-local programming and computed
+addresses remain independent open routes.
 Neither `0x27` nor `0x39` is established as the complete FCCH/SCH sample
 stream. The sibling emulator supplies only a constant for port `0x27`, so it
 offers no independent sample-format evidence. No valid signal fixture follows yet.
