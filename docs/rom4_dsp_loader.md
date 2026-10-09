@@ -1309,8 +1309,11 @@ the LD contract is SPRU172C page 4-68. This does not cover all extended-address
 or repeated multicycle instruction timing.
 The current HINT/absolute-compare model starts fresh-profile port-27 reads
 on frame 30. The 30-second observation has 6,499 frame expiries and 207,040
-reads (`32 * (6499 - 29)`), terminal IMR `035f`, IFR zero and no burst-port
-activity. The gate pins that first-read frame, the three ordered RF control
+reads (`32 * (6499 - 29)`), terminal IMR `035f` and no burst-port
+activity. Fresh execution on the built `552db94` checkpoint reproduces
+these counts (`run_5110_native_rf_current_20261009`), with terminal IFR
+`0020`: INT0 is drained, but other pending sources are not required to be
+zero by the gate. The gate pins that first-read frame, the three ordered RF control
 pairs above and the 32-reads-per-frame cadence, allowing only the bounded
 in-flight frame count at the fixed-time cutoff. The older frame-29,
 zero-control-write oracle described the superseded timer boundary.
