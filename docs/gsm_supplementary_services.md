@@ -96,11 +96,21 @@ physically registers forwarding before normal exit, then retains its own
 storage and physically interrogates after restart: the fresh transaction
 returns active status and the 21-byte forwardingInfo result, followed by
 RR deconfiguration. The existing four-transaction lifecycle also passes.
-This is an initial cold-query result, not yet the complete named cold-routing
-gate described below. Do not reconstruct registration from handset UI state, inject
+`make verify-6250-call-divert-cold RUN_DIR=run_6250_divert_cold` now checks
+three separate processes: physical registration, retained cold interrogation
+with a host-originated forwarded call, and independently fresh inactive
+interrogation. The retained process preserves the store byte-for-byte,
+returns the reviewed active-result pixels and registered idle with forwarding
+indicator. The host result must be `queued -> forwarded`, with unconditional
+reason and destination `5551234`, and no handset paging, alerting or buzzer
+activation. The fresh process retains the existing inactive-result and idle
+oracles. Each process owns its working directory and logs; no runtime
+subscription is injected. This promotes NHM-3 research-HLE persistence,
+not native speech, RF or another product's UI acceptance.
+Do not reconstruct registration from handset UI state, inject
 supplementary results, or change SIM files to make a query pass.
 
-Acceptance must register forwarding through physical input in one process,
+The acceptance contract registers forwarding through physical input in one process,
 exit normally, then cold-start a second process retaining only its own
 storage and physically interrogate the service. Require the actual
 RegisterSS/InterrogateSS exchange, returned destination/status, registered

@@ -11,6 +11,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 REGISTERED = "gsm_ss: request=register transaction=1b invoke=1 service=21"
+ACTIVE_QUERY = "gsm_ss: request=interrogate transaction=1b invoke=1 service=21 active=1"
 
 
 def validate_phases(phases):
@@ -18,9 +19,9 @@ def validate_phases(phases):
         raise ValueError(f"unexpected diverted-call phases {phases!r}")
 
 
-async def wait_for_registration(path, process):
+async def wait_for_registration(path, process, marker=REGISTERED):
     for _ in range(6000):
-        if path.exists() and REGISTERED in path.read_text(errors="replace"):
+        if path.exists() and marker in path.read_text(errors="replace"):
             return
         if process.returncode is not None:
             raise RuntimeError("MAME exited before call forwarding registered")
@@ -41,7 +42,8 @@ async def run(args):
             epoch = ready.get("epoch")
             if not isinstance(epoch, int):
                 raise RuntimeError("adapter ready omitted transport epoch")
-            await wait_for_registration(pathlib.Path(args.cwd) / "error.log", process)
+            marker = ACTIVE_QUERY if getattr(args, 'ready_source', 'registration') == 'active-query' else REGISTERED
+            await wait_for_registration(pathlib.Path(args.cwd) / "error.log", process, marker)
             await websocket.send(json.dumps({
                 "type": "incoming_call",
                 "epoch": epoch,
@@ -85,6 +87,8 @@ def main():
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cwd", required=True)
     parser.add_argument("--caller", default="447700900123")
+    parser.add_argument("--ready-source", choices=('registration', 'active-query'),
+                        default='registration', help='organic readiness before host call')
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:

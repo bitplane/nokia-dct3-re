@@ -366,7 +366,10 @@ register/query/deactivate/query session and reviewed frames; restoration
 is independently tested by `verify-6250-state-divert`: registration and
 activation precede save, exact architecture/protocol/pixels replay, and a
 fresh physical query after load proves active forwarding before deactivation.
-Cold-process forwarding persistence remains unpromoted on NHM-3.
+`verify-6250-call-divert-cold` additionally validates cold-process forwarding
+persistence: physical registration, retained fresh-process active interrogation
+and host call routing without paging, followed by an independent fresh-storage
+inactive-query control. The normal machine and native speech remain unpromoted.
 `verify-6250-sim-toolkit` independently verifies its nine-byte TERMINAL
 PROFILE, card-owned DISPLAY TEXT, physical OK, successful TERMINAL RESPONSE
 and reviewed idle recovery. Other proactive commands remain unpromoted.

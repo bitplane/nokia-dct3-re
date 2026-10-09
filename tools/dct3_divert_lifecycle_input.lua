@@ -10,7 +10,7 @@ local function press(column, name)
     key:set_value(0)
     return emu.wait(0.85)
 end
-local sequences = {'*21*5551234#', '*#21#', '#21#', '*#21#'}
+local sequences = _G.dct3_divert_sequences or {'*21*5551234#', '*#21#', '#21#', '*#21#'}
 local function transactions(first)
     for index = first, #sequences do
         machine:logerror(prefix .. '_physical: transaction=' .. index .. '\n')
