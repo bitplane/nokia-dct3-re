@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb6_own_provisioned_alarm_wake_security_stop",
+      "owner": "nsb6_firmware",
+      "status": "satisfied",
+      "predicate": "An independently persisted physical phone-code change permits RTC-only wake after power-off, physical security acceptance and alarm Stop to registered idle in the explicit 8890 research-HLE composition",
+      "current": "verify-8890-alarm-wake-security generates an own clock seed, physically changes the phone code to 54321, proves independent cold acceptance, then arms 13:49 and powers off. One cause-80 RTC wake at second 60 restarts the native upload/HLE boundary; both boot phases independently register. The physical changed code matches, reviewed frames show security/accepted/ringing/idle, and Stop returns to idle with buzzer control off and rails on. No additional rail event, firmware-state forcing, donor record or activation-choice/native-audio claim is accepted.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/run_noki8890_code_change.py", "tools/run_noki8890_alarm_wake.py", "tools/test_noki8890_alarm_wake.py", "gates.json"]
+    },
+    {
       "id": "c54x_nmi_idle_wake", "owner": "native_dsp_cpu", "status": "satisfied",
       "predicate": "An external NMI wakes each C54x idle mode and reaches vector 1 independently of INTM/IMR without consuming pending maskable IFR sources",
       "current": "Twelve executable cases cross IDLE1/2/3 with both INTM values and empty/full IMR. After sleeping, simultaneous maskable IFR sources and NMI are presented. NMI selects IPTR vector 1, stacks the idle continuation, sets INTM and preserves IFR/IMR. Each case also saves after request latching with fixture-only instruction suspension, services NMI, restores pre-entry PC/SP/INTM and stack memory, and replays the identical single entry. Held-line checks reject duplicate delivery after restoration. Full core conformance is required. This is logical architectural acceptance; synchronizer/pulse timing, PLL restart, nested behavior and exact pipeline drain are not established, and no phone NMI wiring is invented.",

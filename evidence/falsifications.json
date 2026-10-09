@@ -3,6 +3,13 @@
   "kind": "falsifications",
   "entries": [
     {
+      "id": "nsb6_alarm_code_rejection_requires_wake_cause_override",
+      "status": "disproven",
+      "hypothesis": "8890 powered-off alarm code rejection requires clearing the retained CCONT PWRONX bit or replacing the packed code record",
+      "conclusion": "Both physical 12345 inputs encode identically, but generic NV reload of offset 056c restores d33098dc over the RAM-only startup repair d83b30d8. The packed 0110 reader remains valid 123450. The phone's own Settings 4-6-5-3 transaction saves 54321 via selector 0709; an independent cold boot and RTC-only alarm wake both accept the persisted d87d3698 encoding without changing CCONT or fabricating PMM. Physical Stop returns to registered idle, not a demonstrated 6210-style activation choice. The observed initial status reader tests bit 0; IRQ drain masks f8 and the other observed status accessor tests bit 2. This is bounded consumer coverage, not a global absence proof.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/run_noki8890_code_change.py", "tools/run_noki8890_alarm_wake.py", "tools/noki8890_alarm_wake_input.lua"]
+    },
+    {
       "id": "mu4_recorder_padded_context_requires_filename_injection",
       "status": "disproven",
       "hypothesis": "The resident recorder metadata operation cannot select REL_001 because its returned filename context contains REL_ followed by padding",

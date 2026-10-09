@@ -1239,24 +1239,13 @@ acceptance passes in `run_8890_alarm_snooze_acceptance`. This establishes the
 deadline for this observed input timing, not a universal interval/rounding
 algorithm, powered-off wake or audible-output acceptance.
 
-The separate manual `noki8890_alarm_power_probe.lua` preserves the unresolved
-powered-off boundary. Start with the fresh own `run_noki8890_cold_clock.py`
-seed's NVRAM/configuration and the ordinary `nsb6hle` debug/verbose command,
-select this autoboot script and run 95 seconds. Physical power hold/release
-after arming removes rails near second 40; RTC alone wakes them at the
-13:48:00 deadline (second 60), with no new power-key or charger event.
-Firmware reads alarm status `b3`, acknowledges it and drives the buzzer,
-but the display enters `Sicherheitscode`, not the alarm activation prompt.
-Physical `12345` and Menu at seconds 70..73 reaches the decoded key handler
-but displays `Code falsch`; the later right-softkey probe does not establish
-No activation or rail removal. Both raw runs remain preserved in
-`run_8890_alarm_off_review` and `run_8890_alarm_off_security_review`.
-No powered-off alarm acceptance gate is promoted. The ordinary alarm/Snooze
-and power-key-restart gates remain separate from this negative result.
-The acquired PMM's runtime phone-code setting is inconsistent with its
-startup repair. A physical code-change transaction resolves that rejection;
-the powered-off alarm Stop/activation lifecycle still needs acceptance.
-Neither a CCONT wake-cause change nor a manufactured record is justified.
+The unchanged acquired PMM is a negative control: RTC-only powered-off wake
+reaches `Sicherheitscode`, but `12345` is rejected after a settings reload.
+`noki8890_alarm_power_probe.lua` reproduces it from an own cold-clock seed
+in 95 seconds; raw evidence is retained in `run_8890_alarm_off_review` and
+`run_8890_alarm_off_security_review`. The runtime code record is inconsistent
+with its startup repair. Firmware-owned user provisioning resolves this,
+without a CCONT wake-cause change or manufactured record.
 
 The read-only own-ROM probe in `run_8890_alarm_startup_reader_valid`
 narrows the initial status consumer without closing the wake contract.
@@ -1282,15 +1271,10 @@ through five asterisks, then Menu displays `Code falsch`. This excludes
 duplicate logical digits in that retry despite repeated low-level keypad
 decode observations. The same run accepts the cold-start security sequence
 before arming the alarm; no security record or firmware state was changed.
-Read-only NV comparison in `run_8890_alarm_security_nv` observes 1,042
-getter calls before alarm wake and 958 afterward. Both starts successfully
-read the same initial low-offset records: `0000/0120`, `0014/000c`,
-`0000/000c`, `000c/0008`, and `0020/0018` (offset/length). Requests
-`70:13/14/15/16` carry byte-identical payloads on the two starts, followed
-by `70:0d00` and `70:0a09`. This does not establish identity/security DSP
-verdicts, which remain unimplemented, or prove all NV bytes are unchanged.
-In particular, the repeated offset-`000c` reader at `0x28c40c` unpacks
-nibbles into digit characters; it is not evidence of a phone-code compare.
+`run_8890_alarm_security_nv` observes matching initial low-record requests
+and byte-identical `70:13/14/15/16` payloads on both starts. This is not
+an identity/security DSP verdict or proof that all NV bytes are unchanged.
+Offset-`000c` reader `0x28c40c` unpacks identity digits, not the phone code.
 The exact own-ROM five-digit reader is `0x28c140`: it reads three packed
 bytes at NV offset `0110`, converts high/low nibbles to characters, validates
 the first five digits and terminates at byte 5. Invalid digit content selects
@@ -1342,22 +1326,27 @@ transport predicates. `run_8890_code_change_acceptance` reproduces it.
 This is firmware-owned user provisioning, not a shipped replacement PMM,
 security bypass or native DSP-verdict claim.
 
-`run_8890_alarm_changed_code_future` uses only that organically saved
-storage. Physical alarm `13:49` removes rails at 40.452288231 seconds;
-RTC wakes them at 60 seconds with cause `80`. Physical `54321`/Menu then
-compares equal and displays **Code angenommen**, followed by startup/menu
-presentation and the ringing alarm. No CCONT or firmware-state change was
-needed to resolve the code rejection. The fixture's early Stop/Menu occurs
-before alarm presentation and opens the menu instead, so this is not yet
-Stop/No activation acceptance. Preserve the shorter
-`run_8890_alarm_changed_code` negative control: its selected `13:48` was
-not a future deadline on this retained-clock seed and it correctly remained
-off during the observation window.
-The later physical Stop at 87 seconds in
-`run_8890_alarm_changed_code_stop` returns to registered idle. There is no
-activation-choice prompt in this unlocked full-startup path: the subsequent
-right softkey opens the phonebook rather than choosing No, and rails remain
-on. Do not import the 6210 Yes/No lifecycle as an 8890 assertion.
+Preserved negative controls prevent two false claims:
+`run_8890_alarm_changed_code` selects a non-future `13:48` on its retained
+clock seed and remains off; a blank frame alone is not a failed wake.
+`run_8890_alarm_changed_code_stop` shows that early Menu opens the normal
+menu, while Stop after alarm presentation returns to idle and the subsequent
+right softkey opens Names. It is not a 6210-style No activation choice.
+
+`make verify-8890-alarm-wake-security RUN_DIR=RUN` independently runs the
+physical code-change/cold-retention gate, then copies only its own saved
+storage into a fresh alarm process. Physical `13:49` entry programs
+CCONT `0b=31`, `0c=0d`; a four-second power hold removes rails near second
+40. RTC alone wakes them at second 60. Physical `54321` is accepted,
+the alarm is visibly presented, and Stop at second 87 returns to registered
+idle with buzzer control off and rails on. A digit may silence the buzzer
+before Stop, so no Stop-only buzzer edge is asserted. Each boot independently
+passes native-upload/HLE-boundary and retained-location registration checks;
+full reviewed frames cover off, security, accepted code, ringing and idle.
+Fresh acceptance is preserved in `run_8890_alarm_wake_acceptance`.
+The permanent checker rejects additional rail events and failed comparisons.
+This proves research-HLE wake/unlock/Stop after user-owned provisioning,
+not an alarm-only Yes/No activation path, native speech or audible output.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state

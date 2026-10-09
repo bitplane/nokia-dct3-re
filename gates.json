@@ -15220,6 +15220,14 @@
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8890-alarm-wake-security",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_alarm_wake.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8890-alarm",
       "prerequisites": ["build"],
       "variables": {},
