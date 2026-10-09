@@ -9,15 +9,16 @@ and checks its reset and sparse DSP verification contract. This is static
 coverage only; no executable profile or graphical boot is promoted.
 
 The next prerequisite is establishing matching resident DSP behavior and
-product-local EEPROM contents, plus the physical SRAM/flash part and map.
+runtime validity of the acquired product-local EEPROM repair template,
+plus fitted flash attributes and address aliases.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 
 ## Own-firmware contract
 
 Input identity and member extents are authoritative in `roms/README.md`.
-The checker pins 440 instruction bytes, decodes fourteen Thumb anchors
-and seven pool references, and independently resolves three ARM stack loads.
+The checker pins 532 instruction bytes, decodes twenty-one Thumb anchors
+and eleven pool references, and independently resolves three ARM stack loads.
 It does not claim a whole-image control-flow or producer census.
 
 | Boundary | NSM-1 v5.23 evidence |
@@ -49,8 +50,30 @@ Primary references:
 - [NSM-1 system module, Original 10/98](https://www.eserviceinfo.com/preview_html.php?fileid=9648&previewid=5152).
 - [UE4 UI module, Original 10/98](https://www.eserviceinfo.com/preview_html.php?fileid=9648&previewid=5146).
 
-The available system text ends at the start of the memory section. Acquire
-the complete manual or equivalent primary part evidence before selecting
-SRAM/EEPROM capacities or fitted flash attributes. The collaborator's
-documented 6150 lock-screen result and NokiX EEPROM lead justify further
-software investigation, but are not a matching hardware/provisioning proof.
+The [indexed original system manual, page 3-45](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/6150/03sys%20%5B92%5D.pdf)
+establishes 16 Mbit flash, 1 Mbit SRAM (128 KiB) and 128 Kbit serial EEPROM
+(16 KiB). Complete PDF retrieval remains unavailable; fitted flash attributes
+and address aliases are not inferred from those capacities.
+
+## Product-local EEPROM input
+
+The original NokiX 2011.07.24 archive contains a 16 KiB `nsm-1.bin` repair
+template. Source/member hashes and acquisition URL are in `roms/README.md`.
+The static gate audits its original bytes without applying repair scripts
+or changing checksums. It is a historical product-local template, not a
+verified factory handset dump or proof of boot compatibility.
+
+The own-image directory `0x2da10c..0x2da48b` contains 112 distinct group-7
+descriptors; all fit the documented EEPROM, with the highest end `0x3fa8`.
+Records `0x0701` and `0x0702` select `0x03cc`/8 bytes and `0x03d4`/44 bytes;
+nested record `0x070b` selects the checksum at `0x03d2`/2 bytes.
+Settings load `0x2c3a70` places record `0x0702` at SRAM `0x11fc16`.
+Validator `0x2bccfe` reads setting state `0x11fc35`, establishing index
+`0x1f` and physical EEPROM byte `0x03f3` without a value sweep.
+It sums a sixteen-byte identity buffer via `0x2b1e2c`, adds the setting and
+compares the truncated result with checksum state `0x112826`.
+
+The original template has setting `0x58` and stored checksum `0x3124`.
+The identity buffer's encoding and the complete template's checksum/runtime
+validity remain unproved. Do not substitute raw EEPROM identity bytes for
+that buffer, repair the checksum speculatively, or transplant NSE-3 records.

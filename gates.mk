@@ -1177,7 +1177,7 @@ verify-6110-v548-static: normalize-6110-v548
 	$(VENV)/bin/python tools/nse3_v548_static_check.py --rom3 roms/noki6110/6110_nse3_v548_rom3_ppmb.fls --rom4 roms/noki6110/6110_nse3_v548_rom4_ppmb.fls --json run_census/nse3_v548_static_boundary.json
 
 verify-6150-static:
-	$(VENV)/bin/python tools/nsm1_v523_static_check.py roms/research/nsm1-v523/6150-v523-ppm-c.fls --package roms/archive-dct3-packages/nsm1_523.exe --output run_census/nsm1_v523_static_boundary.json
+	$(VENV)/bin/python tools/nsm1_v523_static_check.py roms/research/nsm1-v523/6150-v523-ppm-c.fls --package roms/archive-dct3-packages/nsm1_523.exe --eeprom-package roms/research/nsm1-v523/NokiX-scripts-2011.07.24.zip --output run_census/nsm1_v523_static_boundary.json
 
 verify-6110-bootstrap-capture:
 	@test -n "$(CAPTURE)" || { echo "CAPTURE=<provenance JSON> is required" >&2; exit 2; }

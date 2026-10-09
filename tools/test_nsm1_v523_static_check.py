@@ -46,6 +46,23 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not the acquired"):
             check.normalize_package(b"unknown package")
 
+    def test_unidentified_eeprom_archive_rejected(self):
+        with self.assertRaisesRegex(ValueError, "original NokiX"):
+            check.extract_eeprom(b"unknown package")
+
+    def test_unidentified_directory_rejected(self):
+        with self.assertRaisesRegex(ValueError, "directory fingerprint"):
+            check.decode_group7(bytes(check.SIZE))
+
+    def test_original_eeprom_when_available(self):
+        archive = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/NokiX-scripts-2011.07.24.zip"
+        if not archive.exists():
+            self.skipTest("original NokiX archive not present")
+        eeprom = check.extract_eeprom(archive.read_bytes())
+        self.assertEqual(0x4000, len(eeprom))
+        self.assertEqual(0x58, eeprom[0x3F3])
+        self.assertEqual(bytes.fromhex("3124"), eeprom[0x3D2:0x3D4])
+
     def test_acquired_package_reproduces_input_when_available(self):
         package = Path(__file__).resolve().parents[1] / "roms/archive-dct3-packages/nsm1_523.exe"
         if not package.exists():
@@ -63,6 +80,13 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         self.assertEqual(127, result["stream"]["full_blocks"])
         self.assertFalse(result["boot_promoted"])
         self.assertFalse(result["final_publication"]["matching_resident_dsp_proven"])
+        records = {r["id"]: r for r in result["eeprom"]["records"]}
+        self.assertEqual(112, len(records))
+        self.assertEqual((0x3CC, 8), (records[0x701]["offset"], records[0x701]["size"]))
+        self.assertEqual((0x3D4, 0x2C), (records[0x702]["offset"], records[0x702]["size"]))
+        self.assertEqual(0x3F3, result["eeprom"]["security_setting_offset"])
+        self.assertEqual(0x3FA8, result["eeprom"]["highest_record_end"])
+        self.assertFalse(result["eeprom"]["template_boot_compatibility_proven"])
 
 
 if __name__ == "__main__":

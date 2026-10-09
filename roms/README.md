@@ -404,6 +404,18 @@ Matching EEPROM contents, resident DSP compatibility and product-specific
 hardware configuration remain to be established; no sibling provisioning
 is accepted by this normalization.
 
+The [original NokiX scripts archive, 2011.07.24](https://sourceforge.net/projects/nokix/files/NokiX%20scripts/2011.07.24/NokiX-scripts.zip/download)
+was acquired as ignored `research/nsm1-v523/NokiX-scripts-2011.07.24.zip`
+(876,685 bytes; SHA-256
+`412244a6e03f803bacff4096216355f7f88d13e20d36987158e54fe92e298154`).
+Its data member `NokiX/scripts/scripts/misc/repair_external_eeprom/nsm-1.bin`
+is 16,384 bytes, SHA-1 `1035ee33849563abbeafe0889d5b5c695a817fb5`,
+SHA-256 `95d3326ab9bbcdb31838696c552f56295aac9b234cad53813aff7af9e0a73cbd`.
+This original NSM-1 repair template is retained unchanged, not treated as a
+factory handset dump. `verify-6150-static` reads the pinned ZIP member directly
+and audits its own-image record layout; no NokiX script is executed and no
+EEPROM checksum or setting is modified. Boot compatibility remains unproved.
+
 ### Nokia 6110 NSE-3
 
 The primary service manual specifies a 1 MiB Intel TE28F800 program flash and

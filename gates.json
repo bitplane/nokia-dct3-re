@@ -2052,10 +2052,12 @@
             "roms/research/nsm1-v523/6150-v523-ppm-c.fls",
             "--package",
             "roms/archive-dct3-packages/nsm1_523.exe",
+            "--eeprom-package",
+            "roms/research/nsm1-v523/NokiX-scripts-2011.07.24.zip",
             "--output",
             "run_census/nsm1_v523_static_boundary.json"
           ],
-          "options": ["--package", "--output"]
+          "options": ["--package", "--eeprom-package", "--output"]
         }
       ]
     },
