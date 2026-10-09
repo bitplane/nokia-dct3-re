@@ -52,6 +52,10 @@ class FamilyTest(unittest.TestCase):
         self.assertEqual(gate_parity_audit.family_of("verify-6110-static"),
                          ("6110", "static"))
 
+    def test_static_only_acquired_product_is_not_3210(self):
+        self.assertEqual(gate_parity_audit.family_of("verify-6150-static"),
+                         ("6150", "static"))
+
 
 class AuditTest(unittest.TestCase):
     def setUp(self):

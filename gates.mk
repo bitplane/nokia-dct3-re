@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 668 gates: 470 generated from typed steps, 198 copied verbatim (shell).
+# 669 gates: 471 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -145,17 +145,17 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-radio-periodic-location-update \
 	verify-radio-periodic-location-update-state \
 	verify-3410-radio-periodic-location-update verify-dsp-speech-control-static \
-	verify-6110-static verify-6110-v548-static verify-6110-bootstrap-capture \
-	verify-dct3-type-1f-static verify-3210-v501 verify-dsp-memory-upload verify \
-	verify-ccont verify-ccont-watchdog verify-gensio verify-display \
-	verify-dsp-transport verify-cobba-control verify-dsp-bootstrap-3310 \
-	verify-3310-radio-boundary verify-3330-radio-boundary \
-	verify-3310-radio-registration verify-3330-radio-registration \
-	verify-3330-radio-registration-preserved verify-3330-radio-registration-state \
-	verify-3330-radio-unsuitable-cells verify-3410-radio-registration \
-	verify-3410-radio-registration-preserved verify-3410-radio-registration-state \
-	verify-3410-radio-unsuitable-cells verify-5210-frontier \
-	verify-5210-radio-registration verify-5210-menu \
+	verify-6110-static verify-6110-v548-static verify-6150-static \
+	verify-6110-bootstrap-capture verify-dct3-type-1f-static verify-3210-v501 \
+	verify-dsp-memory-upload verify verify-ccont verify-ccont-watchdog \
+	verify-gensio verify-display verify-dsp-transport verify-cobba-control \
+	verify-dsp-bootstrap-3310 verify-3310-radio-boundary \
+	verify-3330-radio-boundary verify-3310-radio-registration \
+	verify-3330-radio-registration verify-3330-radio-registration-preserved \
+	verify-3330-radio-registration-state verify-3330-radio-unsuitable-cells \
+	verify-3410-radio-registration verify-3410-radio-registration-preserved \
+	verify-3410-radio-registration-state verify-3410-radio-unsuitable-cells \
+	verify-5210-frontier verify-5210-radio-registration verify-5210-menu \
 	verify-5210-radio-authentication verify-5210-radio-a5-1-degraded-state \
 	verify-5210-radio-a5-1-incoming-call verify-5210-radio-call-state \
 	verify-5210-power-lifecycle verify-5210-charger-wake \
@@ -1175,6 +1175,9 @@ verify-6110-static: normalize-6110
 
 verify-6110-v548-static: normalize-6110-v548
 	$(VENV)/bin/python tools/nse3_v548_static_check.py --rom3 roms/noki6110/6110_nse3_v548_rom3_ppmb.fls --rom4 roms/noki6110/6110_nse3_v548_rom4_ppmb.fls --json run_census/nse3_v548_static_boundary.json
+
+verify-6150-static:
+	$(VENV)/bin/python tools/nsm1_v523_static_check.py roms/research/nsm1-v523/6150-v523-ppm-c.fls --package roms/archive-dct3-packages/nsm1_523.exe --output run_census/nsm1_v523_static_boundary.json
 
 verify-6110-bootstrap-capture:
 	@test -n "$(CAPTURE)" || { echo "CAPTURE=<provenance JSON> is required" >&2; exit 2; }

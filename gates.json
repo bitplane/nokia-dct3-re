@@ -2038,6 +2038,28 @@
       ]
     },
     {
+      "name": "verify-6150-static",
+      "prerequisites": [],
+      "variables": {},
+      "steps": [
+        {
+          "step": "check",
+          "silent": false,
+          "interpreter": "$(VENV)/bin/python",
+          "before_script": [],
+          "script": "tools/nsm1_v523_static_check.py",
+          "arguments": [
+            "roms/research/nsm1-v523/6150-v523-ppm-c.fls",
+            "--package",
+            "roms/archive-dct3-packages/nsm1_523.exe",
+            "--output",
+            "run_census/nsm1_v523_static_boundary.json"
+          ],
+          "options": ["--package", "--output"]
+        }
+      ]
+    },
+    {
       "name": "verify-6110-bootstrap-capture",
       "prerequisites": [],
       "variables": {},

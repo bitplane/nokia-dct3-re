@@ -9,7 +9,7 @@ DRIVER = Path(__file__).resolve().parents[1] / "driver/nokia_dct3.cpp"
 SYSTEM_RE = re.compile(r"^SYST\(\s*\d+\s*,\s*noki(\d+)\s*,", re.MULTILINE)
 
 # Identity for tooling classification only, not a claim of runtime support.
-RESEARCH_ONLY_PRODUCTS = frozenset({'5510'})
+RESEARCH_ONLY_PRODUCTS = frozenset({'5510', '6150'})
 
 
 @lru_cache(maxsize=1)
