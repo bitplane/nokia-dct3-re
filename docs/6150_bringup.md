@@ -126,15 +126,42 @@ receive head/tail both zero. No return object is observed through nine
 seconds, and no task-22 invocation of sender `0x27641c` is observed in that
 window. The entry trace confirms that the receiver probe was reached;
 this is narrower evidence than claiming every possible sender is absent.
+The receiver instrument accepts both SRAM and own-flash object pointers:
+the RTOS can deliver immutable objects without allocating a RAM copy.
 
 The static gate enumerates 27 direct Thumb BL candidates targeting
 `0x27641c` over CPU addresses `0x200000..0x2e0eff`. This is a linear,
 even-halfword candidate scan, not a control-flow proof: embedded data,
 indirect calls, descriptor interpreters and other sender primitives are
 not closed. Candidate sites and scan bounds are in the generated report.
+The alternate blocking sender `0x275b60` uses the same task descriptor
+table; its linear inventory has 370 direct-call candidates. Wrappers
+`0x29c4b4`, `0x29c90e` and `0x29ce18` send own immutable objects at
+`0x2e0730`, `0x2e0728`, `0x2e0738`, carrying event bytes `0x37`, `0x38`,
+`0x02`. Their respective direct callers include `0x2076d0`, `0x20768a`,
+`0x207a6c`; the latter is gated by nonzero object byte `0x10e6cf`.
+These wrappers are not yet classified as ordinary startup producers.
 
-Next: identify the legitimate initial task-22 delivery and its producer
-boundary, including interpreted/event-table paths. Keep validating NSM-1
+### Physical socket control
+
+`tools/nsm1_sim_socket_fixture.lua` removes the laboratory card through
+the physical `SIM_REMOVED` input at three seconds and reinserts it at four.
+It writes no firmware or MMIO state. NSM-1 card-detect interrupt routing
+remains a compatibility assumption, so this is a controller/firmware
+experiment, not validation of fitted-board wiring or unattended boot.
+
+The cold socket-edge run delivers own ROM object `0x2e0a50` to task 22 at
+approximately 5.922 seconds: bytes `000000000c000000002a0000`, ordinary
+event `0x0c`. This object is outside SRAM and must be retained by receiver
+observability. Neither of the two traced sender entrances publishes it in
+the observed window; another delivery path remains to be mapped. Readiness
+still reads `01/ff/00/01` at eight seconds. The expanded no-edge cold control
+observes no receive object. The receive path can therefore carry a physical
+input-triggered event, but this does not complete SIM activation.
+
+Next: map the event-`0x0c` producer and continuation, then identify what
+prevents ordinary boot from advancing into card activation. Include direct
+queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
 GPIO ownership independently. Do not inject an event, force the readiness
 byte, replace the verifier result or infer a missing DSP message solely
 from the blank display.

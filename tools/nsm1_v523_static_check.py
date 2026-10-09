@@ -308,6 +308,9 @@ def verify(image: bytes) -> dict:
         if (insn.mnemonic, insn.op_str) != expected:
             raise ValueError(f"instruction mismatch at {address:#x}")
     expected_literals = {
+        0x29C4B6: 0x2E0730,
+        0x29C910: 0x2E0728,
+        0x29CE1A: 0x2E0738,
         0x275DC2: 0x100020,
         0x275DCA: 0x1014AC,
         0x27642A: 0x1014AC,
@@ -354,6 +357,14 @@ def verify(image: bytes) -> dict:
         "loader": 0x2A479E,
         "sim_delivery": {"receive_loop": 0x288114, "receive": 0x275DB4,
                          "sender": 0x27641C, "current_task": 0x100022,
+                         "blocking_sender": 0x275B60,
+                         "blocking_sender_candidates": direct_call_candidates(image, 0x275B60),
+                         "immutable_event_objects": [
+                             {"wrapper": wrapper, "object": literal(image, pool),
+                              "event": image[literal(image, pool) - BASE + 4]}
+                             for wrapper, pool in ((0x29C4B4, 0x29C4B6),
+                                                   (0x29C90E, 0x29C910),
+                                                   (0x29CE18, 0x29CE1A))],
                          "descriptor_base": 0x1014AC, "descriptor_stride": 0x1C,
                          "receive_head_offset": 0x10, "receive_tail_offset": 0x11,
                          "direct_sender_candidates": direct_call_candidates(image, 0x27641C),

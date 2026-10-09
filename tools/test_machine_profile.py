@@ -115,6 +115,11 @@ class MachineProfileTest(unittest.TestCase):
         observer = (ROOT / "tools/nsm1_native_observe.lua").read_text()
         self.assertNotIn("memory:write", observer)
         self.assertNotIn(".value =", observer)
+        self.assertIn("local in_flash", observer)
+        socket = (ROOT / "tools/nsm1_sim_socket_fixture.lua").read_text()
+        self.assertIn("socket:set_value(1)", socket)
+        self.assertIn("socket:set_value(0)", socket)
+        self.assertNotIn("memory:write", socket)
 
     def test_dsp_bootstrap_count_is_product_configuration(self):
         self.assert_profile_fields(

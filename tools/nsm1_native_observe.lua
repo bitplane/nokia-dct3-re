@@ -5,16 +5,18 @@ local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
 local sim_sends = 0
-handles[#handles + 1] = memory:install_read_tap(0x27641c, 0x27641f,
-    'nsm1_sim_sender', function(offset, value, mask)
-        if cpu.state['PC'].value ~= 0x27641c or cpu.state['R0'].value ~= 0x16 then return end
+for _, sender in ipairs({0x27641c, 0x275b60}) do
+handles[#handles + 1] = memory:install_read_tap(sender, sender + 3,
+    'nsm1_sim_sender_' .. sender, function(offset, value, mask)
+        if cpu.state['PC'].value ~= sender or cpu.state['R0'].value ~= 0x16 then return end
         sim_sends = sim_sends + 1
         if sim_sends > 32 then return end
         machine:logerror(string.format(
-            'nsm1_sim_send: argument=%08x caller=%08x count=%u t=%.9f\n',
-            cpu.state['R1'].value, cpu.state['R14'].value, sim_sends,
+            'nsm1_sim_send: sender=%08x argument=%08x caller=%08x count=%u t=%.9f\n',
+            sender, cpu.state['R1'].value, cpu.state['R14'].value, sim_sends,
             machine.time:as_double()))
     end)
+end
 local sim_receive_entries = 0
 handles[#handles + 1] = memory:install_read_tap(0x288114, 0x288117,
     'nsm1_sim_receive_entry', function(offset, value, mask)
@@ -36,7 +38,9 @@ for _, address in ipairs({0x28812a, 0x288140}) do
         function(offset, value, mask)
             if cpu.state['PC'].value ~= address or count >= 32 then return end
             local pointer = cpu.state['R0'].value
-            if pointer < 0x100000 or pointer > 0x11fff4 then return end
+            local in_ram = pointer >= 0x100000 and pointer <= 0x11fff4
+            local in_flash = pointer >= 0x200000 and pointer <= 0x3ffff4
+            if not in_ram and not in_flash then return end
             count = count + 1
             local bytes = {}
             for index = 0, 11 do
