@@ -5,6 +5,18 @@ from tools import nse6_v602_static_check as check
 
 
 class Nse6StaticTests(unittest.TestCase):
+    def test_verifier_stream_stride_lane_and_terminators(self):
+        image = bytearray(0x200000)
+        image[0x40:0x44] = bytes.fromhex("12345678")
+        image[0x60:0x62] = bytes.fromhex("9abc")
+        image[-32:-30] = bytes.fromhex("def0")
+        stream = check.verifier_stream(image)
+        self.assertEqual(len(stream), 131072)
+        self.assertEqual(stream[:4], bytes.fromhex("12349abc"))
+        self.assertEqual(stream[-6:], bytes.fromhex("def0ffffffff"))
+        with self.assertRaises(ValueError):
+            check.verifier_stream(bytes(32))
+
     def test_eeprom_descriptor_own_fields(self):
         self.assertEqual(check.eeprom_descriptor(0xF6), {
             "capacity_bytes": 32768, "page_bytes": 32, "address_bytes": 2})
@@ -39,6 +51,8 @@ class Nse6StaticTests(unittest.TestCase):
         self.assertEqual(result["eeprom_tx"]["scl_bit"], 2)
         self.assertFalse(result["dsp_verifier"]["resident_mask_proven"])
         self.assertEqual(result["dsp_verifier"]["full_blocks"], 127)
+        self.assertEqual(result["dsp_verifier"]["stream_sha1"],
+                         check.VERIFIER_STREAM_SHA1)
         self.assertEqual(result["eeprom_descriptor"]["page_bytes"], 32)
         self.assertEqual(result["keypad"]["power_column_mask"], 16)
         self.assertFalse(result["keypad"]["runtime_input_proven"])

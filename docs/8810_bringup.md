@@ -113,6 +113,13 @@ This identifies a protocol shape shared with other recovered verifier streams,
 not a fitted DSP mask or a successful verdict. No resident-ROM compatibility
 is established and no DSP response is fabricated.
 
+The independently serialized stream is 131,072 bytes, SHA-1
+`1e9487dbc339646937dc9e5bb1bb6c3e2e759dac`. The static checker pins the
+stride, halfword lane and two terminators. Its block/stride shape matches
+the NSM-1 verifier, but its contents differ from that product's stream.
+Neither resemblance nor a digest identifies the fitted resident DSP ROM;
+this is sparse external-flash input, not an extracted DSP program.
+
 ### Display
 
 Initializer `0x2e1194` selects GENSIO control `0x28 = 0x21`, configures PUP

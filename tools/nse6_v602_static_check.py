@@ -13,6 +13,7 @@ from tools.extract_dct3_wintesla import decode_records
 
 PACKAGE_SHA256 = "abc2fa6a0b1b0f5e33206c7ffb5ce17e81ab46e155733584e23aa3459b3349e9"
 IMAGE_SHA1 = "e3b548816fa027da906be3daf049ce6332a9f257"
+VERIFIER_STREAM_SHA1 = "1e9487dbc339646937dc9e5bb1bb6c3e2e759dac"
 BASE = 0x200000
 
 
@@ -30,6 +31,14 @@ def normalize(package):
             BASE, 0x170000, 0x370000, 0x90000):
         raise ValueError("NSE-6 record extents changed")
     return mcu + ppm
+
+
+def verifier_stream(image):
+    """Serialize the sparse flash halfwords, not a contiguous DSP program."""
+    if len(image) != 0x200000:
+        raise ValueError("wrong NSE-6 verifier image size")
+    return b"".join(image[offset:offset + 2]
+                    for offset in range(0x40, len(image), 32)) + b"\xff\xff" * 2
 
 
 def read32(image, address):
@@ -191,6 +200,10 @@ def check(image):
     if (normal.hex() != "3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b"
             or special.hex() != "3e3e3e3e0d"):
         raise ValueError("own NSE-6 keypad tables changed")
+    stream = verifier_stream(image)
+    stream_sha1 = hashlib.sha1(stream).hexdigest()
+    if stream_sha1 != VERIFIER_STREAM_SHA1:
+        raise ValueError("own NSE-6 verifier stream changed")
     return {"product": "NSE-6", "version": "6.02", "ppm": "A",
             "image_sha1": IMAGE_SHA1, "reset_literals": literals,
             "service_manual_sram_bytes": 0x40000,
@@ -223,6 +236,8 @@ def check(image):
                           "pup_direction": "0x20024", "sda_bit": 0,
                           "scl_bit": 2},
             "dsp_verifier": {"entry": "0x2b6118", "source": "0x200040",
+                             "stream_sha1": stream_sha1,
+                             "stream_bytes": len(stream),
                              "stride_bytes": 32, "full_blocks": 127,
                              "words_per_block": 512, "last_words": 510,
                              "buffers": ["0x10200", "0x10600"],
