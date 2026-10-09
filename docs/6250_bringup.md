@@ -1352,6 +1352,21 @@ rail-off. This separately validates state created by the wake/Snooze cycle,
 not just the initial countdown. It does not cover an awake alarm/editor
 save point or promote restored Yes.
 
+`verify-6250-alarm-awake-restore` separately covers the sounding awake
+alarm at second 65, before physical Stop. The fresh own-product Calendar
+seed and unchanged research PMM comparison reach natural 13:48 expiry and
+CCONT acknowledgement. All 37 ARM/banked registers, SRAM digest and time
+match exactly immediately after load and after a 1.25-second replay;
+ordered RTC ticks, complete timed PUP buzzer programming and nonblank
+96x60 pixels also agree. Physical Stop then silences the buzzer, renders
+the reviewed stopped/registered-idle frame and preserves registration.
+Own uploads are independently checked. The strict checker rejects absent
+or altered snapshots, premature Stop/rail-off, and absent/inactive/divergent
+buzzer replay. Raw acceptance:
+`run_6250_alarm_awake_restore_verified_20261009`; runner option
+`tools/run_noki6250_alarm.py --restore-awake`. This does not cover alarm
+editor restoration, audible host output, native speech or offline time.
+
 `verify-6250-alarm-off-restore` and `-restore-yes` save the powered-off
 countdown at emulated second 49. All 37 exported ARM/banked registers,
 modeled RAM digest and emulated time must match exactly on load. The

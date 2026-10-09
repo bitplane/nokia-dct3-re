@@ -171,6 +171,37 @@ def check_restore(text, checkpoint=49):
     return text[:states[0].start()] + text[states[1].start():]
 
 
+def check_awake_restore(text):
+    states = list(re.finditer(
+        r"6250_alarm_awake_state: event=(saved|reference|restored|replayed) "
+        r"pc=([0-9a-f]{8}) sp=([0-9a-f]{8}) ram=([0-9a-f]{8}) "
+        r"cpu=([0-9a-f]{8}(?:,[0-9a-f]{8}){36}) t=([0-9.]+)", text))
+    if (len(states) != 4 or [state[1] for state in states] !=
+            ["saved", "reference", "restored", "replayed"] or
+            text.count("6250_alarm_awake_state:") != 4 or
+            text.count("6250_alarm_awake_restore: PASS") != 1 or "[LUA ERROR]" in text):
+        raise ValueError("missing or incomplete awake alarm restoration")
+    if states[0].groups()[1:] != states[2].groups()[1:] or states[1].groups()[1:] != states[3].groups()[1:]:
+        raise ValueError("awake alarm architecture or replay differs")
+    if float(states[0][6]) != 65 or float(states[1][6]) - float(states[0][6]) != 1.25:
+        raise ValueError("awake alarm replay duration differs")
+    before = text[:states[0].start()]
+    if "event=second time=13:48:00" not in before or "event=status_ack data=81 old=b1" not in before:
+        raise ValueError("snapshot did not follow natural alarm expiry/acknowledgement")
+    if "action=stop" in before or "ccont_power: event=off" in text:
+        raise ValueError("awake snapshot follows Stop or includes rail-off")
+    reference = text[states[0].end():states[1].start()]
+    replayed = text[states[2].end():states[3].start()]
+    ticks = re.findall(r"ccont_rtc: event=second[^\r\n]+", reference)
+    if not ticks or ticks != re.findall(r"ccont_rtc: event=second[^\r\n]+", replayed):
+        raise ValueError("awake alarm RTC replay absent or differs")
+    tones = re.findall(r"buzzer: [^\r\n]+", reference)
+    if (not tones or tones != re.findall(r"buzzer: [^\r\n]+", replayed) or
+            not any(re.search(r"enabled=1 .*volume=[1-9]\d*\b", tone) for tone in tones)):
+        raise ValueError("awake alarm buzzer replay absent, inactive or differs")
+    return text[:states[0].start()] + text[states[2].start():]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
@@ -179,10 +210,14 @@ def main():
                         help="power off before expiry, then physically choose activation")
     parser.add_argument("--snooze", action="store_true")
     parser.add_argument("--restore-off", action="store_true")
+    parser.add_argument("--restore-awake", action="store_true",
+                        help="restore while the awake alarm sounds, then physically Stop")
     parser.add_argument("--restore-snooze", action="store_true",
                         help="restore the later powered-off Snooze countdown at second 100")
     parser.add_argument("--cold", action="store_true")
     args = parser.parse_args()
+    if args.restore_awake and (args.power_choice or args.snooze or args.restore_off or args.restore_snooze or args.cold):
+        parser.error("awake restoration requires the independent awake Stop lifecycle")
     if args.restore_off and not args.power_choice:
         parser.error("off-state restoration requires an explicit activation choice")
     if args.restore_snooze and (not args.snooze or not args.power_choice or args.restore_off):
@@ -204,7 +239,8 @@ def main():
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{phase / 'roms'};{root / 'roms'}", "-nvram_directory", "nvram",
                    "-cfg_directory", "cfg", "-noreadconfig", "-autoboot_script",
-                   str(root / "tools" / ("noki6250_alarm_restore.lua" if args.restore_off or args.restore_snooze
+                   str(root / "tools" / ("noki6250_alarm_awake_restore.lua" if args.restore_awake else
+                                         "noki6250_alarm_restore.lua" if args.restore_off or args.restore_snooze
                                          else "noki6250_alarm_input.lua")), "-autoboot_delay", "0",
                    "-seconds_to_run", "40" if args.cold else "430" if args.snooze and args.power_choice else "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
                    "-nothrottle", "-log", "-verbose"]
@@ -250,7 +286,20 @@ def main():
                 check_frame(cold / "snap" / f"6250_alarm_cold_{name}.png", digest)
             print("6250 research-HLE retained cold alarm and physical Stop PASS; native/audio not tested")
             return
-        if args.restore_off or args.restore_snooze:
+        if args.restore_awake:
+            text = check_awake_restore(text)
+            from tools.noki6250_staged_check import check as check_uploads
+            check_uploads(text, runtime=True)
+            from PIL import Image
+            pixels = []
+            for name in ("reference", "replayed"):
+                with Image.open(phase / "snap" / f"6250_alarm_awake_{name}.png") as frame:
+                    if frame.size != (96, 60):
+                        raise ValueError("unexpected awake alarm frame dimensions")
+                    pixels.append(frame.convert("L").tobytes())
+            if pixels[0] != pixels[1] or not any(pixels[0]):
+                raise ValueError("awake alarm replay pixels differ or are blank")
+        elif args.restore_off or args.restore_snooze:
             text = check_restore(text, checkpoint=100 if args.restore_snooze else 49)
             for name in ("reference", "restored"):
                 check_frame(phase / "snap" / f"6250_alarm_off_{name}.png",

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 666 gates: 468 generated from typed steps, 198 copied verbatim (shell).
+# 667 gates: 469 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -375,10 +375,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-idle-state verify-6250-coherent-call-state \
 	verify-6250-coherent-sms-state verify-6250-pin-state-idle \
 	verify-6250-pin-state-call verify-6250-pin-state-sms verify-6250-alarm \
-	verify-6250-alarm-cold verify-6250-alarm-off-restore \
-	verify-6250-alarm-off-restore-yes verify-6250-alarm-snooze \
-	verify-6250-alarm-off-no verify-6250-alarm-off-snooze-no \
-	verify-6250-alarm-off-snooze-yes verify-6250-alarm-off-snooze-restore \
+	verify-6250-alarm-cold verify-6250-alarm-awake-restore \
+	verify-6250-alarm-off-restore verify-6250-alarm-off-restore-yes \
+	verify-6250-alarm-snooze verify-6250-alarm-off-no \
+	verify-6250-alarm-off-snooze-no verify-6250-alarm-off-snooze-yes \
+	verify-6250-alarm-off-snooze-restore \
 	verify-6250-alarm-snooze-countdown-restore verify-6250-alarm-off-yes \
 	verify-6250-calendar-cold verify-6250-power-cycle verify-6250-ussd \
 	verify-6250-call-divert verify-6210-sim-toolkit-call-decline \
@@ -4765,6 +4766,9 @@ verify-6250-alarm: build
 
 verify-6250-alarm-cold: build
 	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --cold --mame $(MAME_DIR)/mame
+
+verify-6250-alarm-awake-restore: build
+	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --restore-awake --mame $(MAME_DIR)/mame
 
 verify-6250-alarm-off-restore: build
 	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --power-choice no --restore-off --mame $(MAME_DIR)/mame

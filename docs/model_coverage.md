@@ -109,7 +109,14 @@ and off-rail RTC replay from the initial countdown, followed by the complete
 two-wake Snooze/Stop/No continuation.
 `verify-6250-alarm-snooze-countdown-restore` separately proves exact state
 and RTC replay during the later Snooze-induced rail-off, then natural
-recurrence and final Stop/No. Awake alarm/editor restoration, restored Yes
+recurrence and final Stop/No. `verify-6250-alarm-awake-restore` separately
+snapshots the sounding awake alarm at second 65, restores all 37 ARM/banked
+registers, SRAM and time exactly, and reproduces the full architecture, RTC
+ticks, timed buzzer programming and nonblank 96x60 pixels after a 1.25-second
+replay. Physical Stop then silences the buzzer and returns to the reviewed
+registered-idle frame. It uses a fresh own-product clock seed and the declared
+research PMM comparison, not RTC/firmware injection or audible/native speech.
+Alarm-editor restoration, restored Yes
 and audible/native media remain unproved.
 `verify-6250-alarm-cold` additionally proves own physically saved alarm
 reconstruction in a new process, natural expiry and Stop, with independent

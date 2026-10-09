@@ -15292,6 +15292,13 @@
                  "arguments": ["$(RUN_DIR)", "--cold", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-alarm-awake-restore",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_alarm.py",
+                 "arguments": ["$(RUN_DIR)", "--restore-awake", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-alarm-off-restore",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",

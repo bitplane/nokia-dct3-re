@@ -1,9 +1,46 @@
 import unittest
 
-from tools.run_noki6250_alarm import check_alarm, check_restore, check_cold_alarm, check_alarm_seed
+from tools.run_noki6250_alarm import (
+    check_alarm, check_restore, check_cold_alarm, check_alarm_seed, check_awake_restore)
 
 
 class AlarmCheckTest(unittest.TestCase):
+    def awake_restore_trace(self):
+        cpu = ','.join(['00000000'] * 37)
+        def state(event, time):
+            return (f'6250_alarm_awake_state: event={event} pc=00200000 sp=00100000 '
+                    f'ram=12345678 cpu={cpu} t={time}\n')
+        tick = 'ccont_rtc: event=second time=13:48:06 day=0 status=81 mask=10\n'
+        tick += 'buzzer: enabled=1 divider=5202 frequency=2499 volume=5 t=65.1\n'
+        return ('ccont_rtc: event=second time=13:48:00 day=0 status=b1 mask=30\n'
+                'ccont_rtc: event=status_ack data=81 old=b1\n' +
+                state('saved', '65.000000000') + tick +
+                state('reference', '66.250000000') +
+                state('restored', '65.000000000') + tick +
+                state('replayed', '66.250000000') +
+                '6250_alarm_awake_restore: PASS\n')
+
+    def test_awake_alarm_restore(self):
+        self.assertIn('event=restored', check_awake_restore(self.awake_restore_trace()))
+
+    def test_awake_alarm_restore_rejects_incomplete_or_changed_state(self):
+        text = self.awake_restore_trace()
+        for old, new in (('event=restored', 'event=missing'),
+                         ('event=replayed pc=00200000', 'event=replayed pc=00200004'),
+                         ('event=saved pc=', 'event=saved bad='),
+                         ('event=reference pc=', 'event=reference pc=xx'),
+                         ('6250_alarm_awake_restore: PASS', ''),
+                         ('data=81 old=b1', 'data=00 old=b1'),
+                         ('volume=5', 'volume=0'),
+                         ('66.250000000', '66.500000000')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_awake_restore(text.replace(old, new))
+
+    def test_awake_alarm_restore_rejects_off_or_early_stop(self):
+        for prefix in ('ccont_power: event=off\n', '6250_alarm_physical: action=stop\n'):
+            with self.assertRaises(ValueError):
+                check_awake_restore(prefix + self.awake_restore_trace())
+
     def trace(self):
         actions = ["menu", *[f"down_{i}" for i in range(1, 10)], "clock",
                    "clock_down_1", "alarm", *[f"time_{i}" for i in range(1, 5)],
