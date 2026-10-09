@@ -446,6 +446,28 @@ private:
 		m_phase = 6162 + subtract;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_shifted_high_store_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		unsigned const source = (index / 16) & 1;
+		unsigned const modifier = index & 32 ? 5 : 1;
+		program.write_word(0x0109d0, 0x9a00 | (source << 8) | (modifier << 4) | (index & 15));
+		program.write_word(0x0109d1, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0507, 0xbeef);
+		m_cpu->space(AS_DATA).write_word(0x0508, 0xabcd);
+		m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(STATE_GENPC, 0x0109d0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, index & 64 ? 1 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0aa5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xff87654321ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0507);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 30000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_asm_store_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -1336,6 +1358,33 @@ private:
 			osd_printf_info("TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0\n");
 			osd_printf_info("TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0\n");
 			check_control_disassembler();
+			start_shifted_high_store_case(0);
+			return;
+		}
+		if (m_phase >= 30000 && m_phase < 30128)
+		{
+			auto &data = m_cpu->space(AS_DATA);
+			unsigned const index = m_phase - 30000;
+			u64 const source = index & 16 ? 0xff87654321ULL : 0x12345678;
+			u64 const shifted = (source << (index & 15)) & 0xffffffffffULL;
+			s64 const signed_value = s64(shifted << 24) >> 24;
+			u16 expected = u16(shifted >> 16);
+			if (index & 64)
+			{
+				if (signed_value > 0x7fffffffLL) expected = 0x7fff;
+				if (signed_value < -0x80000000LL) expected = 0x8000;
+			}
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				data.read_word(0x0507) == expected && data.read_word(0x0508) == 0xabcd &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (index & 32 ? 0x0506 : 0x0507) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0xff87654321ULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0aa5 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0900,
+				"SPRU172C shifted STH Xmem preserves accumulators/status and applies address modification and SST");
+			if (index < 127) { start_shifted_high_store_case(index + 1); return; }
+			osd_printf_info("TMS320C54x shifted high store conformance: PASS variants=128\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

@@ -51,6 +51,8 @@ class CodecTraceTests(unittest.TestCase):
                   ("data", "write", "0022", "c0c8", "0e24"),
                   ("data", "write", "0021", "0aaa", "0e31"),
                   ("data", "read", "0020", "0aaa", "0e5d"),
+                  ("data", "read", "0020", "0aaa", "3464"),
+                  ("data", "write", "0021", "ffd5", "358b"),
                   ("io", "write", "0021", "1482", "4555"),
                   ("io", "write", "0021", "1482", "4559"),
                   ("io", "write", "0021", "0482", "455d")]
@@ -81,6 +83,10 @@ class CodecTraceTests(unittest.TestCase):
     def test_missing_echo_rejected(self):
         with self.assertRaisesRegex(ValueError, "boot echo"):
             check_trace(self.trace().replace("address=0021 value=0aaa", "address=0021 value=0000"))
+
+    def test_missing_receive_isr_rejected(self):
+        with self.assertRaisesRegex(ValueError, "receive ISR"):
+            check_trace(self.trace().replace("pc=3464", "pc=0000"))
 
     def test_incomplete_cycles_rejected(self):
         with self.assertRaisesRegex(ValueError, "I/O control"):
@@ -126,7 +132,7 @@ class NativeToneTests(unittest.TestCase):
             "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
             "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.09",
             "input-release: t=8.22 name=1 port=1d",
-            "rom4_tone_summary: tx_words=1 rx_reads=1 tone_reads=29 tone_copies=7 t=11.01",
+            "rom4_tone_summary: tx_words=2 rx_reads=2 tone_reads=29 tone_copies=7 t=11.01",
         ])
 
     def test_organic_tone_boundary(self):
@@ -142,7 +148,7 @@ class NativeToneTests(unittest.TestCase):
 
     def test_new_audio_activity_requires_review(self):
         with self.assertRaisesRegex(ValueError, "boundary changed"):
-            check_tone(self.trace().replace("tx_words=1", "tx_words=2"))
+            check_tone(self.trace().replace("tx_words=2", "tx_words=3"))
 
     def test_missing_uncapped_counts_rejected(self):
         with self.assertRaisesRegex(ValueError, "uncapped"):

@@ -211,7 +211,7 @@ identifies an organic command input to trace, not permission to set the cell.
 The codec contract checker covers the vector-page setup, vector entry, direct
 copy, accumulator publication and tone-gate words. Its mutation tests apply
 to these signatures too. This static evidence does not prove that vector 20
-is exercised in ordinary idle, define its external pin/cadence, or promote
+is exercised continuously in ordinary idle, define its external pin/cadence, or promote
 native microphone/earpiece PCM. The next attachment must establish the
 firmware's serial readiness/enable contract before introducing a codec clock;
 neither a fixed interrupt cadence nor shared tone-cell writes may be added
@@ -228,6 +228,17 @@ enable and firmware interrupt mask observed independently. IMR/IFR are
 CPU-internal MMRs in this implementation and bypass data-space taps; an
 empty tap at data `0000/0001` would not prove absent mask activity.
 
+The native endpoint routes each accepted receive-ready edge to source bit 4.
+The existing external boot echo consequently exercises vector 20 after the
+firmware's own polling read: BDRR retains `0aaa` for the ISR read at `3464`,
+and the real processing tail writes `ffd5` at `358b`. No second receive edge
+or periodic clock is synthesized. This exposed the genuinely executed
+`9a5f` at `346f` (`STH A,15,*AR3-`), now implemented from TI SPRU172C
+section 4-169 with 128 executable shift/source/address/SST cases. The CPU
+suite, coherent boot, physical tone delivery, exact save/load and unchanged
+Phone book hash validate the route. This is a boot-ISR execution result,
+not continuous codec playback or speech.
+
 The physical `1` fixture now retains separate boot/interactive serial trace
 caps and observes IMR/IFR plus non-destructive BSPC readback. At idle,
 `IMR=035f`, `IFR=0000`, `BSPC=c8c8`: RRST/XRST are released, XRDY is set,
@@ -235,7 +246,7 @@ and RRDY is clear. At 8.076920923 s the organic tone initializer writes
 `c008` at `a4a7`, then `c0c8` at `a4a9`; its COBBA control traffic writes
 register 0 with `0000` and reads/re-writes register 8 with `0626`. Later
 release handling repeats the BSP reset/release sequence. Counts still show
-one transmitted/received boot echo and no operational samples. Thus this
+the boot echo plus its one receive-ready ISR and no post-key samples. Thus this
 fixture does not lack BSP release or the receive interrupt mask; it lacks
 observed receive-frame delivery. The COBBA register-0/8 field meanings and
 clock/mux gating remain unresolved, so these numeric transactions are not
@@ -286,7 +297,8 @@ upper-halfword `00e1` write at 8.076714462 s, followed by native reads of `0856`
 and a copy to data `00fe` at `a5de` by 8.076919730 s. Release at 8.22 s is
 followed by control `00e0`, then `0001` and its native initializer copy. Total
 tone-cell reads/copies are 29/7, while total data-space serial writes/reads are
-1/1: only the boot `0aaa` exchange, no operational samples. `--tone-log LOG`
+2/2: the boot `0aaa` exchange and its receive-ready ISR's retained-word read
+and computed `ffd5` output, no post-key operational samples. `--tone-log LOG`
 checks the physical key, ordered post-key command/initializer, intact boot
 echo, control readback and uncapped final counts; it refuses to use an earlier
 boot initializer as evidence of a key response. These observations rule out
@@ -348,7 +360,8 @@ The extension-selected 10/12-bit formats remain unimplemented. The suite also
 checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The
-tone run still observes only the single boot echo, not operational samples.
+tone run observes only the boot echo and its one receive ISR, not continuous
+or post-key operational samples.
 
 This remains partial hardware: clock-pin status, transmit-shifter status,
 autobuffering, reset-time transmit preloading and physical frame/bit timing

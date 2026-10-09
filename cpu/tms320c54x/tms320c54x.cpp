@@ -2424,11 +2424,12 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
-	if ((op & 0xfe00) == 0x9800) // STL src, SHFT, Xmem (SPRU172C 4-172)
+	if ((op & 0xfc00) == 0x9800) // STL/STH src, SHFT, Xmem (SPRU172C 4-169/172)
 	{
 		const u8 x = op >> 4;
 		const unsigned xar = 2 + (x & 3);
-		data_write(m_ar[xar], u16(saturated_store((accumulator(BIT(op, 8)) << (op & 15)) & ACC_MASK)));
+		const u32 value = saturated_store((accumulator(BIT(op, 8)) << (op & 15)) & ACC_MASK);
+		data_write(m_ar[xar], u16(value >> (BIT(op, 9) ? 16 : 0)));
 		dual_modify(x);
 		return;
 	}

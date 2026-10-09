@@ -105,8 +105,10 @@ def check_trace(text: str) -> None:
             for space, direction, address, value, pc, _ in records
             if space == "data" and address in ("0020", "0021")]
     if echo != [("write", "0021", "0aaa", "0e31"),
-                ("read", "0020", "0aaa", "0e5d")]:
-        raise ValueError("data-space boot echo missing, duplicated or changed")
+                ("read", "0020", "0aaa", "0e5d"),
+                ("read", "0020", "0aaa", "3464"),
+                ("write", "0021", "ffd5", "358b")]:
+        raise ValueError("data-space boot echo/receive ISR missing, duplicated or changed")
     setup = [(direction, value, pc) for space, direction, address, value, pc, _ in records
              if space == "data" and address == "0022" and direction == "write"]
     if setup[:2] != [("write", "c008", "0e22"), ("write", "c0c8", "0e24")]:
@@ -163,7 +165,7 @@ def check_tone(text: str) -> None:
     if len(summaries) != 1:
         raise ValueError("missing uncapped native tone summary")
     tx, rx, reads, copies, time = summaries[0]
-    if (int(tx), int(rx)) != (1, 1) or int(reads) == 0 or int(copies) == 0 or float(time) < 11:
+    if (int(tx), int(rx)) != (2, 2) or int(reads) == 0 or int(copies) == 0 or float(time) < 11:
         raise ValueError("native tone/serial boundary changed; review actual sample activity")
 
 
@@ -190,7 +192,7 @@ def main() -> int:
     print("PASS: " + ", ".join(results))
     print("Candidate immediate-port coverage: reads=9/9 writes=12/12; uploads excluded.")
     if args.trace is not None:
-        print("Native echo and three operational control readback cycles: PASS")
+            print("Native echo, receive-ready ISR and three operational control readback cycles: PASS")
     if args.restore_log is not None:
         print("Native I/O word, CPU registers and save-time restoration: PASS")
     if args.tone_log is not None:

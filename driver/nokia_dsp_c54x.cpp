@@ -297,7 +297,8 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 			m_cobba->codec_serial_transmit(word);
 			if (m_cobba->codec_serial_receive_ready())
 			{
-				m_bsp.frame_receive(m_cobba->codec_serial_receive());
+				if (m_bsp.frame_receive(m_cobba->codec_serial_receive()))
+					m_cpu->set_input_line(4, HOLD_LINE); // BRINT0, vector 20.
 				m_cobba->codec_serial_receive_ack();
 			}
 		}
