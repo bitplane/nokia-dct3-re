@@ -294,7 +294,10 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 	}
 	if (address == 0x0032)
 	{
-		m_cobba->parallel_control_w(data);
+		// Resident stores use serial-control-shaped C008/C0C8 values.
+		// The MAD2 peripheral identity is unresolved; do not reinterpret
+		// these as COBBA MFI register-C payloads.
+		m_data[address] = data;
 		return;
 	}
 	if (address >= 0xb000 && address <= 0xefff)

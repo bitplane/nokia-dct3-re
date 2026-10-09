@@ -419,9 +419,15 @@ fabricated frame or interrupt. No operational PCM is claimed.
 
 The coherent gate now checks real serial reset/release and echo observations
 instead of expecting synthetic COBBA parallel register-C logs. Data `0032`
-still uses the legacy forwarding path: the generic TI assignment varies by
-part, so that address needs its own local sequence/variant evidence, not a
-shared "interrupt-masked alias" assumption. Before attaching the 8 kHz frame
+now retains an opaque saved latch without forwarding writes into COBBA.
+The local resident candidates at `3b48`, `3b5c` and `3b5e` store `c00c`,
+`c008` and `c0c8`; exact sequence fixtures protect that serial-control-shaped
+observation. No data-`0032` access occurs in the 11-second physical-key
+capture. TI assigns `0032` to different peripherals across variants
+(including TSPC and Timer1 TCR); neither identifies MAD2's implementation.
+Thus this retires an unsupported MFI side effect, not completes a second
+serial port or establishes hardware readback semantics. The actual MFI
+attachment remains to be recovered independently. Before attaching the 8 kHz frame
 clock, establish the remaining enable, frame and interrupt-routing contract
 and validate word timing. MFI port mapping remains an independent boundary; do not
 double-drive both owners to preserve an old log predicate.

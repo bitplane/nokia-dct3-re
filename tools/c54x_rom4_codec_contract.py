@@ -72,6 +72,8 @@ SEQUENCES.update({
     "codec_register8_constant_setup": (0xb89c, (
         0xe908, 0xf074, 0xa484, 0xf020, 0x0602, 0xe908,
         0xf074, 0x45c2, 0xf020, 0x0944, 0xe909, 0xf074, 0x45c2)),
+    "unresolved_data32_control": (0x3b48, (0x7732, 0xc00c)),
+    "unresolved_data32_reset_release": (0x3b5c, (0x7732, 0xc008, 0x7732, 0xc0c8)),
 })
 
 READ_SITES = [0x321e, 0x33f3, 0x3c6f, 0x3c84, 0x4231,
@@ -104,6 +106,9 @@ def check_trace(text: str) -> None:
         r"rom4_serial_audit: space=(data|io) direction=(read|write) "
         r"address=([0-9a-f]{4}) value=([0-9a-f]{4}) mask=ffff "
         r"pc=([0-9a-f]{4}) t=([0-9.]+)", text)
+    if any(space == "data" and address == "0032"
+           for space, _, address, _, _, _ in records):
+        raise ValueError("unresolved data0032 access requires peripheral review")
     echo = [(direction, address, value, pc)
             for space, direction, address, value, pc, _ in records
             if space == "data" and address in ("0020", "0021")]

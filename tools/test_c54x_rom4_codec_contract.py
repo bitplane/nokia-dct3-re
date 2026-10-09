@@ -68,6 +68,12 @@ class CodecTraceTests(unittest.TestCase):
     def test_separate_paths(self):
         check_trace(self.trace())
 
+    def test_new_unresolved_register_access_requires_review(self):
+        event = ("\nrom4_serial_audit: space=data direction=write address=0032 "
+                 "value=c0c8 mask=ffff pc=3b60 t=3.0")
+        with self.assertRaisesRegex(ValueError, "peripheral review"):
+            check_trace(self.trace() + event)
+
     def test_control_readback_does_not_hide_reset_writes(self):
         readback = ("rom4_serial_audit: space=data direction=read address=0022 "
                     "value=0800 mask=ffff pc=408d t=0.01\n")
