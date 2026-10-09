@@ -10,8 +10,9 @@ provisioning and DSP publications are not evidence for this handset.
 
 The reset stack base `0x125f30` fits the documented 256 KiB SRAM window starting
 at `0x100000`; importing a 128 KiB product configuration would be incorrect.
-The current runtime question is the resident DSP implementation that consumes
-the verifier stream and publishes its first acknowledgement.
+The silent baseline waits for its first DSP acknowledgement. The separate
+`nse6r4t` compatibility fixture executes acquired NSE-1 ROM4 code and reaches
+CONTACT SERVICE, without proving that mask belongs to the 8810.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
@@ -201,9 +202,29 @@ Run the hash-pinned package/reset check with
 Its memory-capacity fields cite the service chapter; they are not decoded from
 the reset instructions. The check explicitly reports no runtime acceptance.
 
-Next, identify the resident DSP implementation that consumes the measured
-verifier stream, using independently supported ROM/upload evidence. The shared
-memory handshake is not permission to fabricate its result. Memory capacities,
+### ROM4 Compatibility Run
+
+`nse6r4t` substitutes the acquired NSE-1 ROM4 program/data for the disabled HLE
+exchange. It retains the own 8810 flash, 256 KiB SRAM and erased 32 KiB EEPROM;
+no handset identity, repair template or fabricated DSP verdict is supplied.
+The MCU reset exit still uses the declared boot HLE. This is a compatibility
+experiment, not a fitted-mask profile or full native phone.
+
+The isolated nine-second run reaches final verifier wait `0x2b6200` at
+0.228983538 s, LCD initializer `0x2e1194` at 0.245563231 s and keypad scanner
+`0x2de164` at 0.386279385 s. The eight-second snapshot displays CONTACT SERVICE.
+Handshake cells `0x100fe/0x10100` later read `0x04ec/0x1074`; these are sampled
+live cells, not a captured final verdict. No SIMI initializer observation or
+runtime input acceptance was obtained.
+
+Reproduce with the isolated-run command above, substituting `nse6r4t` and a
+fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
+`nse1_rom4_dsp_program.bin` and `nse1_rom4_dsp_data.bin` declared in the driver.
+Next, capture the firmware-owned verifier result and trace the self-test failure
+with erased own storage. A successful handshake does not justify importing a
+donor EEPROM or claiming native radio/speech.
+
+The shared memory handshake is not permission to fabricate its result. Memory capacities,
 reset/peripheral attachment, static negative fixtures and the first isolated
 boot are established above; persistent-storage dependencies remain unresolved.
 

@@ -1267,6 +1267,7 @@ public:
 	void noki6110(machine_config &config);
 	void nsm1r4t(machine_config &config);
 	void nse6stage(machine_config &config);
+	void nse6r4t(machine_config &config);
 	void noki7110(machine_config &config);
 	void nse5r4t(machine_config &config);
 	void noki6210(machine_config &config);
@@ -4026,6 +4027,15 @@ void nokia_dct3_state::nse6stage(machine_config &config)
 	// contracts. No fitted mask or fabricated bootstrap completion is selected.
 }
 
+void nokia_dct3_state::nse6r4t(machine_config &config)
+{
+	nse6stage(config);
+	// Compatibility instrument only: the fitted NSE-6 DSP mask is unknown.
+	config.device_remove("dsp_hle");
+	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
+}
+
 u8 nokia_dct3_state::nse5_roller_gpio_r(offs_t bank)
 {
 	// One closed pair, with released pins pulled high. A driven-low contact
@@ -4451,6 +4461,21 @@ ROM_START( nse6stage )
 	ROM_REGION(0x8000, "eeprom", ROMREGION_ERASEFF)
 ROM_END
 
+ROM_START( nse6r4t )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nse6_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x20000, "dsp_program", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_program.bin", 0, 0x1fffe,
+		CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739))
+	ROM_REGION16_BE(0x20000, "dsp_data", ROMREGION_ERASE00)
+	ROM_LOAD("nse1_rom4_dsp_data.bin", 0, 0x20000,
+		CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("8810-v602-ppm-a.fls", 0, 0x200000,
+		CRC(4ebe88f4) SHA1(e3b548816fa027da906be3daf049ce6332a9f257))
+	ROM_REGION(0x8000, "eeprom", ROMREGION_ERASEFF)
+ROM_END
+
 ROM_START( nse5r4t )
 	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
 	ROM_LOAD("nse5_boot.bin", 0, 0x10000, NO_DUMP)
@@ -4569,6 +4594,7 @@ SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empt
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  nsm1r4t,  nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nse6stage, 0,       0,    nse6stage, nsm1r4t, nokia_dct3_state, empty_init, "Nokia", "8810 NSE-6 (erased EEPROM, disabled DSP exchange research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nse6r4t, 0,         0,    nse6r4t, nsm1r4t, nokia_dct3_state, empty_init, "Nokia", "8810 NSE-6 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
