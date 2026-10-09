@@ -904,6 +904,16 @@ the order in which each item can enter the validated model.
 
 The checkpoint is accepted when:
 
+NHM-5 encrypted-call fixtures must align the external laboratory cell with
+the handset's ARFCN-88 acquisition request (`NEIGHBORCFG`, mask 12, value 4).
+The default ARFCN-1 composition produces zero channel headers and fails the
+strict lifecycle contract; it must not be accepted by relaxing `041202` to
+`040000`. The carrier-aligned impaired run passes that unchanged contract,
+A5, NHM-5 speech control, PCM/concealment, FACCH and SACCH checks: 500 encoded
+microphone frames, 467 decoded earpiece frames, 68 impaired bursts per
+direction, 32 impairment-induced bad blocks and clean physical End. These
+are HLE media results, not native DSP speech validation.
+
 1. `make verify-radio-camp` passes;
 2. `make verify-radio-registration` proves one accepted update and steady camp;
 3. `make verify-radio-authentication-boundary` and its 3310 counterpart prove
