@@ -1253,3 +1253,25 @@ The fixture checks exact physical action order, RTC programming/retention,
 absence of replacement cold input and exact pixels. This proves own-phone
 persistence and cold presentation in research HLE, not offline elapsed
 time, calendar rollover, native DSP execution or factory provisioning.
+
+## Physical Alarm
+
+`make verify-6250-alarm RUN_DIR=NEW_RUN` first executes the complete
+Calendar/cold gate above, then starts an independent process with only that
+handset's saved clock/date and storage. The own route is Clock menu **10-2**,
+not the 6210's Settings 4-1. Physical `1348` and confirmation program CCONT
+`0b=30`, `0c=0d`, both armed; End returns to the alarm-enabled idle frame.
+At the natural 13:48:00 deadline the device publishes status `b1`, mask `30`,
+and firmware acknowledges `81`. PUP buzzer programming starts afterwards.
+Physical left-softkey Stop disables buzzer output and returns to the reviewed
+registered idle frame. The gate requires exact action order, ordered
+hardware/output boundaries, no resumed buzzer after settled Stop and four
+reviewed 96x60 frames. The active-alarm frame is captured during the title's
+blink phase and shows Stop/Snooze; an absent title in that phase is not a
+missing alarm presentation. Fresh and preserved registration are checked
+independently in the three processes.
+
+This establishes natural RTC IRQ consumption and firmware output programming
+in research HLE. It does not establish audible samples, Snooze recurrence,
+powered-off alarm wake, native DSP or physical clock accuracy. No alarm cause,
+time register or firmware state is injected.
