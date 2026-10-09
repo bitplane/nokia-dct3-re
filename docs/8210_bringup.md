@@ -1689,6 +1689,16 @@ not only aligned literal pools. Together with the four direct BL callers,
 this excludes an overlooked stored absolute callback pointer, not computed
 addresses, relative tables or MCU-generated events. It provides no evidence
 for retaining/replaying the peer's cancelled measurement report.
+The selector's independent direct-BL census has eight sites, each with an
+immediately preceding literal argument: argument 0 at `21f356`, `21f90a`,
+`21fba2`; argument 1 at `2a1e28`, `2a1e62`, `2a224a`; argument 2 at
+`21d886`; argument 3 at `21f5ca`. The pinned static checker enumerates the
+whole image's halfword-aligned BL candidates and verifies every argument.
+In `run_8210_list_tag_late_20261009`, the final argument-zero entry is
+`21f90a` at 12.262007s; the subsequent selector entry at 12.696148s is
+`21f5ca` with argument 3. Thus the post-arrival handler runs, but not through
+the argument-zero promotion branch. This is an observed lifecycle gap, not
+proof of an owed radio completion or a justification for forcing argument 0.
 
 Public-reference coverage is bounded. Gammu's
 [NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)
