@@ -204,8 +204,23 @@ none in a fresh nine-second cold run. This does not close indirect callers
 or later activity, but places the observed failure before the SIM controller's
 activation-request consumption rather than in its response timing.
 
-Next: identify the containing application dispatcher and the input/state
-selecting `0x208a7c`,
+The containing dispatcher begins at `0x20837c`, initializes context
+`0x111e70` and secondary context `0x111e94`, and receives objects through
+`0x275db4` at `0x2085c0`. It dispatches their signed halfword at `+0`.
+Literal comparison at `0x2085ce` selects input `0x119a`, branching to
+`0x208a58`. That handler either takes the `0x2079b0` path (context `+5 == 1`
+and `+23 == 0`) or falls through `0x208a7c` toward the two activation owners,
+subject to secondary-context `+15` and helper `0x2a7e44`. Neighbor inputs
+`0x119b` and `0x11f8` select distinct handlers; they must not be conflated
+with `0x119a`.
+
+A fresh cold trace reaches dispatcher entry at 2.650506 seconds and its
+receive-loop entrance at 2.652597 seconds, with the expected context bases.
+No receive-return object is observed through nine seconds. The dispatcher
+is therefore live, not an unstarted task; the bounded frontier is its absent
+input rather than an observed rejection of `0x119a`.
+
+Next: inventory legitimate producers of dispatcher input `0x119a`,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1

@@ -6,7 +6,20 @@ local writes = 0
 local handles = {}
 local sim_sends = 0
 local activation_requests = 0
-for _, address in ipairs({0x207718, 0x207afc, 0x208a7c}) do
+local application_receives = 0
+handles[#handles + 1] = memory:install_read_tap(0x2085c4, 0x2085c7,
+    'nsm1_application_receive', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x2085c4 or application_receives >= 32 then return end
+        local pointer = cpu.state['R0'].value
+        if not ((pointer >= 0x100000 and pointer <= 0x11fffc) or
+                (pointer >= 0x200000 and pointer <= 0x3ffffc)) then return end
+        application_receives = application_receives + 1
+        machine:logerror(string.format(
+            'nsm1_application_receive: task=%02x pointer=%08x id=%04x t=%.9f\n',
+            memory:read_u8(0x100022), pointer, memory:read_u16(pointer),
+            machine.time:as_double()))
+    end)
+for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc}) do
     local count = 0
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nsm1_activation_owner_' .. address,
