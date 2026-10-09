@@ -9,6 +9,29 @@ local report_events = {}
 local report_raw_messages = {}
 local mask_writes = 0
 local cache_writes = 0
+local row_writes = 0
+local irq_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x20008, 0x2000b,
+    'nse6_input_irq_ack', function(offset, value, mask)
+        -- IRQ acknowledgement is byte 0x09; exclude the busy FIQ registers.
+        if machine.time:as_double() < 7 or (mask & 0x00ff0000) == 0 then return end
+        irq_writes = irq_writes + 1
+        if irq_writes > 48 then return end
+        machine:logerror(string.format(
+            'nse6_irq_register_write: value=%08x mask=%08x pc=%08x lr=%08x t=%.9f\n',
+            value, mask, cpu.state['PC'].value, cpu.state['R14'].value,
+            machine.time:as_double()))
+    end)
+handles[#handles + 1] = memory:install_write_tap(0x2002c, 0x2002f,
+    'nse6_row_direction', function(offset, value, mask)
+        if (mask & 0xff) == 0 or machine.time:as_double() < 7 then return end
+        row_writes = row_writes + 1
+        if row_writes > 48 then return end
+        machine:logerror(string.format(
+            'nse6_row_direction_write: value=%02x pc=%08x lr=%08x t=%.9f\n',
+            value & 0xff, cpu.state['PC'].value, cpu.state['R14'].value,
+            machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_write_tap(0x12158c, 0x12158f,
     'nse6_source_cache', function(offset, value, mask)
         cache_writes = cache_writes + 1

@@ -18,9 +18,11 @@ emu.register_frame_done(function()
             event[2], event[3], event[4], now))
         local memory = machine.devices[':maincpu'].spaces['program']
         machine:logerror(string.format(
-            'nse6_input_irq: pending=%02x mask=%02x control=%02x column_mask=%02x t=%.9f\n',
+            'nse6_input_irq: pending=%02x mask=%02x control=%02x column_mask=%02x row_signal=%02x row_direction=%02x columns=%02x t=%.9f\n',
             memory:read_u8(0x20009), memory:read_u8(0x2000b),
-            memory:read_u8(0x2000c), memory:read_u8(0x20033), now))
+            memory:read_u8(0x2000c), memory:read_u8(0x20033),
+            memory:read_u8(0x20031), memory:read_u8(0x2002f),
+            memory:read_u8(0x20030), now))
         next_event = next_event + 1
     end
 end, 'frame')

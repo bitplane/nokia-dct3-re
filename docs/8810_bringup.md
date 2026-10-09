@@ -16,13 +16,46 @@ CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
 erased-storage failures and reaches SIMI initialization, but remains blank
 through 30 seconds. No usable handset or authentic provisioning is established.
-The current bounded question is the product-specific source-7/source-8
-input and calibration contract: their transformed samples exceed the
-acquisition acceptance range. The missing
-report bit leaves the input controller in state `0x10` with all keypad
-columns masked.
+The nominal VBAT profile now completes ten acquisitions and publishes report
+`0x14` organically at about 1.763 seconds. The input controller leaves state
+`0x10`, reaches state `4`, and changes the column mask from `0x3f` to `0x20`.
+The display remains blank. Physical contacts now reach matrix scanning and
+decoding: the 30-second fixture records 23 scanner entries and 19 decoder
+entries by 28 seconds. This proves input execution, not the inherited host
+labels or a usable UI. The remaining graphical/lifecycle boundary is separate
+from startup report delivery and the ordinary keypad cause register.
+
+The profile is an explicitly nominal silicon-transfer hypothesis, not measured
+NSE-6 calibration. The own-board schematic connects BVOLT to CCONT VBAT pin D2,
+and the system manual specifies a nominal 3.6 V pack. The original Nokia
+[NSE-8/9 service manual](https://manualmachine.com/nokia/3210/8179317-service-manual/),
+Table 30 (page 2-54), specifies the CCONT VBAT input's typical 6.5 mV/bit
+transfer (6.4–6.6 limits). Thus `round(3600 / 6.5) = 554`; the own-ROM identity
+calibration transforms this to `3581`, inside its acquisition interval.
+This uses the silicon VBAT input specification, not the 3210's different
+board-level battery routing. Other ADC channels remain research defaults.
 
 ### Report-0x14 Producer Boundary
+
+The full-scale-input observations below describe the negative control, not
+the current nominal-VBAT result. With ADC2 `554`, ten successful acquisitions
+decrement the remaining count from ten to one before the report path runs;
+the report bitmap becomes `0x0f`. Physical input still reports pending IRQ
+`0x00` with mask `0xca` and column mask `0x20`, so report completion alone
+does not establish an interactive handset.
+Two independent fresh integrity-only boots reproduce all ten sample values
+and the report-path timestamps exactly. The input-edge fixture also observes
+column values change with physical contacts. A byte-lane-filtered MMIO watch
+observes firmware acknowledge IRQ0 (`0x20009 = 1`) for all six edges at
+`0x2de2dc`. A zero pending sample after `set_value` therefore does not prove
+missing delivery. With the inherited no-cause-register profile, the
+scanner/decoder counters remained one/zero at 28 seconds. The own IRQ handler
+`0x2de292` reads `0x20034`, tests its low five bits, and calls `0x2e0400`
+before acknowledging IRQ0. Exposing the existing device-owned pending-column
+bits at this register restores ordinary scan/decode without any firmware
+publication or RAM override. `KEYPAD_NSE6` retains the independently decoded
+row/direction/input/mask offsets and adds this status register; other products'
+contracts are unchanged.
 
 Stub `0x2dca88` posts target `1`, code `0x14`, through `0x27b318`.
 A halfword-aligned Thumb-1 BL scan of the complete `0x170000`-byte MCU
@@ -517,7 +550,8 @@ is not sufficient evidence that all firmware execution or UI work is blocked.
 
 `tools/nse6_keypad_fixture.lua` applies physical digit/softkey/navigation
 contacts at 8, 10 and 12 seconds using the inherited, provisional host labels.
-Three fresh two-integrity runs remain blank at 28 seconds. The scanner runs
+With the former full-scale ADC2 input, three fresh two-integrity runs remain
+blank at 28 seconds. The scanner runs
 once during startup and the decoder never runs. At every input edge MAD2 IRQ
 pending is `00`, IRQ mask `ce`, control `05`, and keypad column mask `3f`.
 All columns are masked, explaining why these contacts produce no keypad IRQ;

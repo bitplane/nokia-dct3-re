@@ -93,6 +93,16 @@ constexpr nokia_ccont_board_profile ADC_DEFAULT = {
 	5, 0x03ff
 };
 
+// NSE-6's schematic connects BVOLT directly to CCONT VBAT. The original
+// manual gives a nominal 3.6 V pack; CCONT's documented typical VBAT scale
+// is 6.5 mV/bit (NSE-8/9 Table 30), hence round(3600 / 6.5) = 554.
+// Nominal silicon-transfer hypothesis, not measured NSE-6 calibration.
+// All other channels retain research defaults; no donor NV is supplied.
+constexpr nokia_ccont_board_profile ADC_NSE6 = {
+	{ 0x000, 0x3ff, 554, 0x280, 0x200, 0x000, 0x200, 0x000 },
+	5, 0x03ff
+};
+
 // NPM-5 MA4 A3-6: BSI is pulled to 2.8 V VBB through 150 kohm;
 // General Information specifies BLB-2 (68 kohm). CCONT BSI conversion
 // uses 1.5 V VREF, not VBB: 1023 * 2.8 * 68 / (1.5 * 218) ~= 595.
@@ -393,6 +403,11 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE1 = {
 // NSM-1 v5.23 scanner 0x2c084c and special table 0x2e0b34.
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSM1 = {
 	5, 0x10, 0x31, 0x30, 0x33, 0x2f
+};
+// NSE-6 v6.02 IRQ handler 0x2de292 tests the five column causes at
+// 0x20034 before starting ordinary key handling; IRQ0 alone is insufficient.
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE6 = {
+	5, 0x10, 0x31, 0x30, 0x33, 0x2f, 0, 0x34
 };
 constexpr nokia_gensio_device::wiring_contract GENSIO_NSE1 = {
 	0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true
@@ -4017,9 +4032,10 @@ void nokia_dct3_state::nse6stage(machine_config &config)
 	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
 	nokia_product_config research;
 	research.pup_eeprom_scl_bit = 2;
+	research.ccont_board = ADC_NSE6;
 	// Independently recovered own six-register tuple and keypad tables.
 	research.gensio_wiring = GENSIO_NSE1;
-	research.keypad_wiring = KEYPAD_NSM1;
+	research.keypad_wiring = KEYPAD_NSE6;
 	research.simi_controller = true;
 	research.synthetic_sim_card = true;
 	apply_product_config(research);
