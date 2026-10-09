@@ -185,6 +185,14 @@ oracle. These establish regression preservation and register separation, not
 native speech or physical audio clocks. The I/O bank already participates in
 native backend save states; no new unsaved latch is introduced.
 
+`verify-5110-save-state` now uses `c54x_rom4_codec_restore.lua` to observe
+pre-save/post-load boundaries, comparing emulated time, DSP PC, ST0, ST1, SP
+and the non-destructive I/O `21` word exactly. `--restore-log LOG` rejects a
+missing, duplicated or changed snapshot pair and a failed round-trip harness.
+This check supplements, rather than replaces, physical Menu input and the
+exact Phone book frame. The fixture does not write DSP registers or assert
+that an idle snapshot covers an active codec transaction.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair

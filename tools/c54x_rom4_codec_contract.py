@@ -103,22 +103,41 @@ def check_trace(text: str) -> None:
         raise ValueError("Lua observation failed")
 
 
+def check_restore(text: str) -> None:
+    records = re.findall(
+        r"rom4_codec_state: phase=(saved|restored) "
+        r"(t=[0-9.]+ pc=[0-9a-f]{4} st0=[0-9a-f]{4} "
+        r"st1=[0-9a-f]{4} sp=[0-9a-f]{4} io21=[0-9a-f]{4})", text)
+    if len(records) != 2 or [phase for phase, _ in records] != ["saved", "restored"]:
+        raise ValueError("expected one ordered native save/restore snapshot pair")
+    if records[0][1] != records[1][1]:
+        raise ValueError("native codec word/CPU/time did not restore exactly")
+    if "Lua error" in text or "state_roundtrip: result=pass" not in text:
+        raise ValueError("native restore harness failed")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
     parser.add_argument("--trace", type=Path,
                         help="check a fresh four-second passive codec observer log")
+    parser.add_argument("--restore-log", type=Path,
+                        help="check exact native I/O-word restoration snapshots")
     args = parser.parse_args()
     try:
         results = check(args.image.read_bytes())
         if args.trace is not None:
             check_trace(args.trace.read_text(errors="replace"))
+        if args.restore_log is not None:
+            check_restore(args.restore_log.read_text(errors="replace"))
     except (OSError, ValueError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print("PASS: " + ", ".join(results))
     print("Candidate immediate-port coverage: reads=9/9 writes=12/12; uploads excluded.")
     if args.trace is not None:
         print("Native echo and three operational control readback cycles: PASS")
+    if args.restore_log is not None:
+        print("Native I/O word, CPU registers and save-time restoration: PASS")
     print("Bounded ROM sequences only; physical port ownership remains unresolved.")
     return 0
 

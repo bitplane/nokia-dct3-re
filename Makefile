@@ -1436,7 +1436,10 @@ verify-5110-save-state: build
 			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
 			-video none -sound none -log -skip_gameinfo -nothrottle \
 			-seconds_to_run 11 \
-			-autoboot_script $(abspath mame_nokia_dct3_input_exerciser.lua) >/dev/null; \
+			-autoboot_script $(abspath tools/c54x_rom4_codec_restore.lua) >/dev/null; \
+		$(PYTHON) $(abspath tools/c54x_rom4_codec_contract.py) \
+			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
+			--restore-log error.log; \
 		grep -q 'state_roundtrip: result=pass' error.log; \
 		grep -q 'input-press: .* name=menu' error.log; \
 		! grep -q 'rom4_reset_request' error.log; \

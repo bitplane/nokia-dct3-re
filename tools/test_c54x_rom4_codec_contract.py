@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_codec_contract import SEQUENCES, check, check_trace
+from tools.c54x_rom4_codec_contract import SEQUENCES, check, check_trace, check_restore
 
 
 class CodecContractTests(unittest.TestCase):
@@ -80,6 +80,34 @@ class CodecTraceTests(unittest.TestCase):
     def test_lua_error_rejected(self):
         with self.assertRaisesRegex(ValueError, "Lua observation"):
             check_trace(self.trace() + "\nLua error")
+
+class CodecRestoreTests(unittest.TestCase):
+    def trace(self):
+        state = "t=7.000000000 pc=30bf st0=0000 st1=2900 sp=1000 io21=0482"
+        return (f"rom4_codec_state: phase=saved {state}\n"
+                f"rom4_codec_state: phase=restored {state}\n"
+                "state_roundtrip: result=pass")
+
+    def test_exact_restoration(self):
+        check_restore(self.trace())
+
+    def test_every_field_mismatch_rejected(self):
+        for field in ("t=7.000000000", "pc=30bf", "st0=0000", "st1=2900",
+                      "sp=1000", "io21=0482"):
+            with self.subTest(field=field):
+                changed = self.trace().splitlines()
+                changed[1] = changed[1].replace(field, field[:-1] + "1")
+                with self.assertRaisesRegex(ValueError, "exactly"):
+                    check_restore("\n".join(changed))
+
+    def test_missing_snapshot_rejected(self):
+        with self.assertRaisesRegex(ValueError, "snapshot pair"):
+            check_restore("\n".join(self.trace().splitlines()[1:]))
+
+    def test_failed_harness_rejected(self):
+        with self.assertRaisesRegex(ValueError, "harness failed"):
+            check_restore(self.trace().replace("result=pass", "result=fail"))
+
 
 if __name__ == "__main__":
     unittest.main()
