@@ -17919,8 +17919,27 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == flags &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
 				"INTR selects IPTR:K, ignores masks, saves next PC, sets INTM, clears only selected IFR and costs three cycles");
+			program.write_word(0x10000 | (base + vector * 4 + 3), 0xf49b); // RETF
+			program.write_word(0x0109d3, 0xf4e1);
+			data.write_word(0x0fff, 0xdead); // RTN, not this stack word, must supply PC.
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 61000 + index;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 61000 && m_phase < 61064)
+		{
+			unsigned const index = m_phase - 61000;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == 0x0109d4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0180 &&
+				data.read_word(0x0fff) == 0xdead,
+				"SPRU131G software INTR publishes RTN for RETF independently of the stack word");
 			if (index < 63) { start_software_interrupt_case(index + 1); return; }
 			osd_printf_info("TMS320C54x software interrupt conformance: PASS variants=64\n");
+			osd_printf_info("TMS320C54x software interrupt fast return: PASS variants=64\n");
 			start_compact_store_case(0);
 			return;
 		}

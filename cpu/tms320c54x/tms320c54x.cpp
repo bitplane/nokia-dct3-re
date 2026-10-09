@@ -932,6 +932,7 @@ void tms320c54x_device::execute_one(u16 op)
 	if ((op & 0xffe0) == 0xf7c0) // INTR K, independent of IMR/INTM (SPRU172C 4-65).
 	{
 		unsigned const vector = op & 31;
+		m_rtn = m_pc; // SPRU131G example 7-6: software INTR also loads RTN.
 		push(m_pc);
 		if (vector >= 16) m_ifr &= ~u16(1U << (vector - 16));
 		m_st1 |= 0x0800;

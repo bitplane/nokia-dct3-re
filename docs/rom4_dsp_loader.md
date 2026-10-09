@@ -956,6 +956,13 @@ reference discrepancies, not desired native-core behavior. The runner
 explicitly reproduces and reports them; its PASS means reproduction, not
 INTR conformance. The native core's existing 64 INTR cases check next-PC
 stacking and selected-IFR clearing against SPRU172C. This reference cannot
+substitute for the RTN contract either: SPRU131G example 7-6 explicitly
+loads RTN during software INTR. Each native case now continues through
+RETF after replacing the stacked word with a sentinel, proving the saved
+RTN supplies the original next PC while SP balances and INTM clears.
+Software INTR publishes RTN just as hardware interrupt entry already does;
+the existing three-cycle cost is unchanged. These are 64 architectural
+return assertions, not a pipeline-latency oracle. The external reference cannot
 adjudicate the outstanding interrupt-pipeline question without separate
 validation. Adding our own timer/request model would remove the
 independence needed to validate that model.
