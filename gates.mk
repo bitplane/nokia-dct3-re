@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 602 gates: 407 generated from typed steps, 195 copied verbatim (shell).
+# 603 gates: 407 generated from typed steps, 196 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -67,7 +67,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8890-cold-clock verify-8890-power-cycle verify-8850-sip-idle-restore \
 	verify-8850-sip-outgoing-busy verify-8850-sip-outgoing-unavailable \
 	verify-8850-sip-cancel verify-8890-sip-idle-restore \
-	verify-8890-sip-alerting-incoming-restore verify-8890-sip-outgoing-busy \
+	verify-8890-sip-alerting-incoming-restore \
+	verify-8890-sip-pending-outgoing-restore verify-8890-sip-outgoing-busy \
 	verify-8890-sip-outgoing-unavailable verify-8890-sip-cancel \
 	verify-8890-host-rejected-sms verify-8890-host-silent-sms \
 	verify-8890-host-incoming-sms verify-8890-host-outgoing-sms verify-8850-ussd \
@@ -581,6 +582,11 @@ verify-8890-sip-idle-restore: build
 verify-8890-sip-alerting-incoming-restore: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8890_sip_cancel.py $(RUN_DIR) --restore-incoming-alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP stack; exact pending outgoing restore cancels SIP 180 without redial/media
+verify-8890-sip-pending-outgoing-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8890_sip_cancel.py $(RUN_DIR) --restore-outgoing-pending --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 # shell: optional PJSIP stack; physical own-PMM NSB-6 outgoing busy on configured GSM900 carrier 60, no media
 verify-8890-sip-outgoing-busy: build

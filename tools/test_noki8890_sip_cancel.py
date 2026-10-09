@@ -25,6 +25,19 @@ class CleanupFramesTest(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 check.check_alerting_restoration(invalid)
 
+    def test_pending_restore_requires_own_digits_and_exact_snapshot(self):
+        state = 'pc=00412345 sp=00170000 ram=12345678 t=32.000000000'
+        text = ('gsm_call_adapter: request id=1 epoch=1 digits=1234567\n'
+                '8890_state: event=saved ' + state + '\nsip_state: saved\n'
+                '8890_state: event=restored ' + state + '\nsip_state: restored\n'
+                'state_roundtrip: result=pass scenario=8890_outgoing_pending\n')
+        check.check_alerting_restoration(text, outgoing=True)
+        for invalid in (text.replace('digits=1234567', 'digits=5551234'),
+                        text.replace('event=restored pc=00412345', 'event=restored pc=00412346'),
+                        text.replace('scenario=8890_outgoing_pending', 'scenario=8890_incoming_alerting')):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                check.check_alerting_restoration(invalid, outgoing=True)
+
     def test_outgoing_requires_own_carrier_send_and_idle_pixels(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

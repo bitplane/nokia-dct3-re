@@ -776,6 +776,17 @@ unanswered call-restoration coverage, not connected SIP, speech or native
 DSP completion. No passive replay interval is asserted during the required
 external-dialog invalidation.
 
+`verify-8890-sip-pending-outgoing-restore` independently dials `1234567`
+through the product's physical keypad, receives a real SIP 180 and saves
+the unanswered handset at 32 seconds. Exact R15/R13, RAM digest and time
+must restore. The external request is cancelled with CANCEL/487, followed
+by one cause-41 clear, complete CC/RR release and reviewed idle recovery.
+The bridge must not redial, confirm SIP, deliver CONNECT or accept media.
+Both NSB-6 call-restoration fixtures share architectural observation code;
+their own input schedules and cleanup frames remain distinct. External
+dialogs are discarded, not serialized or restored. Connected SIP and
+native speech remain outside these gates.
+
 `verify-6210-sip-idle-restore` saves and restores the idle NPE-3 handset before
 the fresh INVITE. It checks exact CPU/RAM/time restoration and ordered protocol
 replay, requires the new host epoch 2, then independently checks the same
