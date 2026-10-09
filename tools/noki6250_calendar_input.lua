@@ -15,6 +15,12 @@ local function digit(value)
     end
     error('missing NHM-3 digit ' .. value)
 end
+local function named(value)
+    for _, port in pairs(machine.ioport.ports) do
+        if port.fields[value] then return port.fields[value] end
+    end
+    error('missing NHM-3 key ' .. value)
+end
 local input = coroutine.create(function()
     if not emu.wait(16) then return end
     local function press(key, action)
@@ -47,7 +53,7 @@ local input = coroutine.create(function()
     if _G.noki6250_calendar_midnight then
         if not emu.wait(65) then return end
         machine.screens[':screen']:snapshot('6250_calendar_midnight_open.png')
-        if not press(cell(1, 2), 'midnight_back') then return end
+        if not press(named('Right Softkey / C'), 'midnight_back') then return end
         if not press(cell(1, 1), 'midnight_reopen') then return end
         machine.screens[':screen']:snapshot('6250_calendar_midnight_result.png')
         machine:logerror('6250_calendar_physical: event=midnight_presented\n')
