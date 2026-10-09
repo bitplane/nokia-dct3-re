@@ -14,7 +14,8 @@ for _, address in ipairs({0x2194, 0x2195, 0x2196, 0x2197, 0x06fd}) do
             end
         end)
 end
-for _, address in ipairs({0x3382, 0x3385, 0x33a1, 0x33a4, 0x33ac}) do
+for _, address in ipairs({0x3347, 0x3357, 0x3360, 0x3362, 0x336c, 0x336e,
+    0x2400, 0x2402, 0x3382, 0x3385, 0x33a1, 0x33a4, 0x33ac}) do
     counts[address] = 0
     taps[#taps + 1] = program:install_read_tap(address, address,
         string.format("comparison_fetch_%04x", address), function(offset, data)
@@ -23,10 +24,19 @@ for _, address in ipairs({0x3382, 0x3385, 0x33a1, 0x33a4, 0x33ac}) do
                 counts[address] = counts[address] + 1
                 if counts[address] <= 4 then
                     machine:logerror(string.format(
-                        "rom4_comparison_fetch: t=%.9f address=%04x word=%04x pair94=%04x%04x pair96=%04x%04x a=%010x b=%010x\n",
+                        "rom4_comparison_fetch: t=%.9f address=%04x word=%04x pair94=%04x%04x pair96=%04x%04x a=%010x b=%010x ar2=%04x ar3=%04x\n",
                         machine.time:as_double(), offset, data, memory:read_u16(0x2194),
                         memory:read_u16(0x2195), memory:read_u16(0x2196), memory:read_u16(0x2197),
-                        cpu.state["A"].value, cpu.state["B"].value))
+                        cpu.state["A"].value, cpu.state["B"].value,
+                        cpu.state["AR2"].value, cpu.state["AR3"].value))
+                    if address == 0x3347 then
+                        local base, values = cpu.state["AR2"].value, {}
+                        for index = 0, 15 do
+                            values[#values + 1] = string.format("%04x", memory:read_u16((base + index) & 0xffff))
+                        end
+                        machine:logerror(string.format("rom4_reduction_input: base=%04x words=%s\n",
+                            base, table.concat(values, ",")))
+                    end
                 end
             end
         end)

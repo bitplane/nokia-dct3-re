@@ -330,6 +330,25 @@ upload ownership and the computation feeding B remain the next static/data
 flow questions. The fresh RF acceptance gate passes alongside this passive
 capture; neither an artificial measurement nor a threshold override is used.
 
+The steady reduction at `3347..3356` consumes 16 words beginning at `1a48`.
+Ignoring saturation/guard effects, its two shifted linear combinations are
+`A=(x1+x2-x5-x6+x9+x10-x13-x14)<<16` and
+`B=(x0-x3-x4+x7+x8-x11-x12+x15)<<16`; it is not a sum of squares.
+The final read does not advance AR2, leaving it at `1a57`. Four passive entry
+snapshots contain sixteen zero words and leave both accumulators zero.
+This explains the observed zero B without assigning I/Q or RF units to the
+input buffer.
+
+Live program reads at `2400/2402` both return `fc00` (`RET`), not an uploaded
+replacement, and the first four caller/return snapshots preserve zero A/B.
+After the `3360` hook, the code at `3362..336b` processes the `06d2` vector;
+the `2402` hook at `336c` likewise preserves B before the saved-result and
+comparison tail. The hooks are each observed 6,033 times. Therefore these
+hook slots do not supply an absent nonzero measurement in this boot.
+Recovering the producer/encoding of the `1a48` reduction input and its
+upstream port-`27` filtering is the unresolved boundary; changing the
+comparison operands or installing a hook result would bypass it.
+
 Port `0x27` is bidirectional in ROM4: seven static `PORTW` sites at
 `0x4248/0x424d/0x4258/0x425d/0x4267/0x426c/0x4271` belong to a separate
 transmit routine. The driver now forwards those writes to a replaceable COBBA
