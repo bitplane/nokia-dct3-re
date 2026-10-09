@@ -379,7 +379,14 @@ RESPONSE. The gate requires ordered APDUs, both reviewed 96x60 frames,
 registered-idle recovery and persisted EF_LOCI. It does not inject any latch,
 message, firmware state or proactive object into the handset.
 
-This establishes DISPLAY TEXT clearance, not all Toolkit commands or native
+`verify-6210-sim-toolkit-interactive` independently extends the own profile
+to GET INKEY and GET INPUT. Physical `5` and `42` return exact successful
+terminal-response text TLVs `0d020435` and `0d03043432`. Ordered FETCH,
+TERMINAL RESPONSE and pending-status lengths are shared protocol checks;
+five reviewed NPE-3 frames and its own registration/EF_LOCI remain separate.
+The final idle hash is product-local, not inherited from 6250.
+
+This establishes these three command lifecycles, not all Toolkit commands or native
 DSP execution. The completion trace records the status bytes actually appended
 to data-bearing card replies; ordinary `9000` and proactive `9116` responses
 use the same observation-only path.

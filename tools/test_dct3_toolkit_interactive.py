@@ -9,6 +9,7 @@ class InteractiveToolkitTest(unittest.TestCase):
 
     def test_ordered_card_owned_commands(self):
         verify_interactive(self.trace(), '6250')
+        verify_interactive('\n'.join(interactive_events('6210')), '6210')
 
     def test_wrong_response_text_result_and_pending_length(self):
         for old, new in (('0d020435', '0d020436'), ('0d03043432', '0d03043433'),

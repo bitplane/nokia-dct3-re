@@ -446,6 +446,9 @@ during physical date entry, followed by successful date-editor recovery and
 persisted laboratory registration. It does not prove displayed proactive
 text or successful physical dismissal on 8890.
 
+The 6210 additionally passes `verify-6210-sim-toolkit-interactive`, proving
+physical `5`/`42` GET INKEY/GET INPUT replies, exact successful text TLVs,
+five independently reviewed frames and own registration/storage checks.
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other

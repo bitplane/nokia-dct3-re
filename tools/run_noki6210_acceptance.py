@@ -28,6 +28,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
              'security': ('npe3hle', 'security_input', 37),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
+             'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
              'ussd': ('npe3hle', 'ussd_input', 40),
              'divert': ('npe3hle', 'divert_input', 35),
              'divert-lifecycle': ('npe3hle', 'divert_lifecycle_input', 80),
@@ -228,14 +229,14 @@ def main():
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
         host = args.scenario.startswith('host-')
-        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit') or host
+        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit', 'toolkit-interactive') or host
         if configured or args.coherent_cell:
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
             ports = ET.SubElement(system, 'input')
-            if args.scenario == 'toolkit':
-                tag, mask, value = ':SATCFG', '15', '1'
+            if args.scenario in ('toolkit', 'toolkit-interactive'):
+                tag, mask, value = ':SATCFG', '15', '3' if args.scenario == 'toolkit-interactive' else '1'
             else:
                 tag = ':CALLHOST' if host else ':NETCFG'
                 mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
@@ -305,6 +306,25 @@ def main():
             if args.scenario == 'accessory':
                 with Image.open(run / 'snap/6210_before_menu.png') as frame:
                     check_accessory(text, frame)
+        elif args.scenario == 'toolkit-interactive':
+            import re
+            from tools.dct3_toolkit_check import verify_interactive
+            from PIL import Image
+            verify_interactive(text, '6210')
+            if re.findall(r'6210_toolkit_interactive: action=(\w+)\b', text) != [
+                    'dismiss', 'inkey_5', 'input_4', 'input_2', 'confirm']:
+                raise ValueError('NPE-3 interactive Toolkit physical sequence differs')
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            expected = {
+                'display': '1c27b5e561a2183e01fffc11e71a78f5df35e342fde2c01d6df3fffc26c4199b',
+                'inkey': '60ece9b44b016ae749bc6b3498ded166628a81f5b983a2c7dd06768e93782fbf',
+                'input': '91bdd069d33a7cd535d1f472ed04f006a8615b8de3158b1c0d574ca5844063c6',
+                'entered': 'c0fe70b64f1b25657e22bc7efb786b17e4831a48230bf3eced61dc0a21616b2a',
+                'idle': OPERATOR_SHA256,
+            }
+            for phase, digest in expected.items():
+                with Image.open(run / 'snap' / f'6210_toolkit_interactive_{phase}.png') as frame:
+                    check_frame(frame, digest, 'interactive Toolkit ' + phase)
         elif args.scenario == 'toolkit':
             from tools.noki6210_toolkit_check import verify as check_toolkit
             check_toolkit(text)
