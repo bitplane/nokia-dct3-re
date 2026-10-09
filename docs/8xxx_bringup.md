@@ -1258,6 +1258,26 @@ an open consumer-side question, not authorization to change status to reach
 a desired screen. The ordinary alarm/Snooze and power-key-restart gates remain
 separate from this negative result.
 
+The read-only own-ROM probe in `run_8890_alarm_startup_reader_valid`
+narrows the initial status consumer without closing the wake contract.
+At `0x2f0c44`, selector `90ff` reads CCONT register `0e`: ordinary cold
+startup returns `03`, whereas alarm wake returns `b3` at 60.250708615
+seconds. `0x2f0c48..0x2f0c54` extracts **bit 0 only** and stores its Boolean
+value at `0x137411`; the retained PWRONX bit 1 cannot distinguish these
+paths at this consumer. The following `0x2e2394` call separately reads
+MAD2 reset status at `0x20001`, not CCONT status. Likewise selector `84ff`
+through `0x2e2220` returns chip ID `b2` on both starts and checks
+`(value & fc) == b0`; it is a self-test, not a wake-cause selector.
+These observations do not exclude later CCONT-status consumers or establish
+the cause of the rejected security transaction. Decode this ROM as
+big-endian Thumb; the 3210 swap16 decoding convention does not apply.
+The other observed full-status reads are the interrupt drain at
+`0x2fc74e/0x2fc7dc`: it subtracts the interrupt mask with BIC and applies
+`f8` before dispatch, excluding all three low reset-cause bits. The observed
+`9004` reads through `0x2458e0` select bit 2 only. Thus none of the observed
+CCONT-status helper callers makes the retained PWRONX bit a selector; this
+is bounded runtime coverage, not a proof that no other reader exists.
+
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
 hooks. Physical time confirmation near 25 seconds and date confirmation near
