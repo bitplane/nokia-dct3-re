@@ -35,6 +35,8 @@ int main(int argc, char **argv)
     Word before;
     int status_fixture = argc > 1 && !strcmp(argv[1], "xf");
     int interrupt_fixture = argc > 1 && !strcmp(argv[1], "intr");
+    int mac_fixture = argc > 1 && (!strcmp(argv[1], "mac") || !strcmp(argv[1], "mac-sat"));
+    int saturated = mac_fixture && !strcmp(argv[1], "mac-sat");
     Registers = pipe_new();
     fill_to_mem(0xf495, 0x100, 0x100, PROGRAM_MEM_TYPE);
     Registers->PC = 0x100;
@@ -52,6 +54,16 @@ int main(int argc, char **argv)
         MMR->IFR = 0xffff;
         write_program_mem(0x100, 0xf7d0);
     }
+    if (mac_fixture) {
+        fill_to_mem(0, 0x200, 1, DATA_MEM_TYPE);
+        write_data_mem(0x200, 1);
+        MMR->ar3 = 0x200;
+        MMR->T = 1;
+        MMR->A = (GP_Reg){0xff, 0xff, 0xff, 0x7f, 0};
+        MMR->ST0 = 0x0800;
+        MMR->ST1 = saturated ? 0x0200 : 0;
+        write_program_mem(0x100, 0x2883);
+    }
     for (i = 0; i < 32; ++i) {
         before = MMR->ST1;
         pipeline(Registers);
@@ -59,11 +71,21 @@ int main(int argc, char **argv)
             ++changes;
             printf("status change: cycle=%d PC=%04x ST1=%04x\n",
                    i + 1, Registers->PC, MMR->ST1);
-            if (!interrupt_fixture && (!status_fixture || changes > 2 ||
+            if (!interrupt_fixture && !mac_fixture && (!status_fixture || changes > 2 ||
                 MMR->ST1 != (changes == 1 ? 0x0900 : 0x2900))
                 )
                 failed = 1;
         }
+    }
+    if (mac_fixture) {
+        guint64 result = GP_REG_2_UINT64(MMR->A) & 0xffffffffffULL;
+        printf("reference MAC: OVM=%d A=%010llx ST0=%04x ST1=%04x T=%04x AR3=%04x\n",
+               saturated, (unsigned long long)result, MMR->ST0, MMR->ST1, MMR->T, MMR->ar3);
+        if (saturated)
+            puts("reference limitation: OVM MAC A=0080000000 (expected 007fffffff)");
+        return failed || gStopRun || result != 0x80000000ULL ||
+               MMR->ST0 != 0x0c00 || MMR->ST1 != (saturated ? 0x0200 : 0) ||
+               MMR->T != 1 || MMR->ar3 != 0x200;
     }
     if (interrupt_fixture) {
         int wait = 0;
