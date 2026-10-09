@@ -364,6 +364,16 @@ the actual input contract, not a fabricated internal result. The passive
 comparison observer retains both counts alongside the full-width operand
 and hook snapshots, and the independent RF gate remains green.
 
+`make check-c54x-rom4-processing` regenerates the product's own EEPROM in a
+private directory, runs both passive observers for 30 seconds and checks the
+RF interface separately from the processing results. It requires sustained
+mode-1 execution, matched caller/hook counts, the two early alternate
+reduction frames, every-other-frame comparisons, exact full-width bounded
+snapshots, live producer counts and zero unattached input/output. Missing or
+duplicate observer records fail closed. These are regression expectations
+for this acquired ROM and composition, not universal radio constants;
+the success line explicitly reports `acquisition_claim=0`.
+
 The physical bus is constrained independently by Nokia's NSE-1 System Module
 manual: COBBA uses a twelve-data-bit/four-address-bit parallel interface for
 control and radio samples, separate from serial audio PCM. The exact DSP-port

@@ -1313,6 +1313,22 @@ check-c54x-rom4-coherent: build
 	@grep -q "ROM4 DSP coherent execution: PASS completion=1074" \
 		/tmp/tms320c54x-rom4-coherent-check.log
 
+.PHONY: check-c54x-rom4-processing
+check-c54x-rom4-processing: build
+	@set -eu; tmp="$$(mktemp -d -t noki5110-c54x-processing.XXXXXX)"; \
+		trap 'rm -rf "$$tmp"' EXIT; \
+		mkdir -p "$$tmp/nvram/noki5110"; \
+		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
+			--eeprom $(abspath roms/noki5110/nse-1.bin) \
+			--flash $(abspath roms/noki5110/5110f530.fls) \
+			--output "$$tmp/nvram/noki5110/eeprom"; \
+		cd "$$tmp"; \
+		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
+			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
+			-skip_gameinfo -nothrottle -seconds_to_run 30 \
+			-autoboot_script $(abspath tools/c54x_rom4_processing_observe.lua) >/dev/null; \
+		$(PYTHON) $(abspath tools/c54x_rom4_processing_check.py) error.log
+
 check-c54x-rom4-rf-boundary: build
 	@set -eu; tmp="$$(mktemp -d -t noki5110-c54x-rf.XXXXXX)"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
@@ -1488,7 +1504,7 @@ check-c54x-observed-coverage: build
 			--require-all-asserted
 
 check-c54x-cross-rom:
-	$(MAKE) --no-print-directory check-c54x-core check-c54x-rom4-rf-boundary check-c54x-observed-coverage verify-frontier verify-5110-menu verify-3310-frontier verify-3330-frontier verify-3410-frontier
+	$(MAKE) --no-print-directory check-c54x-core check-c54x-rom4-rf-boundary check-c54x-rom4-processing check-c54x-observed-coverage verify-frontier verify-5110-menu verify-3310-frontier verify-3330-frontier verify-3410-frontier
 
 
 # Promote the latest informative LCD frame, falling back to the latest capture
