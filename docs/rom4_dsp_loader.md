@@ -349,6 +349,21 @@ Recovering the producer/encoding of the `1a48` reduction input and its
 upstream port-`27` filtering is the unresolved boundary; changing the
 comparison operands or installing a hook result would bypass it.
 
+The producer census closes the unfilled-buffer explanation for this boot.
+Besides 16 startup clears, the `1a48..1a57` CPU-bus write tap records 48,264
+writes at PC `3322` and 48,264 at `3323`, corresponding to the parallel-store
+instructions `d6e9/e4e9` at `3321/3322`. Their total is exactly 16 writes
+per observed mode-1 frame. All 96,528 live writes are zero. Independently,
+the port-`27` read tap records 207,040 reads with zero nonzero input words.
+Thus the running pipeline fills the reduction buffer; it is not waiting for
+an absent buffer-initialization event. In the demonstrated unattached-input
+composition its live zero input and zero filtered output are consistent.
+This is not a nonzero-signal conformance result or a specification of RF
+sample packing. Further native receiver advancement requires evidence for
+the actual input contract, not a fabricated internal result. The passive
+comparison observer retains both counts alongside the full-width operand
+and hook snapshots, and the independent RF gate remains green.
+
 Port `0x27` is bidirectional in ROM4: seven static `PORTW` sites at
 `0x4248/0x424d/0x4258/0x425d/0x4267/0x426c/0x4271` belong to a separate
 transmit routine. The driver now forwards those writes to a replaceable COBBA
