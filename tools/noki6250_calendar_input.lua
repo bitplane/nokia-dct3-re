@@ -34,7 +34,7 @@ local input = coroutine.create(function()
         machine:logerror('6250_calendar_physical: event=cold_presented\n')
         return
     end
-    for index, value in ipairs({'1', '3', '4', '7'}) do
+    for index, value in ipairs(_G.noki6250_calendar_time or {'1', '3', '4', '7'}) do
         if not press(digit(value), 'time_' .. index) then return end
     end
     if not press(cell(1, 1), 'time_confirm') then return end
@@ -44,6 +44,14 @@ local input = coroutine.create(function()
     if not press(cell(1, 1), 'date_confirm') then return end
     machine.screens[':screen']:snapshot('6250_calendar_entered.png')
     machine:logerror('6250_calendar_physical: event=entered_presented\n')
+    if _G.noki6250_calendar_midnight then
+        if not emu.wait(65) then return end
+        machine.screens[':screen']:snapshot('6250_calendar_midnight_open.png')
+        if not press(cell(1, 2), 'midnight_back') then return end
+        if not press(cell(1, 1), 'midnight_reopen') then return end
+        machine.screens[':screen']:snapshot('6250_calendar_midnight_result.png')
+        machine:logerror('6250_calendar_physical: event=midnight_presented\n')
+    end
 end)
 _G.noki6250_calendar_input = input
 assert(coroutine.resume(input))

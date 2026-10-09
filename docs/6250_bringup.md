@@ -1237,6 +1237,17 @@ rendered pages: damaged text extraction loses diagram labels and scope data.
 
 ## Physical Calendar And Cold Storage
 
+Midnight remains unvalidated. The fresh physical 23:59 observation
+`run_6250_midnight_probe_20261009` reaches a natural CCONT
+`00:00:00 day=1` tick at second 102, but the open Calendar changes from
+Wednesday 7 October 2026 to Tuesday 6 October 2026. The later right-softkey
+input opens Calendar options rather than leaving Calendar; its scripted
+`midnight_reopen` label therefore does not prove re-entry. The observation
+fixture is `tools/noki6250_calendar_midnight.lua`; no passing rollover gate
+or sibling-derived pixel expectation is implied. The next question is how
+this firmware combines its persisted Calendar date with CCONT day rollover,
+including whether the date baseline was committed after physical entry.
+
 `make verify-6250-calendar-cold RUN_DIR=NEW_RUN` uses the established NHM-3
 initial-record PMM comparison and otherwise fresh private storage. Physical
 Menu, seven Down presses and Select reach this product's Calendar (menu 8).
