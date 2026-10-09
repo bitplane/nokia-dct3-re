@@ -193,6 +193,30 @@ This check supplements, rather than replaces, physical Menu input and the
 exact Phone book frame. The fixture does not write DSP registers or assert
 that an idle snapshot covers an active codec transaction.
 
+### Operational data-space sample path
+
+The acquired resident ROM supplies a distinct serial ISR entry, independent
+of I/O `21`. At `ff80`, `ST #ffa8,PMST` selects vector page `ff80`; entry
+`ffd0` (vector index 20) delayed-branches to `3416`, with context-save slots.
+Within that routine, the bit test on data `06be` mask `2000` selects a direct
+copy branch: `LD data[0020],A; STL A,data[0021]` at `342d..3430`, then a branch
+to the common epilogue. The other path ultimately executes `STLM A,0021` at
+`358a`. These are actual data-space output instructions, not DSP I/O `21`
+sample writes. The meaning of the `06be` bit and all intervening processing
+branches remains unclassified.
+
+The resident tone initializer at `a598` separately reads shared data `0856`,
+masks bit 0 and conditionally selects its disabled tail at `a5e2`. This
+identifies an organic command input to trace, not permission to set the cell.
+The codec contract checker covers the vector-page setup, vector entry, direct
+copy, accumulator publication and tone-gate words. Its mutation tests apply
+to these signatures too. This static evidence does not prove that vector 20
+is exercised in ordinary idle, define its external pin/cadence, or promote
+native microphone/earpiece PCM. The next attachment must establish the
+firmware's serial readiness/enable contract before introducing a codec clock;
+neither a fixed interrupt cadence nor shared tone-cell writes may be added
+merely to make this routine run.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair

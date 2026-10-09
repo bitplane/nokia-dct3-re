@@ -54,6 +54,16 @@ MASK_SEQUENCES = {
                             0xf495, 0x75f8, 0x0008, 0x0021)),
 }
 SEQUENCES.update(MASK_SEQUENCES)
+SEQUENCES.update({
+    "resident_vector_page_setup": (0xff80, (0x771d, 0xffa8, 0xf073, 0xff85)),
+    "serial_vector20_entry": (0xffd0, (0xf273, 0x3416, 0x4a06, 0x4a07)),
+    "serial_direct_copy_branch": (0x3428, (
+        0x61f8, 0x06be, 0x2000, 0xf820, 0x3433,
+        0x10f8, 0x0020, 0x80f8, 0x0021, 0xf073, 0x358b)),
+    "serial_accumulator_publication": (0x3589, (0xf47d, 0x8821, 0x8a19)),
+    "tone_enable_cell_gate": (0xa598, (0x10f8, 0x0856, 0xf030, 0x0001,
+                                      0xf845, 0xa5e2)),
+})
 
 READ_SITES = [0x321e, 0x33f3, 0x3c6f, 0x3c84, 0x4231,
               0x4275, 0x43c2, 0x43ef, 0x4473]
@@ -138,7 +148,7 @@ def main() -> int:
         print("Native echo and three operational control readback cycles: PASS")
     if args.restore_log is not None:
         print("Native I/O word, CPU registers and save-time restoration: PASS")
-    print("Bounded ROM sequences only; physical port ownership remains unresolved.")
+    print("Bounded ROM sequences only; physical port ownership and codec clock remain unresolved.")
     return 0
 
 
