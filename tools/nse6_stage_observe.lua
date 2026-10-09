@@ -80,9 +80,10 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
                     or memory:read_u16(cpu.state['R4'].value + 0x32) == 0x49) then
                 local context = cpu.state['R4'].value
                 machine:logerror(string.format(
-                    'nse6_report14_dispatch: state=%08x context=%08x event=%04x countdown=%02x sample=%04x lr=%08x t=%.9f\n',
+                    'nse6_report14_dispatch: state=%08x context=%08x event=%04x countdown=%02x flag_a=%02x flag_f=%02x sample=%04x lr=%08x t=%.9f\n',
                     cpu.state['R0'].value, context,
                     memory:read_u16(context + 0x32), memory:read_u8(context + 5),
+                    memory:read_u8(context + 0xa), memory:read_u8(context + 0xf),
                     memory:read_u16(0x13fe54),
                     cpu.state['R14'].value, machine.time:as_double()))
             end

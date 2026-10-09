@@ -16,8 +16,8 @@ CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
 erased-storage failures and reaches SIMI initialization, but remains blank
 through 30 seconds. No usable handset or authentic provisioning is established.
-The current bounded question is why dispatcher continuation state `3`
-(`0x221df0`) does not reach the identified report-`0x14` path. The missing
+The current bounded question is how the dispatcher reaches the identified
+report-`0x14` path after its state-3 countdown is exhausted. The missing
 report bit leaves the input controller in state `0x10` with all keypad
 columns masked.
 
@@ -58,6 +58,25 @@ loads base `0x13fe18` and adds `0x3c`. It is not context `0x120768 + 0x3c`.
 The comparison is signed against `0x01fe`, alongside the decremented
 countdown. The observer now uses the decoded sample address; no physical
 units or battery ownership are assigned from this arithmetic alone.
+
+State `3` handles `0x49` by checking context bytes `+5` (countdown) and
+`+0x0f`. If the latter is not one, `0x221e20` loads descriptor `0x9004`
+and calls CCONT field reader `0x2dfc60`. Its command-table index `0x10`
+contains `0x70` at `0x303534`; the returned status byte is masked by
+`0x04` and shifted to a Boolean. A result other than one follows the
+countdown-decrement path at `0x221da0`. This is an independently decoded
+CCONT status-bit-2 check, not evidence that the model should assert it.
+
+A fresh 60-second integrity-only compatibility run observes countdowns
+four, three, two, one, zero at the state-3 `0x49` deliveries at 8.725481,
+12.125078, 15.525316, 18.924897, and 22.325122 seconds.
+Context `+0x0a` remains one and `+0x0f` remains zero at these selections;
+the correctly addressed sample is `0x03ff`.
+Readiness/report bytes remain `0x06`/`0x0e` through 60 seconds. Waiting
+longer than the initial 12-second window does not supply report `0x14`.
+At countdown zero the decoded branch reaches `0x221de0`; map its ensuing
+event/state selection and the predecessor of `0x21fb94` next. Do not
+replace this investigation with an asserted CCONT bit or injected report.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM

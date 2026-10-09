@@ -110,6 +110,7 @@ def check(image):
         (0x2DE296, 0x20033), (0x2E0570, 0x20033),
         (0x288CC6, 0x13FFA8), (0x288D20, 0x12147D),
         (0x221C8C, 0x13FE18),
+        (0x221E20, 0x9004),
         (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
@@ -259,7 +260,11 @@ def check(image):
         (0x21E028, "adds", "r1, #0x9c"),
         (0x21E02E, "movs", "r0, #0x49"),
         (0x221CEC, "cmp", "r0, #0x49"),
-        (0x221D0C, "cmp", "r2, r1"))
+        (0x221D0C, "cmp", "r2, r1"),
+        (0x221E18, "beq", "#0x221de0"),
+        (0x221E22, "bl", "#0x2dfc60"),
+        (0x221E26, "cmp", "r0, #1"),
+        (0x221E28, "bne", "#0x221da0"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -286,6 +291,8 @@ def check(image):
     if [read32(image, 0x222558 + state * 4) for state in (3, 4)] != [
             0x221DF0, 0x221D38]:
         raise ValueError("own NSE-6 report dispatcher continuation changed")
+    if image[0x103534] != 0x70:
+        raise ValueError("own NSE-6 CCONT status-command table changed")
     stream = verifier_stream(image)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != VERIFIER_STREAM_SHA1:
