@@ -669,6 +669,19 @@ consumer; investigate the CCONT line, MAD2 masks and CPU suspension before
 changing timer cadence or generating substitute firmware messages. Existing
 set/expiry/Stop and cold-retention gates retain their narrower claims.
 
+The passive dispatcher capture in `run_6210_snooze_dispatch` narrows this
+boundary: CCONT IRQ2 rises at 60.025879769 after a mask write `10` exposes
+the retained minute source in status `31`. MAD2 acknowledges IRQ2 at
+60.026224615, but CCONT never lowers its line before the second alarm. The
+board bridge latches only rising CCONT edges; the alarm at 360 seconds
+therefore produces no new MAD2 pending edge. This is earlier than CPU wake
+delivery and does not establish a sleep defect. At the dispatch selection
+point `0x4f277a`, the observed active byte is `01`, while cached mask/status
+at `0x1742fd/0x1742fc` are `10/31`; firmware acknowledges `01`, not the
+minute bit. Resolve the preceding register-reader return values and shadow
+update ordering before changing edge/level routing. A level-sensitive
+reassertion without that source-clear contract could create an IRQ storm.
+
 ## Unattached accessory input
 
 The NPE-3 schematic sheets 2/3 connect `HEADDET` to CCONT's EAD pin A2
