@@ -698,6 +698,32 @@ private:
 		m_phase = 94000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_parallel_load_multiply_case(unsigned index)
+	{
+		u16 const opcode = 0xa800 | ((index & 1) << 8) | ((index & 2) << 8) |
+				((index & 4) << 8) | (index & 32 ? 0xb9 : 0x31);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x05e0, 0x75d6); program.write_word(0x05e1, 0x0124);
+		program.write_word(0x05e2, opcode);
+		program.write_word(0x05e3, 0x75d6); program.write_word(0x05e4, 0x0124);
+		program.write_word(0x05e5, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0500, 0x8001);
+		m_cpu->space(AS_DATA).write_word(0x0600, 0xfffd);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, index & 1 ? 0x18000 : 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, index & 1 ? 0x1234 : 0x18000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800 | (index & 8 ? 0x0100 : 0) | (index & 16 ? 0x40 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1100);
+		m_cpu->set_state_int(STATE_GENPC, 0x05e0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_port_writes = 0;
+		m_phase = 95000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_return_alt_case(unsigned index)
 	{
 		static constexpr u64 values[] = {0xffffffffffULL, 0x8000000000ULL, 0, 1, 0x7fffffffffULL};
@@ -18303,6 +18329,27 @@ private:
 				"PSHM uses page-zero MMR addressing independent of DP/CPL with indirect AR updates in one cycle");
 			if (index < 7) { start_indirect_pshm_case(index + 1); return; }
 			osd_printf_info("TMS320C54x indirect PSHM conformance: PASS variants=8\n");
+			start_parallel_load_multiply_case(0);
+			return;
+		}
+		if (m_phase >= 95000 && m_phase < 95064)
+		{
+			unsigned const index = m_phase - 95000;
+			bool const b = index & 1;
+			s64 const product = index & 16 ? -18 : -9;
+			s64 expected = 0x18000 + (index & 4 ? -product : product);
+			if (index & 2) expected = (expected + 0x8000) & ~s64(0xffff);
+			expect_opcode(0xa800 | ((index & 1) << 8) | ((index & 2) << 8) | ((index & 4) << 8) | (index & 32 ? 0xb9 : 0x31),
+				m_cpu->state_int(b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == (index & 8 ? 0xff80010000ULL : 0x80010000ULL) &&
+				m_cpu->state_int(b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == u64(expected) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 3 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == (index & 32 ? 0x0501 : 0x0500) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (index & 32 ? 0x0601 : 0x0600) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"Parallel LD/MAC/MAS reads old T and other accumulator, honors rounding/FRCT/SXM and updates both operands in one cycle");
+			if (index < 63) { start_parallel_load_multiply_case(index + 1); return; }
+			osd_printf_info("TMS320C54x parallel load multiply conformance: PASS variants=64\n");
 			start_compact_store_case(0);
 			return;
 		}

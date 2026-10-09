@@ -31,7 +31,7 @@ to the editor in the erased-retry negative control. Initializing the synthetic
 retry count permits the same physical code to be accepted, reaching a Menu /
 Names frame with the earlier stalled-core compatibility fixture. Correcting
 native TRN storage advances DSP execution but changes this result: the current
-fresh run stops at unsupported `0xae31` (DSP PC `0x0816`), leaves the MCU in
+fresh run stops at unsupported `0x1780` (DSP PC `0x1968`), leaves the MCU in
 its verifier loop, and captures a blank menu frame. No reset-control write is
 observed through 40 seconds in that run; this is not a successful boot.
 The menu/input observations below remain evidence for the earlier composition,
@@ -72,37 +72,28 @@ Own dispatcher `0x243a24` routes input `0x00d4` to `0x243ba4`; that branch
 increments a context counter, and at count >=15 takes `0x243bfe..0x243c22`
 to request reset. The counter's reset/health contract is not yet decoded.
 Do not disable a hardware watchdog to conceal this software-requested reset.
-Native execution independently exposes missing CPU instructions: the ROM4
-compatibility run stopped at `ADDS *AR7,B` (`0x0387`, PC `0x21a9`). Implementing
-the unsigned-memory B form, with executable accumulator-preservation, carry,
-SXM and cycle checks, passes the full C54x conformance suite. A fresh 40-second
-menu run then reaches `TRAP 15` (`0xf4cf`) at `0x21b6`. Implementing TRAP's
-three-cycle vector transfer with unchanged INTM/IFR, verified over all 32
-vectors and both masking states, advances a fresh run to unsupported `0x8dd2`
-at `0x1caf`. After the restart it instead encounters `0xfce7` at `0x06ce`.
-The restart near 32 seconds persists. CCONT clock control remains `0x56`
-before restart. The differing post-reset execution requires checking retained
-state and instruction-stream provenance, not assuming every encountered word
-is a missing instruction.
-`0x8dd2` is `ST TRN,*AR2+%`. TRN now has explicit debugger/save-state
-storage and MMR `0x0f`, following [TI SPRU131G, table 3-3](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
-Twelve executable cases cover MMR writes/reads, direct, circular and absolute
-stores, bit patterns, preservation and instruction cost. The fresh native run
-then encounters `0x4ac0` at `0x0803`, with blank display and MCU verifier
-activity through 40 seconds. CMPS/TRN update semantics remain unimplemented;
-the store correction alone is not complete trellis-unit emulation.
-`0x4ac0` is a valid indirect PSHM form, not a new data-memory push opcode.
-The decoder now uses its existing page-zero MMR address generator for PSHM,
-including auxiliary-register modification and upper-bit clearing. Eight
-executable cases cover direct, indirect, post-decrement and circular forms
-with nonzero DP and CPL set, checking the stack word, register effects and
-one-cycle execution. The fresh native run advances to `0xae31` at `0x0816`;
-the MCU verifier and blank-frame boundary persist through 40 seconds. Indirect
-POPM remains a separate decoder gap; it has not been implied by this PSHM fix.
-This advances native execution; it does not yet prove the stalled DSP causes
-the reset or establish compatibility with the handset's fitted DSP mask.
-The late phonebook-save attempt crosses this restart boundary, so persistence
-is unproved and must be retested after the lifecycle is stabilized.
+The native compatibility run exposes these independently documented CPU gaps.
+Instruction semantics come from [TI SPRU172C](https://e2e.ti.com/cfs-file/__key/communityserver-discussions-components-files/81/6136.spru172c.pdf);
+TRN's MMR `0x0f` and page-zero indirect addressing follow
+[TI SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+
+| Encountered Word / PC | Implemented Contract | Executable Coverage |
+| --- | --- | --- |
+| `0387 / 21a9` | Unsigned-memory ADDS to B | SXM independence, A preservation, carry and one-cycle cost |
+| `f4cf / 21b6` | TRAP vector transfer, no INTM/IFR changes | 32 vectors, both masking states, stack and three-cycle cost |
+| `8dd2 / 1caf` | ST TRN plus explicit debugger/save state and MMR | 12 MMR/read/write, direct/circular/absolute store cases |
+| `4ac0 / 0803` | Indirect PSHM through page-zero MMR address generator | 8 direct/indirect/post-decrement/circular cases with DP/CPL nonzero |
+| `ae31 / 0816` | Parallel LD with MAC/MAS, optionally rounded | 64 destination/rounding/SXM/FRCT/pointer cases preserving old T and carry |
+
+Current fresh-run boundary: unsupported `0x1780` at DSP PC `0x1968`, blank
+display, MCU verifier activity through 40 seconds. CCONT clock control is
+`0x56`; no reset-control write occurs within that window. This is incomplete
+native execution, not a boot success or fitted-mask compatibility proof.
+CMPS/TRN update semantics and indirect POPM remain separate decoder gaps.
+The TRAP-only composition's post-reset `0xfce7 / 06ce` differs from its cold
+path; retained-state and instruction-stream provenance still need checking
+before interpreting every encountered word as a missing instruction.
+Phonebook persistence must be retested only after native boot stabilizes.
 
 ### Security Storage Observation
 
