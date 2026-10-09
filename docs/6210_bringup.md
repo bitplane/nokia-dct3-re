@@ -879,6 +879,23 @@ scanning found 39 ADC-reader candidates and excludes indirect calls. Full
 accessory identification, button/hook behavior, electrical thresholds and
 cross-product mux identity remain outside this unattached-input contract.
 
+The decision entrance is independently pinned by
+`tools/noki6210_accessory_contract.py`, also executed by the accessory
+acceptance runner. At state `0f`, a second ADC read must be at most 500
+and a third at least 300 to enter branch `39d7d8`, additionally requiring
+the tested flag's bit 2 clear. These are distinct reads, not one captured
+sample or a proved debounce rule. A separate byte equal to one also selects
+that branch. Otherwise state bit 7 selects `39d796`; with that bit clear,
+the initial stored sample at `173aa2` is compared against literal `0312`
+(786). Values at least 786 call `39cc5c`, whose next signed comparison
+uses `0390` (912). The CCONT's 10-bit unsigned sample domain is below
+the signed boundary, so these signed comparisons do not invert the ranges.
+This explains why a nominal 1023 input exercises the high/cleanup path,
+not the 300..500 path. It does not identify every accessory type, recover
+electrical units, establish the complete downstream lifecycle, or justify
+adding guessed headset/hook inputs. The low-input state-`10` write remains
+anchored at `39ccc8`; UI selection remains firmware-owned.
+
 Registration verification permits SIM EF_LOCI writes after Location Updating
 Accept either before or after radio release. The network and SIM consumers
 are independently scheduled; each ordered chain and final persistent state

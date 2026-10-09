@@ -227,6 +227,10 @@ def main():
         contract = assess((root / 'roms/noki6210/6210_556c.fls').read_bytes(),
                           (root / 'roms/noki6210/6210 virgin eeprom 005fa000.fls').read_bytes())
         contract['radio_receive'] = verify_radio_contract((root / 'roms/noki6210/6210_556c.fls').read_bytes())
+        if args.scenario == 'accessory':
+            from tools.noki6210_accessory_contract import verify as verify_accessory_contract
+            contract['accessory_decision'] = verify_accessory_contract(
+                (root / 'roms/noki6210/6210_556c.fls').read_bytes())
         run = args.run_directory.resolve()
         run.mkdir(parents=True, exist_ok=False)
         machine, script, seconds = SCENARIOS[args.scenario]
