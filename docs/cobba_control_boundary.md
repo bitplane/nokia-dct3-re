@@ -258,6 +258,20 @@ MAD2 clock fan-out. Do not import another COBBA revision's clock rate or
 assign receive timing from a pin name alone. The public manual documents
 rates and connectivity, not the register-8 decode or frame edge/pulse width.
 
+The extension-register observation retains data `0023` taps alongside BSPC.
+In the coherent physical-tone fixture no write to `0023` is observed and
+its saved backend latch remains `0000`. Under the generic BSPCE definition
+in TI section 9.3, zero selects no autobuffering, default clock polarity
+(receive on falling edges, transmit on rising edges), and active-high frame
+sync. BSPC `c0c8` selects external clocks/frame sync, burst transfers and
+16-bit words. These are compatible with the own-product PCM interface;
+they do not establish the undocumented MAD2 receive-clock fan-out or prove
+that its register reset matches every generic C54x variant. Also, FSM=1
+requires a frame pulse per word, not specifically a one-clock-wide pulse:
+TI section 9.2.4 explicitly supports longer pulses with delayed shifting.
+The PCM wire's current one-clock profile constraint must not be mistaken
+for an independently measured NSE-1 sync width.
+
 ### Organic tone request boundary
 
 `tools/c54x_rom4_tone_observe.lua` combines the physical-input harness with

@@ -4,7 +4,7 @@ local cpu = assert(machine.devices[':dsp_c54x:cpu'])
 local taps, counts, emitted = {}, {}, {}
 for _, kind in ipairs({'data', 'io'}) do
     local space = assert(cpu.spaces[kind])
-    for _, address in ipairs({0x20, 0x21, 0x22, 0x30, 0x31, 0x32}) do
+    for _, address in ipairs({0x20, 0x21, 0x22, 0x23, 0x30, 0x31, 0x32}) do
         for _, direction in ipairs({'read', 'write'}) do
             local key = kind .. '_' .. direction .. '_' .. address
             counts[key] = 0

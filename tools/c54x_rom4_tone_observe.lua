@@ -44,9 +44,9 @@ end)
 -- reads and BSPC readback are non-destructive; never poll BDRR here.
 local previous
 local state_observer = emu.register_frame_done(function()
-    local state = string.format('imr=%04x ifr=%04x bspc22=%04x',
+    local state = string.format('imr=%04x ifr=%04x bspc22=%04x bspce23=%04x',
         dsp.state['IMR'].value, dsp.state['IFR'].value,
-        dsp.spaces['data']:read_u16(0x22))
+        dsp.spaces['data']:read_u16(0x22), dsp.spaces['data']:read_u16(0x23))
     if state ~= previous then
         machine:logerror(string.format('rom4_tone_enable: %s t=%.9f\n',
             state, machine.time:as_double()))
