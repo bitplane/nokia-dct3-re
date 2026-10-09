@@ -14,6 +14,10 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         special = check.literal(data, 0x2C16E4) - check.BASE
         self.assertEqual(bytes.fromhex("3e3e3e3e0d"), data[special:special + 5])
         self.assertEqual(0x2E0B18, check.literal(data, 0x2C16F8))
+        normal = 0x2E0B18 - check.BASE
+        self.assertEqual(bytes.fromhex(
+            "3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b"),
+            data[normal:normal + 25])
         for address, mnemonic, operands in (
                 (0x2C085A, "movs", "r0, #0x33"),
                 (0x2C0880, "movs", "r0, #0x31"),

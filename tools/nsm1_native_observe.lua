@@ -4,6 +4,18 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
+local keypad_calls = 0
+for _, address in ipairs({0x2c084c, 0x2c15e4, 0x2c1638}) do
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'nsm1_keypad', function(offset, value, mask)
+            if cpu.state['PC'].value ~= address or keypad_calls >= 64 then return end
+            keypad_calls = keypad_calls + 1
+            machine:logerror(string.format(
+                'nsm1_keypad: pc=%08x key=%02x layout=%02x t=%.9f\n',
+                address, cpu.state['R0'].value & 0xff,
+                memory:read_u8(0x1127f2), machine.time:as_double()))
+        end)
+end
 local format_writes = 0
 handles[#handles + 1] = memory:install_write_tap(0x11fdd0, 0x11fdd3,
     'nsm1_record_format', function(offset, value, mask)

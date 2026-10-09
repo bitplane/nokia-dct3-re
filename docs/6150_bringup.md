@@ -51,6 +51,17 @@ identifying column bit 4 as Power. These static anchors confirm the
 currently selected register tuple and power column, not a complete
 physical-key acceptance run or a validated alternate layout.
 
+The compatibility instrument now has its own `nsm1r4t` input map:
+digits occupy columns 2--4, navigation column 1, and side/call keys
+column 0. The former borrowed 6110 map put digits in columns 1--3
+and was inconsistent with the own normal table. A fresh physical-only
+`tools/nsm1_keypad_fixture.lua` run presses 1, Left Softkey and Up,
+but the observer sees only the early scan at 0.323 s and no late
+scan or decoded press/release calls. Record arithmetic and both known
+validator rejections remain unchanged. This corrects host input cells
+without claiming runtime UI acceptance; build, MAME validity and the
+default 3210 structural regression pass.
+
 Read-only observer `tools/nsm1_native_observe.lua` records actual firmware
 shared-memory writes, CPU snapshots and verifier fields; it never writes
 firmware/MMIO state. The nine-second experiment progresses past the sparse

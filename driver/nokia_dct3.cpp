@@ -390,6 +390,10 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE8 = { 4, 0x01 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE1 = {
 	5, 0x10, 0x31, 0x30, 0x33, 0x2f
 };
+// NSM-1 v5.23 scanner 0x2c084c and special table 0x2e0b34.
+constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSM1 = {
+	5, 0x10, 0x31, 0x30, 0x33, 0x2f
+};
 constexpr nokia_gensio_device::wiring_contract GENSIO_NSE1 = {
 	0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c, 0x07, true
 };
@@ -425,6 +429,7 @@ constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NPE3 = { 5, 0x10 };
 constexpr nokia_kbgpio_device::wiring_contract KEYPAD_NSE5 = { 5, 0x02 };
 static_assert(KEYPAD_NSE8.valid());
 static_assert(KEYPAD_NSE1.valid());
+static_assert(KEYPAD_NSM1.valid());
 static_assert(KEYPAD_NHM5.valid());
 static_assert(KEYPAD_NHM6.valid());
 static_assert(KEYPAD_NHM2.valid());
@@ -3332,6 +3337,23 @@ static INPUT_PORTS_START( noki5110 )
 	PORT_BIT( 0x01, IP_ACTIVE_HIGH, IPT_OTHER ) PORT_NAME("Charger connected") PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::charger_irq), 0)
 INPUT_PORTS_END
 
+static INPUT_PORTS_START( nsm1r4t )
+	PORT_INCLUDE(noki5110)
+	// Own normal table 0x2e0b18: digits retain the NSE-1 cells, while
+	// navigation and side keys occupy different cells. Row zero is unused.
+	PORT_MODIFY("COL.0")
+	PORT_BIT( 0x01, IP_ACTIVE_LOW, IPT_UNUSED )
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Volume Down") PORT_CODE(KEYCODE_PGDN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Send") PORT_CODE(KEYCODE_S) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("End / Mode") PORT_CODE(KEYCODE_E) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Volume Up") PORT_CODE(KEYCODE_PGUP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_MODIFY("COL.1")
+	PORT_BIT( 0x02, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Left Softkey") PORT_CODE(KEYCODE_ENTER) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x04, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Up") PORT_CODE(KEYCODE_UP) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x08, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Down") PORT_CODE(KEYCODE_DOWN) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+	PORT_BIT( 0x10, IP_ACTIVE_LOW, IPT_KEYPAD ) PORT_NAME("Right Softkey") PORT_CODE(KEYCODE_BACKSPACE) PORT_CHANGED_MEMBER(DEVICE_SELF, FUNC(nokia_dct3_state::key_irq), 0)
+INPUT_PORTS_END
+
 static INPUT_PORTS_START( noki6110 )
 	PORT_INCLUDE(dct3_network_config)
 
@@ -3951,9 +3973,9 @@ void nokia_dct3_state::nsm1r4t(machine_config &config)
 	// Own 0x2bf082 read selects 0x28=0x22, writes command at 0x2a,
 	// polls status 0x29 bit 2 and reads the reply at 0x2d.
 	research.gensio_wiring = GENSIO_NSE1;
-	// Compatibility GPIO layout avoids routing the observed serial offsets
-	// through the later default keypad block. NSM-1 input is not validated.
-	research.keypad_wiring = KEYPAD_NSE1;
+	// Own scanner confirms this non-overlapping GPIO layout. Runtime UI
+	// input acceptance remains distinct from the static wiring contract.
+	research.keypad_wiring = KEYPAD_NSM1;
 	// Own 0x2af080 resets SIMI at 0x38/0x39; 0x2af0f6 drains RX at
 	// 0x37 while polling its count at 0x3c. Attach the removable lab card,
 	// not a handset identity fixture or an internal readiness publication.
@@ -4497,7 +4519,7 @@ SYST( 2003, noki2100, 0,      0,      noki2100, noki2100, nokia_dct3_state, empt
 SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empty_init, "Nokia", "Nokia 5110 (NSE-1, ROM4 DSP research)", MACHINE_NOT_WORKING )
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
-SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  noki6110, nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  nsm1r4t,  nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )

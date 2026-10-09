@@ -1,4 +1,4 @@
--- Physical power-key experiment; NSM-1 keypad wiring remains provisional.
+-- Physical power-key experiment; own static wiring is known, UI acceptance is not.
 local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(assert(source:match('^(.*[/])')) .. 'nsm1_native_observe.lua')
 local machine = manager.machine
