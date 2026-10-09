@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 655 gates: 457 generated from typed steps, 198 copied verbatim (shell).
+# 656 gates: 458 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -247,7 +247,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-a5-1-degraded-state verify-3310-radio-a5-1-degraded \
 	verify-3310-radio-a5-1-incoming-call verify-3310-radio-a5-1-outgoing-call \
 	verify-3330-radio-outgoing-call-lifecycle \
-	verify-3330-radio-a5-1-incoming-call verify-3330-radio-a5-1-outgoing-call \
+	verify-3330-radio-a5-1-degraded-state verify-3330-radio-a5-1-incoming-call \
+	verify-3330-radio-a5-1-outgoing-call \
 	verify-3410-radio-outgoing-call-lifecycle \
 	verify-3410-radio-a5-1-outgoing-call \
 	verify-radio-incoming-call-lifecycle-v501 verify-radio-call-state-roundtrip \
@@ -3105,6 +3106,17 @@ verify-3330-radio-outgoing-call-lifecycle: normalize-3330
 	test -f $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+
+verify-3330-radio-a5-1-degraded-state: normalize-3330
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'
+	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=32 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=15 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=enter'
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)_call/error.log
 
 verify-3330-radio-a5-1-incoming-call: normalize-3330
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'

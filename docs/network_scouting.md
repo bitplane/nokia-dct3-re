@@ -927,9 +927,14 @@ after its own physical first-boot PMM provisioning and cold phone-code entry.
 The product-local degraded fixture passes A5 and the unchanged NHM-6 physical
 Answer/End lifecycle: 500 microphone frames, 471 earpiece frames, 60 impaired
 bursts per direction, 28 impairment-induced bad blocks, FACCH 3/2 uplink/
-downlink and 83 SACCH/TF slots. This is a verified fixture probe; a combined
-permanent encrypted-degradation gate and its restoration variant remain to
-be added. Existing NHM-6 A5/0 resilience and clean A5/1 gates remain separate.
+downlink and 83 SACCH/TF slots. The permanent
+`make verify-3330-radio-a5-1-degraded-state` gate independently provisions
+fresh own PMM, cold-boots with physical phone-code entry, saves during
+encrypted impaired speech at 15 seconds, and requires exact two-second
+speech/radio replay plus physical End to idle. Its fresh-provisioning run
+replayed 50 digital speech records exactly. Existing NHM-6 A5/0 resilience
+and clean A5/1 gates remain separate. No external dialog or native DSP state
+is claimed by this HLE restoration gate.
 
 1. `make verify-radio-camp` passes;
 2. `make verify-radio-registration` proves one accepted update and steady camp;

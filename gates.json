@@ -9245,6 +9245,30 @@
       ]
     },
     {
+      "name": "verify-3330-radio-a5-1-degraded-state",
+      "prerequisites": ["normalize-3330"], "variables": {},
+      "steps": [
+        {"step": "shell", "silent": true,
+         "command": "$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_provision SECONDS=44 RUN_ENV='$(NOKI3330_FIRST_BOOT_INPUT) NOKIA_DCT3_POST_READY_KEYS=$(NOKI3330_FIRST_BOOT_KEYS) NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=7000'"},
+        {"step": "check", "silent": true, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/check_model_frontier_summary.py", "arguments": ["$(RUN_DIR)_provision/boot_summary.txt", "--require-fiq0"], "options": ["--require-fiq0"]},
+        {"step": "shell", "silent": true,
+         "command": "$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=32 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=15 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=enter'"},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_a5_trace_check.py", "arguments": ["$(RUN_DIR)_call/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_call_state_roundtrip_trace_check.py", "arguments": ["$(RUN_DIR)_call/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_3330_incoming_call_boundary_check.py", "arguments": ["$(RUN_DIR)_call/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_degraded_speech_trace_check.py", "arguments": ["$(RUN_DIR)_call/error.log", "$(COBBA_GJP_PCM_CHECK_ARGS)"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_facch_interruption_trace_check.py", "arguments": ["$(RUN_DIR)_call/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_sacch_coexistence_trace_check.py", "arguments": ["$(RUN_DIR)_call/error.log"], "options": []}
+      ]
+    },
+    {
       "name": "verify-3330-radio-a5-1-incoming-call",
       "prerequisites": [
         "normalize-3330"
