@@ -336,6 +336,25 @@ private:
 		m_phase = 6200 + index * 2;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_stopped_timer_reload_case(unsigned divider)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		u16 const code[] = {0x7725, 0x1234, 0x7726, u16(0x0030 | divider),
+			0x4826, 0xf4e1}; // STM PRD; STM stopped TRB; LDM TCR,A; IDLE1.
+		for (unsigned i = 0; i < std::size(code); ++i)
+			program.write_word(0x010600 + i, code[i]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x010600);
+		m_phase = 7300 + divider;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_timer_boundary_probe(unsigned index)
 	{
 		bool const short_period = !(index & 1);
@@ -888,7 +907,7 @@ private:
 		if (!strcmp(machine().system().name, "tms54test") &&
 				!strcmp(machine().options().bios(), "timer"))
 		{
-			start_timer_boundary_probe(0);
+			start_stopped_timer_reload_case(0);
 			return;
 		}
 		if (!strcmp(machine().system().name, "tms54rom4"))
@@ -1595,6 +1614,25 @@ private:
 			if (index < 175) { start_rounded_multiply_case(index + 1); return; }
 			osd_printf_info("TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2\n");
 			start_idle_nmi_case(0);
+			return;
+		}
+		if (m_phase >= 7300 && m_phase <= 7315)
+		{
+			unsigned const divider = m_phase - 7300;
+			osd_printf_info("TMS320C54x stopped reload case: divider=%u a=%llx tim=%04x idle=%u illegal=%u pc=%06x\n",
+				divider, static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
+				unsigned(m_cpu->state_int(STATE_GENPC)));
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (0x10 | divider | (divider << 6)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_TIM) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"SPRU131G TRB reloads TIM and PSC while TSS stops counting; TRB reads zero");
+			if (divider < 15) { start_stopped_timer_reload_case(divider + 1); return; }
+			osd_printf_info("TMS320C54x stopped timer reload: PASS divider_cases=16\n");
+			start_timer_boundary_probe(0);
 			return;
 		}
 		if (m_phase >= 7000 && m_phase <= 7003)

@@ -451,14 +451,14 @@ u16 tms320c54x_device::data_read(u16 address)
 		return m_prd;
 	if (address == 0x26)
 	{
-		if (!(m_tcr & TIMER_TSS) && m_timer->enabled())
+		if (!(m_tcr & TIMER_TSS) && (m_timer->enabled() || m_idle_mode >= 2))
 		{
 			const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
 			const u64 remaining = m_idle_mode >= 2 ? m_idle_timer_ticks : m_timer->remaining().as_ticks(clock());
 			const u16 psc = remaining ? u16((remaining - 1) % divider) : 0;
 			return (m_tcr & ~TIMER_PSC_MASK) | (psc << 6);
 		}
-		return m_tcr & ~TIMER_PSC_MASK;
+		return m_tcr;
 	}
 	if (address == 0x58)
 		return m_clkmd;
@@ -517,7 +517,11 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		update_timer_counter();
 		m_tcr = value & ~(TIMER_TRB | TIMER_PSC_MASK);
 		if (value & TIMER_TRB)
+		{
 			m_tim = m_prd;
+			// SPRU131G table 8-14: TRB loads PSC even when TSS stops counting.
+			m_tcr |= (m_tcr & TIMER_TDDR_MASK) << 6;
+		}
 		arm_timer();
 	}
 	else if (address == 0x58)

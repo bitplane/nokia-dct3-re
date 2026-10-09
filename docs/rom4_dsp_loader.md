@@ -811,6 +811,18 @@ store and an interrupt-return sequence: the ISR's stacked PC proves the
 following instruction completed before entry. These fixtures failed before
 the guard was implemented. They do not establish general six-stage pipeline
 drain timing or protect arbitrary writes to ST1.
+`make check-c54x-timer-registers` asserts the stopped TRB reload contract
+before running the separate timing observations. Sixteen firmware-free
+instruction cases write PRD `1234`, reload with TSS set and each TDDR value,
+then read TCR through `LDM`. TIM must remain `1234`, PSC must equal TDDR,
+and TRB must read zero (SPRU131G table 8-14). The former core returned PSC
+zero when stopped: the correctly initialized baseline passes divider zero
+but fails divider one. The core now retains TRB's PSC publication for stopped
+readback; IDLE2/3 reads use their existing saved timer phase. This does not
+establish writable-PSC semantics, general stop/restart prescaler continuity,
+interrupt latency or native recording completion. The full CPU suite and
+native NSE-1 RF cadence remain unchanged under their existing regressions.
+
 `make probe-c54x-timer-boundary` runs a separate, firmware-free observation
 profile (`tms54test -bios timer`). It reloads PRD through indirect stores,
 then sets AR1 to IMR and masks TINT. The ISR consists only of `PSHM XPC`

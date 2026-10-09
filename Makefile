@@ -1228,6 +1228,11 @@ check-c54x-core: build
 probe-c54x-timer-boundary: build
 	$(MAME_DIR)/mame tms54test -bios timer -video none -sound none -nothrottle -seconds_to_run 1
 
+# Assert TRB/PSC register behavior before the non-asserting short-period
+# interrupt observations. This is deliberately not an interrupt-latency gate.
+.PHONY: check-c54x-timer-registers
+check-c54x-timer-registers: probe-c54x-timer-boundary
+
 prepare-c54x-rom4-fixture:
 	@test -f roms/research/nse1-rom4/working/transform_entry_prog.bin
 	@test -f roms/research/nse1-rom4/working/transform_entry_data.bin
