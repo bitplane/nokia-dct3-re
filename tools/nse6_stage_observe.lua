@@ -42,11 +42,18 @@ handles[#handles + 1] = memory:install_read_tap(0x1205c8, 0x1205cf,
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
         0x2e1194, 0x2de164, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
-        0x240992, 0x240b94, 0x2dfe9e}) do
+        0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x28d5ca and counts[address] <= 4 then
+                machine:logerror(string.format(
+                    'nse6_config_integrity: computed=%08x stored=%08x t=%.9f\n',
+                    cpu.state['R0'].value,
+                    memory:read_u32(cpu.state['R5'].value + 0x3c),
+                    machine.time:as_double()))
+            end
             if address == 0x2dfe9e and cpu.state['R1'].value == 0x6209 then
                 machine:logerror(string.format(
                     'nse6_integrity_service: enabled=%02x bitmap=%02x class_mask=%02x t=%.9f\n',
@@ -89,10 +96,15 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
 end
 local next_sample = 0
 local captured = false
+local late_captured = false
 emu.register_frame_done(function()
     local now = machine.time:as_double()
     if now < next_sample then return end
     next_sample = next_sample + 1
+    if now >= 28 and not late_captured then
+        late_captured = true
+        machine.screens[':screen']:snapshot('8810-stage-late.png')
+    end
     machine:logerror(string.format(
         'nse6_stage_snapshot: pc=%08x sp=%08x first=%04x second=%04x t=%.9f\n',
         cpu.state['PC'].value, cpu.state['R13'].value,

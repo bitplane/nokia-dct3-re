@@ -13,6 +13,9 @@ at `0x100000`; importing a 128 KiB product configuration would be incorrect.
 The silent baseline waits for its first DSP acknowledgement. The separate
 `nse6r4t` compatibility fixture executes acquired NSE-1 ROM4 code and reaches
 CONTACT SERVICE, without proving that mask belongs to the 8810.
+An explicitly diagnostic six-byte integrity correction removes the two decoded
+erased-storage failures and reaches SIMI initialization, but remains blank
+through 30 seconds. No usable handset or authentic provisioning is established.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
@@ -306,8 +309,31 @@ still display CONTACT SERVICE. The subsequent 24-entry status scan accepts
 values `00/ff/fe`, ignoring entry `0x0b`; other entries clear flag `0x40`.
 In this fixture entry `0x12` at `0x13fcb2` contains `0x12`, causing that clear
 at 0.557605000 s. Its initializer `0x240b46..0x240b50` writes `0x12` when
-helper `0x2be71e` returns nonzero. The next unresolved contract is that helper
-and its underlying failure predicate, not another checksum adjustment.
+helper `0x2be71e` returns nonzero. Its predicate is decoded below.
+
+### Config Integrity and Current Frontier
+
+Helper `0x2be71e` calls validator `0x28d5ae`, which reads 64 EEPROM bytes
+starting at zero, sums the first `0x3c` bytes using the 16-bit byte-sum primitive
+`0x2ce3d0`, and compares the zero-extended result with the big-endian 32-bit
+word at offset `0x3c`. It succeeds only on equality. This is a byte sum, not
+CRC; it does not inspect identity semantics.
+
+The fixture's optional `--config-integrity` corrects that stored word to
+`00003bc4` in addition to the independent `db24` field. Tests enforce exactly
+six altered bytes (`0x3c..0x3f`, `0x11e..0x11f`) and leave all identity fields
+erased. In two fresh runs, validator entry returns sum/stored pair
+`00003bc4/00003bc4` at 0.471406000 s, the status-`0x12` failure disappears,
+and SIMI initializer `0x2ca910` executes at 3.592007923/3.592108077 s.
+The failure-display handler is not observed. Both the eight-second and
+28-second frames are blank; the 30-second run continues executing firmware,
+with one-second samples after six seconds in `0x2d33d6..0x2d33dc`.
+
+These diagnostic results isolate the two integrity gates but do not provide
+valid identity, lock configuration, completed APDUs, physical input acceptance,
+registration or native speech. The next question is the post-initialization
+firmware wait/UI startup boundary. Additional storage changes require their
+own decoded contract; no donor identity is justified by a blank frame.
 
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned

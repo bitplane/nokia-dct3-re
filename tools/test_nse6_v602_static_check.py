@@ -17,6 +17,14 @@ class Nse6StaticTests(unittest.TestCase):
         self.assertEqual(check.integrity_arithmetic(updated[0x40:0x11E], 0),
                          int.from_bytes(image[0x11E:0x120], "big"))
 
+    def test_config_integrity_fixture_preserves_identity(self):
+        image = fixture(config_integrity=True)
+        self.assertEqual([i for i, byte in enumerate(image) if byte != 0xFF],
+                         [0x3C, 0x3D, 0x3E, 0x3F, 0x11E, 0x11F])
+        self.assertEqual(int.from_bytes(image[0x3C:0x40], "big"),
+                         sum(image[:0x3C]))
+        self.assertEqual(image[:0x3C], b"\xff" * 0x3C)
+
     def test_integrity_arithmetic_and_allocation_paths(self):
         block = bytearray(b"\xff" * 0xDE)
         block[0x74 - 0x40:0x76 - 0x40] = b"\0\0"
