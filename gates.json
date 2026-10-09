@@ -371,6 +371,14 @@
       ]
     },
     {
+      "name": "verify-8890-sip-alerting-incoming-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; exact ringing handset restore rejects external dialog, no Answer/media",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki8890_sip_cancel.py $(RUN_DIR) --restore-incoming-alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-8890-sip-outgoing-busy", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP stack; physical own-PMM NSB-6 outgoing busy on configured GSM900 carrier 60, no media",
       "recipe": [

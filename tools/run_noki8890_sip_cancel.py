@@ -76,6 +76,22 @@ def check_outgoing_result(run):
                 raise ValueError('outgoing cleanup differs from reviewed idle content: ' + name)
 
 
+def check_alerting_restoration(text):
+    states = re.findall(r'8890_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
+    if (len(states) != 2 or [state[0] for state in states] != ['saved', 'restored'] or
+            states[0][1:] != states[1][1:] or '8890_state: FAIL' in text):
+        raise ValueError('incoming alerting architecture did not restore exactly')
+    cursor = 0
+    for marker in ('incoming state id=1 epoch=1 phase=alerting',
+                   'sip_state: saved', 'sip_state: restored',
+                   'state_roundtrip: result=pass scenario=8890_incoming_alerting',
+                   '8890_sip_cancel: physical Exit'):
+        position = text.find(marker, cursor)
+        if position < 0:
+            raise ValueError('missing ordered alerting restoration checkpoint: ' + marker)
+        cursor = position + len(marker)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
@@ -88,11 +104,13 @@ def main():
                         help='physically dial 1234567 against a real SIP 486 response')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
                           help='physically dial 1234567 against a real SIP 480 response')
+    outgoing.add_argument('--restore-incoming-alerting', action='store_true',
+                          help='restore an unanswered incoming call and clear the external dialog')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
-    if args.restore_idle and outgoing_failure:
+    if args.restore_idle and (outgoing_failure or args.restore_incoming_alerting):
         parser.error('--restore-idle cannot be combined with outgoing failure')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -109,6 +127,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki8890_outgoing_call_input.lua' if outgoing_failure else
+                       'noki8890_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
                        'noki8890_sip_idle_restore.lua' if args.restore_idle else
                        'noki8890_sip_cancel_observe.lua')),
                    '-state_directory', str(run / 'sta'),
@@ -119,6 +138,8 @@ def main():
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8890',
                    *(['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
+                     ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
+                      str(run / 'snap/8890_sip_registered_idle.png')] if args.restore_incoming_alerting else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/8890_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
@@ -130,15 +151,19 @@ def main():
             check_outgoing_result(run)
         else:
             check_product_result(run, args.restore_idle)
+            if args.restore_incoming_alerting:
+                check_alerting_restoration((run / 'error.log').read_text(errors='replace'))
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),
                         '--configured-gsm900', str(run / 'error.log')], check=True)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsb6hle', 'scenario': ('outgoing-sip-unavailable' if args.outgoing_unavailable else
+            'machine': 'nsb6hle', 'scenario': ('incoming-sip-alerting-restore' if args.restore_incoming_alerting else
+                                             'outgoing-sip-unavailable' if args.outgoing_unavailable else
                                              'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),
             'mcu_sha1': profile[2], 'pmm_sha1': profile[4],
             'provisioning': 'own acquired PMM unchanged', 'laboratory_carrier': 60,
             'native_dsp_complete': False, 'speech_tested': False,
             'idle_restored': args.restore_idle,
+            'incoming_alerting_restored': args.restore_incoming_alerting,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

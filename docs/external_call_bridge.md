@@ -764,6 +764,18 @@ this verifies epoch invalidation and a new call, not restoration of a dialog.
 The ordinary idle-state gate still requires physical Menu; this variant
 instead requires post-replay physical Exit after the new call.
 
+`verify-8890-sip-alerting-incoming-restore` saves the organically ringing
+NSB-6 handset at 52 seconds, after the fresh INVITE admitted at 45 seconds.
+It restores exact architectural R15/R13, complete-RAM digest and emulated
+time. The bridge rejects the outstanding external INVITE and publishes one
+cause-41 clear under epoch 2; it does not replay or serialize the SIP dialog.
+Full CC/RR release, the existing missed-call pixels, decoded physical Exit
+and reviewed registered-idle recovery remain required. The shared checker
+forbids Answer, CONNECT, SIP confirmation and accepted media. This is
+unanswered call-restoration coverage, not connected SIP, speech or native
+DSP completion. No passive replay interval is asserted during the required
+external-dialog invalidation.
+
 `verify-6210-sip-idle-restore` saves and restores the idle NPE-3 handset before
 the fresh INVITE. It checks exact CPU/RAM/time restoration and ordered protocol
 replay, requires the new host epoch 2, then independently checks the same

@@ -633,6 +633,7 @@ injection or borrowed product verdict is part of these workflows.
 | Real outgoing SIP busy | `verify-8890-sip-outgoing-busy`; own unchanged PMM, configured GSM900 carrier 60, physical `1234567`/Send, actual SIP 486, correlated busy and CC/RR release, reviewed idle pixels excluding the top-row clock; no CONNECT/media |
 | Real outgoing SIP unavailable | `verify-8890-sip-outgoing-unavailable`; same physical number and own carrier, actual SIP 480 with consumed cause 18, full release and reviewed idle restoration; no CONNECT/media |
 | Idle restoration before real SIP | `verify-8890-sip-idle-restore`; exact PC/SP/RAM/time and protocol replay, new host epoch 2, then the same unanswered cancellation and decoded physical cleanup; no saved external dialog or speech |
+| Ringing restoration with real SIP | `verify-8890-sip-alerting-incoming-restore`; exact R15/R13/RAM/time at 52 s, rejected external INVITE, one cause-41 clear under epoch 2, CC/RR release and decoded Exit to reviewed idle; Answer/CONNECT/media forbidden |
 
 The host SMS gates use `fixtures/noki8890_host/nsb6hle.cfg` in fresh private
 storage with the unchanged own acquired MCU/PMM. The fixture enables the

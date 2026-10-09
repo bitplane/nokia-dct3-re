@@ -10,6 +10,21 @@ from tools import run_noki8890_sip_cancel as check
 
 
 class CleanupFramesTest(unittest.TestCase):
+    def test_alerting_restore_requires_exact_architecture_and_order(self):
+        state = 'pc=00412345 sp=00170000 ram=12345678 t=52.000000000'
+        text = ('incoming state id=1 epoch=1 phase=alerting\n'
+                '8890_state: event=saved ' + state + '\nsip_state: saved\n'
+                '8890_state: event=restored ' + state + '\nsip_state: restored\n'
+                'state_roundtrip: result=pass scenario=8890_incoming_alerting\n'
+                '8890_sip_cancel: physical Exit\n')
+        check.check_alerting_restoration(text)
+        for invalid in (text.replace('event=restored pc=00412345', 'event=restored pc=00412346'),
+                        text.replace('phase=alerting', 'phase=connected'),
+                        text.replace('sip_state: restored', ''),
+                        text + '8890_state: FAIL incomplete\n'):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                check.check_alerting_restoration(invalid)
+
     def test_outgoing_requires_own_carrier_send_and_idle_pixels(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)
