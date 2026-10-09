@@ -35,6 +35,14 @@ requirement.
 
 ## Promotion rules
 
+`verify-6210-calendar-cold` independently proves physical Menu-8 Calendar
+entry, firmware-owned CCONT programming to 13:47, physical date entry and
+the reviewed 7 October 2026 Wednesday pixels. A separate process retaining
+only that handset's generated NVRAM reproduces the date without replacement
+input, retains hour/minute and completes retained-location registration.
+This remains research HLE and does not prove offline elapsed time, midnight
+rollover, leap-year boundaries or native DSP behavior.
+
 The 6210 research-HLE pending-outgoing and alerting-incoming SIP restore
 gates independently prove exact architectural restoration, external-dialog
 clearing without replay, complete signaling release and registered-idle

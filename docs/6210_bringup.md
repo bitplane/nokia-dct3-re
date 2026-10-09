@@ -570,11 +570,19 @@ prompt. Physical `07-10-2026` and OK render `7 October 2026`, `Wednesday`
 and the ordinary Options/Back Calendar window. No calendar RAM, internal UI
 events, clock registers or foreign provisioning are written by the fixture.
 
-The isolated `run_6210_calendar_entry_probe` also passes the existing own
-laboratory-registration and persistent EF_LOCI checks. This is an observed
-physical-input result, not yet a wired calendar acceptance gate. Independent
-cold-process date/time persistence, midnight rollover and boundary-date
-arithmetic remain to be tested before promoting those capabilities.
+`make verify-6210-calendar-cold RUN_DIR=run_6210_calendar JOBS=4` runs the
+entry fixture, copies only that process's own NVRAM into a separate cold
+process, and executes `noki6210_calendar_cold_input.lua`. The second fixture
+only navigates to Calendar; it never enters replacement time/date. Both
+processes must pass the own upload/self-test and registration checks; the
+cold process must consume retained EF_LOCI. Both retain CCONT hour/minute
+`13:47` and render the reviewed Calendar hash
+`fcf0327cc0cc4edb952d0dc37621e467c0810b867738de6c91f39354a9c3a3b3`.
+Firmware resets seconds during cold initialization, but does not replace
+hour/minute. This proves deterministic retained time/date, not elapsed
+offline time, midnight rollover or boundary-date arithmetic. Those remain
+separate acceptance questions. Six checker tests cover missing/reordered
+inputs, missing time-register programming, cold replacement and bad RTC data.
 
 ## Unattached accessory input
 
