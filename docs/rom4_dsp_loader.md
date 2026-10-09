@@ -446,6 +446,35 @@ receiver boundary.
 
 ## RF ownership and capture target
 
+### Architectural XF diagnostic
+
+Nokia's NSE-1 *Disassembly & Troubleshooting Instructions*, original 03/98,
+pp. 11-12, identifies MAD2 D200 pin 91/test point J222 as DSPXF. Its
+diagnostic diagrams distinguish initialization, network synchronization and
+registration, with intermediate search/access stages. This is a potential
+independent milestone signal, not a specification of RF sample packing.
+Source: [Nokia manual, pp. 11-12](https://www.manualslib.com/manual/3283741/Nokia-Nse-1-Series.html?page=11).
+The accessible text confirms the stage labels; exact waveform polarity and
+edge-to-stage correspondence are not yet established from the figures.
+
+TI SPRU131G table 4-2 identifies ST1 bit 13 as XF, set/cleared by SSBX/RSBX:
+[TI CPU reference](https://e2echina.ti.com/cfs-file/__key/telligent-evolution-components-attachments/13-106-00-00-00-00-46-75/TMS320C54x-DSP-CPU-and-Peripherals-Reference-Set-Volume-1.pdf).
+The acquired `nse1_rom4_dsp_program.bin` has seven candidate `f6bd/f7bd`
+words. A fresh 30-second native run with
+`tools/c54x_rom4_xf_observe.lua` observes `2603/2604` twice,
+`260b/260c` once, `2613/2615` zero times and `309c` 6,461 times.
+Successor fetches show XF low after `2604` near 0.134 and 2.091 seconds,
+then high after `260c` near 2.114 seconds. The first `309c` changes XF from
+low to high near 0.134 seconds; subsequent captured writes retain high.
+The existing RF-boundary checker independently passes with 6,499 frames,
+207,040 reads and the same three control pairs.
+
+This is a bounded architectural observation. It is not an all-writer XF
+census, an electrically exported pin, or proof of synchronization or
+registration. Whole-register ST1 loads and other uploaded code may also
+change XF. Matching the manual's figures to firmware-owned callers remains
+necessary before assigning stage semantics.
+
 `tools/c54x_rom4_port_census.py` inventories candidate `PORTR`/`PORTW` sites
 in the recovered big-endian ROM image. It accounts for the extra Smem address
 word in absolute `74f8`/`75f8` instructions; treating that word as the port
