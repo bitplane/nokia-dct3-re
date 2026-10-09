@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 618 gates: 420 generated from typed steps, 198 copied verbatim (shell).
+# 619 gates: 421 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -376,10 +376,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-host-incoming-sms verify-6250-coherent-host-outgoing-sms \
 	verify-6250-coherent-host-rejected-sms verify-6250-coherent-host-silent-sms \
 	verify-6210-alarm verify-6210-alarm-off-no verify-6210-alarm-off-restore \
-	verify-6210-alarm-off-yes verify-6210-alarm-cold verify-6210-alarm-snooze \
-	verify-6210-calendar-cold verify-6210-calendar-midnight \
-	verify-6210-calendar-leap-day verify-6210-calendar-nonleap \
-	verify-6210-calendar-year-end verify-radio-outgoing-call-sip-unavailable
+	verify-6210-alarm-off-restore-yes verify-6210-alarm-off-yes \
+	verify-6210-alarm-cold verify-6210-alarm-snooze verify-6210-calendar-cold \
+	verify-6210-calendar-midnight verify-6210-calendar-leap-day \
+	verify-6210-calendar-nonleap verify-6210-calendar-year-end \
+	verify-radio-outgoing-call-sip-unavailable
 
 verify-8210-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-call --mame $(MAME_DIR)/mame
@@ -4716,6 +4717,9 @@ verify-6210-alarm-off-no: build
 
 verify-6210-alarm-off-restore: build
 	$(VENV)/bin/python tools/run_noki6210_alarm.py $(RUN_DIR) --restore-off --mame $(MAME_DIR)/mame
+
+verify-6210-alarm-off-restore-yes: build
+	$(VENV)/bin/python tools/run_noki6210_alarm.py $(RUN_DIR) --restore-off yes --mame $(MAME_DIR)/mame
 
 verify-6210-alarm-off-yes: build
 	$(VENV)/bin/python tools/run_noki6210_alarm.py $(RUN_DIR) --power-off yes --mame $(MAME_DIR)/mame

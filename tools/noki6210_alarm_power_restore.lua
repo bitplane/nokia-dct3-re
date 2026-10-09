@@ -47,4 +47,5 @@ _G.noki6210_alarm_restore_checkpoint = function()
     coroutine.yield()
     return 1.25
 end
-dofile(assert(source:match('^(.*[/])')) .. 'noki6210_alarm_power_no.lua')
+_G.noki6210_alarm_power_choice = _G.noki6210_alarm_power_choice or 'no'
+dofile(assert(source:match('^(.*[/])')) .. 'noki6210_alarm_power_off.lua')

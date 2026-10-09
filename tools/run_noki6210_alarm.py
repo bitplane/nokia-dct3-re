@@ -204,11 +204,11 @@ def main():
                       help='physically Snooze and verify natural five-minute recurrence and Stop')
     mode.add_argument('--power-off', choices=('yes', 'no'),
                       help='physically shut down, verify autonomous alarm wake and activation choice')
-    mode.add_argument('--restore-off', action='store_true',
-                      help='restore the powered-off countdown, then verify natural alarm wake and No')
+    mode.add_argument('--restore-off', choices=('yes', 'no'), nargs='?', const='no',
+                      help='restore the powered-off countdown, then verify natural alarm wake and activation')
     args = parser.parse_args()
     if args.restore_off:
-        args.power_off = 'no'
+        args.power_off = args.restore_off
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     mame = (args.mame or root / 'mame/mame').resolve()
@@ -225,6 +225,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki6210_alarm_arm.lua' if args.cold else
+                       'noki6210_alarm_power_restore_yes.lua' if args.restore_off == 'yes' else
                        'noki6210_alarm_power_restore.lua' if args.restore_off else
                        f'noki6210_alarm_power_{args.power_off}.lua' if args.power_off else
                        'noki6210_alarm_snooze.lua' if args.snooze else 'noki6210_alarm_input.lua')),

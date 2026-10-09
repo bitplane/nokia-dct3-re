@@ -716,6 +716,13 @@ buzzer programming and physical Stop/No must still pass the ordinary
 powered-off acceptance. The fixture changes emulator save-state only, not
 firmware, MMIO, clock or alarm registers. Fresh physical clock-entry and
 own provisioning seed the run (`run_6210_alarm_off_restore_quarter`).
+`verify-6210-alarm-off-restore-yes` uses the same architecture/RTC replay
+contract but physically chooses Yes. It independently verifies the subsequent
+software-reset request, restored-countdown alarm boot and normal post-restart
+upload/self-test phases, forbids a new rail drop after Yes, and requires the
+unchanged exact registered idle frame (`run_6210_alarm_restore_yes`). This
+closes both activation choices after a loaded countdown; neither substitutes
+for native DSP or audible-output evidence.
 
 Warm MCU reset preserves SRAM. NPE-3 startup reads the reason at `0x17fe48`
 before clearing ordinary workspace `0x100020..0x175668`. Physical Yes stores

@@ -50,6 +50,9 @@ verified at firmware consumers; native DSP and silicon timing are not inferred.
 restoration during the powered-off countdown, matching RTC replay and blank
 frames, then natural deadline wake and physical Stop/No. It injects no alarm
 cause or clock value and does not establish audible output.
+The paired `verify-6210-alarm-off-restore-yes` proves physical Yes, the
+firmware-owned warm restart, independently checked upload/self-test phases
+and exact registered idle after the same restored countdown.
 `verify-6210-alarm-snooze` additionally proves physical Snooze, firmware's
 five-minute reprogramming, natural recurrence, IRQ acknowledgement, renewed
 buzzer control and physical Stop. Exact frames additionally cover `Snooze

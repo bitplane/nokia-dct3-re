@@ -94,6 +94,16 @@ class AlarmChecks(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Yes activation'):
             check_power_off_alarm(self.power_off_text().replace('activate_no', 'activate_yes'), 'yes')
 
+    def test_restored_power_off_alarm_yes_continues_without_second_rail_drop(self):
+        text = self.power_off_text().replace('activate_no', 'activate_yes').replace(
+            'ccont_power: event=off t=86\n', '')
+        marker = 'ccont_power: event=wake cause=80 t=60\n'
+        text = text.replace(marker, self.restore_text() + marker)
+        restored = check_off_restore(text)
+        check_power_off_alarm(restored, 'yes')
+        with self.assertRaisesRegex(ValueError, 'Yes activation'):
+            check_power_off_alarm(restored + 'ccont_power: event=off t=86\n', 'yes')
+
     def test_each_required_event(self):
         for line in self.text.splitlines(keepends=True):
             with self.subTest(line=line), self.assertRaises(ValueError):
