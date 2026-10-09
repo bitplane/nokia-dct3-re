@@ -1285,6 +1285,17 @@ decode observations. The same run accepts the cold-start security sequence
 before arming the alarm. The remaining boundary is therefore post-wake
 validation/context or stored-code selection, not an established wrong
 default code; no security record or firmware state was changed.
+Read-only NV comparison in `run_8890_alarm_security_nv` observes 1,042
+getter calls before alarm wake and 958 afterward. Both starts successfully
+read the same initial low-offset records: `0000/0120`, `0014/000c`,
+`0000/000c`, `000c/0008`, and `0020/0018` (offset/length). Requests
+`70:13/14/15/16` carry byte-identical payloads on the two starts, followed
+by `70:0d00` and `70:0a09`. This does not establish identity/security DSP
+verdicts, which remain unimplemented, or prove all NV bytes are unchanged.
+In particular, the repeated offset-`000c` reader at `0x28c40c` unpacks
+nibbles into digit characters; it is not evidence of a phone-code compare.
+The next discriminating boundary is the MCU-side validation transaction,
+not a guessed replacement security record.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
