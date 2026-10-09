@@ -187,7 +187,7 @@ native backend save states; no new unsaved latch is introduced.
 
 `verify-5110-save-state` now uses `c54x_rom4_codec_restore.lua` to observe
 pre-save/post-load boundaries, comparing emulated time, DSP PC, ST0, ST1, SP
-and the non-destructive I/O `21` word exactly. `--restore-log LOG` rejects a
+and the non-destructive I/O `21` and serial-control data `22` words exactly. `--restore-log LOG` rejects a
 missing, duplicated or changed snapshot pair and a failed round-trip harness.
 This check supplements, rather than replaces, physical Menu input and the
 exact Phone book frame. The fixture does not write DSP registers or assert
@@ -276,19 +276,24 @@ and frame-sync behavior. Combined with the local ROM's `c008 -> c0c8`,
 BDXR write and BDRR poll, this corroborates the serial-port interpretation;
 it does not corroborate a COBBA parallel register-C transaction.
 
-The native backend still forwards data `0022` and `0032` to
-`parallel_control_w` and returns before updating its data backing word. This
-is an unresolved attachment defect: the observed `0022` writes must not be
-used as evidence of physical MFI control traffic merely because their upper
-nibble is `c`. The generic TI `0032` assignment varies by part, so the second
-address also needs its own local sequence/variant evidence, not a shared
-"interrupt-masked alias" assumption. Before attaching the 8 kHz frame clock,
-separate DSP serial control state from COBBA control, implement documented
-reset/readiness at the DSP endpoint, preserve the externally returned boot
-echo, and replace the coherent gate's parallel-log expectations with actual
-serial-control/echo assertions. Exact word timing and MFI port mapping remain
-independent boundaries; do not double-drive both owners to preserve an old
-log predicate.
+The native backend retains data `0022` in DSP-owned saved control storage,
+cleared at device/core-reset assertion; it no longer forwards the word to
+COBBA's parallel bank. The current raw control latch is partial hardware,
+not a full BSPC decode: writable masks, read-only ready/status bits and
+external-clock transitions are still missing. The separately evidenced boot
+echo is unchanged. Fresh coherent boot and 30-second native processing retain
+865/6033 frame observations; the physical tone request remains accepted
+without operational PCM, and exact idle save/load restores `bspc22=c0c8`
+before drawing the unchanged Phone book oracle.
+
+The coherent gate now checks real serial reset/release and echo observations
+instead of expecting synthetic COBBA parallel register-C logs. Data `0032`
+still uses the legacy forwarding path: the generic TI assignment varies by
+part, so that address needs its own local sequence/variant evidence, not a
+shared "interrupt-masked alias" assumption. Before attaching the 8 kHz frame
+clock, implement documented reset/readiness at the DSP endpoint and validate
+word timing. MFI port mapping remains an independent boundary; do not
+double-drive both owners to preserve an old log predicate.
 
 ## Physical capture option
 

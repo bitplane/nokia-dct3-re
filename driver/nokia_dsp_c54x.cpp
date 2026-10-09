@@ -67,6 +67,7 @@ void nokia_dsp_c54x_device::device_start()
 void nokia_dsp_c54x_device::device_reset()
 {
 	std::fill(m_io.begin(), m_io.end(), 0);
+	m_data[0x0022] = 0;
 	m_host_command_line = false;
 	m_reset_released = false;
 	m_host_command_vector = 0;
@@ -211,6 +212,8 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 	}
 	else
 	{
+		m_data[0x0022] = 0;
+		m_cobba->codec_serial_receive_ack();
 		m_frame_timer->adjust(attotime::never);
 		m_slot_timer->adjust(attotime::never);
 	}
@@ -255,7 +258,15 @@ u16 nokia_dsp_c54x_device::data_r(offs_t offset)
 void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 {
 	const u16 address = offset;
-	if (address == 0x0022 || address == 0x0032)
+	if (address == 0x0022)
+	{
+		// Resident reset/release and BDXR/BDRR traffic corroborate BSPC0,
+		// not a COBBA parallel register-C write. Retain control state here;
+		// read-only readiness and external-clock transitions are not yet modeled.
+		m_data[address] = data;
+		return;
+	}
+	if (address == 0x0032)
 	{
 		m_cobba->parallel_control_w(data);
 		return;

@@ -101,6 +101,10 @@ def check_trace(text: str) -> None:
     if echo != [("write", "0021", "0aaa", "0e31"),
                 ("read", "0020", "0aaa", "0e5d")]:
         raise ValueError("data-space boot echo missing, duplicated or changed")
+    setup = [(direction, value, pc) for space, direction, address, value, pc, _ in records
+             if space == "data" and address == "0022"]
+    if setup[:2] != [("write", "c008", "0e22"), ("write", "c0c8", "0e24")]:
+        raise ValueError("missing native serial reset/release setup")
     io = [(direction, value, pc) for space, direction, address, value, pc, _ in records
           if space == "io" and address == "0021"]
     expected = [("write", "1482", "4555"), ("write", "1482", "4559"),
@@ -117,7 +121,7 @@ def check_restore(text: str) -> None:
     records = re.findall(
         r"rom4_codec_state: phase=(saved|restored) "
         r"(t=[0-9.]+ pc=[0-9a-f]{4} st0=[0-9a-f]{4} "
-        r"st1=[0-9a-f]{4} sp=[0-9a-f]{4} io21=[0-9a-f]{4})", text)
+        r"st1=[0-9a-f]{4} sp=[0-9a-f]{4} io21=[0-9a-f]{4} bspc22=[0-9a-f]{4})", text)
     if len(records) != 2 or [phase for phase, _ in records] != ["saved", "restored"]:
         raise ValueError("expected one ordered native save/restore snapshot pair")
     if records[0][1] != records[1][1]:

@@ -1307,8 +1307,9 @@ check-c54x-rom4-coherent: build
 		grep -q "rom4_validator: event=continue r6=00000001" error.log; \
 		grep -q "rom4_port_write: port=21" error.log; \
 		grep -q "rom4_port_write: port=2c" error.log; \
-		grep -q "cobba: parallel .* address=c data=008" error.log; \
-		grep -q "cobba: parallel .* address=c data=0c8" error.log; \
+		$(PYTHON) $(abspath tools/c54x_rom4_codec_contract.py) \
+			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
+			--trace error.log; \
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --minimum-frames 800; \
 		! grep -q "rom4_reset_request: reason=00000004" error.log
 	@grep -q "ROM4 DSP coherent execution: PASS completion=1074" \

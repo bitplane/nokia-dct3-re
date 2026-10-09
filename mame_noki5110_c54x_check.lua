@@ -2,6 +2,8 @@ local machine = manager.machine
 local dsp = machine.devices[":dsp_c54x:cpu"]
 local data = dsp.spaces["data"]
 local checked = false
+local directory = assert(debug.getinfo(1, "S").source:match("^@(.*/)"))
+dofile(directory .. "tools/c54x_rom4_codec_observe.lua")
 
 emu.register_periodic(function()
 	if checked or machine.time.seconds < 3.0 then

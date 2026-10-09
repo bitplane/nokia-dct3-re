@@ -47,7 +47,9 @@ class CodecContractTests(unittest.TestCase):
 
 class CodecTraceTests(unittest.TestCase):
     def trace(self):
-        events = [("data", "write", "0021", "0aaa", "0e31"),
+        events = [("data", "write", "0022", "c008", "0e22"),
+                  ("data", "write", "0022", "c0c8", "0e24"),
+                  ("data", "write", "0021", "0aaa", "0e31"),
                   ("data", "read", "0020", "0aaa", "0e5d"),
                   ("io", "write", "0021", "1482", "4555"),
                   ("io", "write", "0021", "1482", "4559"),
@@ -71,7 +73,7 @@ class CodecTraceTests(unittest.TestCase):
 
     def test_missing_echo_rejected(self):
         with self.assertRaisesRegex(ValueError, "boot echo"):
-            check_trace("\n".join(self.trace().splitlines()[1:]))
+            check_trace(self.trace().replace("address=0021 value=0aaa", "address=0021 value=0000"))
 
     def test_incomplete_cycles_rejected(self):
         with self.assertRaisesRegex(ValueError, "I/O control"):
@@ -83,7 +85,7 @@ class CodecTraceTests(unittest.TestCase):
 
 class CodecRestoreTests(unittest.TestCase):
     def trace(self):
-        state = "t=7.000000000 pc=30bf st0=0000 st1=2900 sp=1000 io21=0482"
+        state = "t=7.000000000 pc=30bf st0=0000 st1=2900 sp=1000 io21=0482 bspc22=c008"
         return (f"rom4_codec_state: phase=saved {state}\n"
                 f"rom4_codec_state: phase=restored {state}\n"
                 "state_roundtrip: result=pass")
@@ -93,7 +95,7 @@ class CodecRestoreTests(unittest.TestCase):
 
     def test_every_field_mismatch_rejected(self):
         for field in ("t=7.000000000", "pc=30bf", "st0=0000", "st1=2900",
-                      "sp=1000", "io21=0482"):
+                      "sp=1000", "io21=0482", "bspc22=c008"):
             with self.subTest(field=field):
                 changed = self.trace().splitlines()
                 changed[1] = changed[1].replace(field, field[:-1] + "1")
