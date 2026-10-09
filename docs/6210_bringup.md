@@ -384,6 +384,14 @@ termination, complete CC/RR release and exact registered idle. The host
 dialog is cleared rather than saved. No CONNECT, media or redial is allowed;
 this does not establish answered calls or native speech.
 
+`verify-6210-sip-alerting-incoming-restore` saves during an organically
+ringing incoming call and restores exact PC, SP, RAM checksum and time.
+The outstanding SIP INVITE is rejected rather than replayed; one cause-41
+clear completes CC/RR release under the new epoch. Physical Exit dismisses
+the single missed-call notification and returns to exact registered idle.
+Answer, CONNECT and accepted media are forbidden; connected-call SIP
+restoration and speech remain unproved.
+
 `make verify-6210-sip-cancel RUN_DIR=run_6210_sip_cancel` runs the unchanged
 acquired PMM in `npe3hle`, with fresh private NVRAM/configuration and the
 optional PJSIP 2.16 stack. A reviewed registered-idle snapshot at 32 seconds

@@ -2,7 +2,7 @@
 local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local scenario = assert(_G.noki6210_state_scenario)
-local inputs = {idle='staged_observe', call='outgoing_call_input', sms='incoming_sms_input',
+local inputs = {idle='staged_observe', incoming_alerting='staged_observe', call='outgoing_call_input', sms='incoming_sms_input',
                 divert='divert_lifecycle_input'}
 dofile(directory .. 'noki6210_' .. assert(inputs[scenario]) .. '.lua')
 if scenario == 'idle' and os.getenv('NOKIA_DCT3_6210_PIN_ENTRY') == '1' then
@@ -11,7 +11,7 @@ end
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local memory = cpu.spaces['program']
-local save_time = ({idle=19, call=31, sms=15.02, divert=36})[scenario]
+local save_time = ({idle=19, incoming_alerting=40, call=31, sms=15.02, divert=36})[scenario]
 local saved, completed
 local function snapshot()
     local sum = 0
@@ -46,7 +46,17 @@ local post_load = emu.add_machine_post_load_notifier(function()
         machine:logerror(string.format('state_replay: phase=restored event=end t=%.9f\n', machine.time:as_double()))
         -- Lua waits are host-side and are cancelled on load. Resume only
         -- physical fixture input here; no handset task/state is restored by Lua.
-        if scenario == 'divert' then
+        if scenario == 'incoming_alerting' then
+            assert(emu.wait(12))
+            machine.screens[':screen']:snapshot('6210_sip_missed_call.png')
+            local key = assert(machine.ioport.ports[':COL.1'].fields['Right Softkey / C'])
+            machine:logerror('6210_sip_cancel: physical Exit\n')
+            key:set_value(1)
+            assert(emu.wait(0.15))
+            key:set_value(0)
+            assert(emu.wait(1.85))
+            machine.screens[':screen']:snapshot('6210_sip_after_cancel.png')
+        elseif scenario == 'divert' then
             assert(_G.noki6210_resume_divert)()
         elseif scenario == 'call' then
             assert(emu.wait(3))

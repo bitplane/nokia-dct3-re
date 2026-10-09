@@ -35,6 +35,12 @@ requirement.
 
 ## Promotion rules
 
+The 6210 research-HLE pending-outgoing and alerting-incoming SIP restore
+gates independently prove exact architectural restoration, external-dialog
+clearing without replay, complete signaling release and registered-idle
+recovery. They prohibit CONNECT and accepted media and do not establish
+answered SIP calls, connected restoration or native speech.
+
 `verify-8890-calendar-rollover`, `verify-8890-calendar-leap-day` and
 `verify-8890-calendar-year-end`
 independently prove physical time/date entry, RTC day-increment consumption,

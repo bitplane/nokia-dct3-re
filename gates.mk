@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 600 gates: 407 generated from typed steps, 193 copied verbatim (shell).
+# 601 gates: 407 generated from typed steps, 194 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -74,9 +74,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8850-call-divert verify-8890-sim-toolkit verify-8890-sim-toolkit-busy \
 	verify-8890-ussd verify-8890-call-divert verify-5510-package \
 	verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
-	verify-6210-sip-outgoing-unavailable verify-6210-sip-pending-outgoing-restore \
-	verify-6210-sip-idle-restore verify-6210-stage verify-6210-runtime \
-	verify-6210-outgoing-call verify-6210-incoming-call verify-6210-incoming-sms \
+	verify-6210-sip-outgoing-unavailable \
+	verify-6210-sip-alerting-incoming-restore \
+	verify-6210-sip-pending-outgoing-restore verify-6210-sip-idle-restore \
+	verify-6210-stage verify-6210-runtime verify-6210-outgoing-call \
+	verify-6210-incoming-call verify-6210-incoming-sms \
 	verify-6210-host-incoming-sms verify-6210-host-outgoing-sms \
 	verify-6210-host-rejected-sms verify-6210-host-silent-sms \
 	verify-6210-host-silent-sms-realtime verify-6210-outgoing-sms \
@@ -640,6 +642,11 @@ verify-6210-sip-outgoing-busy: build
 verify-6210-sip-outgoing-unavailable: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6210_sip_cancel.py $(RUN_DIR) --outgoing-unavailable --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional external PJSIP stack; exact ringing NPE-3 restore clears dialog without Answer or media
+verify-6210-sip-alerting-incoming-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6210_sip_cancel.py $(RUN_DIR) --restore-incoming-alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 # shell: optional external PJSIP stack; pending NPE-3 dialog cleared after exact handset restore, no media
 verify-6210-sip-pending-outgoing-restore: build

@@ -51,11 +51,13 @@ def main():
                           help='physically dial into SIP 480 instead of receiving CANCEL')
     outgoing.add_argument('--restore-outgoing-pending', action='store_true',
                           help='restore an unanswered outgoing SIP 180 call, clearing it without media')
+    outgoing.add_argument('--restore-incoming-alerting', action='store_true',
+                          help='restore a ringing incoming call without Answer or media')
     parser.add_argument('--http-port', type=int, default=18621)
     parser.add_argument('--sip-port', type=int, default=25621)
     args = parser.parse_args()
     outgoing_status = 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
-    if (outgoing_status or args.restore_outgoing_pending) and args.restore_idle:
+    if (outgoing_status or args.restore_outgoing_pending or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -71,6 +73,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki6210_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
                        'noki6210_sip_outgoing_restore.lua' if args.restore_outgoing_pending else
                        'noki6210_outgoing_call_input.lua' if outgoing_status else
                        'noki6210_sip_idle_restore.lua' if args.restore_idle else
@@ -84,6 +87,8 @@ def main():
                    '--product', '6210',
                    *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', str(outgoing_status)] if outgoing_status else
+                     ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
+                      str(run / 'snap/6210_sip_registered_idle.png')] if args.restore_incoming_alerting else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/6210_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
@@ -111,9 +116,15 @@ def main():
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after SIP failure')
         else:
             check_product_result(run, args.restore_idle)
+            if args.restore_incoming_alerting:
+                text = (run / 'error.log').read_text(errors='replace')
+                if ('LUA ERROR' in text.upper() or '6210_state: FAIL' in text or
+                        'state_roundtrip: result=pass scenario=incoming_alerting' not in text):
+                    raise ValueError('incoming alerting architecture did not restore exactly')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6210 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('6210 research-HLE SIP ' + ('pending outgoing restoration' if args.restore_outgoing_pending else
+    print('6210 research-HLE SIP ' + ('incoming alerting restoration' if args.restore_incoming_alerting else
+          'pending outgoing restoration' if args.restore_outgoing_pending else
           f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +
           ' PASS; registered idle recovered, no speech acceptance')
 

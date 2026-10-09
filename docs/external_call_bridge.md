@@ -453,7 +453,7 @@ CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
 dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects answered/media fixtures for signaling-only
-products `6210`, `6250`, `8850` and `8890`. The 8210 has a narrowly scoped
+products `6210`, `6250` and `8890`. The 8210 and 8850 have narrowly scoped
 single-call outgoing and incoming SIP-200 HLE media-transport fixtures and
 a separate connected-outgoing restore fixture. Explicit recording is
 available for media fixtures without asserting waveform success.
@@ -464,8 +464,9 @@ correlated busy decision and complete CC/RR release, rejects CONNECT and
 media, and checks exact registered-idle pixels afterward. The isolated
 research-HLE runner retains unchanged acquired PMM and own bootstrap,
 self-test, registration and persisted SIM-location checks. Only this
-outgoing busy failure, the unavailable fixture below and pending-outgoing
-restoration are enabled for the 6210; answered calls and speech remain unproved.
+outgoing busy failure, the unavailable fixture below, pending-outgoing
+restoration and alerting-incoming restoration are enabled for the 6210;
+answered calls and speech remain unproved.
 
 `verify-6210-sip-pending-outgoing-restore` physically dials `1234567`, saves
 during SIP 180, and restores handset PC, SP, RAM checksum and emulated time
@@ -473,6 +474,14 @@ exactly. The external dialog is cleared, not restored: CANCEL/487, one
 accepted cause-41 termination, complete CC/RR release and exact registered
 idle are required. CONNECT, accepted media and redial are rejected. This is
 research-HLE signaling coverage, not native DSP or speech evidence.
+
+`verify-6210-sip-alerting-incoming-restore` admits a fresh INVITE only after
+the registered-idle artifact, saves while organically alerting, and restores
+PC, SP, RAM checksum and time exactly. The host rejects the outstanding
+INVITE and clears the handset once under the new epoch. Complete CC/RR
+release, one missed-call notification, physical Exit and exact registered
+idle are required; Answer, CONNECT, accepted media and dialog replay are
+rejected. Connected restoration remains unproved for this product.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:
