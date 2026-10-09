@@ -220,7 +220,23 @@ No receive-return object is observed through nine seconds. The dispatcher
 is therefore live, not an unstarted task; the bounded frontier is its absent
 input rather than an observed rejection of `0x119a`.
 
-Next: inventory legitimate producers of dispatcher input `0x119a`,
+Own producer wrapper `0x29f340` loads immutable object `0x2e0b7c`, whose
+first halfword is `0x119a`, calls `0x2bced2` with that id, then posts the
+object to task `0x15` through `0x275b60` at `0x29f34e`. Its bounded direct
+call candidates are `0x21fb5e`, `0x21fd14`, `0x21fec6`, `0x220574`, and
+`0x220b12`. A fresh nine-second cold run observes dispatcher initialization
+and receive-loop entry but no producer-wrapper invocation. The static
+checker retains the object/id/task and five-site candidate inventory.
+
+The aligned halfword scan of the MCU span also finds `0x119a` at
+`0x2dd28c` in the sequence `1196/3001 ... 119a/3005 ... 119b/3006`.
+This is a separate descriptor-table reference, not proof of an additional
+direct producer. The only recovered Thumb pool-literal load of integer
+`0x119a` is the consumer comparison: a literal-only producer census would
+have missed the immutable-object wrapper.
+
+Next: classify the five application-start producer caller contexts and
+their cold-boot gates,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1

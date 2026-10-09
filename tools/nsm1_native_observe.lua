@@ -19,7 +19,8 @@ handles[#handles + 1] = memory:install_read_tap(0x2085c4, 0x2085c7,
             memory:read_u8(0x100022), pointer, memory:read_u16(pointer),
             machine.time:as_double()))
     end)
-for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc}) do
+for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc,
+        0x29f340}) do
     local count = 0
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nsm1_activation_owner_' .. address,

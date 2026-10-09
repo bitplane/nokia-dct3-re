@@ -15,6 +15,13 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         self.assertEqual(0x10E6D6, wrapper["selector"])
         self.assertEqual(1, data[wrapper["normal_object"] - check.BASE + 4])
         self.assertEqual(0x20, data[wrapper["alternate_object"] - check.BASE + 4])
+        request = check.verify(data)["sim_delivery"]["application_start_request"]
+        self.assertEqual((0x15, 0x2E0B7C, 0x119A),
+                         (request["task"], request["object"], request["id"]))
+        self.assertEqual([0x21FB5E, 0x21FD14, 0x21FEC6, 0x220574, 0x220B12],
+                         request["call_candidates"])
+        decoded = check.instruction(data, 0x29F34E)
+        self.assertEqual(("bl", "#0x275b60"), (decoded.mnemonic, decoded.op_str))
 
     def test_own_descriptor_event_delivery_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"

@@ -366,6 +366,12 @@ def verify(image: bytes) -> dict:
                              "selector": literal(image, 0x29CBE0),
                              "owner_entries": [0x207718, 0x207AFC],
                              "shared_application_branch": 0x208A7C},
+                         "application_start_request": {
+                             "wrapper": 0x29F340, "task": 0x15,
+                             "object": literal(image, 0x29F342),
+                             "id": int.from_bytes(image[literal(image, 0x29F342) - BASE:
+                                                          literal(image, 0x29F342) - BASE + 2], "big"),
+                             "call_candidates": direct_call_candidates(image, 0x29F340)},
                          "descriptor_event": {
                              "pointer_column": literal(image, 0x275FAC),
                              "stride": 8, "index": 0xE3,
