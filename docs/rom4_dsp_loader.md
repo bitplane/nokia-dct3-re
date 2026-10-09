@@ -824,6 +824,13 @@ rather than asserted as correct: this probe is not a fidelity gate. It is
 the small executable comparison for a future generic interrupt/write/drain
 timing correction. Full pipeline behavior still requires an independently
 derived timing oracle; changing PRD to make the handset proceed is not a fix.
+The same profile now checks direct-address masking as well: replacing the
+post-reload AR1 setup and indirect mask with `ANDM #fff7,*(0000)` leaves
+the short-period marker clear, while the long-period control completes.
+It reports four cases, with both long-period controls asserted and neither
+short-period outcome treated as physical acceptance. This rules out the
+extra pointer-setup instruction as the sole cause; it does not resolve
+Decode-stage acceptance versus write visibility.
 SPRU131G section 7.2, example 7-18, constrains that correction more tightly:
 recognition at the end of cycle 3 inserts INTR at Decode in cycle 4,
 replacing `i2`; already-decoded `i1` completes at Execute in cycle 6.
