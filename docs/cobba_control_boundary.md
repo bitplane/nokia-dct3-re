@@ -239,9 +239,18 @@ suite, coherent boot, physical tone delivery, exact save/load and unchanged
 Phone book hash validate the route. This is a boot-ISR execution result,
 not continuous codec playback or speech.
 
+An accepted boot transfer following a DXR write also raises BXINT0 (source
+bit 5, vector 21) on the XRDY rising edge. The physical-key observation
+retains `IFR=0020` with `IMR=035f` through the 11-second run: this request
+is pending but masked, not a second sample ISR. Retained-word underrun
+frames without a preceding DXR write must not generate another XRDY edge.
+The tone gate checks this pending/masked observation independently of its
+unchanged two TX/two RX boot accesses; continuous frame attachment remains
+unimplemented.
+
 The physical `1` fixture now retains separate boot/interactive serial trace
 caps and observes IMR/IFR plus non-destructive BSPC readback. At idle,
-`IMR=035f`, `IFR=0000`, `BSPC=c8c8`: RRST/XRST are released, XRDY is set,
+`IMR=035f`, `IFR=0020`, `BSPC=c8c8`: RRST/XRST are released, XRDY is set,
 and RRDY is clear. At 8.076920923 s the organic tone initializer writes
 `c008` at `a4a7`, then `c0c8` at `a4a9`; its COBBA control traffic writes
 register 0 with `0000` and reads/re-writes register 8 with `0626`. Later

@@ -294,6 +294,9 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 		u16 word;
 		if (m_cobba->codec_serial_loopback() && m_bsp.frame_transmit(word))
 		{
+			// This transfer follows a DXR write: XRDY rises even when BXINT0
+			// is masked. Retained-word underrun frames must not retrigger it.
+			m_cpu->set_input_line(5, HOLD_LINE); // BXINT0, vector 21.
 			m_cobba->codec_serial_transmit(word);
 			if (m_cobba->codec_serial_receive_ready())
 			{

@@ -140,6 +140,8 @@ def check_restore(text: str) -> None:
 
 def check_tone(text: str) -> None:
     check_trace(text)
+    if not re.search(r"rom4_tone_enable: imr=035f ifr=0020 bspc22=c8c8", text):
+        raise ValueError("missing masked transmit-ready interrupt observation")
     press = re.findall(r"input-press: t=([0-9.]+) name=1\b", text)
     release = re.findall(r"input-release: t=([0-9.]+) name=1\b", text)
     if len(press) != 1 or len(release) != 1:

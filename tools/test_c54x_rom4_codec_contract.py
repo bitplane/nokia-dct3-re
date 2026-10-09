@@ -127,6 +127,7 @@ class CodecRestoreTests(unittest.TestCase):
 class NativeToneTests(unittest.TestCase):
     def trace(self):
         return CodecTraceTests().trace() + "\n" + "\n".join([
+            "rom4_tone_enable: imr=035f ifr=0020 bspc22=c8c8 bspce23=0000 t=1.58",
             "input-press: t=8.0 name=1 port=1f",
             "rom4_tone_access: owner=mcu direction=write address=0100ac value=e10000 mask=ffff0000 pc=272034 t=8.07",
             "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
@@ -137,6 +138,10 @@ class NativeToneTests(unittest.TestCase):
 
     def test_organic_tone_boundary(self):
         check_tone(self.trace())
+
+    def test_missing_transmit_irq_rejected(self):
+        with self.assertRaisesRegex(ValueError, "masked transmit-ready"):
+            check_tone(self.trace().replace("ifr=0020", "ifr=0000"))
 
     def test_missing_command_rejected(self):
         with self.assertRaisesRegex(ValueError, "organic tone"):
