@@ -109,6 +109,7 @@ def check(image):
         (0x288D30, 0x20033), (0x288FE6, 0x20033),
         (0x2DE296, 0x20033), (0x2E0570, 0x20033),
         (0x288CC6, 0x13FFA8), (0x288D20, 0x12147D),
+        (0x221C8C, 0x13FE18),
         (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
@@ -254,7 +255,11 @@ def check(image):
         (0x21FB94, "bl", "#0x294c90"),
         (0x21FBA0, "bl", "#0x2dca88"),
         (0x222546, "cmp", "r0, #0x1d"),
-        (0x222554, "mov", "pc, r0"))
+        (0x222554, "mov", "pc, r0"),
+        (0x21E028, "adds", "r1, #0x9c"),
+        (0x21E02E, "movs", "r0, #0x49"),
+        (0x221CEC, "cmp", "r0, #0x49"),
+        (0x221D0C, "cmp", "r2, r1"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -278,6 +283,9 @@ def check(image):
         raise ValueError("own NSE-6 direct report-14 census changed")
     if read32(image, 0x222558 + 0x1A * 4) != 0x221C8C:
         raise ValueError("own NSE-6 report dispatcher state 1a changed")
+    if [read32(image, 0x222558 + state * 4) for state in (3, 4)] != [
+            0x221DF0, 0x221D38]:
+        raise ValueError("own NSE-6 report dispatcher continuation changed")
     stream = verifier_stream(image)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != VERIFIER_STREAM_SHA1:

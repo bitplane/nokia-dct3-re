@@ -5,6 +5,8 @@ local memory = cpu.spaces['program']
 local handles = {}
 local counts = {}
 local result_readers = {}
+local report_events = {}
+local report_raw_messages = {}
 local mask_writes = 0
 handles[#handles + 1] = memory:install_write_tap(0x20030, 0x20033,
     'nse6_keypad_mask', function(offset, value, mask)
@@ -61,15 +63,27 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
         0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a,
         0x21fb1e, 0x21fb94, 0x21fb98, 0x2dca88, 0x294c90,
-        0x222532, 0x22254e}) do
+        0x222532, 0x22254e, 0x21e012}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
-            if address == 0x22254e and counts[address] <= 32 then
+            if address == 0x21e012 then
+                local message = cpu.state['R0'].value
+                report_raw_messages[message] = (report_raw_messages[message] or 0) + 1
+            end
+            if address == 0x22254e then
+                local event = memory:read_u16(cpu.state['R4'].value + 0x32)
+                report_events[event] = (report_events[event] or 0) + 1
+            end
+            if address == 0x22254e and (counts[address] <= 32
+                    or memory:read_u16(cpu.state['R4'].value + 0x32) == 0x49) then
+                local context = cpu.state['R4'].value
                 machine:logerror(string.format(
-                    'nse6_report14_dispatch: state=%08x context=%08x lr=%08x t=%.9f\n',
-                    cpu.state['R0'].value, cpu.state['R4'].value,
+                    'nse6_report14_dispatch: state=%08x context=%08x event=%04x countdown=%02x sample=%04x lr=%08x t=%.9f\n',
+                    cpu.state['R0'].value, context,
+                    memory:read_u16(context + 0x32), memory:read_u8(context + 5),
+                    memory:read_u16(0x13fe54),
                     cpu.state['R14'].value, machine.time:as_double()))
             end
             if address == 0x288a7a and counts[address] <= 32 then
@@ -163,6 +177,16 @@ emu.register_frame_done(function()
         for _, address in ipairs(addresses) do
             machine:logerror(string.format('nse6_stage_count: pc=%08x count=%u\n',
                 address, counts[address]))
+        end
+        for _, category in ipairs({{'event', report_events}, {'raw', report_raw_messages}}) do
+            local keys = {}
+            for key in pairs(category[2]) do keys[#keys + 1] = key end
+            table.sort(keys)
+            for _, key in ipairs(keys) do
+                machine:logerror(string.format(
+                    'nse6_report14_histogram: kind=%s value=%04x count=%u t=%.9f\n',
+                    category[1], key, category[2][key], now))
+            end
         end
     end
 end, 'frame')

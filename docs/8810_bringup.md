@@ -16,8 +16,8 @@ CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
 erased-storage failures and reaches SIMI initialization, but remains blank
 through 30 seconds. No usable handset or authentic provisioning is established.
-The current bounded question is why dispatcher state `0x1a` (`0x221c8c`)
-does not reach the independently identified report-`0x14` path. The missing
+The current bounded question is why dispatcher continuation state `3`
+(`0x221df0`) does not reach the identified report-`0x14` path. The missing
 report bit leaves the input controller in state `0x10` with all keypad
 columns masked.
 
@@ -39,7 +39,25 @@ state `0x1a` from 0.926731 seconds. The eight-second counters record 86
 dispatcher selections and no hits on the report stub, `0x294c90`, or the
 direct report path. Readiness remains `0x06` and report bits remain `0x0e`.
 The observer is read-only; no report, column-mask change, or firmware state
-was injected. Follow the active state-`0x1a` event/predicate contract next.
+was injected.
+
+The uncapped eight-second event histogram corrects the impression left by
+the first-32-event trace: it contains event `0x49` twice, `0x26` 75 times,
+and `0x4a`/`0x4b` four times each (plus the initial zero event).
+Receiver `0x21e00c` maps raw `0x019b` to `0x49`; both raw deliveries are
+observed. They are not missing peer responses.
+On a separate fresh run the `0x49` selections occur in state `0x1a` at
+3.861834 seconds, state `4` at 5.317832 seconds, and state `3` at
+8.725481 seconds, with countdowns four, three, and four respectively.
+State `4` maps to `0x221d38`; state `3` maps to `0x221df0`.
+Thus state `0x1a` is not a permanent park. Follow state `3`'s continuation,
+not an invented `0x019b` response.
+
+The signed sample used at `0x221d06` is at `0x13fe54`: the state entry
+loads base `0x13fe18` and adds `0x3c`. It is not context `0x120768 + 0x3c`.
+The comparison is signed against `0x01fe`, alongside the decremented
+countdown. The observer now uses the decoded sample address; no physical
+units or battery ownership are assigned from this arithmetic alone.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
