@@ -836,6 +836,13 @@ Remaining clocks are rounded upward so fractional attosecond conversion
 does not advance the hardware counter early. Save replay overwrites a timer
 reload, restores the captured current interval and repeats the same checks.
 The baseline prematurely reports TIM `1` in the first one-clock case.
+Fourteen additional controller cases write TIM after one elapsed CPU clock
+without an intervening counter read. TIM writes synchronize the live PSC
+before replacing TIM, preserving its current interval rather than rearming
+from stale state. Sixty-four TCR cases check all reserved high nibbles and
+Free/Soft storage combinations: bits 15..12 read zero, stopped PSC is retained,
+and Free/Soft remain writable (table 8-14). These storage checks do not
+establish debugger-dependent Free/Soft clock behavior.
 The full CPU suite passes, and the native NSE-1 receiver regression retains
 6,499 frames, 207,040 port-27 reads, three port-32 writes and no port-38/39
 reads. This preserves the existing no-cell boundary, not radio acquisition.

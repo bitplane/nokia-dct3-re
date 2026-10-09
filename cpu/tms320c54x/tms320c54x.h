@@ -69,6 +69,7 @@ private:
 	static constexpr u16 TIMER_TSS = 0x0010;
 	static constexpr u16 TIMER_TRB = 0x0020;
 	static constexpr u16 TIMER_PSC_MASK = 0x03c0;
+	static constexpr u16 TIMER_WRITABLE_MASK = 0x0c1f; // Free, Soft, TSS and TDDR; reserved bits read zero.
 
 	TIMER_CALLBACK_MEMBER(timer_expired);
 	void update_timer_counter();

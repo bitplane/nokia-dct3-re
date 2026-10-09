@@ -526,6 +526,7 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		m_xpc = value & 0x7f;
 	else if (address == 0x24)
 	{
+		update_timer_counter();
 		m_tim = value;
 		arm_timer();
 	}
@@ -535,7 +536,7 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 	{
 		update_timer_counter();
 		// SPRU131G 8.4.2: PSC is readable, but cannot be written directly.
-		m_tcr = (value & ~(TIMER_TRB | TIMER_PSC_MASK)) | (m_tcr & TIMER_PSC_MASK);
+		m_tcr = (value & TIMER_WRITABLE_MASK) | (m_tcr & TIMER_PSC_MASK);
 		if (value & TIMER_TRB)
 		{
 			m_tim = m_prd;
