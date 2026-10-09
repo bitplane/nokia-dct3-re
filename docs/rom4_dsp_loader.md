@@ -960,6 +960,19 @@ substitute for the RTN contract either: SPRU131G example 7-6 explicitly
 loads RTN during software INTR. Each native case now continues through
 RETF after replacing the stacked word with a sentinel, proving the saved
 RTN supplies the original next PC while SP balances and INTM clears.
+Ordinary near `CALL pmad` also publishes RTN, per SPRU131G section 7.1.2,
+example 7-4. The executable page-2 case calls a paused callee, checks the
+stacked continuation, replaces it with `dead`, and executes `RETF`; return
+must use RTN while balancing SP and preserving XPC. It failed on the former
+stack-only CALL implementation and passes with RTN assigned before the push
+(`run_c54x_call_rtn_red`, `run_c54x_call_rtn_green`). The four-cycle CALL cost
+is unchanged. This establishes the non-delayed immediate CALL contract, not
+delayed/conditional-call RTN behavior or interrupt-pipeline timing.
+The full executable core suite and tool suite pass. The post-change ROM4
+RF-boundary integration invocation (`run_c54x_call_rtn_rom4.log`) stopped
+before execution when EEPROM fixture generation hit a disk quota; this
+does not establish preserved native handset behavior and must be rerun.
+
 Software INTR publishes RTN just as hardware interrupt entry already does;
 the existing three-cycle cost is unchanged. These are 64 architectural
 return assertions, not a pipeline-latency oracle. The external reference cannot

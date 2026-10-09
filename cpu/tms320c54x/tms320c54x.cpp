@@ -2665,6 +2665,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf074: // CALL pmad
 	{
 		const u16 destination = fetch();
+		m_rtn = m_pc; // SPRU131G 7.1.2: CALL loads RTN before stacking it.
 		push(m_pc);
 		m_pc = destination;
 		m_icount -= 3;

@@ -17443,6 +17443,37 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
 				data.read_word(0x03ff) == 0x0602,
 				"near CALL/RET retain the current page and use one return-stack word");
+			program.write_word(0x020680, 0xf074); // CALL 0700, same extended page.
+			program.write_word(0x020681, 0x0700);
+			program.write_word(0x020682, 0xf4e1);
+			program.write_word(0x020700, 0xf4e1); // Pause before inspecting RTN via RETF.
+			m_cpu->set_state_int(STATE_GENPC, 0x020680);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 62050;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 62050)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x020701 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x03ff &&
+				data.read_word(0x03ff) == 0x0682,
+				"near CALL reaches its callee and stacks the continuation before fast return");
+			data.write_word(0x03ff, 0xdead);
+			program.write_word(0x020701, 0xf49b); // RETF must use RTN, not the sentinel.
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 62051;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 62051)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == 0x020683 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				data.read_word(0x03ff) == 0xdead,
+				"SPRU131G CALL publishes RTN independently of its return-stack word");
 			start_far_save_case(false);
 			return;
 		}
