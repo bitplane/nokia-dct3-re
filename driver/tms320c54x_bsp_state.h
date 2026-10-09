@@ -46,13 +46,17 @@ struct tms320c54x_bsp_state
 			transmit_ready = false;
 		}
 	}
-	bool frame_transmit(std::uint16_t &value)
+	bool frame_transmit(std::uint16_t &value, bool *ready_edge = nullptr)
 	{
+		if (ready_edge)
+			*ready_edge = false;
 		if (!(control & 0x0040) || !transmit_loaded)
 			return false;
 		// External FSX retransmits the retained DXR on underrun (SPRU131G
 		// 9.2.4). Only a new write drops XRDY before the next frame.
 		value = control & 0x0004 ? transmit & 0x00ff : transmit;
+		if (ready_edge)
+			*ready_edge = !transmit_ready;
 		transmit_pending = false;
 		transmit_ready = true;
 		return true;

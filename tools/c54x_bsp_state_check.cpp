@@ -31,10 +31,13 @@ int main()
 	port.transmit_w(0xabcd);
 	assert(port.transmit_pending && !port.transmit_ready);
 	std::uint16_t output = 0;
+	bool ready_edge = false;
 	auto saved = port;
-	assert(port.frame_transmit(output) && output == 0xabcd);
+	assert(port.frame_transmit(output, &ready_edge) && output == 0xabcd);
+	assert(ready_edge);
 	assert(port.transmit_ready && !port.transmit_pending);
-	assert(port.frame_transmit(output) && output == 0xabcd);
+	assert(port.frame_transmit(output, &ready_edge) && output == 0xabcd);
+	assert(!ready_edge);
 	assert(port.transmit_ready && !port.transmit_pending);
 	assert(saved.frame_transmit(output) && output == 0xabcd);
 	assert(saved.control_r() == port.control_r());
@@ -46,7 +49,9 @@ int main()
 	port.transmit_w(4);
 	port.control_w(0);
 	assert(port.transmit_ready && !port.transmit_pending);
-	assert(!port.frame_transmit(output));
+	ready_edge = true;
+	assert(!port.frame_transmit(output, &ready_edge));
+	assert(!ready_edge);
 	port.control_w(0x0040);
 	assert(!port.frame_transmit(output));
 	port.reset();

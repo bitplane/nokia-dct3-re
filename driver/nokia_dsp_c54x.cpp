@@ -263,6 +263,24 @@ u16 nokia_dsp_c54x_device::data_r(offs_t offset)
 	return m_data[address];
 }
 
+bool nokia_dsp_c54x_device::codec_transmit_frame(u16 &word)
+{
+	bool ready_edge;
+	const bool transferred = m_bsp.frame_transmit(word, &ready_edge);
+	// Underrun repeats DXR without another XRDY transition (SPRU131G 9.2.4).
+	if (ready_edge)
+		m_cpu->set_input_line(5, HOLD_LINE); // BXINT0, vector 21.
+	return transferred;
+}
+
+bool nokia_dsp_c54x_device::codec_receive_frame(u16 word)
+{
+	const bool accepted = m_bsp.frame_receive(word);
+	if (accepted)
+		m_cpu->set_input_line(4, HOLD_LINE); // BRINT0, vector 20.
+	return accepted;
+}
+
 void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 {
 	const u16 address = offset;
@@ -292,16 +310,12 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 		// Preserve the existing untimed external boot echo only. Ordinary
 		// pending samples need a real external frame attachment, not this path.
 		u16 word;
-		if (m_cobba->codec_serial_loopback() && m_bsp.frame_transmit(word))
+		if (m_cobba->codec_serial_loopback() && codec_transmit_frame(word))
 		{
-			// This transfer follows a DXR write: XRDY rises even when BXINT0
-			// is masked. Retained-word underrun frames must not retrigger it.
-			m_cpu->set_input_line(5, HOLD_LINE); // BXINT0, vector 21.
 			m_cobba->codec_serial_transmit(word);
 			if (m_cobba->codec_serial_receive_ready())
 			{
-				if (m_bsp.frame_receive(m_cobba->codec_serial_receive()))
-					m_cpu->set_input_line(4, HOLD_LINE); // BRINT0, vector 20.
+				codec_receive_frame(m_cobba->codec_serial_receive());
 				m_cobba->codec_serial_receive_ack();
 			}
 		}

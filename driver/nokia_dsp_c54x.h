@@ -19,6 +19,9 @@ public:
 	nokia_dsp_c54x_device(const machine_config &mconfig, const char *tag,
 			device_t *owner, u32 clock = 0);
 	void set_overlay_end(u16 end) { m_overlay_end = end; }
+	// Completed external serial frames; these methods do not supply clocks.
+	bool codec_transmit_frame(u16 &word);
+	bool codec_receive_frame(u16 word);
 
 	virtual void tx_commit_w(int state) override;
 	virtual void service_pending_w(int state) override { }

@@ -248,6 +248,14 @@ The tone gate checks this pending/masked observation independently of its
 unchanged two TX/two RX boot accesses; continuous frame attachment remains
 unimplemented.
 
+The native backend exposes completed-word `codec_transmit_frame` and
+`codec_receive_frame` attachment methods. Both the existing boot echo and
+a future physical frame source use the same ready-edge interrupt routing.
+Transmit underrun repeats the retained word without raising BXINT0 again;
+disabled/unloaded TX and RX overrun do not manufacture ready edges. The
+executable BSP helper tests distinguish these cases. These methods provide
+no timing source and do not enable the currently unattached NSE-1 PCM clock.
+
 The physical `1` fixture now retains separate boot/interactive serial trace
 caps and observes IMR/IFR plus non-destructive BSPC readback. At idle,
 `IMR=035f`, `IFR=0020`, `BSPC=c8c8`: RRST/XRST are released, XRDY is set,
