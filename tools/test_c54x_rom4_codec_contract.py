@@ -66,6 +66,13 @@ class CodecTraceTests(unittest.TestCase):
     def test_separate_paths(self):
         check_trace(self.trace())
 
+    def test_control_readback_does_not_hide_reset_writes(self):
+        readback = ("rom4_serial_audit: space=data direction=read address=0022 "
+                    "value=0800 mask=ffff pc=408d t=0.01\n")
+        check_trace(readback + self.trace())
+        with self.assertRaisesRegex(ValueError, "reset/release"):
+            check_trace(readback + self.trace().replace("value=c008", "value=c000"))
+
     def test_stale_echo_read_rejected(self):
         with self.assertRaisesRegex(ValueError, "I/O control"):
             check_trace(self.trace().replace("value=0482 mask=ffff pc=3221",

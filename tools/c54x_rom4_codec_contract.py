@@ -102,7 +102,7 @@ def check_trace(text: str) -> None:
                 ("read", "0020", "0aaa", "0e5d")]:
         raise ValueError("data-space boot echo missing, duplicated or changed")
     setup = [(direction, value, pc) for space, direction, address, value, pc, _ in records
-             if space == "data" and address == "0022"]
+             if space == "data" and address == "0022" and direction == "write"]
     if setup[:2] != [("write", "c008", "0e22"), ("write", "c0c8", "0e24")]:
         raise ValueError("missing native serial reset/release setup")
     io = [(direction, value, pc) for space, direction, address, value, pc, _ in records

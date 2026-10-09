@@ -28,6 +28,9 @@ end
 watch(mcu, 'program', 0x100ac, 'mcu', 0x100af)
 watch(dsp, 'data', 0x0856, 'dsp')
 watch(dsp, 'data', 0x00fe, 'dsp')
+watch(dsp, 'data', 0x06be, 'dsp')
+watch(dsp, 'io', 0x002c, 'cobba_select')
+watch(dsp, 'io', 0x002d, 'cobba_data')
 local directory = assert(debug.getinfo(1, 'S').source:match('^@(.*/)'))
 dofile(directory .. 'c54x_rom4_codec_observe.lua')
 local stop = emu.add_machine_stop_notifier(function()
@@ -37,5 +40,18 @@ local stop = emu.add_machine_stop_notifier(function()
         serial['data_write_33'], serial['data_read_32'],
         counts['dsp_2134_read'], counts['dsp_254_write'], machine.time:as_double()))
 end)
-_G.rom4_tone_observe = {taps, counts, stop}
+-- IMR/IFR bypass address-space taps inside the CPU. These debugger state
+-- reads and BSPC readback are non-destructive; never poll BDRR here.
+local previous
+local state_observer = emu.register_frame_done(function()
+    local state = string.format('imr=%04x ifr=%04x bspc22=%04x',
+        dsp.state['IMR'].value, dsp.state['IFR'].value,
+        dsp.spaces['data']:read_u16(0x22))
+    if state ~= previous then
+        machine:logerror(string.format('rom4_tone_enable: %s t=%.9f\n',
+            state, machine.time:as_double()))
+        previous = state
+    end
+end)
+_G.rom4_tone_observe = {taps, counts, stop, state_observer}
 dofile(directory .. '../mame_nokia_dct3_input_exerciser.lua')

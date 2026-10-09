@@ -228,6 +228,19 @@ enable and firmware interrupt mask observed independently. IMR/IFR are
 CPU-internal MMRs in this implementation and bypass data-space taps; an
 empty tap at data `0000/0001` would not prove absent mask activity.
 
+The physical `1` fixture now retains separate boot/interactive serial trace
+caps and observes IMR/IFR plus non-destructive BSPC readback. At idle,
+`IMR=035f`, `IFR=0000`, `BSPC=c8c8`: RRST/XRST are released, XRDY is set,
+and RRDY is clear. At 8.076920923 s the organic tone initializer writes
+`c008` at `a4a7`, then `c0c8` at `a4a9`; its COBBA control traffic writes
+register 0 with `0000` and reads/re-writes register 8 with `0626`. Later
+release handling repeats the BSP reset/release sequence. Counts still show
+one transmitted/received boot echo and no operational samples. Thus this
+fixture does not lack BSP release or the receive interrupt mask; it lacks
+observed receive-frame delivery. The COBBA register-0/8 field meanings and
+clock/mux gating remain unresolved, so these numeric transactions are not
+permission to fabricate microphone samples or assert a periodic interrupt.
+
 ### Organic tone request boundary
 
 `tools/c54x_rom4_tone_observe.lua` combines the physical-input harness with
