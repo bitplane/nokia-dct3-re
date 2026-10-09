@@ -235,8 +235,25 @@ direct producer. The only recovered Thumb pool-literal load of integer
 `0x119a` is the consumer comparison: a literal-only producer census would
 have missed the immutable-object wrapper.
 
-Next: classify the five application-start producer caller contexts and
-their cold-boot gates,
+The five direct caller sites have distinct local prerequisites:
+
+| Call site | Own-ROM prerequisite immediately upstream |
+| --- | --- |
+| `0x21fb5e` | Local context byte `+7 == 1`; it is cleared before posting. |
+| `0x21fd14` | Receive loop at `0x21fcd4` waits for `0x09f0`, then a further literal-selected loop precedes the post. |
+| `0x21fec6` | Helper `0x27d254` must return other than one at `0x21febc`. |
+| `0x220574` | Receive loop at `0x22054c` waits for `0x09f0`. |
+| `0x220b12` | Receive loop at `0x220afc` waits for `0x09f0`. |
+
+These are local branch contracts, not semantic names for the owning task
+or proof that every path is ordinary startup. A fresh 30-second cold run
+still observes no producer-wrapper entry or application receive return.
+The added probe at lifecycle receive return `0x21cf14` also observes no
+object; its entry has not yet been instrumented, so this alone cannot
+distinguish an unstarted owner from an owner parked before/inside receive.
+
+Next: identify and trace the owning lifecycle task's entry and first wait,
+then recover the producer/meaning of `0x09f0` where that wait is selected,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1

@@ -7,6 +7,19 @@ local handles = {}
 local sim_sends = 0
 local activation_requests = 0
 local application_receives = 0
+local lifecycle_receives = 0
+handles[#handles + 1] = memory:install_read_tap(0x21cf14, 0x21cf17,
+    'nsm1_lifecycle_receive', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x21cf14 or lifecycle_receives >= 64 then return end
+        local pointer = cpu.state['R0'].value
+        if not ((pointer >= 0x100000 and pointer <= 0x11fffc) or
+                (pointer >= 0x200000 and pointer <= 0x3ffffc)) then return end
+        lifecycle_receives = lifecycle_receives + 1
+        machine:logerror(string.format(
+            'nsm1_lifecycle_receive: task=%02x pointer=%08x id=%04x caller=%08x t=%.9f\n',
+            memory:read_u8(0x100022), pointer, memory:read_u16(pointer),
+            cpu.state['R14'].value, machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_read_tap(0x2085c4, 0x2085c7,
     'nsm1_application_receive', function(offset, value, mask)
         if cpu.state['PC'].value ~= 0x2085c4 or application_receives >= 32 then return end

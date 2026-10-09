@@ -22,6 +22,13 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
                          request["call_candidates"])
         decoded = check.instruction(data, 0x29F34E)
         self.assertEqual(("bl", "#0x275b60"), (decoded.mnemonic, decoded.op_str))
+        for address in request["call_candidates"]:
+            decoded = check.instruction(data, address)
+            self.assertEqual(("bl", "#0x29f340"), (decoded.mnemonic, decoded.op_str))
+        for address in (0x21FCD0, 0x220546, 0x220AF6):
+            decoded = check.instruction(data, address)
+            self.assertEqual("movs", decoded.mnemonic)
+            self.assertTrue(decoded.op_str.endswith("#0x9f"))
 
     def test_own_descriptor_event_delivery_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
