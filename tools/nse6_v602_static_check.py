@@ -68,7 +68,9 @@ def check(image):
         (0x2B6202, 0xFFFF), (0x2DD102, 0x200005),
         (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
-        (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4))
+        (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
+        (0x2E1146, 0x20000), (0x2E1184, 0x20000),
+        (0x2E11A0, 0x20000))
     for address, expected in expected_literals:
         thumb = address >= 0x2000EC
         decoder.mode = ((capstone.CS_MODE_THUMB if thumb else capstone.CS_MODE_ARM)
@@ -131,7 +133,24 @@ def check(image):
         (0x2DE236, "cmp", "r4, #5"),
         (0x2DE246, "subs", "r0, #0x80"),
         (0x2E049C, "bl", "#0x2de164"),
-        (0x2E04C2, "movs", "r1, #0x19"))
+        (0x2E04C2, "movs", "r1, #0x19"),
+        (0x2E1148, "movs", "r1, #0x29"),
+        (0x2E114C, "lsrs", "r1, r1, #1"),
+        (0x2E1150, "movs", "r1, #0x2c"),
+        (0x2E1152, "strb", "r0, [r1, r2]"),
+        (0x2E118E, "movs", "r1, #0x2b"),
+        (0x2E1190, "strb", "r0, [r1, r2]"),
+        (0x2E11A4, "movs", "r0, #0x21"),
+        (0x2E11B2, "movs", "r0, #0x20"),
+        (0x2E1204, "movs", "r0, #0x24"),
+        (0x2E120A, "movs", "r5, #0x80"),
+        (0x2E120E, "movs", "r0, #0x40"),
+        (0x2E122C, "strb", "r5, [r0, r4]"),
+        (0x2E122E, "movs", "r0, #0x54"),
+        (0x2E1238, "movs", "r1, #0x2b"),
+        (0x2E123A, "strb", "r3, [r1, r4]"),
+        (0x2E1248, "cmp", "r2, #6"),
+        (0x2E1256, "movs", "r0, #0x20"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -147,6 +166,13 @@ def check(image):
             "service_manual_sram_bytes": 0x40000,
             "service_manual_eeprom_bytes": 0x8000,
             "eeprom_descriptor": eeprom_descriptor(image[5]),
+            "display": {"initializer": "0x2e1194", "width": 84,
+                        "height": 48, "command_register": "0x2c",
+                        "data_register": "0x2b", "control_register": "0x28",
+                        "control_value": "0x21", "status_register": "0x29",
+                        "ready_bit": 0, "pup_reset_mask": "0x20",
+                        "exact_controller_part_proven": False,
+                        "runtime_frame_proven": False},
             "keypad": {"scanner": "0x2de164", "decoder": "0x2e049a",
                        "row_register": "0x31", "column_register": "0x30",
                        "direction_register": "0x2f", "mask_register": "0x33",

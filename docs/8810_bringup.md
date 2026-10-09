@@ -95,8 +95,20 @@ into context `0x1205c0 + 0x0c/+0x0a`.
 
 This identifies a protocol shape shared with other recovered verifier streams,
 not a fitted DSP mask or a successful verdict. No resident-ROM compatibility
-is established and no DSP response is fabricated. Display attachment remains
-unexamined.
+is established and no DSP response is fabricated.
+
+### Display
+
+Initializer `0x2e1194` selects GENSIO control `0x28 = 0x21`, configures PUP
+direction `0x24` bit 5, and pulses PUP data `0x20` bit 5 low/high with a delay.
+Command sender `0x2e1146` polls status `0x29` bit 0 then writes `0x2c`;
+pixel sender `0x2e1184` uses the same ready test then writes `0x2b`.
+
+The initialization sends `0x24`, then for six banks sends `0x40|bank` and
+column address `0x80`, followed by 84 zero pixel bytes each, and finally `0x20`.
+This establishes an 84-column, six-eight-pixel-bank surface and a command
+grammar consistent with the shared PCD8544-family implementation. It does not
+identify the exact physical controller or prove a rendered runtime frame.
 
 ### Keypad
 
