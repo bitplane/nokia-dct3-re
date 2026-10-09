@@ -111,6 +111,14 @@ every 1.9 ms, predominantly on PC-valued writes at `3f50`; from 0.948210 s
 the corresponding repeated PC is `90e9`. This is a control-flow target for
 entry/return analysis, not proof of interrupt nesting or a particular opcode
 defect. The depth observer records at most 32 boundary crossings.
+An instruction-window trace at 0.928016..0.928046 s shows the sampled
+`3f4e -> 23d4` CALL/RET and `3f50 -> 8dd0` conditional-return paths balance
+SP. The later `30b8 -> 2464` call branches to overlaid program address
+`1ca4`, whose observed stream contains stack-like `30ba/3e1f` words and
+later saved contexts. Thus repeated calls alone are not the demonstrated
+defect: execution is already entering damaged overlaid code. Locate the
+earliest write into that code and earlier stack imbalance; the short window
+does not establish that all calls, returns or interrupts are correct.
 This establishes stack overlap with shared ring state, not its cause. The next
 question is the first stack/control-flow divergence before those writes,
 including interrupt entry/return and frame-clock servicing. Do not synthesize

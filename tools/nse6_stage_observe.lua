@@ -8,6 +8,31 @@ local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_reg
 local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
 if dsp then
+    local inspecting_call = false
+    for _, address in ipairs({0x3f4e, 0x90e7, 0x23d4, 0x23e2}) do
+        local calls = 0
+        handles[#handles + 1] = dsp.spaces['program']:install_read_tap(address, address,
+            'nse6_native_stack_call_' .. address, function(offset, value)
+                if inspecting_call or dsp.state['PC'].value ~= address + 1 then return end
+                if machine.time:as_double() < 0.928 then return end
+                calls = calls + 1
+                if calls > 16 then return end
+                inspecting_call = true
+                local words, stack = {}, {}
+                local sp = dsp.state['SP'].value
+                for index = 0, 23 do
+                    words[#words + 1] = string.format('%04x', dsp.spaces['program']:read_u16(address + index))
+                    if index < 8 then
+                        stack[#stack + 1] = string.format('%04x', dsp.spaces['data']:read_u16((sp + index) & 0xffff))
+                    end
+                end
+                machine:logerror(string.format(
+                    'nse6_native_stack_call: address=%04x word=%04x hit=%d sp=%04x words=%s stack=%s t=%.9f\n',
+                    address, value, calls, sp, table.concat(words, ','), table.concat(stack, ','),
+                    machine.time:as_double()))
+                inspecting_call = false
+            end)
+    end
     local stack_floor = 0x2000
     local stack_samples = 0
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x0800, 0x1fff,
