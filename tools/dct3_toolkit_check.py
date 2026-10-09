@@ -22,3 +22,28 @@ def verify_display_text(text, product, profile_length=9):
         raise ValueError(f'{product} physical Toolkit fixture failed')
     require_in_order(text.replace('[:sim_card] ', ''),
                      display_text_events(product, profile_length))
+
+
+def interactive_events(product, profile_length=9):
+    prefix = display_text_events(product, profile_length)
+    return (*prefix[:6], f'{product}_toolkit_interactive: action=dismiss',
+            *prefix[7:9], 'proactive GET INKEY ready', 'SIM status ins=14 sw=9115',
+            'header cla=a0 ins=12 p1=00 p2=00 p3=15',
+            f'{product}_toolkit_interactive: action=inkey_5',
+            'header cla=a0 ins=14 p1=00 p2=00 p3=10',
+            'terminal-response data=8103022200020282810301000d020435',
+            'proactive GET INPUT ready', 'SIM status ins=14 sw=911a',
+            'header cla=a0 ins=12 p1=00 p2=00 p3=1a',
+            f'{product}_toolkit_interactive: action=input_4',
+            f'{product}_toolkit_interactive: action=input_2',
+            f'{product}_toolkit_interactive: action=confirm',
+            'header cla=a0 ins=14 p1=00 p2=00 p3=11',
+            'terminal-response data=8103032300020282810301000d03043432',
+            'SIM status ins=14 sw=9000')
+
+
+def verify_interactive(text, product, profile_length=9):
+    if '[LUA ERROR]' in text:
+        raise ValueError(f'{product} physical interactive Toolkit fixture failed')
+    require_in_order(text.replace('[:sim_card] ', ''),
+                     interactive_events(product, profile_length))

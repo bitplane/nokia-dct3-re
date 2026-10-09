@@ -1320,3 +1320,18 @@ both phases. Exact cold frames cover armed idle, active alarm and Stop.
 The cold input script contains no clock/alarm entry or memory/register writes.
 This proves retained firmware settings, not clock advancement while the
 emulator is closed.
+
+## Interactive SIM Toolkit commands
+
+`verify-6250-sim-toolkit-interactive` uses card profile 3 in fresh own
+research storage. After physical DISPLAY TEXT dismissal, the card signals
+GET INKEY (`9115`, FETCH length `15`); physical `5` returns successful
+command-2 TERMINAL RESPONSE with text TLV `0d020435`. The card then signals
+GET INPUT (`911a`, FETCH length `1a`); physical `4`, `2`, left-softkey
+confirmation returns successful command-3 response with `0d03043432` and
+status `9000`. No task messages, editor state or response bytes are injected.
+The shared protocol checker requires ordered commands, physical actions,
+APDU lengths and exact response payloads. Own 96x60 frame checks cover
+DISPLAY TEXT, INKEY, empty INPUT, entered `42` and registered idle; normal
+own upload/registration/storage checks remain independent. This does not
+promote SET UP MENU, network Toolkit commands or native DSP/audio.
