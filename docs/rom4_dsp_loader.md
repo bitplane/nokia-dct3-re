@@ -1328,6 +1328,16 @@ A conservative NSE-1 swap16 literal-seeded MMIO census resolved 562 direct
 accesses from 235 seeds; all resolved offsets are below `0x40`. This does not
 exclude dynamic/table-derived accesses or identify the SCU register. The
 coherent first-access ledger likewise shows no offset above `0x3f` by 12 s.
+The opt-in `mad2_static_census.py --constant-indexes` analysis tracks immediate
+MOV values after each literal seed and admits register-indexed accesses with
+known constants. On the same NSE-1 image it produces 691 candidates from
+the same 235 seeds, versus the original 562; all still lie at offsets
+`00..3f` (`run_5110_constant_index_census_20261009.json`). This removes one
+specific census blind spot without identifying SCU. The scanner remains
+linear rather than control-flow complete; pre-seed constants, computed
+indexes, table pointers, ARM-mode code and other address windows remain
+outside this result. Do not promote a candidate to silicon ownership
+without checking its branch path and observed transaction.
 Neither `0x27` nor `0x39` is established as the complete FCCH/SCH sample
 stream. The sibling emulator supplies only a constant for port `0x27`, so it
 offers no independent sample-format evidence. No valid signal fixture follows yet.

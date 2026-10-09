@@ -37,6 +37,37 @@ class Mad2StaticCensusTests(unittest.TestCase):
 		self.assertEqual(mad2_static_census.MAD2_BASE, pointers["r4"])
 		self.assertEqual("bl", call.mnemonic)
 
+	def test_constant_register_index_is_opt_in(self):
+		md = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+		md.detail = True
+		# movs r1,#0x40; ldrb r0,[r2,r1]
+		load_constant, read = list(md.disasm(bytes.fromhex("4021505c"), 0x200000))
+		pointers = {"r2": mad2_static_census.MAD2_BASE}
+		mad2_static_census.apply_pointer_update(load_constant, pointers, b"", 0x200000, True)
+		self.assertIsNone(mad2_static_census.memory_access(read, pointers))
+		self.assertEqual(0x40, mad2_static_census.memory_access(
+			read, pointers, constant_indexes=True)["offset"])
+
+	def test_unknown_register_index_stays_unresolved(self):
+		md = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+		md.detail = True
+		read = next(md.disasm(bytes.fromhex("505c"), 0x200000))
+		self.assertIsNone(mad2_static_census.memory_access(read,
+			{"r2": mad2_static_census.MAD2_BASE}, constant_indexes=True))
+
+	def test_clobbered_index_and_outside_window_rejected(self):
+		md = capstone.Cs(capstone.CS_ARCH_ARM, capstone.CS_MODE_THUMB)
+		md.detail = True
+		clobber, read = list(md.disasm(bytes.fromhex("0168505c"), 0x200000))
+		pointers = {"r2": mad2_static_census.MAD2_BASE, "r1": 0x40}
+		mad2_static_census.apply_pointer_update(clobber, pointers, b"", 0x200000, True)
+		self.assertIsNone(mad2_static_census.memory_access(read, pointers, constant_indexes=True))
+		pointers["r1"] = 0x100
+		self.assertIsNone(mad2_static_census.memory_access(read, pointers, constant_indexes=True))
+
+	def test_report_labels_candidate_mode(self):
+		self.assertIn("linear-scan candidates", mad2_static_census.markdown([], True))
+
 	def test_markdown_preserves_reviewed_contract_summary(self):
 		report = mad2_static_census.summarize("fixture", "fixture.bin", [], {
 			"literal_seeds": 0, "resolved_accesses": 0, "seed_terminations": {}})

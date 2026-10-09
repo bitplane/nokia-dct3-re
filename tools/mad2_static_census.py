@@ -6,6 +6,10 @@ the MAD2 byte window.  It follows register copies and constant additions within
 the surrounding routine, but never guesses values across a call.  The output
 therefore describes resolved direct accesses, not every possible dynamic or
 table-driven access.
+
+Opt-in constant-index recovery tracks immediate MOV values after each seed.
+It remains a linear scan, not control-flow proof: candidate accesses require
+branch/path review before assigning hardware ownership.
 """
 
 import argparse
@@ -61,7 +65,7 @@ def is_return(insn):
 	return insn.mnemonic in ("bx", "mov") and insn.op_str.startswith("pc,")
 
 
-def apply_pointer_update(insn, pointers, data, image_base):
+def apply_pointer_update(insn, pointers, data, image_base, recover_constants=False):
 	"""Update known pointer values after one instruction."""
 	dst = destination_register(insn)
 	if dst is None:
@@ -74,6 +78,8 @@ def apply_pointer_update(insn, pointers, data, image_base):
 		src = register_name(insn, ops[1])
 		if src is not None:
 			value = pointers.get(src)
+		elif recover_constants and ops[1].type == capstone.arm.ARM_OP_IMM:
+			value = ops[1].imm
 	elif insn.mnemonic in ("add", "adds", "sub", "subs") and len(ops) in (2, 3):
 		left_op = ops[0] if len(ops) == 2 else ops[1]
 		right_op = ops[1] if len(ops) == 2 else ops[2]
@@ -88,7 +94,8 @@ def apply_pointer_update(insn, pointers, data, image_base):
 	pointers[dst] = None if value is None else value & 0xffffffff
 
 
-def memory_access(insn, pointers, window_base=MAD2_BASE, window_size=MAD2_SIZE):
+def memory_access(insn, pointers, window_base=MAD2_BASE, window_size=MAD2_SIZE,
+		constant_indexes=False):
 	if not insn.mnemonic.startswith(("ldr", "str")) or len(insn.operands) < 2:
 		return None
 	mem_op = insn.operands[-1]
@@ -96,9 +103,16 @@ def memory_access(insn, pointers, window_base=MAD2_BASE, window_size=MAD2_SIZE):
 		return None
 	base_reg = insn.reg_name(mem_op.mem.base)
 	base = pointers.get(base_reg)
-	if base is None or mem_op.mem.index:
+	if base is None:
 		return None
-	address = (base + mem_op.mem.disp) & 0xffffffff
+	index = 0
+	if mem_op.mem.index:
+		if not constant_indexes or mem_op.shift.type:
+			return None
+		index = pointers.get(insn.reg_name(mem_op.mem.index))
+		if index is None:
+			return None
+	address = (base + index + mem_op.mem.disp) & 0xffffffff
 	if not window_base <= address < window_base + window_size:
 		return None
 	width = {"ldrb": 1, "strb": 1, "ldrh": 2, "strh": 2, "ldr": 4, "str": 4}.get(insn.mnemonic)
@@ -114,7 +128,7 @@ def memory_access(insn, pointers, window_base=MAD2_BASE, window_size=MAD2_SIZE):
 
 
 def analyze_image(data, image_base=FLASH_BASE, max_seed_span=192,
-		window_base=MAD2_BASE, window_size=MAD2_SIZE):
+		window_base=MAD2_BASE, window_size=MAD2_SIZE, constant_indexes=False):
 	instructions = decode_image(data, image_base)
 	accesses = {}
 	seed_count = 0
@@ -133,7 +147,7 @@ def analyze_image(data, image_base=FLASH_BASE, max_seed_span=192,
 			if insn is None:
 				seed_terminations["decode_gap"] += 1
 				break
-			access = memory_access(insn, pointers, window_base, window_size)
+			access = memory_access(insn, pointers, window_base, window_size, constant_indexes)
 			if access:
 				access["seed_pc"] = seed.address
 				access["seed_value"] = value
@@ -143,7 +157,7 @@ def analyze_image(data, image_base=FLASH_BASE, max_seed_span=192,
 				for reg in ("r0", "r1", "r2", "r3"):
 					pointers[reg] = None
 			else:
-				apply_pointer_update(insn, pointers, data, image_base)
+				apply_pointer_update(insn, pointers, data, image_base, constant_indexes)
 			if is_return(insn):
 				seed_terminations["return"] += 1
 				break
@@ -175,7 +189,7 @@ def summarize(label, path, accesses, coverage):
 	}
 
 
-def markdown(reports):
+def markdown(reports, constant_indexes=False):
 	lines = ["# MAD2 static access census", "",
 		"Direct accesses resolved from swap16 Thumb literal seeds. Dynamic pointers and",
 		"indirect/table-driven accesses are outside this conservative census.", "",
@@ -194,6 +208,9 @@ def markdown(reports):
 		"auxiliary control without an established device-side effect.",
 		"The detailed tables below are reproducibility data, not additional",
 		"semantic claims.", ""]
+	if constant_indexes:
+		lines[2:2] = ["Constant-index mode: immediate MOV values after each seed are tracked.",
+			"Results are linear-scan candidates, not control-flow or hardware-ownership proof.", ""]
 	for report in reports:
 		coverage = report["coverage"]
 		lines += [f"## {report['label']}", "",
@@ -216,13 +233,15 @@ def main():
 		help="ROM label and swap16 image; repeat for paired analysis")
 	parser.add_argument("--json", type=Path)
 	parser.add_argument("--markdown", type=Path)
+	parser.add_argument("--constant-indexes", action="store_true",
+		help="also resolve immediate-valued register indexes within each literal-seeded scan")
 	parser.add_argument("--check", action="store_true",
 		help="require both supported ROMs and their known Timer-1 read anchors")
 	args = parser.parse_args()
 	roms = [(label, Path(path)) for label, path in args.rom] if args.rom else list(DEFAULT_ROMS)
 	reports = []
 	for label, path in roms:
-		accesses, coverage = analyze_image(path.read_bytes())
+		accesses, coverage = analyze_image(path.read_bytes(), constant_indexes=args.constant_indexes)
 		reports.append(summarize(label, path, accesses, coverage))
 	if args.check:
 		if {report["label"] for report in reports} != {"v6.00", "v5.01"}:
@@ -257,13 +276,14 @@ def main():
 				if item["offset"] == 0x0d and item["kind"] == "read"}
 			if clock_sites != expected_clock_sites[report["label"]]:
 				raise SystemExit(f"{report['label']} clock-control RMW sites changed")
-	payload = {"schema": 1, "mad2_base": MAD2_BASE, "window_size": MAD2_SIZE, "roms": reports}
+	payload = {"schema": 1, "mad2_base": MAD2_BASE, "window_size": MAD2_SIZE,
+		"constant_indexes": args.constant_indexes, "roms": reports}
 	if args.json:
 		args.json.write_text(json.dumps(payload, indent=2) + "\n")
 	if args.markdown:
-		args.markdown.write_text(markdown(reports) + "\n")
+		args.markdown.write_text(markdown(reports, args.constant_indexes) + "\n")
 	if not args.json and not args.markdown:
-		print(markdown(reports))
+		print(markdown(reports, args.constant_indexes))
 
 
 if __name__ == "__main__":
