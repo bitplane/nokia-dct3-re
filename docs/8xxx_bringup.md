@@ -1239,6 +1239,25 @@ acceptance passes in `run_8890_alarm_snooze_acceptance`. This establishes the
 deadline for this observed input timing, not a universal interval/rounding
 algorithm, powered-off wake or audible-output acceptance.
 
+The separate manual `noki8890_alarm_power_probe.lua` preserves the unresolved
+powered-off boundary. Start with the fresh own `run_noki8890_cold_clock.py`
+seed's NVRAM/configuration and the ordinary `nsb6hle` debug/verbose command,
+select this autoboot script and run 95 seconds. Physical power hold/release
+after arming removes rails near second 40; RTC alone wakes them at the
+13:48:00 deadline (second 60), with no new power-key or charger event.
+Firmware reads alarm status `b3`, acknowledges it and drives the buzzer,
+but the display enters `Sicherheitscode`, not the alarm activation prompt.
+Physical `12345` and Menu at seconds 70..73 reaches the decoded key handler
+but displays `Code falsch`; the later right-softkey probe does not establish
+No activation or rail removal. Both raw runs remain preserved in
+`run_8890_alarm_off_review` and `run_8890_alarm_off_security_review`.
+No powered-off alarm acceptance gate is promoted. CCONT currently retains
+the old low PWRONX status bit on alarm wake; whether the legitimate alarm-only
+startup should clear that cause or follows a different firmware selector is
+an open consumer-side question, not authorization to change status to reach
+a desired screen. The ordinary alarm/Snooze and power-key-restart gates remain
+separate from this negative result.
+
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
 hooks. Physical time confirmation near 25 seconds and date confirmation near
