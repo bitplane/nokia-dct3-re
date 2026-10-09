@@ -8,6 +8,28 @@ local sim_sends = 0
 local activation_requests = 0
 local application_receives = 0
 local lifecycle_receives = 0
+local scalar_receives = 0
+local completion_gates = 0
+handles[#handles + 1] = memory:install_read_tap(0x281298, 0x28129b,
+    'nsm1_completion_gate', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x28129a or completion_gates >= 16 then return end
+        local pointer = cpu.state['R6'].value
+        if pointer < 0x100000 or pointer > 0x11ffff then return end
+        completion_gates = completion_gates + 1
+        machine:logerror(string.format(
+            'nsm1_completion_gate: context=%08x low_state=%02x secondary=%02x t=%.9f\n',
+            pointer, memory:read_u8(pointer) & 0x0f,
+            memory:read_u8(0x1126c1) & 0x0f, machine.time:as_double()))
+    end)
+handles[#handles + 1] = memory:install_read_tap(0x2802a0, 0x2802a3,
+    'nsm1_scalar_receive', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x2802a2 or scalar_receives >= 64 then return end
+        scalar_receives = scalar_receives + 1
+        machine:logerror(string.format(
+            'nsm1_scalar_receive: task=%02x value=%08x t=%.9f\n',
+            memory:read_u8(0x100022), cpu.state['R0'].value,
+            machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_read_tap(0x21cf0c, 0x21cf0f,
     'nsm1_lifecycle_queue', function(offset, value, mask)
         if cpu.state['PC'].value ~= 0x21cf0c then return end
@@ -44,7 +66,7 @@ handles[#handles + 1] = memory:install_read_tap(0x2085c4, 0x2085c7,
     end)
 for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc,
         0x29f340, 0x21e41c, 0x21cf0c, 0x21e9a8,
-        0x27a4f0, 0x281370, 0x2bc112}) do
+        0x27a4f0, 0x281370, 0x2bc112, 0x28029c, 0x28129a}) do
     local count = 0
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nsm1_activation_owner_' .. address,

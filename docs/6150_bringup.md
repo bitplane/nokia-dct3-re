@@ -276,8 +276,27 @@ no entry into the completion wrapper, block `0x281370`, or routine
 two-site candidate inventory. Descriptor/data references to `0x1587`
 remain additional candidate routes, not excluded by this direct-call result.
 
-Next: decode the dispatcher input selecting `0x281370` and the caller
-contract of `0x2bc112`, retaining descriptor-driven routes in the census,
+The two paths belong to task 1's scalar-input lifecycle. Receiver
+`0x28029c` takes the RTOS return value directly (not an object pointer).
+Input `0xc7` selects `0x28045c`; if `0x2bc37a() != 3`, it calls
+`0x2bc112` at `0x280464`. This scalar namespace must not be confused with
+task-18/object halfwords.
+
+The other path checks low nibble of context `0x11ff14` for six at
+`0x28129a`, then low nibble of `0x1126c1` for fifteen. Only then can
+helper `0x2b4050` returning zero, or `0x2bf1a0` returning nonzero, select
+`0x281370`. Fresh passive traces observe task 1 consuming scalar startup
+inputs and periodic `0xc8`, but no `0xc7` among the first 64 returns
+(trace cap reached around 21.64 seconds). Gate tracing reaches first
+state six at 1.798416 seconds, while the second state progresses
+`8 -> a -> e` and remains `e` at the observed 2.653150-second check.
+The observed normal path therefore fails the second nibble comparison,
+before either helper or completion publication. This is a runtime gate
+finding, not evidence for synthesizing a missing report or changing the byte.
+
+Next: inventory writers of low-nibble state `0x1126c1` and identify the
+legitimate missing transition from `0xe` to `0xf`, keeping the alternate
+scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
