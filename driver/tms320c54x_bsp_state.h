@@ -52,7 +52,7 @@ struct tms320c54x_bsp_state
 			return false;
 		// External FSX retransmits the retained DXR on underrun (SPRU131G
 		// 9.2.4). Only a new write drops XRDY before the next frame.
-		value = transmit;
+		value = control & 0x0004 ? transmit & 0x00ff : transmit;
 		transmit_pending = false;
 		transmit_ready = true;
 		return true;
@@ -66,7 +66,11 @@ struct tms320c54x_bsp_state
 			receive_overrun = true;
 			return false;
 		}
-		receive = value;
+		// BSP (unlike SP) sign-extends 8-bit receptions. The DXR latch
+		// retains all bits even when only its low byte crosses the wire.
+		receive = control & 0x0004
+				? std::uint16_t((value & 0x0080) ? (value | 0xff00) : (value & 0x00ff))
+				: value;
 		receive_ready = true;
 		return true;
 	}

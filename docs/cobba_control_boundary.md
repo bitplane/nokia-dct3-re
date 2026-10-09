@@ -340,8 +340,12 @@ readiness returns at an explicit frame transfer. Executable C++ tests cover
 transmit overwrite before a delayed frame and retained-word retransmission
 on externally clocked underrun (TI section 9.2.4): repeated frames do not
 invent a new XRDY transition. Reset cancels the valid loaded-word state;
-reset-time preloading remains outside the established subset. Tests cover
-all 65,536 control-write values and these transitions. Fresh native coherent
+reset-time preloading remains outside the established subset. FO=0 16-bit
+words and FO=1 8-bit words are tested over all 65,536 input values: the
+transmit latch retains its upper byte while the wire ignores it in 8-bit
+mode, and BSP reception sign-extends the low byte (TI section 9.2.2).
+The extension-selected 10/12-bit formats remain unimplemented. The suite also
+checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The
 tone run still observes only the single boot echo, not operational samples.

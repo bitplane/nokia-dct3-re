@@ -51,4 +51,20 @@ int main()
 	assert(!port.frame_transmit(output));
 	port.reset();
 	assert(port.control_r() == 0x0800 && port.receive == 0 && port.transmit == 0);
+	for (unsigned value = 0; value <= 0xffff; ++value)
+	{
+		port.reset();
+		port.control_w(0x00c4); // 8-bit BSP format.
+		port.transmit_w(value);
+		assert(port.transmit == value);
+		assert(port.frame_transmit(output) && output == (value & 0xff));
+		assert(port.frame_receive(value));
+		const unsigned expected = value & 0x80 ? (value | 0xff00) : (value & 0xff);
+		assert(port.receive_r() == expected);
+		port.control_w(0x00c0);
+		port.transmit_w(value);
+		assert(port.frame_transmit(output) && output == value);
+		assert(port.frame_receive(value));
+		assert(port.receive_r() == value);
+	}
 }
