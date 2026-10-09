@@ -355,6 +355,16 @@ def verify(image: bytes) -> dict:
         "reset_stack_literals": [literal(image, pc, thumb=False)
                                  for pc in (0x200068, 0x200090, 0x2000B0)],
         "loader": 0x2A479E,
+        "keypad": {
+            "scanner": 0x2C084C, "decoder": 0x2C16C6,
+            "register_base": literal(image, 0x2C0858),
+            "rows": 5, "columns": 5, "row_signal": 0x31,
+            "column_input": 0x30, "column_irq_mask": 0x33,
+            "row_direction": 0x2F,
+            "normal_table": literal(image, 0x2C16F8),
+            "special_table": literal(image, 0x2C16E4),
+            "power_column_mask": 0x10,
+            "physical_input_acceptance": False},
         "record_exchange": {
             "builder": 0x27E054, "task": 3, "sender": 0x275B60,
             "flash_record": {"command": 0x14, "offset": 0x14, "bytes": 12},

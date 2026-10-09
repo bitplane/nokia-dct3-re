@@ -26,10 +26,10 @@ verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 `nsm1r4t` uses the own normalized flash and checksum-consistent EEPROM,
 128 KiB SRAM and the acquired NSE-1 ROM4 native DSP program/data. That mask
 is an unproved compatibility input, not an identified NSM-1 fitted mask.
-The MCU reset exit remains declared boot HLE. The base 16-Mbit flash part,
-ROM4 keypad GPIO layout and other conservative peripheral defaults are
-research assumptions; fitted flash identity, aliases and physical input
-are not validated. DSP/service/radio HLE publications are disabled.
+The MCU reset exit remains declared boot HLE. The base 16-Mbit flash part and
+other conservative peripheral defaults are research assumptions. The keypad
+register tuple is now independently decoded below; fitted flash identity,
+aliases and physical input are not validated. DSP/service/radio HLE publications are disabled.
 SIMI and the removable laboratory SIM are enabled from the own reset/RX
 register contract below; their presence is not SIM initialization acceptance.
 
@@ -38,8 +38,18 @@ command through `0x2a`, polls status `0x29` bit 2, and receives at `0x2d`.
 The static checker pins this span and register grammar. Selecting this
 GENSIO leg alone is insufficient: the later default keypad also owns
 `0x28/0x2a` and intercepts the transaction. The explicit compatibility
-instrument selects the non-overlapping ROM4 GPIO layout; this is not yet
-an independently decoded NSM-1 keypad contract.
+instrument selects the non-overlapping GPIO layout independently confirmed
+by the own scanner; physical input acceptance remains separate.
+
+Own scanner `0x2c084c` uses MAD2 base `0x20000`, row output `0x31`,
+column input `0x30`, direction `0x2f`, and column IRQ mask `0x33`.
+Both scan loops run five iterations; normal raw positions use
+`row*5+column`. Decoder `0x2c16c6` calls that scanner and selects the
+normal table `0x2e0b18` or special table `0x2e0b34`, using layout byte
+`0x1127f2`. The first special row is `3e 3e 3e 3e 0d`, independently
+identifying column bit 4 as Power. These static anchors confirm the
+currently selected register tuple and power column, not a complete
+physical-key acceptance run or a validated alternate layout.
 
 Read-only observer `tools/nsm1_native_observe.lua` records actual firmware
 shared-memory writes, CPU snapshots and verifier fields; it never writes

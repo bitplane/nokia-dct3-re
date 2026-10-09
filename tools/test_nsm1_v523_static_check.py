@@ -5,6 +5,28 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_keypad_scanner_and_power_table_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        self.assertEqual(0x20000, check.literal(data, 0x2C0858))
+        special = check.literal(data, 0x2C16E4) - check.BASE
+        self.assertEqual(bytes.fromhex("3e3e3e3e0d"), data[special:special + 5])
+        self.assertEqual(0x2E0B18, check.literal(data, 0x2C16F8))
+        for address, mnemonic, operands in (
+                (0x2C085A, "movs", "r0, #0x33"),
+                (0x2C0880, "movs", "r0, #0x31"),
+                (0x2C0886, "movs", "r0, #0x2f"),
+                (0x2C088C, "movs", "r0, #0x30"),
+                (0x2C08B2, "movs", "r0, #0x30"),
+                (0x2C08F2, "cmp", "r0, #5"),
+                (0x2C0900, "cmp", "r1, #5"),
+                (0x2C16C8, "bl", "#0x2c084c"),
+                (0x2C16EE, "movs", "r1, #0x19")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_record_format_flag_is_firmware_initialized_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():
