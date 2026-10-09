@@ -2,15 +2,26 @@
 
 ## Current result
 
-COBBA owns the 16-address, 12-bit serial-control register file and the
+COBBA owns the 16-address, 12-bit control-register file and the
 analogue conversion endpoints. MAD2 owns the typed PCM wire. The DSP backend
-owns the serial-control policy. The MCU ROM does not directly address COBBA,
+owns the control policy. The MCU ROM does not directly address COBBA,
 and the current DSP HLE does not fabricate COBBA control writes.
 
 Consequently, microphone/output selection and gain remain explicit HLE profile
 data. They are not decoded COBBA register semantics. The production driver
 must not translate MCU call state or Nokia mailbox values directly into COBBA
 register writes.
+
+Nokia's NSE-1 System Module manual (03/98, pp. 3-11, 3-32 and 3-41)
+distinguishes the physical interfaces: the parallel connection has twelve
+data lines, four address lines, read/write strobes and a data-available signal;
+audio PCM has separate serial data, clock and frame-sync wires. The parallel
+connection carries control and transmit/receive samples. See the
+[Nokia manual text](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251).
+The recovered DSP control-word packing is not evidence that this physical
+control bus is serial. Nor does its twelve-bit width establish how MAD2
+presents a sample at DSP I/O port `0x27`: address selection, sign extension,
+word ordering and readiness still require a mapping or timing capture.
 
 ## Implemented capture seam
 
@@ -56,7 +67,7 @@ Nokia's [NSB-6 technical documentation, page 37](https://www.manualslib.com/manu
 describes a 24-bit hardware-random serial read from COBBA and used with
 software/identity data to establish stored flash authority. This is evidence
 that hardware/provisioning pairing exists in the family, not a register map
-for NSE-5. In particular, neither that description nor serial-control bus
+for NSE-5. In particular, neither that description nor control-bus
 traffic establishes registers 5/6 as analog measurements or unique identity
 fields. Their current values are calibrated inputs, not measured defaults.
 

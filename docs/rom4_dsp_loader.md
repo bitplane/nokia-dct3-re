@@ -364,6 +364,14 @@ the actual input contract, not a fabricated internal result. The passive
 comparison observer retains both counts alongside the full-width operand
 and hook snapshots, and the independent RF gate remains green.
 
+The physical bus is constrained independently by Nokia's NSE-1 System Module
+manual: COBBA uses a twelve-data-bit/four-address-bit parallel interface for
+control and radio samples, separate from serial audio PCM. The exact DSP-port
+mapping and sample representation are not specified by that width alone;
+see [COBBA control boundary](cobba_control_boundary.md). Do not truncate or
+sign-extend port `27` by inference from the board bus without establishing
+the intervening MAD2 register contract.
+
 Port `0x27` is bidirectional in ROM4: seven static `PORTW` sites at
 `0x4248/0x424d/0x4258/0x425d/0x4267/0x426c/0x4271` belong to a separate
 transmit routine. The driver now forwards those writes to a replaceable COBBA
