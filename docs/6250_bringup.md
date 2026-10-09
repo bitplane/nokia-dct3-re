@@ -1250,6 +1250,9 @@ own-product NVRAM reproduces 8 October without new time/date input, reads
 is `tools/noki6250_calendar_midnight.lua`. This is research HLE, not native
 DSP evidence. Coordinate `(1,2)` is Scroll Up, not Back: using it can select
 the previous Calendar date and manufacture an apparent rollover regression.
+The original 13:47 Calendar/cold-retention path also reproduces after this
+runner extension (`run_6250_calendar_original_regression_20261009`), including
+both processes' independently checked registration and exact date pixels.
 
 `make verify-6250-calendar-cold RUN_DIR=NEW_RUN` uses the established NHM-3
 initial-record PMM comparison and otherwise fresh private storage. Physical

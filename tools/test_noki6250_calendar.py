@@ -33,6 +33,20 @@ class CalendarTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_phase(self.rollover().replace('data=97', 'data=8d'), False, True)
 
+    def test_original_entry_contract_remains_distinct(self):
+        text = self.rollover().split('ccont_rtc: event=second time=00:00:00', 1)[0]
+        text = text.replace('data=3b', 'data=2f').replace('data=97', 'data=8d')
+        check_phase(text, False)
+        with self.assertRaises(ValueError):
+            check_phase(text, False, True)
+
+    def test_day_reset_cannot_precede_day_consumption(self):
+        text = self.rollover().replace('reg=0a data=01', 'reg=0a data=TEMP')
+        text = text.replace('reg=0a data=00', 'reg=0a data=01')
+        text = text.replace('reg=0a data=TEMP', 'reg=0a data=00')
+        with self.assertRaises(ValueError):
+            check_phase(text, False, True)
+
     def test_cold_rollover_does_not_accept_old_clock(self):
         text = ''.join(f'6250_calendar_physical: action={a}\n'
                        for a in ['menu', *[f'down_{i}' for i in range(1, 8)], 'calendar'])
