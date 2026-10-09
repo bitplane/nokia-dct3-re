@@ -341,9 +341,19 @@ otherwise initialized `0x7b0a` path: the operating-mode state consumed by the
 whole caller family was never established. It also weakens the assumption that
 this family is the ordinary cell-search entrance. Traffic-channel or dedicated-
 channel activation is a plausible interpretation, not yet an established name.
-The next static target is the initializer/dispatcher that assigns `0x121f` and
-the `0x18xx/0x19xx` block; do not synthesize port-`0x38/0x39` readiness before
-that firmware-owned mode transition is identified.
+`0x121f` is also the final word of the host search-list scratch copy described
+below; its address alone does not establish persistent receiver-mode ownership.
+A big-endian word scan of the recovered program finds 15 literal candidates:
+`2733`, `3da7`, `4efa`, `5007`, `5013`, `502a`, `5040`, `504b`, `50a5`,
+`50d8`, `5226`, `5299`, `52dd`, `5327`, and `53d6`. Two candidate absolute
+stores are `80f8 121f` at `4ef9` (low accumulator A) and
+`76f8 121f 00c0` at `5006` (immediate `00c0`). These are raw code/data
+matches, not a closed writer census; indirect copies and overlays remain
+outside this literal scan. The first follows a candidate direct call to
+`23d0`, also used by neighboring control routines. The unresolved target is
+the lifecycle entering these control routines and initializing the
+`0x18xx/0x19xx` block, not another search for the already observed scratch
+copy. Do not synthesize port-`0x38/0x39` readiness from these candidates.
 The DROM function-list mechanism is an immediate call walker, not a persistent
 frame schedule. Routine `0x9a56` calls `0x771c`; the recovered data ROM contains
 `0x9a56` in 17 `0x00ff`-terminated lists between `0xedf7` and `0xeee6`.
