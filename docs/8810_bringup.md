@@ -286,6 +286,29 @@ arithmetic helper does not claim to model all service-side transformations.
 Tests cover both allocation lengths, excluded-byte subtraction and modular
 underflow; they do not establish semantic validity of protected identity data.
 
+The arithmetic callback is class/command `0x6209`. Its class gate first tests
+enable byte `0x13ff1c`, then the class bitmap. The erased cold run records
+enable zero, bitmap zero and class mask `0x20`, so the callback does not change
+this calculation.
+
+### Checksum-Only Diagnostic
+
+`python -m tools.nse6_integrity_fixture <fresh-nvram>/nse6r4t/eeprom` creates
+an erased 32 KiB image changing only offsets `0x011e/0x011f` to `db24`.
+It refuses an existing destination. This is an integrity diagnostic, not an
+identity/lock profile or factory provisioning. Tests enforce the two-byte
+change boundary and checksum invariance when firmware updates excluded word
+`0x0074` to zero. Run `nse6r4t` with that fresh NVRAM directory and the existing
+read-only observer; never seed the diagnostic from another handset's storage.
+
+Two isolated checksum-only runs avoid the `0x240c1e` integrity failure but
+still display CONTACT SERVICE. The subsequent 24-entry status scan accepts
+values `00/ff/fe`, ignoring entry `0x0b`; other entries clear flag `0x40`.
+In this fixture entry `0x12` at `0x13fcb2` contains `0x12`, causing that clear
+at 0.557605000 s. Its initializer `0x240b46..0x240b50` writes `0x12` when
+helper `0x2be71e` returns nonzero. The next unresolved contract is that helper
+and its underlying failure predicate, not another checksum adjustment.
+
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
 `nse1_rom4_dsp_program.bin` and `nse1_rom4_dsp_data.bin` declared in the driver.

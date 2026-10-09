@@ -2,9 +2,21 @@ import unittest
 from pathlib import Path
 
 from tools import nse6_v602_static_check as check
+from tools.nse6_integrity_fixture import fixture
 
 
 class Nse6StaticTests(unittest.TestCase):
+    def test_integrity_fixture_changes_only_checksum(self):
+        image = fixture()
+        self.assertEqual(len(image), 0x8000)
+        self.assertEqual([i for i, byte in enumerate(image) if byte != 0xFF],
+                         [0x11E, 0x11F])
+        self.assertEqual(image[0x11E:0x120], bytes.fromhex("db24"))
+        updated = bytearray(image)
+        updated[0x74:0x76] = b"\0\0"
+        self.assertEqual(check.integrity_arithmetic(updated[0x40:0x11E], 0),
+                         int.from_bytes(image[0x11E:0x120], "big"))
+
     def test_integrity_arithmetic_and_allocation_paths(self):
         block = bytearray(b"\xff" * 0xDE)
         block[0x74 - 0x40:0x76 - 0x40] = b"\0\0"
