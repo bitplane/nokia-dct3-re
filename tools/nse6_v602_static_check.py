@@ -70,7 +70,7 @@ def check(image):
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
         (0x2E1146, 0x20000), (0x2E1184, 0x20000),
-        (0x2E11A0, 0x20000))
+        (0x2E11A0, 0x20000), (0x2DFC9C, 0x20000))
     for address, expected in expected_literals:
         thumb = address >= 0x2000EC
         decoder.mode = ((capstone.CS_MODE_THUMB if thumb else capstone.CS_MODE_ARM)
@@ -150,7 +150,22 @@ def check(image):
         (0x2E1238, "movs", "r1, #0x2b"),
         (0x2E123A, "strb", "r3, [r1, r4]"),
         (0x2E1248, "cmp", "r2, #6"),
-        (0x2E1256, "movs", "r0, #0x20"))
+        (0x2E1256, "movs", "r0, #0x20"),
+        (0x2DFC9E, "movs", "r2, #0x28"),
+        (0x2DFCA0, "movs", "r1, #0x22"),
+        (0x2DFCA2, "strb", "r1, [r2, r0]"),
+        (0x2DFCA4, "movs", "r2, #0x2a"),
+        (0x2DFCA6, "movs", "r1, #4"),
+        (0x2DFCAA, "strb", "r1, [r2, r0]"),
+        (0x2DFCAC, "movs", "r1, #0x29"),
+        (0x2DFCB0, "lsrs", "r1, r1, #3"),
+        (0x2DFCB2, "blo", "#0x2dfcac"),
+        (0x2DFCB4, "movs", "r1, #0x2d"),
+        (0x2DFCB6, "ldrb", "r0, [r1, r0]"),
+        (0x2DFBF2, "movs", "r1, #0x28"),
+        (0x2DFBF4, "movs", "r0, #0x22"),
+        (0x2DFC46, "movs", "r0, #0x2a"),
+        (0x2DFC48, "strb", "r4, [r0, r5]"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -166,6 +181,11 @@ def check(image):
             "service_manual_sram_bytes": 0x40000,
             "service_manual_eeprom_bytes": 0x8000,
             "eeprom_descriptor": eeprom_descriptor(image[5]),
+            "gensio": {"ccont_reader": "0x2dfc60", "ccont_writer": "0x2dfba8",
+                       "ccont_write": "0x2a", "control": "0x28",
+                       "lcd_data": "0x2b", "ccont_read": "0x2d",
+                       "status": "0x29", "lcd_command": "0x2c",
+                       "ccont_ready_bit": 2, "ccont_select_value": "0x22"},
             "display": {"initializer": "0x2e1194", "width": 84,
                         "height": 48, "command_register": "0x2c",
                         "data_register": "0x2b", "control_register": "0x28",

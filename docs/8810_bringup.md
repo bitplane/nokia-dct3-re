@@ -61,6 +61,20 @@ RAM near `0x13ffxx`; this also fits the documented SRAM capacity.
 
 ## Recovered Interface Boundaries
 
+### GENSIO and CCONT
+
+CCONT reader `0x2dfc60` selects control `0x28 = 0x22`, writes the cached
+command OR `0x04` at `0x2a`, waits for status `0x29` bit 2, and reads `0x2d`.
+Writer `0x2dfba8` uses the same select, clears the command's read-request bit,
+then sends the modified byte at `0x2a`. The recovered six-register transport
+tuple is consequently `(0x2a, 0x28, 0x2b, 0x2d, 0x29, 0x2c)`, in
+CCONT-write/control/LCD-data/CCONT-read/status/LCD-command order. It matches the
+shared earlier-layout transport without relying on a sibling's addresses.
+
+This is digital attachment evidence, not an ADC calibration tuple, measured
+conversion latency, or validated interrupt routing. Those remain separate
+configuration questions before runtime promotion.
+
 ### Serial EEPROM
 
 The byte transmitter `0x2de3d4` constructs PUP base `0x20020`, uses data mask

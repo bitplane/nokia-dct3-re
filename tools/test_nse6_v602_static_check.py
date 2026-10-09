@@ -45,6 +45,7 @@ class Nse6StaticTests(unittest.TestCase):
         self.assertEqual((result["display"]["width"], result["display"]["height"]),
                          (84, 48))
         self.assertFalse(result["display"]["runtime_frame_proven"])
+        self.assertEqual(result["gensio"]["ccont_ready_bit"], 2)
         mutated = bytearray(image)
         mutated[0x168] ^= 1
         with self.assertRaises(ValueError):
