@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 658 gates: 460 generated from typed steps, 198 copied verbatim (shell).
+# 659 gates: 461 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -377,8 +377,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-alarm-cold verify-6250-alarm-off-restore \
 	verify-6250-alarm-off-restore-yes verify-6250-alarm-snooze \
 	verify-6250-alarm-off-no verify-6250-alarm-off-snooze-no \
-	verify-6250-alarm-off-yes verify-6250-calendar-cold verify-6250-power-cycle \
-	verify-6250-ussd verify-6250-call-divert verify-6210-sim-toolkit-call-decline \
+	verify-6250-alarm-off-snooze-yes verify-6250-alarm-off-yes \
+	verify-6250-calendar-cold verify-6250-power-cycle verify-6250-ussd \
+	verify-6250-call-divert verify-6210-sim-toolkit-call-decline \
 	verify-6210-sim-toolkit-call verify-6210-sim-toolkit-sms \
 	verify-6210-sim-toolkit-menu verify-6210-sim-toolkit-interactive \
 	verify-6250-sim-toolkit-interactive verify-6250-sim-toolkit-menu \
@@ -4772,6 +4773,9 @@ verify-6250-alarm-off-no: build
 
 verify-6250-alarm-off-snooze-no: build
 	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --snooze --power-choice no --mame $(MAME_DIR)/mame
+
+verify-6250-alarm-off-snooze-yes: build
+	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --snooze --power-choice yes --mame $(MAME_DIR)/mame
 
 verify-6250-alarm-off-yes: build
 	$(PYTHON) tools/run_noki6250_alarm.py $(RUN_DIR) --power-choice yes --mame $(MAME_DIR)/mame

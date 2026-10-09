@@ -1312,8 +1312,11 @@ each wake independently passes the native verifier/upload checks. Alarm-only
 wakes must not register. Exact frames cover the blank Snooze/off state,
 13:53 recurrence, activation question and final blank state. The 430-second
 window includes final settlement; the shorter probe did not. No device or
-firmware behavior changed. Powered-off Snooze with Yes or save/load remains
-unpromoted, and audible/native speech is not established.
+firmware behavior changed. `verify-6250-alarm-off-snooze-yes` independently
+passes the same two-wake lifecycle in `run_6250_off_snooze_yes_20261009`:
+physical Yes subsequently registers and returns to the reviewed idle frame,
+without registration during either alarm-only wake. Powered-off Snooze
+save/load remains unpromoted, and audible/native speech is not established.
 
 `verify-6250-alarm-off-restore` and `-restore-yes` save the powered-off
 countdown at emulated second 49. All 37 exported ARM/banked registers,
