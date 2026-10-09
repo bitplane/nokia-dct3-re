@@ -4654,7 +4654,7 @@ verify-6250-call-divert-cold: build
 	$(PYTHON) tools/run_dct3_divert_cold.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-6210-call-divert-cold: build
-	$(PYTHON) tools/run_dct3_divert_cold.py $(RUN_DIR) --product 6210 --port 16211 --mame $(MAME_DIR)/mame
+	$(PYTHON) tools/run_dct3_divert_cold.py $(RUN_DIR) --product 6210 --port 16211 --check-corrupt-storage --mame $(MAME_DIR)/mame
 
 verify-6250-state-divert: build
 	$(PYTHON) tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario divert-state --mame $(MAME_DIR)/mame

@@ -57,6 +57,10 @@ fresh-storage inactive interrogation. The network-owned subscription file stays
 byte-identical during the retained query. Result and idle frames are reviewed
 6210 oracles; the fixture does not import another product's provisioning or
 claim native speech.
+The gate also copies only its own retained handset state into an isolated
+fourth process and damages the network subscription checksum. MAME must report
+the failed NVRAM read; a physical query must then return inactive with the
+reviewed result and idle frames. The original retained evidence is unchanged.
 
 ## Inputs
 

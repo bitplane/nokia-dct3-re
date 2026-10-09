@@ -15096,7 +15096,7 @@
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_dct3_divert_cold.py",
-                 "arguments": ["$(RUN_DIR)", "--product", "6210", "--port", "16211", "--mame", "$(MAME_DIR)/mame"]}]
+                 "arguments": ["$(RUN_DIR)", "--product", "6210", "--port", "16211", "--check-corrupt-storage", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
       "name": "verify-6250-state-divert",

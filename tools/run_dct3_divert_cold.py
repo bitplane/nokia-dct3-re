@@ -56,6 +56,7 @@ def main():
     parser.add_argument('--mame', type=Path, required=True)
     parser.add_argument('--port', type=int, default=16251)
     parser.add_argument('--product', choices=('6250', '6210'), default='6250')
+    parser.add_argument('--check-corrupt-storage', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -129,8 +130,25 @@ def main():
         else:
             from tools.run_noki6210_acceptance import check_divert
             check_divert(negative, fresh / 'snap')
+        if args.check_corrupt_storage:
+            corrupt = run / 'corrupt'
+            prepare(corrupt)
+            shutil.copytree(retained / 'nvram', corrupt / 'nvram')
+            damaged = bytearray(before)
+            damaged[-1] ^= 1
+            (corrupt / f'nvram/{machine}/gsm_network').write_bytes(damaged)
+            rejected = execute(corrupt, 'corrupt-query', f'noki{product}_divert_input.lua')
+            console = (corrupt / 'corrupt-query-console.log').read_text(errors='replace')
+            if f'Error reading NVRAM file {machine}/gsm_network' not in console:
+                raise ValueError('damaged subscription was not rejected by the NVRAM loader')
+            check_query(rejected, False, product)
+            if product == '6250':
+                check_supplementary(rejected, corrupt / 'snap', 'divert')
+            else:
+                check_divert(rejected, corrupt / 'snap')
         (run / 'acceptance.json').write_text(json.dumps({'product': product, 'native_speech_claim': False,
             'cold_subscription_query': True, 'forwarded_host_call': True, 'fresh_negative': True,
+            'corrupt_storage_rejection': args.check_corrupt_storage,
             'commands': commands}, indent=2) + '\n')
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f'{product} cold forwarding FAIL: {error}\n')

@@ -112,6 +112,8 @@ passes the same three-process contract with unchanged NPE-3 provisioning,
 its own physical-input fixture and separately reviewed active-idle frame.
 The shared runner retains product-specific preparation and frame acceptance;
 only the established subscription/query/routing checks are shared.
+The NPE-3 gate additionally requires actual MAME loader rejection of a copied,
+checksum-damaged network store and an inactive physical query afterward.
 Do not reconstruct registration from handset UI state, inject
 supplementary results, or change SIM files to make a query pass.
 
