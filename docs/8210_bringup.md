@@ -1631,6 +1631,19 @@ measurement, cancellation or recovery request. Decode the mode-4 DSP consumer
 or an independent protocol trace before changing eligibility or supplying a
 reply. The queued-request continuation remains the boot frontier.
 
+Public-reference coverage is bounded. Gammu's
+[NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)
+names `1811` as `NMEAS_INSTRUCTIONS`, but its
+[passive MDI decoder](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/wmx.c)
+hex-dumps this packet rather than interpreting modes. The catalogue's `48xx`
+family distinguishes measurement-request discard, neighbour initialization,
+synchronization selection and system-parameter selection. These labels are
+cross-product search clues, not NSM-3 state identities or proof that mode 4
+expects a reply. Neither this decoder nor the Osmocom decoder establishes
+that missing contract. The remaining software route is to correlate these
+lifecycle distinctions with the own-ROM mode-4 producer and its consumers;
+do not promote an NHM-5 trace label into an NSM-3 semantic claim.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
