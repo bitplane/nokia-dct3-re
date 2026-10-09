@@ -31,10 +31,27 @@ watch(dsp, 'data', 0x00fe, 'dsp')
 watch(dsp, 'data', 0x06be, 'dsp')
 watch(dsp, 'io', 0x002c, 'cobba_select')
 watch(dsp, 'io', 0x002d, 'cobba_data')
+-- Fetch increments PC before the program tap. Restrict this to actual helper
+-- entry, not a data read of its opcode; the stack read is ordinary RAM.
+local control_calls = 0
+taps[#taps + 1] = dsp.spaces['program']:install_read_tap(
+    0x45c2, 0x45c2, 'codec_control_call', function()
+        if dsp.state['PC'].value ~= 0x45c3 then return end
+        control_calls = control_calls + 1
+        if control_calls <= 64 then
+            local sp = dsp.state['SP'].value
+            machine:logerror(string.format(
+                'rom4_codec_control_call: hit=%d a=%010x b=%010x sp=%04x return=%04x t=%.9f\n',
+                control_calls, dsp.state['A'].value, dsp.state['B'].value, sp,
+                dsp.spaces['data']:read_u16(sp), machine.time:as_double()))
+        end
+    end)
 local directory = assert(debug.getinfo(1, 'S').source:match('^@(.*/)'))
 dofile(directory .. 'c54x_rom4_codec_observe.lua')
 local stop = emu.add_machine_stop_notifier(function()
     local serial = assert(_G.rom4_codec_observe[2])
+    machine:logerror(string.format('rom4_codec_control_summary: calls=%d t=%.9f\n',
+        control_calls, machine.time:as_double()))
     machine:logerror(string.format(
         'rom4_tone_summary: tx_words=%d rx_reads=%d tone_reads=%d tone_copies=%d t=%.9f\n',
         serial['data_write_33'], serial['data_read_32'],

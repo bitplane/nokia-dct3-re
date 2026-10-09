@@ -344,6 +344,16 @@ words are checked by `codec_register8_constant_setup`, including mutation
 tests. This is another local control-use context, not evidence that `0600`
 means clock enable or that this path executes during the tone fixture.
 
+The passive helper-entry capture in the physical `1` fixture observes 43
+calls over 11 seconds, including register 8/value `0626` returning to
+`a4bb` during the keypress (8.077 s). The tone checker requires that
+post-key caller independently of the shared tone-cell writes. The constant
+setup at `b8a2` is not observed in this fixture. This confirms execution of
+the known activation path, not its clock-field meanings. Program-tap PC
+must be `45c3` because fetch increments PC; the captured return address is
+read from ordinary stack RAM. Output is capped at 64 entries with an
+uncapped total, so a longer capture must check its truncation explicitly.
+
 The [NSE-1 System Module manual](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251)
 (03/98, pp. 3-32--3-33) supplies product-specific clock evidence: COBBA
 divides the 13 MHz reference by 13 to generate a 1 MHz PCM data clock, then

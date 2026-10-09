@@ -129,6 +129,7 @@ class NativeToneTests(unittest.TestCase):
         return CodecTraceTests().trace() + "\n" + "\n".join([
             "rom4_tone_enable: imr=035f ifr=0020 bspc22=c8c8 bspce23=0000 t=1.58",
             "input-press: t=8.0 name=1 port=1f",
+            "rom4_codec_control_call: hit=37 a=0000000626 b=0000000008 sp=1ea3 return=a4bb t=8.077",
             "rom4_tone_access: owner=mcu direction=write address=0100ac value=e10000 mask=ffff0000 pc=272034 t=8.07",
             "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
             "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.09",
@@ -142,6 +143,14 @@ class NativeToneTests(unittest.TestCase):
     def test_missing_transmit_irq_rejected(self):
         with self.assertRaisesRegex(ValueError, "masked transmit-ready"):
             check_tone(self.trace().replace("ifr=0020", "ifr=0000"))
+
+    def test_boot_control_call_does_not_prove_key_activation(self):
+        with self.assertRaisesRegex(ValueError, "activation caller"):
+            check_tone(self.trace().replace("t=8.077", "t=1.577"))
+
+    def test_wrong_codec_register_rejected(self):
+        with self.assertRaisesRegex(ValueError, "activation caller"):
+            check_tone(self.trace().replace("b=0000000008", "b=0000000009"))
 
     def test_missing_command_rejected(self):
         with self.assertRaisesRegex(ValueError, "organic tone"):

@@ -150,6 +150,13 @@ def check_tone(text: str) -> None:
     if len(press) != 1 or len(release) != 1:
         raise ValueError("expected one physical numeric-key press/release")
     start, end = float(press[0]), float(release[0])
+    calls = re.findall(
+        r"rom4_codec_control_call: hit=(\d+) a=([0-9a-f]{10}) b=([0-9a-f]{10}) "
+        r"sp=([0-9a-f]{4}) return=([0-9a-f]{4}) t=([0-9.]+)", text)
+    if not any(a == "0000000626" and b == "0000000008" and ret == "a4bb"
+               and start <= float(time) < end
+               for _, a, b, _, ret, time in calls):
+        raise ValueError("missing organic register-8 activation caller after physical key")
     events = re.findall(
         r"rom4_tone_access: owner=(mcu|dsp) direction=(read|write) "
         r"address=([0-9a-f]{6}) value=([0-9a-f]+) mask=([0-9a-f]+) "
