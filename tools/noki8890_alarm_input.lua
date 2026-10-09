@@ -28,6 +28,12 @@ local input = coroutine.create(function()
         machine.screens[':screen']:snapshot('8890_alarm_expiry_' .. index .. '.png')
         if index < 4 then assert(emu.wait(index == 1 and 4 or 5)) end
     end
+    if _G.noki8890_alarm_snooze then
+        press(1, 'Names / C', 'snooze')
+        -- Own observed deadline is 13:54 after this 13:48:15 Snooze input.
+        assert(emu.wait(359))
+        machine.screens[':screen']:snapshot('8890_alarm_repeated.png')
+    end
     press(1, 'Menu', 'stop')
     assert(emu.wait(3))
     machine.screens[':screen']:snapshot('8890_alarm_stopped.png')

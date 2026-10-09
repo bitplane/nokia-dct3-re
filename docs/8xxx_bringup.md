@@ -1227,6 +1227,18 @@ clock, IRQ, UI or provisioning state is injected. This is research-HLE
 alarm control/presentation acceptance, not audible output, Snooze,
 powered-off wake or native DSP validation.
 
+`verify-8890-alarm-snooze` additionally presses the own `Names / C` right
+softkey at 13:48:15. Firmware programs `0b=36`, `0c=0d`: the observed next
+deadline is 13:54, not the 6210 fixture's 13:53. At second 420 the natural
+RTC alarm again presents `b3`; firmware acknowledges `a0` and restarts
+buzzer control. Physical Stop at second 435 returns to exact 13:54 idle.
+Separate reviewed full frames cover `Später erinnern eingeschaltet`, the
+recurrent alarm's title-blank/icon-visible phase and final idle. No rendering
+or alarm state is changed to choose that phase. Fresh physical-clock-seeded
+acceptance passes in `run_8890_alarm_snooze_acceptance`. This establishes the
+deadline for this observed input timing, not a universal interval/rounding
+algorithm, powered-off wake or audible-output acceptance.
+
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
 hooks. Physical time confirmation near 25 seconds and date confirmation near

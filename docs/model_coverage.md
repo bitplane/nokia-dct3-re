@@ -42,6 +42,11 @@ to reviewed registered idle. Its German 84x48 frames are separately reviewed;
 the seed is a fresh verified physical clock-entry fixture from the same
 product. This does not promote Snooze, powered-off alarm wake or audible
 output and does not alter the normal/native-DSP boundary.
+`verify-8890-alarm-snooze` independently adds physical right-softkey Snooze,
+the own observed 13:54 deadline, natural recurrent cause/acknowledgement,
+renewed buzzer control and physical Stop with reviewed recurrence/idle
+frames. Its deadline is not inherited from the 6210 fixture. Powered-off
+wake and audible output remain outside both 8890 alarm gates.
 
 `verify-6210-alarm` independently proves physical Menu-4-1 alarm entry,
 CCONT programming, naturally timed expiry, firmware alarm presentation and

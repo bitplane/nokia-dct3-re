@@ -19,11 +19,17 @@ FRAMES = {
     'expiry_4': '5c6d10da719b404c66c41dbe165792c8c509a7e4858202a1bf1db6b0cadbb567',
     'stopped': 'e40423cea2d28b4aebf15cf10c650216ed2137f1caacfd294dcc31e856b90524',
 }
+SNOOZE_FRAMES = {
+    'snooze': 'e795c0845db3095db7702b9885c436939a1bcd370265dfd62322cb6aacbc2121',
+    'repeated': 'e22c4548014aea94a8a82b70ba8a9d466cb2e527a296ce5265995b53601fe594',
+    'stopped': '77b0fc25848be29c70ded6efcb2d4921ff1850e4b2a07a9c215f0ba727f693f1',
+}
 
 
-def check_alarm(text):
+def check_alarm(text, *, snooze=False):
     actions = ['menu', 'menu_2', 'menu_3', 'menu_4', 'settings', 'alarm']
-    actions += [f'time_{index}' for index in range(1, 5)] + ['confirm', 'idle', 'stop']
+    actions += [f'time_{index}' for index in range(1, 5)] + ['confirm', 'idle']
+    actions += (['snooze', 'stop'] if snooze else ['stop'])
     if re.findall(r'8890_alarm_physical: action=([^\r\n]+)', text) != actions:
         raise ValueError('8890 physical alarm action sequence differs')
     cursor = 0
@@ -52,12 +58,31 @@ def check_alarm(text):
     deadline = re.search(r'event=second time=13:48:00 day=0 [^\n]*t=([0-9.]+)', text)
     if deadline is None or float(deadline[1]) != 60:
         raise ValueError('8890 alarm did not reach its natural RTC deadline')
+    if snooze:
+        cursor = text.index('8890_alarm_physical: action=snooze\n')
+        for event in ['event=alarm_write reg=0b data=36 armed=1 ',
+                      'event=alarm_write reg=0c data=0d armed=1 ',
+                      'buzzer: enabled=0 ',
+                      'event=second time=13:54:00 day=0 ',
+                      'event=cause_read data=b3 ',
+                      'event=status_ack data=a0 ',
+                      'buzzer: enabled=1 ',
+                      '8890_alarm_physical: action=stop\n',
+                      'buzzer: enabled=0 ']:
+            position = text.find(event, cursor)
+            if position < 0:
+                raise ValueError('missing ordered 8890 Snooze evidence: ' + event)
+            cursor = position + len(event)
+        deadline = re.search(r'event=second time=13:54:00 day=0 [^\n]*t=([0-9.]+)', text)
+        if deadline is None or float(deadline[1]) != 420:
+            raise ValueError('8890 Snooze did not reach its programmed RTC deadline')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--snooze', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -75,22 +100,25 @@ def main():
                    '-snapshot_directory', 'snap', '-noreadconfig', '-debug',
                    '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki8890_alarm_input.lua'),
-                   '-seconds_to_run', '85']
+                   '-autoboot_script', str(root / 'tools' / (
+                       'noki8890_alarm_snooze.lua' if args.snooze else 'noki8890_alarm_input.lua')),
+                   '-seconds_to_run', '445' if args.snooze else '85']
         with (alarm / 'console.log').open('w') as output:
             subprocess.run(command, cwd=alarm, stdout=output, stderr=subprocess.STDOUT,
-                           check=True, timeout=180)
+                           check=True, timeout=400 if args.snooze else 180)
         check_output((alarm / 'console.log').read_text(errors='replace'))
         text = (alarm / 'error.log').read_text(errors='replace')
-        check_alarm(text)
+        check_alarm(text, snooze=args.snooze)
         verify_stage(text, runtime=True, selftest=True)
         verify_registration(text, configured_gsm900=True, preserved_location=True)
         from PIL import Image
-        for name, expected in FRAMES.items():
+        frames = {**FRAMES, **SNOOZE_FRAMES} if args.snooze else FRAMES
+        for name, expected in frames.items():
             with Image.open(alarm / f'snap/8890_alarm_{name}.png') as frame:
                 if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != expected:
                     raise ValueError('8890 alarm frame differs: ' + name)
-        print('8890 alarm: PASS own physical entry, natural RTC expiry, buzzer control, '
+        print('8890 alarm: PASS ' + ('physical Snooze and natural 13:54 recurrence, ' if args.snooze else '') +
+              'own physical entry, natural RTC expiry, buzzer control, '
               'physical Stop and reviewed idle; research HLE, not audible-output acceptance')
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:
