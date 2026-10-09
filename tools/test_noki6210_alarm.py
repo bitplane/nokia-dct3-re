@@ -38,6 +38,15 @@ class AlarmChecks(unittest.TestCase):
         self.assertNotIn('event=saved', result)
         self.assertEqual(result.count('ccont_rtc: event=second'), 1)
 
+    def test_snooze_restore_requires_later_checkpoint(self):
+        text = self.restore_text().replace('t=45.', 't=100.').replace('t=46.', 't=101.')
+        result = check_off_restore(text, checkpoint=100)
+        self.assertEqual(result.count('ccont_rtc: event=second'), 1)
+        with self.assertRaises(ValueError):
+            check_off_restore(text)
+        with self.assertRaises(ValueError):
+            check_off_restore(self.restore_text(), checkpoint=100)
+
     def test_off_restore_requires_every_observation(self):
         for line in self.restore_text().splitlines(keepends=True):
             with self.subTest(line=line), self.assertRaises(ValueError):

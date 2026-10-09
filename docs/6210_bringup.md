@@ -732,6 +732,15 @@ software restart, which must pass runtime/self-test upload validation,
 retained-location registration and the exact registered-idle frame. No
 extra rail wake or post-decision rail drop is allowed.
 
+`verify-6210-alarm-snooze-countdown-restore` saves at second 100, after
+physical Snooze has rearmed the alarm and removed the rails. Exact
+37-register ARM/banked state, SRAM digest and emulated time must restore;
+the 1.25-second reference and restored windows must reproduce the same RTC
+tick and blank frame with no endpoint activity or early wake. The restored
+timeline then passes natural recurrence, separately checked alarm uploads,
+physical Stop and No (`run_6210_snooze_countdown_restore_20261009`). This
+does not substitute the earlier pre-first-alarm countdown checkpoint.
+
 The repeated alarm must finish booting before Stop is pressed. An earlier
 fixture pressed Stop before the second RTC acknowledgement: its labelled
 action did not dismiss the alarm, so the subsequent right softkey could

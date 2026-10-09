@@ -42,7 +42,7 @@ local input = coroutine.create(function()
         machine:logerror('6210_alarm_probe: action=power_release\n')
         if not emu.wait(9) then return end
         machine.screens[':screen']:snapshot('6210_alarm_powered_off.png')
-        local replayed = _G.noki6210_alarm_restore_checkpoint and
+        local replayed = not _G.noki6210_alarm_restore_snooze and _G.noki6210_alarm_restore_checkpoint and
             _G.noki6210_alarm_restore_checkpoint() or 0
         if not emu.wait(19 - replayed) then return end
         machine.screens[':screen']:snapshot('6210_alarm_woke.png')
@@ -56,7 +56,12 @@ local input = coroutine.create(function()
         -- The alarm title is phase-dependent. One second after the natural
         -- 13:53 recurrence is independently observed to show its visible phase.
         -- Alarm-only rail wake takes several seconds to boot and consume RTC.
-        if not emu.wait(_G.noki6210_alarm_power_off and 287 or 283) then return end
+        local recurrence = machine.time:as_double() + (_G.noki6210_alarm_power_off and 287 or 283)
+        if _G.noki6210_alarm_restore_snooze then
+            if not emu.wait(100 - machine.time:as_double()) then return end
+            _G.noki6210_alarm_restore_checkpoint()
+        end
+        if not emu.wait(recurrence - machine.time:as_double()) then return end
         machine.screens[':screen']:snapshot('6210_alarm_repeated.png')
     end
     if not press(1, 'Left Softkey / Menu', 'stop') then return end

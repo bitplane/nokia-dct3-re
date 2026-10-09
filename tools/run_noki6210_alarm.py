@@ -183,7 +183,7 @@ def check_power_off_alarm(text, choice, snooze=False):
     return off, wake, decision
 
 
-def check_off_restore(text):
+def check_off_restore(text, checkpoint=45):
     from tools.power_domain_contract import require_endpoint_silence
     states = list(re.finditer(r'6210_alarm_state: event=(saved|restored) '
                              r'pc=(\w+) sp=(\w+) ram=(\w+) cpu=([0-9a-f,]+) t=([0-9.]+)', text))
@@ -191,7 +191,7 @@ def check_off_restore(text):
         raise ValueError('missing unique alarm off-state save/load observations')
     if any(not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}', state[5]) for state in states):
         raise ValueError('alarm off-state ARM/banked register snapshot incomplete')
-    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][6]) != 45:
+    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][6]) != checkpoint:
         raise ValueError('alarm off-state architecture or checkpoint time differs')
     windows = list(re.finditer(r'6210_alarm_replay: phase=(reference|restored) '
                               r'event=(begin|end) t=([0-9.]+)', text))
@@ -199,7 +199,8 @@ def check_off_restore(text):
             ('reference', 'begin'), ('reference', 'end'),
             ('restored', 'begin'), ('restored', 'end')]:
         raise ValueError('alarm off-state replay windows absent or unordered')
-    if any(float(event[3]) != when for event, when in zip(windows, (45, 46.25, 45, 46.25))):
+    if any(float(event[3]) != when for event, when in zip(windows,
+            (checkpoint, checkpoint + 1.25, checkpoint, checkpoint + 1.25))):
         raise ValueError('alarm off-state replay windows differ')
     reference = text[windows[0].end():windows[1].start()]
     restored = text[windows[2].end():windows[3].start()]
@@ -229,7 +230,11 @@ def main():
                       help='physically shut down, verify autonomous alarm wake and activation choice')
     mode.add_argument('--restore-off', choices=('yes', 'no'), nargs='?', const='no',
                       help='restore the powered-off countdown, then verify natural alarm wake and activation')
+    mode.add_argument('--restore-snooze', action='store_true',
+                      help='restore the Snooze-induced powered-off countdown, then verify recurrence and No')
     args = parser.parse_args()
+    if args.restore_snooze:
+        args.power_off_snooze = 'no'
     if args.power_off_snooze:
         args.power_off = args.power_off_snooze
         args.snooze = True
@@ -251,6 +256,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki6210_alarm_arm.lua' if args.cold else
+                       'noki6210_alarm_snooze_restore.lua' if args.restore_snooze else
                        ('noki6210_alarm_power_snooze_yes.lua' if args.power_off_snooze == 'yes'
                         else 'noki6210_alarm_power_snooze.lua') if args.power_off_snooze else
                        'noki6210_alarm_power_restore_yes.lua' if args.restore_off == 'yes' else
@@ -265,8 +271,8 @@ def main():
                            check=True, timeout=400 if args.snooze else 180)
         check_output((alarm / 'console.log').read_text(errors='replace'))
         text = (alarm / 'error.log').read_text(errors='replace')
-        if args.restore_off:
-            text = check_off_restore(text)
+        if args.restore_off or args.restore_snooze:
+            text = check_off_restore(text, checkpoint=100 if args.restore_snooze else 45)
         elif '6210_alarm_state:' in text or '6210_alarm_replay:' in text:
             raise ValueError('unexpected alarm replay in an uninterrupted fixture')
         if args.power_off:
@@ -321,7 +327,7 @@ def main():
         elif not args.power_off:
             check_alarm(text, cold=args.cold)
         from PIL import Image
-        if args.restore_off:
+        if args.restore_off or args.restore_snooze:
             for name in ('off_reference', 'off_restored'):
                 with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
                     check_frame(frame, POWER_OFF_FRAMES['powered_off'], 'off-state replay ' + name)
@@ -349,7 +355,7 @@ def main():
             with Image.open(alarm / 'snap/6210_alarm_power_choice.png') as frame:
                 check_frame(frame, digest, 'physical activation ' + args.power_off)
         print('6210 alarm: PASS ' + ('armed cold retention, ' if args.cold else '') +
-              ('exact off-state restore and RTC replay, ' if args.restore_off else '') +
+              ('exact off-state restore and RTC replay, ' if args.restore_off or args.restore_snooze else '') +
               ('physical Snooze, natural five-minute recurrence, ' if args.snooze else '') +
               (f'autonomous rail wake, physical activation {args.power_off}, '
                if args.power_off else '') +

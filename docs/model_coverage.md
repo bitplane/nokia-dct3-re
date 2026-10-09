@@ -179,6 +179,9 @@ This remains research HLE, not native DSP or audible-output acceptance.
 The paired `verify-6210-alarm-off-snooze-yes` independently requires
 firmware-owned software restart after physical Yes, a separately validated
 normal upload/self-test phase, registration and exact registered-idle pixels.
+`verify-6210-alarm-snooze-countdown-restore` separately saves at second 100
+in the Snooze-induced off interval, checks exact CPU/banked state, SRAM,
+time and silent RTC/frame replay, then validates recurrence and physical No.
 
 `verify-6210-calendar-cold` independently proves physical Menu-8 Calendar
 entry, firmware-owned CCONT programming to 13:47, physical date entry and
