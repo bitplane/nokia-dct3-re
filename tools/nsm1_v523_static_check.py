@@ -355,6 +355,15 @@ def verify(image: bytes) -> dict:
         "reset_stack_literals": [literal(image, pc, thumb=False)
                                  for pc in (0x200068, 0x200090, 0x2000B0)],
         "loader": 0x2A479E,
+        "record_exchange": {
+            "builder": 0x27E054, "task": 3, "sender": 0x275B60,
+            "flash_record": {"command": 0x14, "offset": 0x14, "bytes": 12},
+            "identity_record": {"command": 0x15, "offset": 0, "bytes": 12,
+                                "raw_identity_offset": 0x0C, "raw_identity_bytes": 8},
+            "lock_records": {"command": 0x16, "offset": 0x20, "bytes": 24},
+            "restart_marker": literal(image, 0x27E132),
+            "restart_transform": 0x27D4AC,
+            "storage_validity_proven": False},
         "restart_boundary": {
             "request": 0x2C2A02,
             "call_candidates": direct_call_candidates(image, 0x2C2A02),

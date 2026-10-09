@@ -12,10 +12,12 @@ support and graphical boot are not promoted. An explicitly separate
 The next prerequisite is establishing matching resident DSP behavior and
 runtime validity of the explicitly derived product-local EEPROM fixture,
 plus fitted flash attributes and address aliases.
-The first concrete runtime compatibility question is now task 2's rejection
-of a type-`0x74`/`35 32` packet and explicit reason-4 restart. Decode that
-packet/validation boundary before attempting to supply downstream SIM or
-battery-readiness inputs. See the restart contract below.
+The first concrete runtime compatibility question is task 2's rejection
+of a type-`0x74`/`35 32` decoded storage record and explicit reason-4 restart.
+The measured response agrees with the recovered ROM4 codec arithmetic;
+the historical repair template's record semantics and consistency with
+the modeled chip remain unproved. Resolve that storage/validation boundary
+before supplying downstream SIM or battery-readiness inputs.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 
@@ -523,9 +525,47 @@ the NSE-1 resident ROM4 with NSM-1 remain unproved. No payload may be
 replaced with guessed passing bytes. The post-reset `35 32` packet differs
 in its body; do not assume a fixed template or replay the first response.
 
-Next: recover the type-`0x74`/`35 32` request/response and task-2 validation
-contract, including why the first response enters reason-4 restart and how
-the restart marker changes later handling. Keep the SIM/readiness backtrace
+### Record exchange arithmetic
+
+Own builder `0x27e054` sends four type-`0x70` requests to task 3 through
+`0x275b60`: command `0x13` carries four flash-derived bytes; `0x14` reads
+12 EEPROM bytes at `0x14`; `0x15` reads 12 bytes at zero and eight raw
+identity bytes at `0x0c`; `0x16` reads 24 bytes at `0x20`. If the retained
+marker `0x11fdd2` equals `0x5a`, it applies `0x27d4ac` to the final request
+before sending. The different cold/restart requests therefore have an
+own-firmware source; do not mistake them for nondeterministic transport.
+
+The observed `34 0e 00 82` response is a family-`0x82` MSID. The independently
+recovered codec decodes it to `9a1870dd 00160010 a8a9aa27`: the first word
+agrees with request `0x13`, and the chip field agrees with the modeled COBBA
+serial. This is execution evidence, not a fitted NSM-1 chip identity.
+
+`tools/nsm1_record_exchange_check.py` compares both captured `35 32` replies
+against the recovered ROM4 record transform, using the measured chip field.
+Both agree byte-for-byte, including the echoed 24-byte input and the removal
+of each decoded block's two private marker bytes. It also checks identity
+ordering, the requested flash value and complete request/response sizes.
+The first request is `ac9db72cdc5386529fa4ad4946dbdaf7c70f006dd16407d9`;
+after restart it is the raw EEPROM pair
+`73654ae2a7cad1f10e8752b699232739bc9657ce4047f826`. Neither decoded record
+is thereby certified valid storage. No record, identity, calibration or
+DSP response is changed by this comparison.
+
+Run the observer in a fresh directory as above, then:
+
+```sh
+.venv/bin/python tools/nsm1_record_exchange_check.py /path/to/error.log
+```
+
+The earlier native NSE-1 work independently classified the same reason-4
+restart for inconsistent encoded storage (`djr_dsp_integration.md`). That
+is a useful mechanism cross-check, not permission to reuse its handset
+identity, factory constants or complete EEPROM profile. The shared codec
+arithmetic can be checked without donor provisioning.
+
+Next: recover the NSM-1 record semantics and task-2 validation contract,
+including the retained-marker transform and the compatibility required
+between the own repair template and modeled COBBA. Keep the SIM/readiness backtrace
 as a measured downstream dependency, not proof that synthesizing its
 missing report would repair this earlier boundary. Keep validating NSM-1
 GPIO ownership independently. Do not inject an event, force readiness,

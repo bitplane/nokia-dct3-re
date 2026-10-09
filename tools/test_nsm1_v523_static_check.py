@@ -5,6 +5,28 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_record_request_offsets_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        self.assertEqual(0x11FDD2, check.literal(data, 0x27E132))
+        for address, mnemonic, operands in (
+                (0x27E0C6, "movs", "r0, #0x14"),
+                (0x27E0C8, "movs", "r2, #0xc"),
+                (0x27E0CA, "bl", "#0x2bcace"),
+                (0x27E0F2, "movs", "r0, #0"),
+                (0x27E0F4, "movs", "r2, #0xc"),
+                (0x27E0FE, "movs", "r0, #0xc"),
+                (0x27E100, "movs", "r2, #8"),
+                (0x27E12A, "movs", "r0, #0x20"),
+                (0x27E12C, "movs", "r2, #0x18"),
+                (0x27E136, "cmp", "r0, #0x5a"),
+                (0x27E13E, "bl", "#0x27d4ac"),
+                (0x27E146, "bl", "#0x275b60")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_own_packet_restart_boundary_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

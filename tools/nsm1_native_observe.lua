@@ -4,6 +4,26 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
+local record_requests = 0
+for _, sender in ipairs({0x275cb0, 0x275b60, 0x27641c}) do
+    handles[#handles + 1] = memory:install_read_tap(sender, sender + 3,
+        'nsm1_record_request_' .. sender, function(offset, value, mask)
+            if cpu.state['PC'].value ~= sender or cpu.state['R0'].value ~= 3 or
+                record_requests >= 16 then return end
+            local object = cpu.state['R1'].value
+            if object < 0x100000 or object > 0x11ffc0 or
+                memory:read_u8(object + 3) ~= 0x70 then return end
+            record_requests = record_requests + 1
+            local bytes = ''
+            for index = 0, 31 do
+                bytes = bytes .. string.format('%02x', memory:read_u8(object + index))
+            end
+            machine:logerror(string.format(
+                'nsm1_record_request: sender=%08x object=%08x bytes=%s caller=%08x task=%02x t=%.9f\n',
+                sender, object, bytes, cpu.state['R14'].value,
+                memory:read_u8(0x100022), machine.time:as_double()))
+        end)
+end
 local restart_payload_writes = 0
 handles[#handles + 1] = memory:install_write_tap(0x10203c, 0x10203f,
     'nsm1_restart_payload', function(offset, value, mask)
@@ -42,7 +62,7 @@ handles[#handles + 1] = memory:install_read_tap(0x2ab7c8, 0x2ab7cb,
         if object < 0x100000 or object > 0x11ffc0 then return end
         restart_packets = restart_packets + 1
         local bytes = ''
-        for index = 0, 15 do
+        for index = 0, math.min(4 + memory:read_u8(object + 2), 64) - 1 do
             bytes = bytes .. string.format('%02x', memory:read_u8(object + index))
         end
         machine:logerror(string.format(
