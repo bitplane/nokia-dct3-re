@@ -17,11 +17,18 @@ handles[#handles + 1] = memory:install_read_tap(0x1205c8, 0x1205cf,
             pc, offset, value, mask, machine.time:as_double()))
     end)
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
-        0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2e1194, 0x2de164, 0x2ca910}) do
+        0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
+        0x2e1194, 0x2de164, 0x2ca910}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x2dcef0 and counts[address] <= 32 then
+                machine:logerror(string.format(
+                    'nse6_eeprom_request: address=%08x operation=%08x lr=%08x t=%.9f\n',
+                    cpu.state['R0'].value, cpu.state['R1'].value,
+                    cpu.state['R14'].value, machine.time:as_double()))
+            end
             -- Observe at the caller's return target: translated straight-line
             -- instruction fetches need not trigger a mid-routine read tap.
             if address == 0x2d333c and counts[address] == 1 then

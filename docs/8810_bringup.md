@@ -236,6 +236,21 @@ observer's own context read is separately identifiable at `0x2d333c`; adjacent
 context fields are excluded by byte-lane masks. Consequently `4` must not be
 promoted to a self-test failure code without a decoded consumer.
 
+### Storage Activity at the Failure Frame
+
+The own serial address setter `0x2dcef0` receives the EEPROM address in `r0`
+and operation selector in `r1`; its decoded branches select random-read setup
+for zero and write setup for one. The observer records the first 32 requests
+and counts all entries. In a fresh erased-storage run it counts 598 entries
+through eight seconds. Early reads include `0x0000`, `0x006c`, `0x0074`,
+`0x0070`, `0x0374` and `0x03f0`. Firmware-owned write requests begin at
+`0x0074` at 0.231416308 s, followed by `0x0254/0x0260` and `0x0274/0x0280`.
+These are address-setter observations, not successful transaction completions
+or validated stored records. They exclude a never-started storage subsystem,
+but do not distinguish erased-record validation failure from transport errors.
+The actual self-test failure writer remains the open question; no provisioning
+change is justified by this trace alone.
+
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
 `nse1_rom4_dsp_program.bin` and `nse1_rom4_dsp_data.bin` declared in the driver.
