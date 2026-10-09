@@ -45,6 +45,23 @@ def verify(image):
         raise ValueError('own cell-context selector for mode 4 differs')
     if int.from_bytes(read(0x2870b0, 4), 'big') != 0x137228:
         raise ValueError('own mode-selection context root differs')
+    if int.from_bytes(read(0x287198, 4), 'big') != 0x137224:
+        raise ValueError('own received-block update context root differs')
+    if instructions(0x286e58, 10) != [
+            ('push', '{r4, lr}'), ('ldr', 'r1, [pc, #0x33c]'),
+            ('ldr', 'r4, [r1]'), ('ldrb', 'r1, [r0, #4]'),
+            ('cmp', 'r1, #0')]:
+        raise ValueError('received-block updater pointer/error selector differs')
+    if instructions(0x286e70, 12) != [
+            ('movs', 'r0, #0xf0'), ('ldrb', 'r1, [r4, #0xd]'),
+            ('ands', 'r0, r1'), ('movs', 'r1, #3'),
+            ('orrs', 'r1, r0'), ('movs', 'r0, #0')]:
+        raise ValueError('received-block success context selector differs')
+    if instructions(0x286e8c, 12) != [
+            ('movs', 'r0, #0xf0'), ('ldrb', 'r1, [r4, #0xd]'),
+            ('ands', 'r0, r1'), ('movs', 'r1, #1'),
+            ('orrs', 'r1, r0'), ('strb', 'r1, [r4, #0xd]')]:
+        raise ValueError('received-block error context selector differs')
     if instructions(0x21eee2, 22) != [
             ('movs', 'r1, #3'), ('lsls', 'r1, r1, #0x10'),
             ('cmp', 'r0, r1'), ('beq', '#0x21eefa'),
