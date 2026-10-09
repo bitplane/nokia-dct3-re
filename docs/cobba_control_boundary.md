@@ -2,8 +2,9 @@
 
 ## Current result
 
-COBBA owns the 16-address, 12-bit control-register file and the
-analogue conversion endpoints. MAD2 owns the typed PCM wire. The DSP backend
+The current COBBA device models a 16-address, 12-bit control-register file and
+the analogue conversion endpoints. This is not a claim that every COBBA
+revision uses the same physical bus. MAD2 owns the typed PCM wire. The DSP backend
 owns the control policy. The MCU ROM does not directly address COBBA,
 and the current DSP HLE does not fabricate COBBA control writes.
 
@@ -22,6 +23,25 @@ The recovered DSP control-word packing is not evidence that this physical
 control bus is serial. Nor does its twelve-bit width establish how MAD2
 presents a sample at DSP I/O port `0x27`: address selection, sign extension,
 word ordering and readiness still require a mapping or timing capture.
+
+### Product-specific physical buses
+
+Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
+[NSB-5/7190 System Module manual](https://manualmachine.com/nokia/7190/5055290-service-manual/)
+(03/01, pp. 19, 37-38 and 42-43) describes serial connections between
+COBBA_GJP and MAD2WD1. Its pin tables distinguish control data/select
+(`COBBASDa/COBBACSX`), separate bidirectional I/Q sample lines
+(`COBBAIDa/COBBAQDa`), and the audio PCM wires. COBBA also has mode-dependent
+pin assignments; the listed I/Q pins are not proof of the active mode in
+another handset. This corroborates a revision/product distinction, not a
+replacement register map for NSE-1 or a serial bit format for all products.
+
+The attachment methods below are logical transaction boundaries, not an
+implemented serializer for either RF bus. Promoting native RF support on
+another product requires its own bus/mode evidence plus the MAD2-to-DSP
+mapping. Neither service manual establishes DSP port `0x27` sample packing,
+sign extension, interleaving or ready/clock behavior. Keep these contracts
+separate from the already typed audio PCM wire.
 
 ## Implemented capture seam
 
