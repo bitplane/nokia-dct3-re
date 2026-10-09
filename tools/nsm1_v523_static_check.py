@@ -23,6 +23,9 @@ EEPROM_SHA256 = "95d3326ab9bbcdb31838696c552f56295aac9b234cad53813aff7af9e0a73cb
 EEPROM_MEMBER = "NokiX/scripts/scripts/misc/repair_external_eeprom/nsm-1.bin"
 STREAM_WORDS = 127 * 512 + 510
 SPANS = (
+    (0x2AF080, 0x2AF116, "7617a9a4984fe7823883249da0c269800a5f42a11f962b9888bd9641d999bc64"),
+    (0x288FAC, 0x288FBC, "30d931c8e5fd355fa351c119b4fca147da420f44ebb2b718cd5a3b34ffb15afd"),
+    (0x288EC8, 0x288EE4, "ef72919340162330a78477445d24d7a9795b5c1dc389671f7ca2d5a7a4503ffe"),
     (0x29ED4C, 0x29ED70, "fa727c06b546c9726d9892442b6441c67057d3d464b4d830008fdc06a012fcd5"),
     (0x27BDE4, 0x27BE06, "b6f49be79cb8a9b04fdde305d51c8c30b111cba7a64c060844eb7a173baa5888"),
     (0x2B61B8, 0x2B6202, "7b121dee6303c3ff540a15e8912f20389ef1a406aceac774e752ba7f9dcb97ab"),
@@ -175,6 +178,17 @@ def verify(image: bytes) -> dict:
         if hashlib.sha256(image[begin - BASE:end - BASE]).hexdigest() != expected:
             raise ValueError(f"instruction span changed at {begin:#x}")
     anchors = {
+        0x288EDE: ("strb", "r5, [r4, #6]"),
+        0x288FB2: ("strb", "r6, [r4, #6]"),
+        0x288FB4: ("strb", "r6, [r4, #8]"),
+        0x2AF090: ("movs", "r1, #0x38"),
+        0x2AF094: ("strb", "r0, [r1, r4]"),
+        0x2AF0EC: ("movs", "r0, #0x39"),
+        0x2AF0EE: ("movs", "r1, #0x32"),
+        0x2AF0F0: ("strb", "r1, [r0, r4]"),
+        0x2AF0FA: ("ldrb", "r0, [r1, #5]"),
+        0x2AF106: ("ldrb", "r2, [r1]"),
+        0x2AF108: ("strb", "r2, [r3, #6]"),
         0x29ED54: ("cmp", "r0, #0"),
         0x29ED56: ("beq", "#0x29ed6a"),
         0x29ED58: ("bl", "#0x27bde4"),
@@ -265,6 +279,9 @@ def verify(image: bytes) -> dict:
         if (insn.mnemonic, insn.op_str) != expected:
             raise ValueError(f"instruction mismatch at {address:#x}")
     expected_literals = {
+        0x288ED6: 0x10E6C8,
+        0x2AF08E: 0x20000,
+        0x2AF0F8: 0x20037,
         0x29ED50: 0x111EA0,
         0x29ED60: 0x10E6D0,
         0x27BDE4: 0x10BE8C,
@@ -303,6 +320,12 @@ def verify(image: bytes) -> dict:
         "reset_stack_literals": [literal(image, pc, thumb=False)
                                  for pc in (0x200068, 0x200090, 0x2000B0)],
         "loader": 0x2A479E,
+        "simi": {"reset": 0x2AF080, "receive": 0x2AF0F6,
+                 "interrupt_cause": 0x20038, "control": 0x20039,
+                 "rx_data": 0x20037, "rx_count": 0x2003C,
+                 "readiness_object": 0x10E6C8, "state_offset": 6,
+                 "init_state_store": 0x288EDE,
+                 "retry_state_store": 0x288FB2},
         "readiness": {"routine": 0x29ED4C, "selector_predicate": 0x27BDE4,
                       "first": 0x111EA0, "selector": 0x10BE8C,
                       "second": 0x10E6CE, "third": 0x10E6D0,

@@ -24,6 +24,8 @@ The MCU reset exit remains declared boot HLE. The base 16-Mbit flash part,
 ROM4 keypad GPIO layout and other conservative peripheral defaults are
 research assumptions; fitted flash identity, aliases and physical input
 are not validated. DSP/service/radio HLE publications are disabled.
+SIMI and the removable laboratory SIM are enabled from the own reset/RX
+register contract below; their presence is not SIM initialization acceptance.
 
 Own CCONT read routine `0x2bf082` selects control `0x28=0x22`, writes its
 command through `0x2a`, polls status `0x29` bit 2, and receives at `0x2d`.
@@ -83,10 +85,36 @@ register `0x2b`, followed by command `0x20` through `0x2c`. Its status polls
 use `0x29` bit 0. Clearing the display is therefore real firmware activity;
 a blank frame must not be classified as a missing LCD initializer.
 
-Next: census writers of the false readiness state and its surrounding
-object, while independently validating the NSM-1 GPIO layout. Do not force
-the state, replace the verifier result, or infer a missing DSP message
-solely from the blank display.
+### SIM lifecycle ownership
+
+The false byte is offset 6 of the object at `0x10e6c8`. Its owning routine
+`0x288ec8` initializes that offset to zero at `0x288ede`, then initializes
+the SIM controller through `0x2af080`. Another candidate store at
+`0x288fb2` sets it to one after the counter at offset 2 reaches four
+(`0x288f4a..0x288f4e`); this is a retry-exhaustion continuation, not evidence
+that setting the byte means successful card initialization. These candidate
+stores are not an exhaustive writer census: aliases and bulk stores remain
+to be classified.
+
+Own `0x2af080` clears the interrupt cause at `0x20038`, configures UART
+registers and writes control `0x32` at `0x20039`. Own RX routine `0x2af0f6`
+polls count `0x2003c` and copies bytes from `0x20037` into its receive object.
+Those instruction spans are pinned by the static checker. Attaching SIMI
+and the standards-shaped removable card is supported by this register
+contract, but does not manufacture the task's activation event.
+
+The write-watch observes zero initialization stores to offset 6 and no
+retry-exhaustion store in the cold run. With SIMI/card attached, the same
+`01/ff/00/01` readiness inputs persist at eight seconds and the supervisor
+loop persists through thirty seconds. Observed control writes initialize
+the UART; no bit-7 activation write solicits the card's ATR. This is not a
+falsification of card protocol behavior: the firmware has not requested it.
+
+Next: decode the owning task's event dispatch and the producer that should
+start card activation, alongside a complete writer census of the object.
+Keep validating NSM-1 GPIO ownership independently. Do not inject a task
+event, force the readiness byte, replace the verifier result or infer a
+missing DSP message solely from the blank display.
 
 ## Own-firmware contract
 

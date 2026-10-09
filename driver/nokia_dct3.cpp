@@ -3954,6 +3954,11 @@ void nokia_dct3_state::nsm1r4t(machine_config &config)
 	// Compatibility GPIO layout avoids routing the observed serial offsets
 	// through the later default keypad block. NSM-1 input is not validated.
 	research.keypad_wiring = KEYPAD_NSE1;
+	// Own 0x2af080 resets SIMI at 0x38/0x39; 0x2af0f6 drains RX at
+	// 0x37 while polling its count at 0x3c. Attach the removable lab card,
+	// not a handset identity fixture or an internal readiness publication.
+	research.simi_controller = true;
+	research.synthetic_sim_card = true;
 	apply_product_config(research);
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);

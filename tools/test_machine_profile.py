@@ -94,6 +94,8 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("dct3_nsm1_research_map", profile)
         self.assertIn("I2C_24C128(config, m_eeprom)", profile)
         self.assertIn("research.pup_eeprom_scl_bit = 2", profile)
+        self.assertIn("research.simi_controller = true", profile)
+        self.assertIn("research.synthetic_sim_card = true", profile)
         self.assertIn('config.device_remove("dsp_hle")', profile)
         self.assertIn("NOKIA_DSP_C54X", profile)
         self.assertNotIn("PRODUCT_5110", profile)

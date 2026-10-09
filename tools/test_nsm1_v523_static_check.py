@@ -17,6 +17,19 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must be bytes"):
             check.readiness(1, 256, 1, 1)
 
+    def test_own_simi_register_contract_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        contract = check.verify(image.read_bytes())["simi"]
+        self.assertEqual((0x20037, 0x2003C),
+                         (contract["rx_data"], contract["rx_count"]))
+        self.assertEqual((0x20038, 0x20039),
+                         (contract["interrupt_cause"], contract["control"]))
+        self.assertEqual(0x10E6CE,
+                         contract["readiness_object"] + contract["state_offset"])
+        self.assertEqual(0x288FB2, contract["retry_state_store"])
+
     def test_own_serial_reader_contract_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

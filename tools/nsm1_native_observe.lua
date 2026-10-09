@@ -4,6 +4,15 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
+local readiness_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x10e6c8, 0x10e6d3,
+    'nsm1_readiness_writers', function(offset, value, mask)
+        readiness_writes = readiness_writes + 1
+        if readiness_writes > 64 then return end
+        machine:logerror(string.format(
+            'nsm1_readiness_write: address=%08x value=%08x mask=%08x pc=%08x t=%.9f\n',
+            offset, value, mask, cpu.state['PC'].value, machine.time:as_double()))
+    end)
 for _, address in ipairs({0x2b61bc, 0x2b61c4, 0x2b61cc, 0x2b61d4,
         0x2b61dc, 0x2b61e4, 0x2b61ec, 0x2b601a, 0x2b60ae}) do
     local count = 0
