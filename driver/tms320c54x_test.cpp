@@ -16573,6 +16573,26 @@ private:
 				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
 				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 				"SUB B,ASM,A uses B as source and records borrow in one cycle");
+			program.write_word(0x05e2, 0xf480); // ADD A,ASM,A.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 1);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x123456789aULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0103); // SXM, ASM=3.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 40000;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 40000)
+		{
+			expect_opcode(0xf480,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 9 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x123456789aULL &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ADD A,ASM left-shifts its source without modifying B in one cycle");
 			program.write_word(0x05e2, 0xf58c); // MPYA T,B.
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080000000ULL);
