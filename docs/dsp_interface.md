@@ -398,12 +398,21 @@ inbound `0x80` is `RECEIVED_BLOCK`, `0x83` is `RSSI_RESULTS`, `0x84` is
 classify packets; they do not establish that an isolated packet is valid in
 every firmware controller state.
 
-Two public DCT3 traces further establish the type-`0x11` correlation used by
+Two public DCT3 traces further establish the mode-3 type-`0x11` correlation used by
 the radio peer: payload byte 1 is the expected BSIC and byte 7 is the ARFCN of
 the immediately following neighbour type-`0x80` BCCH block.  The pending
 instruction is saved and validated against the generic topology.  It neither
 selects that cell nor changes the serving receiver; those decisions remain
 firmware-owned.
+
+This evidence is mode-specific: the [published trace](https://maps.spench.net/drupal/node/98)
+contains payloads starting `03 07` and `03 22`, followed by matching neighbour
+BCCH blocks. It does not specify mode 4. The NSM-3 mode-4 constructor omits
+timing/BSIC serialization, so neither the mode-3 reply correlation nor its
+eligibility rules establish the mode-4 contract. The
+[Osmocom capture decoder](https://github.com/osmocom/dct3-gsmtap/blob/dcbe73ad77b67a09ac0b88775efb8fc84e9c4615/src/main.c)
+decodes outbound RACH/Layer-2 and inbound Layer-2 traffic, not type `0x11`;
+it supplies no independent mode-4 response specification.
 
 The four remaining direct task-10 status types are closed through their first
 semantic consumer:
