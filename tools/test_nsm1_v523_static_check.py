@@ -63,6 +63,39 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         self.assertEqual(0x58, eeprom[0x3F3])
         self.assertEqual(bytes.fromhex("3124"), eeprom[0x3D2:0x3D4])
 
+    def test_identity_formatter_uses_high_then_low_bcd_and_derived_digit(self):
+        eeprom = bytearray(0x4000)
+        eeprom[0x0C:0x13] = bytes.fromhex("49015420323751")
+        eeprom[0x13] = 0xFF
+        self.assertEqual(b"490154203237518\0", check.identity_buffer(bytes(eeprom)))
+
+    def test_identity_formatter_rejects_short_or_non_decimal_input(self):
+        with self.assertRaisesRegex(ValueError, "16 KiB"):
+            check.identity_buffer(bytes(8))
+        eeprom = bytearray(0x4000)
+        eeprom[0x0C] = 0xFA
+        with self.assertRaisesRegex(ValueError, "non-decimal"):
+            check.identity_buffer(bytes(eeprom))
+
+    def test_security_fixture_only_changes_loaded_checksum(self):
+        root = Path(__file__).resolve().parents[1]
+        image = root / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        archive = root / "roms/research/nsm1-v523/NokiX-scripts-2011.07.24.zip"
+        if not image.exists() or not archive.exists():
+            self.skipTest("acquired NSM-1 inputs not present")
+        contract = check.verify(image.read_bytes())["eeprom"]
+        original = check.extract_eeprom(archive.read_bytes())
+        audit = check.audit_security(original, contract)
+        self.assertEqual(b"493006102132132\0".hex(), audit["identity_buffer_hex"])
+        self.assertEqual(0x34D, audit["expected_security_checksum"])
+        self.assertFalse(audit["checksum_valid"])
+        fixture = check.security_fixture(original, contract)
+        self.assertEqual([0x3D2, 0x3D3],
+                         [i for i, (a, b) in enumerate(zip(original, fixture)) if a != b])
+        self.assertTrue(check.audit_security(fixture, contract)["checksum_valid"])
+        self.assertEqual(original[0x3F3], fixture[0x3F3])
+        self.assertEqual(original[0x0C:0x14], fixture[0x0C:0x14])
+
     def test_acquired_package_reproduces_input_when_available(self):
         package = Path(__file__).resolve().parents[1] / "roms/archive-dct3-packages/nsm1_523.exe"
         if not package.exists():

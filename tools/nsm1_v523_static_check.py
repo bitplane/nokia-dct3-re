@@ -27,7 +27,12 @@ SPANS = (
     (0x2A479E, 0x2A48AA, "07324fa54680e19536956abe4c25ec8be177d7fc6e6392f3ca4b34b16338d577"),
     (0x2BCCFE, 0x2BCD26, "67ee576183c712d2ef4b8d19c8d522578ed5239f3dc90092fca7dc23ccf74a69"),
     (0x2B1E2C, 0x2B1E52, "9f0e8d5aaa2f85e9c4b80238ab30f41023dff68b0c4d961e80b8e3da394c3a12"),
-    (0x2C3A70, 0x2C3A7E, "b468d035fd8f60fb85d45f7ad1e001923c8ddceae409ed13cede25716261b074"),
+    (0x2C3A70, 0x2C3A9E, "fa8e3812cc2ee28b9dd10fdbaa189cd24978504d5fb71c622b25fbe0b4d37ecc"),
+    (0x27E254, 0x27E368, "6e854b3e3bee00df2ab9c1d00e87765f1e539de45476d5948c59687762508dbc"),
+    (0x2AB73A, 0x2AB76A, "12f531e3d5fc3cef1705819d52b5e3bdd4e9d677d95599ef9b78ffe572a9f1ac"),
+    (0x2B8B90, 0x2B8BD2, "5f5cef60ff332360b71d81a456e3599c8ec1586e2096080f45cfaf5529490bc4"),
+    (0x2BCACE, 0x2BCB1A, "295733ee33a0b61c4bee958a161084ba82badcca0a8f364be6cbbd0186a96832"),
+    (0x2BDECE, 0x2BDF9C, "c1978671bd8a64694a84ca8caf83c8e3c480e8ce6c8e0aa2592c8fa6f1fab966"),
 )
 
 
@@ -112,6 +117,45 @@ def decode_group7(image: bytes) -> list[dict]:
     return records
 
 
+def identity_buffer(eeprom: bytes) -> bytes:
+    """Own 0x27e254 selector-3 path, assuming successful serial reads."""
+    if len(eeprom) != 0x4000:
+        raise ValueError("NSM-1 identity requires its 16 KiB EEPROM")
+    packed = eeprom[0x0C:0x13]
+    digits = [digit for value in packed for digit in (value >> 4, value & 15)]
+    if any(digit > 9 for digit in digits):
+        raise ValueError("NSM-1 identity contains a non-decimal BCD digit")
+    total = sum((value >> 4) + sum(divmod((value & 15) * 2, 10)) for value in packed)
+    return bytes(digit + 0x30 for digit in digits) + bytes([0x30 + (-total) % 10, 0])
+
+
+def audit_security(eeprom: bytes, contract: dict) -> dict:
+    records = {record["id"]: record for record in contract["records"]}
+    checksum_index = contract["checksum_state"] - contract["security_record_state"]
+    record = records[0x701]
+    if checksum_index < 0 or checksum_index + 2 > record["size"]:
+        raise ValueError("security checksum lies outside its loaded record")
+    offset = record["offset"] + checksum_index
+    if records[0x70B]["offset"] != offset or records[0x70B]["size"] != 2:
+        raise ValueError("nested checksum descriptor does not match the state load")
+    identity = identity_buffer(eeprom)
+    setting = eeprom[contract["security_setting_offset"]]
+    expected = (sum(identity) + setting) & 0xFFFF
+    stored = int.from_bytes(eeprom[offset:offset + 2], "big")
+    return {"identity_buffer_hex": identity.hex(), "security_setting": setting,
+            "checksum_offset": offset, "stored_security_checksum": stored,
+            "expected_security_checksum": expected, "checksum_valid": stored == expected,
+            "successful_serial_read_assumed": True}
+
+
+def security_fixture(eeprom: bytes, contract: dict) -> bytes:
+    audit = audit_security(eeprom, contract)
+    offset = audit["checksum_offset"]
+    result = bytearray(eeprom)
+    result[offset:offset + 2] = audit["expected_security_checksum"].to_bytes(2, "big")
+    return bytes(result)
+
+
 def verify(image: bytes) -> dict:
     if len(image) != SIZE or hashlib.sha1(image).hexdigest() != SHA1:
         raise ValueError("not the normalized NSM-1 v5.23 PPM C image")
@@ -140,6 +184,24 @@ def verify(image: bytes) -> dict:
         0x2BCD1C: ("ldrh", "r1, [r1]"),
         0x2BCD1E: ("cmp", "r1, r0"),
         0x2C3A7A: ("bl", "#0x2b8b90"),
+        0x2C3A84: ("bl", "#0x2b8b90"),
+        0x2B8BC0: ("bl", "#0x2bcace"),
+        0x2BCAF4: ("bl", "#0x2bdece"),
+        0x2BCAF8: ("strb", "r0, [r4]"),
+        0x2BCB04: ("bl", "#0x2bdece"),
+        0x2BCB08: ("strb", "r0, [r4]"),
+        0x27E268: ("movs", "r0, #0xc"),
+        0x27E26C: ("movs", "r2, #8"),
+        0x27E26E: ("bl", "#0x2bcace"),
+        0x27E282: ("ldrb", "r2, [r1, r4]"),
+        0x27E2A2: ("cmp", "r0, #0xf"),
+        0x27E2EE: ("cmp", "r2, #7"),
+        0x27E306: ("mov", "r1, ip"),
+        0x27E308: ("strb", "r0, [r1, r5]"),
+        0x27E34C: ("strb", "r0, [r1, r5]"),
+        0x2AB746: ("movs", "r1, #3"),
+        0x2AB748: ("bl", "#0x27e254"),
+        0x2AB75C: ("strb", "r0, [r4, #0xf]"),
     }
     for address, expected in anchors.items():
         insn = instruction(image, address)
@@ -157,6 +219,8 @@ def verify(image: bytes) -> dict:
         0x2BCD1A: 0x112826,
         0x2C3A72: 0x11FC16,
         0x2C3A76: 0x0702,
+        0x2C3A7E: 0x112820,
+        0x2C3A80: 0x0701,
     }
     for address, expected in expected_literals.items():
         if literal(image, address) != expected:
@@ -194,8 +258,10 @@ def verify(image: bytes) -> dict:
                    "security_setting_index": setting_index,
                    "security_setting_offset": settings["offset"] + setting_index,
                    "validator": 0x2BCCFE, "identity_sum_helper": 0x2B1E2C,
+                   "security_record_state": literal(image, 0x2C3A7E),
+                   "checksum_state": literal(image, 0x2BCD1A),
                    "checksum_relationship": "(sum(identity_buffer[0:16]) + security_setting) & 0xffff",
-                   "identity_buffer_encoding_proven": False,
+                   "identity_buffer_encoding_proven": True,
                    "template_boot_compatibility_proven": False},
     }
 
@@ -205,21 +271,31 @@ def main() -> None:
     parser.add_argument("image", type=Path)
     parser.add_argument("--package", type=Path, help="normalize this pinned ZIP package before checking")
     parser.add_argument("--eeprom-package", type=Path, help="audit the original product-local template")
+    parser.add_argument("--security-fixture", type=Path, help="emit a two-byte checksum correction, not a factory dump")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if args.security_fixture and not args.eeprom_package:
+        parser.error("--security-fixture requires --eeprom-package")
     try:
         image = normalize_package(args.package.read_bytes()) if args.package else args.image.read_bytes()
         contract = verify(image)
         if args.eeprom_package:
             eeprom = extract_eeprom(args.eeprom_package.read_bytes())
-            checksum = next(r for r in contract["eeprom"]["records"] if r["id"] == 0x70B)
-            offset = checksum["offset"]
             contract["eeprom"]["template"] = {
                 "sha256": EEPROM_SHA256, "bytes": len(eeprom),
-                "security_setting": eeprom[contract["eeprom"]["security_setting_offset"]],
-                "stored_security_checksum": int.from_bytes(eeprom[offset:offset + checksum["size"]], "big"),
+                **audit_security(eeprom, contract["eeprom"]),
                 "mutated": False,
             }
+            if args.security_fixture:
+                fixture = security_fixture(eeprom, contract["eeprom"])
+                args.security_fixture.parent.mkdir(parents=True, exist_ok=True)
+                args.security_fixture.write_bytes(fixture)
+                contract["eeprom"]["derived_security_fixture"] = {
+                    "sha1": hashlib.sha1(fixture).hexdigest(),
+                    "changed_offsets": [i for i, (a, b) in enumerate(zip(eeprom, fixture)) if a != b],
+                    "checksum_valid": audit_security(fixture, contract["eeprom"])["checksum_valid"],
+                    "runtime_boot_proven": False,
+                }
         result = json.dumps(contract, indent=2) + "\n"
         if args.package:
             args.image.parent.mkdir(parents=True, exist_ok=True)

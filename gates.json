@@ -2054,10 +2054,12 @@
             "roms/archive-dct3-packages/nsm1_523.exe",
             "--eeprom-package",
             "roms/research/nsm1-v523/NokiX-scripts-2011.07.24.zip",
+            "--security-fixture",
+            "roms/research/nsm1-v523/nsm1-security-checksum-valid.bin",
             "--output",
             "run_census/nsm1_v523_static_boundary.json"
           ],
-          "options": ["--package", "--eeprom-package", "--output"]
+          "options": ["--package", "--eeprom-package", "--security-fixture", "--output"]
         }
       ]
     },

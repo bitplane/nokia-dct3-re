@@ -414,7 +414,14 @@ SHA-256 `95d3326ab9bbcdb31838696c552f56295aac9b234cad53813aff7af9e0a73cbd`.
 This original NSM-1 repair template is retained unchanged, not treated as a
 factory handset dump. `verify-6150-static` reads the pinned ZIP member directly
 and audits its own-image record layout; no NokiX script is executed and no
-EEPROM checksum or setting is modified. Boot compatibility remains unproved.
+canonical EEPROM checksum or setting is modified. Boot compatibility remains unproved.
+The separately generated `research/nsm1-v523/nsm1-security-checksum-valid.bin`
+fixture corrects only bytes `0x03d2..0x03d3`, from `0x3124` to `0x034d`,
+using the own firmware's decoded identity and checksum rule. It has SHA-1
+`07335e492f72ba9da9c3436890c9eb4af67fd9a9`; original identity, settings and
+calibration are preserved. This derived fixture is explicitly not a factory
+handset dump. The static proof and remaining runtime boundary are in
+`docs/6150_bringup.md`.
 
 ### Nokia 6110 NSE-3
 

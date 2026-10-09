@@ -9,7 +9,7 @@ and checks its reset and sparse DSP verification contract. This is static
 coverage only; no executable profile or graphical boot is promoted.
 
 The next prerequisite is establishing matching resident DSP behavior and
-runtime validity of the acquired product-local EEPROM repair template,
+runtime validity of the explicitly derived product-local EEPROM fixture,
 plus fitted flash attributes and address aliases.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
@@ -17,8 +17,9 @@ verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 ## Own-firmware contract
 
 Input identity and member extents are authoritative in `roms/README.md`.
-The checker pins 532 instruction bytes, decodes twenty-one Thumb anchors
-and eleven pool references, and independently resolves three ARM stack loads.
+The checker pins the reset, loader, identity formatter, serial reader and
+security-check instruction spans and emits exact anchor/pool coverage counts.
+It independently resolves three ARM stack loads.
 It does not claim a whole-image control-flow or producer census.
 
 | Boundary | NSM-1 v5.23 evidence |
@@ -73,7 +74,32 @@ Validator `0x2bccfe` reads setting state `0x11fc35`, establishing index
 It sums a sixteen-byte identity buffer via `0x2b1e2c`, adds the setting and
 compares the truncated result with checksum state `0x112826`.
 
-The original template has setting `0x58` and stored checksum `0x3124`.
-The identity buffer's encoding and the complete template's checksum/runtime
-validity remain unproved. Do not substitute raw EEPROM identity bytes for
-that buffer, repair the checksum speculatively, or transplant NSE-3 records.
+### Identity and checksum closure
+
+Own reader `0x2b8b90` resolves record descriptors and calls the raw serial
+reader `0x2bcace`. The latter deposits bytes from receiver `0x2bdece`
+unchanged; no record decoder intervenes. The security record is loaded into
+`0x112820`, putting the compared checksum at offset `+6`, independently
+agreeing with nested record `0x070b` at physical EEPROM `0x03d2`.
+
+Identity wrapper `0x2ab73a` invokes `0x27e254` with selector 3. This reads
+eight EEPROM bytes at `0x000c`, renders the first seven bytes as high/low
+packed-BCD decimal digits, computes the fifteenth decimal check digit and
+null-terminates the buffer. The wrapper also sets byte 15 to zero. Assuming
+successful serial reads, the original template produces
+`493006102132132` followed by zero. Raw BCD bytes must not be substituted
+for that sixteen-byte ASCII buffer.
+
+The original setting remains `0x58`. Its required checksum is `0x034d`,
+not the stored `0x3124`; the unchanged historical template cannot satisfy
+this initial security-check relationship. `verify-6150-static` generates
+ignored `roms/research/nsm1-v523/nsm1-security-checksum-valid.bin`, changing
+only EEPROM bytes `0x03d2..0x03d3`. SHA-1 is
+`07335e492f72ba9da9c3436890c9eb4af67fd9a9`. Identity, lock/settings byte,
+calibration and all other content remain unchanged. The canonical acquired
+template is not rewritten.
+
+This is an evidenced nonvolatile-input consistency fixture, not a factory
+dump or boot promotion. Remaining checksums, runtime boot, native DSP and
+radio acceptance are unproved. Do not alter a lock level to seek a passing
+screen, transplant NSE-3 records or synthesize a DSP completion.
