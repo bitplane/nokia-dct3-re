@@ -551,6 +551,11 @@ Printed page 7 identifies internal MIC2, headset MIC1 and differential EAR
 for the internal earpiece; page 5 independently lists COBBA EARP/EARN.
 These establish product-owned endpoint topology, not codec gains or an
 enabled media path.
+`nsb6stage` now connects the host microphone to MIC2 and EAR to the mono
+speaker with neutral route gains; `nsb6hle` inherits this board connectivity.
+Neither PCM clocks nor an HLE voice mux are enabled by these routes.
+The independent physical outgoing-call/speech-control gate remains green;
+that proves unchanged signaling/control, not physical duplex or native speech.
 
 The indexed NSB-6 System Module, Issue 1 06/2000, printed page 25,
 [Audio Control](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html?page=25),
@@ -606,6 +611,10 @@ An additional full-manual acquisition candidate is
 listed as `Nokia service manual 8890 NSB-6.zip`, 5.66 MB, MD5
 `6ba2da15107783919ee4e2df8bf89d92`. It requires an authenticated account and
 has not been acquired; its advertised checksum is not local validation.
+The public [03sysa3 schematic listing](https://www.eserviceinfo.com/downloadsm/231240/NOKIA_03sysa3.html)
+is another own-product lead (8890, 1,788 kB). Its HTML listing was retrieved,
+but the embedded PDF response was empty and the download link redirected to
+the site index. No schematic bytes or timing diagram are validated from it.
 
 ```sh
 .venv/bin/python -m tools.noki8890_speech_control_check \

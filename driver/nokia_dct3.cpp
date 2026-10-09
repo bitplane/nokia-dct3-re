@@ -3663,6 +3663,11 @@ void nokia_dct3_state::nsm3dr6(machine_config &config)
 void nokia_dct3_state::nsb6stage(machine_config &config)
 {
 	noki8xxx(config);
+	// NSB-6 UI Description, issue 1 (06/2000), p7: internal MIC2 and EAR.
+	// Board connectivity only; PCM framing and codec mux/gains remain unknown.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	nokia_product_config research = PRODUCT_8XXX;
 	// Own acquired PMM occupies 3d0000..3fffff. Reuse the passive
 	// persistent-flash bus census; it never changes read/write results.
