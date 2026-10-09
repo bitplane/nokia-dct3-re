@@ -27,6 +27,20 @@ class CatalogueTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "pinned"):
             inventory.catalogue(self.image())
 
+    def test_v600_has_separate_hash_origin_and_destination(self):
+        image = bytearray(0x109b00)
+        struct.pack_into(">2I", image, 0x109a40, 0x74, 0x12f360)
+        struct.pack_into(">29I", image, 0x109a48, *([0x200040] * 28 + [0]))
+        struct.pack_into(">6H", image, 0x40, 0xa00, 0x1000, 2, 0x200, 0x3e8, 0)
+        with patch.object(inventory.hashlib, "sha1", return_value=Mock(
+                hexdigest=Mock(return_value="e5e8711870527fb590ad76b4a50fadd341313549"))):
+            self.assertEqual(len(inventory.catalogue(image, "8250-v600")), 28)
+            with self.assertRaisesRegex(ValueError, "pinned"):
+                inventory.catalogue(image, "8250")
+            struct.pack_into(">I", image, 0x109a44, 0x12f040)
+            with self.assertRaisesRegex(ValueError, "initialization"):
+                inventory.catalogue(image, "8250-v600")
+
     def test_8210_catalogues_have_distinct_initialization_origins(self):
         digest = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
         image = bytearray(0x10d000)

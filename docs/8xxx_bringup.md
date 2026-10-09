@@ -51,6 +51,26 @@ remaining software comparison target, not evidence that resident ROM6
 code or matching provisioning is present. No v6.00 boot is established,
 and the v5.02 hash-pinned extraction contract is unchanged.
 
+The v6.00 catalogue initialization at raw `0x109a40` contains 28 nonzero
+descriptor pointers, a zero terminator and destination `0x12f360`.
+All descriptor payloads fit the acquired image. Compared by selector with
+v5.02, only decimal selectors 0, 1, 12 and 20 have changed payload hashes.
+Selector 0 changes 22 table-region words; its 126-word executable tail is
+identical (SHA-1 `5bcd6f091b23730b2484eb844841361ef7a12889`).
+Selector `0x14` (decimal 20), the second loader, grows from 613 to 623
+words, SHA-1 `8e9e4aefa311375ae090b90a607f00cb8e7059ca`.
+Its raw word pairs still include `f074/2c75` at declared program `0x0a4a`,
+followed by `f074/938c`; pairs for `4007` and `9ddd` also remain.
+These are static opcode candidates, not a v6.00 execution trace.
+None of the 28 declared destination ranges covers those four resident
+addresses; relocation is not excluded by this range test. Reproduce with:
+
+```sh
+.venv/bin/python -m tools.nsm3d_catalogue \
+  roms/research/nsm3d/8250-v600-ppmk.bin --product 8250-v600 \
+  --address 0x2c75 --address 0x938c --address 0x4007 --address 0x9ddd
+```
+
 Fresh stock and runtime-comparison runs reproduce the protected upload and
 record-rejection contracts. Selector ownership, direct MCU input copying,
 both codec directions and the actual PMM extent do not provide a correction
