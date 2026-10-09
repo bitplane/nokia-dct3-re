@@ -702,6 +702,18 @@ each own-upload phase independently, including normal self-test/analogue
 acceptance after activation. This is research-HLE control/presentation
 acceptance, not audible-output or native-DSP acceptance.
 
+`verify-6210-alarm-off-restore` additionally saves the powered-off countdown
+at emulated second 45 and compares exact CPU PC/SP, full SRAM checksum and
+emulated time after restoration. Reference and restored windows span
+45..46.25 seconds, deliberately avoiding an endpoint at the RTC callback's
+timestamp. Both contain the same single RTC tick, blank reviewed frames,
+no premature wake and no powered DSP/radio activity. Only the restored
+timeline continues to the natural 13:48 deadline; held alarm delivery,
+buzzer programming and physical Stop/No must still pass the ordinary
+powered-off acceptance. The fixture changes emulator save-state only, not
+firmware, MMIO, clock or alarm registers. Fresh physical clock-entry and
+own provisioning seed the run (`run_6210_alarm_off_restore_quarter`).
+
 Warm MCU reset preserves SRAM. NPE-3 startup reads the reason at `0x17fe48`
 before clearing ordinary workspace `0x100020..0x175668`. Physical Yes stores
 reason `0c`; it survives reset and is consumed by startup. Clearing all SRAM

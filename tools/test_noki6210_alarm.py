@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6210_alarm import check_alarm, check_snooze, check_power_off_alarm
+from tools.run_noki6210_alarm import check_alarm, check_snooze, check_power_off_alarm, check_off_restore
 
 
 class AlarmChecks(unittest.TestCase):
@@ -20,6 +20,42 @@ class AlarmChecks(unittest.TestCase):
 
     def test_complete_lifecycle(self):
         check_alarm(self.text)
+
+    def restore_text(self):
+        return (
+            '6210_alarm_state: event=saved pc=00123456 sp=00170000 ram=abcdef01 t=45.000000000\n'
+            '6210_alarm_replay: phase=reference event=begin t=45.000000000\n'
+            'ccont_rtc: event=second time=13:47:46 day=0 status=31 t=46.000000000\n'
+            '6210_alarm_replay: phase=reference event=end t=46.250000000\n'
+            '6210_alarm_state: event=restored pc=00123456 sp=00170000 ram=abcdef01 t=45.000000000\n'
+            '6210_alarm_replay: phase=restored event=begin t=45.000000000\n'
+            'ccont_rtc: event=second time=13:47:46 day=0 status=31 t=46.000000000\n'
+            '6210_alarm_replay: phase=restored event=end t=46.250000000\n')
+
+    def test_off_restore_replays_rtc_and_removes_abandoned_timeline(self):
+        result = check_off_restore(self.restore_text())
+        self.assertNotIn('event=saved', result)
+        self.assertEqual(result.count('ccont_rtc: event=second'), 1)
+
+    def test_off_restore_requires_every_observation(self):
+        for line in self.restore_text().splitlines(keepends=True):
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                check_off_restore(self.restore_text().replace(line, '', 1))
+
+    def test_off_restore_rejects_state_or_tick_divergence(self):
+        for old, new in [('ram=abcdef01', 'ram=abcdef02'),
+                         ('time=13:47:46', 'time=13:47:47'),
+                         ('event=end t=46.250000000', 'event=end t=47.000000000')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_off_restore(self.restore_text().replace(old, new, 1))
+
+    def test_off_restore_rejects_premature_wake_or_endpoint_activity(self):
+        for event in ['ccont_power: event=wake cause=80 t=45.5\n',
+                      'dspif_transport: RX enqueue\n']:
+            with self.subTest(event=event), self.assertRaises(ValueError):
+                check_off_restore(self.restore_text().replace(
+                    '6210_alarm_replay: phase=reference event=end', event +
+                    '6210_alarm_replay: phase=reference event=end'))
 
     def power_off_text(self):
         prefix, expiry = self.text.split('event=second time=13:48:00', 1)

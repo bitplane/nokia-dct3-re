@@ -42,7 +42,9 @@ local input = coroutine.create(function()
         machine:logerror('6210_alarm_probe: action=power_release\n')
         if not emu.wait(9) then return end
         machine.screens[':screen']:snapshot('6210_alarm_powered_off.png')
-        if not emu.wait(19) then return end
+        local replayed = _G.noki6210_alarm_restore_checkpoint and
+            _G.noki6210_alarm_restore_checkpoint() or 0
+        if not emu.wait(19 - replayed) then return end
         machine.screens[':screen']:snapshot('6210_alarm_woke.png')
         if not emu.wait(13) then return end
     else

@@ -15228,6 +15228,14 @@
                  "arguments": ["$(RUN_DIR)", "--power-off", "no", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-alarm-off-restore",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6210_alarm.py",
+                 "arguments": ["$(RUN_DIR)", "--restore-off", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-alarm-off-yes",
       "prerequisites": ["build"],
       "variables": {},
