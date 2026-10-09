@@ -5,6 +5,46 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_packet_restart_boundary_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        boundary = check.verify(data)["restart_boundary"]
+        self.assertEqual(0x11FEE4, boundary["retained_reason"])
+        self.assertIn(0x27E7F8, boundary["call_candidates"])
+        self.assertEqual([0x23FE4C], boundary["handler_call_candidates"])
+        self.assertEqual([0x2C1C80], boundary["constructor_call_candidates"])
+        self.assertFalse(boundary["compatibility_validated"])
+        for address, mnemonic, operands in (
+                (0x27E7EE, "movs", "r0, #4"),
+                (0x27E7F8, "bl", "#0x2c2a02"),
+                (0x2AB810, "movs", "r0, #2"),
+                (0x2AB814, "bl", "#0x275cb0"),
+                (0x2C1C6E, "cmp", "r1, #0x70"),
+                (0x2C1C80, "bl", "#0x2ab7c8")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
+    def test_own_startup_classes_and_restart_reason_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        self.assertEqual(0x11FED5, check.literal(data, 0x2B5E64))
+        for address, mnemonic, operands in (
+                (0x2BC394, "cmp", "r0, #4"),
+                (0x2BC396, "beq", "#0x2bc42a"),
+                (0x2BC42A, "movs", "r4, #5"),
+                (0x2804F4, "cmp", "r0, #5"),
+                (0x2804F8, "bl", "#0x281150"),
+                (0x2810B6, "cmp", "r0, #2"),
+                (0x2810B8, "beq", "#0x281150"),
+                (0x281112, "bl", "#0x2b3f72"),
+                (0x2B3F76, "movs", "r1, #0x41")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_own_state_selector_uses_ccont_adc_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

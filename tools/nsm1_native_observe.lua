@@ -4,6 +4,115 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
+local restart_payload_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x10203c, 0x10203f,
+    'nsm1_restart_payload', function(offset, value, mask)
+        if machine.time:as_double() > 0.47 or restart_payload_writes >= 32 then return end
+        restart_payload_writes = restart_payload_writes + 1
+        machine:logerror(string.format(
+            'nsm1_restart_payload: pc=%08x value=%08x mask=%08x r0=%08x r1=%08x r2=%08x caller=%08x task=%02x t=%.9f\n',
+            cpu.state['PC'].value, value, mask, cpu.state['R0'].value,
+            cpu.state['R1'].value, cpu.state['R2'].value, cpu.state['R14'].value,
+            memory:read_u8(0x100022), machine.time:as_double()))
+    end)
+local restart_object_sends = 0
+for _, sender in ipairs({0x275cb0}) do
+    handles[#handles + 1] = memory:install_read_tap(sender, sender + 3,
+        'nsm1_task2_send_' .. sender, function(offset, value, mask)
+            if cpu.state['PC'].value ~= sender or cpu.state['R0'].value ~= 2 or
+                restart_object_sends >= 32 then return end
+            local object = cpu.state['R1'].value
+            if object < 0x100000 or object > 0x11fff0 then return end
+            restart_object_sends = restart_object_sends + 1
+            local header = ''
+            for index = 0, 11 do
+                header = header .. string.format('%02x', memory:read_u8(object + index))
+            end
+            machine:logerror(string.format(
+                'nsm1_task2_send: sender=%08x object=%08x header=%s caller=%08x source_task=%02x t=%.9f\n',
+                sender, object, header, cpu.state['R14'].value,
+                memory:read_u8(0x100022), machine.time:as_double()))
+        end)
+end
+local restart_packets = 0
+handles[#handles + 1] = memory:install_read_tap(0x2ab7c8, 0x2ab7cb,
+    'nsm1_restart_packet', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x2ab7c8 or restart_packets >= 16 then return end
+        local object = cpu.state['R0'].value
+        if object < 0x100000 or object > 0x11ffc0 then return end
+        restart_packets = restart_packets + 1
+        local bytes = ''
+        for index = 0, 15 do
+            bytes = bytes .. string.format('%02x', memory:read_u8(object + index))
+        end
+        machine:logerror(string.format(
+            'nsm1_restart_packet: object=%08x bytes=%s caller=%08x task=%02x t=%.9f\n',
+            object, bytes, cpu.state['R14'].value, memory:read_u8(0x100022),
+            machine.time:as_double()))
+    end)
+local restart_checks = 0
+handles[#handles + 1] = memory:install_read_tap(0x27e7cc, 0x27e7cf,
+    'nsm1_restart_check', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x27e7cc or restart_checks >= 16 then return end
+        local context = cpu.state['R6'].value
+        restart_checks = restart_checks + 1
+        local bytes = ''
+        local header = ''
+        if context <= 0xffe0 or (context >= 0x100000 and context <= 0x11ffe0) or
+            (context >= 0x200000 and context <= 0x3fffe0) then
+            for index = 0, 6 do
+                bytes = bytes .. string.format('%02x', memory:read_u8(context + 12 + index))
+            end
+            for index = 0, 11 do
+                header = header .. string.format('%02x', memory:read_u8(context + index))
+            end
+        end
+        machine:logerror(string.format(
+            'nsm1_restart_check: context=%08x header=%s bytes=%s valid=%08x class=%08x marker=%02x t=%.9f\n',
+            context, header, bytes, cpu.state['R5'].value, cpu.state['R12'].value,
+            memory:read_u8(0x11fdd2), machine.time:as_double()))
+    end)
+local restart_requests = 0
+handles[#handles + 1] = memory:install_read_tap(0x2c2a00, 0x2c2a03,
+    'nsm1_restart_request', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x2c2a02 or restart_requests >= 16 then return end
+        restart_requests = restart_requests + 1
+        machine:logerror(string.format(
+            'nsm1_restart_request: reason=%08x caller=%08x task=%02x t=%.9f\n',
+            cpu.state['R0'].value, cpu.state['R14'].value,
+            memory:read_u8(0x100022), machine.time:as_double()))
+    end)
+local reset_control_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x20000, 0x20003,
+    'nsm1_reset_control', function(offset, value, mask)
+        if (mask & 0x00ff0000) == 0 or reset_control_writes >= 32 then return end
+        reset_control_writes = reset_control_writes + 1
+        machine:logerror(string.format(
+            'nsm1_reset_control: pc=%08x data=%02x caller=%08x task=%02x t=%.9f\n',
+            cpu.state['PC'].value, (value >> 16) & 0xff,
+            cpu.state['R14'].value, memory:read_u8(0x100022),
+            machine.time:as_double()))
+    end)
+local reason_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x11fed4, 0x11fed7,
+    'nsm1_restart_reason', function(offset, value, mask)
+        if reason_writes >= 32 then return end
+        reason_writes = reason_writes + 1
+        machine:logerror(string.format(
+            'nsm1_restart_reason: pc=%08x value=%08x mask=%08x caller=%08x task=%02x t=%.9f\n',
+            cpu.state['PC'].value, value, mask, cpu.state['R14'].value,
+            memory:read_u8(0x100022), machine.time:as_double()))
+    end)
+local boot_selections = 0
+handles[#handles + 1] = memory:install_read_tap(0x2810a0, 0x2810a3,
+    'nsm1_boot_selection', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x2810a0 or boot_selections >= 16 then return end
+        boot_selections = boot_selections + 1
+        machine:logerror(string.format(
+            'nsm1_boot_selection: selected=%08x reason=%02x task=%02x t=%.9f\n',
+            cpu.state['R0'].value, memory:read_u8(0x11fed5),
+            memory:read_u8(0x100022), machine.time:as_double()))
+    end)
 local owner_messages = 0
 local owner_message_sites = {}
 handles[#handles + 1] = memory:install_read_tap(0x2c17fc, 0x2c17ff,

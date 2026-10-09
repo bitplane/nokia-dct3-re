@@ -12,6 +12,10 @@ support and graphical boot are not promoted. An explicitly separate
 The next prerequisite is establishing matching resident DSP behavior and
 runtime validity of the explicitly derived product-local EEPROM fixture,
 plus fitted flash attributes and address aliases.
+The first concrete runtime compatibility question is now task 2's rejection
+of a type-`0x74`/`35 32` packet and explicit reason-4 restart. Decode that
+packet/validation boundary before attempting to supply downstream SIM or
+battery-readiness inputs. See the restart contract below.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
 
@@ -473,16 +477,59 @@ helper samples CCONT ADC selector 5 through GENSIO, not a DSP-owned value.
 The physical pin/source and units remain unproved for NSM-1; do not import
 another product's channel name or alter its sample to trigger the report.
 
-Next: determine which ordinary power/startup input selects fast-VBAT
-sampling and its report `0x14`; distinguish that from
-the charging initialization now identified. Check any additional
-initialization input against the own-ROM startup source,
-keeping the alternate scalar `0xc7` lifecycle separate,
-while keeping the task-0 scheduling caller unresolved; determine what
-prevents ordinary boot from advancing into card activation. Include direct
-queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
-GPIO ownership independently. Do not inject an event, force the readiness
-byte, replace the verifier result or infer a missing DSP message solely
+### Startup selection and held-key control
+
+Task-1 selector `0x2bc37a` reads firmware reason byte `0x11fed5` through
+`0x2b5e64`. Class 1 takes `0x2810c8` and sends task 20 input `0x41` via
+`0x2b3f72`; class 2 takes `0x281150` without that send. Class 5 also enters
+`0x281150`, explicitly through `0x2804f4/0x2804f8`. Do not treat the
+absence of `0x41` as proof that an executed sender lost its message.
+
+The released-key cold control selects class 2 for reason `0x0a` at
+0.323491 s. After the early reset, reason `0x04` selects class 5 at
+0.760326 s. `tools/nsm1_power_key_fixture.lua` holds only the physical PWR
+input from startup through one second: it changes the first selection to
+class 5, but the post-reset selection is again class 5/reason `0x04`.
+Both fresh nine-second runs retain the blank frame, no observed task-20
+scalar sends and no activation-wrapper calls. The model responds to the
+input; it does not provide a missing ordinary-startup request. The NSE-1
+keypad wiring is provisional, so this is a model-level external-input
+control, not validated NSM-1 power-key decoding or a real-hardware exclusion.
+
+### Explicit packet-triggered restart
+
+The early reset is firmware-requested, not a watchdog timeout. A fresh
+cold trace enters non-returning request `0x2c2a02` from `0x27e7f8`, task 2,
+with reason 4 at 0.461303 s. The handler records the reason in `0x11fee4`
+and writes MCU reset control; the next boot copies that retained reason
+to `0x11fed5`. The direct-call census has eight request candidates; the
+runtime observation identifies this particular caller without interpreting
+the last callee's LR at the eventual MMIO write as the requester.
+
+Task-4 converter `0x2ab7c8`, called from dispatcher `0x2c1c80`, creates the
+task-2 object from the `0x70` packet family. The observed source packet at
+`0x101fdc` begins `18 02 34 74 35 32 00 00 20 67 3c c1 76 0d f2 c7`.
+It becomes object `0x102030`, header `000000740036010035320000`, through
+the copy at `0x2ab80c` and post at `0x2ab814`. Sender `0x275cb0` can carry
+object pointers as well as scalar inputs: zero observations at the other
+two send primitives do not establish absence of task-2 delivery.
+
+Own handler `0x27e618` (direct candidate caller `0x23fe4c`) rejects this
+object, with local valid flag 0, class 2 and marker `0x5a` at `0x27e7cc`.
+It updates the retained restart structure and checksum, sets reason 4,
+then requests reset. This locates the rejection, not its root cause:
+the packet's full semantics, validation alternatives and compatibility of
+the NSE-1 resident ROM4 with NSM-1 remain unproved. No payload may be
+replaced with guessed passing bytes. The post-reset `35 32` packet differs
+in its body; do not assume a fixed template or replay the first response.
+
+Next: recover the type-`0x74`/`35 32` request/response and task-2 validation
+contract, including why the first response enters reason-4 restart and how
+the restart marker changes later handling. Keep the SIM/readiness backtrace
+as a measured downstream dependency, not proof that synthesizing its
+missing report would repair this earlier boundary. Keep validating NSM-1
+GPIO ownership independently. Do not inject an event, force readiness,
+replace a verifier/packet result or infer a missing DSP message solely
 from the blank display.
 
 ## Own-firmware contract

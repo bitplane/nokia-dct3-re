@@ -355,6 +355,18 @@ def verify(image: bytes) -> dict:
         "reset_stack_literals": [literal(image, pc, thumb=False)
                                  for pc in (0x200068, 0x200090, 0x2000B0)],
         "loader": 0x2A479E,
+        "restart_boundary": {
+            "request": 0x2C2A02,
+            "call_candidates": direct_call_candidates(image, 0x2C2A02),
+            "task2_call_site": 0x27E7F8,
+            "task2_handler": 0x27E618,
+            "handler_call_candidates": direct_call_candidates(image, 0x27E618),
+            "retained_reason": literal(image, 0x27E7F4),
+            "packet_constructor": 0x2AB7C8,
+            "constructor_call_candidates": direct_call_candidates(image, 0x2AB7C8),
+            "task": 2, "sender": 0x275CB0,
+            "sender_call_site": 0x2AB814,
+            "compatibility_validated": False},
         "sim_delivery": {"receive_loop": 0x288114, "receive": 0x275DB4,
                          "sender": 0x27641C, "current_task": 0x100022,
                          "blocking_sender": 0x275B60,
