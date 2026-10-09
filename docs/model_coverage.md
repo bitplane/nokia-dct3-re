@@ -48,6 +48,11 @@ rebase the hardware day increment; reopened Calendar shows 8 October 2026,
 Thursday. Another cold process retains that date and laboratory registration.
 This covers one ordinary-day transition, not leap/year boundaries or
 automatic redraw of an already-open Calendar window.
+`verify-6210-calendar-leap-day` and `verify-6210-calendar-year-end` separately
+exercise physical 28 February 2024 -> 29 February 2024 and 31 December 2026
+-> 1 January 2027. Each checks both date frames, organic midnight/day
+consumption and a retained cold Calendar with registration. Non-leap
+February and other calendar boundaries remain outside these cases.
 
 The 6210 research-HLE pending-outgoing and alerting-incoming SIP restore
 gates independently prove exact architectural restoration, external-dialog

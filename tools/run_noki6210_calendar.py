@@ -16,6 +16,20 @@ from tools.noki6210_staged_check import verify as verify_stage
 
 CALENDAR_SHA256 = 'fcf0327cc0cc4edb952d0dc37621e467c0810b867738de6c91f39354a9c3a3b3'
 MIDNIGHT_SHA256 = 'a04551d523cb8e0adf4efe4da7e6bdcc6ec683dc264a8e791aed57ae798d4d01'
+BOUNDARIES = {
+    'leap-day': {
+        'script': 'calendar_leap_input',
+        'before': 'ed6aad596773e123f80db40fe8034ea55cc8fb78b1346766437814658b12b7db',
+        'after': '4dbca58bfc5f7a97df617fbffa70686eead09c0b9c4bc9bfcedf878b52aaa45e',
+        'description': '28 February -> 29 February 2024',
+    },
+    'year-end': {
+        'script': 'calendar_year_input',
+        'before': 'af17a183794279bf85b189fc8c1ccd11680e5d79f56d91cc845757ca1c53cd0a',
+        'after': '4624ec9f948d58f2d2e25ade39d988ebde69cb996dc5c77240249d7d711e5d8e',
+        'description': '31 December 2026 -> 1 January 2027',
+    },
+}
 
 
 def check_entry(text, rtc, *, midnight=False):
@@ -74,7 +88,14 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--midnight', action='store_true',
                         help='enter 23:59, cross midnight organically and cold-read the next day')
+    parser.add_argument('--boundary', choices=BOUNDARIES,
+                        help='select an independently reviewed boundary-date fixture; implies --midnight')
     args = parser.parse_args()
+    args.midnight = args.midnight or args.boundary is not None
+    boundary = BOUNDARIES.get(args.boundary)
+    before_hash = boundary['before'] if boundary else CALENDAR_SHA256
+    after_hash = boundary['after'] if boundary else MIDNIGHT_SHA256 if args.midnight else CALENDAR_SHA256
+    entry_script = boundary['script'] if boundary else 'calendar_midnight_input' if args.midnight else 'calendar_input'
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
@@ -85,7 +106,7 @@ def main():
         from PIL import Image
         for phase, seconds, script, frame in (
             ('entry', 135 if args.midnight else 52,
-             'calendar_midnight_input' if args.midnight else 'calendar_input',
+             entry_script,
              '6210_calendar_midnight_result.png' if args.midnight else '6210_calendar_after_date.png'),
             ('cold', 34, 'calendar_cold_input', '6210_calendar_cold_result.png'),
         ):
@@ -115,9 +136,9 @@ def main():
                 check_cold(text, rtc, expected=(0, 0) if args.midnight else (47, 13))
             if args.midnight and phase == 'entry':
                 with Image.open(directory / 'snap/6210_calendar_after_date.png') as rendered:
-                    check_frame(rendered, CALENDAR_SHA256, 'original 7 October 2026 Calendar')
+                    check_frame(rendered, before_hash, 'original fixture Calendar date')
             with Image.open(directory / 'snap' / frame) as rendered:
-                check_frame(rendered, MIDNIGHT_SHA256 if args.midnight else CALENDAR_SHA256,
+                check_frame(rendered, after_hash, boundary['description'] if boundary else
                             '8 October 2026 Thursday Calendar' if args.midnight else
                             '7 October 2026 Wednesday Calendar')
         print('6210 Calendar: PASS physical entry, CCONT time, ' +
