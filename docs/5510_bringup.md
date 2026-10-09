@@ -2194,6 +2194,19 @@ multiword-store and return fixtures, but the metadata diagnostic still has
 cursor 27, RX/TX 36/47 and no metadata delivery. It does not close this
 general timer/write/pipeline boundary.
 
+The current `bootrecsave` reproduction again reaches original resident
+startup and control return, but stops with cursor 27, RX-ready set, zero
+tracks and PRD `1`; the metadata packet has not been delivered. This remains
+a CPU interrupt-recognition/pipeline-drain question, not evidence of metadata
+rejection. A blanket return-instruction guard is not established by
+[SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf): section 6.10.7
+explicitly protects SSBX/RSBX INTM and their following instruction, while
+section 7.2 examples 7-9/7-10 describe RETE/RETED clearing INTM during execute.
+Do not transfer that instruction-specific guarantee to RETE, RETF or FRETE,
+or choose a fixed post-return delay to make this firmware advance. The next
+CPU experiment must distinguish recognition, already-decoded instruction
+drain and memory-mapped timer-write visibility using firmware-free fixtures.
+
 The ISR's return path is also checked independently of its endpoint PC.
 The vector saves XPC, the handler reserves a frame word, and its stack store
 selects the original `FRETE` stub at `02:4044`. A bounded read-only trace
