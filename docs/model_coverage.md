@@ -503,7 +503,10 @@ successful terminal-response text TLVs and five own frames through idle.
 `verify-6250-sim-toolkit-menu` additionally proves card-owned SET UP MENU,
 physical navigation and item-1 selection, exact firmware ENVELOPE and four
 own menu/recovery frames with independently checked registration/storage.
-Network Toolkit commands remain unpromoted for this product.
+`verify-6250-sim-toolkit-sms` additionally validates card-requested SEND SHORT
+MESSAGE through exact CP/RP submission and acknowledgements, successful
+TERMINAL RESPONSE, RR release and physical idle recovery. This is laboratory
+SMS signaling; Toolkit call consent and native speech remain unpromoted.
 
 `verify-8890-minute-redraw` extends the retained cold clock to a serviced minute
 interrupt and reviewed 13:48 idle. The four GSM900/PCS incoming/outgoing

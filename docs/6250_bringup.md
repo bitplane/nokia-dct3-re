@@ -1343,5 +1343,15 @@ item 1. Firmware emits ENVELOPE `d30702020181100101`, receiving `9000`;
 physical End returns to registered idle. Four additional own 96x60 frames
 cover the menu entry, item list, selection result and idle recovery. The
 fresh isolated acceptance also requires normal own upload, laboratory
-registration and persisted SIM location checks. Network Toolkit commands
-and native DSP/audio remain unpromoted.
+registration and persisted SIM location checks.
+
+`verify-6250-sim-toolkit-sms` uses card profile 5 on the same physical menu
+path. Item-1 ENVELOPE returns `9124`; firmware fetches the card-owned SEND
+SHORT MESSAGE command (length `24`) and submits exactly one 8-bit `SAT`
+message to `5551234` through laboratory GSM CP/RP. The checker pins observed
+CP identifier `39` and message reference `01`, the complete SMS payload,
+CP-ACK/RP-ACK, successful TERMINAL RESPONSE
+`810305130002028281030100`, final CP-ACK and RR release. Ten reviewed own
+frames cover input, menu, network completion and physical End to idle.
+This validates laboratory signaling, not public-network delivery. Toolkit
+call consent and native DSP/audio remain unpromoted.

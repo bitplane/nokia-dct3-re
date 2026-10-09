@@ -15184,6 +15184,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "toolkit-menu", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-sim-toolkit-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "toolkit-sms", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-sim-toolkit",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
