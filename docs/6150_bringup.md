@@ -54,9 +54,39 @@ and data files declared in the driver:
   -autoboot_script ../tools/nsm1_native_observe.lua
 ```
 
-Next: decode the own-firmware policy consuming those verifier words and
-the live post-verifier wait, then establish the remaining GPIO/LCD
-register contracts. Do not replace the result with a passing HLE value.
+### Current unresolved predicate
+
+Own supervisor `0x2b6180` repeatedly calls readiness predicate `0x29ed4c`.
+It requires nonzero bytes at `0x111ea0` and `0x10e6d0`, plus selector helper
+`0x27bde4`: selector byte `0x10be8c==0` requires `0x10e6ce==1`; a nonzero
+selector requires `0x10e6ce!=0`. Failure at `0x2b61be` skips the subsequent
+readiness chain and enters the supervisor latch loop. The static checker
+pins all relevant branch instructions and state literals. These are
+software states, not yet identified physical input semantics.
+
+Fresh native observation at eight seconds gives first/selector/second/third
+`01/ff/00/01`: **the second input alone is false**. The remaining question
+is which legitimate firmware lifecycle writes `0x10e6ce`, and what supplies
+its prerequisite. The literal scan identifies references to selector
+`0x10be8c`, including message-driven stores at `0x2009a0` and `0x2038f4`;
+this does not establish an EEPROM field or justify changing provisioning.
+
+The native service path is not simply absent. Own `0x2ab6ce` posts `0x622a`,
+waits for bit 2 of `0x11fdd1` to clear, and returns success if bit 6 is set.
+The observed return at `0x2b601a` is `1`, with `0x11fdd1=0x48` and DSP state
+`0x111a94=1` at eight seconds. This proves that completion path ran, not
+that every self-test, radio or UI prerequisite passed.
+
+Observed LCD initializer `0x2bfaa0` writes command `0x24`, bank commands
+`0x40..0x45`, column command `0x80` and six 84-byte zero banks through data
+register `0x2b`, followed by command `0x20` through `0x2c`. Its status polls
+use `0x29` bit 0. Clearing the display is therefore real firmware activity;
+a blank frame must not be classified as a missing LCD initializer.
+
+Next: census writers of the false readiness state and its surrounding
+object, while independently validating the NSM-1 GPIO layout. Do not force
+the state, replace the verifier result, or infer a missing DSP message
+solely from the blank display.
 
 ## Own-firmware contract
 

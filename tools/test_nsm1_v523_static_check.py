@@ -5,6 +5,18 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_readiness_selector_and_all_three_inputs(self):
+        for selector in (0, 1, 0xFF):
+            for first in (0, 1):
+                for second in (0, 1, 2):
+                    for third in (0, 1):
+                        expected = bool(first and third and
+                                        (second == 1 if selector == 0 else second != 0))
+                        self.assertEqual(expected, check.readiness(first, selector, second, third))
+        self.assertFalse(check.readiness(1, 0xFF, 0, 1))
+        with self.assertRaisesRegex(ValueError, "must be bytes"):
+            check.readiness(1, 256, 1, 1)
+
     def test_own_serial_reader_contract_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

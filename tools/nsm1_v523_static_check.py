@@ -23,6 +23,10 @@ EEPROM_SHA256 = "95d3326ab9bbcdb31838696c552f56295aac9b234cad53813aff7af9e0a73cb
 EEPROM_MEMBER = "NokiX/scripts/scripts/misc/repair_external_eeprom/nsm-1.bin"
 STREAM_WORDS = 127 * 512 + 510
 SPANS = (
+    (0x29ED4C, 0x29ED70, "fa727c06b546c9726d9892442b6441c67057d3d464b4d830008fdc06a012fcd5"),
+    (0x27BDE4, 0x27BE06, "b6f49be79cb8a9b04fdde305d51c8c30b111cba7a64c060844eb7a173baa5888"),
+    (0x2B61B8, 0x2B6202, "7b121dee6303c3ff540a15e8912f20389ef1a406aceac774e752ba7f9dcb97ab"),
+    (0x2AB6CE, 0x2AB6F8, "ac841cbd40e302ba62164d568653150d9a0532ad4a2ab9b5ed8d9746141aedae"),
     (0x2BF082, 0x2BF0AE, "e4d653116034ca56e11435d99cacd9ed548f7becef6efa3b555bb318b89358d5"),
     (0x200040, 0x2000EC, "417277417929323fd0b5c97b34413f832015aa1d7938ea6152b7f523b9e4ea16"),
     (0x2A479E, 0x2A48AA, "07324fa54680e19536956abe4c25ec8be177d7fc6e6392f3ca4b34b16338d577"),
@@ -157,6 +161,13 @@ def security_fixture(eeprom: bytes, contract: dict) -> bytes:
     return bytes(result)
 
 
+def readiness(first: int, selector: int, second: int, third: int) -> bool:
+    """Own 0x29ed4c / 0x27bde4 byte-state predicate, not a state setter."""
+    if any(not 0 <= value <= 0xFF for value in (first, selector, second, third)):
+        raise ValueError("readiness inputs must be bytes")
+    return bool(first and third and (second == 1 if selector == 0 else second != 0))
+
+
 def verify(image: bytes) -> dict:
     if len(image) != SIZE or hashlib.sha1(image).hexdigest() != SHA1:
         raise ValueError("not the normalized NSM-1 v5.23 PPM C image")
@@ -164,6 +175,24 @@ def verify(image: bytes) -> dict:
         if hashlib.sha256(image[begin - BASE:end - BASE]).hexdigest() != expected:
             raise ValueError(f"instruction span changed at {begin:#x}")
     anchors = {
+        0x29ED54: ("cmp", "r0, #0"),
+        0x29ED56: ("beq", "#0x29ed6a"),
+        0x29ED58: ("bl", "#0x27bde4"),
+        0x29ED5E: ("beq", "#0x29ed6a"),
+        0x29ED66: ("beq", "#0x29ed6a"),
+        0x29ED68: ("movs", "r4, #1"),
+        0x27BDE8: ("cmp", "r0, #0"),
+        0x27BDEA: ("bne", "#0x27bdf6"),
+        0x27BDF0: ("cmp", "r0, #1"),
+        0x27BDF2: ("beq", "#0x27bdfe"),
+        0x27BDFA: ("cmp", "r0, #0"),
+        0x27BDFC: ("beq", "#0x27be02"),
+        0x2B61B8: ("bl", "#0x29ed4c"),
+        0x2B61BE: ("beq", "#0x2b61f0"),
+        0x2AB6DC: ("lsrs", "r0, r0, #3"),
+        0x2AB6DE: ("bhs", "#0x2ab6d8"),
+        0x2AB6E4: ("lsrs", "r0, r0, #7"),
+        0x2AB6E6: ("blo", "#0x2ab6ec"),
         0x2BF08E: ("movs", "r2, #0x28"),
         0x2BF090: ("movs", "r1, #0x22"),
         0x2BF092: ("strb", "r1, [r2, r0]"),
@@ -236,6 +265,13 @@ def verify(image: bytes) -> dict:
         if (insn.mnemonic, insn.op_str) != expected:
             raise ValueError(f"instruction mismatch at {address:#x}")
     expected_literals = {
+        0x29ED50: 0x111EA0,
+        0x29ED60: 0x10E6D0,
+        0x27BDE4: 0x10BE8C,
+        0x27BDEC: 0x10E6CE,
+        0x27BDF6: 0x10E6CE,
+        0x2AB6D0: 0x622A,
+        0x2AB6D6: 0x11FD68,
         0x2BF08C: 0x20000,
         0x2A47A0: 0x10000,
         0x2A47A6: 0xFFFF,
@@ -267,6 +303,12 @@ def verify(image: bytes) -> dict:
         "reset_stack_literals": [literal(image, pc, thumb=False)
                                  for pc in (0x200068, 0x200090, 0x2000B0)],
         "loader": 0x2A479E,
+        "readiness": {"routine": 0x29ED4C, "selector_predicate": 0x27BDE4,
+                      "first": 0x111EA0, "selector": 0x10BE8C,
+                      "second": 0x10E6CE, "third": 0x10E6D0,
+                      "zero_selector_requires_second": 1,
+                      "nonzero_selector_requires_nonzero_second": True,
+                      "all_three_required": True},
         "gensio_read": {"routine": 0x2BF082, "base": 0x20000,
                         "control": 0x28, "selection": 0x22,
                         "tx": 0x2A, "status": 0x29,
