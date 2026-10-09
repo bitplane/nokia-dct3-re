@@ -5,6 +5,16 @@ local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
 local sim_sends = 0
+local activation_requests = 0
+handles[#handles + 1] = memory:install_read_tap(0x29cb90, 0x29cb93,
+    'nsm1_activation_request', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x29cb90 or activation_requests >= 16 then return end
+        activation_requests = activation_requests + 1
+        machine:logerror(string.format(
+            'nsm1_activation_request: caller=%08x selector=%02x t=%.9f\n',
+            cpu.state['R14'].value, memory:read_u8(0x10e6d6),
+            machine.time:as_double()))
+    end)
 local descriptor_events = 0
 for _, address in ipairs({0x275106, 0x275f9c}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,

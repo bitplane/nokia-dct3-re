@@ -181,8 +181,21 @@ without a return-selecting `r7` update, loops back to RTOS receive rather
 than returning the event to the outer SIM owner. Socket notification is
 therefore consumed as local state maintenance, not an activation request.
 
-Next: identify the outer SIM owner's legitimate activation event and
-its producer, while keeping the task-0 scheduling caller unresolved; determine what
+The outer owner at `0x2893de` receives through the same dispatcher. At
+`0x2893f0` it compares the returned event with `1`; that branch calls
+reset/activation routine `0x28842c`, then enters its subsequent receive
+phase. Own wrapper `0x29cb90` posts to task 22 via `0x275b60`: with
+selector byte `0x10e6d6` not equal to one it uses ROM object `0x2e0720`
+(event `1`); otherwise it sets `0x10e6cf` to two and uses `0x2e0718`
+(event `0x20`). The bounded linear Thumb call scan finds wrapper call
+candidates `0x2077e4` and `0x207bb0`, not an exhaustive indirect-call
+closure. A fresh nine-second cold run with an entry tap observes no
+invocation of the wrapper. Thus an activation producer exists in this
+ROM; its caller lifecycle, not a manufactured SIM event, is the next
+boundary to investigate.
+
+Next: decode the two activation-wrapper caller contexts and their gates,
+while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
 GPIO ownership independently. Do not inject an event, force the readiness
