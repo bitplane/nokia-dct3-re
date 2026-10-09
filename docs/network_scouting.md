@@ -927,9 +927,12 @@ checker's `--require-cipher` option: repeated uplink/downlink A5 frame/count
 observations occur inside the two-second reference interval and match exactly
 after restoration (56 total selected replay records). The option rejects
 media-only intervals and divergent cipher records. This verifies observed
-frame/count progression, not ciphertext equality or native DSP execution;
-the strict option still needs wiring into the model gates after cross-model
-revalidation.
+frame/count progression, not ciphertext equality or native DSP execution.
+The encrypted degraded-state gates for 3310, 3330, 3410 and 5210 now require
+`--require-cipher`; each passes an independent fresh run with repeated
+observations in both directions. Their exact selected replay record counts
+are 56, 58, 52 and 47 respectively. These counts describe the accepted runs,
+not protocol constants or fixed checker thresholds.
 
 NHM-6 v4.50E also independently carries an encrypted impaired incoming call
 after its own physical first-boot PMM provisioning and cold phone-code entry.

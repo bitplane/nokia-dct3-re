@@ -1357,7 +1357,7 @@ verify-5210-radio-authentication: normalize-5210
 verify-5210-radio-a5-1-degraded-state: normalize-5210
 	@$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=23 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
-	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log --require-cipher
 	$(PYTHON) tools/radio_5210_incoming_call_trace_check.py $(RUN_DIR)/error.log --a5-1 --require-state-roundtrip
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log
@@ -2025,7 +2025,7 @@ verify-3410-radio-a5-1-outgoing-degraded: normalize-3410
 verify-3410-radio-a5-1-degraded-state: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300) NOKIA_DCT3_STATE_ROUNDTRIP_AT=18.51 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
-	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log --require-cipher
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log
@@ -3078,7 +3078,7 @@ verify-3310-radio-outgoing-call-lifecycle:
 verify-3310-radio-a5-1-degraded-state:
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3310) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=21 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=navi'
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
-	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)/error.log --require-cipher
 	$(PYTHON) tools/radio_3310_incoming_call_boundary_check.py $(RUN_DIR)/error.log --ended
 	$(PYTHON) tools/radio_3310_speech_control_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
@@ -3122,7 +3122,7 @@ verify-3330-radio-a5-1-degraded-state: normalize-3330
 	@$(PYTHON) tools/check_model_frontier_summary.py $(RUN_DIR)_provision/boot_summary.txt --require-fiq0
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR)_call SECONDS=32 RUN_VERBOSE=1 PRESERVE_NVRAM=1 RUN_NVRAM_DIR=$(abspath $(RUN_DIR)_provision/nvram) RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=1,2,3,4,5,enter,wait500,c,wait500,c,wait500,waitalerting,enter NOKIA_DCT3_POST_READY_KEY_DELAY_MS=6000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=15 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=enter'
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)_call/error.log
-	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)_call/error.log
+	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py $(RUN_DIR)_call/error.log --require-cipher
 	$(PYTHON) tools/radio_3330_incoming_call_boundary_check.py $(RUN_DIR)_call/error.log
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)_call/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)_call/error.log
