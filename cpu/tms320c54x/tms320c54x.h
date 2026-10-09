@@ -44,7 +44,8 @@ public:
 		STATE_XPC,
 		STATE_TIM,
 		STATE_PRD,
-		STATE_TCR
+		STATE_TCR,
+		STATE_TRN
 	};
 
 protected:
@@ -137,6 +138,7 @@ private:
 	u64 m_a = 0;
 	u64 m_b = 0;
 	u16 m_t = 0;
+	u16 m_trn = 0;
 	u16 m_sp = 0;
 	u16 m_sp_address_base = 0;
 	bool m_sp_address_pending = false;

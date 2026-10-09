@@ -643,6 +643,37 @@ private:
 		m_phase = (trap ? 92000 : 2701) + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_trn_store_case(unsigned index)
+	{
+		static constexpr u16 values[] = {0, 0xffff, 0x8001, 0x1234};
+		auto &program = m_cpu->space(AS_PROGRAM);
+		unsigned const mode = index % 3;
+		program.write_word(0x05e0, 0x760f); // ST #lk, TRN via its MMR.
+		program.write_word(0x05e1, values[index / 3]);
+		program.write_word(0x05e2, 0x480f); // LDM TRN,A.
+		program.write_word(0x05e3, 0x75d6);
+		program.write_word(0x05e4, 0x0124);
+		program.write_word(0x05e5, mode == 0 ? 0x8d45 : mode == 1 ? 0x8dd2 : 0x8df8);
+		unsigned next = 0x05e6;
+		if (mode == 2) program.write_word(next++, 0x0f67);
+		program.write_word(next++, 0x75d6);
+		program.write_word(next++, 0x0124);
+		program.write_word(next, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(mode == 0 ? 0x0045 : 0x0f67, 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TRN, 0xabcd);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x9876);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f67);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x1100);
+		m_cpu->set_state_int(STATE_GENPC, 0x05e0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_port_writes = 0;
+		m_phase = 93000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_return_alt_case(unsigned index)
 	{
 		static constexpr u64 values[] = {0xffffffffffULL, 0x8000000000ULL, 0, 1, 0x7fffffffffULL};
@@ -18207,6 +18238,27 @@ private:
 				"TRAP selects IPTR:K, pushes next PC, preserves INTM/IFR and costs three cycles");
 			if (index < 63) { start_software_interrupt_case(index + 1, true); return; }
 			osd_printf_info("TMS320C54x TRAP conformance: PASS variants=64\n");
+			start_trn_store_case(0);
+			return;
+		}
+		if (m_phase >= 93000 && m_phase < 93012)
+		{
+			static constexpr u16 values[] = {0, 0xffff, 0x8001, 0x1234};
+			unsigned const index = m_phase - 93000, mode = index % 3;
+			u16 const expected = values[index / 3];
+			expect_opcode(mode == 0 ? 0x8d45 : mode == 1 ? 0x8dd2 : 0x8df8,
+				data.read_word(mode == 0 ? 0x0045 : 0x0f67) == expected &&
+				m_cpu->state_int(tms320c54x_device::STATE_TRN) == expected &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == expected &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 0x12345678 &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x9876 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0900 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (mode == 1 ? 0x0f60 : 0x0f67) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (mode == 2 ? 4 : 3),
+				"ST TRN uses writable/readable MMR state, preserves flags and supports circular/absolute stores");
+			if (index < 11) { start_trn_store_case(index + 1); return; }
+			osd_printf_info("TMS320C54x TRN store conformance: PASS variants=12\n");
 			start_compact_store_case(0);
 			return;
 		}

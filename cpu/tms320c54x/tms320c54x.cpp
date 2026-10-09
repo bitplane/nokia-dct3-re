@@ -171,6 +171,7 @@ void tms320c54x_device::device_start()
 	state_add(STATE_A, "A", m_a).mask(ACC_MASK).formatstr("%010X");
 	state_add(STATE_B, "B", m_b).mask(ACC_MASK).formatstr("%010X");
 	state_add(STATE_T, "T", m_t).formatstr("%04X");
+	state_add(STATE_TRN, "TRN", m_trn).formatstr("%04X");
 	state_add(STATE_SP, "SP", m_sp).formatstr("%04X");
 	state_add(STATE_ST0, "ST0", m_st0).formatstr("%04X");
 	state_add(STATE_ST1, "ST1", m_st1).callimport().formatstr("%04X");
@@ -195,6 +196,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_a));
 	save_item(NAME(m_b));
 	save_item(NAME(m_t));
+	save_item(NAME(m_trn));
 	save_item(NAME(m_sp));
 	save_item(NAME(m_sp_address_base));
 	save_item(NAME(m_sp_address_pending));
@@ -254,6 +256,7 @@ void tms320c54x_device::device_reset()
 	m_a = 0;
 	m_b = 0;
 	m_t = 0;
+	m_trn = 0;
 	m_sp = 0;
 	// C54x silicon resets DP to page 0x1f with ARP/CNF set.  ROM4's
 	// resident dispatcher relies on this state surviving loader startup.
@@ -452,6 +455,8 @@ u16 tms320c54x_device::data_read(u16 address)
 		return u16(m_b >> 32);
 	if (address == 0x0e)
 		return m_t;
+	if (address == 0x0f)
+		return m_trn;
 	if (address >= 0x10 && address <= 0x17)
 		return m_ar[address - 0x10];
 	if (address == 0x18)
@@ -509,6 +514,8 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		m_b = (m_b & ~u64(0xff00000000)) | (u64(value & 0xff) << 32);
 	else if (address == 0x0e)
 		m_t = value;
+	else if (address == 0x0f)
+		m_trn = value;
 	else if (address >= 0x10 && address <= 0x17)
 		m_ar[address - 0x10] = value;
 	else if (address == 0x18)
@@ -1789,7 +1796,8 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x8c00: // ST T, Smem
-		indirect_write(low, m_t);
+	case 0x8d00: // ST TRN, Smem (SPRU172C 4-167)
+		indirect_write(low, BIT(op, 8) ? m_trn : m_t);
 		m_icount -= low >= 0xe0;
 		return;
 	case 0x8b00: // POPD Smem

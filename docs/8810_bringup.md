@@ -29,8 +29,13 @@ digits through physical contacts: the 12.5-second snapshot shows five masked
 characters, and OK produces Code error at 13.5 seconds. The late frame returns
 to the editor in the erased-retry negative control. Initializing the synthetic
 retry count permits the same physical code to be accepted, reaching a Menu /
-Names frame. The current boundary is a firmware-requested restart near
-31.968 seconds and card/service execution, not ordinary menu input.
+Names frame with the earlier stalled-core compatibility fixture. Correcting
+native TRN storage advances DSP execution but changes this result: the current
+fresh run stops at unsupported `0x4ac0` (DSP PC `0x0803`), leaves the MCU in
+its verifier loop, and captures a blank menu frame. No reset-control write is
+observed through 40 seconds in that run; this is not a successful boot.
+The menu/input observations below remain evidence for the earlier composition,
+not acceptance of the current native instruction path.
 No donor identity or lock state is supplied.
 
 The display-transport observer records 15,684 data bytes, 2,774 nonzero,
@@ -79,6 +84,13 @@ The restart near 32 seconds persists. CCONT clock control remains `0x56`
 before restart. The differing post-reset execution requires checking retained
 state and instruction-stream provenance, not assuming every encountered word
 is a missing instruction.
+`0x8dd2` is `ST TRN,*AR2+%`. TRN now has explicit debugger/save-state
+storage and MMR `0x0f`, following [TI SPRU131G, table 3-3](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+Twelve executable cases cover MMR writes/reads, direct, circular and absolute
+stores, bit patterns, preservation and instruction cost. The fresh native run
+then encounters `0x4ac0` at `0x0803`, with blank display and MCU verifier
+activity through 40 seconds. CMPS/TRN update semantics remain unimplemented;
+the store correction alone is not complete trellis-unit emulation.
 This advances native execution; it does not yet prove the stalled DSP causes
 the reset or establish compatibility with the handset's fitted DSP mask.
 The late phonebook-save attempt crosses this restart boundary, so persistence
