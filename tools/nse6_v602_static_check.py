@@ -70,7 +70,10 @@ def check(image):
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
         (0x2E1146, 0x20000), (0x2E1184, 0x20000),
-        (0x2E11A0, 0x20000), (0x2DFC9C, 0x20000))
+        (0x2E11A0, 0x20000), (0x2DFC9C, 0x20000),
+        (0x2CA5D2, 0x20036), (0x2CA81A, 0x2003D),
+        (0x2CA820, 0x20037), (0x2CA8A2, 0x20038),
+        (0x2CA91E, 0x20000), (0x2CA988, 0x20037))
     for address, expected in expected_literals:
         thumb = address >= 0x2000EC
         decoder.mode = ((capstone.CS_MODE_THUMB if thumb else capstone.CS_MODE_ARM)
@@ -165,7 +168,19 @@ def check(image):
         (0x2DFBF2, "movs", "r1, #0x28"),
         (0x2DFBF4, "movs", "r0, #0x22"),
         (0x2DFC46, "movs", "r0, #0x2a"),
-        (0x2DFC48, "strb", "r4, [r0, r5]"))
+        (0x2DFC48, "strb", "r4, [r0, r5]"),
+        (0x2CA822, "ldrb", "r0, [r5, #5]"),
+        (0x2CA828, "ldrb", "r0, [r5]"),
+        (0x2CA834, "bne", "#0x2ca828"),
+        (0x2CA920, "movs", "r1, #0x38"),
+        (0x2CA922, "movs", "r0, #0xff"),
+        (0x2CA924, "strb", "r0, [r1, r4]"),
+        (0x2CA97C, "movs", "r0, #0x39"),
+        (0x2CA97E, "movs", "r1, #0x32"),
+        (0x2CA980, "strb", "r1, [r0, r4]"),
+        (0x2CA98A, "ldrb", "r0, [r1, #5]"),
+        (0x2CA996, "ldrb", "r2, [r1]"),
+        (0x2CA9A4, "bne", "#0x2ca992"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -181,6 +196,11 @@ def check(image):
             "service_manual_sram_bytes": 0x40000,
             "service_manual_eeprom_bytes": 0x8000,
             "eeprom_descriptor": eeprom_descriptor(image[5]),
+            "simi": {"initializer": "0x2ca910", "receiver": "0x2ca986",
+                     "tx_register": "0x36", "rx_register": "0x37",
+                     "iir_register": "0x38", "control_register": "0x39",
+                     "rx_count_register": "0x3c", "initial_control": "0x32",
+                     "runtime_card_exchange_proven": False},
             "gensio": {"ccont_reader": "0x2dfc60", "ccont_writer": "0x2dfba8",
                        "ccont_write": "0x2a", "control": "0x28",
                        "lcd_data": "0x2b", "ccont_read": "0x2d",

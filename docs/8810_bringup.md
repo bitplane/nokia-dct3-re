@@ -144,6 +144,16 @@ The bytes coincide with independently recovered NSE-1/NSM-1 tables, but are
 checked against this image rather than assumed from those products. Host
 button labels and runtime input acceptance are not yet established.
 
+### SIMI
+
+Initializer `0x2ca910` writes `0xff` at IIR `0x38`, configures the controller
+and finally writes control `0x39 = 0x32`. Transmit routine `0x2ca5ac` loads
+base `0x20036`; receive routine `0x2ca986` loads `0x20037`, checks RX count
+at base+5 (`0x3c`), and drains bytes while that count is nonzero. The interrupt
+receive routine `0x2ca80c` uses the same count/data pair, with FIFO control at
+`0x3d`. This supports the existing controller register window, not a claim of
+completed ATR/PPS/APDU exchange on NSE-6 or measured serial timing.
+
 ## Acceptance Required Before Promotion
 
 Run the hash-pinned package/reset check with
