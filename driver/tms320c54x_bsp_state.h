@@ -46,7 +46,13 @@ struct tms320c54x_bsp_state
 			transmit_ready = false;
 		}
 	}
-	bool frame_transmit(std::uint16_t &value, bool *ready_edge = nullptr)
+	unsigned word_bits(std::uint16_t extension = 0) const
+	{
+		return extension & 0x0080 ? (control & 0x0004 ? 12 : 10)
+				: (control & 0x0004 ? 8 : 16);
+	}
+	bool frame_transmit(std::uint16_t &value, bool *ready_edge = nullptr,
+			std::uint16_t extension = 0)
 	{
 		if (ready_edge)
 			*ready_edge = false;
@@ -54,14 +60,14 @@ struct tms320c54x_bsp_state
 			return false;
 		// External FSX retransmits the retained DXR on underrun (SPRU131G
 		// 9.2.4). Only a new write drops XRDY before the next frame.
-		value = control & 0x0004 ? transmit & 0x00ff : transmit;
+		value = transmit & ((1U << word_bits(extension)) - 1);
 		if (ready_edge)
 			*ready_edge = !transmit_ready;
 		transmit_pending = false;
 		transmit_ready = true;
 		return true;
 	}
-	bool frame_receive(std::uint16_t value)
+	bool frame_receive(std::uint16_t value, std::uint16_t extension = 0)
 	{
 		if (!(control & 0x0080) || receive_overrun)
 			return false;
@@ -70,11 +76,13 @@ struct tms320c54x_bsp_state
 			receive_overrun = true;
 			return false;
 		}
-		// BSP (unlike SP) sign-extends 8-bit receptions. The DXR latch
-		// retains all bits even when only its low byte crosses the wire.
-		receive = control & 0x0004
-				? std::uint16_t((value & 0x0080) ? (value | 0xff00) : (value & 0x00ff))
-				: value;
+		// BSP sign-extends 8/10/12-bit receptions (SPRU131G table 9-9).
+		// DXR retains all bits even when only its low bits cross the wire.
+		const unsigned bits = word_bits(extension);
+		const unsigned mask = (1U << bits) - 1;
+		const unsigned payload = value & mask;
+		receive = std::uint16_t(payload & (1U << (bits - 1))
+				? payload | ~mask : payload);
 		receive_ready = true;
 		return true;
 	}

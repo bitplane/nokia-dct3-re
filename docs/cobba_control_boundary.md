@@ -394,8 +394,18 @@ reset-time preloading remains outside the established subset. FO=0 16-bit
 words and FO=1 8-bit words are tested over all 65,536 input values: the
 transmit latch retains its upper byte while the wire ignores it in 8-bit
 mode, and BSP reception sign-extends the low byte (TI section 9.2.2).
-The extension-selected 10/12-bit formats remain unimplemented. The suite also
-checks all 65,536 control-write values and the state transitions. Native coherent
+Extension bit 7 (FE) now combines with BSPC bit 2 (FO) to select 16/10/8/12
+bits as specified by TI table 9-10. Each format transmits the right-justified
+payload and sign-extends reception; all 65,536 input words are tested in
+each of the four formats, including retransmit/ready-edge behavior. Native
+frames consult the saved data-`0023` latch, without changing its reset value
+or claiming that firmware uses FE in the observed boot. The generic TI
+BSPCE reset value is `0003`, whereas the current MAD2 latch is `0000`;
+the product-specific reset/decode remains unresolved. DLB also remains
+unimplemented: TI connects DX/FSX internally to DR/FSR but still requires
+external CLKR when MCM is zero, so DLB cannot justify an untimed receive
+completion or bypass the missing receive-clock attachment (section 9.2.3).
+The suite also checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The
 tone run observes only the boot echo and its one receive ISR, not continuous

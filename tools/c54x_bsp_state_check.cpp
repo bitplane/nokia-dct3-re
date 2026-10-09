@@ -58,6 +58,25 @@ int main()
 	assert(port.control_r() == 0x0800 && port.receive == 0 && port.transmit == 0);
 	for (unsigned value = 0; value <= 0xffff; ++value)
 	{
+		for (unsigned format = 0; format != 4; ++format)
+		{
+			const unsigned bits[] = {16, 8, 10, 12};
+			const unsigned width = bits[format];
+			const std::uint16_t extension = format & 2 ? 0x0080 : 0;
+			const unsigned mask = (1U << width) - 1;
+			port.reset();
+			port.control_w(0x00c0 | (format & 1 ? 0x0004 : 0));
+			assert(port.word_bits(extension) == width);
+			port.transmit_w(value);
+			assert(port.frame_transmit(output, &ready_edge, extension));
+			assert(output == (value & mask) && ready_edge);
+			assert(port.frame_transmit(output, &ready_edge, extension) && !ready_edge);
+			assert(port.frame_receive(value, extension));
+			const unsigned payload = value & mask;
+			const auto expected = std::uint16_t(payload & (1U << (width - 1))
+					? payload | ~mask : payload);
+			assert(port.receive_r() == expected);
+		}
 		port.reset();
 		port.control_w(0x00c4); // 8-bit BSP format.
 		port.transmit_w(value);

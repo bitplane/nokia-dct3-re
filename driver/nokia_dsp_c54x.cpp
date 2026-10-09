@@ -266,7 +266,7 @@ u16 nokia_dsp_c54x_device::data_r(offs_t offset)
 bool nokia_dsp_c54x_device::codec_transmit_frame(u16 &word)
 {
 	bool ready_edge;
-	const bool transferred = m_bsp.frame_transmit(word, &ready_edge);
+	const bool transferred = m_bsp.frame_transmit(word, &ready_edge, m_data[0x0023]);
 	// Underrun repeats DXR without another XRDY transition (SPRU131G 9.2.4).
 	if (ready_edge)
 		m_cpu->set_input_line(5, HOLD_LINE); // BXINT0, vector 21.
@@ -275,7 +275,7 @@ bool nokia_dsp_c54x_device::codec_transmit_frame(u16 &word)
 
 bool nokia_dsp_c54x_device::codec_receive_frame(u16 word)
 {
-	const bool accepted = m_bsp.frame_receive(word);
+	const bool accepted = m_bsp.frame_receive(word, m_data[0x0023]);
 	if (accepted)
 		m_cpu->set_input_line(4, HOLD_LINE); // BRINT0, vector 20.
 	return accepted;
