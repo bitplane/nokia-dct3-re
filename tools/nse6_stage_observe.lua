@@ -8,6 +8,20 @@ local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_reg
 local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
 if dsp then
+    local stack_floor = 0x2000
+    local stack_samples = 0
+    handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x0800, 0x1fff,
+        'nse6_native_stack_depth', function(offset, value, mask)
+            local sp = dsp.state['SP'].value
+            if offset ~= sp or sp >= stack_floor or stack_samples >= 32 then return end
+            -- Sample each crossed 128-word boundary, not every stack write.
+            stack_floor = sp & ~0x7f
+            stack_samples = stack_samples + 1
+            machine:logerror(string.format(
+                'nse6_native_stack_depth: address=%04x value=%04x pc=%04x sp=%04x st1=%04x imr=%04x ifr=%04x t=%.9f\n',
+                offset, value, dsp.state['PC'].value, sp, dsp.state['ST1'].value,
+                dsp.state['IMR'].value, dsp.state['IFR'].value, machine.time:as_double()))
+        end)
     local ring_writes = 0
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x08e4, 0x08e5,
         'nse6_native_rx_indices', function(offset, value, mask)

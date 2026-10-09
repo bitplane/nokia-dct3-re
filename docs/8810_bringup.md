@@ -105,6 +105,12 @@ one second. At 1.002106865 s the DSP writes `90e9` to data address `08e5`
 overwrite both indices. The MCU consequently reads an out-of-window packet
 at `0x16174` and continues draining corrupted headers. Earlier DSP producer
 writes at PC `3805` show SP declining from `1e47` to `1c7f`.
+Bounded stack-depth observations locate the rapid descent before corruption:
+SP crosses `1bff` at 0.929342 s, then successive 128-word boundaries roughly
+every 1.9 ms, predominantly on PC-valued writes at `3f50`; from 0.948210 s
+the corresponding repeated PC is `90e9`. This is a control-flow target for
+entry/return analysis, not proof of interrupt nesting or a particular opcode
+defect. The depth observer records at most 32 boundary crossings.
 This establishes stack overlap with shared ring state, not its cause. The next
 question is the first stack/control-flow divergence before those writes,
 including interrupt entry/return and frame-clock servicing. Do not synthesize
