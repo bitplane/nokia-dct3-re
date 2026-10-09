@@ -592,6 +592,17 @@ def verify(image):
             ('lsrs', 'r0, r0, #0x1b'), ('orrs', 'r1, r0'),
             ('strb', 'r1, [r6, #0xd]')]:
         raise ValueError('candidate metadata update selector preservation differs')
+    if instructions(0x287780, 18) != [
+            ('lsls', 'r0, r0, #0x1d'), ('lsrs', 'r0, r0, #0x1d'),
+            ('lsls', 'r0, r0, #0x15'), ('ldr', 'r2, [r1, #0xc]'),
+            ('movs', 'r4, #7'), ('lsls', 'r4, r4, #0x15'),
+            ('bics', 'r2, r4'), ('orrs', 'r2, r0'),
+            ('str', 'r2, [r1, #0xc]')]:
+        raise ValueError('list metadata tag update differs')
+    for address in (0x2a1024, 0x2a10b8):
+        if instructions(address, 6) != [
+                ('movs', 'r0, #5'), ('bl', '#0x28776a')]:
+            raise ValueError('request lifecycle list tag caller differs')
     if instructions(0x2df22e, 12) != [
             ('ldrb', 'r1, [r4, #4]'), ('lsls', 'r1, r1, #0x1f'),
             ('lsrs', 'r1, r1, #0x1f'), ('ldrb', 'r2, [r0, #2]'),

@@ -1666,10 +1666,16 @@ passing early-PIN case additionally rewrites the control word through
 `287790` at 12.262220s and updates its byte to `a2` at 12.262347s;
 the failing late-PIN case instead reaches the mode-4 selector and retains
 `c2`. Thus selector 2 is an organic RSSI-candidate state, not a late-PIN
-injection or a direct received-block success state. Determine the cleanup
-branch's ownership and ordering before treating the retained metadata as
-the cause of the queued-request failure. The static contract pins the
-selector assignment and preservation; runtime watches are observation-only.
+injection or a direct received-block success state. The `287790` rewrite
+is not selector cleanup: helper `28776a` replaces only control bits 21..23
+across its candidate-list range, preserving selector bits 16..19. An aligned
+direct-BL scan finds two call candidates, `2a1026` and `2a10ba`; both pass
+tag 5. Thus the passing rewrite belongs to request-lifecycle list tagging,
+not a new RSSI completion. The static contract pins the bit mask and both
+callers. Correlate this tagging with current/queued request selection before
+claiming the metadata difference causes registration failure; the unchanged
+selector is insufficient to establish a missing DSP reply. Runtime watches
+are observation-only.
 
 Public-reference coverage is bounded. Gammu's
 [NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)
