@@ -1296,6 +1296,16 @@ In particular, the repeated offset-`000c` reader at `0x28c40c` unpacks
 nibbles into digit characters; it is not evidence of a phone-code compare.
 The next discriminating boundary is the MCU-side validation transaction,
 not a guessed replacement security record.
+The exact own-ROM five-digit reader is `0x28c140`: it reads three packed
+bytes at NV offset `0110`, converts high/low nibbles to characters, validates
+the first five digits and terminates at byte 5. Invalid digit content selects
+the ROM's `12345` fallback at `0x28c18a`. In
+`run_8890_alarm_security_code`, cold and alarm startup both call it through
+`0x2c250a` and return valid packed `123450`, decoded `313233343500`.
+Thus the stored-code reader itself agrees with the physical retry; replacing
+its NV record is not justified. Its caller initializes the runtime setting
+through `0x2fa270`, using selector structure `0x1377e4`; the post-wake
+editor's actual validation use of that setting remains to be traced.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
