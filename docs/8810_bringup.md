@@ -128,10 +128,12 @@ crossing at 0.385015 s is inside the `a4f7/4612` call/context-save path;
 its sampled saves/restores balance. At 0.385020596 s the return-address
 helper entered through `24cf -> 266b` instead selects `2677`: its ROM
 sequence compares the stacked continuation with `a53b`, restores ST0/AR2,
-uses `FRAME +1` to discard the return word, then branches to `27aa`.
+uses `FRAME +1` to discard the return word. The resident ROM branches to
+`27aa`, but the live MCU-uploaded overlay patches that destination to
+`2946`, confirmed by the instruction words fetched at `2677`.
 This bypasses ordinary return after the `a539` call inside the `a51b`
 interrupt-servicing path. Subsequent vector entries have lower SP. The next
-contract is how this recognized-continuation path at `27aa` should unwind
+contract is how this recognized-continuation path at `2946` should unwind
 or transfer the saved context; a matched conditional branch is not itself
 proof of a CPU defect or proof that the firmware intended to leak a frame.
 This establishes stack overlap with shared ring state, not its cause. The next
