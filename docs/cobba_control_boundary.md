@@ -117,6 +117,38 @@ operate on completed serial words, so a future C54x backend must still own
 BSPC, BDXR/BDRR ready flags, interrupts and bit timing. The production HLE does
 not call this test path.
 
+## Native NSE-1 address-space audit
+
+`tools/c54x_rom4_codec_observe.lua` passively taps DSP data and I/O spaces
+separately, recording the first 16 accesses per direction/address without
+additional device reads. A fresh four-second `noki5110` run with its own
+generated EEPROM observed the following sequence:
+
+| Space/address | Observation | DSP PC reported by tap |
+| --- | --- | --- |
+| Data `0022` | `c008`, then `c0c8` | `0e22`, `0e24` |
+| Data `0021` | Self-test transmit `0aaa` | `0e31` |
+| Data `0020` | Self-test receive `0aaa` | `0e5d` |
+| I/O `0021` | Initialization writes `1482`, `1482`, `0482` | `4555`, `4559`, `455d` |
+| I/O `0021` | Repeated reads `0aaa`, writes `0eaa` / `02aa` | `3221` / `3228`, `33f6` / `33fd` |
+
+The PC is sampled during the memory callback, after operand fetch; it is not
+automatically the instruction's start address. Reproduce with `-log`, an
+isolated NVRAM directory and `-autoboot_script tools/c54x_rom4_codec_observe.lua`.
+The audit's output cap limits observations, not execution.
+
+The repeated I/O reads expose a remaining contract question: `io_r(0021)`
+returns COBBA's retained self-test receive latch even after acknowledgement,
+whereas data `0020` consumes the ready echo only. This is an observed model
+behavior, not evidence that real hardware reuses the self-test sample during
+ordinary audio processing. Conversely, read/modify/write-shaped firmware
+accesses do not prove that I/O `0021` is a control register: the independent
+ROM4 analysis identifies it as bidirectional PCM. Do not replace it with
+control-register readback on that inference. Establish the operational sample
+source, frame cadence and readiness separately from the boot echo before
+promoting native microphone/earpiece behavior. The four-second audit does not
+prove absence of other register paths or validate physical serial timing.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair
