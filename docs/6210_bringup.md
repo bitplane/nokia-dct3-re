@@ -503,11 +503,16 @@ presses physical End and verifies release and resumed paging; the SMS fixture
 opens the delivered message and verifies its persistent read status and frame.
 These remain signaling/storage checks, not speech validation.
 
-All three scenarios reproduce on the post-594-word native-core checkpoint
-(`bce95f0`) using the current built emulator and the project's Capstone-enabled
-Python environment. For Make invocations, pass an absolute `PYTHON` path:
-the nested MAME build changes working directory. These gates select the
-research-HLE composition, not normal NPE-3 native verification.
+All three scenarios reproduce on the built `0e4649a` source checkpoint,
+including the C54x XF-output changes. Independently fresh accessory boots
+also pass the cold-repeat comparison on that build. The acceptance covers
+exact saved architectural state/time, selected protocol replay and the
+scenario-specific physical-input continuation; it does not establish
+cross-host determinism, connected SIP restoration or native speech.
+Use the project's Capstone-enabled Python environment. For Make invocations,
+pass an absolute `PYTHON` path: the nested MAME build changes working
+directory. These gates select the research-HLE composition, not normal
+NPE-3 native verification.
 
 MAME cancels pending Lua waits when loading a state. The host fixture therefore
 explicitly resumes its physical input schedule after the replay interval;
