@@ -248,8 +248,31 @@ through eight seconds. Early reads include `0x0000`, `0x006c`, `0x0074`,
 These are address-setter observations, not successful transaction completions
 or validated stored records. They exclude a never-started storage subsystem,
 but do not distinguish erased-record validation failure from transport errors.
-The actual self-test failure writer remains the open question; no provisioning
-change is justified by this trace alone.
+Address requests alone do not justify a provisioning change.
+
+### Erased-Storage Integrity Failure
+
+The controller initializes context at `0x13fd78`. Its failure-display handler
+`0x243ba4` uses the MCU strings at `0x243e18` (CONTACT) and `0x243e20` (SERVICE).
+The reason byte `0x13ff74` is initialized to one at `0x2d3308`, before DSP
+verification; it is not evidence that the DSP subsequently failed.
+
+The integrity calculator `0x240918` reads a block starting at EEPROM `0x40`,
+sums bytes and subtracts the two bytes returned by helper `0x2c0ac8`. The
+allocated-buffer path covers `0xde` bytes; the allocation-failure path covers
+`0x9e` bytes, so these paths must not be conflated into one checksum recipe.
+The caller reads stored words at `0x011e` and `0x0090`; it first compares the
+calculated value with the former, then tests the OR of the latter and the
+calculated value for zero. Either failure selects `0x240c1e`, writes status
+`0x0c` into its status record and clears flag `0x40` at `0x13fde1`.
+
+The cold erased-storage run takes that branch at 0.509262231 s with calculated
+`0xdb24`, stored `0x011e=0xffff`, and stored `0x0090=0xffff`. The failure-display
+handler runs at 1.476262308 s. This establishes an integrity failure in this
+fixture, not an authentic factory profile or the absence of additional faults.
+Next recover the calculator/helper and protected fields completely before
+choosing any own-storage fixture; no donor record or firmware flag override is
+permitted.
 
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
