@@ -436,8 +436,28 @@ Receive branch `0x275e40` reads that slot at 0.398276/0.835120 s, immediately
 before `0x221ee6` returns `0xb1`. This closes its origin without attributing
 it to a hardware event or treating the lack of scalar-send calls as a gap.
 
-Next: decode task 20's initialized lifecycle and its timer-driven progress
-to determine why report `0x14` is not published. Check any additional
+Task 20's own diagnostic strings identify the observed path as charging
+initialization, not an unnamed transport-readiness state machine. Static
+ADR references identify `DO INIT CHARGING` at `0x225da0`, `BOOT UP CHARGE`
+at `0x225f28`, `WAIT CHARGER VOLTAGE SETTING` at `0x225f38` and
+`CHARGER DISCONNECTED` at `0x225f58`. A fresh passive cold run reaches
+the voltage-setting wait at 4.233769 s and disconnected state at 5.689757 s.
+The observer captures bounded, unique firmware diagnostic call sites;
+strings are firmware evidence, not newly invented subsystem names.
+
+This does **not** establish an erroneous charger boot selection. The
+power-reason check at `0x225a9e` distinguishes return `0x0a`; otherwise it
+checks byte `0x11fe78` for an already connected charger. Both the zero-byte
+path at `0x225ac0` and the reason-`0x0a` branch reach common initialization
+`0x225ae0`. Thus charging initialization without a charger is explicitly
+supported by this firmware. State `0x1a` eventually consumes timer input
+`0x49` (`0x0198`), exhausts retries or sees a signed measurement at least
+`0x01fe`, then enters the voltage-setting/disconnected path. No threshold
+input should be changed merely to escape these states.
+
+Next: determine which ordinary power/startup input selects the separate
+task-20 initialization that publishes report `0x14`; distinguish that from
+the charging initialization now identified. Check any additional
 initialization input against the own-ROM startup source,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what

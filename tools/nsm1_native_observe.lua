@@ -4,6 +4,29 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
+local owner_messages = 0
+local owner_message_sites = {}
+handles[#handles + 1] = memory:install_read_tap(0x2c17fc, 0x2c17ff,
+    'nsm1_owner_diagnostic', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x2c17fe or
+            memory:read_u8(0x100022) ~= 0x14 or owner_messages >= 64 then return end
+        local address = cpu.state['R0'].value
+        if address < 0x200000 or address > 0x3fff80 then return end
+        local text = ''
+        for index = 0, 127 do
+            local byte = memory:read_u8(address + index)
+            if byte == 0 then break end
+            if byte < 32 or byte > 126 then return end
+            text = text .. string.char(byte)
+        end
+        local caller = cpu.state['R14'].value
+        if text == '' or owner_message_sites[caller] then return end
+        owner_message_sites[caller] = true
+        owner_messages = owner_messages + 1
+        machine:logerror(string.format(
+            'nsm1_owner_diagnostic: address=%08x caller=%08x text=%s t=%.9f\n',
+            address, caller, text, machine.time:as_double()))
+    end)
 local sim_sends = 0
 local owner_scalar_sends = 0
 handles[#handles + 1] = memory:install_read_tap(0x275cb0, 0x275cb3,

@@ -5,6 +5,28 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_charging_lifecycle_strings_and_common_branch_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        for address, text in (
+                (0x225B98, b"DO INIT CHARGING"),
+                (0x225BBC, b"BOOT UP CHARGE"),
+                (0x225BE2, b"WAIT CHARGER VOLTAGE SETTING"),
+                (0x225C0C, b"CHARGER DISCONNECTED")):
+            decoded = check.instruction(data, address)
+            self.assertEqual("adr", decoded.mnemonic)
+            target = ((address + 4) & ~3) + decoded.operands[1].imm
+            offset = target - check.BASE
+            self.assertEqual(text + b"\0", data[offset:offset + len(text) + 1])
+        for address, mnemonic, operands in (
+                (0x225AAC, "bne", "#0x225ae0"),
+                (0x225ABA, "beq", "#0x225ac0"),
+                (0x225AC0, "b", "#0x225ae0")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_own_rtos_preloads_startup_queue_input_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():
