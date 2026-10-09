@@ -83,12 +83,44 @@ def check_alarm(text, *, cold=False):
         raise ValueError('alarm process replaced the clock through Calendar input')
 
 
+def check_snooze(text):
+    cursor = check_alarm_set(text)
+    events = [
+        'event=second time=13:48:00 day=0 ',
+        'event=status_ack data=81 ',
+        'buzzer: enabled=1 ',
+        '6210_alarm_probe: action=snooze\n',
+        'event=alarm_write reg=0b data=35 armed=1 ',
+        'event=alarm_write reg=0c data=0d armed=1 ',
+        'buzzer: enabled=0 ',
+        'event=second time=13:53:00 day=0 ',
+        'event=read reg=0e data=b1 ',
+        'event=status_ack data=a1 ',
+        'buzzer: enabled=1 ',
+        '6210_alarm_probe: action=stop\n',
+        'buzzer: enabled=0 ',
+    ]
+    for event in events:
+        position = text.find(event, cursor)
+        if position < 0:
+            raise ValueError('missing ordered Snooze evidence: ' + event)
+        cursor = position + len(event)
+    if '6210_calendar_probe:' in text:
+        raise ValueError('Snooze process replaced the clock through Calendar input')
+    states = re.findall(r'buzzer: enabled=([01]) ', text[cursor:])
+    if states and states[-1] != '0':
+        raise ValueError('Snooze buzzer remains enabled after physical Stop')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
-    parser.add_argument('--cold', action='store_true',
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--cold', action='store_true',
                         help='exit with an armed alarm, then verify expiry in a separate cold boot')
+    mode.add_argument('--snooze', action='store_true',
+                      help='physically Snooze and verify natural five-minute recurrence and Stop')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -105,12 +137,13 @@ def main():
                    '-nvram_directory', 'nvram', '-cfg_directory', 'cfg', '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
-                       'noki6210_alarm_arm.lua' if args.cold else 'noki6210_alarm_input.lua')),
-                   '-seconds_to_run', '85', '-video', 'none', '-sound', 'none',
+                       'noki6210_alarm_arm.lua' if args.cold else
+                       'noki6210_alarm_snooze.lua' if args.snooze else 'noki6210_alarm_input.lua')),
+                   '-seconds_to_run', '385' if args.snooze else '85', '-video', 'none', '-sound', 'none',
                    '-nothrottle', '-log', '-verbose']
         with (alarm / 'console.log').open('w') as output:
             subprocess.run(command, cwd=alarm, stdout=output, stderr=subprocess.STDOUT,
-                           check=True, timeout=180)
+                           check=True, timeout=400 if args.snooze else 180)
         check_output((alarm / 'console.log').read_text(errors='replace'))
         text = (alarm / 'error.log').read_text(errors='replace')
         verify_stage(text, runtime=True, selftest=True)
@@ -134,7 +167,10 @@ def main():
             verify_stage(text, runtime=True, selftest=True)
             check_registration(text, (alarm / 'nvram/npe3hle/sim_card').read_bytes(),
                                preserved_location=True)
-        check_alarm(text, cold=args.cold)
+        if args.snooze:
+            check_snooze(text)
+        else:
+            check_alarm(text, cold=args.cold)
         from PIL import Image
         if args.cold:
             with Image.open(alarm / 'snap/6210_alarm_cold_idle.png') as frame:
@@ -145,8 +181,12 @@ def main():
             with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
                 check_frame(frame, digest, 'physical alarm ' + name)
         print('6210 alarm: PASS ' + ('armed cold retention, ' if args.cold else '') +
+              ('physical Snooze, natural five-minute recurrence, ' if args.snooze else '') +
               'physical set, natural RTC expiry, reviewed pixels, '
               'buzzer control and physical Stop; research HLE, not audible-output acceptance')
+        if args.snooze:
+            print('6210 Snooze scope: original alarm and final idle pixels verified; '
+                  'repeated alarm title/time pixels remain unresolved')
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f'6210 alarm: FAIL: {exc}', file=sys.stderr)

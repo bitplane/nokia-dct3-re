@@ -94,6 +94,7 @@ private:
 	u8 m_external_status = 0;
 	u16 m_fiq_status = 0;
 	u16 m_irq_status = 0;
+	u16 m_irq_levels = 0;
 	u16 m_timer0_counter = 0;
 	u16 m_timer1_counter = 0;
 	u16 m_timer1_destination = 0x7fff;

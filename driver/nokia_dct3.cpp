@@ -2006,11 +2006,8 @@ void nokia_dct3_state::pup_buzzer_enable_w(int state)
 
 void nokia_dct3_state::ccont_irq_w(int state)
 {
-	// MAD2 latches the rising CCONT indication. Its IRQ acknowledgement clears
-	// that pending edge; CCONT retains the source in register 0x0e until the
-	// deferred firmware service acknowledges it through GENSIO.
-	if (state && !m_ccont_irq_state)
-		m_mad2->assert_irq(CCONT_IRQ_LINE_NUM);
+	// CCONT retains its indication until the source is cleared through GENSIO.
+	m_mad2->set_irq_line(CCONT_IRQ_LINE_NUM, state);
 	if (m_trace_enabled && state != m_ccont_irq_state)
 		LOGMASKED(LOG_CCONT_RTC, "ccont_route: state=%u irq_line=%u pending=%03x mask=%02x ctrl=%02x t=%.9f\n",
 			state, CCONT_IRQ_LINE_NUM, m_mad2->irq_status(), m_mad2->reg(MAD2_IRQ_MASK),

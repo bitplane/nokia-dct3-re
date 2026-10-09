@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6210_alarm import check_alarm
+from tools.run_noki6210_alarm import check_alarm, check_snooze
 
 
 class AlarmChecks(unittest.TestCase):
@@ -83,6 +83,49 @@ class AlarmChecks(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_alarm('event=second time=00:00:01 day=0 status=31\n' +
                         self.cold_text(), cold=True)
+
+    def snooze_text(self):
+        prefix = self.text[:self.text.index('6210_alarm_probe: action=stop\n')]
+        return prefix + (
+            '6210_alarm_probe: action=snooze\n'
+            'event=alarm_write reg=0b data=35 armed=1 t=77\n'
+            'event=alarm_write reg=0c data=0d armed=1 t=77\n'
+            'buzzer: enabled=0 t=77\n'
+            'event=second time=13:53:00 day=0 status=b1\n'
+            'event=read reg=0e data=b1 t=360\n'
+            'event=status_ack data=a1 old=b1\n'
+            'buzzer: enabled=1 t=360\n'
+            '6210_alarm_probe: action=stop\n'
+            'buzzer: enabled=0 t=377\n')
+
+    def test_snooze_lifecycle(self):
+        check_snooze(self.snooze_text())
+
+    def test_snooze_requires_recurrence_delivery(self):
+        for token in ['time=13:53:00', 'event=read reg=0e data=b1 t=360\n',
+                      'event=status_ack data=a1 old=b1\n', 'buzzer: enabled=1 t=360\n']:
+            with self.subTest(token=token), self.assertRaises(ValueError):
+                check_snooze(self.snooze_text().replace(token, ''))
+
+    def test_snooze_requires_physical_input_and_programming(self):
+        for token in ['6210_alarm_probe: action=snooze\n',
+                      'event=alarm_write reg=0b data=35 armed=1 t=77\n',
+                      'event=alarm_write reg=0c data=0d armed=1 t=77\n']:
+            with self.subTest(token=token), self.assertRaises(ValueError):
+                check_snooze(self.snooze_text().replace(token, ''))
+
+    def test_snooze_rejects_reordered_recurrence(self):
+        event = 'event=second time=13:53:00 day=0 status=b1\n'
+        with self.assertRaises(ValueError):
+            check_snooze(event + self.snooze_text().replace(event, ''))
+
+    def test_snooze_rejects_replaced_clock(self):
+        with self.assertRaises(ValueError):
+            check_snooze(self.snooze_text() + '6210_calendar_probe: action=time_confirm\n')
+
+    def test_snooze_rejects_buzzer_left_enabled(self):
+        with self.assertRaises(ValueError):
+            check_snooze(self.snooze_text() + 'buzzer: enabled=1 t=378\n')
 
 
 if __name__ == '__main__':

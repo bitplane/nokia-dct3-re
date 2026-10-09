@@ -55,6 +55,7 @@ void nokia_mad2_device::device_start()
 	save_item(NAME(m_external_status));
 	save_item(NAME(m_fiq_status));
 	save_item(NAME(m_irq_status));
+	save_item(NAME(m_irq_levels));
 	save_item(NAME(m_timer0_counter));
 	save_item(NAME(m_timer1_counter));
 	save_item(NAME(m_timer1_destination));
@@ -74,6 +75,7 @@ void nokia_mad2_device::device_reset()
 	m_regs[0x0c] = 0x0a;
 	m_fiq_status = 0;
 	m_irq_status = 0;
+	m_irq_levels = 0;
 	m_timer0_counter = 0;
 	m_timer1_counter = 0;
 	m_timer1_destination = 0x7fff;
@@ -251,9 +253,15 @@ void nokia_mad2_device::set_irq_line(unsigned line, bool state)
 	const u16 mask = line < 8 ? u16(1) << line : LINE_EXTENDED;
 	const u16 before = m_irq_status;
 	if (state)
+	{
+		m_irq_levels |= mask;
 		m_irq_status |= mask;
+	}
 	else
+	{
+		m_irq_levels &= ~mask;
 		m_irq_status &= ~mask;
+	}
 	if (before != m_irq_status && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
 		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=levels domain=IRQ line=%u active=%u pending_before=%03x pending_after=%03x t=%.9f\n",
 				line, state, before, m_irq_status, machine().time().as_double());
@@ -279,6 +287,9 @@ void nokia_mad2_device::ack_irq(u16 mask)
 	m_irq_status &= ~mask;
 	if (mask)
 		m_irq_ack_cb(mask);
+	// An acknowledgement cannot release a source whose external line is held.
+	// Source callbacks may clear their latch during the acknowledgement above.
+	m_irq_status |= m_irq_levels;
 	update_irq_line();
 	if (mask && m_interrupt_trace && m_interrupt_trace_count++ < 4096)
 		LOGMASKED(LOG_MAD2, "mad2_interrupt: event=ack domain=IRQ mask=%03x pending_before=%03x pending_after=%03x t=%.9f\n",

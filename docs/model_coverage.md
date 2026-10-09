@@ -41,7 +41,11 @@ physical Stop returning to registered idle. Its seed is a fresh physically
 entered Calendar/time fixture, not donor storage or register injection.
 Reviewed frames and ordered hardware/input checks cover alarm-on, active
 alarm and post-Stop idle; buzzer programming is checked but audible output,
-Snooze and powered-off wake are not promoted. `verify-6210-alarm-cold`
+full repeated-alarm presentation and powered-off wake are not promoted.
+`verify-6210-alarm-snooze` additionally proves physical Snooze, firmware's
+five-minute reprogramming, natural recurrence, IRQ acknowledgement, renewed
+buzzer control and physical Stop. Original/final frames remain verified;
+the repeated alarm title/time pixels are unresolved. `verify-6210-alarm-cold`
 independently proves physical arming followed by retained-register reads,
 natural expiry and Stop in a new process with no clock/alarm entry. Its
 armed-idle, active-alarm and stopped frames are reviewed and reproducible.

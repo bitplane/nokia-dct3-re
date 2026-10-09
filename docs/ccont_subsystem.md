@@ -97,7 +97,11 @@ not prove that physical GENSIO or CCONT has zero latency.
 
 Writing PWRONX or upper interrupt-status bits clears them. The IRQ output is active when
 `status & ~mask & 0xf8` is nonzero; the low reset/presence bits do not assert
-it. MAD2 owns the resulting CPU interrupt assertion. The default-inactive
+it. This is a held level, not a pulse for each source: MAD2 acknowledgement
+does not release a still-active CCONT input. The physical NPE-3 Snooze gate
+validates redelivery across a stale mask-shadow sample and subsequent alarm
+delivery; see [the product contract](6210_bringup.md#snooze-delivery-contract).
+MAD2 owns the resulting CPU interrupt assertion. The default-inactive
 `CHARGER` input latches established source bit 3 on both connection and
 removal. Both edges use the same firmware debounce path.
 

@@ -729,9 +729,18 @@ if irq_overlap_at >= 0 and charger_field and key_fields.up then
 		-- asserts the second. Gate delivery briefly so both physical sources
 		-- reach MAD2 pending state before testing aggregation.
 		local old_ctrl = space:read_u8(0x2000c) & 0xdf
+		local old_mask = space:read_u8(0x2000b)
 		space:write_u8(0x2000c, old_ctrl & 0xfb)
+		-- Firmware may reopen the global gate during the sampling interval.
+		-- Mask only the two fixture sources until both callbacks have fired.
+		space:write_u8(0x2000b, old_mask | 0x05)
 		press("up")
 		charger_field:set_value(1)
+		-- The charger field callback is sampled on the next input frame,
+		-- unlike the keypad latch. Keep delivery gated across that boundary.
+		emu.wait(0.02)
+		space:write_u8(0x2000b,
+			(space:read_u8(0x2000b) & 0xfa) | (old_mask & 0x05))
 		space:write_u8(0x2000c, old_ctrl | 0x04)
 		emu.wait(0.05)
 		release("up")

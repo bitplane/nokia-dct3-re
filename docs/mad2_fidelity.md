@@ -83,6 +83,18 @@ and global gate permit it. The v5.01/v6.00 keypad and CCONT firmware paths
 support those two IRQ assignments. The remaining assignments still need a
 second runtime oracle or hardware documentation.
 
+Level inputs supplied through `set_irq_line` remain pending across MAD2
+acknowledgement while the component holds its indication. Edge events supplied
+through `assert_irq` retain their write-one-clear semantics. The external
+level bitmap is reset and saved separately from pending status. NPE-3 physical
+Snooze exposes why this distinction matters: firmware may acknowledge MAD2
+before an exposed RTC minute source is cleared, and must receive that held
+source again before a later alarm can arrive. See the
+[Snooze contract](6210_bringup.md#snooze-delivery-contract).
+The overlap fixture masks IRQ0/IRQ2 across the charger field's next input frame;
+global gating alone is insufficient because running firmware can reopen it.
+This remains a mapped-MMIO controller fixture, not an organic boot condition.
+
 FIQ8 uses the ninth internal pending bit (`0x100`). Register `0x16.bit1`
 projects that pending state, bit 2 masks its CPU delivery, and writing bit 1
 acknowledges it. `make verify-mad2-interrupts` exercises this routing while the

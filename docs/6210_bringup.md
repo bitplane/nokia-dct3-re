@@ -651,36 +651,30 @@ register reads, cold observation, clock restoration, or replacement alarm entry.
 Neither gate establishes audible output, Snooze, powered-off wake or native
 DSP behavior.
 
-### Snooze observation boundary
+### Snooze delivery contract
 
-`noki6210_alarm_snooze.lua` extends the same physical alarm fixture with
-Right Softkey / C at 77 seconds, then observes ten emulated minutes without
-writing the clock, interrupt registers or firmware state. In
-`run_6210_snooze_probe`, the firmware changes CCONT alarm registers to
-`35/0d` (13:53): this ROM selects a five-minute Snooze interval. The RTC
-naturally reaches 13:53:00 at 360 seconds and latches status `b1`, with mask
-`10`, but there is no subsequent alarm-status read or resumed buzzer before
-the physical Stop at 678 seconds. The captured screen remains `Snooze active`.
-Stop then reads the pending `b1` and clears the programmed alarm.
+`verify-6210-alarm-snooze` uses the same fresh physical Calendar seed and
+alarm entry. Right Softkey / C at 77 seconds makes firmware program CCONT
+`35/0d` (13:53): this ROM selects a five-minute interval. The gate requires
+natural 13:53:00, status `b1`, acknowledgement `a1` (minute plus alarm),
+renewed PUP buzzer programming and physical Stop. It preserves the exact
+original-alarm and final-idle pixel checks. The repeated capture at 377
+seconds shows Stop/Snooze controls but lacks the title/time text; those
+pixels and audible output are not accepted by this gate.
 
-This is not Snooze acceptance. The unresolved boundary is delivery/wake
-between an unmasked CCONT alarm latch and the MCU's sleeping interrupt
-consumer; investigate the CCONT line, MAD2 masks and CPU suspension before
-changing timer cadence or generating substitute firmware messages. Existing
-set/expiry/Stop and cold-retention gates retain their narrower claims.
-
-The passive dispatcher capture in `run_6210_snooze_dispatch` narrows this
-boundary: CCONT IRQ2 rises at 60.025879769 after a mask write `10` exposes
-the retained minute source in status `31`. MAD2 acknowledges IRQ2 at
-60.026224615, but CCONT never lowers its line before the second alarm. The
-board bridge latches only rising CCONT edges; the alarm at 360 seconds
-therefore produces no new MAD2 pending edge. This is earlier than CPU wake
-delivery and does not establish a sleep defect. At the dispatch selection
-point `0x4f277a`, the observed active byte is `01`, while cached mask/status
-at `0x1742fd/0x1742fc` are `10/31`; firmware acknowledges `01`, not the
-minute bit. Resolve the preceding register-reader return values and shadow
-update ordering before changing edge/level routing. A level-sensitive
-reassertion without that source-clear contract could create an IRQ storm.
+CCONT's held source must survive a MAD2 acknowledgement until firmware
+clears it over GENSIO. NPE-3's mask write can expose the minute IRQ before
+its register helper updates the RAM mask shadow. Passive reads at
+`0x4f2766/0x4f2774` in `run_6210_snooze_reader_valid` establish mask/status
+returns `30/31`; at `0x4f277a` the shadow at `0x1742fd` has become `10`, but
+the already-sampled mask yields active `01`. With held-input retention,
+firmware receives the source again, selects `21`, clears it and lowers the
+line. Minute events then drain normally and the second alarm is delivered
+(`run_6210_snooze_level`, `run_6210_snooze_acceptance`). The old rising-edge
+bridge instead lost the second alarm behind the uncleared minute source
+(`run_6210_snooze_probe`). This establishes a source-level integration
+defect, not a CPU sleep or serial-latency defect; physical serial timing
+remains unmeasured.
 
 ## Unattached accessory input
 
