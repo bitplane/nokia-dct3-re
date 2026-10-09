@@ -1603,6 +1603,18 @@ boundary is still post-acquisition measurement/request lifetime; synthesizing
 
 ## Evidence needed for native DSP completion
 
+The post-acquisition type-`11` instruction independently carries a full
+16-bit carrier. Own constructor `2b304a..2b3052` serializes descriptor
+halfword `+4` into message bytes `+0a/+0b` (payload `+6/+7`). The mode-4
+DCS request `040000000000033800000000` therefore targets ARFCN 824, not
+56. The product-selected peer decoder now preserves both bytes; other
+products retain their own encoding. Static constructor checks and fresh
+early/late PIN runs verify the correction. Early PIN still registers;
+late PIN still fails, and the corrected request is rejected by the separate
+neighbour-list eligibility predicate. This does not establish that mode 4
+must populate that list or which reply it requires. Resolve its original
+descriptor/list lifecycle before changing eligibility or publishing a reply.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:

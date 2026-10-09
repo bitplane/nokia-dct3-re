@@ -1342,6 +1342,9 @@ bool nokia_radio_peer_device::decode_neighbour_measurement_instruction(
 	const u8 expected_bsic = packet.payload[1];
 	u16 arfcn = packet.payload[7];
 	if (m_protocol.neighbour_instruction_arfcn ==
+			neighbour_arfcn_encoding::big_endian_word)
+		arfcn |= u16(packet.payload[6]) << 8;
+	if (m_protocol.neighbour_instruction_arfcn ==
 			neighbour_arfcn_encoding::topology_low_octet)
 	{
 		for (unsigned index = 0; index < m_gsm_network->cell_count(); ++index)

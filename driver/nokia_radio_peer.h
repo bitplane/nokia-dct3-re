@@ -42,6 +42,7 @@ public:
 	enum class neighbour_arfcn_encoding : u8
 	{
 		direct_octet,
+		big_endian_word,
 		topology_low_octet
 	};
 

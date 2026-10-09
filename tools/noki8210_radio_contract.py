@@ -20,6 +20,15 @@ def verify(image):
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     def instructions(address, size):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
+    if instructions(0x2b303a, 26) != [
+            ('movs', 'r0, #0xc'), ('strb', 'r0, [r4, #2]'),
+            ('movs', 'r0, #2'), ('strh', 'r0, [r4]'),
+            ('movs', 'r0, #0x11'), ('strb', 'r0, [r4, #3]'),
+            ('ldrb', 'r0, [r5]'), ('strb', 'r0, [r4, #4]'),
+            ('ldrh', 'r0, [r5, #4]'), ('lsrs', 'r0, r0, #8'),
+            ('strb', 'r0, [r4, #0xa]'), ('ldrb', 'r0, [r5, #5]'),
+            ('strb', 'r0, [r4, #0xb]')]:
+        raise ValueError('own neighbour instruction full carrier serialization differs')
     if instructions(0x30702a, 4) != [('bl', '#0x2df484')]:
         raise ValueError('type 8b handler differs')
     if instructions(0x2df498, 6) != [('movs', 'r0, #0xc'), ('bl', '#0x28845c')]:
