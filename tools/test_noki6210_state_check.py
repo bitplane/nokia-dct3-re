@@ -5,14 +5,15 @@ from tools.noki6210_state_check import verify
 
 class StateAcceptanceTest(unittest.TestCase):
     def fixture(self):
+        cpu = ','.join(['00000000'] * 37)
         return '\n'.join((
             'LAPDm Location Updating Accept acknowledged nr=1',
             'LAPDm Channel Release acknowledged nr=2',
-            '6210_state: scenario=idle event=saved pc=1c sp=17583c ram=127bd2b1 t=19.000000',
+            f'6210_state: scenario=idle event=saved pc=1c sp=17583c ram=127bd2b1 cpu={cpu} t=19.000000',
             'state_replay: phase=reference event=begin t=19.000000',
             'TX packet type=70 payload=01 t=19.100000',
             'state_replay: phase=reference event=end t=20.000000',
-            '6210_state: scenario=idle event=restored pc=1c sp=17583c ram=127bd2b1 t=19.000000',
+            f'6210_state: scenario=idle event=restored pc=1c sp=17583c ram=127bd2b1 cpu={cpu} t=19.000000',
             'state_roundtrip: result=pass requested_at=19.000000 t=19.000000',
             'state_replay: phase=restored event=begin t=19.000000',
             'TX packet type=70 payload=01 t=19.100000',
@@ -36,6 +37,16 @@ class StateAcceptanceTest(unittest.TestCase):
     def test_missing_snapshot(self):
         with self.assertRaises(ValueError):
             verify(self.fixture().replace(self.fixture().splitlines()[2], ''), 'idle')
+
+    def test_every_arm_register_and_complete_snapshot_required(self):
+        original = ','.join(['00000000'] * 37)
+        for index in range(37):
+            changed = ['00000000'] * 37
+            changed[index] = '00000001'
+            with self.subTest(register=index), self.assertRaises(ValueError):
+                verify(self.fixture().replace(original, ','.join(changed), 1), 'idle')
+        with self.assertRaises(ValueError):
+            verify(self.fixture().replace('cpu=00000000,', 'cpu=', 1), 'idle')
 
     def test_registration_must_precede_save(self):
         for event in ('LAPDm Location Updating Accept acknowledged nr=1',

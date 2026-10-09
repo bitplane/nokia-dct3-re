@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_primary_state_full_arm_restore",
+      "owner": "npe3_firmware",
+      "status": "satisfied",
+      "predicate": "6210 idle, active-call and delivered-SMS restoration preserves every exported ARM register and continues organically, with and without SIM PIN",
+      "current": "Independent fresh state-idle, state-call and state-sms runs and their coherent-cell PIN-enabled variants compare 37 ARM registers (including CPSR and banked state), the complete mapped SRAM digest and emulated time exactly. All require pre-save registration, nonempty identical selected protocol replay and the existing reviewed frames/physical continuation. Authenticated variants also require physical PIN verification before registration and save. The shared read-only arm_architecture_snapshot.lua captures architecture for these and the separate alarm fixtures; it does not impose product lifecycle or input policy. Every register mismatch and incomplete snapshots are negative-tested. These are research-HLE signaling/storage checks, not native speech or cross-host determinism.",
+      "evidence": ["docs/6210_bringup.md", "tools/arm_architecture_snapshot.lua", "tools/noki6210_state_roundtrip.lua", "tools/noki6210_state_check.py", "tools/test_noki6210_state_check.py", "tools/run_noki6210_acceptance.py", "gates.json"]
+    },
+    {
       "id": "npe3_alarm_countdown_full_arm_restore",
       "owner": "npe3_firmware",
       "status": "satisfied",

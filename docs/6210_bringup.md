@@ -514,8 +514,12 @@ The 135-second fixture does not shorten firmware timers.
 ## Save-state acceptance
 
 `verify-6210-state-idle`, `verify-6210-state-call` and
-`verify-6210-state-sms` save and restore emulated time, architectural R15/R13
-and a digest of the complete handset RAM. Each requires a nonempty, identical
+`verify-6210-state-sms` save and restore emulated time, all 37 exported ARM
+registers (including CPSR and banked state), and a digest of the complete
+handset RAM. The shared read-only `arm_architecture_snapshot.lua` supplies
+the same register order and RAM interval as the 6210/8890 alarm fixtures.
+The checker rejects any register mismatch or incomplete snapshot.
+Each requires a nonempty, identical
 ordered protocol replay interval after restoration. Location Updating Accept
 and its subsequent Channel Release must occur before the saved snapshot;
 post-load registration cannot satisfy this prerequisite. The call fixture then

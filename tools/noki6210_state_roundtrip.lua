@@ -9,22 +9,13 @@ if scenario == 'idle' and os.getenv('NOKIA_DCT3_6210_PIN_ENTRY') == '1' then
     dofile(directory .. 'noki6210_security_input.lua')
 end
 local machine = manager.machine
-local cpu = assert(machine.devices[':maincpu'])
-local memory = cpu.spaces['program']
 local save_time = ({idle=19, incoming_alerting=40, call=31, sms=15.02, divert=36})[scenario]
 local saved, completed
-local function snapshot()
-    local sum = 0
-    for address = 0x100000, 0x17fffc, 4 do
-        sum = ((sum << 5) - sum + memory:read_u32(address)) & 0xffffffff
-    end
-    -- ARM7's named PC is a debugger cache; R15 is the saved register.
-    return {time=machine.time:as_double(), pc=cpu.state['R15'].value,
-            sp=cpu.state['R13'].value, ram=sum}
-end
+local capture = dofile(directory .. 'arm_architecture_snapshot.lua')
+local function snapshot() return capture(machine) end
 local function log_snapshot(event, state)
-    machine:logerror(string.format('6210_state: scenario=%s event=%s pc=%08x sp=%08x ram=%08x t=%.9f\n',
-        scenario, event, state.pc, state.sp, state.ram, state.time))
+    machine:logerror(string.format('6210_state: scenario=%s event=%s pc=%08x sp=%08x ram=%08x cpu=%s t=%.9f\n',
+        scenario, event, state.pc, state.sp, state.ram, state.cpu, state.time))
 end
 local pre_save = emu.add_machine_pre_save_notifier(function()
     saved = snapshot()
@@ -36,7 +27,8 @@ local post_load = emu.add_machine_post_load_notifier(function()
     local restored = snapshot()
     log_snapshot('restored', restored)
     assert(restored.time == saved.time, 'saved timeline was not restored exactly')
-    assert(restored.pc == saved.pc and restored.sp == saved.sp and restored.ram == saved.ram,
+    assert(restored.pc == saved.pc and restored.sp == saved.sp and restored.ram == saved.ram and
+        restored.cpu == saved.cpu,
         'CPU/RAM snapshot not restored exactly')
     machine:logerror(string.format('state_roundtrip: result=pass scenario=%s requested_at=%.9f t=%.9f\n',
         scenario, saved.time, restored.time))
