@@ -45,8 +45,11 @@ machine support, offline calendar advance or native DSP/audio acceptance.
 `verify-6250-alarm` uses that own clock/storage seed for physical Clock 10-2
 arming, natural 13:48 RTC expiry/acknowledgement, buzzer programming and Stop
 back to reviewed registered idle. It independently checks its own status
-bytes and four product-local frames; Snooze, off-wake and audible/native
-media remain unproved.
+bytes and four product-local frames. `verify-6250-alarm-off-no` and
+`verify-6250-alarm-off-yes` additionally prove RTC-only wake from rail-off,
+Stop to the activation question, physical No back to off, and physical Yes
+to preserved registration, with separate uploaded-stage checks and exact
+frames. Snooze and audible/native media remain unproved.
 
 `verify-8890-alarm` independently proves physical Settings 4-1 alarm entry
 on NSB-6, own `13:48` CCONT programming, natural expiry, alarm-cause `b3`

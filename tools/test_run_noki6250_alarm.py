@@ -26,6 +26,31 @@ class AlarmCheckTest(unittest.TestCase):
     def test_own_alarm_contract(self):
         check_alarm(self.trace())
 
+    def power_trace(self, choice):
+        text = self.trace().replace(
+            "ccont_rtc: event=second", "6250_alarm_physical: action=power_off\n"
+            "ccont_power: event=off\n6250_alarm_physical: action=power_release\n"
+            "ccont_power: event=wake cause=80\nccont_rtc: event=second", 1)
+        text += "6250_alarm_physical: action=activate_" + choice + "\n"
+        if choice == "no":
+            text += "ccont_power: event=off\n"
+        return text
+
+    def test_power_choices(self):
+        for choice in ("yes", "no"):
+            check_alarm(self.power_trace(choice), choice)
+
+    def test_wrong_power_cause_and_missing_off_rejected(self):
+        for text in (self.power_trace("no").replace("cause=80", "cause=02"),
+                     self.power_trace("no").replace("ccont_power: event=off\n", "", 1),
+                     self.power_trace("yes") + "ccont_power: event=off\n"):
+            with self.assertRaises(ValueError):
+                check_alarm(text, "no" if "activate_no" in text else "yes")
+
+    def test_power_choice_must_match_physical_input(self):
+        with self.assertRaises(ValueError):
+            check_alarm(self.power_trace("no"), "yes")
+
     def test_wrong_deadline_cause_or_ack_rejected(self):
         for old, new in (("13:48:00", "13:47:00"), ("status=b1", "status=31"),
                          ("data=81 old=b1", "data=01 old=b1"), ("data=30 armed=1", "data=00 armed=1")):

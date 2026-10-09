@@ -22,11 +22,16 @@ FRAMES = {
 }
 
 
-def check_alarm(text):
+def check_alarm(text, power_choice=None):
+    if power_choice not in (None, "yes", "no"):
+        raise ValueError("unknown NHM-3 alarm activation choice")
     actions = re.findall(r"6250_alarm_physical: action=(\w+)\b", text)
     expected = ["menu", *[f"down_{i}" for i in range(1, 10)], "clock",
                 "clock_down_1", "alarm", *[f"time_{i}" for i in range(1, 5)],
                 "confirm", "idle", "stop"]
+    if power_choice:
+        expected[-1:-1] = ["power_off", "power_release"]
+        expected.append("activate_" + power_choice)
     if "[LUA ERROR]" in text or actions != expected:
         raise ValueError("NHM-3 physical alarm sequence differs")
     cursor = 0
@@ -49,12 +54,29 @@ def check_alarm(text):
     after_stop = text.split("6250_alarm_physical: event=stopped_presented", 1)[1]
     if "buzzer: enabled=1" in after_stop:
         raise ValueError("NHM-3 buzzer resumed after Stop settled")
+    if power_choice:
+        from tools.power_domain_contract import require_endpoint_silence
+
+        off = list(re.finditer(r"ccont_power: event=off\b", text))
+        wakes = list(re.finditer(r"ccont_power: event=wake cause=([0-9a-f]+)\b", text))
+        activation = text.index("6250_alarm_physical: action=activate_" + power_choice)
+        if len(off) != (2 if power_choice == "no" else 1) or len(wakes) != 1 or wakes[0][1] != "80":
+            raise ValueError("NHM-3 alarm must wake once from RTC, with the selected rail-off outcome")
+        if not off[0].end() < wakes[0].start() < activation:
+            raise ValueError("NHM-3 alarm power boundaries out of order")
+        require_endpoint_silence(text[off[0].end():wakes[0].start()], "NHM-3 powered-off alarm interval")
+        if power_choice == "no":
+            if off[1].start() < activation:
+                raise ValueError("NHM-3 declined activation powered off before the choice")
+            require_endpoint_silence(text[off[1].end():], "NHM-3 declined activation interval")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
     parser.add_argument("--mame", type=Path)
+    parser.add_argument("--power-choice", choices=("yes", "no"),
+                        help="power off before expiry, then physically choose activation")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -72,18 +94,49 @@ def main():
                    f"{phase / 'roms'};{root / 'roms'}", "-nvram_directory", "nvram",
                    "-cfg_directory", "cfg", "-noreadconfig", "-autoboot_script",
                    str(root / "tools/noki6250_alarm_input.lua"), "-autoboot_delay", "0",
-                   "-seconds_to_run", "80", "-video", "none", "-sound", "none",
+                   "-seconds_to_run", "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
                    "-nothrottle", "-log", "-verbose"]
+        environment = os.environ.copy()
+        for key in ("NOKIA_DCT3_6250_ALARM_POWER_OFF", "NOKIA_DCT3_6250_ALARM_POWER_CHOICE"):
+            environment.pop(key, None)
+        if args.power_choice:
+            environment.update(NOKIA_DCT3_6250_ALARM_POWER_OFF="1",
+                               NOKIA_DCT3_6250_ALARM_POWER_CHOICE=args.power_choice)
         with (phase / "console.log").open("w") as console:
-            subprocess.run(command, cwd=phase, env=os.environ.copy(), stdout=console,
+            subprocess.run(command, cwd=phase, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
         text = (phase / "error.log").read_text(errors="replace")
-        check_alarm(text)
-        for name, digest in FRAMES.items():
+        check_alarm(text, args.power_choice)
+        frames = dict(FRAMES)
+        if args.power_choice:
+            from tools.noki6250_staged_check import check as check_uploads
+            from tools.radio_registration_trace_check import verify
+
+            off = text.index("ccont_power: event=off")
+            wake = text.index("ccont_power: event=wake cause=80")
+            activation = text.index("6250_alarm_physical: action=activate_" + args.power_choice)
+            check_uploads(text[:off], runtime=True)
+            check_uploads(text[wake:activation], runtime=True)
+            verify(text[:off], "nhm3", preserved=True)
+            if "LAPDm Location Updating Accept acknowledged" in text[wake:activation]:
+                raise ValueError("alarm-only wake unexpectedly registered before activation")
+            if args.power_choice == "yes":
+                verify(text[activation:], "nhm3", preserved=True)
+            elif "LAPDm Location Updating Accept acknowledged" in text[activation:]:
+                raise ValueError("declined activation unexpectedly registered")
+            frames.update(
+                off="907c2e3cc0dc7d0dc17827521badb7be0f647b6b945f1bac2e68094fd47568a7",
+                elapsed="06480ad9a6db38ed78e22108fd63272d7992765161fe11ab8bea65a18c98ab33",
+                stopped="66e40d0bd8e655b0ac6400b6e83c1acd01c58b0247d51ed4f341ccf6f7cab615",
+                choice=(FRAMES["stopped"] if args.power_choice == "yes" else
+                        "907c2e3cc0dc7d0dc17827521badb7be0f647b6b945f1bac2e68094fd47568a7"))
+        for name, digest in frames.items():
             check_frame(phase / "snap" / f"6250_alarm_{name}.png", digest)
-        subprocess.run([sys.executable, str(root / "tools/radio_registration_trace_check.py"),
+        if not args.power_choice:
+            subprocess.run([sys.executable, str(root / "tools/radio_registration_trace_check.py"),
                         str(phase / "error.log"), "--profile", "nhm3", "--preserved"], check=True)
-        print("6250 research-HLE physical alarm, natural RTC expiry and Stop PASS; audio/native/off-wake not tested")
+        print("6250 research-HLE physical alarm PASS; activation=" +
+              (args.power_choice or "awake Stop") + "; native speech/audio output not tested")
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"6250 alarm failed: {error}\n")
 

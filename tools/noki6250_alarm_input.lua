@@ -2,6 +2,7 @@
 local source = debug.getinfo(1, 'S').source:sub(2)
 dofile(assert(source:match('^(.*[/])')) .. 'noki6250_runtime_observe.lua')
 local machine = manager.machine
+local powered_off = os.getenv('NOKIA_DCT3_6250_ALARM_POWER_OFF') == '1'
 local function cell(column, row)
     for _, field in pairs(machine.ioport.ports[':COL.' .. column].fields) do
         if field.mask == (1 << row) then return field end
@@ -37,13 +38,36 @@ local input = coroutine.create(function()
     machine.screens[':screen']:snapshot('6250_alarm_confirm.png')
     if not press(named('End'), 'idle') then return end
     machine.screens[':screen']:snapshot('6250_alarm_idle.png')
-    if not emu.wait(30) then return end
+    if powered_off then
+        local power = assert(machine.ioport.ports[':PWR'].fields['Power'])
+        machine:logerror('6250_alarm_physical: action=power_off\n')
+        power:set_value(1)
+        if not emu.wait(4) then power:set_value(0); return end
+        power:set_value(0)
+        machine:logerror('6250_alarm_physical: action=power_release\n')
+        if not emu.wait(10) then return end
+        machine.screens[':screen']:snapshot('6250_alarm_off.png')
+        if not emu.wait(31) then return end
+    elseif not emu.wait(30) then
+        return
+    end
     -- This phase shows the firmware's Stop/Snooze controls during title blink.
     machine.screens[':screen']:snapshot('6250_alarm_elapsed.png')
     if not press(cell(1, 1), 'stop') then return end
     if not emu.wait(3) then return end
     machine.screens[':screen']:snapshot('6250_alarm_stopped.png')
     machine:logerror('6250_alarm_physical: event=stopped_presented\n')
+    if powered_off then
+        local choice = os.getenv('NOKIA_DCT3_6250_ALARM_POWER_CHOICE')
+        if choice then
+            assert(choice == 'yes' or choice == 'no', 'invalid activation choice')
+            if not press(choice == 'yes' and cell(1, 1) or named('Right Softkey / C'),
+                         'activate_' .. choice) then return end
+            if not emu.wait(20) then return end
+            machine.screens[':screen']:snapshot('6250_alarm_choice.png')
+            machine:logerror('6250_alarm_physical: event=choice_presented\n')
+        end
+    end
 end)
 _G.noki6250_alarm_input = input
 assert(coroutine.resume(input))

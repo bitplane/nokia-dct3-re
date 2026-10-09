@@ -1273,5 +1273,16 @@ independently in the three processes.
 
 This establishes natural RTC IRQ consumption and firmware output programming
 in research HLE. It does not establish audible samples, Snooze recurrence,
-powered-off alarm wake, native DSP or physical clock accuracy. No alarm cause,
+native DSP or physical clock accuracy. No alarm cause,
 time register or firmware state is injected.
+
+`verify-6250-alarm-off-no` and `verify-6250-alarm-off-yes` additionally
+hold the physical power input after arming. The LCD is blank while rails are
+off; natural RTC expiry wakes the phone with cause `80`. Stop presents
+`Switch the phone on?`. Physical No returns to rail-off; physical Yes
+activates the phone and completes preserved Location Updating. Alarm-only
+wake does not register before the activation choice. Both gates validate
+the initial and alarm-wake uploaded DSP stages separately, require silence
+of the named powered transport endpoints during the off interval, and check
+exact product-local off, alarm, question and final-choice frames. This is
+the own PMM research-HLE composition, not a native-DSP or speech claim.
