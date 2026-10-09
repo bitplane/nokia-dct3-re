@@ -1277,6 +1277,14 @@ The other observed full-status reads are the interrupt drain at
 `9004` reads through `0x2458e0` select bit 2 only. Thus none of the observed
 CCONT-status helper callers makes the retained PWRONX bit a selector; this
 is bounded runtime coverage, not a proof that no other reader exists.
+The isolated physical retry in `run_8890_alarm_security_digits` captures
+the editor after each key: `12345` at seconds 86..91 produces exactly one
+through five asterisks, then Menu displays `Code falsch`. This excludes
+duplicate logical digits in that retry despite repeated low-level keypad
+decode observations. The same run accepts the cold-start security sequence
+before arming the alarm. The remaining boundary is therefore post-wake
+validation/context or stored-code selection, not an established wrong
+default code; no security record or firmware state was changed.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
