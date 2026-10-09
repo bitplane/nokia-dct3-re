@@ -354,6 +354,21 @@ outside this literal scan. The first follows a candidate direct call to
 the lifecycle entering these control routines and initializing the
 `0x18xx/0x19xx` block, not another search for the already observed scratch
 copy. Do not synthesize port-`0x38/0x39` readiness from these candidates.
+
+`tools/c54x_rom4_mode_observe.lua` passively watches every write to `121f`,
+`1835`, `07fb` and `1974`. Run it with `-autoboot_script` in the same isolated,
+fresh-generated-EEPROM composition as `check-c54x-rom4-rf-boundary`.
+Under the current absolute CTSI compare model, a 30-second run records 12
+writes, all zero: startup clearing at PCs `0f10/0f15/3074`, the search-list
+scratch tail at `3da3` (2.091269308 s), another write at `33e7`
+(2.114326750 s), and clearing at `3074` (2.180219058 s). All four watched
+words finish zero. The RF gate passes independently with 6,499 frame
+expiries, 207,040 port-`27` reads, three port-`32` writes and no port-`38/39`
+reads. This refreshes the earlier inactive-control observation without
+assuming that the older relative-compare timing still applies. It does not
+close the writer census or prove these routines are the cell-search path.
+Preserved-NVRAM runs have a different RF sequence and must not be checked
+against that gate's fresh-profile port-sequence expectation.
 The DROM function-list mechanism is an immediate call walker, not a persistent
 frame schedule. Routine `0x9a56` calls `0x771c`; the recovered data ROM contains
 `0x9a56` in 17 `0x00ff`-terminated lists between `0xedf7` and `0xeee6`.
