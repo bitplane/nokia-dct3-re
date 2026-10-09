@@ -34,6 +34,12 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
                          (wait["entry"], wait["expected_id"], wait["context"]))
         decoded = check.instruction(data, wait["call_site"])
         self.assertEqual(("bl", "#0x21cf0c"), (decoded.mnemonic, decoded.op_str))
+        completion = check.verify(data)["sim_delivery"]["lifecycle_completion"]
+        self.assertEqual((0x12, 0x2E0138, 0x1587),
+                         (completion["task"], completion["object"], completion["id"]))
+        self.assertEqual([0x281376, 0x2BC146], completion["call_candidates"])
+        self.assertEqual(bytes.fromhex("1587"),
+                         data[completion["object"] - check.BASE:completion["object"] - check.BASE + 2])
 
     def test_own_descriptor_event_delivery_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"

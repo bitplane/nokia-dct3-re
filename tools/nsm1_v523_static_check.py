@@ -377,6 +377,11 @@ def verify(image: bytes) -> dict:
                                             "call_site": 0x21FCF2,
                                             "expected_id": literal(image, 0x21FCF8),
                                             "context": literal(image, 0x21E42A)},
+                         "lifecycle_completion": {
+                             "wrapper": 0x27A4F0, "task": 0x12,
+                             "object": literal(image, 0x27A4FA),
+                             "id": literal(image, 0x27A4F2),
+                             "call_candidates": direct_call_candidates(image, 0x27A4F0)},
                          "descriptor_event": {
                              "pointer_column": literal(image, 0x275FAC),
                              "stride": 8, "index": 0xE3,

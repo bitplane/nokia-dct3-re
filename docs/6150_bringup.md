@@ -260,8 +260,24 @@ Task 18 is started; the selected cold lifecycle is waiting before its
 application-start publication. This identifies the active wait, not the
 semantic meaning or missing hardware origin of `0x1587`.
 
-Next: recover the producer and delivery contract of the observed task-18
-input `0x1587`, rather than pursuing the unselected `0x09f0` loops,
+Own producer `0x27a4f0` loads id `0x1587`, calls `0x28fddc`, then posts
+immutable object `0x2e0138` to task 18 through `0x275b60` at `0x27a4fc`.
+The object begins `15870000`; this is an explicit in-ROM producer, not a
+missing external-event inference. Bounded direct call candidates are
+`0x281376` and `0x2bc146`. The first follows a byte store in handler block
+`0x281370`; the second belongs to entry `0x2bc112`, which updates context
+halfword `+10`, publishes through `0x2bf6cc`, sets context byte `+1` to
+five, then posts the completion. These mechanics do not yet establish
+semantic subsystem ownership.
+
+A fresh 30-second cold run observes task-18 entry and its receive wait but
+no entry into the completion wrapper, block `0x281370`, or routine
+`0x2bc112`. The static checker pins the wrapper's own id/object/task and
+two-site candidate inventory. Descriptor/data references to `0x1587`
+remain additional candidate routes, not excluded by this direct-call result.
+
+Next: decode the dispatcher input selecting `0x281370` and the caller
+contract of `0x2bc112`, retaining descriptor-driven routes in the census,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
