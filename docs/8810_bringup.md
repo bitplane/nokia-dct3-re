@@ -16,6 +16,8 @@ CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
 erased-storage failures and reaches SIMI initialization, but remains blank
 through 30 seconds. No usable handset or authentic provisioning is established.
+The current bounded question is why firmware leaves all keypad columns masked
+after initialization, and which own prerequisite enables input/UI startup.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
@@ -273,9 +275,8 @@ The cold erased-storage run takes that branch at 0.509262231 s with calculated
 `0xdb24`, stored `0x011e=0xffff`, and stored `0x0090=0xffff`. The failure-display
 handler runs at 1.476262308 s. This establishes an integrity failure in this
 fixture, not an authentic factory profile or the absence of additional faults.
-Next recover the calculator/helper and protected fields completely before
-choosing any own-storage fixture; no donor record or firmware flag override is
-permitted.
+Protected identity semantics are not established by this integrity check;
+no donor record or firmware flag override is permitted.
 
 The observed allocated path's arithmetic is reproduced independently: sum
 EEPROM bytes `0x40..0x11d`, subtract the high and low bytes returned by
@@ -335,12 +336,33 @@ registration or native speech. The next question is the post-initialization
 firmware wait/UI startup boundary. Additional storage changes require their
 own decoded contract; no donor identity is justified by a blank frame.
 
+### Parked Task and Physical Input
+
+The sampled loop `0x2d33d6..0x2d33dc` waits on byte `0x1216bc`. Its entry
+tests predicates in order; the observed first predicate `0x2c76fe` returns
+zero at 5.355727077 s, selecting `0x2d33cc`. That predicate itself tests two
+state bytes and helper `0x2a15cc`; no lifecycle meaning is yet established.
+The loop flag has clear writers in handlers `0x2deb9a` and `0x2dec1c`, and
+runtime interrupt traffic reaches those writers. Thus a sampled parked task
+is not sufficient evidence that all firmware execution or UI work is blocked.
+
+`tools/nse6_keypad_fixture.lua` applies physical digit/softkey/navigation
+contacts at 8, 10 and 12 seconds using the inherited, provisional host labels.
+Three fresh two-integrity runs remain blank at 28 seconds. The scanner runs
+once during startup and the decoder never runs. At every input edge MAD2 IRQ
+pending is `00`, IRQ mask `ce`, control `05`, and keypad column mask `3f`.
+All columns are masked, explaining why these contacts produce no keypad IRQ;
+this is not acceptance of the host labels or proof of a controller defect.
+The next bounded question is the firmware-owned column-mask enable lifecycle
+and its prerequisites. The harness must not unmask columns or force a task
+publication to make this fixture appear interactive.
+
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
 `nse1_rom4_dsp_program.bin` and `nse1_rom4_dsp_data.bin` declared in the driver.
-Next, capture the firmware-owned verifier result and trace the self-test failure
-with erased own storage. A successful handshake does not justify importing a
-donor EEPROM or claiming native radio/speech.
+A successful handshake does not justify importing a donor EEPROM or claiming
+native radio/speech. Captured results and the two integrity failures are above;
+the current input-enable boundary is distinct from those resolved questions.
 
 The shared memory handshake is not permission to fabricate its result. Memory capacities,
 reset/peripheral attachment, static negative fixtures and the first isolated

@@ -5,17 +5,22 @@ local memory = cpu.spaces['program']
 local handles = {}
 local counts = {}
 local result_readers = {}
-for _, address in ipairs({0x13ff74, 0x13fde1}) do
+for _, address in ipairs({0x13ff74, 0x13fde1, 0x1216bc}) do
     local writes = 0
+    local late_writes = 0
     handles[#handles + 1] = memory:install_write_tap(address & ~3,
         (address & ~3) + 3, 'nse6_failure_' .. address,
         function(offset, value, mask)
             local lane = 0xff << ((3 - (address & 3)) * 8)
             if (mask & lane) == 0 then return end
             writes = writes + 1
-            if writes > 32 then return end
+            if machine.time:as_double() >= 7 then
+                late_writes = late_writes + 1
+                if late_writes > 16 then return end
+            elseif writes > 32 then return end
             machine:logerror(string.format(
-                'nse6_failure_write: address=%08x pc=%08x lr=%08x byte=%02x t=%.9f\n',
+                '%s: address=%08x pc=%08x lr=%08x byte=%02x t=%.9f\n',
+                address == 0x1216bc and 'nse6_wake_flag_write' or 'nse6_failure_write',
                 address, cpu.state['PC'].value, cpu.state['R14'].value,
                 (value >> ((3 - (address & 3)) * 8)) & 0xff,
                 machine.time:as_double()))
@@ -41,12 +46,21 @@ handles[#handles + 1] = memory:install_read_tap(0x1205c8, 0x1205cf,
     end)
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
-        0x2e1194, 0x2de164, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
-        0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca}) do
+        0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
+        0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca,
+        0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
+        0x2d33c0, 0x2d33c8, 0x2d33cc}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address >= 0x2d3398 and address <= 0x2d33cc
+                    and counts[address] <= 4 then
+                machine:logerror(string.format(
+                    'nse6_park_predicate: pc=%08x result=%08x flag_address=%08x t=%.9f\n',
+                    address, cpu.state['R0'].value, cpu.state['R5'].value,
+                    machine.time:as_double()))
+            end
             if address == 0x28d5ca and counts[address] <= 4 then
                 machine:logerror(string.format(
                     'nse6_config_integrity: computed=%08x stored=%08x t=%.9f\n',
@@ -104,6 +118,9 @@ emu.register_frame_done(function()
     if now >= 28 and not late_captured then
         late_captured = true
         machine.screens[':screen']:snapshot('8810-stage-late.png')
+        machine:logerror(string.format(
+            'nse6_late_input_counts: scans=%d decodes=%d t=%.9f\n',
+            counts[0x2de164] or 0, counts[0x2e049a] or 0, now))
     end
     machine:logerror(string.format(
         'nse6_stage_snapshot: pc=%08x sp=%08x first=%04x second=%04x t=%.9f\n',
