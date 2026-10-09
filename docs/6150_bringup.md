@@ -303,7 +303,27 @@ scalar sender `0x275cb0` at `0x2bc4e2`. The bounded direct call scan finds
 one candidate at `0x223a74`. This closes the missing-bit interpretation,
 not the report's hardware ownership or all indirect producers.
 
-Next: decode and trace report-`0x14` caller `0x223a74` and its prerequisite,
+The report-`0x14` caller belongs to entry `0x223520`, running as task
+`0x14` (20). Its report branch calls `0x28b760` at `0x223a68`, sets bit
+6 in byte `0x110894`, then calls the report wrapper at `0x223a74`.
+Fresh entry traces observe task 20 starting twice (0.395867 and 0.832705
+seconds, across the already-observed early reset), but never reaching
+that report branch in the nine-second run.
+
+The active lifecycle tail `0x2263fa` calls scalar receiver `0x221ee0`,
+stores its transformed result at context `+50`, and dispatches on halfword
+`+52` through the 30-entry pointer table at `0x226420`. Runtime receive
+returns establish context `0x111c34` and state `0x18 -> 0x1a -> 4 -> 3`;
+frequent scalar `0x019d` and occasional `0x019a/0x0199/0x0198` are delivered.
+The first 64 returns reach the trace cap around six seconds, so absence
+claims after that point must use the separate uncapped entry counters.
+Own table entries select `0x2258e4` for state `0x18`, `0x225b54` for
+`0x1a`, `0x225c00` for four and `0x225cb8` for three. This establishes a
+live, event-driven owner; the report branch's absent lifecycle transition
+is the next question, not a stalled global scheduler.
+
+Next: decode the selected task-20 state handlers and the route into
+report branch `0x223a68`,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct

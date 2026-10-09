@@ -10,6 +10,17 @@ local application_receives = 0
 local lifecycle_receives = 0
 local scalar_receives = 0
 local completion_gates = 0
+local report_owner_receives = 0
+handles[#handles + 1] = memory:install_read_tap(0x221ee4, 0x221ee7,
+    'nsm1_report_owner_receive', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x221ee6 or report_owner_receives >= 64 then return end
+        report_owner_receives = report_owner_receives + 1
+        machine:logerror(string.format(
+            'nsm1_report_owner_receive: task=%02x value=%08x context=%08x state=%04x t=%.9f\n',
+            memory:read_u8(0x100022), cpu.state['R0'].value,
+            cpu.state['R4'].value, memory:read_u16(cpu.state['R4'].value + 0x34),
+            machine.time:as_double()))
+    end)
 local readiness_nibble_writes = 0
 handles[#handles + 1] = memory:install_write_tap(0x1126c0, 0x1126c3,
     'nsm1_readiness_nibble', function(offset, value, mask)
@@ -76,7 +87,8 @@ handles[#handles + 1] = memory:install_read_tap(0x2085c4, 0x2085c7,
     end)
 for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc,
         0x29f340, 0x21e41c, 0x21cf0c, 0x21e9a8,
-        0x27a4f0, 0x281370, 0x2bc112, 0x28029c, 0x28129a}) do
+        0x27a4f0, 0x281370, 0x2bc112, 0x28029c, 0x28129a,
+        0x223520, 0x223a14, 0x223a68, 0x28b760, 0x2263fa, 0x2bc4d4}) do
     local count = 0
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nsm1_activation_owner_' .. address,
