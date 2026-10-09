@@ -24,6 +24,25 @@ control bus is serial. Nor does its twelve-bit width establish how MAD2
 presents a sample at DSP I/O port `0x27`: address selection, sign extension,
 word ordering and readiness still require a mapping or timing capture.
 
+### NSE-1 synthesizer boundary
+
+Nokia's NSE-1 System Module manual (03/98, pp. 3-50--51 and 3-61--63),
+available as a [complete manual reproduction](https://www.scribd.com/document/74806191/41-Mobile100-Technical),
+separates PLUSSA tuning from COBBA sample/control traffic. The synthesizer
+bus uses SDATA, SCLK and SENA1; SCLK is 3.25 MHz and SENA1 latches the
+transferred word. The startup diagram lists five 23-bit transfers: mode,
+VHF reference divider, VHF N/A, UHF reference divider and UHF N/A.
+The UHF PLL uses a 64/65 prescaler and 200 kHz reference/channel spacing;
+the VHF PLL uses a 16/17 prescaler. The divider relation is `M = N*P + A`.
+
+These are physical constraints, not decoded MAD2 SCU registers. In particular,
+the observed DSP port-31/32 pairs are not established as these 23-bit words.
+The MCU/DSP programming owner, word layout, bit order, address mapping and
+timed latch mechanism remain unknown. A future tuning model must connect
+an evidenced software write path to this bus rather than infer an ARFCN
+from arbitrary COBBA control values. RF sample encoding remains a separate
+unresolved MFI contract.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
