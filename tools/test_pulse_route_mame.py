@@ -43,11 +43,14 @@ class PulseRouteMameTests(unittest.TestCase):
         self.assertNotIn('-f pulse "$input_sink_name"', script)
         self.assertIn('-i "$output_sink_name.monitor"', script)
         self.assertIn(
-            '--source "$input_sink_name.monitor" --sink "$output_sink_name"',
+            '--source "$capture_source_name" --sink "$output_sink_name"',
             script,
         )
         self.assertIn('pactl set-default-sink "$default_sink"', script)
         self.assertIn('pactl set-default-source "$default_source"', script)
+        self.assertIn('module-remap-source', script)
+        self.assertIn('"master=$input_sink_name.monitor"', script)
+        self.assertIn('pactl unload-module "$capture_module_id"', script)
 
 
 if __name__ == "__main__":

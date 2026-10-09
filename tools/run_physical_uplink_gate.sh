@@ -24,6 +24,8 @@ run_nvram_dir=${RUN_NVRAM_DIR:-}
 input_sink_name="nokia_dct3_uplink_$$"
 output_sink_name="nokia_dct3_downlink_$$"
 input_module_id=
+capture_module_id=
+capture_source_name="nokia_dct3_capture_$$"
 output_module_id=
 source_pid=
 capture_pid=
@@ -60,6 +62,9 @@ cleanup()
 		pactl set-default-sink "$default_sink" >/dev/null 2>&1 || true
 		default_sink_changed=false
 	fi
+	if [[ -n "$capture_module_id" ]]; then
+		pactl unload-module "$capture_module_id" >/dev/null 2>&1 || true
+	fi
 	if [[ -n "$output_module_id" ]]; then
 		pactl unload-module "$output_module_id" >/dev/null 2>&1 || true
 	fi
@@ -93,6 +98,11 @@ input_module_id=$(pactl load-module module-null-sink \
 output_module_id=$(pactl load-module module-null-sink \
 	"sink_name=$output_sink_name" \
 	"sink_properties=device.description=NokiaDCT3PhysicalDownlink")
+# A distinct source avoids sink/monitor index collisions in MAME's Pulse
+# node inventory and provides a recording endpoint rather than a sink name.
+capture_module_id=$(pactl load-module module-remap-source \
+	"master=$input_sink_name.monitor" "source_name=$capture_source_name" \
+	"source_properties=device.description=NokiaDCT3PhysicalCapture")
 # SDL's PulseAudio backend selects the server defaults rather than honoring
 # PULSE_SOURCE/PULSE_SINK. Preserve and temporarily replace both before MAME
 # opens its streams; existing host streams are not moved.
@@ -100,7 +110,7 @@ default_sink=$(pactl get-default-sink)
 default_source=$(pactl get-default-source)
 pactl set-default-sink "$output_sink_name"
 default_sink_changed=true
-pactl set-default-source "$input_sink_name.monitor"
+pactl set-default-source "$capture_source_name"
 default_source_changed=true
 mkdir -p "$run_dir"
 # Mixer routes are host state, not handset fixture data. Let MAME discover the
@@ -120,7 +130,7 @@ ffmpeg -y -hide_banner -loglevel error \
 	-ac 1 -ar 8000 -c:a pcm_s16le "$run_dir/downlink.wav" &
 capture_pid=$!
 python3 tools/pulse_route_mame.py \
-	--source "$input_sink_name.monitor" --sink "$output_sink_name" \
+	--source "$capture_source_name" --sink "$output_sink_name" \
 	> "$run_dir/pulse_routes.log" &
 router_pid=$!
 
@@ -129,7 +139,7 @@ if [[ -n "$host_media_port" ]]; then
 	if [[ -n "$bios" ]]; then
 		bios_args=(-bios "$bios")
 	fi
-	( env PULSE_SOURCE="$input_sink_name.monitor" \
+	( env PULSE_SOURCE="$capture_source_name" \
 		NOKIA_DCT3_LUA_QUIET=1 \
 		NOKIA_DCT3_POST_READY_KEYS="$post_ready_keys" \
 		NOKIA_DCT3_POST_READY_KEY_DELAY_MS="$post_ready_delay_ms" \
@@ -165,7 +175,7 @@ else
 		ERASED_IDENTITY_SECURITY_CODE=12345 RUN_VERBOSE=1 \
 		"${nvram_args[@]}" \
 		RUN_EXTRA_ARGS="-cfg_directory $audio_cfg -sound pulse -throttle" \
-		RUN_ENV="PULSE_SOURCE=$input_sink_name.monitor NOKIA_DCT3_POST_READY_KEYS=$post_ready_keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$post_ready_delay_ms NOKIA_DCT3_POST_READY_KEY_DURATION_MS=$post_ready_duration_ms NOKIA_DCT3_POST_READY_KEY_GAP_MS=$post_ready_gap_ms"
+		RUN_ENV="PULSE_SOURCE=$capture_source_name NOKIA_DCT3_POST_READY_KEYS=$post_ready_keys NOKIA_DCT3_POST_READY_KEY_DELAY_MS=$post_ready_delay_ms NOKIA_DCT3_POST_READY_KEY_DURATION_MS=$post_ready_duration_ms NOKIA_DCT3_POST_READY_KEY_GAP_MS=$post_ready_gap_ms"
 fi
 
 test -f "$run_dir/error.log"
