@@ -241,6 +241,23 @@ observed receive-frame delivery. The COBBA register-0/8 field meanings and
 clock/mux gating remain unresolved, so these numeric transactions are not
 permission to fabricate microphone samples or assert a periodic interrupt.
 
+The resident register-8 pair is independently checked from ROM words:
+`a4a5` resets/releases BSPC; `a4b4` reads selector 8 through `4610`, ORs
+`0600`, and writes through `45c2`. Conversely, `a502` resets BSPC, reads
+selector 8, ANDs `09ff` (clearing those two bits), and writes it back. Thus
+`0600` is a paired firmware activation mask, distinct from the self-test's
+additional `0010` echo bit. These instructions do not identify the two
+bits as oscillator enables, converter enables or routing controls. The
+checker protects all three sequences against word mutations.
+
+The own-product manual's pin table (pp. 3-40/3-41) identifies MAD2 pin 135
+as PCMTxData/DX, pin 137 as PCMRxData/RX, pin 138 as PCMDClk/CLKX and pin
+139 as PCMSClk/FSX. This strengthens the external transmit-clock/frame
+attachment, but does not separately identify a CLKR/FSR wiring or internal
+MAD2 clock fan-out. Do not import another COBBA revision's clock rate or
+assign receive timing from a pin name alone. The public manual documents
+rates and connectivity, not the register-8 decode or frame edge/pulse width.
+
 ### Organic tone request boundary
 
 `tools/c54x_rom4_tone_observe.lua` combines the physical-input harness with
