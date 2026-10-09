@@ -615,6 +615,16 @@ the 8850's 1 MHz/125-clock framing; the reported NSB-6 ratio would be 64 clocks.
 Own-ROM speech-control decoding and physical Send/End correlation remain
 separate prerequisites. Native DSP speech is not established.
 
+The manual's publicly readable [page summary](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html)
+now independently establishes the narrower clock-ownership statement:
+COBBA-GJP generates PCM sync by dividing the 512 kHz data clock to 8 kHz.
+That fixes the frequency ratio at 64 and identifies sync generation, but the
+summary's sign-extension caption does not recover word placement, sample
+edge or sync polarity/width. The direct page and independent Guidessimo
+mirror return HTTP 403; the waveform has not been visually reviewed.
+Accordingly PCM remains disabled pending the missing framing evidence,
+not pending ownership of sync generation.
+
 The acquired v12.20 MCU (SHA1 `a214a0d69760ecd8eeca0b9d82f95c94bdfe70ed`)
 independently pins the compiler at `2c307c`, selector table `2c30b0`
 (`00..34`), selector 17 at `2c32f8` and selector 8 at `2c3340`.
