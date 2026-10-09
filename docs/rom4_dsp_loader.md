@@ -1044,6 +1044,20 @@ the 32-bit class registration exists and points to the installed
 `cc_setup.exe`. This does not establish that this class alone causes the
 failure. No target instruction, timer fixture or pipeline mode has executed.
 
+A COM activation trace identifies the requested application class as
+`CodeComposer.Application` (`{DE4FA3E7-B47F-11D1-B009-0040055C1953}`),
+registered in the 32-bit view to the installed `cc_app.exe`. Thus
+`0x80040154` is not proof that its registry key is absent. Observing the
+application during the actual call captures **Error reading Code Composer
+Setup information**, not a usable target. The documented alternative
+`CCSConfigClear`/`CCSConfigImport` sequence fails already at `CCSConfigClear`
+with the same unsupported SystemSetup interface; it never reaches import of
+the package's `drivers/import/c549sim.ccs`. This rules out an unnoticed
+drag/drop dialog as a sufficient explanation for that attempt. The remaining
+dependency is functioning legacy SystemSetup COM initialization in this
+environment, not a changed DSP fixture. Do not invent a board database or
+modify the vendor binaries to conceal this failure.
+
 Retain `full-install-expanded-path.log`, `installed-ide.log`,
 `installed-ide-screen.png`, `run_ccs33_oracle_plugin_msxml_legacy.log`,
 and the earlier `full-install-shell-registered.log`, `xds-install-error.png`
@@ -1051,7 +1065,10 @@ and `plugin-install-error.png`. Additional evidence is `mono-install.log`,
 `run_ccs33_oracle_plugin_with_mono.log`,
 `run_ccs33_oracle_wineboot_repair.log` and `plugin-prefix-repair-error.png`.
 Current verification evidence is `full-install-wow32.log` and
-`run_ccs33_oracle_automation_registered.log`. Resolve the remaining COM
+`run_ccs33_oracle_automation_registered.log`,
+`run_ccs33_oracle_automation_com_trace.log.zst`,
+`automation-observed-screen.png` and `run_ccs33_oracle_automation_import.log`.
+The verbose COM trace is also retained uncompressed. Resolve the remaining COM
 initialization boundary using the vendor tools; do not edit the generated
 component database or interpret copied files as a working simulator.
 
