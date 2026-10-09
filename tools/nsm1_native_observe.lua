@@ -5,6 +5,27 @@ local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
 local sim_sends = 0
+local descriptor_events = 0
+for _, address in ipairs({0x275106, 0x275f9c}) do
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'nsm1_descriptor_' .. address,
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= address then return end
+            local r0 = cpu.state['R0'].value
+            local index = r0
+            if address == 0x275f9c then
+                if r0 < 0x100000 or r0 > 0x11fff0 then return end
+                index = memory:read_u8(r0 + 9)
+            end
+            if index ~= 0xe3 or descriptor_events >= 32 then return end
+            descriptor_events = descriptor_events + 1
+            machine:logerror(string.format(
+                'nsm1_descriptor: pc=%08x index=%02x r0=%08x r1=%08x caller=%08x task=%02x t=%.9f\n',
+                address, index, r0, cpu.state['R1'].value,
+                cpu.state['R14'].value, memory:read_u8(0x100022),
+                machine.time:as_double()))
+        end)
+end
 for _, sender in ipairs({0x27641c, 0x275b60}) do
 handles[#handles + 1] = memory:install_read_tap(sender, sender + 3,
     'nsm1_sim_sender_' .. sender, function(offset, value, mask)

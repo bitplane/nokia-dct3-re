@@ -358,6 +358,15 @@ def verify(image: bytes) -> dict:
         "sim_delivery": {"receive_loop": 0x288114, "receive": 0x275DB4,
                          "sender": 0x27641C, "current_task": 0x100022,
                          "blocking_sender": 0x275B60,
+                         "descriptor_event": {
+                             "pointer_column": literal(image, 0x275FAC),
+                             "stride": 8, "index": 0xE3,
+                             "object": read32(image, literal(image, 0x275FAC) + 0xE3 * 8),
+                             "event": image[read32(image, literal(image, 0x275FAC) + 0xE3 * 8) - BASE + 4],
+                             "scheduler": 0x275106, "schedule_site": 0x288F80,
+                             "delay": 0x178, "runtime_schedule_verified": False,
+                             "socket_schedule_observed": True,
+                             "socket_schedule_caller": 0x2AB893},
                          "blocking_sender_candidates": direct_call_candidates(image, 0x275B60),
                          "immutable_event_objects": [
                              {"wrapper": wrapper, "object": literal(image, pool),

@@ -154,12 +154,25 @@ The cold socket-edge run delivers own ROM object `0x2e0a50` to task 22 at
 approximately 5.922 seconds: bytes `000000000c000000002a0000`, ordinary
 event `0x0c`. This object is outside SRAM and must be retained by receiver
 observability. Neither of the two traced sender entrances publishes it in
-the observed window; another delivery path remains to be mapped. Readiness
+the observed window. Own RTOS receive supplies a descriptor-driven alternate
+path: `0x275fac` loads pointer-column base `0x2d869c`, then reads the node's
+index byte at `+9` and scales it by eight. Entry `0xe3` at `0x2d8db4`
+points to this exact object. The SIM task schedules index `0xe3` at
+`0x288f80` through `0x275106`, with delay `0xff + 0x79 = 0x178`.
+The cold socket-edge trace confirms index `0xe3`, delay `0x178`, at
+3.016680 seconds, retaining caller `0x2ab893` in task 0. This is a
+distinct path from the SIM-task schedule site: the caller is the return
+from `0x2a70dc` at `0x2ab88e`, so the timer primitive is reached through
+that helper rather than a direct call there. RTOS receive reaches the
+descriptor branch `0x275f9c` with node `0x100bdc`, index `0xe3`, in task
+22 at 5.922080 seconds; the exact ROM object returns ten microseconds
+later. The SIM-task schedule site remains static-only. Readiness
 still reads `01/ff/00/01` at eight seconds. The expanded no-edge cold control
 observes no receive object. The receive path can therefore carry a physical
 input-triggered event, but this does not complete SIM activation.
 
-Next: map the event-`0x0c` producer and continuation, then identify what
+Next: map event-`0x0c`'s continuation and the socket scheduling helper,
+then identify what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
 GPIO ownership independently. Do not inject an event, force the readiness

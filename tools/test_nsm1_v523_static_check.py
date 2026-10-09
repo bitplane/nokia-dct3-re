@@ -5,6 +5,27 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_descriptor_event_delivery_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        contract = check.verify(data)["sim_delivery"]["descriptor_event"]
+        self.assertEqual(0x2D869C, contract["pointer_column"])
+        self.assertEqual(0x2D8DB4, contract["pointer_column"] + contract["index"] * contract["stride"])
+        self.assertEqual((0x2E0A50, 0x0C), (contract["object"], contract["event"]))
+        for address, mnemonic, operands in (
+                (0x275FAE, "ldrb", "r2, [r0, #9]"),
+                (0x275FB0, "lsls", "r2, r2, #3"),
+                (0x275FB2, "ldr", "r1, [r1, r2]"),
+                (0x288F7A, "movs", "r0, #0xe3"),
+                (0x288F7C, "movs", "r1, #0xff"),
+                (0x288F7E, "adds", "r1, #0x79"),
+                (0x288F80, "bl", "#0x275106")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+        self.assertFalse(contract["runtime_schedule_verified"])
+
     def test_direct_call_candidates_decode_thumb_big_endian_and_bounds(self):
         self.assertEqual([check.BASE],
                          check.direct_call_candidates(bytes.fromhex("f000f800"), check.BASE + 4))
