@@ -223,7 +223,7 @@ upload at PC `0x31d7`; the four ring advances observed were startup traffic
 at PC `0x3805`. This is a negative result for the unattached-input run, not
 proof that the processing branches cannot publish results with real samples.
 The branch conditions and sample format remain the next receiver questions.
-An instruction-PC census of the coherent no-cell run resolves the default
+An earlier relative-compare instruction-PC census resolves that model's default
 route more tightly. `0x00ac=0` fails both mode comparisons at `0x322e/0x3232`,
 so INT0 runs the four-read block at `0x3249..0x325b` eight times. It then
 reaches `0x3268`, tests `0x00af` at `0x326b..0x3272`, and branches directly
@@ -233,12 +233,12 @@ first zero-input frame. These are observed branch PCs, not decoded purposes
 for the callees. ROM `0x4414..0x4460` is an initializer that stores `0x00ac`
 and `0x00af`; direct call sites include `0x09a4`, `0x0ab8`, `0x4de3`,
 `0x4e00`, and `0x9b62/0x9b9f/0x9bb0`. Whether ordinary acquisition reaches
-this initializer at all remains unproved. A focused 30-second coherent no-cell
+this initializer was unproved under that model. A relative-compare 30-second no-cell
 run recorded zero
 executions at `0x4414/0x4428/0x4433/0x4460` while servicing 6,497 frame
-expiries and 207,232 port-`0x27` reads. Thus the observed baseline loop does
-not itself establish that this mode initializer or its result-publication
-branches are reached. No firmware or DSP state was forced for this census.
+expiries and 207,232 port-`0x27` reads. That absence is superseded by the
+current absolute-compare observation below; it is not a current exclusion.
+No firmware or DSP state was forced for either census.
 The host-command jump table is distinct: DSP code `0x398d..0x3997` adds the
 incoming type to data-ROM base `0xb00f`, reads the function pointer, and
 branches through it. Type `0x1a` selects table entry `0xb029 = 0x3d5e`,
@@ -247,7 +247,7 @@ consistent with the observed `0x3d70` search-list handler; it does not select
 `0x4de3/0x4e00`, and `0x9b62/0x9b9f/0x9bb0`. The last group is reached from
 the separate `0x3660` control dispatch or ROM function lists. This classifies
 `0x4414` as a DSP control-mode operation, not a direct host-packet handler.
-A changed-write watch over the same 30-second boot found no writes to
+A changed-write watch over that earlier relative-compare boot found no writes to
 `0x1973` or `0x00ac`. Word `0x00af` was decremented at PC `0x3273` on 6,476
 INT0 frames after the 21-frame startup interval, starting at `0xffff` after
 its zero-initialized first pass. The branch at `0x326f` therefore continues
@@ -260,7 +260,7 @@ one repeated state-change pattern, not three independent host requests.
 The `0x77c2` path reaches that pattern only when the `0x1953` value is not
 positive; it follows calls into the separate `0x7b0a` mode family. The
 `0x78ed/0x7c73` paths likewise follow `0x7a75` and join `0x7778` after
-setting the flag. In the coherent 30-second no-cell run, a changed-write watch
+setting the flag. In that earlier 30-second no-cell run, a changed-write watch
 recorded zero writes to `0x1949`, `0x1953`, or `0x1973`. These are dormant
 control-mode paths in that run, not evidence of a missing direct MCU command.
 The source of the transition, and whether it belongs to ordinary search or a
@@ -270,6 +270,24 @@ port-`0x38` status reads. A coherent 12-second run records zero reads on both
 `0x38` and `0x39`; those sites are dormant while the `0x27` loop runs. Their
 activation and sample encoding must be recovered before a controlled GSM
 burst can be meaningfully attached.
+
+The current absolute-compare fresh boot reaches `4414/4428/4460` three
+times and `4433` once. Mode `00ac` is cleared at startup, then written as
+`1` at 2.104547481 s, `2` at 2.109165308 s, `9` at 2.138664673 s, and `1`
+at 2.161736846 s. The first three writes occur at PC `442b`; the final write
+occurs at `32b6`. The active frame paths include `32f4` 6,033 times, `33b4`
+seven times and sample-read instruction `3249` 3,384 times. Thus the
+mode initializer is live, and the old zero-mode-only description is not the
+current receiver lifecycle. Mode 1 branches through `32f4` and has its own
+four-read block beginning at `330a`; its sample meaning and publication
+contract remain unproved. Word `1973` still receives only zero initialization
+in this run. The RF gate independently passes with 6,499 frames, 207,040
+sample reads and three control writes, without acquisition. These counts
+come from passive program/data taps in `c54x_rom4_mode_observe.lua`, with
+31 observed fetches at `3da2` as a positive control. Observer handles are
+retained for the whole machine lifetime; otherwise Lua garbage collection
+can invalidate a cached-fetch tap. The next receiver analysis must start
+from this active mode-1 path rather than try to activate `4414` again.
 
 Port `0x27` is bidirectional in ROM4: seven static `PORTW` sites at
 `0x4248/0x424d/0x4258/0x425d/0x4267/0x426c/0x4271` belong to a separate
