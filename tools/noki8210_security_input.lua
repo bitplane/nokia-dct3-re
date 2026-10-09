@@ -10,6 +10,24 @@ if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' th
     local selector_count = 0
     -- Own late-PIN observation identifies this record; this is not a model address.
     local control_count = 0
+    local tag_count = 0
+    _G.nsm3_candidate_list_tag = memory:install_read_tap(0x287768, 0x28776b,
+        'nsm3_candidate_list_tag', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x28776a or tag_count >= 32 then return end
+            tag_count = tag_count + 1
+            local context = memory:read_u32(0x2a110c)
+            local function input(pointer)
+                if pointer >= 0x100000 and pointer < 0x17fffc then
+                    return memory:read_u16(pointer)
+                end
+                return 0
+            end
+            machine:logerror(string.format(
+                '8210_candidate_list_tag: tag=%u caller=%08x current=%04x queued=%04x t=%.6f\n',
+                cpu.state['R0'].value, cpu.state['R14'].value,
+                input(memory:read_u32(context + 8)), input(memory:read_u32(context + 12)),
+                machine.time:as_double()))
+        end)
     _G.nsm3_late_neighbour_control = memory:install_write_tap(0x1196ac, 0x1196af,
         'nsm3_late_neighbour_control', function(offset, value, mask)
             if control_count >= 128 then return end

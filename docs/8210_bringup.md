@@ -1672,10 +1672,16 @@ across its candidate-list range, preserving selector bits 16..19. An aligned
 direct-BL scan finds two call candidates, `2a1026` and `2a10ba`; both pass
 tag 5. Thus the passing rewrite belongs to request-lifecycle list tagging,
 not a new RSSI completion. The static contract pins the bit mask and both
-callers. Correlate this tagging with current/queued request selection before
-claiming the metadata difference causes registration failure; the unchanged
-selector is insufficient to establish a missing DSP reply. Runtime watches
-are observation-only.
+callers. Paired `run_8210_list_tag_{early,late}_20261009` resolves observed
+ordering: early PIN enters promoter `2a0dc8` with current `03eb` and queued
+`03ec` at 12.262178s, then calls the tag helper from `2a1026` at
+12.262213s with `03ec` already current and the queue empty. Late PIN enters
+the promoter at 12.262021s with current `03eb` and no replacement, and
+never calls the tag helper through the complete failing run. Tag 5 is
+downstream of replacement promotion in the passing lifecycle, not an
+independent missing hardware event. The metadata difference therefore adds
+no justification for a DSP reply; the frontier remains legitimate
+reevaluation of the later queued request. Runtime watches are observation-only.
 
 Public-reference coverage is bounded. Gammu's
 [NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)
