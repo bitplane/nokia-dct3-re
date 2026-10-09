@@ -185,7 +185,7 @@ def main() -> int:
         print("Native I/O word, CPU registers and save-time restoration: PASS")
     if args.tone_log is not None:
         print("Organic tone initialization: PASS; operational_serial_samples=0 native_audio_claim=0")
-    print("Bounded ROM sequences only; physical port ownership and codec clock remain unresolved.")
+    print("Bounded ROM sequences only; physical port ownership and serial clock attachment remain unresolved.")
     return 0
 
 

@@ -827,6 +827,14 @@ constexpr nokia_product_config make_5110_config()
 	result.mad2_clock_stop = false;
 	result.ccont_board = ADC_5110;
 	result.boot_rom_hle = true;
+	// NSE-1 System Module 03/98, p. 3-32: COBBA divides 13 MHz by 13,
+	// then by 125, supplying 1 MHz data and 8 kHz PCM frame clocks. The
+	// depicted word is 16-bit, sign-extended 13-bit PCM. Sync width/edge
+	// stay unset: this does not enable the unattached native serial path.
+	result.cobba_pcm.data_clock = 1'000'000;
+	result.cobba_pcm.frame_clock = 8'000;
+	result.cobba_pcm.sample_bits = 13;
+	result.cobba_pcm.word_clocks = 16;
 	return result;
 }
 
@@ -3863,9 +3871,8 @@ void nokia_dct3_state::noki5110(machine_config &config)
 	// A finder lookup after device_remove can refer to the deleted device.
 	apply_product_config(PRODUCT_5110);
 	config.device_remove("dsp_hle");
-	// The independently reproduced co-simulation advances four DSP cycles per
-	// 13 MHz MCU hardware cycle. Keep this as an explicit ROM4 pacing result
-	// until the MAD2 clock tree is recovered from primary hardware material.
+	// NSE-1 System Module 03/98, p. 3-33: the DSP multiplies the 13 MHz
+	// system reference to 52 MHz; native co-simulation independently agrees.
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }

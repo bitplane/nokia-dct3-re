@@ -247,6 +247,25 @@ semantics; it does not establish the MAD2/COBBA frame-clock rate, pin mapping,
 or whether every native data `0022` write is the generic BSPC interface.
 Keep those product attachments explicit before promoting operational audio.
 
+### NSE-1 physical clock contract
+
+The [NSE-1 System Module manual](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251)
+(03/98, pp. 3-32--3-33) supplies product-specific clock evidence: COBBA
+divides the 13 MHz reference by 13 to generate a 1 MHz PCM data clock, then
+by 125 for an 8 kHz sample/frame clock. Its diagram shows a 16-bit word with
+13 converter bits and sign extension. This is not the 520 kHz profile used
+by other product-family attachments. The same manual specifies a 13 MHz DSP
+reference multiplied internally to 52 MHz, corroborating the native backend
+clock rather than leaving it solely as a co-simulation pacing calibration.
+
+`PRODUCT_5110` now records those four PCM properties. Sync width and transfer
+edge are not promoted from another handset; the unsupported shape remains
+inert and the native backend is not attached to the HLE block-transfer path.
+Thus these constants supply the physical clock boundary for future native
+serial work, not a periodic interrupt source or proof of audio output. The
+native tone fixture still requires serial readiness/frame delivery to be
+modeled separately.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair
