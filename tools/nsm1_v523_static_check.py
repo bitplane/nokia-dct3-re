@@ -394,6 +394,13 @@ def verify(image: bytes) -> dict:
                              "adjacent_literal_sites": [0x224E34, 0x225348],
                              "same_input_other_task": {"site": 0x26B7F4, "task": 8},
                              "all_producers_closed": False},
+                         "scalar_init_trigger": {
+                             "wrapper": 0x2B3F12, "task": 0x14, "input": 0x42,
+                             "call_candidates": direct_call_candidates(image, 0x2B3F12),
+                             "state_helper": 0x2BF2E6,
+                             "helper_call_candidates": direct_call_candidates(image, 0x2BF2E6),
+                             "state": literal(image, 0x2BF2E8),
+                             "previous_state": literal(image, 0x2BF2EC)},
                          "descriptor_event": {
                              "pointer_column": literal(image, 0x275FAC),
                              "stride": 8, "index": 0xE3,

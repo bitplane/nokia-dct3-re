@@ -69,6 +69,18 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         other = check.instruction(data, producers["same_input_other_task"]["site"] - 4)
         self.assertEqual("r0, #8", other.op_str)
         self.assertFalse(producers["all_producers_closed"])
+        trigger = check.verify(data)["sim_delivery"]["scalar_init_trigger"]
+        self.assertEqual([0x2BF31A], trigger["call_candidates"])
+        self.assertEqual([0x280B0C, 0x2813A0], trigger["helper_call_candidates"])
+        self.assertEqual((0x1127D8, 0x11FF10),
+                         (trigger["state"], trigger["previous_state"]))
+        for address, mnemonic, operands in (
+                (0x2B3F14, "movs", "r0, #0x14"),
+                (0x2B3F16, "movs", "r1, #0x42"),
+                (0x2BF316, "cmp", "r1, #0"),
+                (0x2BF31A, "bl", "#0x2b3f12")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
 
     def test_own_descriptor_event_delivery_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"

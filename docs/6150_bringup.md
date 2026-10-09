@@ -351,8 +351,21 @@ input `0x42` in state ten (`0x224e06`) or fourteen (`0x22586a`). Producer
 these branches. This establishes an additional state/input dependency;
 it does not establish that the analog inputs should be changed to select it.
 
-Next: recover transformed input `0x42`'s producer and the evidenced entry
-into these task-20 lifecycle states, including computed/table-driven sends,
+Own wrapper `0x2b3f12` posts raw scalar `0x42` to task 20 through
+`0x275cb0`. Its sole bounded direct call candidate is `0x2bf31a`, inside
+state-change helper `0x2bf2e6`. The helper compares state byte `0x1127d8`
+with prior state `0x11ff10`, also honoring byte `0x1127d9 == 1` as a
+notification condition. On that branch it clears the notification byte,
+copies the current state into the prior state, and posts `0x42` only when
+the current state is zero. Other state values take a different publication
+path. Direct helper callers are task-1 sites `0x280b0c` and `0x2813a0`.
+A fresh nine-second cold trace observes none of helper `0x2bf2e6`, wrapper
+`0x2b3f12`, or the two task-20 self-posting blocks. This is a bounded
+lifecycle observation, not a closed proof of absent hardware traffic.
+
+Next: decode helper caller `0x280b0c` and the writers of state
+`0x1127d8`/notification `0x1127d9`, while checking the other caller's
+dependency on the already-mapped completion path,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
