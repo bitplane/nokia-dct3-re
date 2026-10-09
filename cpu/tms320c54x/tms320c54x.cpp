@@ -298,11 +298,12 @@ void tms320c54x_device::device_reset()
 
 void tms320c54x_device::update_timer_counter()
 {
-	if ((m_tcr & TIMER_TSS) || !m_timer->enabled() || m_idle_mode >= 2)
+	if ((m_tcr & TIMER_TSS) || (!m_timer->enabled() && m_idle_mode < 2))
 		return;
-	const u64 remaining = m_timer->remaining().as_ticks(clock());
+	const u64 remaining = m_idle_mode >= 2 ? m_idle_timer_ticks : m_timer->remaining().as_ticks(clock());
 	const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
 	m_tim = remaining ? u16((remaining - 1) / divider) : 0;
+	m_tcr = (m_tcr & ~TIMER_PSC_MASK) | (remaining ? ((remaining - 1) % divider) << 6 : 0);
 }
 
 void tms320c54x_device::arm_timer()
@@ -312,7 +313,8 @@ void tms320c54x_device::arm_timer()
 		m_timer->adjust(attotime::never);
 		return;
 	}
-	const u64 cycles = u64(m_tim + 1) * ((m_tcr & TIMER_TDDR_MASK) + 1);
+	const u64 cycles = u64(m_tim) * ((m_tcr & TIMER_TDDR_MASK) + 1) +
+		((m_tcr & TIMER_PSC_MASK) >> 6) + 1;
 	if (m_idle_mode >= 2)
 	{
 		m_idle_timer_ticks = cycles;
@@ -335,6 +337,7 @@ void tms320c54x_device::leave_idle()
 TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
 {
 	m_tim = m_prd;
+	m_tcr = (m_tcr & ~TIMER_PSC_MASK) | ((m_tcr & TIMER_TDDR_MASK) << 6);
 	m_ifr |= 0x0008; // TINT, vector 19
 	// SPRU131G 6.11.1: IMR enables wake even when INTM blocks ISR entry.
 	if (m_imr & 0x0008)
@@ -515,12 +518,13 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 	else if (address == 0x26)
 	{
 		update_timer_counter();
-		m_tcr = value & ~(TIMER_TRB | TIMER_PSC_MASK);
+		// SPRU131G 8.4.2: PSC is readable, but cannot be written directly.
+		m_tcr = (value & ~(TIMER_TRB | TIMER_PSC_MASK)) | (m_tcr & TIMER_PSC_MASK);
 		if (value & TIMER_TRB)
 		{
 			m_tim = m_prd;
 			// SPRU131G table 8-14: TRB loads PSC even when TSS stops counting.
-			m_tcr |= (m_tcr & TIMER_TDDR_MASK) << 6;
+			m_tcr = (m_tcr & ~TIMER_PSC_MASK) | ((m_tcr & TIMER_TDDR_MASK) << 6);
 		}
 		arm_timer();
 	}

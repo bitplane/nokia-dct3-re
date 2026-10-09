@@ -336,14 +336,18 @@ private:
 		m_phase = 6200 + index * 2;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
-	void start_stopped_timer_reload_case(unsigned divider)
+	void start_stopped_timer_reload_case(unsigned index)
 	{
+		unsigned const divider = index % 16;
+		unsigned const variant = index / 16;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		u16 const code[] = {0x7725, 0x1234, 0x7726, u16(0x0030 | divider),
-			0x4826, 0xf4e1}; // STM PRD; STM stopped TRB; LDM TCR,A; IDLE1.
+			u16(variant ? 0x6926 : 0xf495), u16(variant ? (variant == 1 ? 0 : 0x03c0) : 0xf495),
+			0x4826, 0xf4e1}; // Reload only, identity ORM, or attempted write to read-only PSC.
 		for (unsigned i = 0; i < std::size(code); ++i)
 			program.write_word(0x010600 + i, code[i]);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
@@ -352,7 +356,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(STATE_GENPC, 0x010600);
-		m_phase = 7300 + divider;
+		m_phase = 7300 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 	void start_timer_boundary_probe(unsigned index)
@@ -1616,11 +1620,12 @@ private:
 			start_idle_nmi_case(0);
 			return;
 		}
-		if (m_phase >= 7300 && m_phase <= 7315)
+		if (m_phase >= 7300 && m_phase <= 7347)
 		{
-			unsigned const divider = m_phase - 7300;
-			osd_printf_info("TMS320C54x stopped reload case: divider=%u a=%llx tim=%04x idle=%u illegal=%u pc=%06x\n",
-				divider, static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
+			unsigned const index = m_phase - 7300;
+			unsigned const divider = index % 16;
+			osd_printf_info("TMS320C54x stopped reload case: divider=%u variant=%u a=%llx tim=%04x idle=%u illegal=%u pc=%06x\n",
+				divider, index / 16, static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IDLE)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
@@ -1629,9 +1634,9 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_TIM) == 0x1234 &&
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
-				"SPRU131G TRB reloads TIM and PSC while TSS stops counting; TRB reads zero");
-			if (divider < 15) { start_stopped_timer_reload_case(divider + 1); return; }
-			osd_printf_info("TMS320C54x stopped timer reload: PASS divider_cases=16\n");
+				"SPRU131G TRB reloads stopped TIM and read-only PSC; TCR writes preserve PSC and TRB reads zero");
+			if (index < 47) { start_stopped_timer_reload_case(index + 1); return; }
+			osd_printf_info("TMS320C54x stopped timer reload: PASS divider_cases=16 write_variants=3\n");
 			start_timer_boundary_probe(0);
 			return;
 		}

@@ -812,16 +812,21 @@ following instruction completed before entry. These fixtures failed before
 the guard was implemented. They do not establish general six-stage pipeline
 drain timing or protect arbitrary writes to ST1.
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
-before running the separate timing observations. Sixteen firmware-free
+before running the separate timing observations. Forty-eight firmware-free
 instruction cases write PRD `1234`, reload with TSS set and each TDDR value,
-then read TCR through `LDM`. TIM must remain `1234`, PSC must equal TDDR,
-and TRB must read zero (SPRU131G table 8-14). The former core returned PSC
-zero when stopped: the correctly initialized baseline passes divider zero
-but fails divider one. The core now retains TRB's PSC publication for stopped
-readback; IDLE2/3 reads use their existing saved timer phase. This does not
-establish writable-PSC semantics, general stop/restart prescaler continuity,
-interrupt latency or native recording completion. The full CPU suite and
-native NSE-1 RF cadence remain unchanged under their existing regressions.
+then read TCR through `LDM`: reload alone, `ORM #0,TCR`, and an attempted
+write of all PSC bits. TIM must remain `1234`, PSC must equal TDDR,
+and TRB must read zero (SPRU131G table 8-14). Section 8.4.2 explicitly
+identifies PSC as readable but not directly writable. TCR writes therefore
+retain the counter rather than clearing it or accepting the supplied PSC;
+TRB and timer expiry reload it from TDDR. Timer rearming includes the current
+PSC, and IDLE2/3 reads use their existing saved timer phase. The correctly
+initialized identity-write baseline fails divider one (`11` instead of `51`).
+These assertions do not establish arbitrary live TDDR changes, general
+stop/restart timing, interrupt latency or native recording completion.
+The full CPU suite passes, and the native NSE-1 receiver regression retains
+6,499 frames, 207,040 port-27 reads, three port-32 writes and no port-38/39
+reads. This preserves the existing no-cell boundary, not radio acquisition.
 
 `make probe-c54x-timer-boundary` runs a separate, firmware-free observation
 profile (`tms54test -bios timer`). It reloads PRD through indirect stores,
