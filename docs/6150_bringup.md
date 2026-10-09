@@ -535,6 +535,16 @@ marker `0x11fdd2` equals `0x5a`, it applies `0x27d4ac` to the final request
 before sending. The different cold/restart requests therefore have an
 own-firmware source; do not mistake them for nondeterministic transport.
 
+`0x27d4ac` reads the twelve bytes at EEPROM offset zero and duplicates
+them into a 24-byte work buffer. Each adjacent pair becomes its unsigned
+byte product stored low byte first. It then reverses the buffer order,
+bit-reverses and complements each byte, and XORs that pad into the request.
+The offline `retained_record_transform` test reproduces the observed cold
+request exactly from the own raw record pair and own identity record
+`3000abb18f2632abcc51301a`; applying it twice restores the raw pair.
+This accounts for the entire cold/restart input difference without a
+DSP timing hypothesis, handset-data substitution or storage modification.
+
 The observed `34 0e 00 82` response is a family-`0x82` MSID. The independently
 recovered codec decodes it to `9a1870dd 00160010 a8a9aa27`: the first word
 agrees with request `0x13`, and the chip field agrees with the modeled COBBA

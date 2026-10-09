@@ -8,6 +8,18 @@ class Nsm1RecordExchangeTests(unittest.TestCase):
     DECODED = bytes.fromhex("20673cc1760df2c72eec0000fbe1ef0608e402bdb4b80000")
     IDENTITY = "18021074340e0082d10917b88e61c1122e4e42f6"
 
+    def test_own_retained_transform_matches_cold_request(self):
+        raw = bytes.fromhex("73654ae2a7cad1f10e8752b699232739bc9657ce4047f826")
+        identity = bytes.fromhex("3000abb18f2632abcc51301a")
+        self.assertEqual(self.REQUEST, check.retained_record_transform(raw, identity))
+        self.assertEqual(raw, check.retained_record_transform(self.REQUEST, identity))
+
+    def test_retained_transform_requires_complete_records(self):
+        with self.assertRaisesRegex(ValueError, "twenty-four/twelve"):
+            check.retained_record_transform(bytes(23), bytes(12))
+        with self.assertRaisesRegex(ValueError, "twenty-four/twelve"):
+            check.retained_record_transform(bytes(24), bytes(11))
+
     def transcript(self):
         request = "00021a701618" + self.REQUEST.hex()
         reply = "1802347435320000" + self.DECODED.hex() + self.REQUEST.hex()

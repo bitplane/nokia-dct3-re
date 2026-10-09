@@ -24,6 +24,23 @@ REQUEST = re.compile(r"nsm1_record_request: .*?bytes=([0-9a-f]+)\b")
 REPLY = re.compile(r"nsm1_restart_packet: .*?bytes=([0-9a-f]+)\b")
 
 
+def retained_record_transform(record: bytes, identity_record: bytes) -> bytes:
+    """Reproduce NSM-1 0x27d4ac for a captured request, without provisioning."""
+    if len(record) != 24 or len(identity_record) != 12:
+        raise ValueError("request/identity record must contain twenty-four/twelve bytes")
+    work = bytearray(identity_record * 2)
+    for index in range(0, 24, 2):
+        product = work[index] * work[index + 1]
+        work[index:index + 2] = product.to_bytes(2, "little")
+    pad = []
+    for value in reversed(work):
+        reversed_complement = 0
+        for bit in range(8):
+            reversed_complement = (reversed_complement << 1) | (1 ^ ((value >> bit) & 1))
+        pad.append(reversed_complement)
+    return bytes(value ^ mask for value, mask in zip(record, pad))
+
+
 def decode_record(encoded: bytes, chip: bytes) -> bytes:
     if len(encoded) != 12 or len(chip) != 4:
         raise ValueError("record/chip must contain twelve/four bytes")
