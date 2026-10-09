@@ -18,6 +18,16 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         self.assertTrue(contract["msb_first"])
         self.assertFalse(contract["runtime_verified"])
 
+    def test_own_gensio_read_contract_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        contract = check.verify(image.read_bytes())["gensio_read"]
+        self.assertEqual({"routine": 0x2BF082, "base": 0x20000,
+                          "control": 0x28, "selection": 0x22,
+                          "tx": 0x2A, "status": 0x29,
+                          "ready_bit": 2, "rx": 0x2D}, contract)
+
     def test_projection_uses_entire_two_megabyte_source_and_terminators(self):
         image = bytearray(check.SIZE)
         image[0x40:0x42] = b"\x12\x34"

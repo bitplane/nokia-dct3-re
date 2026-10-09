@@ -5,14 +5,58 @@
 The acquired v5.23 PPM C package normalizes to an exact 2 MiB CPU-order
 image. `make verify-6150-static` regenerates it from a hash-pinned ZIP
 wrapper without executing the installer, validates every Wintesla record,
-and checks its reset and sparse DSP verification contract. This is static
-coverage only; no executable profile or graphical boot is promoted.
+and checks its reset and sparse DSP verification contract. Normal handset
+support and graphical boot are not promoted. An explicitly separate
+`nsm1r4t` executable compatibility instrument now exists.
 
 The next prerequisite is establishing matching resident DSP behavior and
 runtime validity of the explicitly derived product-local EEPROM fixture,
 plus fitted flash attributes and address aliases.
 A 6110 profile is not a safe substitute: this image uses a larger flash
 verification stream and stack addresses outside NSE-3's 64 KiB SRAM.
+
+## Executable compatibility boundary
+
+`nsm1r4t` uses the own normalized flash and checksum-consistent EEPROM,
+128 KiB SRAM and the acquired NSE-1 ROM4 native DSP program/data. That mask
+is an unproved compatibility input, not an identified NSM-1 fitted mask.
+The MCU reset exit remains declared boot HLE. The base 16-Mbit flash part,
+ROM4 keypad GPIO layout and other conservative peripheral defaults are
+research assumptions; fitted flash identity, aliases and physical input
+are not validated. DSP/service/radio HLE publications are disabled.
+
+Own CCONT read routine `0x2bf082` selects control `0x28=0x22`, writes its
+command through `0x2a`, polls status `0x29` bit 2, and receives at `0x2d`.
+The static checker pins this span and register grammar. Selecting this
+GENSIO leg alone is insufficient: the later default keypad also owns
+`0x28/0x2a` and intercepts the transaction. The explicit compatibility
+instrument selects the non-overlapping ROM4 GPIO layout; this is not yet
+an independently decoded NSM-1 keypad contract.
+
+Read-only observer `tools/nsm1_native_observe.lua` records actual firmware
+shared-memory writes, CPU snapshots and verifier fields; it never writes
+firmware/MMIO state. The nine-second experiment progresses past the sparse
+verifier into later firmware execution, captures result words `0x0000` and
+`0x0004` at `0x111a9e/0x111aa0`, and records native mailbox/completion
+activity. The captured 84 x 48 frame is blank. Leaving the verifier is not
+proof that its result passes the product's later self-test policy. No
+SIM, graphical boot, input, radio or speech acceptance is claimed.
+
+Reproduce using an empty run directory and a ROM directory named
+`nsm1r4t` containing the own flash/EEPROM and the hash-pinned NSE-1 program
+and data files declared in the driver:
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir run_6150_native_cold -- nsm1r4t \
+  -rompath /absolute/path/to/roms -video none -sound none -nothrottle \
+  -seconds_to_run 9 -log -autoboot_delay 0 \
+  -autoboot_script ../tools/nsm1_native_observe.lua
+```
+
+Next: decode the own-firmware policy consuming those verifier words and
+the live post-verifier wait, then establish the remaining GPIO/LCD
+register contracts. Do not replace the result with a passing HLE value.
 
 ## Own-firmware contract
 

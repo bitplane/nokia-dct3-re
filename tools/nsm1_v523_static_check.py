@@ -23,6 +23,7 @@ EEPROM_SHA256 = "95d3326ab9bbcdb31838696c552f56295aac9b234cad53813aff7af9e0a73cb
 EEPROM_MEMBER = "NokiX/scripts/scripts/misc/repair_external_eeprom/nsm-1.bin"
 STREAM_WORDS = 127 * 512 + 510
 SPANS = (
+    (0x2BF082, 0x2BF0AE, "e4d653116034ca56e11435d99cacd9ed548f7becef6efa3b555bb318b89358d5"),
     (0x200040, 0x2000EC, "417277417929323fd0b5c97b34413f832015aa1d7938ea6152b7f523b9e4ea16"),
     (0x2A479E, 0x2A48AA, "07324fa54680e19536956abe4c25ec8be177d7fc6e6392f3ca4b34b16338d577"),
     (0x2BCCFE, 0x2BCD26, "67ee576183c712d2ef4b8d19c8d522578ed5239f3dc90092fca7dc23ccf74a69"),
@@ -163,6 +164,18 @@ def verify(image: bytes) -> dict:
         if hashlib.sha256(image[begin - BASE:end - BASE]).hexdigest() != expected:
             raise ValueError(f"instruction span changed at {begin:#x}")
     anchors = {
+        0x2BF08E: ("movs", "r2, #0x28"),
+        0x2BF090: ("movs", "r1, #0x22"),
+        0x2BF092: ("strb", "r1, [r2, r0]"),
+        0x2BF094: ("movs", "r2, #0x2a"),
+        0x2BF096: ("movs", "r1, #4"),
+        0x2BF09A: ("strb", "r1, [r2, r0]"),
+        0x2BF09C: ("movs", "r1, #0x29"),
+        0x2BF09E: ("ldrb", "r1, [r1, r0]"),
+        0x2BF0A0: ("lsrs", "r1, r1, #3"),
+        0x2BF0A2: ("blo", "#0x2bf09c"),
+        0x2BF0A4: ("movs", "r1, #0x2d"),
+        0x2BF0A6: ("ldrb", "r0, [r1, r0]"),
         0x2A47A4: ("strh", "r4, [r6]"),
         0x2A47A8: ("strh", "r5, [r6, #2]"),
         0x2A4818: ("movs", "r2, #1"),
@@ -223,6 +236,7 @@ def verify(image: bytes) -> dict:
         if (insn.mnemonic, insn.op_str) != expected:
             raise ValueError(f"instruction mismatch at {address:#x}")
     expected_literals = {
+        0x2BF08C: 0x20000,
         0x2A47A0: 0x10000,
         0x2A47A6: 0xFFFF,
         0x2A480C: 0x100FE,
@@ -253,6 +267,10 @@ def verify(image: bytes) -> dict:
         "reset_stack_literals": [literal(image, pc, thumb=False)
                                  for pc in (0x200068, 0x200090, 0x2000B0)],
         "loader": 0x2A479E,
+        "gensio_read": {"routine": 0x2BF082, "base": 0x20000,
+                        "control": 0x28, "selection": 0x22,
+                        "tx": 0x2A, "status": 0x29,
+                        "ready_bit": 2, "rx": 0x2D},
         "coverage": {"pinned_instruction_bytes": sum(b - a for a, b, _ in SPANS),
                      "decoded_anchors": len(anchors), "pool_loads": len(expected_literals)},
         "stream": {"full_blocks": 127, "block_words": 512, "last_source_words": 510,

@@ -86,6 +86,34 @@ class MachineProfileTest(unittest.TestCase):
         self.assertNotIn("nokia_env_u32", apply)
         self.assertNotIn("std::getenv", apply)
 
+    def test_6150_native_compatibility_is_separate_and_product_local(self):
+        profile = self.function_body(
+            "void nokia_dct3_state::nsm1r4t(machine_config &config)",
+            "u8 nokia_dct3_state::nse5_roller_gpio_r",
+        )
+        self.assertIn("dct3_nsm1_research_map", profile)
+        self.assertIn("I2C_24C128(config, m_eeprom)", profile)
+        self.assertIn("research.pup_eeprom_scl_bit = 2", profile)
+        self.assertIn('config.device_remove("dsp_hle")', profile)
+        self.assertIn("NOKIA_DSP_C54X", profile)
+        self.assertNotIn("PRODUCT_5110", profile)
+        self.assertNotIn("PRODUCT_6110", profile)
+        mapping = self.function_body(
+            "void nokia_dct3_state::dct3_nsm1_research_map",
+            "INPUT_CHANGED_MEMBER",
+        )
+        self.assertIn("map(0x100000, 0x11ffff)", mapping)
+        self.assertIn("map(0x200000, 0x3fffff)", mapping)
+        self.assertNotIn("mirror(", mapping)
+        rom = self.driver.split("ROM_START( nsm1r4t )", 1)[1].split("ROM_END", 1)[0]
+        self.assertIn("6150-v523-ppm-c.fls", rom)
+        self.assertIn("nsm1-security-checksum-valid.bin", rom)
+        self.assertNotIn("eeprom 005fa000", rom)
+        self.assertIn("nse1_rom4_dsp_program.bin", rom)
+        observer = (ROOT / "tools/nsm1_native_observe.lua").read_text()
+        self.assertNotIn("memory:write", observer)
+        self.assertNotIn(".value =", observer)
+
     def test_dsp_bootstrap_count_is_product_configuration(self):
         self.assert_profile_fields(
             "make_3310_config",
