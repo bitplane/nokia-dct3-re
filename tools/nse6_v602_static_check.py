@@ -39,6 +39,16 @@ def read32(image, address):
     return int.from_bytes(image[offset:offset + 4], "big")
 
 
+def eeprom_descriptor(value):
+    """Decode the fields used by NSE-6 routine 0x2dd100."""
+    page_shift = ((value >> 3) & 7) - 1
+    if not 0 <= value <= 255 or page_shift < 0:
+        raise ValueError("unsupported EEPROM descriptor")
+    return {"capacity_bytes": 1 << ((value & 7) + 9),
+            "page_bytes": 1 << page_shift,
+            "address_bytes": 2 if value & 0x40 else 1}
+
+
 def check(image):
     if len(image) != 0x200000 or hashlib.sha1(image).hexdigest() != IMAGE_SHA1:
         raise ValueError("not the acquired NSE-6 v6.02 PPM A image")
@@ -55,7 +65,8 @@ def check(image):
         (0x2B611A, 0x10000), (0x2B6120, 0xFFFF),
         (0x2B6144, 0x100F6), (0x2B6186, 0x100FE),
         (0x2B6188, 0x10200), (0x2B618C, 0x200040),
-        (0x2B6202, 0xFFFF))
+        (0x2B6202, 0xFFFF), (0x2DD102, 0x200005),
+        (0x2DD106, 0x121570))
     for address, expected in expected_literals:
         thumb = address >= 0x2000EC
         decoder.mode = ((capstone.CS_MODE_THUMB if thumb else capstone.CS_MODE_ARM)
@@ -89,7 +100,25 @@ def check(image):
         (0x2DE3EA, "strb", "r5, [r3]"),
         (0x2DE3F0, "strb", "r1, [r3, #4]"),
         (0x2DE428, "strb", "r5, [r3]"),
-        (0x2DE450, "strb", "r5, [r3]"))
+        (0x2DE450, "strb", "r5, [r3]"),
+        (0x2DD10E, "adds", "r2, #9"),
+        (0x2DD112, "str", "r3, [r0, #4]"),
+        (0x2DD116, "lsrs", "r3, r1, #3"),
+        (0x2DD11C, "subs", "r3, #1"),
+        (0x2DD120, "strb", "r2, [r0, #1]"),
+        (0x2DD122, "lsrs", "r1, r1, #6"),
+        (0x2DD128, "strb", "r1, [r0]"),
+        (0x2DCF3A, "lsrs", "r0, r7, #8"),
+        (0x2DCF40, "bl", "#0x2de3d4"),
+        (0x2DCF4C, "bl", "#0x2de3d4"),
+        (0x2DE484, "ldrb", "r1, [r3]"),
+        (0x2DE486, "eors", "r0, r1"),
+        (0x2DE488, "lsls", "r7, r0, #0x1f"),
+        (0x2DE4A0, "movs", "r6, #1"),
+        (0x2DE4A2, "movs", "r7, #4"),
+        (0x2DE4B2, "strb", "r2, [r3, #4]"),
+        (0x2DE4F6, "ldrb", "r1, [r3]"),
+        (0x2DE4F8, "tst", "r1, r6"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -99,6 +128,7 @@ def check(image):
             "image_sha1": IMAGE_SHA1, "reset_literals": literals,
             "service_manual_sram_bytes": 0x40000,
             "service_manual_eeprom_bytes": 0x8000,
+            "eeprom_descriptor": eeprom_descriptor(image[5]),
             "eeprom_tx": {"entry": "0x2de3d4", "pup_data": "0x20020",
                           "pup_direction": "0x20024", "sda_bit": 0,
                           "scl_bit": 2},

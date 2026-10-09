@@ -65,10 +65,24 @@ RAM near `0x13ffxx`; this also fits the documented SRAM capacity.
 
 The byte transmitter `0x2de3d4` constructs PUP base `0x20020`, uses data mask
 `0x01` and clock mask `0x04`, and controls SDA direction at `0x20024`. Thus
-the own transmit contract uses SDA bit 0 and SCL bit 2. This is not a claim
-of complete ACK/read/page-cycle recovery or an exact EEPROM manufacturer part.
-The address setup at `0x2dcef0` supports the two-address-byte branch selected
-by its configuration byte; its initialization still needs decoding.
+the own transmit contract uses SDA bit 0 and SCL bit 2. The ACK sampling at
+`0x2de484..0x2de492` returns the inverted SDA bit after clocking the ninth bit.
+The reader `0x2de496` releases SDA direction at `0x20024`, samples bit 0 with
+clock mask 4, and assembles eight bits MSB-first.
+
+Initializer `0x2dd100` reads flash byte `0x200005`, value `0xf6`:
+
+| Field | Firmware decoding | Own result |
+| --- | --- | --- |
+| Capacity | `1 << ((descriptor & 7) + 9)` | 32768 bytes |
+| Page size | `1 << (((descriptor >> 3) & 7) - 1)` | 32 bytes |
+| Address width | Descriptor bit 6 | Two address bytes |
+
+The address setup at `0x2dcef0` consequently uses control byte `0xa0`, then
+high and low address bytes through `0x2de3d4`. The write wrapper at `0x2dcf7a`
+splits transfers using the configured page size. These contracts agree with
+the manual capacity, but do not identify a manufacturer, establish measured
+write-cycle latency, or supply authentic EEPROM contents.
 
 ### DSP Startup
 

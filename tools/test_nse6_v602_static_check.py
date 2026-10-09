@@ -5,6 +5,13 @@ from tools import nse6_v602_static_check as check
 
 
 class Nse6StaticTests(unittest.TestCase):
+    def test_eeprom_descriptor_own_fields(self):
+        self.assertEqual(check.eeprom_descriptor(0xF6), {
+            "capacity_bytes": 32768, "page_bytes": 32, "address_bytes": 2})
+        self.assertEqual(check.eeprom_descriptor(0xB6)["address_bytes"], 1)
+        with self.assertRaises(ValueError):
+            check.eeprom_descriptor(0)
+
     def test_unknown_package_rejected(self):
         with self.assertRaisesRegex(ValueError, "package"):
             check.normalize(b"not firmware")
@@ -32,6 +39,7 @@ class Nse6StaticTests(unittest.TestCase):
         self.assertEqual(result["eeprom_tx"]["scl_bit"], 2)
         self.assertFalse(result["dsp_verifier"]["resident_mask_proven"])
         self.assertEqual(result["dsp_verifier"]["full_blocks"], 127)
+        self.assertEqual(result["eeprom_descriptor"]["page_bytes"], 32)
         mutated = bytearray(image)
         mutated[0x168] ^= 1
         with self.assertRaises(ValueError):
