@@ -15135,6 +15135,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "divert", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-sim-toolkit-call-decline",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "toolkit-call-decline", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-sim-toolkit-call",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",

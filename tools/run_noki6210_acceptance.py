@@ -32,6 +32,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
              'toolkit-sms': ('npe3hle', 'toolkit_sms', 100),
              'toolkit-call': ('npe3hle', 'toolkit_call', 105),
+             'toolkit-call-decline': ('npe3hle', 'toolkit_call_decline', 105),
              'ussd': ('npe3hle', 'ussd_input', 40),
              'divert': ('npe3hle', 'divert_input', 35),
              'divert-lifecycle': ('npe3hle', 'divert_lifecycle_input', 80),
@@ -46,6 +47,8 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'host-rejected-sms': ('npe3hle', 'sms_reject_input', 50),
              'host-silent-sms': ('npe3hle', 'sms_silence_input', 135),
              'host-outgoing-call': ('npe3hle', 'outgoing_call_input', 48)}
+TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-interactive': 3, 'toolkit-menu': 4,
+                    'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
@@ -232,14 +235,14 @@ def main():
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
         host = args.scenario.startswith('host-')
-        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit', 'toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call') or host
+        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms') or args.scenario in TOOLKIT_PROFILES or host
         if configured or args.coherent_cell:
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
             ports = ET.SubElement(system, 'input')
-            if args.scenario in ('toolkit', 'toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call'):
-                tag, mask, value = ':SATCFG', '15', {'toolkit': '1', 'toolkit-interactive': '3', 'toolkit-menu': '4', 'toolkit-sms': '5', 'toolkit-call': '6'}[args.scenario]
+            if args.scenario in TOOLKIT_PROFILES:
+                tag, mask, value = ':SATCFG', '15', str(TOOLKIT_PROFILES[args.scenario])
             else:
                 tag = ':CALLHOST' if host else ':NETCFG'
                 mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
@@ -309,14 +312,14 @@ def main():
             if args.scenario == 'accessory':
                 with Image.open(run / 'snap/6210_before_menu.png') as frame:
                     check_accessory(text, frame)
-        elif args.scenario in ('toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call'):
+        elif args.scenario in ('toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call', 'toolkit-call-decline'):
             import re
             from tools.dct3_toolkit_check import verify_interactive
             from PIL import Image
             actions = ['dismiss', 'inkey_5', 'input_4', 'input_2', 'confirm']
-            if args.scenario in ('toolkit-menu', 'toolkit-sms', 'toolkit-call'):
+            if args.scenario != 'toolkit-interactive':
                 from tools.dct3_toolkit_check import verify_menu
-                status = {'toolkit-menu': '9000', 'toolkit-sms': '9124', 'toolkit-call': '911c'}[args.scenario]
+                status = {'toolkit-menu': '9000', 'toolkit-sms': '9124', 'toolkit-call': '911c', 'toolkit-call-decline': '911c'}[args.scenario]
                 verify_menu(text, '6210', selection_status=status)
                 actions.extend(['menu', 'menu_last', 'menu_open', 'menu_select'])
                 if args.scenario == 'toolkit-call':
@@ -328,6 +331,10 @@ def main():
                                            '6210_toolkit_interactive: action=menu_exit',
                                            'GSM service uplink sapi=0 pd=03 message=25'])
                     actions.append('call_accept')
+                elif args.scenario == 'toolkit-call-decline':
+                    from tools.sim_toolkit_call_trace_check import verify_decline
+                    verify_decline(text, '6210')
+                    actions.append('call_decline')
                 actions.append('menu_exit')
                 if args.scenario == 'toolkit-sms':
                     from tools.sim_toolkit_sms_trace_check import verify as check_toolkit_sms
@@ -347,18 +354,18 @@ def main():
             for phase, digest in expected.items():
                 with Image.open(run / 'snap' / f'6210_toolkit_interactive_{phase}.png') as frame:
                     check_frame(frame, digest, 'interactive Toolkit ' + phase)
-            if args.scenario in ('toolkit-menu', 'toolkit-sms', 'toolkit-call'):
+            if args.scenario != 'toolkit-interactive':
                 for phase, digest in {
                     'entry': '904ec53842abe3b1dcf50fc5e6bc93d61ad352295e07dcbb7d13cf0e3594c5d1',
                     'items': 'a9d5d7e7caa5f074af70d12c5b25ec7dfcad057e7bebc49a91f181cf0a1cfcea',
                     'result': ('66063a4df7efdacdfce3e8d90995423c48d856dfc50e1a649e008d42572cc35a'
-                               if args.scenario == 'toolkit-call' else
+                               if args.scenario in ('toolkit-call', 'toolkit-call-decline') else
                                'a9d5d7e7caa5f074af70d12c5b25ec7dfcad057e7bebc49a91f181cf0a1cfcea'),
                     'idle': OPERATOR_SHA256,
                 }.items():
                     with Image.open(run / 'snap' / f'6210_toolkit_menu_{phase}.png') as frame:
                         check_frame(frame, digest, 'Toolkit menu ' + phase)
-                if args.scenario in ('toolkit-sms', 'toolkit-call'):
+                if args.scenario in ('toolkit-sms', 'toolkit-call', 'toolkit-call-decline'):
                     with Image.open(run / 'snap/6210_toolkit_network_result.png') as frame:
                         check_frame(frame, ('0b46b0a01032750f26d6856034443cb7b5d7d2f6a37f282051867fd112e05f06'
                                             if args.scenario == 'toolkit-call' else

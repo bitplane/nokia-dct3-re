@@ -461,6 +461,8 @@ native DSP remain unpromoted.
 physical consent, exact destination `5551234`, complete laboratory CC/RR
 setup and release, successful terminal response and reviewed idle recovery.
 Speech and external calls are not established by this signaling gate.
+`verify-6210-sim-toolkit-call-decline` independently proves physical Cancel,
+card result `22`, no GSM call establishment and reviewed menu/idle recovery.
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other

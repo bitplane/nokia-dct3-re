@@ -418,6 +418,13 @@ call and idle frames are checked alongside the earlier interactive/menu
 frames and unchanged-PMM upload/registration/storage checks. This proves
 laboratory signaling and consent, not native speech or an external call.
 
+`verify-6210-sim-toolkit-call-decline` uses the same card request but physically
+presses Cancel. The successful APDU carries terminal result `22` (user
+rejection), not call success. The checker forbids an outgoing request,
+SETUP, traffic assignment or CONNECT anywhere in the run. Reviewed prompt,
+recovered menu and post-End idle frames establish physical recovery;
+own upload/registration/storage checks remain independent.
+
 This establishes these command lifecycles, not all Toolkit commands or native
 DSP execution. The completion trace records the status bytes actually appended
 to data-bearing card replies; ordinary `9000` and proactive `9116` responses

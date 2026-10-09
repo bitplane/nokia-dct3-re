@@ -38,6 +38,29 @@ class SimToolkitCallTraceCheckTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "destination 5551234"):
             check.verify(GOOD.replace("81551532f4", "81214365f7"))
 
+    def decline_trace(self):
+        return '\n'.join((
+            'proactive SET UP CALL ready', 'SIM status ins=c2 sw=911c',
+            'header cla=a0 ins=12 p1=00 p2=00 p3=1c',
+            '6210_toolkit_interactive: action=call_decline',
+            'terminal-response data=810306100002028281030122',
+            'SIM status ins=14 sw=9000', '6210_toolkit_interactive: action=menu_exit'))
+
+    def test_physical_decline(self):
+        check.verify_decline(self.decline_trace(), '6210')
+
+    def test_decline_rejects_network_activity(self):
+        for event in ('GSM outgoing request id=1 digits=5551234',
+                      'GSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101',
+                      'GSM service downlink kind=14 sapi=0 pd=06 message=2e length=8',
+                      'GSM service downlink kind=12 sapi=0 pd=03 message=07 length=2'):
+            with self.subTest(event=event), self.assertRaises(ValueError):
+                check.verify_decline(self.decline_trace() + '\n' + event, '6210')
+
+    def test_decline_requires_user_rejection_result(self):
+        with self.assertRaises(ValueError):
+            check.verify_decline(self.decline_trace().replace('030122', '030100'), '6210')
+
 
 if __name__ == "__main__":
     unittest.main()

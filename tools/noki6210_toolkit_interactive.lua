@@ -41,7 +41,8 @@ local input = coroutine.create(function()
         assert(emu.wait(3))
         machine.screens[':screen']:snapshot('6210_toolkit_menu_result.png')
         if _G.noki6210_toolkit_call then
-            press('Left Softkey / Menu', 'call_accept')
+            press(_G.noki6210_toolkit_decline and 'Right Softkey / C' or 'Left Softkey / Menu',
+                  _G.noki6210_toolkit_decline and 'call_decline' or 'call_accept')
         end
         if _G.noki6210_toolkit_network_wait then
             assert(emu.wait(_G.noki6210_toolkit_network_wait))
