@@ -5,7 +5,8 @@
 The acquired v6.02 PPM A package normalizes to a complete, contiguous 2 MiB
 CPU-big-endian flash image. Research machine `nse6stage` now executes its own
 reset/initialization and reaches the verifier's first DSP acknowledgement wait.
-There is no graphical/input/card/service acceptance yet. Other products'
+The ROM4 compatibility fixture now has graphical security-editor and physical
+digit-entry acceptance, but no idle/card/service acceptance. Other products'
 provisioning and DSP publications are not evidence for this handset.
 
 The reset stack base `0x125f30` fits the documented 256 KiB SRAM window starting
@@ -14,16 +15,26 @@ The silent baseline waits for its first DSP acknowledgement. The separate
 `nse6r4t` compatibility fixture executes acquired NSE-1 ROM4 code and reaches
 CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
-erased-storage failures and reaches SIMI initialization, but remains blank
-through 30 seconds. No usable handset or authentic provisioning is established.
+erased-storage failures and reaches SIMI initialization. No usable idle handset
+or authentic provisioning is established.
 The nominal VBAT profile now completes ten acquisitions and publishes report
 `0x14` organically at about 1.763 seconds. The input controller leaves state
 `0x10`, reaches state `4`, and changes the column mask from `0x3f` to `0x20`.
-The display remains blank. Physical contacts now reach matrix scanning and
+The display presents the firmware's Security-code editor. Physical contacts reach matrix scanning and
 decoding: the 30-second fixture records 23 scanner entries and 19 decoder
 entries by 28 seconds. This proves input execution, not the inherited host
-labels or a usable UI. The remaining graphical/lifecycle boundary is separate
-from startup report delivery and the ordinary keypad cause register.
+labels beyond those exercised. `tools/nse6_security_fixture.lua` enters five
+digits through physical contacts: the 12.5-second snapshot shows five masked
+characters, and OK produces Code error at 13.5 seconds. The late frame returns
+to the editor. The erased security contents do not establish that 12345 is a
+valid code; no donor code or lock state is supplied. The current boundary is
+the own-phone security/provisioning contract and subsequent idle lifecycle.
+
+The display-transport observer records 15,684 data bytes, 2,774 nonzero,
+and 584 commands by 28 seconds in the digit/softkey/navigation fixture.
+Inspecting its actual `snap/8810-stage-late.png` corrects the stale blank-frame
+claim: display traffic and editor presentation are present. This is not native
+speech, network registration, or proof of the fitted DSP mask.
 
 The profile is an explicitly nominal silicon-transfer hypothesis, not measured
 NSE-6 calibration. The own-board schematic connects BVOLT to CCONT VBAT pin D2,

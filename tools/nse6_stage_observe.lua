@@ -9,6 +9,23 @@ local report_events = {}
 local report_raw_messages = {}
 local mask_writes = 0
 local cache_writes = 0
+local lcd_data_count, lcd_nonzero_count, lcd_command_count = 0, 0, 0
+handles[#handles + 1] = memory:install_write_tap(0x20028, 0x2002b,
+    'nse6_lcd_data', function(offset, value, mask)
+        if (mask & 0xff) == 0 then return end
+        lcd_data_count = lcd_data_count + 1
+        if (value & 0xff) ~= 0 then lcd_nonzero_count = lcd_nonzero_count + 1 end
+    end)
+handles[#handles + 1] = memory:install_write_tap(0x2002c, 0x2002f,
+    'nse6_lcd_command', function(offset, value, mask)
+        if (mask & 0xff000000) == 0 then return end
+        lcd_command_count = lcd_command_count + 1
+        if lcd_command_count > 48 then return end
+        machine:logerror(string.format(
+            'nse6_lcd_command: value=%02x pc=%08x t=%.9f\n',
+            (value >> 24) & 0xff, cpu.state['PC'].value,
+            machine.time:as_double()))
+    end)
 local row_writes = 0
 local irq_writes = 0
 handles[#handles + 1] = memory:install_write_tap(0x20008, 0x2000b,
@@ -210,6 +227,9 @@ emu.register_frame_done(function()
     next_sample = next_sample + 1
     if now >= 28 and not late_captured then
         late_captured = true
+        machine:logerror(string.format(
+            'nse6_lcd_counts: data=%d nonzero=%d commands=%d t=%.9f\n',
+            lcd_data_count, lcd_nonzero_count, lcd_command_count, now))
         machine.screens[':screen']:snapshot('8810-stage-late.png')
         machine:logerror(string.format(
             'nse6_late_input_counts: scans=%d decodes=%d t=%.9f\n',
