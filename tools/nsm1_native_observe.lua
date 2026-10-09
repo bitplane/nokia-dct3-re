@@ -5,6 +5,17 @@ local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
 local sim_sends = 0
+local owner_scalar_sends = 0
+handles[#handles + 1] = memory:install_read_tap(0x275cb0, 0x275cb3,
+    'nsm1_owner_scalar_send', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x275cb0 or cpu.state['R0'].value ~= 0x14 then return end
+        if owner_scalar_sends >= 64 then return end
+        owner_scalar_sends = owner_scalar_sends + 1
+        machine:logerror(string.format(
+            'nsm1_owner_scalar_send: value=%08x caller=%08x source_task=%02x t=%.9f\n',
+            cpu.state['R1'].value, cpu.state['R14'].value,
+            memory:read_u8(0x100022), machine.time:as_double()))
+    end)
 local activation_requests = 0
 local application_receives = 0
 local lifecycle_receives = 0

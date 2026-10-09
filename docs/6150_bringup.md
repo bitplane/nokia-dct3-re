@@ -417,8 +417,18 @@ that state before the previously observed retry progression. The initialized
 state therefore has an explicit own-ROM explanation; it is not evidence for
 changing calibration or hardware identity to reach another state.
 
-Next: inventory remaining computed/table-driven initialization sends and
-the first external transition of this own-ROM startup lifecycle,
+An entry tap at scalar sender `0x275cb0`, filtering destination task 20
+but accepting every runtime argument value, observes zero invocations in a
+fresh nine-second cold run. This extends beyond the adjacent-literal scan,
+but only covers that primitive and interval. The periodic received values
+are independently accounted for by timer descriptor entries: index `0xd8`
+returns `0x0198`, `0xd9` returns `0x0199`, `0xda` returns `0x019a`, and
+`0xdd` returns `0x019d`. They do not require a missing transport peer and
+must not be counted as scalar-send activity. The initial `0xb1` delivery
+is still a separate startup/RTOS contract to recover.
+
+Next: recover cold-power/startup delivery of task-20 input `0xb1` and any
+additional initialization input from the own-ROM startup source,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct

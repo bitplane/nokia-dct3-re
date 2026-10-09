@@ -84,6 +84,9 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
         self.assertEqual((0xCF, 0xD0),
                          (check.read32(data, 0x2D869C + 15 * 8),
                           check.read32(data, 0x2D869C + 16 * 8)))
+        for index, scalar in ((0xD8, 0x198), (0xD9, 0x199),
+                              (0xDA, 0x19A), (0xDD, 0x19D)):
+            self.assertEqual(scalar, check.read32(data, 0x2D869C + index * 8))
         for address, mnemonic, operands in (
                 (0x28064A, "cmp", "r1, #0x52"),
                 (0x28064E, "b", "#0x280ae4"),
