@@ -1575,7 +1575,22 @@ disposal instructions are checked against the acquired image by
 does not reach the `03f7` decoder as data. This bounds the forwarding grammar;
 it does not name either marker's GSM meaning, authorize a `9c` publication,
 or prove that this sequence supplies late-PIN recovery. The legitimate sender
-and marker consumers remain to be identified before any peer implementation.
+remains to be identified before any peer implementation. The shared
+consumer `275c6c` uses a ten-entry table at `275cdc`, with input origin
+`03f1`: `03f7 -> 275da8`, `03f8 -> 275d7a`, `03f9 -> 275e82` (return),
+and `03fa -> 275d04`. This origin is derived from the complete subtract
+cascade, not from the table's location alone. The `03f8` arm calls `2b9a18`,
+clears context bytes `+24/+25`, and sets `+26=1`; the `03fa` arm updates
+tracked context and conditionally enters the same constructor. Constructor
+`2b9a18` creates internal message halfword 2, payload length byte `+2`,
+type `50` at `+3`, and copies its supplied context bytes after the header.
+The table, flag mutations and constructor header are own-ROM checked.
+Thus markers can have an outbound transaction effect; they are not
+interchangeable with the forwarded data packet. No type-`50` or type-`9c`
+publication is recorded in the retained 46-second late-PIN forwarding run.
+That is a bounded observation, not proof of a universal request/response
+pairing or justification for publishing either packet unsolicited. The
+constructor's payload semantics and legitimate activation remain open.
 The expanded passive run `run_8210_late_pin_status_forward_04` also watches
 constructor `305ec4`, its `03f7` store at `305ef4`, and the six shared-decoder
 returns `2ff4d4`, `303cb6`, `30511c`, `30951a`, `30a0d8`, `30a576`.

@@ -483,6 +483,32 @@ def verify(image):
     if [int.from_bytes(read(address, 2), 'big') for address in (
             0x33ea20, 0x33ea14)] != [0x3fa, 0x3f8]:
         raise ValueError('type-9c changed-tag/flag marker IDs differ')
+    if int.from_bytes(read(0x27604c, 4), 'big') != 0x3ea or instructions(0x275cb6, 32) != [
+            ('subs', 'r1, r1, r3'), ('cmp', 'r1, #3'), ('bhi', '#0x275cbe'),
+            ('b', '#0x275e80'), ('subs', 'r1, #5'), ('cmp', 'r1, #1'),
+            ('bhi', '#0x275cc6'), ('b', '#0x275e80'), ('subs', 'r1, #2'),
+            ('cmp', 'r1, #9'), ('bls', '#0x275cce'), ('b', '#0x275e82'),
+            ('adr', 'r3, #0xc'), ('mov', 'sb, r3'), ('lsls', 'r3, r1, #2'),
+            ('mov', 'r1, sb')]:
+        raise ValueError('shared transport marker dispatch arithmetic differs')
+    if [int.from_bytes(read(0x275cdc + index * 4, 4), 'big') for index in range(10)] != [
+            0x275e24, 0x275e14, 0x275e08, 0x275dfc, 0x275df0,
+            0x275de4, 0x275da8, 0x275d7a, 0x275e82, 0x275d04]:
+        raise ValueError('shared transport 03f1..03fa dispatch table differs')
+    if instructions(0x275d86, 24) != [
+            ('bl', '#0x2b9a18'), ('movs', 'r0, #0x24'), ('ldr', 'r1, [r4]'),
+            ('strb', 'r6, [r0, r1]'), ('movs', 'r0, #0x25'),
+            ('ldr', 'r1, [r4]'), ('strb', 'r6, [r0, r1]'),
+            ('movs', 'r0, #0x26'), ('ldr', 'r1, [r4]'), ('movs', 'r2, #1'),
+            ('strb', 'r2, [r0, r1]')]:
+        raise ValueError('03f8 context flag clear/consumed marker differs')
+    if instructions(0x2b9a60, 22) != [
+            ('adds', 'r5, r0, #0'), ('movs', 'r0, #2'), ('strh', 'r0, [r5]'),
+            ('ldr', 'r0, [sp]'), ('strb', 'r0, [r5, #2]'),
+            ('movs', 'r0, #0x50'), ('strb', 'r0, [r5, #3]'),
+            ('movs', 'r0, #4'), ('adds', 'r0, r0, r5'), ('mov', 'r1, sl'),
+            ('ldr', 'r2, [sp]')]:
+        raise ValueError('shared marker transport type-50 constructor differs')
     default_selectors = (0x21bcdc, 0x21bce4, 0x21bd24,
                          0x21bd28, 0x21bd2c, 0x21bd7c)
     if [int.from_bytes(read(address, 4), 'big') for address in default_selectors] != [
