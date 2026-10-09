@@ -3940,6 +3940,12 @@ void nokia_dct3_state::nse5r4t(machine_config &config)
 void nokia_dct3_state::noki6210(machine_config &config)
 {
 	dct3_32mbit_flash_base(config);
+	// NPE-3 System Module, issue 1 (09/00), table 8: internal MIC2
+	// and differential EAR. These board routes do not select a codec mux,
+	// establish analog gain or supply the still-unrecovered PCM profile.
+	m_cobba->add_route(nokia_cobba_device::ear, "mono", 1.0);
+	MICROPHONE(config, "microphone", 1).front_center()
+			.add_route(0, m_cobba, 1.0, nokia_cobba_device::mic2);
 	apply_product_config(PRODUCT_6210);
 }
 

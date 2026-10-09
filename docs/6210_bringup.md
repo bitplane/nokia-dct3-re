@@ -280,6 +280,15 @@ are 24 bytes, not the NSM-3 20-byte forms. Physical End emits release
 parameter `14`, now selected by the NPE-3 peer. Incoming Call Confirmed is
 `8308040460020081150101`. These prove signaling, **not speech**.
 
+The physical NPE-3 board now attaches COBBA EAR to the speaker and the
+internal microphone to MIC2, as specified by Nokia System Module issue 1
+(09/00), table 8. Unity MAME routes declare connectivity, not analog gain or
+the runtime codec mux. The PCM profile remains unspecified and the HLE
+voice selector remains disconnected; these routes do not enable fabricated
+call audio. The independently mapped command-8 speech-request field and
+exact missing clock/framing evidence are owned by
+[`external_call_bridge.md`](external_call_bridge.md).
+
 `verify-6210-incoming-sms` requires segmented GSM delivery, CP/RP acknowledgments,
 EF_SMS delivery/read-status writes and persistent `hello`, plus its graphical
 read frame. `verify-6210-outgoing-sms` physically composes `A` for `5551234`,
