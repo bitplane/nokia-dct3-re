@@ -732,7 +732,10 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 				gsm::a5::direction::uplink))
 			return;
 		++m_uplink_ciphered_bursts;
-		if (m_trace_enabled && m_uplink_ciphered_bursts == 1)
+		// Bounded observations must continue past activation so saved-call
+		// replay can compare cipher frame/count progression without key data.
+		if (m_trace_enabled && (m_uplink_ciphered_bursts == 1 ||
+				m_uplink_ciphered_bursts % 104 == 0))
 			LOGMASKED(LOG_RADIO,
 					"radio_l1: kind=cipher direction=uplink algorithm=%u fn=%u count=%u\n",
 					u8(m_gsm_session->cipher_algorithm()), frame_number,
@@ -845,7 +848,8 @@ TIMER_CALLBACK_MEMBER(nokia_radio_peer_device::burst_tick)
 				gsm::a5::direction::downlink))
 			return;
 		++m_downlink_ciphered_bursts;
-		if (m_trace_enabled && m_downlink_ciphered_bursts == 1)
+		if (m_trace_enabled && (m_downlink_ciphered_bursts == 1 ||
+				m_downlink_ciphered_bursts % 104 == 0))
 			LOGMASKED(LOG_RADIO,
 					"radio_l1: kind=cipher direction=downlink algorithm=%u fn=%u count=%u\n",
 					u8(m_gsm_session->cipher_algorithm()), frame_number,

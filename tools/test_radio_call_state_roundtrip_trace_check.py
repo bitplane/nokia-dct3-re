@@ -23,11 +23,11 @@ dsp_hle: speech stop control=060b uplink=174 downlink=168 t=30.720000
 
 
 class CallStateRoundtripTests(unittest.TestCase):
-    def run_check(self, text):
+    def run_check(self, text, require_cipher=False):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "error.log"
             path.write_text(text)
-            return check(path)
+            return check(path, require_cipher=require_cipher)
 
     def test_accepts_active_speech_roundtrip_and_teardown(self):
         result = self.run_check(GOOD)
@@ -37,6 +37,26 @@ class CallStateRoundtripTests(unittest.TestCase):
     def test_rejects_failed_roundtrip(self):
         with self.assertRaisesRegex(ValueError, "successful"):
             self.run_check(GOOD.replace("result=pass", "result=fail"))
+
+    def test_cipher_requirement_rejects_media_only_replay(self):
+        with self.assertRaisesRegex(ValueError, "cipher observations"):
+            self.run_check(GOOD, require_cipher=True)
+
+    def test_cipher_requirement_accepts_both_directions(self):
+        records = "".join(
+            f"radio_l1: kind=cipher direction={direction} algorithm=1 "
+            f"fn={frame} count={frame}\n"
+            for direction in ("uplink", "downlink")
+            for frame in (1234, 1338)
+        )
+        text = GOOD.replace(
+            "state_replay: phase=reference event=end",
+            records + "state_replay: phase=reference event=end"
+        ).replace(
+            "state_replay: phase=restored event=end",
+            records + "state_replay: phase=restored event=end"
+        )
+        self.assertIn("replayed 6", self.run_check(text, require_cipher=True))
 
     def test_rejects_roundtrip_outside_speech(self):
         with self.assertRaisesRegex(ValueError, "bracketed"):

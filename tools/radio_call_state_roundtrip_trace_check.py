@@ -36,7 +36,7 @@ def replay_records(lines, begin, end):
     ]
 
 
-def check(path: Path) -> str:
+def check(path: Path, require_cipher: bool = False) -> str:
     text = path.read_text(errors="replace")
     roundtrip = ROUNDTRIP_RE.search(text)
     if not roundtrip or roundtrip.group(1) != "pass":
@@ -70,6 +70,16 @@ def check(path: Path) -> str:
         raise ValueError(
             "restored digital speech trace diverged from the reference interval"
         )
+    if require_cipher:
+        for direction in ("uplink", "downlink"):
+            observations = [
+                record for record in reference
+                if f"kind=cipher direction={direction} algorithm=1 " in record
+            ]
+            if len(observations) < 2:
+                raise ValueError(
+                    f"missing repeated {direction} cipher observations inside replay"
+                )
     reference_duration = markers[1][2] - markers[0][2]
     restored_duration = markers[3][2] - markers[2][2]
     if abs(reference_duration - restored_duration) > 0.000_001:
@@ -105,9 +115,10 @@ def check(path: Path) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=Path)
+    parser.add_argument("--require-cipher", action="store_true")
     args = parser.parse_args()
     try:
-        print(check(args.log))
+        print(check(args.log, require_cipher=args.require_cipher))
     except ValueError as error:
         raise SystemExit(f"FAIL - {error}") from error
 
