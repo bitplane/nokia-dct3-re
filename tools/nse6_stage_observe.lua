@@ -1,0 +1,42 @@
+-- Read-only own NSE-6 observer; no fabricated DSP/firmware publications.
+local machine = manager.machine
+local cpu = machine.devices[':maincpu']
+local memory = cpu.spaces['program']
+local handles = {}
+local counts = {}
+for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
+        0x2b6196, 0x2b61bc, 0x2b6200, 0x2e1194, 0x2de164, 0x2ca910}) do
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
+            if cpu.state['PC'].value ~= address then return end
+            counts[address] = (counts[address] or 0) + 1
+            if counts[address] > 4 then return end
+            machine:logerror(string.format(
+                'nse6_stage_pc: pc=%08x lr=%08x sp=%08x t=%.9f\n',
+                address, cpu.state['R14'].value, cpu.state['R13'].value,
+                machine.time:as_double()))
+        end)
+end
+local next_sample = 0
+local captured = false
+emu.register_frame_done(function()
+    local now = machine.time:as_double()
+    if now < next_sample then return end
+    next_sample = next_sample + 1
+    machine:logerror(string.format(
+        'nse6_stage_snapshot: pc=%08x sp=%08x first=%04x second=%04x t=%.9f\n',
+        cpu.state['PC'].value, cpu.state['R13'].value,
+        memory:read_u16(0x100fe), memory:read_u16(0x10100), now))
+    if now >= 8 and not captured then
+        captured = true
+        machine.screens[':screen']:snapshot('8810-stage.png')
+        local addresses = {}
+        for address in pairs(counts) do addresses[#addresses + 1] = address end
+        table.sort(addresses)
+        for _, address in ipairs(addresses) do
+            machine:logerror(string.format('nse6_stage_count: pc=%08x count=%u\n',
+                address, counts[address]))
+        end
+    end
+end, 'frame')
+_G.nse6_stage_observer_handles = handles

@@ -3,13 +3,15 @@
 ## Current Result
 
 The acquired v6.02 PPM A package normalizes to a complete, contiguous 2 MiB
-CPU-big-endian flash image. No NSE-6 machine configuration or runtime acceptance
-exists yet. Other products' provisioning and DSP publications are not evidence
-for this handset.
+CPU-big-endian flash image. Research machine `nse6stage` now executes its own
+reset/initialization and reaches the verifier's first DSP acknowledgement wait.
+There is no graphical/input/card/service acceptance yet. Other products'
+provisioning and DSP publications are not evidence for this handset.
 
 The reset stack base `0x125f30` fits the documented 256 KiB SRAM window starting
 at `0x100000`; importing a 128 KiB product configuration would be incorrect.
-The next question is the own DSP bootstrap/verifier and EEPROM attachment.
+The current runtime question is the resident DSP implementation that consumes
+the verifier stream and publishes its first acknowledgement.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
@@ -156,16 +158,48 @@ completed ATR/PPS/APDU exchange on NSE-6 or measured serial timing.
 
 ## Acceptance Required Before Promotion
 
+### First Isolated Run
+
+`run_8810_stage_20261009` ran nine emulated seconds with erased EEPROM and
+the required HLE backend's exchange/service contracts disabled. No resident
+DSP mask, fabricated acknowledgement, radio peer or external-service responder
+is selected. The MCU boot-exit HLE remains explicit; this is not native reset.
+
+The own verifier starts at 0.011511154 s. Its first 512-word block is sent;
+at 0.014975308 s execution reaches `0x2b61bc..0x2b61c0`, waiting for the first
+handshake halfword to become nonzero. Both handshake halfwords stay zero through
+9 s. Display initializer and SIMI initializer do not run; the screenshot is
+blank. This result validates execution to that boundary, not the downstream
+peripheral contracts or fitted DSP compatibility.
+
+The EEPROM device is a capacity/address-compatible 24C256 instrument, not an
+identified fitted part: its modeled page size is 64 bytes while the own firmware
+splits writes at 32. Page-wrap fidelity and write latency remain unvalidated.
+Shared host matrix labels remain provisional; the raw tables are independently
+checked, but no runtime key acceptance has occurred.
+
+```sh
+.venv/bin/python tools/run_mame_isolated.py --mame-dir mame \
+  --run-dir run_8810_stage_20261009 -- nse6stage \
+  -rompath ../run_8810_stage_20261009/roms \
+  -video none -sound none -nothrottle -seconds_to_run 9 -log \
+  -autoboot_delay 0 -autoboot_script ../tools/nse6_stage_observe.lua
+```
+
+The run ROM directory must contain `nse6stage/8810-v602-ppm-a.fls`. Use a new
+run directory for a fresh erased-NVRAM experiment.
+
 Run the hash-pinned package/reset check with
 `python -m tools.nse6_v602_static_check roms/archive-dct3-packages/nse6_602.exe`.
 Its memory-capacity fields cite the service chapter; they are not decoded from
 the reset instructions. The check explicitly reports no runtime acceptance.
 
-1. Recover own memory/reset map and peripheral attachment from firmware and
-   original service information; recover EEPROM pins and BUSC configuration.
-2. Identify own DSP bootstrap/verifier and persistent-storage dependencies.
-3. Add hash-pinned static checks and negative fixtures before a runtime profile.
-4. Run an isolated, forcing-free boot; record its actual frontier, even if blank.
-5. Promote graphical/input/SIM/service capabilities only with their own runtime
-   evidence. A historical repair EEPROM, if examined, remains a repair template,
-   not an authentic handset dump or independently justified provisioning.
+Next, identify the resident DSP implementation that consumes the measured
+verifier stream, using independently supported ROM/upload evidence. The shared
+memory handshake is not permission to fabricate its result. Memory capacities,
+reset/peripheral attachment, static negative fixtures and the first isolated
+boot are established above; persistent-storage dependencies remain unresolved.
+
+Promote graphical/input/SIM/service capabilities only with their own runtime
+evidence. A historical repair EEPROM, if examined, remains a repair template,
+not an authentic handset dump or independently justified provisioning.

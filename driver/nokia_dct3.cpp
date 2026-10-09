@@ -1266,6 +1266,7 @@ public:
 	void noki5110(machine_config &config);
 	void noki6110(machine_config &config);
 	void nsm1r4t(machine_config &config);
+	void nse6stage(machine_config &config);
 	void noki7110(machine_config &config);
 	void nse5r4t(machine_config &config);
 	void noki6210(machine_config &config);
@@ -1338,6 +1339,7 @@ private:
 	void dct3_map(address_map &map) ATTR_COLD;
 	void dct3_nse3_map(address_map &map) ATTR_COLD;
 	void dct3_nsm1_research_map(address_map &map) ATTR_COLD;
+	void dct3_nse6_research_map(address_map &map) ATTR_COLD;
 
 	void trace_interrupt_register(char operation, offs_t offset, uint8_t data);
 	void mad2_fiq_w(int state);
@@ -2695,6 +2697,19 @@ void nokia_dct3_state::dct3_nsm1_research_map(address_map &map)
 	map(0x200000, 0x3fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));
 }
 
+void nokia_dct3_state::dct3_nse6_research_map(address_map &map)
+{
+	map.global_mask(0x00ffffff);
+	// NSE-6 service chapter: 256 KiB SRAM, 2 MiB flash. Aliases unproved.
+	map(0x000000, 0x00ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
+	map(0x010000, 0x010fff).rw(FUNC(nokia_dct3_state::dsp_ram_r), FUNC(nokia_dct3_state::dsp_ram_w));
+	map(0x020000, 0x0200ff).rw(FUNC(nokia_dct3_state::mad2_io_r), FUNC(nokia_dct3_state::mad2_io_w));
+	map(0x030000, 0x030003).rw(FUNC(nokia_dct3_state::mad2_dspif_r), FUNC(nokia_dct3_state::mad2_dspif_w));
+	map(0x040000, 0x040003).rw(FUNC(nokia_dct3_state::mad2_mcuif_r), FUNC(nokia_dct3_state::mad2_mcuif_w));
+	map(0x100000, 0x13ffff).rw(FUNC(nokia_dct3_state::ram_r), FUNC(nokia_dct3_state::ram_w));
+	map(0x200000, 0x3fffff).rw(FUNC(nokia_dct3_state::flash_r), FUNC(nokia_dct3_state::flash_w));
+}
+
 INPUT_CHANGED_MEMBER( nokia_dct3_state::key_irq )
 {
 	m_kbgpio->input_changed();
@@ -3987,6 +4002,30 @@ void nokia_dct3_state::nsm1r4t(machine_config &config)
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
+void nokia_dct3_state::nse6stage(machine_config &config)
+{
+	dct3_base(config);
+	m_maincpu->set_addrmap(AS_PROGRAM, &nokia_dct3_state::dct3_nse6_research_map);
+	// Capacity/address-compatible instrument, not an identified fitted part.
+	// Firmware descriptor 0xf6 splits writes at 32 bytes; this model has
+	// 64-byte pages. Do not claim page-wrap fidelity or measured latency.
+	I2C_24C256(config, m_eeprom);
+	m_eeprom->set_write_cycle_time(attotime::from_msec(5));
+	m_pup->eeprom_sda_read_cb().set(m_eeprom, FUNC(i2cmem_device::read_sda));
+	m_pup->eeprom_sda_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_sda));
+	m_pup->eeprom_scl_write_cb().set(m_eeprom, FUNC(i2cmem_device::write_scl));
+	nokia_product_config research;
+	research.pup_eeprom_scl_bit = 2;
+	// Independently recovered own six-register tuple and keypad tables.
+	research.gensio_wiring = GENSIO_NSE1;
+	research.keypad_wiring = KEYPAD_NSM1;
+	research.simi_controller = true;
+	research.synthetic_sim_card = true;
+	apply_product_config(research);
+	// Keep the required backend with its default disabled exchange/service
+	// contracts. No fitted mask or fabricated bootstrap completion is selected.
+}
+
 u8 nokia_dct3_state::nse5_roller_gpio_r(offs_t bank)
 {
 	// One closed pair, with released pins pulled high. A driven-low contact
@@ -4403,6 +4442,15 @@ ROM_START( nsm1r4t )
 		CRC(de1c353e) SHA1(07335e492f72ba9da9c3436890c9eb4af67fd9a9))
 ROM_END
 
+ROM_START( nse6stage )
+	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
+	ROM_LOAD("nse6_boot.bin", 0, 0x10000, NO_DUMP)
+	ROM_REGION16_BE(0x200000, "flash", ROMREGION_ERASEFF)
+	ROM_LOAD("8810-v602-ppm-a.fls", 0, 0x200000,
+		CRC(4ebe88f4) SHA1(e3b548816fa027da906be3daf049ce6332a9f257))
+	ROM_REGION(0x8000, "eeprom", ROMREGION_ERASEFF)
+ROM_END
+
 ROM_START( nse5r4t )
 	ROM_REGION16_BE(0x10000, "boot_rom", ROMREGION_ERASEFF)
 	ROM_LOAD("nse5_boot.bin", 0, 0x10000, NO_DUMP)
@@ -4520,6 +4568,7 @@ SYST( 1998, noki5110, 0,      0,      noki5110, noki5110, nokia_dct3_state, empt
 SYST( 1997, noki6110, 0,      0,      noki6110, noki6110, nokia_dct3_state, empty_init, "Nokia", "Nokia 6110 (NSE-3)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki7110, 0,      0,      noki7110, noki7110, nokia_dct3_state, empty_init, "Nokia", "Nokia 7110", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1998, nsm1r4t,  0,        0,    nsm1r4t,  nsm1r4t,  nokia_dct3_state, empty_init, "Nokia", "NSM-1 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
+SYST( 1998, nse6stage, 0,       0,    nse6stage, nsm1r4t, nokia_dct3_state, empty_init, "Nokia", "8810 NSE-6 (erased EEPROM, disabled DSP exchange research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nse5r4t,  noki7110, 0,    nse5r4t,  noki7110, nokia_dct3_state, empty_init, "Nokia", "NSE-5 with NSE-1 ROM4 (compatibility fixture, not fitted mask)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, noki8210, 0,      0,      noki8210, noki3310, nokia_dct3_state, empty_init, "Nokia", "Nokia 8210", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
 SYST( 1999, nsm3stage, noki8210, 0, nsm3stage, noki3310, nokia_dct3_state, empty_init, "Nokia", "8210 product-local staged DSP (research fixture)", MACHINE_NO_SOUND | MACHINE_NOT_WORKING )
