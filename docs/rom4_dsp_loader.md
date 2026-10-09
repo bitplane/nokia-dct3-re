@@ -364,6 +364,22 @@ the actual input contract, not a fabricated internal result. The passive
 comparison observer retains both counts alongside the full-width operand
 and hook snapshots, and the independent RF gate remains green.
 
+The live program snapshot further bounds the upstream filter. Setup at
+`32f8..3309` selects output `1a48`, copies AR2 to AR3, sets BK to `0010`,
+AR0 to `0002`, AR6 to `0080`, AR4 to `0084`, AR5 to `21a9`, and repeats
+through `3325`. Four `74d6 0027` port reads occur at `330a/3310/3316/331c`.
+Between those reads the dual-memory MPY/MAC instructions consume history
+and coefficient words; `d6e9/e4e9` publish the two output words. The first
+four passive loop-entry snapshots show ST1=`e900`, BK=`0010`, AR0=`0002`,
+AR3=`1a48/1a4a/1a4c/1a4e`, AR4=`0084/0088/008c/0080`, and
+AR6=`0080/0084/0088/008c`. AR5 remains `21a9`, whose first eight words are
+`0387,11a3,2ad6,4000,4000,2ad6,11a3,0387` in all four snapshots.
+This identifies circular history and a symmetric coefficient sequence,
+not a physical I/Q mapping, scaling or sample-ready protocol. In particular,
+ST1.FRCT is clear in these snapshots; interpreting the words as normalized
+fractional coefficients would require additional evidence. The comparison
+observer records these bounded entries without modifying input or state.
+
 `make check-c54x-rom4-processing` regenerates the product's own EEPROM in a
 private directory, runs both passive observers for 30 seconds and checks the
 RF interface separately from the processing results. It requires sustained

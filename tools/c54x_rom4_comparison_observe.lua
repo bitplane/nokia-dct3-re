@@ -32,7 +32,7 @@ for _, address in ipairs({0x2194, 0x2195, 0x2196, 0x2197, 0x06fd}) do
             end
         end)
 end
-for _, address in ipairs({0x3347, 0x3357, 0x3360, 0x3362, 0x336c, 0x336e,
+for _, address in ipairs({0x330a, 0x3347, 0x3357, 0x3360, 0x3362, 0x336c, 0x336e,
     0x2400, 0x2402, 0x3382, 0x3385, 0x33a1, 0x33a4, 0x33ac}) do
     counts[address] = 0
     taps[#taps + 1] = program:install_read_tap(address, address,
@@ -47,7 +47,18 @@ for _, address in ipairs({0x3347, 0x3357, 0x3360, 0x3362, 0x336c, 0x336e,
                         memory:read_u16(0x2195), memory:read_u16(0x2196), memory:read_u16(0x2197),
                         cpu.state["A"].value, cpu.state["B"].value,
                         cpu.state["AR2"].value, cpu.state["AR3"].value))
-                    if address == 0x3347 then
+                    if address == 0x330a then
+                        local values = {}
+                        for index = 0, 7 do
+                            values[#values + 1] = string.format("%04x", memory:read_u16(0x21a9 + index))
+                        end
+                        machine:logerror(string.format(
+                            "rom4_filter_entry: st1=%04x bk=%04x ar0=%04x ar3=%04x ar4=%04x ar5=%04x ar6=%04x coefficients=%s\n",
+                            cpu.state["ST1"].value, cpu.state["BK"].value,
+                            cpu.state["AR0"].value, cpu.state["AR3"].value,
+                            cpu.state["AR4"].value, cpu.state["AR5"].value,
+                            cpu.state["AR6"].value, table.concat(values, ",")))
+                    elseif address == 0x3347 then
                         local base, values = cpu.state["AR2"].value, {}
                         for index = 0, 15 do
                             values[#values + 1] = string.format("%04x", memory:read_u16((base + index) & 0xffff))
