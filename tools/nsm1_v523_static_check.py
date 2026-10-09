@@ -372,6 +372,11 @@ def verify(image: bytes) -> dict:
                              "id": int.from_bytes(image[literal(image, 0x29F342) - BASE:
                                                           literal(image, 0x29F342) - BASE + 2], "big"),
                              "call_candidates": direct_call_candidates(image, 0x29F340)},
+                         "lifecycle_wait": {"entry": read32(image, 0x2D8650) & ~1,
+                                            "task": 0x12, "receive": 0x21CF0C,
+                                            "call_site": 0x21FCF2,
+                                            "expected_id": literal(image, 0x21FCF8),
+                                            "context": literal(image, 0x21E42A)},
                          "descriptor_event": {
                              "pointer_column": literal(image, 0x275FAC),
                              "stride": 8, "index": 0xE3,

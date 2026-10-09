@@ -8,6 +8,16 @@ local sim_sends = 0
 local activation_requests = 0
 local application_receives = 0
 local lifecycle_receives = 0
+handles[#handles + 1] = memory:install_read_tap(0x21cf0c, 0x21cf0f,
+    'nsm1_lifecycle_queue', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x21cf0c then return end
+        local task = memory:read_u8(0x100022)
+        local descriptor = 0x1014ac + task * 0x1c
+        machine:logerror(string.format(
+            'nsm1_lifecycle_queue: task=%02x head=%02x tail=%02x t=%.9f\n',
+            task, memory:read_u8(descriptor + 0x10),
+            memory:read_u8(descriptor + 0x11), machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_read_tap(0x21cf14, 0x21cf17,
     'nsm1_lifecycle_receive', function(offset, value, mask)
         if cpu.state['PC'].value ~= 0x21cf14 or lifecycle_receives >= 64 then return end
@@ -33,7 +43,7 @@ handles[#handles + 1] = memory:install_read_tap(0x2085c4, 0x2085c7,
             machine.time:as_double()))
     end)
 for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc,
-        0x29f340}) do
+        0x29f340, 0x21e41c, 0x21cf0c, 0x21e9a8}) do
     local count = 0
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nsm1_activation_owner_' .. address,
@@ -41,9 +51,10 @@ for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc,
             if cpu.state['PC'].value ~= address or count >= 16 then return end
             count = count + 1
             machine:logerror(string.format(
-                'nsm1_activation_owner: pc=%08x caller=%08x r8=%08x sl=%08x gate=%02x t=%.9f\n',
+                'nsm1_activation_owner: pc=%08x caller=%08x r8=%08x sl=%08x gate=%02x task=%02x t=%.9f\n',
                 address, cpu.state['R14'].value, cpu.state['R8'].value,
                 cpu.state['R10'].value, memory:read_u8(0x111e71),
+                memory:read_u8(0x100022),
                 machine.time:as_double()))
         end)
 end

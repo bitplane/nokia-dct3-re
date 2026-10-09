@@ -249,11 +249,19 @@ These are local branch contracts, not semantic names for the owning task
 or proof that every path is ordinary startup. A fresh 30-second cold run
 still observes no producer-wrapper entry or application receive return.
 The added probe at lifecycle receive return `0x21cf14` also observes no
-object; its entry has not yet been instrumented, so this alone cannot
-distinguish an unstarted owner from an owner parked before/inside receive.
+object. Entry tracing resolves the owner: own task-table pointer at
+`0x2d8650` selects Thumb entry `0x21e41c`, running as task `0x12` (18)
+at 2.652673 seconds. It reaches receive helper `0x21cf0c` at 2.652792
+seconds with link register `0x21fcf7`, the return from call `0x21fcf2`.
+That loop compares against own literal `0x1587` at `0x21fcf8` before
+reaching producer `0x21fd14`. The fresh queue trace shows head/tail zero
+at the receive-helper entry. No return is observed through 30 seconds.
+Task 18 is started; the selected cold lifecycle is waiting before its
+application-start publication. This identifies the active wait, not the
+semantic meaning or missing hardware origin of `0x1587`.
 
-Next: identify and trace the owning lifecycle task's entry and first wait,
-then recover the producer/meaning of `0x09f0` where that wait is selected,
+Next: recover the producer and delivery contract of the observed task-18
+input `0x1587`, rather than pursuing the unselected `0x09f0` loops,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
