@@ -62,6 +62,16 @@ words, SHA-1 `8e9e4aefa311375ae090b90a607f00cb8e7059ca`.
 Its raw word pairs still include `f074/2c75` at declared program `0x0a4a`,
 followed by `f074/938c`; pairs for `4007` and `9ddd` also remain.
 These are static opcode candidates, not a v6.00 execution trace.
+Independent GNU Binutils 2.43.1 tic54x decoding of the complete little-endian
+word extraction confirms a straight-line entry from `0x0a00` to the
+unconditional `call 0x2c75` at `0x0a4a`: only bounded repeat/NOP sequences
+precede it, with no conditional bypass or code-copy instruction. The
+immediately following instruction is `call 0x938c` at `0x0a4c`.
+Thus the second loader's entry does not itself replace the missing first
+routine before calling it. This does not close earlier-loader relocation
+or establish native execution of v6.00. The retained independent decode is
+`run_8250_v600_loader2_disassembly.log`, generated from the own catalogue's
+selector `0x14`, not a donor program.
 None of the 28 declared destination ranges covers those four resident
 addresses; relocation is not excluded by this range test. Reproduce with:
 
