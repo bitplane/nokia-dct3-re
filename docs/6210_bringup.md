@@ -406,7 +406,17 @@ The physical End returns to reviewed idle only after the network wait.
 All earlier interactive/menu frames, the completion frame, physical sequence,
 own upload/registration and persisted location are checked independently.
 This is laboratory research-HLE signaling, not external SMS delivery or
-native-DSP execution. Menu-triggered call behavior remains unvalidated.
+native-DSP execution.
+
+`verify-6210-sim-toolkit-call` independently uses card profile 6: physical
+menu selection yields `911c` and FETCH length `1c`. The firmware presents
+`SAT call`; physical Call consent precedes the sole outgoing request to
+`5551234`. The gate requires SETUP, proceeding, assignment, CONNECT/ACK,
+successful card response `810306100002028281030100`, physical End,
+DISCONNECT/RELEASE/RELEASE COMPLETE and RR release. Own prompt, connected
+call and idle frames are checked alongside the earlier interactive/menu
+frames and unchanged-PMM upload/registration/storage checks. This proves
+laboratory signaling and consent, not native speech or an external call.
 
 This establishes these command lifecycles, not all Toolkit commands or native
 DSP execution. The completion trace records the status bytes actually appended

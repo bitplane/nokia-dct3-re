@@ -3,9 +3,12 @@
 
 import argparse
 from pathlib import Path
+import sys
 
-from radio_call_lifecycle_common import require_ordered
-from radio_outgoing_call_trace_check import (
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.radio_call_lifecycle_common import require_ordered
+from tools.radio_outgoing_call_trace_check import (
     ALERTING,
     ASSIGNMENT_COMPLETE,
     CALL_PROCEEDING,
@@ -19,7 +22,7 @@ from radio_outgoing_call_trace_check import (
     TRAFFIC_ASSIGNMENT,
     decode_called_digits,
 )
-from sim_toolkit_trace_check import require_in_order
+from tools.sim_toolkit_trace_check import require_in_order
 
 
 def verify(log: str) -> None:

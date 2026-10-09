@@ -457,6 +457,10 @@ independently proves physical item selection, card-owned SEND SHORT MESSAGE,
 one exact `SAT` SMS to `5551234`, CP/RP success, successful terminal response,
 RR release and physical return to reviewed idle. External SMS delivery and
 native DSP remain unpromoted.
+`verify-6210-sim-toolkit-call` separately proves card-owned SET UP CALL,
+physical consent, exact destination `5551234`, complete laboratory CC/RR
+setup and release, successful terminal response and reviewed idle recovery.
+Speech and external calls are not established by this signaling gate.
 The 6210 research-HLE profile independently passes `verify-6210-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, card-owned STATUS/FETCH DISPLAY TEXT,
 physical successful clearance and exact registered-idle recovery. Other

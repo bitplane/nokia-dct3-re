@@ -50,7 +50,7 @@ def verify_interactive(text, product, profile_length=9):
 
 
 def menu_events(product, profile_length=9, selection_status='9000'):
-    if selection_status not in ('9000', '9124'):
+    if selection_status not in ('9000', '9124', '911c'):
         raise ValueError('unsupported observed Toolkit menu selection status')
     return (*interactive_events(product, profile_length)[:-1],
             'proactive SET UP MENU ready', 'SIM status ins=14 sw=9128',
