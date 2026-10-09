@@ -54,8 +54,35 @@ Direct ARM-big-endian disassembly of this image establishes:
 | `0x2000c8..0x2000d4` | Writes `0xff` to peripheral bytes `0x2000a` and `0x2000b`. |
 | `0x2000d8..0x2000e8` | Clears CPSR interrupt-mask bits and switches into Thumb execution at `0x2000ec`. |
 
-These are reset observations, not closure of the subsequent boot, DSP verifier,
-EEPROM interface, display, or keypad contracts. No compatibility mask is selected.
+The first Thumb calls are `0x27afe8` and `0x23190e`, before the zero-fill
+of `0x100020..0x1216cb`. The startup entry at `0x2d330e` then calls the
+DSP initialization/verifier at `0x2b6118`. The pre-clear routines access retained
+RAM near `0x13ffxx`; this also fits the documented SRAM capacity.
+
+## Recovered Interface Boundaries
+
+### Serial EEPROM
+
+The byte transmitter `0x2de3d4` constructs PUP base `0x20020`, uses data mask
+`0x01` and clock mask `0x04`, and controls SDA direction at `0x20024`. Thus
+the own transmit contract uses SDA bit 0 and SCL bit 2. This is not a claim
+of complete ACK/read/page-cycle recovery or an exact EEPROM manufacturer part.
+The address setup at `0x2dcef0` supports the two-address-byte branch selected
+by its configuration byte; its initialization still needs decoding.
+
+### DSP Startup
+
+The own verifier `0x2b6118` reads one 16-bit word every 32 flash bytes from
+`0x200040`, sends 127 blocks of 512 words and a final 510 words followed by
+two `0xffff` words. Buffers alternate between `0x10200` and `0x10600`, with
+handshake halfwords at `0x100fe/0x10100`. At `0x2b6200` it waits while the
+second handshake halfword is `0xffff`, then copies the two returned halfwords
+into context `0x1205c0 + 0x0c/+0x0a`.
+
+This identifies a protocol shape shared with other recovered verifier streams,
+not a fitted DSP mask or a successful verdict. No resident-ROM compatibility
+is established and no DSP response is fabricated. Display and keypad contracts
+remain unexamined.
 
 ## Acceptance Required Before Promotion
 
