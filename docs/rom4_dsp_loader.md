@@ -310,6 +310,26 @@ The sample encoding, the computation feeding `2194/2196`, and whether this
 arm reports RF acquisition remain unresolved. No nonzero sample or control
 state has been synthesized to satisfy the comparisons.
 
+The operands at `2194` and `2196` are double-word loads, not independent
+16-bit samples. `tools/c54x_rom4_comparison_observe.lua` records their complete
+pairs as `0003d9de` and `00000fa0`. At the first four observed `3382` load
+entries B is zero; after the accumulator subtraction at `3384`, A is
+`0000000fa0` (+4,000). The `BCD ... ALT` at `3385` is fetched 3,017 times;
+its negative-result destination `33a1` and the later comparison at `33a4`
+are never fetched. Thus the later `2194/5` comparison does not explain this
+run's exclusion: the preceding comparison already selects another arm.
+No RF units or meaning are assigned to the pair values.
+
+The observer sees three CPU-bus writes to `06fd`: startup zero, zero at
+PC `312c` (2.120203519 s), then one at `3135` (2.180201942 s), consistent
+with the two early alternate reduction frames. Each pair half has only a
+startup-clear write through this CPU-bus tap even though its later value is
+nonzero. Backend upload/copy writes bypass that tap, so this is not an
+all-writer closure or proof that the operands never change. Their original
+upload ownership and the computation feeding B remain the next static/data
+flow questions. The fresh RF acceptance gate passes alongside this passive
+capture; neither an artificial measurement nor a threshold override is used.
+
 Port `0x27` is bidirectional in ROM4: seven static `PORTW` sites at
 `0x4248/0x424d/0x4258/0x425d/0x4267/0x426c/0x4271` belong to a separate
 transmit routine. The driver now forwards those writes to a replaceable COBBA

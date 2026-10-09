@@ -28,7 +28,7 @@ for _, address in ipairs(sites) do
                 counts[address] = counts[address] + 1
                 if address >= 0x330a and address <= 0x33b0 and counts[address] <= 2 then
                     machine:logerror(string.format(
-                        "rom4_mode1_fetch: t=%.9f address=%04x word=%04x fd=%04x bc=%04x sample94=%04x sample96=%04x\n",
+                        "rom4_mode1_fetch: t=%.9f address=%04x word=%04x fd=%04x bc=%04x high94=%04x high96=%04x\n",
                         machine.time:as_double(), offset, data, memory:read_u16(0x06fd),
                         memory:read_u16(0x06bc), memory:read_u16(0x2194), memory:read_u16(0x2196)))
                 end
