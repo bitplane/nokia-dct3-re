@@ -5,6 +5,23 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_rtos_preloads_startup_queue_input_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        self.assertEqual(check.SHA1, check.hashlib.sha1(data).hexdigest())
+        self.assertEqual(0x2D8578, check.literal(data, 0x27610E))
+        self.assertNotEqual(0, data[0x2D8578 + 20 * 12 + 9 - check.BASE])
+        for address, mnemonic, operands in (
+                (0x27615C, "ldrb", "r1, [r0, #9]"),
+                (0x276164, "movs", "r2, #0xb1"),
+                (0x276166, "str", "r2, [r1, #4]"),
+                (0x27616A, "strb", "r1, [r5, #4]"),
+                (0x27616C, "adds", "r0, #0xc")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+
     def test_own_activation_wrapper_objects_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

@@ -143,6 +143,34 @@ handles[#handles + 1] = memory:install_read_tap(0x29cb90, 0x29cb93,
             cpu.state['R14'].value, memory:read_u8(0x10e6d6),
             machine.time:as_double()))
     end)
+local owner_queue_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x1012c8, 0x1012cb,
+    'nsm1_owner_first_queue_slot', function(offset, value, mask)
+        if owner_queue_writes >= 32 then return end
+        owner_queue_writes = owner_queue_writes + 1
+        machine:logerror(string.format(
+            'nsm1_owner_queue_write: pc=%08x value=%08x mask=%08x caller=%08x task=%02x t=%.9f\n',
+            cpu.state['PC'].value, value, mask, cpu.state['R14'].value,
+            memory:read_u8(0x100022), machine.time:as_double()))
+    end)
+local owner_queue_reads = 0
+for _, address in ipairs({0x275e40, 0x275f3e}) do
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'nsm1_owner_queue_' .. address,
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= address or
+                memory:read_u8(0x100022) ~= 0x14 or owner_queue_reads >= 32 then return end
+            owner_queue_reads = owner_queue_reads + 1
+            local descriptor = 0x1014ac + 0x14 * 0x1c
+            local column = address == 0x275e40 and 0x0c or 0x14
+            local base = memory:read_u32(descriptor + column)
+            local index = cpu.state['R0'].value
+            machine:logerror(string.format(
+                'nsm1_owner_queue: pc=%08x base=%08x index=%02x value=%08x t=%.9f\n',
+                address, base, index, memory:read_u32(base + index * 4),
+                machine.time:as_double()))
+        end)
+end
 local descriptor_events = 0
 for _, address in ipairs({0x275106, 0x275f9c}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,

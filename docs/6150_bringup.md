@@ -424,11 +424,21 @@ but only covers that primitive and interval. The periodic received values
 are independently accounted for by timer descriptor entries: index `0xd8`
 returns `0x0198`, `0xd9` returns `0x0199`, `0xda` returns `0x019a`, and
 `0xdd` returns `0x019d`. They do not require a missing transport peer and
-must not be counted as scalar-send activity. The initial `0xb1` delivery
-is still a separate startup/RTOS contract to recover.
+must not be counted as scalar-send activity.
 
-Next: recover cold-power/startup delivery of task-20 input `0xb1` and any
-additional initialization input from the own-ROM startup source,
+The initial `0xb1` is a firmware-preloaded queue input, not an RTOS receive
+sentinel or missing peer response. Queue initializer `0x27610c` iterates 24
+task records at `0x2d8578`, stride 12. If record byte `+9` is nonzero,
+`0x276164/0x276166` stores `0xb1` in the first queue's slot 1 and marks its
+head as 1. A fresh nine-second cold trace observes task-0 writes to task
+20's slot `0x1012c8` at 0.233503 s and, after the early reset, 0.693237 s.
+Receive branch `0x275e40` reads that slot at 0.398276/0.835120 s, immediately
+before `0x221ee6` returns `0xb1`. This closes its origin without attributing
+it to a hardware event or treating the lack of scalar-send calls as a gap.
+
+Next: decode task 20's initialized lifecycle and its timer-driven progress
+to determine why report `0x14` is not published. Check any additional
+initialization input against the own-ROM startup source,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
