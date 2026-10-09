@@ -6,6 +6,34 @@ local machine = manager.machine
 if _G.noki8210_radio_observe or os.getenv('NOKIA_DCT3_8210_PIN_ENTRY') == '1' then
     local cpu = machine.devices[':maincpu']
     local memory = cpu.spaces['program']
+    local instruction_count = 0
+    local selector_count = 0
+    _G.nsm3_neighbour_selector = memory:install_read_tap(0x286d48, 0x286d4b,
+        'nsm3_neighbour_selector', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x286d4a or selector_count >= 32 then return end
+            local context = memory:read_u32(0x137228)
+            if context < 0x100000 or context >= 0x17fff0 then return end
+            selector_count = selector_count + 1
+            machine:logerror(string.format(
+                '8210_neighbour_selector: caller=%08x argument=%08x context=%08x carrier=%04x control=%08x t=%.6f\n',
+                cpu.state['R14'].value, cpu.state['R0'].value, context,
+                memory:read_u16(context + 6), memory:read_u32(context + 12),
+                machine.time:as_double()))
+        end)
+    _G.nsm3_neighbour_constructor = memory:install_read_tap(0x2b3024, 0x2b3027,
+        'nsm3_neighbour_constructor', function(offset, value, mask)
+            if cpu.state['PC'].value ~= 0x2b3026 or instruction_count >= 32 then return end
+            local descriptor = cpu.state['R0'].value
+            if descriptor < 0x100000 or descriptor >= 0x17fff4 then return end
+            instruction_count = instruction_count + 1
+            local bytes = {}
+            for index = 0, 11 do
+                bytes[#bytes + 1] = string.format('%02x', memory:read_u8(descriptor + index))
+            end
+            machine:logerror(string.format(
+                '8210_neighbour_constructor: descriptor=%08x caller=%08x data=%s t=%.6f\n',
+                descriptor, cpu.state['R14'].value, table.concat(bytes), machine.time:as_double()))
+        end)
     _G.nsm3_special_status_decoder = {}
     for _, address in ipairs({0x275ac0, 0x275dcc, 0x21ee4c,
             0x305ec4, 0x305ef4, 0x2ff4d4, 0x303cb6, 0x30511c,

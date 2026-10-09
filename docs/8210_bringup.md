@@ -1612,8 +1612,24 @@ products retain their own encoding. Static constructor checks and fresh
 early/late PIN runs verify the correction. Early PIN still registers;
 late PIN still fails, and the corrected request is rejected by the separate
 neighbour-list eligibility predicate. This does not establish that mode 4
-must populate that list or which reply it requires. Resolve its original
-descriptor/list lifecycle before changing eligibility or publishing a reply.
+must populate that list or which reply it requires.
+
+The original constructor bypasses timing/BSIC serialization for mode 4.
+An aligned direct-BL scan identifies nine constructor candidates: six
+ROM-descriptor sites (`21c320`, `21c96e`, `21cc1e`, `21d236`, `21d41a`,
+`21de2e`) and three stack-descriptor sites (`286d04`, `286d42`, `286d88`).
+This is direct-call candidate coverage, not closure of indirect/data-driven
+entrances. Helper `286d4a` selects modes 4/2/3 from context bits 16..19
+equal to 2/3/4 respectively; mode 4 takes carrier halfword `+6` only.
+Passive runtime capture observes caller `21ef07`, argument zero, context
+`1196a0`, carrier `0338`, control `ffc22664` at 12.262144s, then constructor
+caller `286d8d` at 12.262148s. This precedes the late `03ec` queue arrival.
+Unused stack bytes do not become packet timing or BSIC fields: the constructor
+zeroes its allocated message before taking the mode-4 shortcut. This bounds
+the observed packet's provenance but does not name it as an acknowledged
+measurement, cancellation or recovery request. Decode the mode-4 DSP consumer
+or an independent protocol trace before changing eligibility or supplying a
+reply. The queued-request continuation remains the boot frontier.
 
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon

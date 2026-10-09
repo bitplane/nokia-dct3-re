@@ -29,6 +29,22 @@ def verify(image):
             ('strb', 'r0, [r4, #0xa]'), ('ldrb', 'r0, [r5, #5]'),
             ('strb', 'r0, [r4, #0xb]')]:
         raise ValueError('own neighbour instruction full carrier serialization differs')
+    if instructions(0x2b3054, 6) != [
+            ('ldrb', 'r0, [r5]'), ('cmp', 'r0, #4'), ('beq', '#0x2b30ae')]:
+        raise ValueError('mode-4 instruction does not bypass timing/BSIC serialization')
+    if instructions(0x286d7e, 14) != [
+            ('mov', 'r0, sp'), ('movs', 'r1, #4'), ('strb', 'r1, [r0]'),
+            ('ldrh', 'r1, [r2, #6]'), ('strh', 'r1, [r0, #4]'),
+            ('bl', '#0x2b3026')]:
+        raise ValueError('own mode-4 descriptor carrier source differs')
+    if instructions(0x286d52, 16) != [
+            ('ldr', 'r1, [r2, #0xc]'), ('lsls', 'r1, r1, #0xc'),
+            ('lsrs', 'r1, r1, #0x1c'), ('lsls', 'r1, r1, #0x10'),
+            ('movs', 'r3, #1'), ('lsls', 'r3, r3, #0x11'),
+            ('cmp', 'r1, r3'), ('beq', '#0x286d7e')]:
+        raise ValueError('own cell-context selector for mode 4 differs')
+    if int.from_bytes(read(0x2870b0, 4), 'big') != 0x137228:
+        raise ValueError('own mode-selection context root differs')
     if instructions(0x30702a, 4) != [('bl', '#0x2df484')]:
         raise ValueError('type 8b handler differs')
     if instructions(0x2df498, 6) != [('movs', 'r0, #0xc'), ('bl', '#0x28845c')]:
