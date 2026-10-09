@@ -1001,7 +1001,7 @@ DSP/BIOS installation. Its XDS560 physical-debugger driver reports a DevCon
 installation error under Wine; acknowledging that error lets setup reach
 plugin registration, not proven target initialization.
 
-The remaining setup boundary is a rejected Component Manager database.
+The Component Manager path and installation boundary are now resolved.
 The earlier `SETUPinstallPlugins` attempt used literal `%SystemDrive%` in
 its registry path and was explicitly stopped, not completed or timed out.
 Expanding the isolated prefix's `ProgramFilesDir` to its existing
@@ -1025,10 +1025,24 @@ The IDE also reports RPC service startup failure; a registry query confirms
 RpcSs is absent. Wine's standard `wineboot -u` restores that service, but
 reveals a registration-view mismatch: the original Component Manager target
 exists in the 64-bit view and is absent with `/reg:32`. The 32-bit registrar
-then reports an empty path. The next repair must use the original installer
-in the correct 32-bit environment; neither Mono installation nor an IDE
-splash proves target execution. Do not infer database corruption solely from
-this incomplete registration state.
+then reports an empty path. Running the original MSI through
+`C:\windows\syswow64\msiexec.exe` completes with exit zero, including
+`SETUPinstallPlugins` return value 1. The `/reg:32` query now returns
+`C:\Program Files (x86)\Common Files\Texas Instruments`; the original
+installer generates a 43,030-byte component INI there. The earlier database
+and empty-path warnings are superseded by this corrected installation, not
+evidence of a permanent simulator incompatibility.
+
+The current boundary is target automation initialization. Registering the
+original `CCS_Scripting_Com.dll` with 32-bit `regsvr32.exe` makes its public
+`CCS_Scripting_Com.CCS_Scripting` object respond with **CCStudio Scripting
+Version 1.52**. Its documented `CCSOpen(0x54, 0, 0, 1, 0)` call then fails
+with a CreateInstance automation error `0x80040154` rather than returning
+a board/CPU identity. Wine also reports an unsupported interface on
+`CodeComposerSetup.SystemSetup` (`{3620D2F0-F091-11D1-8BE4-0020182ABDCA}`);
+the 32-bit class registration exists and points to the installed
+`cc_setup.exe`. This does not establish that this class alone causes the
+failure. No target instruction, timer fixture or pipeline mode has executed.
 
 Retain `full-install-expanded-path.log`, `installed-ide.log`,
 `installed-ide-screen.png`, `run_ccs33_oracle_plugin_msxml_legacy.log`,
@@ -1036,8 +1050,9 @@ and the earlier `full-install-shell-registered.log`, `xds-install-error.png`
 and `plugin-install-error.png`. Additional evidence is `mono-install.log`,
 `run_ccs33_oracle_plugin_with_mono.log`,
 `run_ccs33_oracle_wineboot_repair.log` and `plugin-prefix-repair-error.png`.
-Resolve the remaining runtime/database
-registration boundary using the vendor tools; do not edit the generated
+Current verification evidence is `full-install-wow32.log` and
+`run_ccs33_oracle_automation_registered.log`. Resolve the remaining COM
+initialization boundary using the vendor tools; do not edit the generated
 component database or interpret copied files as a working simulator.
 
 The acquired vendor SDK's `CCDspUser.h` defines `GetSimMode()` and, under
@@ -1051,8 +1066,8 @@ display and acknowledgement of the drag/drop registration warning allow
 `cc_setup.exe` to reach its real factory-board UI. The C54xx list contains
 `C549 Device Simulator`; adding it displays the Texas Instruments C54x
 simulator CPU with `drivers/tisim54x.dvr`. Save-and-launch starts `cc_app.exe`
-and `ccsmonitor.exe`, but the IDE then reports a missing/incorrect Component
-Manager INI registry path. No simulator initialization, pipeline-mode
+and `ccsmonitor.exe`. The missing Component Manager path was resolved by
+the correct 32-bit installation above. No simulator initialization, pipeline-mode
 selection or timer result is proved by these UI observations.
 
 Retained setup evidence is `run_ccs33_oracle/admin-install.log`,
