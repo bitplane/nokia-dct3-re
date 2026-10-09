@@ -2,6 +2,8 @@
 local machine = manager.machine
 local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
+local ccont_watchdog = emu.item(assert(machine.devices[':ccont'].items['0/m_watchdog']))
+local mad2_registers = emu.item(assert(machine.devices[':mad2'].items['0/m_regs']))
 local handles = {}
 local counts = {}
 local result_readers = {}
@@ -28,6 +30,14 @@ handles[#handles + 1] = memory:install_write_tap(0x2002c, 0x2002f,
             machine.time:as_double()))
     end)
 local row_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x20000, 0x20003,
+    'nse6_reset_control', function(offset, value, mask)
+        if (mask & 0x00ff00ff) == 0 then return end
+        machine:logerror(string.format(
+            'nse6_reset_control_write: value=%08x mask=%08x pc=%08x lr=%08x t=%.9f\n',
+            value, mask, cpu.state['PC'].value, cpu.state['R14'].value,
+            machine.time:as_double()))
+    end)
 local irq_writes = 0
 handles[#handles + 1] = memory:install_write_tap(0x20008, 0x2000b,
     'nse6_input_irq_ack', function(offset, value, mask)
@@ -274,6 +284,9 @@ emu.register_frame_done(function()
     local now = machine.time:as_double()
     if now < next_sample then return end
     next_sample = next_sample + 1
+    machine:logerror(string.format(
+        'nse6_watchdog_snapshot: ccont=%02x mad2=%02x t=%.9f\n',
+        ccont_watchdog:read(0), mad2_registers:read(3), now))
     if now >= 28 and not late_captured then
         late_captured = true
         machine:logerror(string.format(

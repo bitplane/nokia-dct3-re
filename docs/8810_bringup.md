@@ -29,7 +29,8 @@ digits through physical contacts: the 12.5-second snapshot shows five masked
 characters, and OK produces Code error at 13.5 seconds. The late frame returns
 to the editor in the erased-retry negative control. Initializing the synthetic
 retry count permits the same physical code to be accepted, reaching a Menu /
-Names frame. The current boundary is menu lifecycle and card/service execution.
+Names frame. The current boundary is a firmware-requested restart near
+31.968 seconds and card/service execution, not ordinary menu input.
 No donor identity or lock state is supplied.
 
 The display-transport observer records 15,684 data bytes, 2,774 nonzero,
@@ -47,6 +48,27 @@ transfer (6.4–6.6 limits). Thus `round(3600 / 6.5) = 554`; the own-ROM identit
 calibration transforms this to `3581`, inside its acquisition interval.
 This uses the silicon VBAT input specification, not the 3210's different
 board-level battery routing. Other ADC channels remain research defaults.
+
+### Menu Execution and Restart Boundary
+
+`tools/nse6_menu_fixture.lua` accepts the default code then applies physical
+Menu, Down and Select contacts. Snapshots show Messages, Call register, and
+Missed calls respectively. `tools/nse6_names_fixture.lua` opens Names, selects
+Add entry, and reaches name and number editors with entered characters.
+This validates the exercised softkeys/navigation and editor inputs, not a
+saved phonebook record, call signaling, or SMS transport.
+
+The longer 40-second menu run returns to reset entry `0x200040` at
+31.967763462 seconds. At 31 seconds the CCONT countdown is `0x13` and MAD2
+watchdog register is `0xff`; neither expires. Firmware writes `0x31` to
+`0x20003` at 31.001033692 seconds and reset-control `0x05` to `0x20001` at
+31.967763000 seconds, from `0x2e51e0`, caller return `0x243c27`.
+Own dispatcher `0x243a24` routes input `0x00d4` to `0x243ba4`; that branch
+increments a context counter, and at count >=15 takes `0x243bfe..0x243c22`
+to request reset. The counter's reset/health contract is not yet decoded.
+Do not disable a hardware watchdog to conceal this software-requested reset.
+The late phonebook-save attempt crosses this restart boundary, so persistence
+is unproved and must be retested after the lifecycle is stabilized.
 
 ### Security Storage Observation
 
