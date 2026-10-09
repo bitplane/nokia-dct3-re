@@ -173,6 +173,21 @@ Keep the recovered source-7/selector-2 fact separate from the VBAT/D2 board
 fact until a CCONT transfer/mux specification connects them. No ADC tuple
 has been changed on the strength of this drawing alone.
 
+The original [NSE-6 tuning instructions, page 12](https://www.eserviceinfo.com/preview_html.php?fileid=5448&previewid=3007)
+describe distinct default, battery-voltage, charger-voltage, battery-size,
+temperature, and current calibration operations. They do not provide an
+ADC raw-code transfer point. Their service-junction-box supply settings are
+not battery-pin voltages and must not be substituted into the ADC model.
+
+For the observed identity-calibration branch alone, the decoded arithmetic
+admits exactly raw codes `279..850` to the `1800..5500` acceptance interval;
+raw 278 is below it and raw 851 is above it. The checker tests all 1024
+ten-bit inputs against that arithmetic. This mathematical enumeration is not
+an emulator input sweep, a pack model, or a calibration measurement. It
+identifies what remains to establish electrically, not which raw code to
+choose to make the boot proceed. The acquired drawing and tuning text narrow
+the source hunt but do not yet close the transfer/mux specification boundary.
+
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
 (32 KiB). These are physical capacities, not a complete BUSC alias map.

@@ -48,6 +48,13 @@ def integrity_arithmetic(block, excluded_word):
     return (sum(block) - (excluded_word >> 8) - (excluded_word & 0xFF)) & 0xFFFF
 
 
+def identity_sample(raw):
+    """Observed identity-calibration branch; no electrical units implied."""
+    if not isinstance(raw, int) or not 0 <= raw <= 0x3FF:
+        raise ValueError("CCONT sample must be ten-bit")
+    return raw * 1500 // 232
+
+
 def read32(image, address):
     offset = address - BASE
     if offset < 0 or offset + 4 > len(image):
@@ -368,6 +375,7 @@ def check(image):
                             "cache_selectors": [2, 1], "cache_sentinel": "0x8000",
                             "gain_address": "0x13fe4c", "offset_address": "0x13fe50",
                             "scale_numerator": 1500, "scale_divisor": 232,
+                            "identity_accepted_raw_range": [279, 850],
                             "physical_units_proven": False},
             "simi": {"initializer": "0x2ca910", "receiver": "0x2ca986",
                      "tx_register": "0x36", "rx_register": "0x37",

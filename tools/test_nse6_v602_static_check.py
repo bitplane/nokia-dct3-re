@@ -6,6 +6,15 @@ from tools.nse6_integrity_fixture import fixture
 
 
 class Nse6StaticTests(unittest.TestCase):
+    def test_identity_sample_acceptance_boundaries_not_physical_units(self):
+        accepted = [raw for raw in range(1024)
+                    if 0x708 <= check.identity_sample(raw) <= 0x157C]
+        self.assertEqual(accepted, list(range(279, 851)))
+        self.assertEqual(check.identity_sample(1023), 6614)
+        for raw in (-1, 1024, 1.5):
+            with self.assertRaises(ValueError):
+                check.identity_sample(raw)
+
     def test_thumb_bl_census_signed_offsets_and_scope(self):
         forward = bytes.fromhex("f000f802")
         self.assertEqual(check.thumb_bl_callers(forward, check.BASE + 8, 4),
