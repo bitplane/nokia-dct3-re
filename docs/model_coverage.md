@@ -446,6 +446,15 @@ during physical date entry, followed by successful date-editor recovery and
 persisted laboratory registration. It does not prove displayed proactive
 text or successful physical dismissal on 8890.
 
+`verify-8890-sim-toolkit` separately proves retained-clock DISPLAY TEXT,
+physical dismissal and exact own idle recovery. Its interactive extension
+`verify-8890-sim-toolkit-interactive` independently proves GET INKEY and GET
+INPUT, exact `5`/`42` terminal replies and five own frames. NSB-6 requires
+an additional physical OK after the INKEY digit; the checker enforces that
+product difference. Both gates seed the clock physically from own PMM and
+require retained registration/SIM location. Other proactive commands and
+native DSP speech remain unpromoted for this product.
+
 The 6210 additionally passes `verify-6210-sim-toolkit-interactive`, proving
 physical `5`/`42` GET INKEY/GET INPUT replies, exact successful text TLVs,
 five independently reviewed frames and own registration/storage checks.

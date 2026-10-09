@@ -2,31 +2,58 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.dct3_toolkit_check import verify_display_text
+from tools.dct3_toolkit_check import verify_display_text, verify_interactive
+from tools.sim_toolkit_trace_check import require_in_order
 from tools.noki8890_registration_check import verify as verify_registration
 
 FRAMES = {
     '8890_toolkit_display.png': '6a0bd20bfe0a7f57ae82a570eceb3a0f29fdc8a9a1e047fb294e85d61e610f6f',
     '8890_toolkit_after_dismiss.png': '8187cbe68f4b7fe0a15cf10c16b742b3236f3240af3f79556c319d5ed337f2ee',
 }
+INTERACTIVE_FRAMES = {
+    '8890_toolkit_interactive_display.png': '6a0bd20bfe0a7f57ae82a570eceb3a0f29fdc8a9a1e047fb294e85d61e610f6f',
+    '8890_toolkit_interactive_inkey.png': '7b31b9248d0fe79ded4ff5f6ea40136ee11f2257b0969513d878c7bfee71ff17',
+    '8890_toolkit_interactive_input.png': '2adee3ccafa0c386614b674ff9ec35685e57223e0aee691756a8eb04f7d62191',
+    '8890_toolkit_interactive_entered.png': '16ed0527e2ff95760f4c4e68897f185357fcdcc66d54ad565284e4b02f6f4b0d',
+    '8890_toolkit_interactive_idle.png': '8187cbe68f4b7fe0a15cf10c16b742b3236f3240af3f79556c319d5ed337f2ee',
+}
 
 
-def verify(run):
+def verify_interactive_protocol(text):
+    verify_interactive(text, '8890')
+    actions = re.findall(r'8890_toolkit_interactive: action=(\w+)\b', text)
+    if actions != ['dismiss', 'inkey_5', 'inkey_confirm', 'input_4', 'input_2', 'confirm']:
+        raise ValueError('NSB-6 Toolkit physical reply sequence differs')
+    # The NSB-6 editor requires OK; other products submit INKEY immediately.
+    require_in_order(text.replace('[:sim_card] ', ''), [
+        '8890_toolkit_interactive: action=inkey_5',
+        '8890_toolkit_interactive: action=inkey_confirm',
+        'terminal-response data=8103022200020282810301000d020435',
+        '8890_toolkit_interactive: action=input_4',
+    ])
+
+
+def verify(run, *, interactive=False):
     from PIL import Image
     text = (run / 'error.log').read_text(errors='replace')
-    verify_display_text(text, '8890')
+    if interactive:
+        verify_interactive_protocol(text)
+    else:
+        verify_display_text(text, '8890')
     verify_registration(text, preserved_location=True)
     card = (run / 'nvram/nsb6hle/sim_card').read_bytes()
     if len(card) < 1611 or card[1604:1609] != bytes.fromhex('00f1100001') or card[1610] != 0:
         raise ValueError('retained SIM location differs')
-    for name, digest in FRAMES.items():
+    for name, digest in (INTERACTIVE_FRAMES if interactive else FRAMES).items():
         with Image.open(run / 'snap' / name) as frame:
             if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
                 raise ValueError('unexpected retained Toolkit frame: ' + name)
@@ -36,6 +63,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--interactive', action='store_true',
+                        help='require own GET INKEY/GET INPUT physical replies')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -52,16 +81,26 @@ def main():
         for name in ('nvram', 'cfg'):
             shutil.copytree(seed / name, warm / name)
         (warm / 'snap').mkdir()
+        if args.interactive:
+            config_path = warm / 'cfg/nsb6hle.cfg'
+            config = ET.parse(config_path)
+            port = config.find("./system/input/port[@tag=':SATCFG']")
+            if port is None:
+                raise ValueError('retained seed lacks the card-profile configuration')
+            port.set('value', '3')
+            config.write(config_path, encoding='utf-8', xml_declaration=True)
         command = json.loads((seed / 'acceptance.json').read_text())['command']
-        command[command.index('-autoboot_script') + 1] = str(root / 'tools/noki8890_toolkit_retained_input.lua')
-        command[command.index('-seconds_to_run') + 1] = '80'
+        script = 'noki8890_toolkit_interactive_input.lua' if args.interactive else 'noki8890_toolkit_retained_input.lua'
+        command[command.index('-autoboot_script') + 1] = str(root / 'tools' / script)
+        command[command.index('-seconds_to_run') + 1] = '105' if args.interactive else '80'
         with (warm / 'console.log').open('w') as console:
             subprocess.run(command, cwd=warm, stdout=console, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        verify(warm)
+        verify(warm, interactive=args.interactive)
         (run / 'acceptance.json').write_text(json.dumps({
             'product': '8890', 'result': 'pass', 'seed': 'fresh physical clock/date; own acquired PMM',
-            'scope': 'retained-clock DISPLAY TEXT and laboratory registration; research HLE, not native speech',
+            'scope': ('retained-clock DISPLAY TEXT/GET INKEY/GET INPUT' if args.interactive else
+                      'retained-clock DISPLAY TEXT') + ' and laboratory registration; research HLE, not native speech',
             'command': command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

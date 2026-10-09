@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 643 gates: 445 generated from typed steps, 198 copied verbatim (shell).
+# 644 gates: 446 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -74,8 +74,9 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8890-host-rejected-sms verify-8890-host-silent-sms \
 	verify-8890-host-incoming-sms verify-8890-host-outgoing-sms verify-8850-ussd \
 	verify-8850-sim-toolkit verify-8850-call-divert verify-8890-sim-toolkit \
-	verify-8890-sim-toolkit-busy verify-8890-ussd verify-8890-call-divert \
-	verify-5510-package verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
+	verify-8890-sim-toolkit-interactive verify-8890-sim-toolkit-busy \
+	verify-8890-ussd verify-8890-call-divert verify-5510-package \
+	verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
 	verify-6210-sip-outgoing-unavailable \
 	verify-6210-sip-alerting-incoming-restore \
 	verify-6210-sip-pending-outgoing-restore verify-6210-sip-idle-restore \
@@ -657,6 +658,9 @@ verify-8850-call-divert: build
 
 verify-8890-sim-toolkit: build
 	$(PYTHON) tools/run_noki8890_toolkit_retained.py $(RUN_DIR) --mame $(MAME_DIR)/mame
+
+verify-8890-sim-toolkit-interactive: build
+	$(PYTHON) tools/run_noki8890_toolkit_retained.py $(RUN_DIR) --interactive --mame $(MAME_DIR)/mame
 
 verify-8890-sim-toolkit-busy: build
 	$(PYTHON) tools/run_noki8xxx_supplementary.py 8890 $(RUN_DIR) --service toolkit-busy --mame $(MAME_DIR)/mame

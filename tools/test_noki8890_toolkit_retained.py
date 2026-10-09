@@ -4,11 +4,31 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from PIL import Image
-from tools.dct3_toolkit_check import display_text_events
-from tools.run_noki8890_toolkit_retained import verify
+from tools.dct3_toolkit_check import display_text_events, interactive_events
+from tools.run_noki8890_toolkit_retained import verify, verify_interactive_protocol
 
 
 class RetainedToolkitTest(unittest.TestCase):
+    def interactive_trace(self):
+        return '\n'.join(interactive_events('8890')).replace(
+            '8890_toolkit_interactive: action=inkey_5',
+            '8890_toolkit_interactive: action=inkey_5\n'
+            '8890_toolkit_interactive: action=inkey_confirm')
+
+    def test_interactive_requires_own_confirmation(self):
+        verify_interactive_protocol(self.interactive_trace())
+        with self.assertRaises(ValueError):
+            verify_interactive_protocol('\n'.join(interactive_events('8890')))
+
+    def test_interactive_confirmation_must_precede_response(self):
+        trace = self.interactive_trace().replace(
+            '8890_toolkit_interactive: action=inkey_confirm\n', '')
+        trace = trace.replace('8890_toolkit_interactive: action=input_4',
+                              '8890_toolkit_interactive: action=inkey_confirm\n'
+                              '8890_toolkit_interactive: action=input_4')
+        with self.assertRaises(ValueError):
+            verify_interactive_protocol(trace)
+
     def test_protocol_storage_and_both_frames_required(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)

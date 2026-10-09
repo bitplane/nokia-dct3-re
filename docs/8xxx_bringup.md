@@ -2101,11 +2101,25 @@ the post-dismissal 12:01 idle hash is
 `noki8890_toolkit_retained_input.lua` supplies only physical security entry,
 snapshots and dismissal. The shared DISPLAY TEXT protocol checker passes
 the captured exchange, and the gate requires retained registration,
-persistent SIM location and both exact frames. This proves DISPLAY TEXT,
+persistent SIM location and both exact frames. This gate proves DISPLAY TEXT,
 not other proactive commands or native DSP speech. The cold-start screen-busy
 gate remains unchanged. The earlier 43-second observation window missed this
 later poll; no polling interval, card-ready timing or firmware UI state was
 forced to obtain the result.
+
+`verify-8890-sim-toolkit-interactive` uses the same fresh physical clock seed,
+then selects card profile 3 in an isolated retained process. Physical Menu
+dismisses DISPLAY TEXT; the card supplies GET INKEY (`9115`, FETCH `15`).
+Unlike the independently tested 6210/6250 UI, NSB-6 retains entered `5` in an
+OK editor: a second physical Menu is required before successful command-2
+TERMINAL RESPONSE `8103022200020282810301000d020435`. The gate explicitly
+requires this confirmation before the response, not merely somewhere in the
+run. Card-owned GET INPUT (`911a`, FETCH `1a`) then receives physical `4`,
+`2`, Menu and exact command-3 text TLV `0d03043432` with successful result.
+Five own 84x48 frames cover DISPLAY TEXT, INKEY, empty INPUT, entered `42`
+and registered idle. Registration and persistent SIM location are checked
+independently. No firmware memory, task messages or reply bytes are injected;
+SET UP MENU, network Toolkit commands and native DSP speech remain unpromoted.
 
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first
