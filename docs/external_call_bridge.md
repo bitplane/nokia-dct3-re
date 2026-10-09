@@ -464,8 +464,15 @@ correlated busy decision and complete CC/RR release, rejects CONNECT and
 media, and checks exact registered-idle pixels afterward. The isolated
 research-HLE runner retains unchanged acquired PMM and own bootstrap,
 self-test, registration and persisted SIM-location checks. Only this
-outgoing busy failure and the unavailable fixture below are enabled for the 6210; answered calls, speech and
-outgoing SIP restoration remain unproved.
+outgoing busy failure, the unavailable fixture below and pending-outgoing
+restoration are enabled for the 6210; answered calls and speech remain unproved.
+
+`verify-6210-sip-pending-outgoing-restore` physically dials `1234567`, saves
+during SIP 180, and restores handset PC, SP, RAM checksum and emulated time
+exactly. The external dialog is cleared, not restored: CANCEL/487, one
+accepted cause-41 termination, complete CC/RR release and exact registered
+idle are required. CONNECT, accepted media and redial are rejected. This is
+research-HLE signaling coverage, not native DSP or speech evidence.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:

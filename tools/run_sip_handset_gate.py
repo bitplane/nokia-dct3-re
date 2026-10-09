@@ -573,12 +573,16 @@ def main():
     nsm3_restore = (args.product in ('8210', '8850') and not args.incoming and
                     args.restore_outgoing and args.sip_response in (180, 200) and
                     not args.record_media and not args.restore_call and not args.restore_idle)
+    npe3_pending_restore = (args.product == '6210' and not args.incoming and
+                            args.restore_outgoing and args.sip_response == 180 and
+                            args.calls == 1 and not args.record_media and
+                            not args.restore_call and not args.restore_idle)
     nsm3_incoming_restore = (args.product in ('8210', '8850') and args.incoming and
                             args.restore_call and not args.cancel_incoming and
                             not args.record_media and not args.restore_outgoing and not args.restore_idle)
-    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not nsm3_incoming_restore and
+    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not npe3_pending_restore and not nsm3_incoming_restore and
             (not args.incoming or not args.cancel_incoming)) or
-            (args.record_media and not nsm3_media and not nsm2_media) or (args.restore_call and not nsm3_incoming_restore) or args.restore_idle or (args.restore_outgoing and not nsm3_restore)):
+            (args.record_media and not nsm3_media and not nsm2_media) or (args.restore_call and not nsm3_incoming_restore) or args.restore_idle or (args.restore_outgoing and not nsm3_restore and not npe3_pending_restore)):
         parser.error(f'{args.product} requires unanswered incoming CANCEL or outgoing 480/486; media is unproved')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')

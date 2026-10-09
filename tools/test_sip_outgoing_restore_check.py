@@ -28,6 +28,13 @@ REMOTE = 'Response msg 180/INVITE/\nRequest msg CANCEL/\nResponse msg 487/INVITE
 
 
 class SipOutgoingRestoreCheckTest(unittest.TestCase):
+    def test_6210_requires_own_physically_dialed_number(self):
+        log = LOG.replace('5551234', '1234567').replace(
+            '03450401a05e0581551532f4150101', '03450401a05e0581214365f7150101')
+        self.assertIn('6210 pending outgoing', self.check(log=log, product='6210'))
+        with self.assertRaises(RuntimeError):
+            self.check(product='6210')
+
     def test_8210_uses_own_number_not_older_fixture_number(self):
         log = LOG.replace('5551234', '1234567').replace(
             '03450401a05e0581551532f4150101', '03450401a05e0581214365f7150101')

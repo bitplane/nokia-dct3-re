@@ -49,11 +49,13 @@ def main():
                         help='physically dial into SIP 486 instead of receiving CANCEL')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
                           help='physically dial into SIP 480 instead of receiving CANCEL')
+    outgoing.add_argument('--restore-outgoing-pending', action='store_true',
+                          help='restore an unanswered outgoing SIP 180 call, clearing it without media')
     parser.add_argument('--http-port', type=int, default=18621)
     parser.add_argument('--sip-port', type=int, default=25621)
     args = parser.parse_args()
     outgoing_status = 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
-    if outgoing_status and args.restore_idle:
+    if (outgoing_status or args.restore_outgoing_pending) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -69,6 +71,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki6210_sip_outgoing_restore.lua' if args.restore_outgoing_pending else
                        'noki6210_outgoing_call_input.lua' if outgoing_status else
                        'noki6210_sip_idle_restore.lua' if args.restore_idle else
                        'noki6210_sip_cancel_observe.lua')),
@@ -79,7 +82,8 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6210',
-                   *(['--sip-response', str(outgoing_status)] if outgoing_status else
+                   *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
+                     ['--sip-response', str(outgoing_status)] if outgoing_status else
                      ['--incoming', '--cancel-incoming', '--ready-file',
                       str(run / 'snap/6210_sip_registered_idle.png')]),
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port),
@@ -87,21 +91,30 @@ def main():
         with (run / 'console.log').open('w') as output:
             subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if outgoing_status:
+        if outgoing_status or args.restore_outgoing_pending:
             from PIL import Image
             text = (run / 'error.log').read_text(errors='replace')
             verify(text, runtime=True, selftest=True)
             check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            if args.restore_outgoing_pending:
+                if ('LUA ERROR' in text.upper() or '6210_state: FAIL' in text or
+                        'state_roundtrip: result=pass scenario=call' not in text):
+                    raise ValueError('pending call architecture did not restore exactly')
+                before_save = text.split('6210_state: scenario=call event=saved', 1)[0]
+                check_registration(before_save, (run / 'nvram/npe3hle/sim_card').read_bytes())
             if ('6210_call_physical: action=send' not in text or
                     '6210_keypad_decoded: key=0e' not in text):
                 raise ValueError('outgoing SIP fixture did not physically decode Send')
-            with Image.open(run / 'snap/6210_after_outgoing_call.png') as frame:
+            frame_name = ('6210_state_call_after_release.png' if args.restore_outgoing_pending
+                          else '6210_after_outgoing_call.png')
+            with Image.open(run / 'snap' / frame_name) as frame:
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after SIP failure')
         else:
             check_product_result(run, args.restore_idle)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6210 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('6210 research-HLE SIP ' + (f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +
+    print('6210 research-HLE SIP ' + ('pending outgoing restoration' if args.restore_outgoing_pending else
+          f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +
           ' PASS; registered idle recovered, no speech acceptance')
 
 

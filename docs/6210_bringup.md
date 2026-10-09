@@ -377,6 +377,13 @@ before/after the call are required. `--port` selects the unused HTTP port
 
 ## SIP caller cancellation
 
+Pending outgoing restoration is also covered by
+`verify-6210-sip-pending-outgoing-restore`: physical `1234567`/Send, SIP 180,
+exact architectural save/load, external CANCEL/487, a single cause-41
+termination, complete CC/RR release and exact registered idle. The host
+dialog is cleared rather than saved. No CONNECT, media or redial is allowed;
+this does not establish answered calls or native speech.
+
 `make verify-6210-sip-cancel RUN_DIR=run_6210_sip_cancel` runs the unchanged
 acquired PMM in `npe3hle`, with fresh private NVRAM/configuration and the
 optional PJSIP 2.16 stack. A reviewed registered-idle snapshot at 32 seconds

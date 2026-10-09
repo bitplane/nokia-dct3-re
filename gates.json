@@ -497,6 +497,16 @@
       ]
     },
     {
+      "name": "verify-6210-sip-pending-outgoing-restore",
+      "prerequisites": ["build"],
+      "variables": {},
+      "unstructured": "optional external PJSIP stack; pending NPE-3 dialog cleared after exact handset restore, no media",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6210_sip_cancel.py $(RUN_DIR) --restore-outgoing-pending --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-6210-sip-idle-restore",
       "prerequisites": ["build"],
       "variables": {},
