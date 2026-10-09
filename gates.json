@@ -655,6 +655,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "incoming-call", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-pcm-missing",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "incoming-pcm-missing", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-incoming-sms",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",

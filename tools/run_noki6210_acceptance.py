@@ -24,6 +24,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'registration': ('npe3hle', 'menu_input', 25),
              'outgoing-call': ('npe3hle', 'outgoing_call_input', 48),
              'incoming-call': ('npe3hle', 'incoming_call_input', 42),
+             'incoming-pcm-missing': ('npe3hle', 'incoming_call_input', 42),
              'incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
              'outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
              'security': ('npe3hle', 'security_input', 37),
@@ -235,7 +236,7 @@ def main():
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
         host = args.scenario.startswith('host-')
-        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms') or args.scenario in TOOLKIT_PROFILES or host
+        configured = args.scenario in ('incoming-call', 'incoming-pcm-missing', 'incoming-sms', 'state-sms') or args.scenario in TOOLKIT_PROFILES or host
         if configured or args.coherent_cell:
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
@@ -245,11 +246,14 @@ def main():
                 tag, mask, value = ':SATCFG', '15', str(TOOLKIT_PROFILES[args.scenario])
             else:
                 tag = ':CALLHOST' if host else ':NETCFG'
-                mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
+                mask = '1' if host else '2' if args.scenario in ('incoming-call', 'incoming-pcm-missing') else '4'
                 value = mask
             if configured:
                 ET.SubElement(ports, 'port', tag=tag, type='CONFIG',
                               mask=mask, defvalue='0', value=value)
+            if args.scenario == 'incoming-pcm-missing':
+                ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
+                              mask='32', defvalue='0', value='32')
             if args.coherent_cell:
                 ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
                               mask='1024', defvalue='0', value='1024')
@@ -462,9 +466,12 @@ def main():
             if host:
                 from tools.radio_host_outgoing_connect_check import verify as check_host
                 check_host((run / 'error.log').read_text(errors='replace'), '1234567')
-        elif args.scenario in ('incoming-call', 'host-incoming-call'):
+        elif args.scenario in ('incoming-call', 'incoming-pcm-missing', 'host-incoming-call'):
             from tools.noki6210_incoming_call_check import verify as check_call
             check_call(text, coherent_pin=args.pin_enabled)
+            if args.scenario == 'incoming-pcm-missing':
+                from tools.radio_pcm_missing_trace_check import check_unclocked
+                check_unclocked(run / 'error.log', expected_control=0x070b)
             if args.scenario == 'host-incoming-call':
                 from PIL import Image
                 with Image.open(run / 'snap/6210_host_registered_idle.png') as frame:

@@ -844,6 +844,24 @@ Accept either before or after radio release. The network and SIM consumers
 are independently scheduled; each ordered chain and final persistent state
 is required, not the accidental interleaving of a prior trace.
 
+## Unclocked research-HLE speech boundary
+
+`verify-6210-pcm-missing` independently answers and ends an incoming call
+using physical keys, unchanged own PMM and the existing NPE-3 upload,
+registration and call-signaling checks. Only external network configuration
+is added: an independent laboratory 1 kHz voice source. The gate requires
+the applied command-8 wire `870b` / speech control `070b`, continued network
+downlink exchanges, zero good network-decoded uplink and no HLE codec ticks,
+followed by organic release. It does not prove handset playback or speech.
+
+The product's PCM clocks remain unspecified. With a zero frame clock,
+the speech timer is never scheduled, so its unsupported-link diagnostic
+cannot run either. The gate checks the observed doorbell and absence of
+media directly; it does not create a diagnostic clock, attach sibling PCM
+timings or treat a missing timer message as a firmware failure. Physical
+MIC2/EAR wiring is known, but product-owned clock/framing evidence remains
+required before enabling the media path.
+
 ## Missing native bootstrap observation
 
 No matching raw NPE-3 final publication or ROM6 mask image was identified in

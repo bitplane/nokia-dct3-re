@@ -12,15 +12,19 @@ ROUTE_RE = re.compile(
 )
 BLOCKED_RE = re.compile(
     r"dsp_hle: speech blocked by unsupported PCM link "
-    r"control=([0-9a-f]{4}) enabled=0 clock=520000/8000 "
-    r"shape=65 .*?t=([0-9.]+)"
+    r"control=([0-9a-f]{4}) enabled=(\d) clock=(\d+)/(\d+) "
+    r"shape=(\d+) .*?t=([0-9.]+)"
 )
 EXCHANGE_RE = re.compile(
     r"gsm_voice_peer: exchange=(\d+) .*?uplink_good=(\d) .*?t=([0-9.]+)"
 )
+DOORBELL_RE = re.compile(
+    r"dsp_hle: doorbell pending=[0-9a-f]{4} wire=([0-9a-f]{4}) "
+    r"speech_control=([0-9a-f]{4}) t=([0-9.]+)"
+)
 
 
-def check(path: Path) -> str:
+def check(path: Path, expected_link=(0, 520000, 8000, 65)) -> str:
     text = path.read_text(errors="replace")
     routes = list(ROUTE_RE.finditer(text))
     blocked = BLOCKED_RE.search(text)
@@ -29,7 +33,10 @@ def check(path: Path) -> str:
     if not blocked:
         raise ValueError("missing PCM link did not block the speech data plane")
     control = int(blocked.group(1), 16)
-    blocked_time = float(blocked.group(2))
+    actual_link = tuple(int(blocked.group(index)) for index in range(2, 6))
+    if actual_link != expected_link:
+        raise ValueError(f"unsupported PCM profile {actual_link} differs from {expected_link}")
+    blocked_time = float(blocked.group(6))
     route = next((
         match for match in routes
         if int(match.group(1), 16) >> 12 in (0x00, 0x08)
@@ -42,6 +49,22 @@ def check(path: Path) -> str:
             f"command-08 wires [{wires}] did not reach DSP control "
             f"{control:04x}"
         )
+    return check_absent_media(text)
+
+
+def check_unclocked(path: Path, expected_control: int) -> str:
+    """Check a product with no PCM clock, hence no speech-timer diagnostic."""
+    text = path.read_text(errors="replace")
+    requests = [
+        (int(wire, 16), int(control, 16))
+        for wire, control, _ in DOORBELL_RE.findall(text)
+    ]
+    if (0x8000 | expected_control, expected_control) not in requests:
+        raise ValueError("own command-08 doorbell did not apply the expected speech control")
+    return check_absent_media(text)
+
+
+def check_absent_media(text: str) -> str:
     if "dsp_hle: speech tick" in text:
         raise ValueError("codec/PCM speech clock ran without the physical link")
     exchanges = [

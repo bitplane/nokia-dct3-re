@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.radio_pcm_missing_trace_check import check
+from tools.radio_pcm_missing_trace_check import check, check_unclocked
 
 
 GOOD = """
@@ -14,14 +14,23 @@ dsp_hle: GSM service uplink sapi=0 pd=03 message=2a length=2 t=13.000000
 
 
 class MissingPcmTraceTests(unittest.TestCase):
-    def run_check(self, text):
+    def run_check(self, text, expected_link=(0, 520000, 8000, 65)):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "error.log"
             path.write_text(text)
-            return check(path)
+            return check(path, expected_link=expected_link)
 
     def test_accepts_control_only_call(self):
         self.assertIn("no codec", self.run_check(GOOD))
+
+    def test_accepts_explicit_unknown_product_profile(self):
+        text = GOOD.replace('enabled=0 clock=520000/8000 shape=65',
+                            'enabled=1 clock=0/0 shape=0')
+        self.assertIn('no codec', self.run_check(text, (1, 0, 0, 0)))
+
+    def test_rejects_unexpected_profile(self):
+        with self.assertRaisesRegex(ValueError, 'PCM profile'):
+            self.run_check(GOOD, (1, 0, 0, 0))
 
     def test_accepts_v501_command_tagged_wire(self):
         self.assertIn("no codec", self.run_check(GOOD.replace(
@@ -60,6 +69,21 @@ class MissingPcmTraceTests(unittest.TestCase):
     def test_rejects_missing_release(self):
         with self.assertRaisesRegex(ValueError, "Release Complete"):
             self.run_check(GOOD.split("dsp_hle: GSM service", 1)[0])
+
+    def test_unclocked_product_requires_own_applied_control(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'error.log'
+            path.write_text(GOOD + '\ndsp_hle: doorbell pending=0000 wire=870b speech_control=070b t=10.020000\n')
+            self.assertIn('no codec', check_unclocked(path, 0x070b))
+            with self.assertRaisesRegex(ValueError, 'doorbell'):
+                check_unclocked(path, 0x060b)
+
+    def test_unclocked_product_rejects_codec_activity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'error.log'
+            path.write_text(GOOD + '\ndsp_hle: doorbell pending=0000 wire=870b speech_control=070b t=10.020000\ndsp_hle: speech tick uplink=1 downlink=0\n')
+            with self.assertRaisesRegex(ValueError, 'speech clock'):
+                check_unclocked(path, 0x070b)
 
 
 if __name__ == "__main__":
