@@ -116,8 +116,11 @@ ticks, timed buzzer programming and nonblank 96x60 pixels after a 1.25-second
 replay. Physical Stop then silences the buzzer and returns to the reviewed
 registered-idle frame. It uses a fresh own-product clock seed and the declared
 research PMM comparison, not RTC/firmware injection or audible/native speech.
-Alarm-editor restoration, restored Yes
-and audible/native media remain unproved.
+`verify-6250-alarm-snooze-countdown-restore-yes` independently adds physical
+Yes after the restored later countdown, firmware-requested software reset,
+separately checked own verifier/uploads and renewed registered idle.
+Alarm-editor restoration and audible/native media remain unproved; the
+initial off-countdown Snooze/Yes combination is not covered by this gate.
 `verify-6250-alarm-cold` additionally proves own physically saved alarm
 reconstruction in a new process, natural expiry and Stop, with independent
 uploaded-stage/registration checks and exact retained-alarm frames. It does

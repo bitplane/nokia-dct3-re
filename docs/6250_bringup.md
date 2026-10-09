@@ -1339,7 +1339,8 @@ restores all 37 exported ARM/banked registers, RAM digest and time at second
 49, reproduces the 1.25-second RTC/blank-frame window, and then completes
 both natural wakes, physical Snooze/Stop/No and final rail-off. This is not
 a save/load inside the later Snooze interval or an awake editor transaction.
-Restored Yes and audible/native speech remain unpromoted.
+That initial Snooze countdown gate does not promote restored Yes;
+audible/native speech remains unpromoted.
 
 `verify-6250-alarm-snooze-countdown-restore` independently saves the later
 Snooze-induced rail-off state at second 100, after the first RTC wake and
@@ -1351,6 +1352,18 @@ still wakes naturally at second 360, followed by physical Stop/No and final
 rail-off. This separately validates state created by the wake/Snooze cycle,
 not just the initial countdown. It does not cover an awake alarm/editor
 save point or promote restored Yes.
+
+`verify-6250-alarm-snooze-countdown-restore-yes` independently checks the
+same second-100 restored Snooze countdown followed by recurrent RTC wake,
+physical Stop and Yes. The own firmware requests reset-control `05` after
+Yes; the subsequent native verifier, loaders and exclusive handoff at
+missing mask routine `2c75` are checked independently before laboratory
+registration and the reviewed registered-idle frame. Both alarm-only wakes
+must remain unregistered and both off-rail intervals must be silent.
+Raw acceptance: `run_6250_snooze_countdown_restore_yes_20261009`.
+All physical Yes alarm gates now require their post-Yes upload phase as
+well as registration. No reset, alarm cause or firmware state is injected;
+this remains the declared research-HLE PMM comparison, not native speech.
 
 `verify-6250-alarm-awake-restore` separately covers the sounding awake
 alarm at second 65, before physical Stop. The fresh own-product Calendar

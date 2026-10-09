@@ -335,6 +335,9 @@ def main():
             if "LAPDm Location Updating Accept acknowledged" in text[wake:activation]:
                 raise ValueError("alarm-only wake unexpectedly registered before activation")
             if args.power_choice == "yes":
+                if not re.search(r"6250_reset_control: value=05\b", text[activation:]):
+                    raise ValueError("NHM-3 physical Yes did not request its own software restart")
+                check_uploads(text[activation:], runtime=True)
                 verify(text[activation:], "nhm3", preserved=True)
             elif "LAPDm Location Updating Accept acknowledged" in text[activation:]:
                 raise ValueError("declined activation unexpectedly registered")
