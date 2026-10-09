@@ -51,8 +51,10 @@ Stop to the activation question, physical No back to off, and physical Yes
 to preserved registration, with separate uploaded-stage checks and exact
 frames. `verify-6250-alarm-snooze` proves physical awake Snooze, firmware
 re-arm to 13:53, natural second expiry and Stop with two additional exact
-frames. Powered-off Snooze, pending-alarm state restoration and audible/native
-media remain unproved.
+frames. `verify-6250-alarm-off-restore` and `-restore-yes` additionally
+check exact 37-register ARM/RAM/time restoration and off-rail RTC replay,
+then natural deadline wake and the respective physical activation choice.
+Powered-off Snooze and audible/native media remain unproved.
 
 `verify-8890-alarm` independently proves physical Settings 4-1 alarm entry
 on NSB-6, own `13:48` CCONT programming, natural expiry, alarm-cause `b3`

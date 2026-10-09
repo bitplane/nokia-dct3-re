@@ -1293,5 +1293,15 @@ for 13:53. Natural RTC expiry at that deadline has status `b1`, mask `10`,
 and firmware acknowledgement `a1`; buzzer programming resumes before the
 second physical Stop. Exact additional frames show `Snooze active` and the
 recurring alarm. No deadline, status or firmware state is injected. This
-does not validate powered-off Snooze or save-state restoration of a pending
-alarm, nor does programmed buzzer activity establish audible/native audio.
+does not validate powered-off Snooze, nor does programmed buzzer activity
+establish audible/native audio.
+
+`verify-6250-alarm-off-restore` and `-restore-yes` save the powered-off
+countdown at emulated second 49. All 37 exported ARM/banked registers,
+modeled RAM digest and emulated time must match exactly on load. The
+reference/restored 1.25-second off-rail windows must reproduce the same RTC
+tick and blank frame with no named powered-endpoint activity or early wake.
+The restored RTC deadline then drives the ordinary alarm boot and physical
+Stop/No or Stop/Yes lifecycle; only the abandoned reference interval is
+excluded from subsequent lifecycle checks. This does not establish offline
+clock advance or native-DSP state/audio correctness.

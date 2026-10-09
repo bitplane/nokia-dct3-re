@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6250_alarm import check_alarm
+from tools.run_noki6250_alarm import check_alarm, check_restore
 
 
 class AlarmCheckTest(unittest.TestCase):
@@ -66,6 +66,38 @@ class AlarmCheckTest(unittest.TestCase):
 
     def test_snooze_recurrence(self):
         check_alarm(self.snooze_trace(), snooze=True)
+
+    def restore_trace(self):
+        registers = ",".join(["00000000"] * 37)
+        state = " pc=00000000 sp=00000000 ram=12345678 cpu=" + registers + " t=49.000000000\n"
+        tick = "ccont_rtc: event=second time=13:47:50 day=0 status=31 mask=10 t=50.000000000\n"
+        return ("6250_alarm_state: event=saved" + state +
+                "6250_alarm_replay: phase=reference event=begin t=49.000000000\n" + tick +
+                "6250_alarm_replay: phase=reference event=end t=50.250000000\n" +
+                "6250_alarm_state: event=restored" + state +
+                "6250_alarm_replay: phase=restored event=begin t=49.000000000\n" + tick +
+                "6250_alarm_replay: phase=restored event=end t=50.250000000\n")
+
+    def test_exact_restore_and_rtc_replay(self):
+        result = check_restore(self.restore_trace())
+        self.assertNotIn("event=saved", result)
+        self.assertIn("event=restored", result)
+        self.assertEqual(result.count("event=second"), 1)
+
+    def test_restore_architecture_time_and_tick_mismatch_rejected(self):
+        for old, new in (("ram=12345678", "ram=12345679"),
+                         ("t=50.250000000", "t=50.500000000"),
+                         ("time=13:47:50", "time=13:47:51")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_restore(self.restore_trace().replace(old, new, 1))
+
+    def test_incomplete_registers_and_early_wake_rejected(self):
+        with self.assertRaises(ValueError):
+            check_restore(self.restore_trace().replace(",00000000", "", 1))
+        with self.assertRaises(ValueError):
+            check_restore(self.restore_trace().replace(
+                "6250_alarm_replay: phase=reference event=end",
+                "ccont_power: event=wake cause=80\n6250_alarm_replay: phase=reference event=end"))
 
     def test_snooze_wrong_deadline_ack_or_rearm_rejected(self):
         for old, new in (("13:53:00", "13:52:00"), ("data=a1", "data=21"),

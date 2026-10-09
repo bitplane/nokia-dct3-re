@@ -47,7 +47,9 @@ local input = coroutine.create(function()
         machine:logerror('6250_alarm_physical: action=power_release\n')
         if not emu.wait(10) then return end
         machine.screens[':screen']:snapshot('6250_alarm_off.png')
-        if not emu.wait(31) then return end
+        local replayed = _G.noki6250_alarm_restore_checkpoint and
+                         _G.noki6250_alarm_restore_checkpoint() or 0
+        if not emu.wait(31 - replayed) then return end
     elseif not emu.wait(30) then
         return
     end

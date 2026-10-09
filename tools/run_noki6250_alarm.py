@@ -92,6 +92,36 @@ def check_alarm(text, power_choice=None, snooze=False):
             require_endpoint_silence(text[off[1].end():], "NHM-3 declined activation interval")
 
 
+def check_restore(text):
+    from tools.power_domain_contract import require_endpoint_silence
+    states = list(re.finditer(
+        r"6250_alarm_state: event=(saved|restored) pc=([0-9a-f]{8}) sp=([0-9a-f]{8}) "
+        r"ram=([0-9a-f]{8}) cpu=([0-9a-f,]+) t=([0-9.]+)", text))
+    if len(states) != 2 or [state[1] for state in states] != ["saved", "restored"]:
+        raise ValueError("missing unique NHM-3 alarm save/load observations")
+    if any(not re.fullmatch(r"[0-9a-f]{8}(?:,[0-9a-f]{8}){36}", state[5]) for state in states):
+        raise ValueError("incomplete NHM-3 ARM/banked snapshot")
+    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][6]) != 49:
+        raise ValueError("NHM-3 restored architecture/checkpoint differs")
+    windows = list(re.finditer(
+        r"6250_alarm_replay: phase=(reference|restored) event=(begin|end) t=([0-9.]+)", text))
+    if [(event[1], event[2]) for event in windows] != [
+            ("reference", "begin"), ("reference", "end"),
+            ("restored", "begin"), ("restored", "end")]:
+        raise ValueError("NHM-3 alarm replay windows absent/unordered")
+    if [float(event[3]) for event in windows] != [49, 50.25, 49, 50.25]:
+        raise ValueError("NHM-3 alarm replay times differ")
+    reference = text[windows[0].end():windows[1].start()]
+    restored = text[windows[2].end():windows[3].start()]
+    ticks = re.findall(r"ccont_rtc: event=second[^\r\n]+", reference)
+    if len(ticks) != 1 or ticks != re.findall(r"ccont_rtc: event=second[^\r\n]+", restored):
+        raise ValueError("NHM-3 powered-off RTC replay differs/absent")
+    require_endpoint_silence(reference + restored, "NHM-3 off-state replay")
+    if "ccont_power: event=wake" in reference + restored:
+        raise ValueError("NHM-3 replay woke before deadline")
+    return text[:states[0].start()] + text[states[1].start():]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_directory", type=Path)
@@ -99,9 +129,12 @@ def main():
     parser.add_argument("--power-choice", choices=("yes", "no"),
                         help="power off before expiry, then physically choose activation")
     parser.add_argument("--snooze", action="store_true")
+    parser.add_argument("--restore-off", action="store_true")
     args = parser.parse_args()
     if args.snooze and args.power_choice:
         parser.error("Snooze/off combination is not validated")
+    if args.restore_off and not args.power_choice:
+        parser.error("off-state restoration requires an explicit activation choice")
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     mame = (args.mame or root / "mame/mame").resolve()
@@ -117,7 +150,8 @@ def main():
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{phase / 'roms'};{root / 'roms'}", "-nvram_directory", "nvram",
                    "-cfg_directory", "cfg", "-noreadconfig", "-autoboot_script",
-                   str(root / "tools/noki6250_alarm_input.lua"), "-autoboot_delay", "0",
+                   str(root / "tools" / ("noki6250_alarm_restore.lua" if args.restore_off
+                                         else "noki6250_alarm_input.lua")), "-autoboot_delay", "0",
                    "-seconds_to_run", "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
                    "-nothrottle", "-log", "-verbose"]
         environment = os.environ.copy()
@@ -133,6 +167,13 @@ def main():
             subprocess.run(command, cwd=phase, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
         text = (phase / "error.log").read_text(errors="replace")
+        if args.restore_off:
+            text = check_restore(text)
+            for name in ("reference", "restored"):
+                check_frame(phase / "snap" / f"6250_alarm_off_{name}.png",
+                            "907c2e3cc0dc7d0dc17827521badb7be0f647b6b945f1bac2e68094fd47568a7")
+        elif "6250_alarm_state:" in text or "6250_alarm_replay:" in text:
+            raise ValueError("unexpected state replay in uninterrupted alarm run")
         check_alarm(text, args.power_choice, args.snooze)
         frames = dict(FRAMES)
         if args.snooze:

@@ -15063,6 +15063,20 @@
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-alarm-off-restore",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_alarm.py",
+                 "arguments": ["$(RUN_DIR)", "--power-choice", "no", "--restore-off", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6250-alarm-off-restore-yes",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_alarm.py",
+                 "arguments": ["$(RUN_DIR)", "--power-choice", "yes", "--restore-off", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-alarm-snooze",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
