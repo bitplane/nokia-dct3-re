@@ -18,6 +18,8 @@ BOUNDARIES = {
                  '33a22a0e0d1072996f2d4bbac4f1f67b54aa8eb919d23ad70b736d7502124c05'),
     'leap-day': ('noki8890_calendar_leap_input.lua', '29 February 2024 Thursday',
                  '8d4c81f3534b43d590855d1112bc38ffc7426f3aa967f775db2b0252146b5f41'),
+    'year-end': ('noki8890_calendar_year_input.lua', '1 January 2027 Friday',
+                 'b78f184f04f8931745eb7e201e109cd2fc4d8a887cc7a38c17e7506891b3ff00'),
 }
 
 

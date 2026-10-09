@@ -1,5 +1,5 @@
 -- Physical 23:59/date entry followed by ordinary RTC-driven midnight.
--- Exploratory fixture: calendar-date advancement is not yet an acceptance claim.
+-- Calendar gates separately check date advancement and cold journal restoration.
 local source = debug.getinfo(1, 'S').source:sub(2)
 _G.noki8890_clock_settlement_only = true
 _G.noki8890_clock_digits = {{3, 'Keypad 2'}, {4, 'Keypad 3'},

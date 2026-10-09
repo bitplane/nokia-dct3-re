@@ -6,6 +6,7 @@ import re
 SCALARS = {
     'ordinary': ('d44b1580', 'd44c6700'),
     'leap-day': ('cf640180', 'cf655300'),
+    'year-end': ('d4bb2500', 'd4bc7680'),
 }
 
 

@@ -301,6 +301,12 @@
                  "arguments": ["$(RUN_DIR)", "--minute-redraw", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8890-calendar-year-end", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8890_calendar.py",
+                 "arguments": ["$(RUN_DIR)", "--boundary", "year-end", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8890-calendar-leap-day", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
                  "before_script": [], "script": "tools/run_noki8890_calendar.py",

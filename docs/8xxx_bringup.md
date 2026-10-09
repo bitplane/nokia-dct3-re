@@ -1188,9 +1188,18 @@ from physical 23:59 and 28/02/2024. The same day-register read/clear
 sequence advances the scalar from `cf640180` to `cf655300`; a cold
 Calendar readback shows **29 February 2024, Thursday**. The checker
 requires this date's own scalar pair and full reviewed frame, not the
-ordinary October oracle. This validates entry into a leap day; leaving
-February, non-leap February, month/year boundaries and century rules
-remain outside the acceptance scope.
+ordinary October oracle. This validates entry into a leap day, not leaving
+February or non-leap February.
+
+`make verify-8890-calendar-year-end RUN_DIR=RUN` physically enters
+23:59 and 31/12/2026 from empty storage with the unchanged own PMM. Midnight
+advances the scalar from `d4bb2500` to `d4bc7680`; cold journal restoration
+and physical Calendar selection display **1 January 2027, Friday**.
+Both isolated processes must register, and the complete 84x48 date frame is
+checked independently of the October and leap-day oracles. This establishes
+the December-to-January month/year boundary. Other month lengths, February
+exit, century rules and offline elapsed time remain outside the acceptance
+scope. No RTC/date RAM or provisioning record is forced by these fixtures.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state

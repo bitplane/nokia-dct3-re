@@ -31,8 +31,9 @@ class CalendarTest(unittest.TestCase):
                     verify(seed, cold.replace(after, before), boundary=boundary)
 
     def test_leap_day_does_not_accept_ordinary_date(self):
-        with self.assertRaises(ValueError):
-            verify(SEED, COLD, boundary='leap-day')
+        for boundary in ('leap-day', 'year-end'):
+            with self.subTest(boundary=boundary), self.assertRaises(ValueError):
+                verify(SEED, COLD, boundary=boundary)
         with self.assertRaises(ValueError):
             verify(SEED, COLD, boundary='unknown')
 
