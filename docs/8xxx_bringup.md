@@ -1212,6 +1212,21 @@ the December-to-January month/year boundary. Other month lengths, February
 exit, century rules and offline elapsed time remain outside the acceptance
 scope. No RTC/date RAM or provisioning record is forced by these fixtures.
 
+`make verify-8890-alarm RUN_DIR=RUN` independently seeds a physically entered
+13:47 clock using the checked cold-clock fixture, then enters Settings 4-1
+(`Erinnerungsfunktion`) and 13:48 with physical keys. Confirmation programs
+CCONT `0b=30`, `0c=0d`. At emulated second 60, RTC reaches 13:48:00;
+firmware reads alarm status `b3`, acknowledges `a0` and drives PUP buzzer
+control. Physical Stop at second 75 returns to the exact registered idle
+frame with buzzer control off. The alarm confirmation, visible 75-second
+alarm phase and stopped frame have independent full 84x48 reviewed hashes
+in `run_noki8890_alarm.py`; no 6210 rendering oracle or acknowledgement is
+imported. The fresh permanent runner checks own uploads/self-test and
+retained-location GSM900 registration (`run_8890_alarm_acceptance`). No
+clock, IRQ, UI or provisioning state is injected. This is research-HLE
+alarm control/presentation acceptance, not audible output, Snooze,
+powered-off wake or native DSP validation.
+
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
 hooks. Physical time confirmation near 25 seconds and date confirmation near

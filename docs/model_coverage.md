@@ -35,6 +35,14 @@ requirement.
 
 ## Promotion rules
 
+`verify-8890-alarm` independently proves physical Settings 4-1 alarm entry
+on NSB-6, own `13:48` CCONT programming, natural expiry, alarm-cause `b3`
+consumption and `a0` acknowledgement, buzzer control and physical Stop back
+to reviewed registered idle. Its German 84x48 frames are separately reviewed;
+the seed is a fresh verified physical clock-entry fixture from the same
+product. This does not promote Snooze, powered-off alarm wake or audible
+output and does not alter the normal/native-DSP boundary.
+
 `verify-6210-alarm` independently proves physical Menu-4-1 alarm entry,
 CCONT programming, naturally timed expiry, firmware alarm presentation and
 physical Stop returning to registered idle. Its seed is a fresh physically
