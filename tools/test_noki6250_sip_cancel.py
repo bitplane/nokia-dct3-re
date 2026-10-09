@@ -98,7 +98,7 @@ class SipCancelTest(unittest.TestCase):
                     capture_output=True, text=True)
                 with self.subTest(options=options):
                     self.assertEqual(result.returncode, 2)
-                    self.assertIn('media is unproved', result.stderr)
+                    self.assertIn('unsupported SIP scenario for 6250', result.stderr)
 
 
 if __name__ == '__main__':

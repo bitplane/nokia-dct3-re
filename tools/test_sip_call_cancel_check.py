@@ -56,7 +56,7 @@ class SipCancelCheckTest(unittest.TestCase):
     def test_signaling_only_cli_rejects_answered_or_media_promotion(self):
         script = Path(__file__).with_name('run_sip_handset_gate.py')
         with tempfile.TemporaryDirectory() as directory:
-            for product in ('6210', '8210', '8850', '8890'):
+            for product in ('6210', '6250', '8890'):
                 for extra in ([], ['--incoming'],
                               ['--incoming', '--cancel-incoming', '--record-media'],
                               ['--incoming', '--cancel-incoming', '--restore-call']):
@@ -65,7 +65,28 @@ class SipCancelCheckTest(unittest.TestCase):
                                                  '--run-dir', directory, '--product', product, *extra],
                                                 capture_output=True, text=True)
                         self.assertEqual(result.returncode, 2)
-                        self.assertIn('limited to unanswered incoming CANCEL', result.stderr)
+                        self.assertIn('unsupported SIP scenario for ' + product, result.stderr)
+
+    def test_validated_media_products_do_not_inherit_cancel_only_scope(self):
+        script = Path(__file__).with_name('run_sip_handset_gate.py')
+        with tempfile.TemporaryDirectory() as directory:
+            for product in ('8210', '8850'):
+                for extra in ([], ['--incoming'], ['--record-media'],
+                              ['--incoming', '--record-media']):
+                    with self.subTest(product=product, extra=extra):
+                        result = subprocess.run([sys.executable, str(script), '--pjsua', 'absent',
+                                                 '--run-dir', directory, '--product', product, *extra],
+                                                capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 2)
+                        self.assertIn('a handset command is required', result.stderr)
+                for extra in (['--incoming', '--cancel-incoming', '--record-media'],
+                              ['--incoming', '--cancel-incoming', '--restore-call']):
+                    with self.subTest(product=product, extra=extra):
+                        result = subprocess.run([sys.executable, str(script), '--pjsua', 'absent',
+                                                 '--run-dir', directory, '--product', product, *extra],
+                                                capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 2)
+                        self.assertIn('unsupported SIP scenario for ' + product, result.stderr)
 
     def test_stale_ready_file_is_rejected_before_launch(self):
         script = Path(__file__).with_name('run_sip_handset_gate.py')

@@ -591,7 +591,7 @@ def main():
     if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not npe3_pending_restore and not unanswered_alerting_restore and not unanswered_pending_restore and not nsm3_incoming_restore and
             (not args.incoming or not args.cancel_incoming)) or
             (args.record_media and not nsm3_media and not nsm2_media) or (args.restore_call and not nsm3_incoming_restore and not unanswered_alerting_restore) or args.restore_idle or (args.restore_outgoing and not nsm3_restore and not npe3_pending_restore and not unanswered_pending_restore)):
-        parser.error(f'{args.product} requires unanswered incoming CANCEL or outgoing 480/486; media is unproved')
+        parser.error(f'unsupported SIP scenario for {args.product}; use a verified product-specific signaling/media fixture')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')
     if args.incoming and args.sip_response != 200:
