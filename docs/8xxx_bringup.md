@@ -1251,12 +1251,11 @@ Physical `12345` and Menu at seconds 70..73 reaches the decoded key handler
 but displays `Code falsch`; the later right-softkey probe does not establish
 No activation or rail removal. Both raw runs remain preserved in
 `run_8890_alarm_off_review` and `run_8890_alarm_off_security_review`.
-No powered-off alarm acceptance gate is promoted. CCONT currently retains
-the old low PWRONX status bit on alarm wake; whether the legitimate alarm-only
-startup should clear that cause or follows a different firmware selector is
-an open consumer-side question, not authorization to change status to reach
-a desired screen. The ordinary alarm/Snooze and power-key-restart gates remain
-separate from this negative result.
+No powered-off alarm acceptance gate is promoted. The ordinary alarm/Snooze
+and power-key-restart gates remain separate from this negative result.
+The current boundary is a runtime phone-code setting overwritten by an NV
+reload; neither a CCONT wake-cause change nor replacement of the packed code
+is justified by the observations below.
 
 The read-only own-ROM probe in `run_8890_alarm_startup_reader_valid`
 narrows the initial status consumer without closing the wake contract.
@@ -1268,8 +1267,7 @@ paths at this consumer. The following `0x2e2394` call separately reads
 MAD2 reset status at `0x20001`, not CCONT status. Likewise selector `84ff`
 through `0x2e2220` returns chip ID `b2` on both starts and checks
 `(value & fc) == b0`; it is a self-test, not a wake-cause selector.
-These observations do not exclude later CCONT-status consumers or establish
-the cause of the rejected security transaction. Decode this ROM as
+These observations do not exclude later CCONT-status consumers. Decode this ROM as
 big-endian Thumb; the 3210 swap16 decoding convention does not apply.
 The other observed full-status reads are the interrupt drain at
 `0x2fc74e/0x2fc7dc`: it subtracts the interrupt mask with BIC and applies
@@ -1282,9 +1280,7 @@ the editor after each key: `12345` at seconds 86..91 produces exactly one
 through five asterisks, then Menu displays `Code falsch`. This excludes
 duplicate logical digits in that retry despite repeated low-level keypad
 decode observations. The same run accepts the cold-start security sequence
-before arming the alarm. The remaining boundary is therefore post-wake
-validation/context or stored-code selection, not an established wrong
-default code; no security record or firmware state was changed.
+before arming the alarm; no security record or firmware state was changed.
 Read-only NV comparison in `run_8890_alarm_security_nv` observes 1,042
 getter calls before alarm wake and 958 afterward. Both starts successfully
 read the same initial low-offset records: `0000/0120`, `0014/000c`,
@@ -1294,18 +1290,37 @@ by `70:0d00` and `70:0a09`. This does not establish identity/security DSP
 verdicts, which remain unimplemented, or prove all NV bytes are unchanged.
 In particular, the repeated offset-`000c` reader at `0x28c40c` unpacks
 nibbles into digit characters; it is not evidence of a phone-code compare.
-The next discriminating boundary is the MCU-side validation transaction,
-not a guessed replacement security record.
 The exact own-ROM five-digit reader is `0x28c140`: it reads three packed
 bytes at NV offset `0110`, converts high/low nibbles to characters, validates
 the first five digits and terminates at byte 5. Invalid digit content selects
 the ROM's `12345` fallback at `0x28c18a`. In
 `run_8890_alarm_security_code`, cold and alarm startup both call it through
 `0x2c250a` and return valid packed `123450`, decoded `313233343500`.
-Thus the stored-code reader itself agrees with the physical retry; replacing
-its NV record is not justified. Its caller initializes the runtime setting
-through `0x2fa270`, using selector structure `0x1377e4`; the post-wake
-editor's actual validation use of that setting remains to be traced.
+Its caller initializes the encoded runtime setting through `0x2fa270`,
+using storage `0x1377e4`. The encoder combines a compact code representation
+with identity-derived context from `0x2e10ac`; this is firmware behavior,
+not an emulated security verdict.
+
+`run_8890_alarm_security_compare` identifies the actual validator
+`0x2fa48c`, called by `0x2cb872`: five input characters are encoded through
+`0x2fa270`, compared with the four runtime bytes at `0x1377e4` through
+`0x305e9c`, then passed to the retry/verdict handler `0x2fa438`.
+Both physical entries are `313233343500` and encode to `d83b30d8`.
+Cold startup compares against `d83b30d8` and returns match; alarm startup
+compares against `d33098dc` and returns mismatch. Retry count is initially
+zero in both cases, so this is not a pre-existing retry-limit rejection.
+
+The write tap in `run_8890_alarm_security_writer` locates the change:
+`0x2fa2a8` initializes the correct encoded bytes at 1.990148538 seconds;
+`0x3062cc` overwrites them at 32.065452231 after alarm confirmation.
+After wake, initialization repeats at 62.005513769, followed by the same
+overwrite at 63.485831769, before code entry. The NV getter census identifies
+that copy as offset `056c`, length 8, destination `0x1377e4`, through owner
+`0x2f4da0`. Its restored bytes are `d33098dc00000301`; the packed `0110`
+record remains valid `123450`. The unresolved contract is why this settings
+reload restores an encoding inconsistent with the initialized code, and
+whether its persistence/selection or context is mis-modeled. Do not patch
+RAM, suppress the reload, or invent a replacement PMM record to pass it.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
