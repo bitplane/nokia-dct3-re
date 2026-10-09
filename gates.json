@@ -15686,6 +15686,14 @@
                  "arguments": ["$(RUN_DIR)", "--snooze", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-alarm-off-snooze-no",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6210_alarm.py",
+                 "arguments": ["$(RUN_DIR)", "--power-off-snooze", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-calendar-cold",
       "prerequisites": ["build"],
       "variables": {},

@@ -169,6 +169,14 @@ natural expiry and Stop in a new process with no clock/alarm entry. Its
 armed-idle, active-alarm and stopped frames are reviewed and reproducible.
 Seconds restart at zero; offline elapsed time is not inferred.
 
+`verify-6210-alarm-off-snooze-no` combines the independently validated
+powered-off and Snooze lifecycles: two natural RTC wakes, separately checked
+alarm-only uploads, silent endpoint intervals while powered off, physical
+Stop, the reviewed activation question, and physical No returning to a blank
+powered-off display. Its recurrence input waits for the second alarm boot;
+scripted key labels alone are not evidence that the intended UI consumed them.
+This remains research HLE, not native DSP or audible-output acceptance.
+
 `verify-6210-calendar-cold` independently proves physical Menu-8 Calendar
 entry, firmware-owned CCONT programming to 13:47, physical date entry and
 the reviewed 7 October 2026 Wednesday pixels. A separate process retaining

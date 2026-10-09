@@ -29,6 +29,10 @@ POWER_OFF_FRAMES = {
     'woke': 'd1c7925c3a9dd1c116cc09133fcab3e32e7bf871597055965ac15e2ccea858e7',
     'stopped': '66e40d0bd8e655b0ac6400b6e83c1acd01c58b0247d51ed4f341ccf6f7cab615',
 }
+POWER_OFF_SNOOZE_FRAMES = {
+    'snooze': POWER_OFF_FRAMES['powered_off'],
+    'repeated': 'd2cdd6ecc3a2ffed838a36c19ba946cbb41db0695fdf29f5fc319964e522c393',
+}
 
 
 def check_alarm_set(text):
@@ -121,7 +125,7 @@ def check_snooze(text):
         raise ValueError('Snooze buzzer remains enabled after physical Stop')
 
 
-def check_power_off_alarm(text, choice):
+def check_power_off_alarm(text, choice, snooze=False):
     from tools.power_domain_contract import require_endpoint_silence
     cursor = check_alarm_set(text)
 
@@ -146,16 +150,31 @@ def check_power_off_alarm(text, choice):
     require('event=cause_read data=b1 ')
     require('event=status_ack data=81 ')
     require('buzzer: enabled=1 ')
+    if snooze:
+        require('6210_alarm_probe: action=snooze\n')
+        require('event=alarm_write reg=0b data=35 armed=1 ')
+        require('event=alarm_write reg=0c data=0d armed=1 ')
+        require('buzzer: enabled=0 ')
+        snooze_off = require('ccont_power: event=off ')
+        recurrence = require('ccont_power: event=wake cause=80 ')
+        require_endpoint_silence(text[snooze_off:recurrence], 'Snooze rail-off domain generated activity')
+        require('event=second time=13:53:00 day=0 ')
+        wake_time = re.search(r'ccont_power: event=wake cause=80 t=([0-9.]+)', text[recurrence:])
+        deadline = re.search(r'event=second time=13:53:00 day=0 [^\n]*t=([0-9.]+)', text[recurrence:])
+        if wake_time is None or deadline is None or float(wake_time[1]) != float(deadline[1]):
+            raise ValueError('Snooze rail wake did not occur at the natural RTC deadline')
+        require('event=status_ack data=a1 ')
+        require('buzzer: enabled=1 ')
     require('6210_alarm_probe: action=stop\n')
     require('buzzer: enabled=0 ')
     decision = require(f'6210_alarm_probe: action=activate_{choice}\n')
-    if re.findall(r'ccont_power: event=wake cause=(\w+)', text) != ['80']:
+    if re.findall(r'ccont_power: event=wake cause=(\w+)', text) != ['80'] * (2 if snooze else 1):
         raise ValueError('alarm wake used an extra power-key/charger wake')
     if choice == 'no':
         final_off = require('ccont_power: event=off ')
         require_endpoint_silence(text[final_off:], 'No activation did not leave endpoints off')
-        if len(re.findall(r'ccont_power: event=off ', text)) != 2:
-            raise ValueError('No activation requires exactly two rail-off transitions')
+        if len(re.findall(r'ccont_power: event=off ', text)) != (3 if snooze else 2):
+            raise ValueError('No activation rail-off count differs')
     else:
         if 'ccont_power: event=off ' in text[decision:]:
             raise ValueError('Yes activation unexpectedly removed the rails')
@@ -205,7 +224,7 @@ def main():
     mode.add_argument('--snooze', action='store_true',
                       help='physically Snooze and verify natural five-minute recurrence and Stop')
     mode.add_argument('--power-off-snooze', action='store_true',
-                      help='probe powered-off Snooze and physical No; independent validation required')
+                      help='verify powered-off Snooze, natural recurrence, Stop and physical No')
     mode.add_argument('--power-off', choices=('yes', 'no'),
                       help='physically shut down, verify autonomous alarm wake and activation choice')
     mode.add_argument('--restore-off', choices=('yes', 'no'), nargs='?', const='no',
@@ -250,7 +269,7 @@ def main():
         elif '6210_alarm_state:' in text or '6210_alarm_replay:' in text:
             raise ValueError('unexpected alarm replay in an uninterrupted fixture')
         if args.power_off:
-            off, wake, decision = check_power_off_alarm(text, args.power_off)
+            off, wake, decision = check_power_off_alarm(text, args.power_off, snooze=args.power_off_snooze)
             verify_stage(text[:off], runtime=True, selftest=True)
             # Alarm-only startup is not normal telephony/analogue initialization.
             if args.power_off == 'yes':
@@ -261,7 +280,13 @@ def main():
                 verify_stage(text[wake:boundary], runtime=True)
                 verify_stage(text[boundary:], runtime=True, selftest=True)
             else:
-                verify_stage(text[wake:], runtime=True)
+                if args.power_off_snooze:
+                    wakes = list(re.finditer(r'ccont_power: event=wake cause=80 ', text))
+                    snooze_off = text.index('ccont_power: event=off ', wakes[0].end())
+                    verify_stage(text[wake:snooze_off], runtime=True)
+                    verify_stage(text[wakes[1].start():], runtime=True)
+                else:
+                    verify_stage(text[wake:], runtime=True)
         else:
             verify_stage(text, runtime=True, selftest=True)
         check_registration(text, (alarm / 'nvram/npe3hle/sim_card').read_bytes(),
@@ -304,7 +329,8 @@ def main():
             with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
                 check_frame(frame, digest, 'physical alarm ' + name)
         if args.snooze:
-            for name, digest in SNOOZE_FRAMES.items():
+            snooze_frames = POWER_OFF_SNOOZE_FRAMES if args.power_off_snooze else SNOOZE_FRAMES
+            for name, digest in snooze_frames.items():
                 with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
                     check_frame(frame, digest, 'physical Snooze ' + name)
         if args.power_off:

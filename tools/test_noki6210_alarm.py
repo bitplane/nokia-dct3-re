@@ -86,6 +86,36 @@ class AlarmChecks(unittest.TestCase):
     def test_power_off_alarm_no(self):
         check_power_off_alarm(self.power_off_text(), 'no')
 
+    def power_off_snooze_text(self):
+        return self.power_off_text().replace('6210_alarm_probe: action=stop\n',
+            '6210_alarm_probe: action=snooze\n'
+            'event=alarm_write reg=0b data=35 armed=1 t=78\n'
+            'event=alarm_write reg=0c data=0d armed=1 t=78\n'
+            'buzzer: enabled=0 t=78\n'
+            'ccont_power: event=off t=83\n'
+            'ccont_power: event=wake cause=80 t=360\n'
+            'event=second time=13:53:00 day=0 status=b1 t=360\n'
+            'event=status_ack data=a1 t=363\n'
+            'buzzer: enabled=1 t=364\n'
+            '6210_alarm_probe: action=stop\n')
+
+    def test_power_off_snooze_no(self):
+        check_power_off_alarm(self.power_off_snooze_text(), 'no', snooze=True)
+
+    def test_power_off_snooze_requires_recurrence_deadline_and_ack(self):
+        text = self.power_off_snooze_text()
+        for old, new in [('cause=80 t=360', 'cause=80 t=361'),
+                         ('data=a1', 'data=81'), ('data=35', 'data=30')]:
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_power_off_alarm(text.replace(old, new), 'no', snooze=True)
+
+    def test_power_off_snooze_rejects_second_off_endpoint_activity(self):
+        text = self.power_off_snooze_text().replace(
+            'ccont_power: event=off t=83\n',
+            'ccont_power: event=off t=83\ndspif_transport: RX enqueue\n')
+        with self.assertRaises(ValueError):
+            check_power_off_alarm(text, 'no', snooze=True)
+
     def test_power_off_alarm_rejects_wrong_deadline(self):
         with self.assertRaisesRegex(ValueError, 'natural RTC deadline'):
             check_power_off_alarm(self.power_off_text().replace('cause=80 t=60', 'cause=80 t=61'), 'no')

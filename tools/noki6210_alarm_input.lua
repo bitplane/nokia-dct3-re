@@ -55,7 +55,8 @@ local input = coroutine.create(function()
         if not press(1, 'Right Softkey / C', 'snooze') then return end
         -- The alarm title is phase-dependent. One second after the natural
         -- 13:53 recurrence is independently observed to show its visible phase.
-        if not emu.wait(283) then return end
+        -- Alarm-only rail wake takes several seconds to boot and consume RTC.
+        if not emu.wait(_G.noki6210_alarm_power_off and 287 or 283) then return end
         machine.screens[':screen']:snapshot('6210_alarm_repeated.png')
     end
     if not press(1, 'Left Softkey / Menu', 'stop') then return end

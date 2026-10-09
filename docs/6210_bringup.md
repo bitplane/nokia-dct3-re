@@ -714,17 +714,22 @@ DSP behavior.
 
 ### Snooze delivery contract
 
-The independent powered-off combination probe
-`run_6210_off_snooze_probe_20261009` uses fresh own-model physical Calendar
-provisioning, then alarm entry, long power-off, Snooze, Stop and No. It
-observes rail-off at 38.681934s, RTC wake (`80`) at 60s, Snooze-induced
-rail-off at 82.881080s, another RTC wake at 360s and final declined
-rail-off at 370.887634s. This is bounded runtime evidence, not acceptance:
-the existing single-wake checker rejects the second wake. The runner's
-`--power-off-snooze` is an explicit probe using the own NPE-3 keys; no
-6250 clock/status/loader or pixel contract is inherited. Promotion requires
-two independently checked alarm-only uploads, both silent off-rail
-intervals, own RTC acknowledgement/recurrence and reviewed frames.
+`tools/run_noki6210_alarm.py --power-off-snooze` validates fresh own-model
+physical Calendar provisioning, alarm entry, long power-off, Snooze,
+natural five-minute recurrence, Stop and No. The acceptance run
+`run_6210_off_snooze_acceptance_20261009` passes two independently checked
+alarm-only uploads, both silent off-rail intervals, own RTC
+acknowledgement/recurrence and exact reviewed frames. Snooze powers the
+phone off; the repeated alarm displays `Alarm! 13:53`, Stop presents
+`Switch the phone on?`, and No returns to a blank powered-off display.
+No 6250 clock/status/loader or pixel contract is inherited. This is
+research-HLE lifecycle acceptance, not native DSP or audible-output proof.
+
+The repeated alarm must finish booting before Stop is pressed. An earlier
+fixture pressed Stop before the second RTC acknowledgement: its labelled
+action did not dismiss the alarm, so the subsequent right softkey could
+not establish No. Physical-action labels alone do not prove UI consumption;
+the recurrence and activation-question frames guard this distinction.
 
 `verify-6210-alarm-snooze` uses the same fresh physical Calendar seed and
 alarm entry. Right Softkey / C at 77 seconds makes firmware program CCONT
