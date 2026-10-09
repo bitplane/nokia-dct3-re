@@ -4,6 +4,18 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local handles = {}
 local counts = {}
+local result_readers = {}
+handles[#handles + 1] = memory:install_read_tap(0x1205c8, 0x1205cf,
+    'nse6_verifier_result_readers', function(offset, value, mask)
+        if not ((offset == 0x1205c8 and (mask & 0x0000ffff) ~= 0)
+            or (offset == 0x1205cc and (mask & 0xffff0000) ~= 0)) then return end
+        local pc = cpu.state['PC'].value
+        if result_readers[pc] then return end
+        result_readers[pc] = true
+        machine:logerror(string.format(
+            'nse6_verifier_reader: pc=%08x address=%08x value=%08x mask=%08x t=%.9f\n',
+            pc, offset, value, mask, machine.time:as_double()))
+    end)
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2e1194, 0x2de164, 0x2ca910}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,

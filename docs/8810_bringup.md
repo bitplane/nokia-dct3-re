@@ -225,6 +225,17 @@ meaning of result `4` and its contribution to CONTACT SERVICE remain to be
 decoded. The observer uses a return target, not a mid-routine fetch tap whose
 silence could merely reflect translated straight-line execution.
 
+The syntactic Thumb literal census finds 13 loads of context base `0x1205c0`
+and two direct loads of `0x1205ca` within the MCU extent. This is not a
+whole-program reference closure: derived pointers and ARM/data-driven accesses
+remain outside its coverage. Direct reader `0x2c0436` formats the first word's
+nibbles; `0x2d3914..0x2d391c` compares that word against literal `0x0b06`.
+In the nine-second cold observation the latter reads zero at 0.385486231 s.
+No firmware read of the second word was observed in that bounded run. The
+observer's own context read is separately identifiable at `0x2d333c`; adjacent
+context fields are excluded by byte-lane masks. Consequently `4` must not be
+promoted to a self-test failure code without a decoded consumer.
+
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
 `nse1_rom4_dsp_program.bin` and `nse1_rom4_dsp_data.bin` declared in the driver.
