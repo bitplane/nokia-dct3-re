@@ -384,8 +384,25 @@ six. Caller `0x2813a0` follows the earlier readiness-completion block.
 The cold trace does not reach the separate countdown entry `0x280ac0`.
 Do not infer that changing the selector can repair this lifecycle ordering.
 
-Next: identify what selects the task-1 countdown path `0x280ac0` and why
-the initialized zero-state notification remains pending before readiness,
+Task-1 dispatch selects countdown initialization `0x280ac0` on scalar
+`0xcf` (`0x280656..0x28065a`) and countdown stepping `0x280ae4` on
+transformed input `0x52` (`0x28064a..0x28064e`). Receiver `0x28029c`
+maps raw `0xd0` to `0x52`. Own RTOS descriptor pointer-column entries
+15 and 16 contain scalar `0xcf` and `0xd0`, respectively: the countdown
+is timer/event driven, not an undiscovered object-message handler.
+The bounded adjacent-argument timer-call scan finds an index-15 schedule
+at `0x281864`; a nearby-looking index-15 literal at `0x2a7b14` belongs to
+a different call and the actual timer at `0x2a7b1e` schedules index 21.
+Do not promote a literal found near a call into its recovered argument.
+
+The cold task-1 scalar trace contains neither `0xcf` nor `0xd0` before
+its cap, consistent with the observed absence of both countdown branches.
+This path cannot yet be treated as the normal startup publication: its
+scheduling lifecycle remains unresolved. The pending notification alone
+does not prove a missing timer implementation.
+
+Next: inspect task-20's initial lifecycle selection and computed/table-driven
+initialization sources before assuming the later countdown is a boot dependency,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct

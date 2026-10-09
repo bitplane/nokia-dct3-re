@@ -81,6 +81,16 @@ class Nsm1V523StaticCheckTests(unittest.TestCase):
                 (0x2BF31A, "bl", "#0x2b3f12")):
             decoded = check.instruction(data, address)
             self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
+        self.assertEqual((0xCF, 0xD0),
+                         (check.read32(data, 0x2D869C + 15 * 8),
+                          check.read32(data, 0x2D869C + 16 * 8)))
+        for address, mnemonic, operands in (
+                (0x28064A, "cmp", "r1, #0x52"),
+                (0x28064E, "b", "#0x280ae4"),
+                (0x280656, "cmp", "r1, #0xcf"),
+                (0x28065A, "b", "#0x280ac0")):
+            decoded = check.instruction(data, address)
+            self.assertEqual((mnemonic, operands), (decoded.mnemonic, decoded.op_str))
 
     def test_own_descriptor_event_delivery_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
