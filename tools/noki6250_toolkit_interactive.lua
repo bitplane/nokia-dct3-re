@@ -40,6 +40,13 @@ local input = coroutine.create(function()
         press('Left Softkey / Menu', 'menu_select')
         assert(emu.wait(3))
         machine.screens[':screen']:snapshot('6250_toolkit_menu_result.png')
+        if _G.noki6250_toolkit_call then
+            if _G.noki6250_toolkit_call_decline then
+                press('Right Softkey / C', 'call_decline')
+            else
+                press('Left Softkey / Menu', 'call_accept')
+            end
+        end
         if _G.noki6250_toolkit_network_wait then
             assert(emu.wait(_G.noki6250_toolkit_network_wait))
             machine.screens[':screen']:snapshot('6250_toolkit_network_result.png')

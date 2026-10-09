@@ -1353,5 +1353,20 @@ CP identifier `39` and message reference `01`, the complete SMS payload,
 CP-ACK/RP-ACK, successful TERMINAL RESPONSE
 `810305130002028281030100`, final CP-ACK and RR release. Ten reviewed own
 frames cover input, menu, network completion and physical End to idle.
-This validates laboratory signaling, not public-network delivery. Toolkit
-call consent and native DSP/audio remain unpromoted.
+This validates laboratory signaling, not public-network delivery.
+
+`verify-6250-sim-toolkit-call` uses card profile 6. The item-1 ENVELOPE
+announces SET UP CALL (`911c`, FETCH length `1c`), displaying the firmware's
+Call/Cancel prompt. Physical Call precedes the outgoing `5551234` request.
+The checker requires successful TERMINAL RESPONSE
+`810306100002028281030100`, SETUP, Call Proceeding, one traffic assignment,
+Assignment Complete, Alerting, Connect and Connect Acknowledge. Physical
+End must precede Disconnect, Release, Release Complete and RR release.
+Own prompt, connected-call and recovered idle frames are pinned separately.
+
+`verify-6250-sim-toolkit-call-decline` tests the same card request with physical
+Cancel. Firmware returns `810306100002028281030122` (user rejection), then
+recovers the menu and idle. Any outgoing request, SETUP, traffic assignment
+or Connect fails this negative gate. Both gates retain independent own
+upload, registration and SIM-location checks. These are HLE laboratory call
+signaling and consent tests, not native DSP speech or end-to-end audio.

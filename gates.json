@@ -15191,6 +15191,20 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "toolkit-sms", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-sim-toolkit-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "toolkit-call", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6250-sim-toolkit-call-decline",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "toolkit-call-decline", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-sim-toolkit",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",

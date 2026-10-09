@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 641 gates: 443 generated from typed steps, 198 copied verbatim (shell).
+# 643 gates: 445 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -372,6 +372,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-sim-toolkit-sms verify-6210-sim-toolkit-menu \
 	verify-6210-sim-toolkit-interactive verify-6250-sim-toolkit-interactive \
 	verify-6250-sim-toolkit-menu verify-6250-sim-toolkit-sms \
+	verify-6250-sim-toolkit-call verify-6250-sim-toolkit-call-decline \
 	verify-6250-sim-toolkit verify-6250-call-divert-lifecycle \
 	verify-6250-call-divert-cold verify-6210-call-divert-cold \
 	verify-6250-state-divert verify-6250-coherent-registration \
@@ -4709,6 +4710,12 @@ verify-6250-sim-toolkit-menu: build
 
 verify-6250-sim-toolkit-sms: build
 	$(PYTHON) tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario toolkit-sms --mame $(MAME_DIR)/mame
+
+verify-6250-sim-toolkit-call: build
+	$(PYTHON) tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario toolkit-call --mame $(MAME_DIR)/mame
+
+verify-6250-sim-toolkit-call-decline: build
+	$(PYTHON) tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario toolkit-call-decline --mame $(MAME_DIR)/mame
 
 verify-6250-sim-toolkit: build
 	$(PYTHON) tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario toolkit --mame $(MAME_DIR)/mame

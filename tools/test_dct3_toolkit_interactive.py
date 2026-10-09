@@ -35,6 +35,13 @@ class InteractiveToolkitTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             verify_menu('\n'.join(menu_events('6250')), '6210')
 
+    def test_6250_invalid_network_combinations(self):
+        from tools.run_noki6250_acceptance import check_interactive_toolkit
+        for arguments in ({'sms': True}, {'call': True}, {'decline': True},
+                          {'menu': True, 'sms': True, 'call': True}):
+            with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+                check_interactive_toolkit('', None, **arguments)
+
     def test_menu_wrong_item_result_and_fetch_length(self):
         trace = '\n'.join(menu_events('6210'))
         for old, new in (('d30702020181100101', 'd30702020181100102'),
