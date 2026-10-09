@@ -420,6 +420,23 @@ the COBBA parallel interface as carrying control and receive/transmit samples
 over a 12-data-bit bus; that corroborates the boundary, not the sample encoding:
 <https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251>.
 
+The fresh native control-source capture further fixes the operand provenance.
+Both calls into `a22f` return to `a1d5`; setup `a228` stores pointers
+`197b=1914` and `197d=1920`. At the second port write, AR5 is `1921`,
+and data words `1920..1927` are
+`2a04,0006,0041,0040,27a2,0030,0041,0020`. The observed first pair
+comes from `1920/1921`, not an invented peer response. At `4025`, A and B
+are `0000302813`; the `75f8 0008 0031` / `75f8 0009 0032` sequence
+publishes A's low/high MMR halves as `2813/0030`. These observations do
+not identify electrical registers, RF sample packing or acquisition.
+`tools/c54x_rom4_rf_operand_observe.lua` captures the bounded sources;
+`tools/c54x_rom4_control_source_check.py <error.log>` requires their exact
+counts and words alongside the existing 30-second RF-boundary acceptance.
+The observer retains its tap handles and suppresses callback re-entry while
+reading program snapshots; otherwise those reads falsely inflate fetch
+counts. Debugger data-space reads of MMR addresses are not substituted for
+the architectural accumulator state.
+
 The SIM transaction ending near 8.51 seconds is not a stalled initialization
 sequence: the firmware has read all ten configured ADN records. At 31.002
 seconds it organically issues `A0 F2` STATUS as its periodic card-presence
