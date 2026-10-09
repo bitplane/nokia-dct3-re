@@ -889,6 +889,13 @@ hardware-interrupt fixture detects the former discarded `pop()` read.
 The implementation now increments SP directly; return state and the
 three-cycle instruction cost are unchanged. This does not establish
 interrupt recognition/drain timing or native recorder completion.
+The delayed form `RETFD` (`f69b`) uses the same RTN/SP contract and the
+existing two-word delayed-transfer machinery. The fixture covers two
+one-word loads and one two-word load, checks their destination accumulator,
+the returned continuation, balanced SP and cleared INTM, and requires zero
+stack reads in all three return cases. Disassembler fixtures cover both
+forms. The specified delayed instruction cost is one cycle; these state/bus
+assertions do not independently validate pipeline stage timing.
 The full CPU suite and native NSE-1 receiver gate pass. The original MU4
 recorder replay retains cursor `27`, pending RX and PC `02:3d76`; eliminating
 the discarded stack read does not advance that independent boundary.

@@ -76,6 +76,7 @@ private:
 			{0xfc00, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "RET"},
 			{0xf4eb, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "RETE"},
 			{0xf49b, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "RETF"},
+			{0xf69b, 1 | dasm::SUPPORTED, "RETFD"},
 			{0xfe00, 1 | dasm::SUPPORTED, "RETD"},
 			{0xf4e2, 1 | dasm::SUPPORTED, "BACC    A"},
 			{0xf5e2, 1 | dasm::SUPPORTED, "BACC    B"},
@@ -119,7 +120,8 @@ private:
 				expect(result == test.result && text.str() == test.text,
 					"control disassembly preserves mnemonic, operand, word length, page and bounded stepping flags");
 			}
-		osd_printf_info("TMS320C54x control disassembler: PASS vectors=46 pages=2\n");
+		osd_printf_info("TMS320C54x control disassembler: PASS vectors=%u pages=2\n",
+			unsigned(std::size(vectors)));
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
@@ -18107,7 +18109,33 @@ private:
 					"RETF restores the fast return and interrupt-mask state");
 			expect(m_fast_stack_reads == 0,
 					"SPRU172C RETF increments SP without reading the stacked return address");
-			osd_printf_info("TMS320C54x fast return bus: PASS stack_reads=0\n");
+			osd_printf_info("TMS320C54x fast return case: variant=%u a=%010llx b=%010llx pc=%04x\n",
+				m_fast_return_case,
+				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
+				(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)));
+			expect(m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0402 &&
+				(!m_fast_return_case || m_cpu->state_int(m_fast_return_case == 1 ?
+					tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == 2),
+					"SPRU172C RETFD executes two one-word instructions or one two-word instruction before returning");
+			if (m_fast_return_case < 2)
+			{
+				++m_fast_return_case;
+				program.write_word(0x004a, 0xf69b); // RETFD
+				program.write_word(0x004b, m_fast_return_case == 1 ? 0xe901 : 0xf020);
+				program.write_word(0x004c, m_fast_return_case == 1 ? 0xe902 : 0x0002);
+				m_cpu->set_input_line(2, CLEAR_LINE);
+				m_irq_raised = false;
+				m_fast_stack_reads = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0400);
+				m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			osd_printf_info("TMS320C54x fast return bus: PASS cases=3 stack_reads=0 delayed_words=2\n");
 			m_cpu->set_input_line(2, CLEAR_LINE);
 			m_phase = 1;
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
@@ -18259,6 +18287,7 @@ private:
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
 	unsigned m_fast_stack_reads = 0;
+	unsigned m_fast_return_case = 0;
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};
 	unsigned m_irq_trigger_read = 1;

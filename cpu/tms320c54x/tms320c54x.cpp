@@ -91,6 +91,7 @@ public:
 		case 0xfc00: stream << "RET"; return 1 | SUPPORTED | STEP_OUT;
 		case 0xf4eb: stream << "RETE"; return 1 | SUPPORTED | STEP_OUT;
 		case 0xf49b: stream << "RETF"; return 1 | SUPPORTED | STEP_OUT;
+		case 0xf69b: stream << "RETFD"; return 1 | SUPPORTED;
 		case 0xfe00: stream << "RETD"; return 1 | SUPPORTED;
 		case 0xf4e2: case 0xf5e2:
 			util::stream_format(stream, "BACC    %c", BIT(op, 8) ? 'B' : 'A');
@@ -2603,6 +2604,12 @@ void tms320c54x_device::execute_one(u16 op)
 		++m_sp; // SPRU172C: RTN supplies PC; no stack-memory read occurs.
 		m_st1 &= ~0x0800;
 		m_icount -= 2;
+		return;
+	case 0xf69b: // RETFD
+		m_delayed_target = m_rtn;
+		m_delayed_words = 2;
+		++m_sp;
+		m_st1 &= ~0x0800;
 		return;
 	case 0xfc30: // RETC TC
 		return_if(m_st0 & 0x1000);
