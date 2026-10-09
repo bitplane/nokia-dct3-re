@@ -79,19 +79,25 @@ remain protocol-conformance support unless an organic product route is named.
 Forwarding records currently belong to `nokia_gsm_network_device` and are
 registered with `save_item`: register/active flags, destination and length,
 BasicService kind/code and no-reply duration for each condition. They are
-not handset EEPROM or SIM files. The network device has no NVRAM interface,
-so a new emulator process starts with an empty subscription even when the
-handset's flash and SIM storage are retained. Save/load acceptance does not
-establish cold-process forwarding persistence on any product.
+not handset EEPROM or SIM files. The network now stores these records in its
+own `gsm_network` NVRAM file. Version 1 is a fixed 108-byte record: an eight-byte
+magic/version/geometry header, nine EF_IMSI bytes and three home-PLMN bytes,
+four 21-byte forwarding records and a little-endian CRC-32. Invalid sizes,
+trailing bytes, identity mismatch, checksum failure, out-of-range lengths or
+service kinds and inconsistent active/registered flags are rejected before
+publishing any state. Fresh Make runs clear this file; explicit preserved
+storage retains it. Neither live calls nor pending host requests are persisted.
+Save/load acceptance remains separate from cold-process acceptance.
 
-The software-only completion boundary is a network-owned, versioned
-subscription store bound to the configured subscriber identity. Restore
-must validate format, identity and record lengths before publishing any
-state; mismatched or malformed storage must not partially change records.
-Persist registration/activation and service scope, not live call, RR or
-pending host-request state. Fresh-run preparation must clear this server
-store alongside product-local storage, while explicit cold-restart tests
-retain it. Do not reconstruct registration from handset UI state, inject
+Executable codec tests cover all four forwarding conditions, identity
+mismatch, every single-bit corruption of the stored image, checksum-valid
+invalid fields and atomic rejection. A two-process NHM-3 research capture
+physically registers forwarding before normal exit, then retains its own
+storage and physically interrogates after restart: the fresh transaction
+returns active status and the 21-byte forwardingInfo result, followed by
+RR deconfiguration. The existing four-transaction lifecycle also passes.
+This is an initial cold-query result, not yet the complete named cold-routing
+gate described below. Do not reconstruct registration from handset UI state, inject
 supplementary results, or change SIM files to make a query pass.
 
 Acceptance must register forwarding through physical input in one process,

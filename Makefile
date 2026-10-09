@@ -34,6 +34,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_cobba.cpp driver/nokia_cobba.h \
 	driver/nokia_b3_flash.cpp driver/nokia_b3_flash.h \
 	driver/nokia_dsp_backend.h \
+	driver/gsm_subscription_storage.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \
 	driver/tms320c54x_bsp_state.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
@@ -911,6 +912,7 @@ prepare-run-files:
 		rm -f "$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/flash" \
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/sim_card" \
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/ccont" \
+			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/gsm_network" \
 			"$(RUN_NVRAM_DIR)/$(NVRAM_SYSTEM)/eeprom"; \
 	fi
 	@if [ "$(PHONE)" = "noki3210" ]; then \

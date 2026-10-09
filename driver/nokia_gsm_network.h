@@ -12,10 +12,11 @@
 #include "gsm_mobility.h"
 #include "gsm_supplementary.h"
 #include "gsm_subscriber.h"
+#include "gsm_subscription_storage.h"
 
 #include <array>
 
-class nokia_gsm_network_device : public device_t
+class nokia_gsm_network_device : public device_t, public device_nvram_interface
 {
 public:
 	enum class cell_profile : u8
@@ -335,9 +336,13 @@ public:
 protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;
+	virtual void nvram_default() override;
+	virtual bool nvram_read(util::read_stream &file) override;
+	virtual bool nvram_write(util::write_stream &file) override;
 
 private:
 	TIMER_CALLBACK_MEMBER(delayed_persistent_loss);
+	gsm::subscription_storage::identity subscription_identity() const;
 
 	cell_profile m_cell_profile = cell_profile::suitable;
 	paging_profile m_paging_profile = paging_profile::matched;
