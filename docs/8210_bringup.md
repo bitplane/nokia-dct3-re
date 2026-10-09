@@ -1245,6 +1245,28 @@ legitimately cancels the earlier window's terminal measurement or whether
 that measurement remains independently owed. Current passing early-PIN
 and no-PIN runs do not decide this contract, and must not be used as proof
 that cancellation is correct.
+Passive own-ROM serializer captures additionally rule out differing initial
+channel-config bytes as the early/late-PIN discriminator. Constructor
+`2b3910` serializes a 24-byte envelope (20-byte payload); source descriptor
+byte 1 becomes payload byte 7. Its high nibble selects payload byte 8:
+`50` becomes `50`, `10` becomes `60`. Both fresh DCS runs send identical
+initial payloads `0412020000000050500003370000000000296ff9` and
+`0412020900000010600003371000000000297000`. The passing PIN-at-7-second
+run subsequently sends descriptor subtypes `16` and `1a`; the failing
+PIN-at-8-second run does not reach those calls. These byte-level facts do
+not identify subtype semantics or prove cancellation of a type-`56`
+measurement. Raw descriptor/packet pairs are retained in
+`run_8210_channel_config_wire_pin7_20261009/error.log` and
+`run_8210_channel_config_wire_pin8_20261009/error.log`. Observation uses
+actual branch targets `2b3910` and `3052b2` (caller `2b39b5`), not a
+mid-routine fetch tap; no firmware or MMIO state is written.
+The retained passive instrument is `tools/noki8210_channel_config_observe.lua`;
+`tools/noki8210_channel_config_contract.py` pins the complete constructor/send
+instruction span and translates its descriptor bytes without interpreting
+DSP transaction lifetimes. All eight captured entry/send pairs match both
+the outgoing envelope and the constructor's descriptor-byte-A mutation.
+Six focused tests include exact-`50` versus high-nibble-`50` tail handling,
+unknown-nibble preservation, input bounds and the acquired-ROM pin.
 Reference scope: the recovered NHM-5 trace-name catalogue in the sibling
 project (`tools/symbols/trace-names-nhm5.txt`) labels `1855`, `1856`, and
 `1857` as `INVALID_MDI_MSG`. Its useful names for `188b` and `1802` do not
