@@ -119,6 +119,13 @@ later saved contexts. Thus repeated calls alone are not the demonstrated
 defect: execution is already entering damaged overlaid code. Locate the
 earliest write into that code and earlier stack imbalance; the short window
 does not establish that all calls, returns or interrupts are correct.
+The entry is initially intact: executions from 0.256693 s read `f7bb` at
+`1ca4`. Its first observed non-initialization writes are stack writes at
+0.926814346 s (`1ca5=a507`, SP=`1ca5`) and 0.926814423 s
+(`1ca4=4612`, SP=`1ca4`, PMST=`ffac`). This distinguishes later stack
+corruption from an initially malformed entry. The first 128-word depth
+crossing at 0.385015 s is inside the `a4f7/4612` call/context-save path;
+its net stack balance remains to be established.
 This establishes stack overlap with shared ring state, not its cause. The next
 question is the first stack/control-flow divergence before those writes,
 including interrupt entry/return and frame-clock servicing. Do not synthesize

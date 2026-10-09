@@ -8,13 +8,23 @@ local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_reg
 local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
 if dsp then
+    local overlay_writes = 0
+    handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x1ca4, 0x1ca5,
+        'nse6_native_overlay_entry', function(offset, value, mask)
+            overlay_writes = overlay_writes + 1
+            if overlay_writes > 32 then return end
+            machine:logerror(string.format(
+                'nse6_native_overlay_write: address=%04x value=%04x mask=%04x pc=%04x sp=%04x pmst=%04x t=%.9f\n',
+                offset, value, mask, dsp.state['PC'].value, dsp.state['SP'].value,
+                dsp.state['PMST'].value, machine.time:as_double()))
+        end)
     local inspecting_call = false
-    for _, address in ipairs({0x3f4e, 0x90e7, 0x23d4, 0x23e2}) do
+    for _, address in ipairs({0x3f4e, 0x90e7, 0x23d4, 0x23e2, 0x1ca4}) do
         local calls = 0
         handles[#handles + 1] = dsp.spaces['program']:install_read_tap(address, address,
             'nse6_native_stack_call_' .. address, function(offset, value)
                 if inspecting_call or dsp.state['PC'].value ~= address + 1 then return end
-                if machine.time:as_double() < 0.928 then return end
+                if address ~= 0x1ca4 and machine.time:as_double() < 0.928 then return end
                 calls = calls + 1
                 if calls > 16 then return end
                 inspecting_call = true
