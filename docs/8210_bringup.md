@@ -1601,7 +1601,7 @@ not be imported to identify this NSM-3 task-24 callback. The primary remaining
 boundary is still post-acquisition measurement/request lifetime; synthesizing
 9c solely to reach an eligible software continuation is unsupported.
 
-## Evidence needed to resume
+## Evidence needed for native DSP completion
 
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
@@ -1619,5 +1619,7 @@ publication. A useful physical or independently captured reference must include:
 
 A matching raw capture can justify a narrowly declared HLE bootstrap contract;
 a ROM6 memory image/map can support core execution. Neither is currently
-available in the acquired collection. UI, SIM, network, call/audio and
-handset save/load acceptance remain unvalidated behind this boundary.
+available in the acquired collection. Native UI, SIM, network, call/audio and
+handset save/load acceptance remain unvalidated behind this boundary. The
+separate research-HLE profile has the product-local acceptance listed above;
+those results do not establish the missing native silicon publication.
