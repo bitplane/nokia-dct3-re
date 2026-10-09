@@ -376,7 +376,7 @@ security entry to idle. This validates emulator state restoration, not
 battery-backed persistence across process termination.
 
 The independent NPE-3 `verify-6210-power-cycle` gate covers the same shared
-PWRONX/backend boundary with unchanged own PMM, eight seconds of off-state
+PWRONX/backend boundary with unchanged own PMM, at least fifty seconds of off-state
 RTC ticks and DSP/radio silence, both own native-upload/HLE stages and
 physical Menu after registered-idle recovery. Its retained-location
 registration rewrites LAI but not status; no NSB-6 protocol ordering or
@@ -408,7 +408,13 @@ status read before expiry and the first after reboot are both `0x13`: existing
 ready/PWRONX state plus the pending RTC-second source survive exactly, while
 MAD2 clock initialization restarts. CCONT watchdog expiry therefore creates no
 new CCONT cause bit. Watchdog data zero remains the distinct commanded rail-off
-path.
+path. A zero write stores zero, stops the counter and removes the rails;
+`watchdog_tick` cannot expire a retained reload while the baseband is off.
+The long NPE-3 power-cycle gate observes continuous RTC and endpoint silence
+beyond the previous 49-second reload before physical PWRONX restart. Autonomous
+alarm-driven rail restoration remains unimplemented; an IRQ indication alone
+cannot release the CPU's rail-off reset. See the
+[powered-off alarm boundary](6210_bringup.md#powered-off-alarm-boundary).
 
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
 phone's one-second tick. The NSE-8/9 documentation says an ordinary operational

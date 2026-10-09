@@ -544,13 +544,17 @@ cache: the snapshot reads the saved architectural `R15` instead.
 `verify-6210-power-cycle` starts a fresh private `npe3hle` process with its
 unchanged acquired PMM. Registered idle at 20 s is followed by physical
 Power at 25 s, held for four seconds. Firmware commands rail-off at about
-31.68 s; the display is blank. At least eight seconds of continuous CCONT
+31.68 s; the display is blank. At least fifty seconds of continuous CCONT
 RTC ticks are required with no DSP RX publication, peer shared-RAM writes,
-FIQ0 notifications, native port activity or radio LAPDm output.
+FIQ0 notifications, native port activity or radio LAPDm output. This exceeds
+the last 49-second watchdog reload and prevents an old counter from silently
+rebooting the supposedly off domain. RTC progression is anchored to the last
+pre-shutdown tick, including minute rollover, not an assumed clock origin.
 
-A separate physical Power press at 40 s restores the digital domain through
+A separate physical Power press at 90 s restores the digital domain through
 PWRONX cause `02`, not a charger event. Firmware consumes ready/PWRONX
-status `13`, executes its own native verifier/loaders before the explicit
+status low bits `03` (observed full status `33` with retained RTC sources),
+executes its own native verifier/loaders before the explicit
 missing-mask HLE handoff, and completes its own compact self-test again.
 Both boot stages are checked independently; passive debugger log caps are
 re-armed without changing firmware registers or RAM.
@@ -682,6 +686,20 @@ bridge instead lost the second alarm behind the uncleared minute source
 (`run_6210_snooze_probe`). This establishes a source-level integration
 defect, not a CPU sleep or serial-latency defect; physical serial timing
 remains unmeasured.
+
+### Powered-off alarm boundary
+
+The Nokia-authored user guide states that the alarm operates while switched
+off; Stop then offers activation for calls. `noki6210_alarm_power_off.lua`
+physically sets 13:48 and shuts down before the deadline using the same
+product-local Calendar seed. In `run_6210_alarm_power_off_stopped_watchdog`,
+CCONT removes the rails at 38.68 seconds and its always-powered RTC reaches
+13:48:00 at 60 seconds, latching status `b1` with mask `30`. The screen stays
+blank through 100 seconds and firmware does not read the pending cause.
+This is not powered-off alarm acceptance. The missing contract is autonomous
+alarm-driven rail restoration while retaining the alarm cause for startup,
+then organic ringing and the Stop/activation decision. No substitute power
+keypress, watchdog reset or RTOS event is a valid alarm wake.
 
 ## Unattached accessory input
 

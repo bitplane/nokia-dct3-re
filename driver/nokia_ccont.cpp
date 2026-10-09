@@ -299,6 +299,8 @@ void nokia_ccont_device::serial_w(uint8_t data)
 		case WATCHDOG:
 			if (data == 0x00)
 			{
+				m_regs[address] = 0;
+				m_watchdog = 0;
 				m_powered = false;
 				if (m_adc_trace)
 					LOGMASKED(LOG_CCONT, "ccont_power: event=off t=%.9f\n", machine().time().as_double());
@@ -402,7 +404,8 @@ uint8_t nokia_ccont_device::serial_r()
 
 bool nokia_ccont_device::watchdog_tick()
 {
-	if (m_wddisx_grounded || m_watchdog == 0)
+	// The switched baseband cannot be reset by an old reload after rail-off.
+	if (!m_powered || m_wddisx_grounded || m_watchdog == 0)
 		return false;
 	return --m_watchdog == 0;
 }

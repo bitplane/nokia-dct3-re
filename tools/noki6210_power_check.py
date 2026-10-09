@@ -9,12 +9,12 @@ FRAMES = {
     '6210_power_idle.png': OPERATOR_SHA256,
     '6210_power_restarted.png': OPERATOR_SHA256,
     '6210_power_off.png': '907c2e3cc0dc7d0dc17827521badb7be0f647b6b945f1bac2e68094fd47568a7',
-    # Reviewed Messages animation phase at 63 s after physical Menu at 60 s.
+    # Reviewed Messages animation phase three seconds after physical Menu.
     '6210_power_menu.png': '81b207e77820f80f4844daeeebdbd260c1f2590888de1d0274ac67f7d036b586',
 }
 
 
-def verify(text, storage):
+def verify(text, storage, *, minimum_off=8):
     check_output(text)
     actions = list(re.finditer(r'6210_power_physical: action=(\w+)', text))
     if [event[1] for event in actions] != [
@@ -28,12 +28,24 @@ def verify(text, storage):
     if not (actions[1].end() < off.start() < actions[2].start() < wake.start()
             < actions[3].start() < actions[4].start()):
         raise ValueError('NPE-3 rail transitions do not follow physical inputs')
-    if float(wake[2]) - float(off[1]) < 8:
+    if float(wake[2]) - float(off[1]) < minimum_off:
         raise ValueError('NPE-3 off interval is too short')
     interval = text[off.end():wake.start()]
-    ticks = re.findall(r'ccont_rtc: event=second time=12:00:(\d+) day=0[^\n]*t=([0-9.]+)', interval)
-    if len(ticks) < 8 or any(int(second) != float(when) for second, when in ticks) or any(
-            float(right[1]) - float(left[1]) != 1 for left, right in zip(ticks, ticks[1:])):
+    tick_pattern = r'ccont_rtc: event=second time=(\d+):(\d+):(\d+) day=(\d+)[^\n]*t=([0-9.]+)'
+    before_ticks = re.findall(tick_pattern, text[:off.start()])
+    ticks = re.findall(tick_pattern, interval)
+    timeline = before_ticks[-1:] + ticks
+
+    def rtc_seconds(tick):
+        hour, minute, second, day, _ = map(float, tick)
+        return day * 86400 + hour * 3600 + minute * 60 + second
+
+    if not before_ticks or len(ticks) < minimum_off or any(
+            int(hour) >= 24 or int(minute) >= 60 or int(second) >= 60
+            for hour, minute, second, _, _ in timeline) or any(
+            float(right[4]) - float(left[4]) != 1 or
+            rtc_seconds(right) - rtc_seconds(left) != 1
+            for left, right in zip(timeline, timeline[1:])):
         raise ValueError('NPE-3 always-powered RTC did not keep ticking while off')
     require_endpoint_silence(interval, 'NPE-3 DSP/radio endpoint generated activity while off')
     before, after = text[:off.start()], text[wake.end():]

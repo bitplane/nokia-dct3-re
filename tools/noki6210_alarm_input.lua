@@ -33,7 +33,19 @@ local input = coroutine.create(function()
         machine:exit()
         return
     end
-    if not emu.wait(45) then return end
+    if _G.noki6210_alarm_power_off then
+        local power = assert(machine.ioport.ports[':PWR'].fields['Power'])
+        machine:logerror('6210_alarm_probe: action=power_off\n')
+        power:set_value(1)
+        if not emu.wait(4) then power:set_value(0); return end
+        power:set_value(0)
+        machine:logerror('6210_alarm_probe: action=power_release\n')
+        if not emu.wait(9) then return end
+        machine.screens[':screen']:snapshot('6210_alarm_powered_off.png')
+        if not emu.wait(32) then return end
+    else
+        if not emu.wait(45) then return end
+    end
     machine.screens[':screen']:snapshot('6210_alarm_elapsed.png')
     if _G.noki6210_alarm_snooze then
         if not press(1, 'Right Softkey / C', 'snooze') then return end

@@ -16,7 +16,7 @@ from tools.noki6210_staged_check import verify
 from tools.noki6210_radio_contract import verify as verify_radio_contract
 
 SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
-             'power-cycle': ('npe3hle', 'power_cycle_input', 65),
+             'power-cycle': ('npe3hle', 'power_cycle_input', 115),
              'runtime': ('npe3hle', 'staged_observe', 18),
              'menu': ('npe3hle', 'menu_input', 25),
              'calculator': ('npe3hle', 'application_input', 38),
@@ -281,7 +281,7 @@ def main():
         runtime = args.scenario != 'stage'
         if args.scenario == 'power-cycle':
             from tools.noki6210_power_check import verify as check_power, check_frames
-            check_power(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            check_power(text, (run / 'nvram/npe3hle/sim_card').read_bytes(), minimum_off=50)
             check_frames(run / 'snap')
         else:
             verify(text, runtime=runtime, selftest=runtime)
