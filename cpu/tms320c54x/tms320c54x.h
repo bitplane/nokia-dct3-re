@@ -14,6 +14,7 @@ public:
 	void set_power_on_imr(u16 value) { m_power_on_imr = value; }
 	void set_extended_program(bool enabled) { m_extended_program = enabled; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
+	auto xf_out_cb() { return m_xf_out_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
 
 	enum : unsigned
@@ -50,6 +51,7 @@ protected:
 	virtual void device_start() override ATTR_COLD;
 	virtual void device_reset() override ATTR_COLD;
 	virtual void device_stop() override ATTR_COLD;
+	virtual void device_post_load() override;
 
 	virtual u32 execute_min_cycles() const noexcept override { return 1; }
 	virtual u32 execute_max_cycles() const noexcept override { return 5; }
@@ -72,6 +74,7 @@ private:
 	void update_timer_counter();
 	void arm_timer();
 	void leave_idle();
+	void update_xf(bool force = false);
 	u16 fetch();
 	u32 logical_program_address(u16 address) const { return (u32(m_extended_program ? m_xpc : 0) << 16) | address; }
 	u32 physical_program_address(u32 address) const
@@ -115,6 +118,8 @@ private:
 	address_space_config m_data_config;
 	address_space_config m_io_config;
 	devcb_read_line m_bio_in_cb;
+	devcb_write_line m_xf_out_cb;
+	bool m_xf_level = true;
 	devcb_write_line m_peripheral_clock_stop_cb;
 
 	memory_access<23, 1, -1, ENDIANNESS_LITTLE>::cache m_cache;

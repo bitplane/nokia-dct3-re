@@ -31,6 +31,13 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void xf_w(int state)
+	{
+		m_xf_pin = bool(state);
+		++m_xf_publications;
+	}
+	bool m_xf_pin = true;
+	unsigned m_xf_publications = 0;
 	void check_control_disassembler()
 	{
 		using dasm = util::disasm_interface;
@@ -13024,6 +13031,7 @@ private:
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0800);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x2000);
+			m_xf_publications = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
@@ -13045,6 +13053,9 @@ private:
 				{ 0xf7b8, 0x1800, 0x0200, 0x1800, 0x0300 }
 			};
 			const unsigned index = m_phase >= 6547 ? m_phase - 6547 + 4 : m_phase - 533;
+			expect(m_xf_pin == bool(BIT(cases[index].st1_after, 13)) &&
+					m_xf_publications == unsigned(BIT(cases[index].st1_before ^ cases[index].st1_after, 13)),
+					"XF pin follows status mutations exactly once and ignores unrelated bits");
 			expect_opcode(cases[index].opcode,
 					m_cpu->state_int(tms320c54x_device::STATE_ST1) == cases[index].st1_after &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == cases[index].st0_after &&
@@ -13056,6 +13067,7 @@ private:
 				m_port_writes = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, cases[index + 1].st0_before);
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, cases[index + 1].st1_before);
+				m_xf_publications = 0;
 				m_cpu->set_state_int(tms320c54x_device::STATE_AR6, 0x0a03);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
@@ -13063,6 +13075,17 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
+			m_saved_repeat.str(std::string());
+			m_saved_repeat.clear();
+			expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+				"save architectural XF low");
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, cases[index].st1_after | 0x2000);
+			expect(m_xf_pin, "debugger ST1 import drives XF high immediately");
+			m_saved_repeat.clear();
+			m_saved_repeat.seekg(0);
+			expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE && !m_xf_pin,
+				"post-load re-drives restored XF low instead of retaining external high");
+			osd_printf_info("TMS320C54x XF output: PASS status_variants=8 debugger=1 restore=1\n");
 			program.write_word(0x05e2, 0xfd30); // XC 1,TC
 			program.write_word(0x05e3, 0x6d91); // MAR *AR1+
 			program.write_word(0x05e4, 0x75d6);
@@ -18036,6 +18059,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));
+	m_cpu->xf_out_cb().set(FUNC(tms320c54x_test_state::xf_w));
 	NOKIA_DSPIF(config, m_transport, 0);
 	TMS320C54X_MCBSP(config, m_idle_mcbsp, 13'000'000);
 	m_cpu->peripheral_clock_stop_cb().set(m_idle_mcbsp, FUNC(tms320c54x_mcbsp_device::internal_clock_stop_w));

@@ -134,6 +134,7 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_data_config("data", ENDIANNESS_LITTLE, 16, 16, -1),
 	m_io_config("io", ENDIANNESS_LITTLE, 16, 16, -1),
 	m_bio_in_cb(*this, 1),
+	m_xf_out_cb(*this),
 	m_peripheral_clock_stop_cb(*this)
 {
 }
@@ -171,7 +172,7 @@ void tms320c54x_device::device_start()
 	state_add(STATE_T, "T", m_t).formatstr("%04X");
 	state_add(STATE_SP, "SP", m_sp).formatstr("%04X");
 	state_add(STATE_ST0, "ST0", m_st0).formatstr("%04X");
-	state_add(STATE_ST1, "ST1", m_st1).formatstr("%04X");
+	state_add(STATE_ST1, "ST1", m_st1).callimport().formatstr("%04X");
 	state_add(STATE_PMST, "PMST", m_pmst).formatstr("%04X");
 	for (unsigned i = 0; i != std::size(m_ar); ++i)
 		state_add(STATE_AR0 + i, string_format("AR%u", i).c_str(), m_ar[i]).formatstr("%04X");
@@ -256,6 +257,7 @@ void tms320c54x_device::device_reset()
 	// resident dispatcher relies on this state surviving loader startup.
 	m_st0 = 0x181f;
 	m_st1 = 0x2900;
+	update_xf(true);
 	m_pmst = 0xffa0;
 	std::fill(std::begin(m_ar), std::end(m_ar), 0);
 	m_brc = 0;
@@ -352,10 +354,28 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 		m_pc = u16(m_debug_pc);
 		m_xpc = m_extended_program ? (m_debug_pc >> 16) & 0x7f : 0;
 	}
+	else if (entry.index() == STATE_ST1)
+		update_xf();
 	else if (entry.index() >= STATE_TIM && entry.index() <= STATE_TCR)
 		data_write(0x24 + entry.index() - STATE_TIM, m_debug_timer);
 	else if (entry.index() == STATE_IDLE && !m_idle)
 		leave_idle();
+}
+
+void tms320c54x_device::update_xf(bool force)
+{
+	const bool level = BIT(m_st1, 13);
+	if (force || level != m_xf_level)
+	{
+		m_xf_level = level;
+		m_xf_out_cb(level);
+	}
+}
+
+void tms320c54x_device::device_post_load()
+{
+	// The output cache is derived; re-drive the restored architectural level.
+	update_xf(true);
 }
 
 void tms320c54x_device::state_export(const device_state_entry &entry)
@@ -2910,6 +2930,7 @@ void tms320c54x_device::execute_run()
 			m_opcode_first_pc[m_op] = instruction_pc;
 		++m_opcode_count[m_op];
 		execute_one(m_op);
+		update_xf();
 		// One-cycle stack-operation group from SPRU131G table 7-9.
 		// Calls/returns use the architectural SP, not this DAGEN snapshot.
 		m_sp_address_pending = (m_op & 0xff00) == 0xee00 ||

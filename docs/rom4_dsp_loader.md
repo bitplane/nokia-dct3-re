@@ -470,7 +470,7 @@ The existing RF-boundary checker independently passes with 6,499 frames,
 207,040 reads and the same three control pairs.
 
 This is a bounded architectural observation. It is not an all-writer XF
-census, an electrically exported pin, or proof of synchronization or
+census, a mapped handset-board pin, or proof of synchronization or
 registration. Whole-register ST1 loads and other uploaded code may also
 change XF. Matching the manual's figures to firmware-owned callers remains
 necessary before assigning stage semantics.
@@ -494,6 +494,18 @@ spine; their execution alone does not establish network synchronization.
 `309c` independently sets XF during the periodic path, so observing XF high
 cannot by itself establish registration. The native RF-boundary regression
 remains unchanged under the extended observer.
+
+The core now exposes `xf_out_cb()` as a latched architectural output, derived
+from ST1 bit 13. Reset publishes high; instruction retirement and debugger
+ST1 imports publish only changed levels; post-load forcibly re-drives the
+restored level rather than preserving a stale external output. The output
+cache is derived state, not a second saved flag. Eight executable status
+variants check edge counts and rejection of unrelated-bit changes, and the
+core fixture explicitly changes the debugger level then restores a saved
+low output. `check-c54x-core` requires the XF-output success marker.
+The 30-second native NSE-1 RF regression is unchanged. This callback does
+not model OFF/HOLD high impedance, decode Nokia stage pulses or connect an
+RF source; no board-level or acquisition claim follows from exporting it.
 
 `tools/c54x_rom4_port_census.py` inventories candidate `PORTR`/`PORTW` sites
 in the recovered big-endian ROM image. It accounts for the extra Smem address
