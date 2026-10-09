@@ -96,6 +96,8 @@ class Nse6StaticTests(unittest.TestCase):
                          (84, 48))
         self.assertFalse(result["display"]["runtime_frame_proven"])
         self.assertEqual(result["gensio"]["ccont_ready_bit"], 2)
+        self.assertEqual(len(result["input_controller"]["targets"]), 17)
+        self.assertEqual(result["input_controller"]["targets"][16], "0x288c3a")
         self.assertEqual(result["simi"]["initial_control"], "0x32")
         self.assertFalse(result["simi"]["runtime_card_exchange_proven"])
         mutated = bytearray(image)

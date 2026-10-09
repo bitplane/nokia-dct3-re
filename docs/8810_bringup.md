@@ -16,8 +16,9 @@ CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
 erased-storage failures and reaches SIMI initialization, but remains blank
 through 30 seconds. No usable handset or authentic provisioning is established.
-The current bounded question is why firmware leaves all keypad columns masked
-after initialization, and which own prerequisite enables input/UI startup.
+The current bounded question is the producer/prerequisite of startup report
+`0x14`: its missing bit leaves the input controller in state `0x10` with all
+keypad columns masked.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
@@ -353,9 +354,32 @@ once during startup and the decoder never runs. At every input edge MAD2 IRQ
 pending is `00`, IRQ mask `ce`, control `05`, and keypad column mask `3f`.
 All columns are masked, explaining why these contacts produce no keypad IRQ;
 this is not acceptance of the host labels or proof of a controller defect.
-The next bounded question is the firmware-owned column-mask enable lifecycle
-and its prerequisites. The harness must not unmask columns or force a task
-publication to make this fixture appear interactive.
+The harness must not unmask columns or force a task publication to make this
+fixture appear interactive.
+
+### Input-Enable Contract
+
+The syntactic Thumb literal census finds seven loads of `0x20033` within the
+MCU extent. Four controller paths (`0x2882da`, `0x288b82`, `0x288d30`,
+`0x288fe6`) clear ordinary column-mask bits using AND `0xe0`; scanner/setup
+paths at `0x2de16e`, `0x2de296`, `0x2e0570` set them. This direct-literal
+inventory is not a closure over constructed/derived register pointers.
+The live mask initially reaches `0x20` after the first scan, then becomes
+`0x3f` at setup store `0x2e0578` at 0.458432846 s.
+
+The independently decoded table `0x288a84` contains 17 controller targets;
+state `0x10` selects `0x288c3a`. Context `0x121564` receives initial event
+`0xb1` in state one at 0.386226308 s, then remains in state `0x10` while
+receiving actual events. This state's ordinary advance requires low nibble
+`0x13ffa8 == 6` and low nibble `0x12147d == 0xf`, then tests additional helpers
+before clearing the column mask. Report `0x14` sets bitmap bit zero; reports
+`0x16/0x15/0x17` set bits one/two/three respectively. The cold run receives
+those last three reports but not `0x14`; sampled readiness is `06` from two
+seconds and the report bitmap is `0e` from four through twelve seconds.
+Thus the missing report bit is a concrete unmet prerequisite, not proof that
+supplying it would complete every later gate. Next census its own producer
+and input conditions. No external startup report is to be synthesized merely
+because a sibling profile supplies similarly numbered reports.
 
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned

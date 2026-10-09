@@ -5,6 +5,16 @@ local memory = cpu.spaces['program']
 local handles = {}
 local counts = {}
 local result_readers = {}
+local mask_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x20030, 0x20033,
+    'nse6_keypad_mask', function(offset, value, mask)
+        if (mask & 0xff) == 0 or mask_writes >= 32 then return end
+        mask_writes = mask_writes + 1
+        machine:logerror(string.format(
+            'nse6_column_mask_write: value=%02x pc=%08x lr=%08x t=%.9f\n',
+            value & 0xff, cpu.state['PC'].value, cpu.state['R14'].value,
+            machine.time:as_double()))
+    end)
 for _, address in ipairs({0x13ff74, 0x13fde1, 0x1216bc}) do
     local writes = 0
     local late_writes = 0
@@ -49,11 +59,20 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
         0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
-        0x2d33c0, 0x2d33c8, 0x2d33cc}) do
+        0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x288a7a and counts[address] <= 32 then
+                local context = cpu.state['R4'].value
+                if context >= 0x100000 and context <= 0x13fff8 then
+                    machine:logerror(string.format(
+                        'nse6_input_controller: context=%08x state=%04x event=%04x t=%.9f\n',
+                        context, memory:read_u16(context + 4),
+                        memory:read_u16(context + 2), machine.time:as_double()))
+                end
+            end
             if address >= 0x2d3398 and address <= 0x2d33cc
                     and counts[address] <= 4 then
                 machine:logerror(string.format(
@@ -123,9 +142,10 @@ emu.register_frame_done(function()
             counts[0x2de164] or 0, counts[0x2e049a] or 0, now))
     end
     machine:logerror(string.format(
-        'nse6_stage_snapshot: pc=%08x sp=%08x first=%04x second=%04x t=%.9f\n',
+        'nse6_stage_snapshot: pc=%08x sp=%08x first=%04x second=%04x readiness=%02x reports=%02x t=%.9f\n',
         cpu.state['PC'].value, cpu.state['R13'].value,
-        memory:read_u16(0x100fe), memory:read_u16(0x10100), now))
+        memory:read_u16(0x100fe), memory:read_u16(0x10100),
+        memory:read_u8(0x13ffa8), memory:read_u8(0x12147d), now))
     if now >= 8 and not captured then
         captured = true
         machine.screens[':screen']:snapshot('8810-stage.png')

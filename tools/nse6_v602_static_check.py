@@ -85,6 +85,10 @@ def check(image):
         (0x2B6208, 0x1205C0), (0x2DD102, 0x200005),
         (0x2D3914, 0x1205CA), (0x2D3918, 0x0B06),
         (0x2409A6, 0x6209), (0x2DFDB2, 0x13FF1C),
+        (0x2882DA, 0x20033), (0x288B82, 0x20033),
+        (0x288D30, 0x20033), (0x288FE6, 0x20033),
+        (0x2DE296, 0x20033), (0x2E0570, 0x20033),
+        (0x288CC6, 0x13FFA8), (0x288D20, 0x12147D),
         (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
@@ -136,6 +140,12 @@ def check(image):
         (0x28D5C6, "bl", "#0x2ce3d0"),
         (0x28D5CC, "ldr", "r1, [r5, #0x3c]"),
         (0x28D5CE, "cmp", "r0, r1"),
+        (0x288D1C, "cmp", "r0, #6"),
+        (0x288D28, "cmp", "r0, #0xf"),
+        (0x288C7A, "movs", "r0, #1"),
+        (0x288C80, "strb", "r0, [r2]"),
+        (0x288D46, "movs", "r0, #0xe0"),
+        (0x288D4C, "strb", "r0, [r5]"),
         (0x2DE3DC, "movs", "r4, #0x80"),
         (0x2DE3DE, "lsls", "r3, r4, #0xa"),
         (0x2DE3E0, "adds", "r3, #0x20"),
@@ -228,6 +238,14 @@ def check(image):
     if (normal.hex() != "3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b"
             or special.hex() != "3e3e3e3e0d"):
         raise ValueError("own NSE-6 keypad tables changed")
+    controller_targets = [read32(image, address)
+                          for address in range(0x288A84, 0x288AC8, 4)]
+    if controller_targets != [
+            0x288B0A, 0x288AF6, 0x288F7E, 0x288EB0, 0x2890A2,
+            0x287F20, 0x2885C8, 0x2885D2, 0x28929A, 0x28923A,
+            0x288D88, 0x2892DE, 0x28903A, 0x289084, 0x28905E,
+            0x289110, 0x288C3A]:
+        raise ValueError("own NSE-6 input-controller table changed")
     stream = verifier_stream(image)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != VERIFIER_STREAM_SHA1:
@@ -249,6 +267,14 @@ def check(image):
                                   "stored_offset": "0x3c", "stored_bytes": 4,
                                   "sum_bits": 16, "stored_byte_order": "big",
                                   "status_index": "0x12"},
+            "input_controller": {"table": "0x288a84",
+                                 "targets": [hex(target) for target in controller_targets],
+                                 "readiness_byte": "0x13ffa8",
+                                 "readiness_low_nibble": 6,
+                                 "report_byte": "0x12147d",
+                                 "report_low_nibble": 15,
+                                 "missing_bit_report": "0x14",
+                                 "unmask_instruction": "0x288d4c"},
             "simi": {"initializer": "0x2ca910", "receiver": "0x2ca986",
                      "tx_register": "0x36", "rx_register": "0x37",
                      "iir_register": "0x38", "control_register": "0x39",
