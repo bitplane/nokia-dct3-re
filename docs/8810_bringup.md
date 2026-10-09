@@ -67,6 +67,14 @@ Own dispatcher `0x243a24` routes input `0x00d4` to `0x243ba4`; that branch
 increments a context counter, and at count >=15 takes `0x243bfe..0x243c22`
 to request reset. The counter's reset/health contract is not yet decoded.
 Do not disable a hardware watchdog to conceal this software-requested reset.
+Native execution independently exposes missing CPU instructions: the ROM4
+compatibility run stopped at `ADDS *AR7,B` (`0x0387`, PC `0x21a9`). Implementing
+the unsigned-memory B form, with executable accumulator-preservation, carry,
+SXM and cycle checks, passes the full C54x conformance suite. A fresh 40-second
+menu run then reaches unsupported `0xf4cf` at `0x21b6`, while the restart near
+32 seconds persists. CCONT clock control remains `0x56` before restart.
+This advances native execution; it does not yet prove the stalled DSP causes
+the reset or establish compatibility with the handset's fitted DSP mask.
 The late phonebook-save attempt crosses this restart boundary, so persistence
 is unproved and must be retested after the lifecycle is stabilized.
 

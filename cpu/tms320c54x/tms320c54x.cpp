@@ -1585,8 +1585,12 @@ void tms320c54x_device::execute_one(u16 op)
 		m_b = add_sub(m_b, data_operand(alu_smem()), false, true);
 		return;
 	case 0x0200: // ADDS Smem, A
-		m_a = add_sub(m_a, alu_smem(), false, false);
+	case 0x0300: // ADDS Smem, B (SPRU172C 4-10)
+	{
+		u64 &destination = accumulator(BIT(op, 8));
+		destination = add_sub(destination, alu_smem(), false, BIT(op, 8));
 		return;
+	}
 	case 0x0400: // ADD Smem, TS, A
 	case 0x0500: // ADD Smem, TS, B
 	{

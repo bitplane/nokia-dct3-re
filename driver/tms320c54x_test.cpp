@@ -8446,24 +8446,50 @@ private:
 			m_check_timer->adjust(attotime::from_usec(100));
 			return;
 		}
-		if (m_phase == 310 || m_phase == 311)
+		if (m_phase == 310 || m_phase == 311 || m_phase == 90010 || m_phase == 90011)
 		{
-			expect_opcode(0x0282,
-					m_cpu->state_int(tms320c54x_device::STATE_A) ==
-					(m_phase == 310 ? 0x10000 : 0x100000000ULL) &&
+			const bool destination_b = m_phase == 90010 || m_phase == 90011;
+			const bool carry_case = m_phase == 311 || m_phase == 90011;
+			if (destination_b)
+				osd_printf_info("ADDS B observation: phase=%d a=%010llx b=%010llx st0=%04x ar7=%04x writes=%d cycles=%d\n",
+					m_phase, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
+					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_B),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST0)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR7)), m_port_writes,
+					int(m_last_port_cycle - m_first_port_cycle));
+			expect_opcode(destination_b ? 0x0387 : 0x0282,
+					m_cpu->state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) ==
+					(!carry_case ? 0x10000 : 0x100000000ULL) &&
 					bool(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0800) ==
-					(m_phase == 311) &&
-					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0f66 &&
+					carry_case &&
+					(!destination_b || m_cpu->state_int(tms320c54x_device::STATE_A) == 0x12345678) &&
+					m_cpu->state_int(destination_b ? tms320c54x_device::STATE_AR7 : tms320c54x_device::STATE_AR2) == 0x0f66 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-					"ROM4 ADDS *AR2,A ignores SXM and carries at bit 32 in one cycle");
-			if (m_phase == 310)
+					"ADDS Smem,A/B ignores SXM, preserves the other accumulator, and carries at bit 32 in one cycle");
+			if (m_phase == 310 || m_phase == 90010)
 			{
 				data.write_word(0x0f66, 1);
 				m_port_writes = 0;
-				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffULL);
+				m_cpu->set_state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A, 0xffffffffULL);
 				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-				m_phase = 311;
+				m_phase = destination_b ? 90011 : 311;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			if (m_phase == 311)
+			{
+				program.write_word(0x05e3, 0x0387); // ADDS *AR7,B
+				data.write_word(0x0f66, 0xffff);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x0f66);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_phase = 90010;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}

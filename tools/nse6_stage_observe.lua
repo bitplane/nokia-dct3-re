@@ -4,6 +4,8 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local ccont_watchdog = emu.item(assert(machine.devices[':ccont'].items['0/m_watchdog']))
 local mad2_registers = emu.item(assert(machine.devices[':mad2'].items['0/m_regs']))
+local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_regs']))
+local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
 local counts = {}
 local result_readers = {}
@@ -287,6 +289,12 @@ emu.register_frame_done(function()
     machine:logerror(string.format(
         'nse6_watchdog_snapshot: ccont=%02x mad2=%02x t=%.9f\n',
         ccont_watchdog:read(0), mad2_registers:read(3), now))
+    if dsp then
+        machine:logerror(string.format(
+            'nse6_native_snapshot: pc=%04x imr=%04x ifr=%04x ccont_clock=%02x t=%.9f\n',
+            dsp.state['PC'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,
+            ccont_registers:read(6), now))
+    end
     if now >= 28 and not late_captured then
         late_captured = true
         machine:logerror(string.format(
