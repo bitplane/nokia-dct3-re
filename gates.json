@@ -8943,6 +8943,33 @@
       ]
     },
     {
+      "name": "verify-3310-radio-a5-1-degraded-state",
+      "prerequisites": [], "variables": {},
+      "steps": [
+        {"step": "run", "silent": true, "make_flags": ["--no-print-directory"], "run_target": "run",
+         "tokens": ["$(DCT3_RUN_3310)", "RUN_DIR=$(RUN_DIR)", "SECONDS=45", "RUN_VERBOSE=1",
+                    "RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded'",
+                    "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=21 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=navi'"],
+         "parameters": {"RUN_DIR": "$(RUN_DIR)", "SECONDS": "45", "RUN_VERBOSE": "1",
+                        "RUN_EXTRA_ARGS": "'-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded'",
+                        "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=navi NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_200_200) NOKIA_DCT3_STATE_ROUNDTRIP_AT=21 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=navi'"}},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_a5_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_call_state_roundtrip_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_3310_incoming_call_boundary_check.py", "arguments": ["$(RUN_DIR)/error.log", "--ended"], "options": ["--ended"]},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_3310_speech_control_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_degraded_speech_trace_check.py", "arguments": ["$(RUN_DIR)/error.log", "$(COBBA_GJP_PCM_CHECK_ARGS)"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_facch_interruption_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_sacch_coexistence_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []}
+      ]
+    },
+    {
       "name": "verify-3310-radio-a5-1-degraded",
       "prerequisites": [], "variables": {},
       "steps": [

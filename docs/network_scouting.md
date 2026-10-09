@@ -915,6 +915,12 @@ direction, 32 impairment-induced bad blocks and clean physical End. These
 are HLE media results, not native DSP speech validation. The permanent
 `make verify-3310-radio-a5-1-degraded` gate requires all six independent
 checks from fresh storage and physical Navi Answer/End.
+`make verify-3310-radio-a5-1-degraded-state` additionally saves at 21 seconds
+inside encrypted speech and compares a two-second restored interval exactly
+against its reference (50 digital speech records). Physical Navi End after
+restoration must release CC/RR and return to idle; the same impaired-media,
+FACCH and SACCH predicates remain required. This proves saved HLE protocol
+and digital-media continuity, not persistence of an external SIP dialog.
 
 1. `make verify-radio-camp` passes;
 2. `make verify-radio-registration` proves one accepted update and steady camp;
