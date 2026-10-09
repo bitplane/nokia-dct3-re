@@ -16,7 +16,8 @@ end
 -- not mistaken for evidence when opcode-fetch observation is unavailable.
 local program = cpu.spaces["program"]
 local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
-    0x4414, 0x4428, 0x4433, 0x4460, 0x32f4, 0x33b4, 0x3249}
+    0x4414, 0x4428, 0x4433, 0x4460, 0x32f4, 0x33b4, 0x3249,
+    0x330a, 0x3326, 0x332b, 0x3347, 0x3360, 0x337c, 0x33ac, 0x33b0, 0x42f6}
 local counts = {}
 for _, address in ipairs(sites) do
     counts[address] = 0
@@ -25,6 +26,12 @@ for _, address in ipairs(sites) do
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
+                if address >= 0x330a and address <= 0x33b0 and counts[address] <= 2 then
+                    machine:logerror(string.format(
+                        "rom4_mode1_fetch: t=%.9f address=%04x word=%04x fd=%04x bc=%04x sample94=%04x sample96=%04x\n",
+                        machine.time:as_double(), offset, data, memory:read_u16(0x06fd),
+                        memory:read_u16(0x06bc), memory:read_u16(0x2194), memory:read_u16(0x2196)))
+                end
             end
         end)
 end

@@ -289,6 +289,27 @@ retained for the whole machine lifetime; otherwise Lua garbage collection
 can invalidate a cached-fetch tap. The next receiver analysis must start
 from this active mode-1 path rather than try to activate `4414` again.
 
+The current mode-1 processing census records 48,264 fetches of `330a`,
+eight per mode-1 frame, followed by 6,033 executions of the absolute
+`CMPM 06fd,#1` at `3326`. The reduction branch at `332b` executes twice;
+`3347` executes 6,031 times, with `06fd=1` at its first two observed entries.
+All 6,033 frames reach `3360`, `337c` and `33b0`. At the first two `337c`
+entries, control word `06bc` is `0828/082a`; the corresponding exit
+observations are `082a/0828`. This is live processing, not an idle sample
+reader. The delayed conditional branch includes the bit-clearing instruction
+at `337c` in its delay words, so that instruction's execution alone does not
+prove the following processing arm was selected.
+
+At these bounded snapshots, `2194=3` and `2196=0`. No fetch occurs at the
+candidate processing call `33ac` to `42f6`; `42f6` itself executes four times
+elsewhere in the boot. Its global execution count therefore must not be
+used as evidence that this sample-processing call succeeds. The passive
+observer records these exact instruction-start sites (not their immediate
+operand words), and the fresh RF gate still passes with 207,040 sample reads.
+The sample encoding, the computation feeding `2194/2196`, and whether this
+arm reports RF acquisition remain unresolved. No nonzero sample or control
+state has been synthesized to satisfy the comparisons.
+
 Port `0x27` is bidirectional in ROM4: seven static `PORTW` sites at
 `0x4248/0x424d/0x4258/0x425d/0x4267/0x426c/0x4271` belong to a separate
 transmit routine. The driver now forwards those writes to a replaceable COBBA
