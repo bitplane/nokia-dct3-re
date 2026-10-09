@@ -959,6 +959,11 @@ and process-isolated namespace around Wine/Xvfb. Persistent writes are limited
 to `WORK`; host `/data`, `/home` and `/root` are hidden. This optional vendor-
 tool runner is not a MAME acceptance gate. It requires `bwrap`, `timeout`,
 `xvfb-run` and Wine; prepare `WORK/home` and `WORK/prefix` first.
+The default timeout is 120 seconds; `CCS33_TIMEOUT_SECONDS` accepts an
+integer from 1 to 1800 for vendor installation steps. Normal command exit
+also stops and waits for Wine's server so registry writes can finish before
+the namespace disappears. This does not make an interrupted installation
+successful.
 The runner disables GLX: the host NVIDIA/EGL loader crashes Xvfb in this
 namespace otherwise. Harmless `/bin/true` and `wine --version` controls both
 exit zero with that setting. A child process printing output is insufficient
@@ -971,7 +976,29 @@ simulator driver and scripting DLL. The directory label is the MSI's layout,
 not evidence of a different package version. Full installation stopped at
 `TIBuildInstallDirRegKey` before completing installation. Inspection shows
 that action constructs a registry path from `INSTALLDIR` and commits the MSI
-database; it is not a target program or simulator execution.
+database; it is not a target program or simulator execution. Registering
+Wine's supplied `vbscript.dll` and `msi.dll`, together with the standard
+`.vbs`/`VBSFile` script-engine association, lets the original installer pass
+that action. A read-only query of the original MSI confirms its Component
+Manager `Target` registry value comes from `[CommonFilesFolder]Texas Instruments`.
+No substitute component database or modified installer is used.
+
+The longer installation attempt reaches the bundled DSP/BIOS installer,
+but its silent mode displays a hidden **Error in startup script** dialog:
+`InstallProgramFolderShortcut` fails with Windows error `-2147221164`
+(class not registered). Wine separately reports the missing Shell Link COM
+class `{00021401-0000-0000-c000-000000000046}`. Acknowledging the dialog makes
+`BIOS_Install_CA` return zero and the parent installation roll back; the
+runner exits 91. This is a Windows setup dependency, not a timer result or
+evidence that a longer wait would succeed. Retain
+`run_ccs33_oracle/full-install-long.log`, `bios-installer-error.png` and
+`run_ccs33_oracle_full_long.log` for this boundary.
+
+The acquired vendor SDK's `CCDspUser.h` defines `GetSimMode()` and, under
+`USE_TI_INTERNAL_APIs`, `SetSimMode(long)`: mode 0 flushes the pipeline as an
+emulator, mode 1 does not. Its comments explicitly restrict support to
+certain simulators and require querying the mode to verify it. These are
+automation leads only; neither mode has been selected or measured here.
 
 The package-owned MFC42/Xerces directories in `WINEPATH`, a working software
 display and acknowledgement of the drag/drop registration warning allow

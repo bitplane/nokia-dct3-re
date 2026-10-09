@@ -9,10 +9,18 @@ work=$(realpath "$1")
 shift
 test -d "$work/home"
 test -d "$work/prefix"
+limit=${CCS33_TIMEOUT_SECONDS:-120}
+case "$limit" in
+    ''|*[!0-9]*) printf 'CCS33_TIMEOUT_SECONDS must be a positive integer\n' >&2; exit 2 ;;
+esac
+if [ "$limit" -lt 1 ] || [ "$limit" -gt 1800 ]; then
+    printf 'CCS33_TIMEOUT_SECONDS must be between 1 and 1800\n' >&2
+    exit 2
+fi
 
 # Hide host data, disable networking and kill all namespace children at exit.
 # The command sees only this research directory as writable persistent storage.
-exec timeout 120 bwrap --unshare-all --die-with-parent \
+exec timeout "$limit" bwrap --unshare-all --die-with-parent \
     --ro-bind / / --tmpfs /mnt --bind "$work" /mnt/work \
     --tmpfs /data --tmpfs /home --tmpfs /root --tmpfs /tmp \
     --proc /proc --dev /dev --chdir /mnt/work \
@@ -20,4 +28,5 @@ exec timeout 120 bwrap --unshare-all --die-with-parent \
     --setenv TMPDIR /tmp \
     --setenv WINEPATH 'C:\CCS33Admin;C:\CCS33Admin\CCStudio_v3.1\cc\bin' \
     -- xvfb-run -a -e /dev/stderr \
-        -s '-screen 0 1280x1024x24 -extension GLX' "$@"
+        -s '-screen 0 1280x1024x24 -extension GLX' \
+        sh -c '"$@"; status=$?; wineserver -k; wineserver -w; exit "$status"' sh "$@"
