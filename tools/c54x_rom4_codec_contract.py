@@ -4,6 +4,11 @@
 import argparse
 from pathlib import Path
 
+if __package__ in (None, ""):
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tools.c54x_rom4_port_census import census
+
 
 SEQUENCES = {
     "frame_entry_port21_set": (0x321e, (
@@ -29,6 +34,31 @@ SEQUENCES = {
     )),
 }
 
+# Each additional immediate port reader preserves/modifies specific bits and
+# writes the result back. These are ROM observations, not register field names.
+MASK_SEQUENCES = {
+    "port21_3c6f": (0x3c6f, (0x74f8, 0x000b, 0x0021, 0xf340, 0x0005,
+                            0xf330, 0xfffd, 0xf495, 0x75f8, 0x000b, 0x0021)),
+    "port21_3c84": (0x3c84, (0x74f8, 0x000b, 0x0021, 0xf330, 0xfffb,
+                            0xf340, 0x0003, 0xf495, 0x75f8, 0x000b, 0x0021)),
+    "port21_4231": (0x4231, (0x74f8, 0x000b, 0x0021, 0xf340, 0x0a00,
+                            0xf330, 0xfbff, 0xf495, 0x75f8, 0x000b, 0x0021)),
+    "port21_4275": (0x4275, (0x74f8, 0x0008, 0x0021, 0xf030, 0xf7ff,
+                            0xf040, 0x0600, 0xf495, 0x75f8, 0x0008, 0x0021)),
+    "port21_43c2": (0x43c2, (0x74f8, 0x0008, 0x0021, 0xf040, 0x0140,
+                            0xf030, 0xff7f, 0xf495, 0x75f8, 0x0008, 0x0021)),
+    "port21_43ef": (0x43ef, (0x74f8, 0x0008, 0x0021, 0xf030, 0xfeff,
+                            0xf040, 0x00c0, 0xf495, 0x75f8, 0x0008, 0x0021)),
+    "port21_4473": (0x4473, (0x74f8, 0x0008, 0x0021, 0xf040, 0x0200,
+                            0xf495, 0x75f8, 0x0008, 0x0021)),
+}
+SEQUENCES.update(MASK_SEQUENCES)
+
+READ_SITES = [0x321e, 0x33f3, 0x3c6f, 0x3c84, 0x4231,
+              0x4275, 0x43c2, 0x43ef, 0x4473]
+WRITE_SITES = [0x3225, 0x33fa, 0x3c77, 0x3c8c, 0x4239, 0x427d,
+               0x43ca, 0x43f7, 0x4479, 0x4553, 0x4557, 0x455b]
+
 
 def check(image: bytes) -> list[str]:
     if len(image) % 2:
@@ -41,6 +71,11 @@ def check(image: bytes) -> list[str]:
         if words != expected:
             raise ValueError(f"{name}: ROM words differ at {address:04x}")
         results.append(name)
+    sites = census(image)
+    if sites.get(("R", 0x21), []) != READ_SITES:
+        raise ValueError("port21 reader census differs from reviewed nine sites")
+    if sites.get(("W", 0x21), []) != WRITE_SITES:
+        raise ValueError("port21 writer census differs from reviewed twelve sites")
     return results
 
 
@@ -53,6 +88,7 @@ def main() -> int:
     except (OSError, ValueError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print("PASS: " + ", ".join(results))
+    print("Candidate immediate-port coverage: reads=9/9 writes=12/12; uploads excluded.")
     print("Bounded ROM sequences only; physical port ownership remains unresolved.")
     return 0
 

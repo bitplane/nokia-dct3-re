@@ -32,6 +32,18 @@ class CodecContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "complete"):
             check(b"\x00")
 
+    def test_unreviewed_reader_rejected(self):
+        image = self.image()
+        image[0x200:0x206] = bytes.fromhex("74f800080021")
+        with self.assertRaisesRegex(ValueError, "reader census"):
+            check(image)
+
+    def test_unreviewed_writer_rejected(self):
+        image = self.image()
+        image[0x200:0x206] = bytes.fromhex("75f800080021")
+        with self.assertRaisesRegex(ValueError, "writer census"):
+            check(image)
+
 
 if __name__ == "__main__":
     unittest.main()

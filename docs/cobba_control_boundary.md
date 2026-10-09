@@ -162,6 +162,19 @@ label but do not by themselves identify a MAD2 register or prove that no
 operational sample path uses the port. Preserve the independent claim as a
 hypothesis, not an implemented microphone contract.
 
+The complete raw-word immediate-port census finds nine candidate reads and
+twelve candidate writes to I/O `21`. All nine readers are covered by the
+checker and perform constant mask/set operations before writing back to the
+same port; the three remaining writers are the initialization sequence. The
+seven additional readers are `3c6f`, `3c84`, `4231`, `4275`, `43c2`, `43ef`
+and `4473`. They modify masks spanning low bits `0001/0002/0004` and higher
+bits through `0800`. Thus the reviewed resident access surface is entirely
+control-shaped; no sample-processing interpretation is established by these
+sites. The checker rejects additional candidate sites rather than silently
+claiming complete coverage after the image changes. This quantified scope
+excludes dynamic port addressing, flash uploads and other product masks;
+raw-word census matches alone are not proof of instruction reachability.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair
