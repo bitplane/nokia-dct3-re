@@ -363,9 +363,29 @@ A fresh nine-second cold trace observes none of helper `0x2bf2e6`, wrapper
 `0x2b3f12`, or the two task-20 self-posting blocks. This is a bounded
 lifecycle observation, not a closed proof of absent hardware traffic.
 
-Next: decode helper caller `0x280b0c` and the writers of state
-`0x1127d8`/notification `0x1127d9`, while checking the other caller's
-dependency on the already-mapped completion path,
+Own classifier `0x2bf1a0` writes `0x1127d8` at `0x2bf214`. It reads
+selector five through `0x2c32f4`, partitions readings at 100 while
+accumulating five consistent samples, then derives a zero/one state using
+the ROM floating-point comparison. Physical channel meaning and units are
+not assigned from this code alone.
+
+The runtime writer trace observes initialization at `0x2bf338/0x2bf33c`
+setting ancillary state and notification byte `0x1127d9 = 1`; classifier
+entry follows with caller `0x2bf343` in task 1, and its store sets current
+state `0x1127d8 = 0`. This happens before and after the early reset, with
+the latter zero publication at 0.832085 seconds. The desired current state
+therefore already exists; the observed issue is that helper `0x2bf2e6`
+does not consume/publish the pending notification, not an ADC value needing
+adjustment.
+
+Caller `0x280b0c` follows a stability countdown (initialized to eight,
+restarted on state changes) and timer scheduling at index `0x10`, delay
+six. Caller `0x2813a0` follows the earlier readiness-completion block.
+The cold trace does not reach the separate countdown entry `0x280ac0`.
+Do not infer that changing the selector can repair this lifecycle ordering.
+
+Next: identify what selects the task-1 countdown path `0x280ac0` and why
+the initialized zero-state notification remains pending before readiness,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct

@@ -22,6 +22,15 @@ handles[#handles + 1] = memory:install_read_tap(0x221ee4, 0x221ee7,
             machine.time:as_double()))
     end)
 local readiness_nibble_writes = 0
+local input_state_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x1127d8, 0x1127db,
+    'nsm1_input_state', function(offset, value, mask)
+        if input_state_writes >= 32 then return end
+        input_state_writes = input_state_writes + 1
+        machine:logerror(string.format(
+            'nsm1_input_state: value=%08x mask=%08x pc=%08x t=%.9f\n',
+            value, mask, cpu.state['PC'].value, machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_write_tap(0x1126c0, 0x1126c3,
     'nsm1_readiness_nibble', function(offset, value, mask)
         if readiness_nibble_writes >= 64 then return end
@@ -89,7 +98,7 @@ for _, address in ipairs({0x207718, 0x207afc, 0x208a7c, 0x20837c, 0x2085bc,
         0x29f340, 0x21e41c, 0x21cf0c, 0x21e9a8,
         0x27a4f0, 0x281370, 0x2bc112, 0x28029c, 0x28129a,
         0x223520, 0x223a14, 0x223a68, 0x28b760, 0x2263fa, 0x2bc4d4,
-        0x2b3f12, 0x2bf2e6, 0x224e10, 0x22530c}) do
+        0x2b3f12, 0x2bf2e6, 0x224e10, 0x22530c, 0x2bf1a0, 0x280ac0}) do
     local count = 0
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nsm1_activation_owner_' .. address,
