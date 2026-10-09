@@ -225,6 +225,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_tim));
 	save_item(NAME(m_prd));
 	save_item(NAME(m_tcr));
+	save_item(NAME(m_timer_head_tim));
 	save_item(NAME(m_block_repeat_active));
 	save_item(NAME(m_idle));
 	save_item(NAME(m_idle_mode));
@@ -287,6 +288,7 @@ void tms320c54x_device::device_reset()
 	m_tim = 0xffff;
 	m_prd = 0xffff;
 	m_tcr = 0;
+	m_timer_head_tim = 0xffff;
 	m_idle_mode = 0;
 	m_idle_timer_ticks = 0;
 	m_peripheral_clock_stop_cb(0);
@@ -296,14 +298,33 @@ void tms320c54x_device::device_reset()
 	m_illegal = false;
 }
 
+u64 tms320c54x_device::timer_remaining_ticks() const
+{
+	const attotime remaining = m_timer->remaining();
+	if (remaining <= attotime::zero)
+		return 0;
+	u64 ticks = remaining.as_ticks(clock());
+	// A partially remaining clock must not decrement TIM/PSC early.
+	if (attotime::from_ticks(ticks, clock()) < remaining)
+		++ticks;
+	return ticks;
+}
+
 void tms320c54x_device::update_timer_counter()
 {
 	if ((m_tcr & TIMER_TSS) || (!m_timer->enabled() && m_idle_mode < 2))
 		return;
-	const u64 remaining = m_idle_mode >= 2 ? m_idle_timer_ticks : m_timer->remaining().as_ticks(clock());
+	const u64 remaining = m_idle_mode >= 2 ? m_idle_timer_ticks : timer_remaining_ticks();
 	const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
-	m_tim = remaining ? u16((remaining - 1) / divider) : 0;
-	m_tcr = (m_tcr & ~TIMER_PSC_MASK) | (remaining ? ((remaining - 1) % divider) << 6 : 0);
+	const u64 subsequent_ticks = u64(m_timer_head_tim) * divider;
+	// A new TDDR can be smaller than the current read-only PSC. The first
+	// interval keeps that PSC; only later intervals reload from the new TDDR.
+	u16 const psc = remaining > subsequent_ticks
+			? u16(remaining - subsequent_ticks - 1)
+			: remaining ? u16((remaining - 1) % divider) : 0;
+	m_tim = remaining > subsequent_ticks ? m_timer_head_tim
+			: remaining ? u16((remaining - 1) / divider) : 0;
+	m_tcr = (m_tcr & ~TIMER_PSC_MASK) | (psc << 6);
 }
 
 void tms320c54x_device::arm_timer()
@@ -315,6 +336,7 @@ void tms320c54x_device::arm_timer()
 	}
 	const u64 cycles = u64(m_tim) * ((m_tcr & TIMER_TDDR_MASK) + 1) +
 		((m_tcr & TIMER_PSC_MASK) >> 6) + 1;
+	m_timer_head_tim = m_tim;
 	if (m_idle_mode >= 2)
 	{
 		m_idle_timer_ticks = cycles;
@@ -454,13 +476,7 @@ u16 tms320c54x_device::data_read(u16 address)
 		return m_prd;
 	if (address == 0x26)
 	{
-		if (!(m_tcr & TIMER_TSS) && (m_timer->enabled() || m_idle_mode >= 2))
-		{
-			const u32 divider = (m_tcr & TIMER_TDDR_MASK) + 1;
-			const u64 remaining = m_idle_mode >= 2 ? m_idle_timer_ticks : m_timer->remaining().as_ticks(clock());
-			const u16 psc = remaining ? u16((remaining - 1) % divider) : 0;
-			return (m_tcr & ~TIMER_PSC_MASK) | (psc << 6);
-		}
+		update_timer_counter();
 		return m_tcr;
 	}
 	if (address == 0x58)
@@ -1020,7 +1036,7 @@ void tms320c54x_device::execute_one(u16 op)
 		if (mode >= 2 && !(m_tcr & TIMER_TSS))
 		{
 			// Peripheral clocks stop independently of TSS; preserve prescaler phase.
-			m_idle_timer_ticks = m_timer->remaining().as_ticks(clock());
+			m_idle_timer_ticks = timer_remaining_ticks();
 			update_timer_counter();
 			m_timer->adjust(attotime::never);
 		}

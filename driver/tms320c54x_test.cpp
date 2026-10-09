@@ -359,6 +359,20 @@ private:
 		m_phase = 7300 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_timer_prescaler_divider_case(unsigned divider)
+	{
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 2);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x30 | divider);
+		// TDDR changes the next reload, not the current read-only PSC.
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 1);
+		m_phase = 7350 + divider;
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_timer_boundary_probe(unsigned index)
 	{
 		bool const short_period = !(index & 1);
@@ -1637,6 +1651,57 @@ private:
 				"SPRU131G TRB reloads stopped TIM and read-only PSC; TCR writes preserve PSC and TRB reads zero");
 			if (index < 47) { start_stopped_timer_reload_case(index + 1); return; }
 			osd_printf_info("TMS320C54x stopped timer reload: PASS divider_cases=16 write_variants=3\n");
+			start_timer_prescaler_divider_case(1);
+			return;
+		}
+		if (m_phase >= 7351 && m_phase <= 7365)
+		{
+			unsigned const divider = m_phase - 7350;
+			u16 const tim = m_cpu->state_int(tms320c54x_device::STATE_TIM);
+			u16 const tcr = m_cpu->state_int(tms320c54x_device::STATE_TCR);
+			osd_printf_info("TMS320C54x timer divider change: loaded_psc=%u tim=%04x tcr=%04x\n",
+				divider, tim, tcr);
+			expect(tim == 2 && tcr == ((divider - 1) << 6) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_IFR),
+				"SPRU131G changing TDDR preserves current PSC until borrow or TRB");
+			m_saved_repeat.str(std::string());
+			m_saved_repeat.clear();
+			expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+				"save current PSC larger than new TDDR");
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 9);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x20);
+			m_saved_repeat.clear();
+			m_saved_repeat.seekg(0);
+			expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE &&
+				m_cpu->state_int(tms320c54x_device::STATE_TIM) == tim &&
+				m_cpu->state_int(tms320c54x_device::STATE_TCR) == tcr,
+				"restore current PSC interval independently of overwritten timer reload");
+			m_phase = 7450 + divider;
+			// Observe after the first borrow, halfway to the following edge.
+			m_check_timer->adjust(attotime::from_ticks(2 * divider + 1, m_cpu->clock()) / 2);
+			return;
+		}
+		if ((m_phase >= 7451 && m_phase <= 7465) ||
+			(m_phase >= 7551 && m_phase <= 7565) ||
+			(m_phase >= 7651 && m_phase <= 7665))
+		{
+			unsigned const stage = (m_phase - 7350) / 100;
+			unsigned const divider = (m_phase - 7350) % 100;
+			u16 const expected_tim = stage == 1 ? 1 : stage == 2 ? 0 : 2;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_TIM) == expected_tim &&
+				m_cpu->state_int(tms320c54x_device::STATE_TCR) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (stage == 3 ? 8 : 0),
+				"SPRU131G PSC borrows once, then reloads new TDDR; timer expiry reloads PRD and latches TINT");
+			if (stage < 3)
+			{
+				m_phase += 100;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+				return;
+			}
+			if (divider < 15) { start_timer_prescaler_divider_case(divider + 1); return; }
+			osd_printf_info("TMS320C54x timer divider change: PASS cases=15 save_replay=15 borrow_expiry_checks=45\n");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			start_timer_boundary_probe(0);
 			return;
 		}

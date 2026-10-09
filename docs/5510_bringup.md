@@ -2201,7 +2201,9 @@ a CPU interrupt-recognition/pipeline-drain question, not evidence of metadata
 rejection. The independently verified stopped-PSC/read-only-TCR corrections
 do not change this endpoint: the retained original-bootstrap reproduction
 still records RX/TX 36/47, three responses, two ACKs, completion `8009`,
-PC `02:3d76`, and TIM/PRD/TCR `0000/0001/0000`. The recorder acceptance
+PC `02:3d76`, and PRD/TCR `0001/0000`. Correcting remaining-clock rounding
+changes the sampled TIM read from `0000` to `0001`, without changing the
+cursor, control returns or metadata delivery. The recorder acceptance
 checker still fails; passing timer-register conformance must not promote it.
 A blanket return-instruction guard is not established by
 [SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf): section 6.10.7

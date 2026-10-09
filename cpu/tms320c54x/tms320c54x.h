@@ -73,6 +73,7 @@ private:
 	TIMER_CALLBACK_MEMBER(timer_expired);
 	void update_timer_counter();
 	void arm_timer();
+	u64 timer_remaining_ticks() const;
 	void leave_idle();
 	void update_xf(bool force = false);
 	u16 fetch();
@@ -169,6 +170,7 @@ private:
 	u16 m_tim = 0xffff;
 	u16 m_prd = 0xffff;
 	u16 m_tcr = 0;
+	u16 m_timer_head_tim = 0xffff;
 	emu_timer *m_timer = nullptr;
 	bool m_block_repeat_active = false;
 	bool m_idle = false;

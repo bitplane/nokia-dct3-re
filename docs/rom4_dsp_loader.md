@@ -824,6 +824,18 @@ PSC, and IDLE2/3 reads use their existing saved timer phase. The correctly
 initialized identity-write baseline fails divider one (`11` instead of `51`).
 These assertions do not establish arbitrary live TDDR changes, general
 stop/restart timing, interrupt latency or native recording completion.
+Fifteen additional controller-only cases load PSC `1..15` with TIM `2`,
+change TDDR to zero while stopped, then restart without TRB. After one CPU
+clock TIM must still be `2` and PSC must be one less than its loaded value.
+Each then checks the first borrow, subsequent one-clock decrement and PRD
+reload/TINT at expiry. This follows section 8.4.2: the current read-only PSC
+survives a TDDR change, with the new TDDR used on the next prescaler reload.
+The core saves the initial TIM for that first interval, which can be longer
+than later intervals; division by the new TDDR alone cannot recover it.
+Remaining clocks are rounded upward so fractional attosecond conversion
+does not advance the hardware counter early. Save replay overwrites a timer
+reload, restores the captured current interval and repeats the same checks.
+The baseline prematurely reports TIM `1` in the first one-clock case.
 The full CPU suite passes, and the native NSE-1 receiver regression retains
 6,499 frames, 207,040 port-27 reads, three port-32 writes and no port-38/39
 reads. This preserves the existing no-cell boundary, not radio acquisition.
