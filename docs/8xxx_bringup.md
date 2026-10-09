@@ -2179,6 +2179,20 @@ for 8850 only. The own-ROM field writer and physical Send/End correspondence
 are verified below, including bidirectional PCM/media. No native
 DSP speech, audible call or 8890 PCM contract is established by this finding.
 
+### NSB-6 PCM source lead (not promoted)
+
+The indexed Nokia NSB-6 Disassembly & Troubleshooting Instructions, issue 1
+(06/2000), printed page 9, labels J254/PCMDCLK as 512 kHz and J255/PCMSCLK
+as 8 kHz. Source: [original manual mirror](https://electronicsandbooks.com/edt/manual/Hardware/N/Nokia/Phone/8890/DISTRBLE%20%5B42%5D.pdf).
+The original PDF could not be acquired for visual verification; this is an
+indexed primary-document lead, not a validated bus profile. The separate
+[System Module contents](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html)
+identify an Audio Control / PCM Serial Interface section. Recover that page
+and corroborate clocks, ownership, word width, alignment and edges before
+enabling PCM. Do not import the 8850's 1 MHz profile or infer a 16-bit word
+from the two clock labels. Existing 8890 signaling and native/HLE limits
+remain unchanged.
+
 The acquired `8850v531.fls` (SHA1
 `9f966787403b68a09530680ad911302403eb1521`) now has a ROM-pinned static
 check:
