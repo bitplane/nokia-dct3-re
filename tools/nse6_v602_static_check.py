@@ -74,7 +74,8 @@ def check(image):
         (0x2B611A, 0x10000), (0x2B6120, 0xFFFF),
         (0x2B6144, 0x100F6), (0x2B6186, 0x100FE),
         (0x2B6188, 0x10200), (0x2B618C, 0x200040),
-        (0x2B6202, 0xFFFF), (0x2DD102, 0x200005),
+        (0x2B61E6, 0x10000), (0x2B6202, 0xFFFF),
+        (0x2B6208, 0x1205C0), (0x2DD102, 0x200005),
         (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
@@ -243,6 +244,8 @@ def check(image):
                              "buffers": ["0x10200", "0x10600"],
                              "handshake": "0x100fe",
                              "final_wait": "0x2b6200",
+                             "result_registers": ["0x10000", "0x10002"],
+                             "result_context": ["0x1205ca", "0x1205cc"],
                              "resident_mask_proven": False},
             "runtime_acceptance": False}
 

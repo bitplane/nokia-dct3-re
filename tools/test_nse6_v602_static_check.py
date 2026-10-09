@@ -53,6 +53,8 @@ class Nse6StaticTests(unittest.TestCase):
         self.assertEqual(result["dsp_verifier"]["full_blocks"], 127)
         self.assertEqual(result["dsp_verifier"]["stream_sha1"],
                          check.VERIFIER_STREAM_SHA1)
+        self.assertEqual(result["dsp_verifier"]["result_registers"],
+                         ["0x10000", "0x10002"])
         self.assertEqual(result["eeprom_descriptor"]["page_bytes"], 32)
         self.assertEqual(result["keypad"]["power_column_mask"], 16)
         self.assertFalse(result["keypad"]["runtime_input_proven"])

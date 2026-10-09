@@ -107,8 +107,9 @@ The own verifier `0x2b6118` reads one 16-bit word every 32 flash bytes from
 `0x200040`, sends 127 blocks of 512 words and a final 510 words followed by
 two `0xffff` words. Buffers alternate between `0x10200` and `0x10600`, with
 handshake halfwords at `0x100fe/0x10100`. At `0x2b6200` it waits while the
-second handshake halfword is `0xffff`, then copies the two returned halfwords
-into context `0x1205c0 + 0x0c/+0x0a`.
+separate result cell `0x10002` is `0xffff`, then copies `0x10000/0x10002`
+into context `0x1205ca/0x1205cc`. The static checker resolves the result-base
+and context literals independently of the transfer-handshake addresses.
 
 This identifies a protocol shape shared with other recovered verifier streams,
 not a fitted DSP mask or a successful verdict. No resident-ROM compatibility
@@ -216,6 +217,13 @@ The isolated nine-second run reaches final verifier wait `0x2b6200` at
 Handshake cells `0x100fe/0x10100` later read `0x04ec/0x1074`; these are sampled
 live cells, not a captured final verdict. No SIMI initializer observation or
 runtime input acceptance was obtained.
+
+A second cold run observes the verifier's caller return at `0x2d333c`:
+context `0x1205ca/0x1205cc` contains `0x0000/0x0004` at 0.230685000 s.
+This captures the firmware-owned result before later shared-cell reuse; the
+meaning of result `4` and its contribution to CONTACT SERVICE remain to be
+decoded. The observer uses a return target, not a mid-routine fetch tap whose
+silence could merely reflect translated straight-line execution.
 
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
 fresh run directory. Its ROM subdirectory additionally requires the hash-pinned

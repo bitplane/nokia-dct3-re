@@ -5,11 +5,19 @@ local memory = cpu.spaces['program']
 local handles = {}
 local counts = {}
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
-        0x2b6196, 0x2b61bc, 0x2b6200, 0x2e1194, 0x2de164, 0x2ca910}) do
+        0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2e1194, 0x2de164, 0x2ca910}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            -- Observe at the caller's return target: translated straight-line
+            -- instruction fetches need not trigger a mid-routine read tap.
+            if address == 0x2d333c and counts[address] == 1 then
+                machine:logerror(string.format(
+                    'nse6_verifier_result: first=%04x second=%04x t=%.9f\n',
+                    memory:read_u16(0x1205ca), memory:read_u16(0x1205cc),
+                    machine.time:as_double()))
+            end
             if counts[address] > 4 then return end
             machine:logerror(string.format(
                 'nse6_stage_pc: pc=%08x lr=%08x sp=%08x t=%.9f\n',
