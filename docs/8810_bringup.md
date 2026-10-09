@@ -125,7 +125,15 @@ The entry is initially intact: executions from 0.256693 s read `f7bb` at
 (`1ca4=4612`, SP=`1ca4`, PMST=`ffac`). This distinguishes later stack
 corruption from an initially malformed entry. The first 128-word depth
 crossing at 0.385015 s is inside the `a4f7/4612` call/context-save path;
-its net stack balance remains to be established.
+its sampled saves/restores balance. At 0.385020596 s the return-address
+helper entered through `24cf -> 266b` instead selects `2677`: its ROM
+sequence compares the stacked continuation with `a53b`, restores ST0/AR2,
+uses `FRAME +1` to discard the return word, then branches to `27aa`.
+This bypasses ordinary return after the `a539` call inside the `a51b`
+interrupt-servicing path. Subsequent vector entries have lower SP. The next
+contract is how this recognized-continuation path at `27aa` should unwind
+or transfer the saved context; a matched conditional branch is not itself
+proof of a CPU defect or proof that the firmware intended to leak a frame.
 This establishes stack overlap with shared ring state, not its cause. The next
 question is the first stack/control-flow divergence before those writes,
 including interrupt entry/return and frame-clock servicing. Do not synthesize

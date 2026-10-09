@@ -19,12 +19,14 @@ if dsp then
                 dsp.state['PMST'].value, machine.time:as_double()))
         end)
     local inspecting_call = false
-    for _, address in ipairs({0x3f4e, 0x90e7, 0x23d4, 0x23e2, 0x1ca4}) do
+    for _, address in ipairs({0x3f4e, 0x90e7, 0x23d4, 0x23e2, 0x1ca4,
+            0x266b, 0x2677, 0x27aa}) do
         local calls = 0
         handles[#handles + 1] = dsp.spaces['program']:install_read_tap(address, address,
             'nse6_native_stack_call_' .. address, function(offset, value)
                 if inspecting_call or dsp.state['PC'].value ~= address + 1 then return end
-                if address ~= 0x1ca4 and machine.time:as_double() < 0.928 then return end
+                local context_exit = address == 0x266b or address == 0x2677 or address == 0x27aa
+                if address ~= 0x1ca4 and machine.time:as_double() < (context_exit and 0.38 or 0.928) then return end
                 calls = calls + 1
                 if calls > 16 then return end
                 inspecting_call = true
