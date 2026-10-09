@@ -105,6 +105,31 @@ Neither the acceptance range nor the observed numbers establishes physical
 units, a valid battery tuple, or authentic EEPROM calibration. Do not sweep
 inputs or edit the counter/event byte to manufacture report `0x14`.
 
+### Source Mapping and Calibration Boundary
+
+Source reader `0x2e0ada` uses the ten-byte selector table at `0x3033d8`:
+`00 04 05 06 07 03 01 02 02 01`. Source 7 selects CCONT ADC channel 2
+through `0x2e5db8`. Sources 8/9 instead return cached halfwords from
+`0x121588 + 2*source - 12`; source 8 therefore reads `0x12158c`.
+The request API at `0x2e0a8a` separately starts acquisition for those cached
+sources; a table entry alone is not evidence of an immediate conversion.
+
+The sample transform uses calibration fields at `0x13fe4c` and `0x13fe50`,
+then the own-ROM constants 1500 and 232. A fresh diagnostic cold run records
+source 7 raw `0x03ff`, gain bits `0x3f800000` (1.0), and offset bits zero.
+For that observed identity case, integer scaling `1023 * 1500 / 232`
+gives 6614, matching the rejected `0x19d6` sample. This grounds the current
+failure in a full-scale input rather than an invented completion event.
+
+The original NSE-6 service chapter identifies a nominal 3.6 V battery and
+CCONT-controlled battery measurements (pages 3-12 and 3-26/27), but its
+text preview does not identify ADC selector numbers or the conversion scale.
+Do not transfer the sibling profiles' channel-2 VBATT interpretation solely
+from matching firmware tables. The next evidence target is the own power
+schematic/CCONT transfer specification, plus the writer of the source-8 cache.
+Until then these fields establish a digital contract, not a physically
+calibrated NSE-6 battery model or authenticated provisioning.
+
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
 (32 KiB). These are physical capacities, not a complete BUSC alias map.

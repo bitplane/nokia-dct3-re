@@ -113,6 +113,8 @@ def check(image):
         (0x221E20, 0x9004),
         (0x21E09A, 0x11EB59), (0x21F836, 0x11EB5E),
         (0x293D7A, 0x157C), (0x293D8A, 0x157C),
+        (0x2E0B0C, 0x3033D8), (0x2E0AF2, 0x121588),
+        (0x293CCE, 0x13FE18), (0x293CE8, 1500),
         (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
@@ -278,7 +280,11 @@ def check(image):
         (0x293D74, "lsls", "r2, r2, #3"),
         (0x293D78, "blt", "#0x293d92"),
         (0x293D7E, "bgt", "#0x293d92"),
-        (0x293D90, "movs", "r0, #1"))
+        (0x293D90, "movs", "r0, #1"),
+        (0x2E0AEA, "cmp", "r5, #8"),
+        (0x2E0AF8, "subs", "r0, #0xc"),
+        (0x2E0AFA, "ldrh", "r4, [r0]"),
+        (0x293CEC, "movs", "r1, #0xe8"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -307,6 +313,9 @@ def check(image):
         raise ValueError("own NSE-6 report dispatcher continuation changed")
     if image[0x103534] != 0x70:
         raise ValueError("own NSE-6 CCONT status-command table changed")
+    source_selectors = image[0x1033D8:0x1033E2]
+    if source_selectors != bytes.fromhex("00040506070301020201"):
+        raise ValueError("own NSE-6 source-selector table changed")
     stream = verifier_stream(image)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != VERIFIER_STREAM_SHA1:
@@ -342,6 +351,13 @@ def check(image):
                          "indirect_callers_closed": False,
                          "dispatcher": "0x222532", "states": 30,
                          "observed_state_1a_target": "0x221c8c"},
+            "acquisition": {"reader": "0x293cc0", "source_reader": "0x2e0ada",
+                            "selector_table": "0x3033d8",
+                            "selectors": list(source_selectors),
+                            "source7_selector": 2, "source8_cache": "0x12158c",
+                            "gain_address": "0x13fe4c", "offset_address": "0x13fe50",
+                            "scale_numerator": 1500, "scale_divisor": 232,
+                            "physical_units_proven": False},
             "simi": {"initializer": "0x2ca910", "receiver": "0x2ca986",
                      "tx_register": "0x36", "rx_register": "0x37",
                      "iir_register": "0x38", "control_register": "0x39",

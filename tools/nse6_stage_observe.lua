@@ -65,11 +65,19 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
         0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a,
         0x21fb1e, 0x21fb94, 0x21fb98, 0x2dca88, 0x294c90,
-        0x222532, 0x22254e, 0x21e012, 0x293da2}) do
+        0x222532, 0x22254e, 0x21e012, 0x293da2, 0x293ccc, 0x293d0e}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if (address == 0x293ccc or address == 0x293d0e)
+                    and counts[address] <= 4 then
+                machine:logerror(string.format(
+                    'nse6_source_sample: source=%u raw=%04x gain_bits=%08x offset_bits=%08x t=%.9f\n',
+                    address == 0x293ccc and 7 or 8, cpu.state['R0'].value & 0xffff,
+                    memory:read_u32(0x13fe4c), memory:read_u32(0x13fe50),
+                    machine.time:as_double()))
+            end
             if address == 0x293da2 and counts[address] <= 16 then
                 machine:logerror(string.format(
                     'nse6_sample_acquire: result=%08x remaining=%02x first=%04x second=%04x t=%.9f\n',
