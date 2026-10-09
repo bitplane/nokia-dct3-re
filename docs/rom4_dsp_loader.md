@@ -989,6 +989,15 @@ RTN or describes a distinct fast-return value is not settled by these
 sources. Resolve that distinction before asserting a CALLD-to-RETF
 expectation or changing its RTN behavior. The non-delayed immediate CALL
 regression does not close accumulator, conditional or far-call coverage.
+An isolated 30-second native 5110 run with passive `-verbose` opcode
+observation executes `f074` CALL 103,727 times (first PC `0f15`) and `f274`
+CALLD 6,502 times (first PC `0db3`). No `f4e3`/`f5e3` CALA or
+`f6e3`/`f7e3` CALAD is observed in that window; this is not a static absence
+claim. The same run passes the RF-boundary checker with the unchanged
+207,040 reads and three port-32 writes. Its raw evidence is retained in
+`run_rom4_call_inventory_verbose/error.log`. CALLD therefore has a measured
+native workload, but execution frequency cannot resolve the RTN ambiguity
+or prove its fast-return contract.
 
 Software INTR publishes RTN just as hardware interrupt entry already does;
 the existing three-cycle cost is unchanged. These are 64 architectural
