@@ -16631,6 +16631,47 @@ private:
 				return;
 			}
 			osd_printf_info("TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4\n");
+			program.write_word(0x05e2, 0xf581); // SUB A,ASM,B.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xffffffffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x7fffffff);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 40005;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 40005 && m_phase <= 40008)
+		{
+			const unsigned index = m_phase - 40005;
+			const bool negative = index >= 2;
+			const bool saturate = BIT(index, 0);
+			const u64 expected = negative ?
+				(saturate ? 0xff80000000ULL : 0xff7fffffffULL) :
+				(saturate ? 0x007fffffffULL : 0x0080000000ULL);
+			expect_opcode(0xf581,
+				m_cpu->state_int(tms320c54x_device::STATE_B) == expected &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (negative ? 1 : 0xffffffffffULL) &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0e00) == (negative ? 0x0a00 : 0x0200) &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"SUB A,ASM,B owns B overflow, preserves A and distinguishes OVM saturation in one cycle");
+			if (index < 3)
+			{
+				const unsigned next = index + 1;
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, next >= 2 ? 1 : 0xffffffffffULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, next >= 2 ? 0xff80000000ULL : 0x7fffffff);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0100 | (BIT(next, 0) ? 0x0200 : 0));
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			osd_printf_info("TMS320C54x ASM accumulator subtract conformance: PASS overflow_variants=4 source_preserved=1\n");
 			program.write_word(0x05e2, 0xf58c); // MPYA T,B.
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080000000ULL);

@@ -1211,6 +1211,7 @@ check-c54x-core: build
 		tee /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x core conformance: PASS" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4" /tmp/tms320c54x-core-check.log
+	@grep -q "TMS320C54x ASM accumulator subtract conformance: PASS overflow_variants=4 source_preserved=1" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x shifted high store conformance: PASS variants=128" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x XF output: PASS status_variants=8 debugger=1 restore=1" /tmp/tms320c54x-core-check.log
 	@grep -q "TMS320C54x stack address latency conformance: PASS" /tmp/tms320c54x-core-check.log
