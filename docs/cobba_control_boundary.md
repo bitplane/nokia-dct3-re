@@ -266,6 +266,30 @@ serial work, not a periodic interrupt source or proof of audio output. The
 native tone fixture still requires serial readiness/frame delivery to be
 modeled separately.
 
+### Serial-control ownership correction
+
+TI's [C54x CPU Reference Guide](https://www.ti.com/lit/ug/spru131g/spru131g.pdf),
+section 8.2 tables 8-2 through 8-7, maps data `20/21/22` to BDRR0/BDXR0/BSPC0
+on the relevant buffered-serial variants. Section 9.2 distinguishes writable
+configuration from read-only readiness/clock-pin fields and defines reset
+and frame-sync behavior. Combined with the local ROM's `c008 -> c0c8`,
+BDXR write and BDRR poll, this corroborates the serial-port interpretation;
+it does not corroborate a COBBA parallel register-C transaction.
+
+The native backend still forwards data `0022` and `0032` to
+`parallel_control_w` and returns before updating its data backing word. This
+is an unresolved attachment defect: the observed `0022` writes must not be
+used as evidence of physical MFI control traffic merely because their upper
+nibble is `c`. The generic TI `0032` assignment varies by part, so the second
+address also needs its own local sequence/variant evidence, not a shared
+"interrupt-masked alias" assumption. Before attaching the 8 kHz frame clock,
+separate DSP serial control state from COBBA control, implement documented
+reset/readiness at the DSP endpoint, preserve the externally returned boot
+echo, and replace the coherent gate's parallel-log expectations with actual
+serial-control/echo assertions. Exact word timing and MFI port mapping remain
+independent boundaries; do not double-drive both owners to preserve an old
+log predicate.
+
 ## Physical capture option
 
 The NSM-3 v5.31 flash-staged verifier independently uses the serial port pair
