@@ -457,8 +457,11 @@ additionally proves SET UP MENU, physical navigation and item-1 selection,
 exact ENVELOPE and four own localized menu/recovery frames.
 `verify-8890-sim-toolkit-sms` additionally proves card-requested SMS through
 exact laboratory CP/RP submission/acknowledgements, terminal success and RR
-release, with physical idle recovery. Toolkit call consent and native DSP
-speech remain unpromoted for this product.
+release, with physical idle recovery. `verify-8890-sim-toolkit-call` additionally
+proves physical Call consent and complete laboratory CC/RR setup/release;
+`verify-8890-sim-toolkit-call-decline` proves physical Cancel, result `22`
+and no call establishment. Own localized frames and retained registration
+are required. Native DSP speech and end-to-end audio remain unpromoted.
 
 The 6210 additionally passes `verify-6210-sim-toolkit-interactive`, proving
 physical `5`/`42` GET INKEY/GET INPUT replies, exact successful text TLVs,

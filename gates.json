@@ -499,6 +499,18 @@
                  "arguments": ["$(RUN_DIR)", "--sms", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8890-sim-toolkit-call", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8890_toolkit_retained.py",
+                 "arguments": ["$(RUN_DIR)", "--call", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-8890-sim-toolkit-call-decline", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8890_toolkit_retained.py",
+                 "arguments": ["$(RUN_DIR)", "--call-decline", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8890-sim-toolkit-busy", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8xxx_supplementary.py",

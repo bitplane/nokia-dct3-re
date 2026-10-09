@@ -2141,7 +2141,27 @@ Ten own 84x48 frames cover interactive input, card menu, post-network menu
 and physical End to 12:02 idle (the network wait crosses a minute boundary).
 The earlier menu gate retains its separate 12:01 oracle. The extra INKEY OK, retained registration and SIM
 location remain independently required. This is laboratory SMS signaling,
-not public delivery, Toolkit call consent or native DSP speech.
+not public delivery or native DSP speech.
+
+`verify-8890-sim-toolkit-call` independently uses card profile 6. Item-1
+ENVELOPE announces SET UP CALL (`911c`, FETCH `1c`) and the localized
+Call/Cancel prompt. Physical Menu consent precedes the outgoing `5551234`
+request. The gate requires successful TERMINAL RESPONSE
+`810306100002028281030100`, SETUP, Call Proceeding, one traffic assignment,
+Assignment Complete, Alerting, Connect and Connect Acknowledge. Physical
+End precedes Disconnect, Release, Release Complete and RR release.
+
+`verify-8890-sim-toolkit-call-decline` uses physical Names/C at the same
+prompt. Firmware returns result `22` in
+`810306100002028281030122`, with no outgoing request, SETUP, traffic
+assignment or Connect. Own prompt and connected-or-menu frames are
+checked separately. Accepted-call recovered idle displays 12:01, while
+refused-call idle displays 12:02; these are separate pixel observations,
+not a claim about the underlying RTC or redraw mechanism. Idle frames are
+checked separately, alongside retained registration and SIM location. Both
+gates retain the NSB-6 INKEY OK requirement and start with a fresh own-PMM
+physical clock seed. They prove HLE laboratory consent/signaling, not native
+DSP speech, physical duplex or end-to-end audio.
 
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first

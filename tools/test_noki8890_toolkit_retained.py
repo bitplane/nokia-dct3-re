@@ -51,6 +51,12 @@ class RetainedToolkitTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'menu selection item=1 accepted'):
             verify_interactive_protocol(trace, menu=True, sms=True)
 
+    def test_invalid_call_consent_combinations(self):
+        for arguments in ({'decline': True}, {'call': True},
+                          {'menu': True, 'sms': True, 'call': True}):
+            with self.subTest(arguments=arguments), self.assertRaises(ValueError):
+                verify_interactive_protocol('', **arguments)
+
     def test_protocol_storage_and_both_frames_required(self):
         with tempfile.TemporaryDirectory() as directory:
             run = Path(directory)
