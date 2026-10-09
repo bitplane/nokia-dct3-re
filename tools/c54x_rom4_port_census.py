@@ -40,16 +40,33 @@ def direct_callers(image: bytes, target: int) -> list[tuple[int, bool]]:
             if opcode in (0xf074, 0xf274) and words[address + 1] == target]
 
 
+def caller_contexts(image: bytes, target: int, radius: int):
+    """Raw surrounding words, not an instruction-boundary or argument proof."""
+    if radius < 0:
+        raise ValueError("context radius must be nonnegative")
+    sites = direct_callers(image, target)
+    words = [int.from_bytes(image[i:i + 2], "big") for i in range(0, len(image), 2)]
+    return [(address, delayed, max(0, address - radius),
+             words[max(0, address - radius):min(len(words), address + 2 + radius)])
+            for address, delayed in sites]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
     parser.add_argument("--port", type=lambda value: int(value, 0))
     parser.add_argument("--call-target", type=lambda value: int(value, 0))
+    parser.add_argument("--context", type=int, default=0,
+                        help="raw words before/after each candidate call; not recovered arguments")
     args = parser.parse_args()
     image = args.image.read_bytes()
     if args.call_target is not None:
-        for address, delayed in direct_callers(image, args.call_target):
+        if args.context < 0:
+            parser.error("context radius must be nonnegative")
+        for address, delayed, base, words in caller_contexts(image, args.call_target, args.context):
             print(f"{address:04x} {'CALLD' if delayed else 'CALL'} {args.call_target:04x}")
+            if args.context:
+                print(f"  words@{base:04x}: " + " ".join(f"{word:04x}" for word in words))
         return
     for (direction, port), addresses in sorted(census(image).items()):
         if args.port is None or args.port == port:

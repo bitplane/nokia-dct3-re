@@ -333,6 +333,17 @@ Keep those product attachments explicit before promoting operational audio.
 
 ### NSE-1 physical clock contract
 
+The control-write helper at `45c2` has 27 raw direct CALL/CALLD candidates
+in the resident image. Reproduce their operand windows with
+`c54x_rom4_port_census.py IMAGE --call-target 0x45c2 --context 10`.
+This is full raw-word candidate coverage, not proven executable-call or
+data-flow coverage; indirect calls and uploaded code are excluded. The
+reviewed `b89c` sequence calls `a484` with register index 8, then supplies
+`0602` to `45c2` with index 8, followed by `0944` with index 9. Its exact
+words are checked by `codec_register8_constant_setup`, including mutation
+tests. This is another local control-use context, not evidence that `0600`
+means clock enable or that this path executes during the tone fixture.
+
 The [NSE-1 System Module manual](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251)
 (03/98, pp. 3-32--3-33) supplies product-specific clock evidence: COBBA
 divides the 13 MHz reference by 13 to generate a 1 MHz PCM data clock, then
