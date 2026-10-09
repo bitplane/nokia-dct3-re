@@ -939,7 +939,8 @@ Static cabinet inspection establishes these available components:
 - `Tools_C54x_sim_analysis.CAB`: the accompanying analysis component.
 
 Only static extraction/inspection has been performed; no installer, driver
-or scripting binary has been executed. The PE import table includes
+or scripting binary had been executed at acquisition. Subsequent isolated
+setup attempts are described below. The PE import table includes
 `CCReg.dll`, MFC42 and Windows runtime dependencies. Availability is not
 proof that this package runs under the current host or licensed setup.
 
@@ -950,6 +951,45 @@ recording cycle markers, IMR/IFR, SP and return continuation. Identify the
 target, package hash and execution mode in the result. Do not change Nokia
 timing, cancel accepted requests or add a foreground-instruction delay from
 archive availability alone. Native recorder completion remains unresolved.
+
+### Isolated simulator setup boundary
+
+`tools/run_ccs33_isolated.sh WORK COMMAND ...` supplies a disposable network-
+and process-isolated namespace around Wine/Xvfb. Persistent writes are limited
+to `WORK`; host `/data`, `/home` and `/root` are hidden. This optional vendor-
+tool runner is not a MAME acceptance gate. It requires `bwrap`, `timeout`,
+`xvfb-run` and Wine; prepare `WORK/home` and `WORK/prefix` first.
+The runner disables GLX: the host NVIDIA/EGL loader crashes Xvfb in this
+namespace otherwise. Harmless `/bin/true` and `wine --version` controls both
+exit zero with that setting. A child process printing output is insufficient
+display evidence; the stock Xvfb wrapper can run it after exhausting failed
+server starts and then report a cleanup error.
+
+Administrative MSI unpacking populated
+`run_ccs33_oracle/prefix/drive_c/CCS33Admin/CCStudio_v3.1`, including the IDE,
+simulator driver and scripting DLL. The directory label is the MSI's layout,
+not evidence of a different package version. Full installation stopped at
+`TIBuildInstallDirRegKey` before completing installation. Inspection shows
+that action constructs a registry path from `INSTALLDIR` and commits the MSI
+database; it is not a target program or simulator execution.
+
+The package-owned MFC42/Xerces directories in `WINEPATH`, a working software
+display and acknowledgement of the drag/drop registration warning allow
+`cc_setup.exe` to reach its real factory-board UI. The C54xx list contains
+`C549 Device Simulator`; adding it displays the Texas Instruments C54x
+simulator CPU with `drivers/tisim54x.dvr`. Save-and-launch starts `cc_app.exe`
+and `ccsmonitor.exe`, but the IDE then reports a missing/incorrect Component
+Manager INI registry path. No simulator initialization, pipeline-mode
+selection or timer result is proved by these UI observations.
+
+Retained setup evidence is `run_ccs33_oracle/admin-install.log`,
+`full-install.log`, `setup-observed.log`, `setup-windows.log` and
+`setup-screen.png`, plus `run_ccs33_oracle_setup_display_fixed.log` and
+`run_ccs33_oracle_launch_c549.log`. The next dependency is functioning legacy
+installation/component registration and automation, not a changed Nokia
+fixture or an invented interrupt delay. The Wine log also reports missing
+Mono for a launched runtime component; it does not prove Mono alone prevents
+the C54x driver from running.
 TI's [C5400 scripting support answer](https://e2e.ti.com/support/tools/code-composer-studio-group/ccs/f/code-composer-studio-forum/1026307/code-composer-c5400-debugging-with-dss-api)
 also rules out a modern DSS-based shortcut: C54x simulation ends at CCS
 3.3, whereas DSS begins at CCS 4. TI explicitly states that no version
