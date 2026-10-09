@@ -17461,6 +17461,10 @@ private:
 				"near CALL reaches its callee and stacks the continuation before fast return");
 			data.write_word(0x03ff, 0xdead);
 			program.write_word(0x020701, 0xf49b); // RETF must use RTN, not the sentinel.
+			m_saved_repeat.str(std::string());
+			m_saved_repeat.clear();
+			expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+				"save CALL-published RTN before fast return");
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			m_phase = 62051;
 			m_check_timer->adjust(attotime::from_usec(100));
@@ -17474,6 +17478,41 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
 				data.read_word(0x03ff) == 0xdead,
 				"SPRU131G CALL publishes RTN independently of its return-stack word");
+			program.write_word(0x030780, 0xf074);
+			program.write_word(0x030781, 0x0700);
+			program.write_word(0x030700, 0xf4e1);
+			m_cpu->set_state_int(STATE_GENPC, 0x030780);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 62052;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 62052)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x030701 &&
+				data.read_word(0x03ff) == 0x0782,
+				"second real CALL replaces the RTN checkpoint before restoration");
+			m_saved_repeat.clear();
+			m_saved_repeat.seekg(0);
+			expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE,
+				"restore CALL-published RTN checkpoint");
+			expect(m_cpu->state_int(STATE_GENPC) == 0x020701 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x03ff &&
+				data.read_word(0x03ff) == 0xdead,
+				"restore paused callee, page and independent stack sentinel");
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 62053;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase == 62053)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == 0x020683 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				data.read_word(0x03ff) == 0xdead,
+				"restored CALL RTN fast-returns identically after another call overwrites it");
 			start_far_save_case(false);
 			return;
 		}

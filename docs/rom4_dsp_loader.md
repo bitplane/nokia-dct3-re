@@ -968,6 +968,13 @@ stack-only CALL implementation and passes with RTN assigned before the push
 (`run_c54x_call_rtn_red`, `run_c54x_call_rtn_green`). The four-cycle CALL cost
 is unchanged. This establishes the non-delayed immediate CALL contract, not
 delayed/conditional-call RTN behavior or interrupt-pipeline timing.
+The same executable case now saves the paused callee with a sentinel stack
+word, completes its fast return, then executes another CALL on page three
+with a different continuation. Restoring the snapshot must recover page two,
+the sentinel and the original RTN: a second RETF reaches the same original
+continuation with balanced SP. This validates restoration of the otherwise
+inaccessible return register after real architectural overwrite, rather than
+merely checking its save-item declaration (`run_c54x_call_rtn_restore.log`).
 The full executable core suite and tool suite pass. The post-change ROM4
 RF-boundary integration check also passes: 207,040 RF reads, three port-32
 writes, and no port-38/39 reads. This preserves the known native no-cell
