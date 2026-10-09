@@ -22,7 +22,7 @@ FRAMES = {
 }
 
 
-def check_alarm(text, power_choice=None):
+def check_alarm(text, power_choice=None, snooze=False):
     if power_choice not in (None, "yes", "no"):
         raise ValueError("unknown NHM-3 alarm activation choice")
     actions = re.findall(r"6250_alarm_physical: action=(\w+)\b", text)
@@ -32,6 +32,10 @@ def check_alarm(text, power_choice=None):
     if power_choice:
         expected[-1:-1] = ["power_off", "power_release"]
         expected.append("activate_" + power_choice)
+    if snooze:
+        if power_choice:
+            raise ValueError("combined Snooze/off fixture is not validated")
+        expected.insert(-1, "snooze")
     if "[LUA ERROR]" in text or actions != expected:
         raise ValueError("NHM-3 physical alarm sequence differs")
     cursor = 0
@@ -54,6 +58,23 @@ def check_alarm(text, power_choice=None):
     after_stop = text.split("6250_alarm_physical: event=stopped_presented", 1)[1]
     if "buzzer: enabled=1" in after_stop:
         raise ValueError("NHM-3 buzzer resumed after Stop settled")
+    if snooze:
+        cursor = text.index("6250_alarm_physical: action=snooze")
+        for pattern in (
+            r"buzzer: enabled=0 divider=0 frequency=0\b",
+            r"ccont_rtc: event=alarm_write reg=0b data=35 armed=1\b",
+            r"ccont_rtc: event=alarm_write reg=0c data=0d armed=1\b",
+            r"6250_alarm_physical: event=snoozed_presented\b",
+            r"ccont_rtc: event=second time=13:53:00 day=0 status=b1 mask=10\b",
+            r"ccont_rtc: event=status_ack data=a1 old=b1\b",
+            r"buzzer: enabled=1 divider=\d+ frequency=\d+ volume=[1-9]\d*\b",
+            r"6250_alarm_physical: event=recurrence_observed\b",
+            r"6250_alarm_physical: action=stop\b",
+        ):
+            match = re.search(pattern, text[cursor:])
+            if not match:
+                raise ValueError("missing/out-of-order NHM-3 Snooze boundary: " + pattern)
+            cursor += match.end()
     if power_choice:
         from tools.power_domain_contract import require_endpoint_silence
 
@@ -77,7 +98,10 @@ def main():
     parser.add_argument("--mame", type=Path)
     parser.add_argument("--power-choice", choices=("yes", "no"),
                         help="power off before expiry, then physically choose activation")
+    parser.add_argument("--snooze", action="store_true")
     args = parser.parse_args()
+    if args.snooze and args.power_choice:
+        parser.error("Snooze/off combination is not validated")
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     mame = (args.mame or root / "mame/mame").resolve()
@@ -94,20 +118,27 @@ def main():
                    f"{phase / 'roms'};{root / 'roms'}", "-nvram_directory", "nvram",
                    "-cfg_directory", "cfg", "-noreadconfig", "-autoboot_script",
                    str(root / "tools/noki6250_alarm_input.lua"), "-autoboot_delay", "0",
-                   "-seconds_to_run", "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
+                   "-seconds_to_run", "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
                    "-nothrottle", "-log", "-verbose"]
         environment = os.environ.copy()
-        for key in ("NOKIA_DCT3_6250_ALARM_POWER_OFF", "NOKIA_DCT3_6250_ALARM_POWER_CHOICE"):
+        for key in ("NOKIA_DCT3_6250_ALARM_POWER_OFF", "NOKIA_DCT3_6250_ALARM_POWER_CHOICE",
+                    "NOKIA_DCT3_6250_ALARM_SNOOZE"):
             environment.pop(key, None)
         if args.power_choice:
             environment.update(NOKIA_DCT3_6250_ALARM_POWER_OFF="1",
                                NOKIA_DCT3_6250_ALARM_POWER_CHOICE=args.power_choice)
+        if args.snooze:
+            environment["NOKIA_DCT3_6250_ALARM_SNOOZE"] = "1"
         with (phase / "console.log").open("w") as console:
             subprocess.run(command, cwd=phase, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
         text = (phase / "error.log").read_text(errors="replace")
-        check_alarm(text, args.power_choice)
+        check_alarm(text, args.power_choice, args.snooze)
         frames = dict(FRAMES)
+        if args.snooze:
+            frames.update(
+                snoozed="360ff6d56fc11b9b4447678eb0e11f6568d7171ea3c611633137f9f14c785b76",
+                recurred="a17ae41b186da6b422d94484b171c0766749f27c4ce0c1747a5a49b24e6d7c18")
         if args.power_choice:
             from tools.noki6250_staged_check import check as check_uploads
             from tools.radio_registration_trace_check import verify
@@ -136,7 +167,8 @@ def main():
             subprocess.run([sys.executable, str(root / "tools/radio_registration_trace_check.py"),
                         str(phase / "error.log"), "--profile", "nhm3", "--preserved"], check=True)
         print("6250 research-HLE physical alarm PASS; activation=" +
-              (args.power_choice or "awake Stop") + "; native speech/audio output not tested")
+              (args.power_choice or ("awake Snooze/Stop" if args.snooze else "awake Stop")) +
+              "; native speech/audio output not tested")
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"6250 alarm failed: {error}\n")
 

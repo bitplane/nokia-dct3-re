@@ -1272,7 +1272,7 @@ missing alarm presentation. Fresh and preserved registration are checked
 independently in the three processes.
 
 This establishes natural RTC IRQ consumption and firmware output programming
-in research HLE. It does not establish audible samples, Snooze recurrence,
+in research HLE. It does not establish audible samples,
 native DSP or physical clock accuracy. No alarm cause,
 time register or firmware state is injected.
 
@@ -1286,3 +1286,12 @@ the initial and alarm-wake uploaded DSP stages separately, require silence
 of the named powered transport endpoints during the off interval, and check
 exact product-local off, alarm, question and final-choice frames. This is
 the own PMM research-HLE composition, not a native-DSP or speech claim.
+
+`verify-6250-alarm-snooze` separately exercises the awake alarm's physical
+right softkey. Firmware silences the buzzer and programs `0b=35`, `0c=0d`
+for 13:53. Natural RTC expiry at that deadline has status `b1`, mask `10`,
+and firmware acknowledgement `a1`; buzzer programming resumes before the
+second physical Stop. Exact additional frames show `Snooze active` and the
+recurring alarm. No deadline, status or firmware state is injected. This
+does not validate powered-off Snooze or save-state restoration of a pending
+alarm, nor does programmed buzzer activity establish audible/native audio.

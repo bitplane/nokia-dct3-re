@@ -49,7 +49,10 @@ bytes and four product-local frames. `verify-6250-alarm-off-no` and
 `verify-6250-alarm-off-yes` additionally prove RTC-only wake from rail-off,
 Stop to the activation question, physical No back to off, and physical Yes
 to preserved registration, with separate uploaded-stage checks and exact
-frames. Snooze and audible/native media remain unproved.
+frames. `verify-6250-alarm-snooze` proves physical awake Snooze, firmware
+re-arm to 13:53, natural second expiry and Stop with two additional exact
+frames. Powered-off Snooze, pending-alarm state restoration and audible/native
+media remain unproved.
 
 `verify-8890-alarm` independently proves physical Settings 4-1 alarm entry
 on NSB-6, own `13:48` CCONT programming, natural expiry, alarm-cause `b3`

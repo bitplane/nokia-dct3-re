@@ -51,6 +51,28 @@ class AlarmCheckTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_alarm(self.power_trace("no"), "yes")
 
+    def snooze_trace(self):
+        return self.trace().replace("6250_alarm_physical: action=stop", "\n".join((
+            "6250_alarm_physical: action=snooze",
+            "buzzer: enabled=0 divider=0 frequency=0",
+            "ccont_rtc: event=alarm_write reg=0b data=35 armed=1",
+            "ccont_rtc: event=alarm_write reg=0c data=0d armed=1",
+            "6250_alarm_physical: event=snoozed_presented",
+            "ccont_rtc: event=second time=13:53:00 day=0 status=b1 mask=10",
+            "ccont_rtc: event=status_ack data=a1 old=b1",
+            "buzzer: enabled=1 divider=5202 frequency=2499 volume=5",
+            "6250_alarm_physical: event=recurrence_observed",
+            "6250_alarm_physical: action=stop")))
+
+    def test_snooze_recurrence(self):
+        check_alarm(self.snooze_trace(), snooze=True)
+
+    def test_snooze_wrong_deadline_ack_or_rearm_rejected(self):
+        for old, new in (("13:53:00", "13:52:00"), ("data=a1", "data=21"),
+                         ("data=35", "data=34"), ("event=recurrence_observed", "event=absent")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_alarm(self.snooze_trace().replace(old, new), snooze=True)
+
     def test_wrong_deadline_cause_or_ack_rejected(self):
         for old, new in (("13:48:00", "13:47:00"), ("status=b1", "status=31"),
                          ("data=81 old=b1", "data=01 old=b1"), ("data=30 armed=1", "data=00 armed=1")):
