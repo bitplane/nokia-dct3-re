@@ -60,9 +60,13 @@ Display controller and viewport dimensions now form one typed geometry
 contract. The LCD controller and MAME screen consume the same contract, and
 zero-sized or controller-exceeding viewports are rejected centrally. The 3410
 retains its evidenced 102-by-72 controller RAM and 96-by-65 viewport. The
-unsupported 7110 and 6210 no longer resize only the screen while silently
-leaving the controller at 84-by-48; they retain conservative defaults until
-their different controller is modeled.
+6210 and 6250 independently select 96-by-64 controller storage with a
+96-by-60 viewport. Their firmware bank writes and product documentation
+support this geometry; the fitted controller identity remains unresolved.
+The 7110 selects the separate SED1565 serial controller with a 132-by-65
+storage contract and a 96-by-65 panel window starting at column 18. That
+configuration does not promote its blocked native-DSP boot to graphical
+phone acceptance. Product boot status belongs to `model_coverage.md`.
 
 ## Completed MAD2 DSP-reset wiring refactor
 
@@ -160,10 +164,12 @@ in `network_scouting.md`. Dedicated-mode handover is validated independently on
 NSE-8, NHM-5, NHM-6 and NHM-2; their Nokia channel-confirmation values remain explicit product
 contracts rather than a cross-product default.
 
-## Frozen post-NHM-2 frontier
+## Post-NHM-2 regression reference
 
-This cleanup starts from commit `6b30852` (`speech control`). Its named
-acceptance surface is:
+The following established regression surface was recorded at commit
+`6b30852` (`speech control`). It is not the current model frontier or an
+exhaustive acceptance inventory; `gates.json` owns the live recipes and
+`model_coverage.md` owns demonstrated product scope:
 
 - `make verify-radio-incoming-call-lifecycle`;
 - `make verify-3310-radio-incoming-call-lifecycle`;
