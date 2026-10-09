@@ -3435,6 +3435,19 @@
       ]
     },
     {
+      "name": "verify-5210-radio-a5-1-degraded-state",
+      "prerequisites": ["normalize-5210"], "variables": {},
+      "steps": [
+        {"step": "shell", "silent": true, "command": "$(MAKE) --no-print-directory run PHONE=noki5210 BIOS=540e RUN_DIR=$(RUN_DIR) SECONDS=35 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=send NOKIA_DCT3_POST_READY_KEY_DELAY_MS=18000 $(DCT3_PRESS_220_280) NOKIA_DCT3_STATE_ROUNDTRIP_AT=23 NOKIA_DCT3_STATE_ROUNDTRIP_REPLAY_MS=2000 NOKIA_DCT3_STATE_ROUNDTRIP_END_DELAY_MS=3000 NOKIA_DCT3_STATE_ROUNDTRIP_END_KEY=end'"},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/radio_a5_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/radio_call_state_roundtrip_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/radio_5210_incoming_call_trace_check.py", "arguments": ["$(RUN_DIR)/error.log", "--a5-1", "--require-state-roundtrip"], "options": ["--a5-1", "--require-state-roundtrip"]},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/radio_degraded_speech_trace_check.py", "arguments": ["$(RUN_DIR)/error.log", "$(COBBA_GJP_PCM_CHECK_ARGS)"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/radio_facch_interruption_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/radio_sacch_coexistence_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []}
+      ]
+    },
+    {
       "name": "verify-5210-radio-a5-1-incoming-call",
       "prerequisites": ["normalize-5210"],
       "variables": {},

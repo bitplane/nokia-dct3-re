@@ -120,6 +120,13 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   sample in a 16-bit word. The coherent gate proves bidirectional GSM-FR,
   non-silent downlink, FACCH stealing, degraded-frame concealment, SACCH
   coexistence, exact active-call save/load replay and physical End teardown.
+  `make verify-5210-radio-a5-1-degraded-state` separately combines organic
+  authentication/ciphering with bidirectional burst impairment and a save at
+  23 seconds. Its two-second restored interval reproduces 41 digital speech
+  records exactly; physical End returns to PCH after 500 microphone and 470
+  earpiece frames. The own NSM-5 lifecycle, concealment/recovery, FACCH and
+  SACCH checks remain mandatory. This is HLE codec/protocol restoration,
+  not native DSP execution or restoration of an external SIP dialog.
   Nokia's matching troubleshooting guide traces the internal microphone
   components `R268/C274/C263/C278/C262` to COBBA MIC2P/MIC2N and the receiver
   components `C292/C291/L272/L271` to EARP/EARN. Consequently,
