@@ -976,6 +976,20 @@ during fixture generation under `/tmp`; rerunning with workspace `TMPDIR`
 resolved that storage failure without changing the fixture or acceptance
 criteria (`run_c54x_call_rtn_rom4_workspace.log`).
 
+Adjacent call forms remain a separate conformance question. `CALA`,
+`CALAD` and `CALLD` currently push their continuation without publishing
+RTN; their existing executable cases test target, stack and delay slots,
+not fast return through RTN. Do not extend the immediate-CALL fix by
+analogy: [SPRU131G example 7-5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+labels delayed-call RTN as `a3`, the first delay-slot address, whereas
+[SPRU172C pages 4-27/4-28](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+explicitly stack instruction-PC plus four (after both delay words).
+The stack continuation is unambiguous; whether that diagram mislabels
+RTN or describes a distinct fast-return value is not settled by these
+sources. Resolve that distinction before asserting a CALLD-to-RETF
+expectation or changing its RTN behavior. The non-delayed immediate CALL
+regression does not close accumulator, conditional or far-call coverage.
+
 Software INTR publishes RTN just as hardware interrupt entry already does;
 the existing three-cycle cost is unchanged. These are 64 architectural
 return assertions, not a pipeline-latency oracle. The external reference cannot
