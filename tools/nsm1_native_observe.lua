@@ -39,6 +39,16 @@ handles[#handles + 1] = memory:install_read_tap(sender, sender + 3,
     end)
 end
 local sim_receive_entries = 0
+local socket_continuations = 0
+handles[#handles + 1] = memory:install_read_tap(0x28830c, 0x28830f,
+    'nsm1_socket_continuation', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x28830e or socket_continuations >= 16 then return end
+        socket_continuations = socket_continuations + 1
+        machine:logerror(string.format(
+            'nsm1_socket_continuation: event=%02x object=%08x flag14=%02x t=%.9f\n',
+            cpu.state['R8'].value, cpu.state['R4'].value,
+            memory:read_u8(0x10e6d6), machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_read_tap(0x288114, 0x288117,
     'nsm1_sim_receive_entry', function(offset, value, mask)
         if cpu.state['PC'].value ~= 0x288114 then return end

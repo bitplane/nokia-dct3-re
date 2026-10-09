@@ -161,9 +161,10 @@ points to this exact object. The SIM task schedules index `0xe3` at
 `0x288f80` through `0x275106`, with delay `0xff + 0x79 = 0x178`.
 The cold socket-edge trace confirms index `0xe3`, delay `0x178`, at
 3.016680 seconds, retaining caller `0x2ab893` in task 0. This is a
-distinct path from the SIM-task schedule site: the caller is the return
-from `0x2a70dc` at `0x2ab88e`, so the timer primitive is reached through
-that helper rather than a direct call there. RTOS receive reaches the
+distinct observation from the SIM-task schedule site. The retained link
+register matches the return from `0x2a70dc` at `0x2ab88e`, but task-0
+interrupt context means it does not prove a call chain through that helper.
+The scheduling caller remains unresolved. RTOS receive reaches the
 descriptor branch `0x275f9c` with node `0x100bdc`, index `0xe3`, in task
 22 at 5.922080 seconds; the exact ROM object returns ten microseconds
 later. The SIM-task schedule site remains static-only. Readiness
@@ -171,8 +172,17 @@ still reads `01/ff/00/01` at eight seconds. The expanded no-edge cold control
 observes no receive object. The receive path can therefore carry a physical
 input-triggered event, but this does not complete SIM activation.
 
-Next: map event-`0x0c`'s continuation and the socket scheduling helper,
-then identify what
+The event reaches its own dispatch continuation `0x28830e` at 5.922103
+seconds with event `0x0c`, object `0x2e0a50`, and state-object byte `+14`
+zero. Firmware sets `0x10e6c9` (`+1`) and `0x10e6cf` (`+7`) to one;
+the existing write watch observes both stores. This branch does not set
+readiness byte `0x10e6ce` (`+6`). Its tail frees the received object and,
+without a return-selecting `r7` update, loops back to RTOS receive rather
+than returning the event to the outer SIM owner. Socket notification is
+therefore consumed as local state maintenance, not an activation request.
+
+Next: identify the outer SIM owner's legitimate activation event and
+its producer, while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
 GPIO ownership independently. Do not inject an event, force the readiness
