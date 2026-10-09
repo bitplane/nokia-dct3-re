@@ -383,7 +383,9 @@ observer records these bounded entries without modifying input or state.
 `make check-c54x-rom4-processing` regenerates the product's own EEPROM in a
 private directory, runs both passive observers for 30 seconds and checks the
 RF interface separately from the processing results. It requires sustained
-mode-1 execution, matched caller/hook counts, the two early alternate
+mode-1 execution, eight filter iterations per mode-1 frame, the four ordered
+filter-entry snapshots including status, history/output pointers and exact
+coefficient order, matched caller/hook counts, the two early alternate
 reduction frames, every-other-frame comparisons, exact full-width bounded
 snapshots, live producer counts and zero unattached input/output. Missing or
 duplicate observer records fail closed. These are regression expectations

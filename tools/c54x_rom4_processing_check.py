@@ -30,6 +30,20 @@ def check(text):
     frames = modes.get(0x32f4, 0)
     if frames < 1000:
         raise ValueError("missing sustained mode-1 execution")
+    if counts.get(0x330a) != frames * 8:
+        raise ValueError("filter loop count changed")
+    filter_entries = re.findall(
+        r"rom4_filter_entry: st1=([0-9a-f]{4}) bk=([0-9a-f]{4}) "
+        r"ar0=([0-9a-f]{4}) ar3=([0-9a-f]{4}) ar4=([0-9a-f]{4}) "
+        r"ar5=([0-9a-f]{4}) ar6=([0-9a-f]{4}) coefficients=([^\s]+)", text)
+    coefficients = "0387,11a3,2ad6,4000,4000,2ad6,11a3,0387"
+    expected_filter_entries = [
+        ("e900", "0010", "0002", output, history, "21a9", input_history, coefficients)
+        for output, history, input_history in (
+            ("1a48", "0084", "0080"), ("1a4a", "0088", "0084"),
+            ("1a4c", "008c", "0088"), ("1a4e", "0080", "008c"))]
+    if filter_entries != expected_filter_entries:
+        raise ValueError("missing or changed filter entry state/coefficients")
     for address in (0x3360, 0x3362, 0x336c, 0x336e, 0x2400, 0x2402):
         if counts.get(address) != frames:
             raise ValueError(f"processing/hook count changed at {address:04x}")
