@@ -3,11 +3,12 @@ from tools.noki8890_state_check import verify
 
 
 def sample():
-    return '''8890_state: event=saved pc=0000001c sp=00137b6c ram=97bf9f87 t=42.000000000
+    cpu = ','.join(['00000000'] * 37)
+    return f'''8890_state: event=saved pc=0000001c sp=00137b6c ram=97bf9f87 cpu={cpu} t=42.000000000
 state_replay: phase=reference event=begin t=42.000000000
 RX enqueue type=80 payload=34 data=1234 t=42.500000000
 state_replay: phase=reference event=end t=43.000000000
-8890_state: event=restored pc=0000001c sp=00137b6c ram=97bf9f87 t=42.000000000
+8890_state: event=restored pc=0000001c sp=00137b6c ram=97bf9f87 cpu={cpu} t=42.000000000
 state_roundtrip: result=pass scenario=8890_idle requested_at=42.000000000 t=42.000000000
 state_replay: phase=restored event=begin t=42.000000000
 RX enqueue type=80 payload=34 data=1234 t=42.500000000
@@ -18,6 +19,16 @@ state_replay: phase=restored event=end t=43.000000000
 
 
 class StateTest(unittest.TestCase):
+    def test_every_register_and_snapshot_extent(self):
+        original = ','.join(['00000000'] * 37)
+        for index in range(37):
+            changed = ['00000000'] * 37
+            changed[index] = '00000001'
+            with self.subTest(register=index), self.assertRaises(ValueError):
+                verify(sample().replace(original, ','.join(changed), 1))
+        with self.assertRaises(ValueError):
+            verify(sample().replace('cpu=00000000,', 'cpu=', 1))
+
     def test_sip_idle_continuation_requires_physical_exit(self):
         text = sample().replace('8890_state_physical: key=Menu', '8890_sip_cancel: physical Exit').replace('key=19', 'key=1a')
         verify(text, sip_cancel=True)

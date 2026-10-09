@@ -8,18 +8,13 @@ _G.noki8890_clock_outgoing_call = call
 local directory = assert(source:match('^(.*[/])'))
 dofile(directory .. (sms and 'noki8890_incoming_sms_input.lua' or 'noki8890_clock_input.lua'))
 local machine = manager.machine
-local cpu = assert(machine.devices[':maincpu'])
-local memory = cpu.spaces['program']
 local saved, completed
+local capture = dofile(directory .. 'arm_architecture_snapshot.lua')
 local function snapshot(event)
-    local sum = 0
-    for address = 0x100000, 0x17fffc, 4 do
-        sum = ((sum << 5) - sum + memory:read_u32(address)) & 0xffffffff
-    end
-    local state = {machine.time:as_double(), cpu.state['R15'].value,
-        cpu.state['R13'].value, sum}
-    machine:logerror(string.format('8890_state: event=%s pc=%08x sp=%08x ram=%08x t=%.9f\n',
-        event, state[2], state[3], state[4], state[1]))
+    local observed = capture(machine)
+    local state = {observed.time, observed.pc, observed.sp, observed.ram, observed.cpu}
+    machine:logerror(string.format('8890_state: event=%s pc=%08x sp=%08x ram=%08x cpu=%s t=%.9f\n',
+        event, state[2], state[3], state[4], state[5], state[1]))
     return state
 end
 local pre_save = emu.add_machine_pre_save_notifier(function()
@@ -29,7 +24,7 @@ end)
 local post_load = emu.add_machine_post_load_notifier(function()
     local restored = snapshot('restored')
     assert(saved, 'save observation absent')
-    for index = 1, 4 do assert(restored[index] == saved[index], 'architectural state mismatch') end
+    for index = 1, #saved do assert(restored[index] == saved[index], 'architectural state mismatch') end
     machine:logerror(string.format('state_roundtrip: result=pass scenario=8890_%s requested_at=%.9f t=%.9f\n', scenario, saved[1], restored[1]))
     machine:logerror(string.format('state_replay: phase=restored event=begin t=%.9f\n', restored[1]))
     local replay = coroutine.create(function()

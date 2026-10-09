@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb6_authenticated_dualband_full_arm_restore",
+      "owner": "nsb6_firmware",
+      "status": "satisfied",
+      "predicate": "Authenticated 8890 idle/call/SMS save-state lifecycles preserve all exported ARM architecture independently on GSM900 and PCS1900",
+      "current": "Six independently fresh PIN-enabled idle-state, call-state and sms-state runs compare 37 exported ARM registers, including CPSR and banked state, alongside mapped SRAM digest and emulated time. Each retains its own band/carrier registration predicates, pre-save PIN/registration ordering, nonempty protocol replay, exact reference/restored frames and physical Menu/End/Read continuation. The read-only arm_architecture_snapshot.lua is shared with the 6210, but timing, input and radio grammars remain product-specific. Every register mismatch and incomplete snapshots are negative-tested. Separate alerting/pending SIP fixtures retain their narrower snapshot contract; no native speech or PCM profile is promoted.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/arm_architecture_snapshot.lua", "tools/noki8890_state_roundtrip.lua", "tools/noki8890_state_check.py", "tools/test_noki8890_state_check.py", "tools/run_noki8890_pin_registration.py", "gates.json"]
+    },
+    {
       "id": "npe3_primary_state_full_arm_restore",
       "owner": "npe3_firmware",
       "status": "satisfied",

@@ -939,8 +939,11 @@ belongs to the cold process. The no-PIN composition is separately verified.
 `verify-8890-pin-state-sms` independently verify authenticated configured
 GSM900 restoration. Save points are 46, 56 and 23 seconds respectively;
 registration must have completed first, calls must be connected and SMS
-must be stored with its delivery channel released. Exact CPU/RAM/time,
-nonempty protocol replay and whole-screen equality are followed by physical
+must be stored with its delivery channel released. All 37 exported ARM
+registers (including CPSR and banked state), the mapped SRAM digest and time
+must restore exactly. The same read-only architecture helper is shared with
+the 6210 and both products' alarm fixtures; product input/timing remains local.
+Nonempty protocol replay and whole-screen equality are followed by physical
 Menu, End or Read after load. These tests retain the separate native-speech,
 cold-clock and authenticated PCS1900 boundaries.
 
@@ -1098,13 +1101,14 @@ directories, verbose logging and 50 seconds, then check:
 ```
 
 The fixture physically provisions time/date, saves at 42 seconds and requires
-exact restored emulated time, architectural R15/R13 and a digest over the
+exact restored emulated time, all 37 exported ARM registers and a digest over the
 complete mapped handset RAM window. A nonempty one-second ordered protocol
 interval replays identically, including payloads and GSM frame numbers.
 Reference/restored idle pixels match; a new physical Menu press after load
 decodes `19` and opens the reviewed `Mitteilungen` menu. Lua resumes only its
-host-side input schedule after restoration, never handset state. Five checker
-tests protect architectural and protocol mismatches, missing input and
+host-side input schedule after restoration, never handset state. Checker
+tests reject every individual register mismatch, incomplete snapshots,
+protocol mismatches, missing input and
 incomplete fixtures. This is idle/UI restoration, not active-call/SMS replay,
 battery-backed cold RTC continuity or native DSP speech validation.
 

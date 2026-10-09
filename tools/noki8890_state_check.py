@@ -22,9 +22,11 @@ def verify(text, call=False, sms=False, storage=None, pcs1900=False, sip_cancel=
         verify_registration(text, pcs1900=True)
     if configured_gsm900:
         verify_registration(text, configured_gsm900=True)
-    states = re.findall(r'8890_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
+    states = re.findall(r'8890_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) cpu=([0-9a-f,]+) t=([0-9.]+)', text)
     if len(states) != 2 or [state[0] for state in states] != ['saved', 'restored']:
         raise ValueError('missing exact save/load snapshots')
+    if any(not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}', state[4]) for state in states):
+        raise ValueError('incomplete ARM/banked register snapshot')
     if states[0][1:] != states[1][1:]:
         raise ValueError('CPU/RAM/time did not restore exactly')
     verify_roundtrip(text, ('TX packet', 'RX enqueue', 'GSM service', 'sim_device:'), '8890 idle')
