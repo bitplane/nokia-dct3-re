@@ -352,8 +352,12 @@ supplementary requests, correlated laboratory responses, RR release, reviewed
 result/idle pixels and EF_LOCI persistence. `verify-6210-call-divert-lifecycle`
 extends forwarding through register/active-query/deactivate/inactive-query;
 `verify-6210-state-divert` additionally restores exact CPU/RAM/time and observed
-protocol replay before a fresh physical active query. Forwarding is laboratory
-network save-state data, not cold-process NVRAM. These gates do not establish
+protocol replay before a fresh physical active query.
+`verify-6210-call-divert-cold` separately proves network-owned subscription
+NVRAM across independent processes: physical registration, retained active
+interrogation and host forwarding without paging, plus a fresh-storage inactive
+control. It uses unchanged own provisioning and separately reviewed idle pixels.
+These gates do not establish
 native DSP, speech or displayed forwarding-number content.
 
 `verify-6250-ussd` separately establishes the physical USSD exchange and reviewed

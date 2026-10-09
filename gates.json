@@ -15088,8 +15088,15 @@
       "name": "verify-6250-call-divert-cold",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
-                 "before_script": [], "script": "tools/run_noki6250_divert_cold.py",
+                 "before_script": [], "script": "tools/run_dct3_divert_cold.py",
                  "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-call-divert-cold",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_dct3_divert_cold.py",
+                 "arguments": ["$(RUN_DIR)", "--product", "6210", "--port", "16211", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
       "name": "verify-6250-state-divert",

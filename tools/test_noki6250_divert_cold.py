@@ -1,5 +1,5 @@
 import unittest
-from tools.run_noki6250_divert_cold import check_query
+from tools.run_dct3_divert_cold import check_query
 
 
 class ColdQueryTests(unittest.TestCase):
@@ -13,6 +13,9 @@ class ColdQueryTests(unittest.TestCase):
     def test_active_and_fresh_inactive_queries(self):
         check_query(self.trace(), True)
         check_query(self.trace(False), False)
+        check_query(self.trace().replace('6250_', '6210_'), True, '6210')
+        with self.assertRaisesRegex(ValueError, 'physical cold query'):
+            check_query(self.trace(), True, '6210')
 
     def test_registration_cannot_substitute_for_restoration(self):
         with self.assertRaisesRegex(ValueError, 're-registered'):
