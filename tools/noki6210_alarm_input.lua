@@ -35,6 +35,12 @@ local input = coroutine.create(function()
     end
     if not emu.wait(45) then return end
     machine.screens[':screen']:snapshot('6210_alarm_elapsed.png')
+    if _G.noki6210_alarm_snooze then
+        if not press(1, 'Right Softkey / C', 'snooze') then return end
+        -- Observe natural recurrence; do not write the clock or assume a delay.
+        if not emu.wait(600) then return end
+        machine.screens[':screen']:snapshot('6210_alarm_repeated.png')
+    end
     if not press(1, 'Left Softkey / Menu', 'stop') then return end
     if not emu.wait(3) then return end
     machine.screens[':screen']:snapshot('6210_alarm_stopped.png')

@@ -651,6 +651,24 @@ register reads, cold observation, clock restoration, or replacement alarm entry.
 Neither gate establishes audible output, Snooze, powered-off wake or native
 DSP behavior.
 
+### Snooze observation boundary
+
+`noki6210_alarm_snooze.lua` extends the same physical alarm fixture with
+Right Softkey / C at 77 seconds, then observes ten emulated minutes without
+writing the clock, interrupt registers or firmware state. In
+`run_6210_snooze_probe`, the firmware changes CCONT alarm registers to
+`35/0d` (13:53): this ROM selects a five-minute Snooze interval. The RTC
+naturally reaches 13:53:00 at 360 seconds and latches status `b1`, with mask
+`10`, but there is no subsequent alarm-status read or resumed buzzer before
+the physical Stop at 678 seconds. The captured screen remains `Snooze active`.
+Stop then reads the pending `b1` and clears the programmed alarm.
+
+This is not Snooze acceptance. The unresolved boundary is delivery/wake
+between an unmasked CCONT alarm latch and the MCU's sleeping interrupt
+consumer; investigate the CCONT line, MAD2 masks and CPU suspension before
+changing timer cadence or generating substitute firmware messages. Existing
+set/expiry/Stop and cold-retention gates retain their narrower claims.
+
 ## Unattached accessory input
 
 The NPE-3 schematic sheets 2/3 connect `HEADDET` to CCONT's EAD pin A2
