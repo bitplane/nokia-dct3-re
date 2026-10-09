@@ -9775,7 +9775,7 @@
         "\ttest -f $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \\",
-        "\t\t$(RUN_DIR)/error.log; \\",
+        "\t\t$(RUN_DIR)/error.log --require-cipher; \\",
         "\t$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \\",
         "\t\t$(RUN_DIR)/error.log; \\",
         "\t$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log; \\",

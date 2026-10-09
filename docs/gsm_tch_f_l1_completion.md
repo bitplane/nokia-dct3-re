@@ -39,6 +39,17 @@ whereas all-zero source bits produce none. These are reproducible decoder
 observations, not an independent standards conformance vector or a measured
 radio error distribution. A parity/tail pass cannot establish bit equality.
 
+A fresh v6.00 `verify-radio-a5-1-degraded` run with the strict cipher-replay
+requirement exposes the same acceptance boundary: exact replay passes
+(59 selected records), physical Answer/End and DSP release pass, but the
+uplink impairment-to-bad-frame predicate fails. The microphone remains
+silent (`mic_peak=0`, zero non-silent uplink blocks); burst inversion is
+observed in both directions while network speech is still reported good.
+Do not mark the complete degraded gate green, weaken its bad-frame
+predicate, or infer uplink integrity from parity acceptance. A controlled
+physical non-silent microphone run is the next discriminator; no codec or
+firmware state should be injected to satisfy the gate.
+
 Consequently, impairment counters plus network concealment counts do not
 alone prove corruption-induced uplink BFI: startup and FACCH can also cause
 concealment. Runtime evidence must distinguish these from corruption, and

@@ -3274,7 +3274,7 @@ verify-radio-a5-1-degraded:
 	test -f $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_call_state_roundtrip_trace_check.py \
-		$(RUN_DIR)/error.log; \
+		$(RUN_DIR)/error.log --require-cipher; \
 	$(PYTHON) tools/radio_answered_call_lifecycle_trace_check.py \
 		$(RUN_DIR)/error.log; \
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log; \
