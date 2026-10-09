@@ -61,6 +61,36 @@ class CallStateRoundtripTests(unittest.TestCase):
                 )
             )
 
+    def test_accepts_identical_cipher_burst_replay(self):
+        record = (
+            "radio_l1: kind=cipher direction=uplink algorithm=1 "
+            "fn=1234 count=17 t=29.200000\n"
+        )
+        text = GOOD.replace(
+            "state_replay: phase=reference event=end", record +
+            "state_replay: phase=reference event=end"
+        ).replace(
+            "state_replay: phase=restored event=end", record +
+            "state_replay: phase=restored event=end"
+        )
+        self.assertIn("replayed 3", self.run_check(text))
+
+    def test_rejects_restored_cipher_frame_number_divergence(self):
+        record = (
+            "radio_l1: kind=cipher direction=uplink algorithm=1 "
+            "fn=1234 count=17 t=29.200000\n"
+        )
+        text = GOOD.replace(
+            "state_replay: phase=reference event=end", record +
+            "state_replay: phase=reference event=end"
+        ).replace(
+            "state_replay: phase=restored event=end",
+            record.replace("fn=1234", "fn=1235") +
+            "state_replay: phase=restored event=end"
+        )
+        with self.assertRaisesRegex(ValueError, "diverged"):
+            self.run_check(text)
+
 
 if __name__ == "__main__":
     unittest.main()

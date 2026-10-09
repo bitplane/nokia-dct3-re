@@ -921,6 +921,12 @@ against its reference (50 digital speech records). Physical Navi End after
 restoration must release CC/RR and return to idle; the same impaired-media,
 FACCH and SACCH predicates remain required. This proves saved HLE protocol
 and digital-media continuity, not persistence of an external SIP dialog.
+Cipher-burst observation currently logs only the first uplink/downlink burst,
+before these save points. Exact restored codec/voice/radio trace comparison
+therefore does not independently compare post-save A5 frame/count progression
+or ciphertext. The replay checker rejects divergent cipher records when
+present (including a changed frame number), but a bounded passive post-save
+cipher observation is still required for that stronger claim.
 
 NHM-6 v4.50E also independently carries an encrypted impaired incoming call
 after its own physical first-boot PMM provisioning and cold phone-code entry.
