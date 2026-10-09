@@ -617,6 +617,18 @@ the observed reply, so this path preserves bit 6. This is a measured
 status-bit contract, not proof of the semantic validity of all EEPROM
 records or an identification of what the DSP tested for those bits.
 
+The accepted-record consumer adds checks beyond the early representation
+test: object halfwords `+0x16` and `+0x22` must match zero, or `0xa5a5`
+when local class is 3; object byte `+0x1d` bits 4--5 must be zero.
+The block-swap path rereads the own 24 EEPROM bytes, applies the retained
+transform when appropriate, and compares both echoed twelve-byte blocks
+at `+0x24` / `+0x30`. Later, valid records are copied from object `+0x0c`
+to context `0x11232c+0x1c`. The native builder's zero marker bytes agree
+with the ordinary marker case, but that does not repair the earlier
+format failure. Field semantics and complete storage validity remain
+unproved; the static report exposes these bounds without generating
+accepted records or changing any storage.
+
 Next: recover the NSM-1 record semantics and task-2 validation contract,
 including the retained-marker transform and the compatibility required
 between the own repair template and modeled COBBA. Keep the SIM/readiness backtrace

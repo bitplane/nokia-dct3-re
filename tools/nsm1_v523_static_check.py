@@ -363,6 +363,17 @@ def verify(image: bytes) -> dict:
             "lock_records": {"command": 0x16, "offset": 0x20, "bytes": 24},
             "restart_marker": literal(image, 0x27E132),
             "restart_transform": 0x27D4AC,
+            "acceptance": {
+                "handler": 0x27E618,
+                "context": literal(image, 0x27E628),
+                "marker_offsets": [0x16, 0x22],
+                "ordinary_marker": 0,
+                "class3_marker": literal(image, 0x27E836),
+                "reserved_field_offset": 0x1D,
+                "reserved_field_mask": 0x30,
+                "echo_offsets": [0x24, 0x30],
+                "accepted_record_destination_offset": 0x1C,
+                "field_semantics_proven": False},
             "storage_validity_proven": False},
         "restart_boundary": {
             "request": 0x2C2A02,
