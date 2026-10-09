@@ -19,8 +19,9 @@ local input = coroutine.create(function()
         if not press('Scroll Down', 'menu_' .. index) then return end
     end
     if not press('Left Softkey / Menu', 'selected') then return end
-    for index, step in ipairs({{2, 'Keypad 1'}, {4, 'Keypad 3'},
-                              {2, 'Keypad 4'}, {2, 'Keypad 7'}}) do
+    local time_digits = _G.noki6210_calendar_time_digits or {
+        {2, 'Keypad 1'}, {4, 'Keypad 3'}, {2, 'Keypad 4'}, {2, 'Keypad 7'}}
+    for index, step in ipairs(time_digits) do
         if not press(step[2], 'time_' .. index, step[1]) then return end
     end
     if not press('Left Softkey / Menu', 'time_confirm') then return end
@@ -34,6 +35,14 @@ local input = coroutine.create(function()
     if not press('Left Softkey / Menu', 'date_confirm') then return end
     if not emu.wait(3) then return end
     machine.screens[':screen']:snapshot('6210_calendar_after_date.png')
+    if _G.noki6210_calendar_wait_midnight then
+        if not emu.wait(80) then return end
+        machine.screens[':screen']:snapshot('6210_calendar_midnight_open.png')
+        if not press('Right Softkey / C', 'midnight_back') then return end
+        if not press('Left Softkey / Menu', 'midnight_reopen') then return end
+        if not emu.wait(3) then return end
+        machine.screens[':screen']:snapshot('6210_calendar_midnight_result.png')
+    end
 end)
 _G.noki6210_calendar_probe = input
 assert(coroutine.resume(input))

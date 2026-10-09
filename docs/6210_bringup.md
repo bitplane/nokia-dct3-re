@@ -580,9 +580,21 @@ cold process must consume retained EF_LOCI. Both retain CCONT hour/minute
 `fcf0327cc0cc4edb952d0dc37621e467c0810b867738de6c91f39354a9c3a3b3`.
 Firmware resets seconds during cold initialization, but does not replace
 hour/minute. This proves deterministic retained time/date, not elapsed
-offline time, midnight rollover or boundary-date arithmetic. Those remain
-separate acceptance questions. Six checker tests cover missing/reordered
-inputs, missing time-register programming, cold replacement and bad RTC data.
+offline time or boundary-date arithmetic. Eight checker tests cover
+missing/reordered inputs, missing time-register programming, cold replacement,
+bad RTC data and midnight/day-consumption ordering.
+
+`make verify-6210-calendar-midnight RUN_DIR=run_6210_midnight JOBS=4` enters
+`23:59` and the same date physically, then waits for ordinary emulated time.
+CCONT reaches `00:00:00`, day counter 1. Physical Back triggers firmware
+reads of day register `0a=01` followed by its rebase to zero; Select then
+reopens Calendar with `8 October 2026`, `Thursday`, hash
+`a04551d523cb8e0adf4efe4da7e6bdcc6ec683dc264a8e791aed57ae798d4d01`.
+A separate retained cold process reproduces the next-day pixels and
+registered SIM location without new date entry. The already-open Calendar
+remains on its selected date until navigation; this gate proves the
+leave/reopen path, not automatic redraw of that window. No host-clock
+advance, RTC register fixture or Gregorian date state is injected.
 
 ## Unattached accessory input
 

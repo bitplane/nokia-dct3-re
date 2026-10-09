@@ -42,6 +42,12 @@ only that handset's generated NVRAM reproduces the date without replacement
 input, retains hour/minute and completes retained-location registration.
 This remains research HLE and does not prove offline elapsed time, midnight
 rollover, leap-year boundaries or native DSP behavior.
+`verify-6210-calendar-midnight` separately enters 23:59 physically and lets
+the emulated RTC cross midnight. Physical Back makes firmware consume and
+rebase the hardware day increment; reopened Calendar shows 8 October 2026,
+Thursday. Another cold process retains that date and laboratory registration.
+This covers one ordinary-day transition, not leap/year boundaries or
+automatic redraw of an already-open Calendar window.
 
 The 6210 research-HLE pending-outgoing and alerting-incoming SIP restore
 gates independently prove exact architectural restoration, external-dialog

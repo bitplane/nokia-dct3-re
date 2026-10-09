@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 608 gates: 410 generated from typed steps, 198 copied verbatim (shell).
+# 609 gates: 411 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -375,7 +375,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-host-outgoing-call \
 	verify-6250-coherent-host-incoming-sms verify-6250-coherent-host-outgoing-sms \
 	verify-6250-coherent-host-rejected-sms verify-6250-coherent-host-silent-sms \
-	verify-6210-calendar-cold verify-radio-outgoing-call-sip-unavailable
+	verify-6210-calendar-cold verify-6210-calendar-midnight \
+	verify-radio-outgoing-call-sip-unavailable
 
 verify-8210-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-call --mame $(MAME_DIR)/mame
@@ -4706,6 +4707,9 @@ verify-6250-coherent-host-silent-sms: build
 
 verify-6210-calendar-cold: build
 	$(VENV)/bin/python tools/run_noki6210_calendar.py $(RUN_DIR) --mame $(MAME_DIR)/mame
+
+verify-6210-calendar-midnight: build
+	$(VENV)/bin/python tools/run_noki6210_calendar.py $(RUN_DIR) --midnight --mame $(MAME_DIR)/mame
 
 verify-radio-outgoing-call-sip-unavailable:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 480'

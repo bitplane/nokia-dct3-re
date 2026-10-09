@@ -15,9 +15,10 @@ from tools.noki6210_radio_contract import verify as verify_radio
 from tools.noki6210_staged_check import verify as verify_stage
 
 CALENDAR_SHA256 = 'fcf0327cc0cc4edb952d0dc37621e467c0810b867738de6c91f39354a9c3a3b3'
+MIDNIGHT_SHA256 = 'a04551d523cb8e0adf4efe4da7e6bdcc6ec683dc264a8e791aed57ae798d4d01'
 
 
-def check_entry(text, rtc):
+def check_entry(text, rtc, *, midnight=False):
     actions = ['menu'] + [f'menu_{i}' for i in range(2, 9)] + ['selected']
     actions += [f'time_{i}' for i in range(1, 5)] + ['time_confirm']
     actions += [f'date_{i}' for i in range(1, 9)] + ['date_confirm']
@@ -28,17 +29,33 @@ def check_entry(text, rtc):
         if position < 0:
             raise ValueError('missing ordered physical Calendar action: ' + action)
         cursor = position + len(token)
-    if not re.search(r'event=alarm_write reg=0b data=2f.*\n.*event=alarm_write reg=0c data=8d', text):
-        raise ValueError('physical time entry did not program CCONT 13:47')
-    check_rtc(rtc)
+    minute, hour = ('3b', '97') if midnight else ('2f', '8d')
+    if not re.search(rf'event=alarm_write reg=0b data={minute}.*\n.*event=alarm_write reg=0c data={hour}', text):
+        raise ValueError('physical time entry did not program the expected CCONT latch')
+    if midnight:
+        check_midnight(text)
+    check_rtc(rtc, expected=(0, 0) if midnight else (47, 13))
 
 
-def check_rtc(rtc):
-    if len(rtc) != 9 or rtc[1:3] != bytes((47, 13)):
-        raise ValueError('retained CCONT snapshot does not contain 13:47')
+def check_rtc(rtc, *, expected=(47, 13)):
+    if len(rtc) != 9 or rtc[1:3] != bytes(expected):
+        raise ValueError('retained CCONT snapshot does not contain the expected hour/minute')
 
 
-def check_cold(text, rtc):
+def check_midnight(text):
+    cursor = 0
+    for token in ('event=second time=00:00:00 day=1 ',
+                  '6210_calendar_probe: action=midnight_back\n',
+                  'event=read reg=0a data=01 ',
+                  'event=counter_write reg=0a data=00 ',
+                  '6210_calendar_probe: action=midnight_reopen\n'):
+        position = text.find(token, cursor)
+        if position < 0:
+            raise ValueError('missing ordered midnight/day-consumption evidence: ' + token)
+        cursor = position + len(token)
+
+
+def check_cold(text, rtc, *, expected=(47, 13)):
     if '6210_calendar_probe:' in text or 'action=time_' in text or 'action=date_' in text:
         raise ValueError('cold Calendar fixture replaced time/date')
     cursor = 0
@@ -48,13 +65,15 @@ def check_cold(text, rtc):
         if position < 0:
             raise ValueError('missing ordered cold Calendar action: ' + action)
         cursor = position + len(token)
-    check_rtc(rtc)
+    check_rtc(rtc, expected=expected)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--midnight', action='store_true',
+                        help='enter 23:59, cross midnight organically and cold-read the next day')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -65,7 +84,9 @@ def main():
         run.mkdir(parents=True, exist_ok=False)
         from PIL import Image
         for phase, seconds, script, frame in (
-            ('entry', 52, 'calendar_input', '6210_calendar_after_date.png'),
+            ('entry', 135 if args.midnight else 52,
+             'calendar_midnight_input' if args.midnight else 'calendar_input',
+             '6210_calendar_midnight_result.png' if args.midnight else '6210_calendar_after_date.png'),
             ('cold', 34, 'calendar_cold_input', '6210_calendar_cold_result.png'),
         ):
             directory = run / phase
@@ -87,10 +108,21 @@ def main():
             storage = directory / 'nvram/npe3hle'
             check_registration(text, (storage / 'sim_card').read_bytes(),
                                preserved_location=phase == 'cold')
-            (check_entry if phase == 'entry' else check_cold)(text, (storage / 'ccont').read_bytes())
+            rtc = (storage / 'ccont').read_bytes()
+            if phase == 'entry':
+                check_entry(text, rtc, midnight=args.midnight)
+            else:
+                check_cold(text, rtc, expected=(0, 0) if args.midnight else (47, 13))
+            if args.midnight and phase == 'entry':
+                with Image.open(directory / 'snap/6210_calendar_after_date.png') as rendered:
+                    check_frame(rendered, CALENDAR_SHA256, 'original 7 October 2026 Calendar')
             with Image.open(directory / 'snap' / frame) as rendered:
-                check_frame(rendered, CALENDAR_SHA256, '7 October 2026 Wednesday Calendar')
-        print('6210 Calendar: PASS physical entry, CCONT time, cold date pixels and retained-location registration; research HLE only')
+                check_frame(rendered, MIDNIGHT_SHA256 if args.midnight else CALENDAR_SHA256,
+                            '8 October 2026 Thursday Calendar' if args.midnight else
+                            '7 October 2026 Wednesday Calendar')
+        print('6210 Calendar: PASS physical entry, CCONT time, ' +
+              ('organic midnight and cold next-day pixels' if args.midnight else 'cold date pixels') +
+              ' and retained-location registration; research HLE only')
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f'6210 Calendar: FAIL: {exc}', file=sys.stderr)

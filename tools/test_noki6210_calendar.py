@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6210_calendar import check_cold, check_entry, check_rtc
+from tools.run_noki6210_calendar import check_cold, check_entry, check_midnight, check_rtc
 
 
 class CalendarChecks(unittest.TestCase):
@@ -42,6 +42,26 @@ class CalendarChecks(unittest.TestCase):
         for rtc in (self.rtc[:4], bytes((19, 0, 12)) + self.rtc[3:]):
             with self.assertRaises(ValueError):
                 check_rtc(rtc)
+
+    def test_midnight_day_consumed_after_back(self):
+        text = ('event=read reg=0a data=01 t=0\n'
+                'event=second time=00:00:00 day=1 t=93\n'
+                '6210_calendar_probe: action=midnight_back\n'
+                'event=read reg=0a data=01 t=129\n'
+                'event=counter_write reg=0a data=00 t=129\n'
+                '6210_calendar_probe: action=midnight_reopen\n')
+        check_midnight(text)
+        with self.assertRaises(ValueError):
+            check_midnight(text.replace('data=01 t=129', 'data=00 t=129'))
+        with self.assertRaises(ValueError):
+            check_midnight(text.replace('event=counter_write reg=0a data=00',
+                                        'event=counter_write reg=0a data=01'))
+
+    def test_midnight_requires_hardware_rollover(self):
+        with self.assertRaises(ValueError):
+            check_midnight('6210_calendar_probe: action=midnight_back\n'
+                           '6210_calendar_probe: action=midnight_reopen\n'
+                           'event=read reg=0a data=01 t=129\n')
 
 
 if __name__ == '__main__':
