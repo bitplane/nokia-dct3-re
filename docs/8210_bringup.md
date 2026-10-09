@@ -1631,6 +1631,14 @@ measurement, cancellation or recovery request. Decode the mode-4 DSP consumer
 or an independent protocol trace before changing eligibility or supplying a
 reply. The queued-request continuation remains the boot frontier.
 
+The observed caller's own eligibility is narrower than the helper's full
+mode selection: `21eee2..21ef06` invokes `286d4a(0)` only for context
+selectors 2 or 3. Other selectors bypass this invocation. Consequently this
+entrance can emit mode 4 (selector 2) or mode 2 (selector 3), not the helper's
+mode-3 branch (selector 4). The hash-pinned radio contract verifier checks
+both comparisons and the helper call. This is an MCU lifecycle distinction,
+not a recovered DSP cancellation or acknowledgement contract.
+
 Public-reference coverage is bounded. Gammu's
 [NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)
 names `1811` as `NMEAS_INSTRUCTIONS`, but its

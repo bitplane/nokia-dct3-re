@@ -45,6 +45,18 @@ def verify(image):
         raise ValueError('own cell-context selector for mode 4 differs')
     if int.from_bytes(read(0x2870b0, 4), 'big') != 0x137228:
         raise ValueError('own mode-selection context root differs')
+    if instructions(0x21eee2, 22) != [
+            ('movs', 'r1, #3'), ('lsls', 'r1, r1, #0x10'),
+            ('cmp', 'r0, r1'), ('beq', '#0x21eefa'),
+            ('movs', 'r1, #1'), ('lsls', 'r1, r1, #0x11'),
+            ('cmp', 'r0, r1'), ('beq', '#0x21eefa'),
+            ('adr', 'r0, #0x384'), ('bl', '#0x2d5dcc')]:
+        raise ValueError('observed measurement caller context eligibility differs')
+    if instructions(0x21eef8, 14) != [
+            ('b', '#0x21ef0c'), ('adr', 'r0, #0x37c'),
+            ('bl', '#0x2d5dcc'), ('movs', 'r0, #0'),
+            ('bl', '#0x286d4a')]:
+        raise ValueError('observed measurement caller helper ownership differs')
     if instructions(0x30702a, 4) != [('bl', '#0x2df484')]:
         raise ValueError('type 8b handler differs')
     if instructions(0x2df498, 6) != [('movs', 'r0, #0xc'), ('bl', '#0x28845c')]:
