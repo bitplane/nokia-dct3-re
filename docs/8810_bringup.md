@@ -145,11 +145,33 @@ minus context halfword `+0x3a` (`0x293d00..0x293d04`). Thus absence of a
 cache update is not itself evidence of the current failure; do not fabricate
 one. Both observed rejected samples remain `0x19d6`.
 
-The original [NSE-6 circuit appendix](https://www.eserviceinfo.com/preview_html.php?fileid=5448&previewid=3001)
-identifies the power-supply schematic as page 3/A3-5 (version 7.0, edit 257,
-layout 07). Its text preview omits the drawing, so it does not yet prove the
-ADC pin connection. Obtain/view that drawing or an independent CCONT
-transfer specification before choosing an electrical channel-2 fixture.
+### Acquired Circuit Appendix
+
+The original NSE-6 circuit appendix is now available locally as
+`roms/research/nse6-v602/reference/03us8a3-schematics.pdf` (ignored reference
+input, not distributed emulator source). It was retrieved from the public
+[8810 schematic download](https://altehandys.de/downloads/ser-no-8810-schematics.pdf),
+linked by the [handset archive page](https://altehandys.de/phones/phones-n-r/nokia/8810.html).
+SHA256: `23885bfacb5cd8876d8e67a83860bc4ef6b063fba51f35f590c7858bf8b78a9e`;
+size 866,659 bytes; 14 PDF pages; document title `03us8a3`.
+The [text preview](https://www.eserviceinfo.com/preview_html.php?fileid=5448&previewid=3001)
+omits the circuit drawings and is not a substitute for visual inspection.
+
+Visual inspection of PDF page 5, printed page 3/A3-5, establishes:
+
+| Board Fact | Evidence |
+| --- | --- |
+| Power-supply drawing | Version 7.0, edit 257, layout version 07, original 08/98. |
+| Power-management component | N100, marked `CCONT_2F_uBGA_0.8P`. |
+| Battery-voltage connection | Battery connector X100 BVOLT joins the VB supply net and CCONT VBAT input D2. |
+| Separate analog inputs | N100 identifies ICHAR, VCHAR, BSI, BTEMP, VCXOTEMP, RSSI, and EAD inputs separately. |
+| Charging component | N101, UBA2006T; battery/current-sense and charger connections are physically distinct. |
+
+This confirms board wiring independently of the firmware table, but the
+drawing does not label internal ADC selector numbers or conversion units.
+Keep the recovered source-7/selector-2 fact separate from the VBAT/D2 board
+fact until a CCONT transfer/mux specification connects them. No ADC tuple
+has been changed on the strength of this drawing alone.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM
