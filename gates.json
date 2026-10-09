@@ -7075,6 +7075,26 @@
       ]
     },
     {
+      "name": "verify-3410-radio-a5-1-degraded",
+      "prerequisites": ["normalize-3410"], "variables": {},
+      "steps": [
+        {"step": "run", "silent": true, "make_flags": ["--no-print-directory"], "run_target": "run",
+         "tokens": ["$(DCT3_RUN_3410)", "RUN_DIR=$(RUN_DIR)", "SECONDS=45", "RUN_VERBOSE=1",
+                    "RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded'",
+                    "RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait10000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'"],
+         "parameters": {"RUN_DIR": "$(RUN_DIR)", "SECONDS": "45", "RUN_VERBOSE": "1",
+                        "RUN_EXTRA_ARGS": "'-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded'",
+                        "RUN_ENV": "'NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait10000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'"}},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_a5_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_3410_incoming_call_lifecycle_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_degraded_speech_trace_check.py",
+         "arguments": ["$(RUN_DIR)/error.log", "$(COBBA_GJP_PCM_CHECK_ARGS)"], "options": []}
+      ]
+    },
+    {
       "name": "verify-3410-radio-a5-1-incoming-call",
       "prerequisites": [
         "normalize-3410"

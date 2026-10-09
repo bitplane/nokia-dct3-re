@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 648 gates: 450 generated from typed steps, 198 copied verbatim (shell).
+# 649 gates: 451 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -197,7 +197,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3410-radio-paging-negatives verify-3310-radio-incoming-call-boundary \
 	verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle \
 	verify-3330-radio-incoming-call-lifecycle \
-	verify-3410-radio-incoming-call-lifecycle \
+	verify-3410-radio-incoming-call-lifecycle verify-3410-radio-a5-1-degraded \
 	verify-3410-radio-a5-1-incoming-call verify-3330-radio-media-resilience \
 	verify-3310-radio-media-resilience verify-radio-incoming-call \
 	verify-radio-incoming-ringing verify-radio-incoming-call-answered \
@@ -1986,6 +1986,12 @@ verify-3410-radio-incoming-call-lifecycle: normalize-3410
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_speech_media_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	@echo "OK — NHM-2 carried internal GSM-FR media through physical Answer/End and returned to PCH"
+
+verify-3410-radio-a5-1-degraded: normalize-3410
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait10000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 
 verify-3410-radio-a5-1-incoming-call: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'
