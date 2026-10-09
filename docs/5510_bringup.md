@@ -2198,7 +2198,12 @@ The current `bootrecsave` reproduction again reaches original resident
 startup and control return, but stops with cursor 27, RX-ready set, zero
 tracks and PRD `1`; the metadata packet has not been delivered. This remains
 a CPU interrupt-recognition/pipeline-drain question, not evidence of metadata
-rejection. A blanket return-instruction guard is not established by
+rejection. The independently verified stopped-PSC/read-only-TCR corrections
+do not change this endpoint: the retained original-bootstrap reproduction
+still records RX/TX 36/47, three responses, two ACKs, completion `8009`,
+PC `02:3d76`, and TIM/PRD/TCR `0000/0001/0000`. The recorder acceptance
+checker still fails; passing timer-register conformance must not promote it.
+A blanket return-instruction guard is not established by
 [SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf): section 6.10.7
 explicitly protects SSBX/RSBX INTM and their following instruction, while
 section 7.2 examples 7-9/7-10 describe RETE/RETED clearing INTM during execute.
