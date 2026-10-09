@@ -933,6 +933,10 @@ The encrypted degraded-state gates for 3310, 3330, 3410 and 5210 now require
 observations in both directions. Their exact selected replay record counts
 are 56, 58, 52 and 47 respectively. These counts describe the accepted runs,
 not protocol constants or fixed checker thresholds.
+The strict checker also validates each observed GSM frame-to-COUNT mapping
+and requires forward frame progression per direction, with hyperframe wrap
+allowed. Identical invalid COUNT values or a stalled frame number cannot
+satisfy restoration acceptance merely by repeating in both intervals.
 
 NHM-6 v4.50E also independently carries an encrypted impaired incoming call
 after its own physical first-boot PMM provisioning and cold phone-code entry.

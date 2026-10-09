@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.radio_call_state_roundtrip_trace_check import check
+from tools.radio_call_state_roundtrip_trace_check import check, validate_cipher_progression
 
 
 GOOD = """
@@ -45,9 +45,9 @@ class CallStateRoundtripTests(unittest.TestCase):
     def test_cipher_requirement_accepts_both_directions(self):
         records = "".join(
             f"radio_l1: kind=cipher direction={direction} algorithm=1 "
-            f"fn={frame} count={frame}\n"
+            f"fn={frame} count={count}\n"
             for direction in ("uplink", "downlink")
-            for frame in (1234, 1338)
+            for frame, count in ((1234, 332), (1338, 2444))
         )
         text = GOOD.replace(
             "state_replay: phase=reference event=end",
@@ -57,6 +57,22 @@ class CallStateRoundtripTests(unittest.TestCase):
             records + "state_replay: phase=restored event=end"
         )
         self.assertIn("replayed 6", self.run_check(text, require_cipher=True))
+
+    def test_rejects_identical_but_invalid_cipher_count(self):
+        records = [
+            f"radio_l1: kind=cipher direction={direction} algorithm=1 fn={frame} count=0"
+            for direction in ("uplink", "downlink") for frame in (1234, 1338)
+        ]
+        with self.assertRaisesRegex(ValueError, "COUNT mapping"):
+            validate_cipher_progression(records)
+
+    def test_rejects_repeated_cipher_frame(self):
+        records = [
+            f"radio_l1: kind=cipher direction={direction} algorithm=1 fn=1234 count=332"
+            for direction in ("uplink", "downlink") for _ in range(2)
+        ]
+        with self.assertRaisesRegex(ValueError, "non-progressing"):
+            validate_cipher_progression(records)
 
     def test_rejects_roundtrip_outside_speech(self):
         with self.assertRaisesRegex(ValueError, "bracketed"):
