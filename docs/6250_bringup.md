@@ -751,14 +751,11 @@ fault-array scan `304382..3043a8` clear it on failures (ignoring sentinel
 `47f354` clears pending bit `80` at `47f370` at 3.734 s; the provisioned run
 retains `40` afterward. Do not target that bit for clearing.
 
-Passive LCD payload counts distinguish this frontier from invisible rendered
-content: five 768-byte transfers occur by 3.001 s. Transfers 1/2/4/5 are all
-zero; transfer 3 has 768 nonzero bytes (576 are `ff`) at 2.010 s. No further
-LCD data arrives through 20 s. Thus the endpoint blank frame agrees with
-the firmware's final zero payload, rather than proving that a menu is drawn
-but hidden by the LCD model. Controller identity/command fidelity remain
-separate unknowns. The next investigation is the post-self-test UI lifecycle
-and organic physical-input handling, not another self-test completion reply.
+Before the channel-2 input correction, the final LCD payload was zero and
+the keypad remained suppressed. That was a readiness failure, not hidden
+rendered content or an outstanding self-test reply. The nominal-input
+research composition now reaches interactive idle; its physical menu,
+storage, Calendar and alarm gates below are the current acceptance boundary.
 
 ### Keypad boundary
 
@@ -777,17 +774,15 @@ the first 25 entries are:
 10 1a 0c 0a 0b
 ```
 
-Inherited NHM-5 input labels do not describe this matrix. The physical probe
-`noki6250_key_observe.lua` presses/releases column 1, row 1 (own logical
-key `19`) at 6/6.15 s without writing MMIO or RAM. It observes no subsequent
-scan or display transfer. At both edges the firmware keeps all columns
-masked (`3f`), row `e0`, direction `1f`, MAD2 IRQ mask `8e`.
-The mask is set by suppression routine `508462`, called from `3b197e`
-at 2.011 s, and retained by subsequent scans. Follow that caller's lifecycle
-and the corresponding re-enable contract; do not bypass the column mask to
-manufacture interactivity. Scanner output is observed at RAM `174050`.
+Column 1, row 1 maps to logical key `19`; row 4 on that column is the
+right softkey. Own physical acceptance routes must use this matrix rather
+than infer keys from another product's menu layout. Scanner output is
+observed at RAM `174050`. Startup suppression routine `508462`, called
+from `3b197e`, keeps columns masked until the readiness contract below
+settles. No acceptance fixture bypasses that mask or manufactures input
+messages.
 
-### Missing readiness report
+### Analog readiness contract
 
 Suppression is part of startup engine `3b1848`, not an isolated input bug.
 The ordinary re-enable tails at `3b1a5a`/`3b1af6` clear the low five column
@@ -806,8 +801,8 @@ dispatch continuation at `+4`; its counter value `04` is not a boot mode.
 The literal report-14 publisher is `4e966c`, posting value `14` to task 1
 via `3c3588`. An aligned Thumb direct-call scan identifies caller `30bf3c`.
 Its surrounding lifecycle includes firmware strings "VBAT Checks" and
-"Start limited fast VBAT reads"; therefore the next investigation is this
-analog/power readiness path and its inputs, not an invented DSP packet.
+"Start limited fast VBAT reads", identifying the analog/power readiness
+path rather than a DSP-packet response contract.
 This direct-call observation is not an exhaustive exclusion of indirect or
 data-driven producers. The default ADC tuple is still conservative for
 NHM-3. The full-scale comparison below identifies the corrected channel-2 input.
