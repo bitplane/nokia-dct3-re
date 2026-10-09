@@ -1253,9 +1253,10 @@ No activation or rail removal. Both raw runs remain preserved in
 `run_8890_alarm_off_review` and `run_8890_alarm_off_security_review`.
 No powered-off alarm acceptance gate is promoted. The ordinary alarm/Snooze
 and power-key-restart gates remain separate from this negative result.
-The current boundary is a runtime phone-code setting overwritten by an NV
-reload; neither a CCONT wake-cause change nor replacement of the packed code
-is justified by the observations below.
+The acquired PMM's runtime phone-code setting is inconsistent with its
+startup repair. A physical code-change transaction resolves that rejection;
+the powered-off alarm Stop/activation lifecycle still needs acceptance.
+Neither a CCONT wake-cause change nor a manufactured record is justified.
 
 The read-only own-ROM probe in `run_8890_alarm_startup_reader_valid`
 narrows the initial status consumer without closing the wake contract.
@@ -1317,10 +1318,32 @@ After wake, initialization repeats at 62.005513769, followed by the same
 overwrite at 63.485831769, before code entry. The NV getter census identifies
 that copy as offset `056c`, length 8, destination `0x1377e4`, through owner
 `0x2f4da0`. Its restored bytes are `d33098dc00000301`; the packed `0110`
-record remains valid `123450`. The unresolved contract is why this settings
-reload restores an encoding inconsistent with the initialized code, and
-whether its persistence/selection or context is mis-modeled. Do not patch
-RAM, suppress the reload, or invent a replacement PMM record to pass it.
+record remains valid `123450`. The startup repair calls the encoder but
+does not persist that setting; reload therefore restores the acquired
+record. Do not patch RAM, suppress the reload, or invent a replacement PMM
+record to pass it.
+
+The firmware-owned remedy is independently exercised in
+`run_8890_security_change_save`: physical Settings `4-6-5-3`, old code
+`12345`, new code `54321` twice, produces **Sicherheitscode geaendert**.
+Setter `0x2fa4d2` encodes `d87d3698` and persists through `0x2f4d2a` with
+selector `0709` (not the initializer's read selector `0701`). Independent
+cold run `run_8890_security_change_cold` compares `54321` against
+`d87d3698` successfully without invoking the packed-code fallback reader.
+Thus `0110` is a startup fallback source, not authority for every later
+code-validation transaction.
+
+`run_8890_alarm_changed_code_future` uses only that organically saved
+storage. Physical alarm `13:49` removes rails at 40.452288231 seconds;
+RTC wakes them at 60 seconds with cause `80`. Physical `54321`/Menu then
+compares equal and displays **Code angenommen**, followed by startup/menu
+presentation and the ringing alarm. No CCONT or firmware-state change was
+needed to resolve the code rejection. The fixture's early Stop/Menu occurs
+before alarm presentation and opens the menu instead, so this is not yet
+Stop/No activation acceptance. Preserve the shorter
+`run_8890_alarm_changed_code` negative control: its selected `13:48` was
+not a future deadline on this retained-clock seed and it correctly remained
+off during the observation window.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
