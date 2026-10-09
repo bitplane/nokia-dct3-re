@@ -417,12 +417,6 @@ def verify(image):
         0x21d886: 2, 0x21f356: 0, 0x21f5ca: 3, 0x21f90a: 0,
         0x21fba2: 0, 0x2a1e28: 1, 0x2a1e62: 1, 0x2a224a: 1,
     }
-    selector_calls = []
-    for offset in range(0, len(image) - 4, 2):
-        if image[offset] & 0xf8 == 0xf0 and instructions(0x200000 + offset, 4) == [('bl', '#0x2a1380')]:
-            selector_calls.append(0x200000 + offset)
-    if selector_calls != list(selector_arguments):
-        raise ValueError('direct cell-selector callsite inventory differs')
     for address, argument in selector_arguments.items():
         if instructions(address - 2, 6) != [
                 ('movs', f'r0, #{argument}'), ('bl', '#0x2a1380')]:

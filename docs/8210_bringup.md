@@ -1465,10 +1465,8 @@ receive state 10 additionally reaches wrapper `21f900` by tail branch
 `21f2c0`, after its message comparison and class-`89` predicate. The observed
 late lifecycle remains state 13, so that state-10 entrance is not established
 as its recovery. Tail/data-driven/indirect entrances require separate closure;
-a missing BL cannot prove absence of a producer. The next decode is the
-shared state-13 forwarding route and ordinary events selecting the alternate
-argument-zero owner at `21f356`, rather than replaying acknowledgement packets.
-That alternate owner is now bounded to receive state 21: table entry
+a missing BL cannot prove absence of a producer. The alternate
+argument-zero owner at `21f356` is bounded to receive state 21: table entry
 `21bbe4 + 21*4` selects `21fc40`, which treats `03ed` specially and otherwise
 calls `21f2ec`. Its literal comparisons select `03eb`, `03ec` (`fb<<2`)
 and `03ea` for `21f314`; after the selected-object predicate, `21f348`
@@ -1689,11 +1687,8 @@ not only aligned literal pools. Together with the four direct BL callers,
 this excludes an overlooked stored absolute callback pointer, not computed
 addresses, relative tables or MCU-generated events. It provides no evidence
 for retaining/replaying the peer's cancelled measurement report.
-The selector's independent direct-BL census has eight sites, each with an
-immediately preceding literal argument: argument 0 at `21f356`, `21f90a`,
-`21fba2`; argument 1 at `2a1e28`, `2a1e62`, `2a224a`; argument 2 at
-`21d886`; argument 3 at `21f5ca`. The pinned static checker enumerates the
-whole image's halfword-aligned BL candidates and verifies every argument.
+The pinned static checker additionally verifies the immediately preceding
+literal argument at all eight selector sites listed in the ownership census.
 In `run_8210_list_tag_late_20261009`, the final argument-zero entry is
 `21f90a` at 12.262007s; the subsequent selector entry at 12.696148s is
 `21f5ca` with argument 3. Thus the post-arrival handler runs, but not through
