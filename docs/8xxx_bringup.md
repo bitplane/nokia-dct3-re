@@ -2119,7 +2119,17 @@ run. Card-owned GET INPUT (`911a`, FETCH `1a`) then receives physical `4`,
 Five own 84x48 frames cover DISPLAY TEXT, INKEY, empty INPUT, entered `42`
 and registered idle. Registration and persistent SIM location are checked
 independently. No firmware memory, task messages or reply bytes are injected;
-SET UP MENU, network Toolkit commands and native DSP speech remain unpromoted.
+Network Toolkit commands and native DSP speech remain unpromoted.
+
+`verify-8890-sim-toolkit-menu` extends the same fresh-seed/retained process
+with card profile 4. SET UP MENU is announced with `9128`, fetched at length
+`28` and accepted by TERMINAL RESPONSE `810304250002028281030100`.
+Physical Menu, Scroll Up and Menu open the installed card menu; physical
+selection emits ENVELOPE `d30702020181100101` for item 1 and receives `9000`.
+Physical End restores registered idle. Four additional own localized 84x48
+frames pin menu entry, item list, selection result and idle. The gate retains
+the NSB-6 INKEY OK requirement and independent registration/SIM-location
+checks. Card-menu selection does not establish network proactive commands.
 
 Use `noki8850_startup_observe.lua` for a passive startup/one-softkey run.
 The ten-second and end-of-run frames are authoritative for the first

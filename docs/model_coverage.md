@@ -452,8 +452,10 @@ physical dismissal and exact own idle recovery. Its interactive extension
 INPUT, exact `5`/`42` terminal replies and five own frames. NSB-6 requires
 an additional physical OK after the INKEY digit; the checker enforces that
 product difference. Both gates seed the clock physically from own PMM and
-require retained registration/SIM location. Other proactive commands and
-native DSP speech remain unpromoted for this product.
+require retained registration/SIM location. `verify-8890-sim-toolkit-menu`
+additionally proves SET UP MENU, physical navigation and item-1 selection,
+exact ENVELOPE and four own localized menu/recovery frames. Network proactive
+commands and native DSP speech remain unpromoted for this product.
 
 The 6210 additionally passes `verify-6210-sim-toolkit-interactive`, proving
 physical `5`/`42` GET INKEY/GET INPUT replies, exact successful text TLVs,

@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from PIL import Image
-from tools.dct3_toolkit_check import display_text_events, interactive_events
+from tools.dct3_toolkit_check import display_text_events, interactive_events, menu_events
 from tools.run_noki8890_toolkit_retained import verify, verify_interactive_protocol
 
 
@@ -28,6 +28,18 @@ class RetainedToolkitTest(unittest.TestCase):
                               '8890_toolkit_interactive: action=input_4')
         with self.assertRaises(ValueError):
             verify_interactive_protocol(trace)
+
+    def test_menu_preserves_own_confirmation_and_selection(self):
+        trace = '\n'.join(menu_events('8890')).replace(
+            '8890_toolkit_interactive: action=inkey_5',
+            '8890_toolkit_interactive: action=inkey_5\n'
+            '8890_toolkit_interactive: action=inkey_confirm')
+        verify_interactive_protocol(trace, menu=True)
+        for old, new in (('action=inkey_confirm', 'action=absent'),
+                         ('d30702020181100101', 'd30702020181100102'),
+                         ('action=menu_exit', 'action=absent')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_interactive_protocol(trace.replace(old, new), menu=True)
 
     def test_protocol_storage_and_both_frames_required(self):
         with tempfile.TemporaryDirectory() as directory:
