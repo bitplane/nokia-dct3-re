@@ -39,6 +39,12 @@ PEER_CONCEALMENT_RE = re.compile(
 )
 
 
+SPEECH_STOP_RE = re.compile(
+    r"dsp_hle: speech stop control=[0-9a-f]+ uplink=\d+ "
+    r"downlink=\d+ t=([0-9.]+)"
+)
+
+
 def check(
         path: Path,
         data_clock: int = 520_000,
@@ -50,6 +56,10 @@ def check(
         path, data_clock, frame_clock, frame_clocks,
         sync_clocks, word_clocks)
     text = canonical_timeline(path.read_text(errors="replace"))
+    # Empty ring blocks after firmware stops speech belong to the release tail,
+    # not active media expected to recover before the user's End command.
+    stops = [float(time) for time in SPEECH_STOP_RE.findall(text)]
+    speech_stop = min(stops) if stops else float("inf")
     impairments = [
         (direction, int(burst), int(count), int(frame), float(time))
         for direction, burst, count, frame, time
@@ -58,6 +68,7 @@ def check(
     bad = [
         (direction, int(count), int(frame), float(time))
         for direction, count, frame, time in BAD_RE.findall(text)
+        if float(time) < speech_stop
     ]
     for direction in ("uplink", "downlink"):
         direction_impairments = [

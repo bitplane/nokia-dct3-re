@@ -51,5 +51,21 @@ class RadioDegradedSpeechTraceCheckTests(unittest.TestCase):
         self.assertIn("observed 2", self.run_check(lines))
 
 
+    def test_excludes_uplink_loss_after_explicit_speech_stop(self):
+        lines = self.good_lines() + [
+            "dsp_hle: speech stop control=040a uplink=103 downlink=101 t=12.030000",
+            "radio_l1: direction=uplink kind=speech good=0 count=2 fn=200 t=12.040000",
+        ]
+        self.assertIn("observed 1", self.run_check(lines))
+
+    def test_rejects_unrecovered_uplink_loss_before_speech_stop(self):
+        lines = self.good_lines() + [
+            "radio_l1: direction=uplink kind=speech good=0 count=2 fn=200 t=12.025000",
+            "dsp_hle: speech stop control=040a uplink=103 downlink=101 t=12.030000",
+        ]
+        with self.assertRaisesRegex(ValueError, "independent downlink"):
+            self.run_check(lines)
+
+
 if __name__ == "__main__":
     unittest.main()

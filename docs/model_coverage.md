@@ -67,6 +67,19 @@ after the final impaired block (peer logs are sampled every 50 exchanges).
 This proves the modeled MIC2/EAR host boundary with neutral gains, not native
 DSP speech, measured silicon gain or a real GSM network call.
 
+`verify-3410-radio-a5-1-outgoing-degraded` independently covers physical
+dialing of `5551234`, organic A5/1, the same external burst faults, FACCH/BFI
+recovery, SACCH coexistence and clean mobile-originated release to PCH.
+The fresh gate observes 550 microphone and 514 decoded earpiece frames,
+68 impaired bursts per direction and 32 downlink impairment-induced bad
+blocks. Network concealment also occurs at startup/FACCH boundaries; this
+does not establish that the configured uplink corruption defeats decoding.
+The recovery checker excludes bad ring blocks after the explicit firmware
+speech-stop event: the release tail cannot recover media already stopped by
+End. An unrecovered uplink bad frame before speech-stop still fails.
+Outgoing impaired host duplex and active-call restoration are not promoted
+by this internal-media gate, nor is native DSP speech.
+
 `verify-6250-calendar-cold` independently proves physical NHM-3 Calendar
 time/date entry, the reviewed 7 October 2026 Wednesday frame, and the same
 frame in a separate process retaining only its own saved NVRAM/configuration.

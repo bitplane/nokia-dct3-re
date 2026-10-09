@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 651 gates: 453 generated from typed steps, 198 copied verbatim (shell).
+# 652 gates: 454 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -198,6 +198,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-3310-radio-incoming-call-ui verify-3310-radio-incoming-call-lifecycle \
 	verify-3330-radio-incoming-call-lifecycle \
 	verify-3410-radio-incoming-call-lifecycle verify-3410-radio-a5-1-degraded \
+	verify-3410-radio-a5-1-outgoing-degraded \
 	verify-3410-radio-a5-1-degraded-state verify-3410-radio-a5-1-incoming-call \
 	verify-3330-radio-media-resilience verify-3310-radio-media-resilience \
 	verify-radio-incoming-call verify-radio-incoming-ringing \
@@ -1994,6 +1995,14 @@ verify-3410-radio-a5-1-degraded: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait10000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)/error.log
+
+verify-3410-radio-a5-1-outgoing-degraded: normalize-3410
+	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=45 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_outgoing_call_degraded' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,wait1000,5,5,5,1,2,3,4,send,waitalerting,wait11500,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=16000 $(DCT3_PRESS_120_240)'
+	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_outgoing_call_trace_check.py $(RUN_DIR)/error.log --release-complete optional
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
 	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)/error.log
