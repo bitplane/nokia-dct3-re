@@ -912,7 +912,9 @@ strict lifecycle contract; it must not be accepted by relaxing `041202` to
 A5, NHM-5 speech control, PCM/concealment, FACCH and SACCH checks: 500 encoded
 microphone frames, 467 decoded earpiece frames, 68 impaired bursts per
 direction, 32 impairment-induced bad blocks and clean physical End. These
-are HLE media results, not native DSP speech validation.
+are HLE media results, not native DSP speech validation. The permanent
+`make verify-3310-radio-a5-1-degraded` gate requires all six independent
+checks from fresh storage and physical Navi Answer/End.
 
 1. `make verify-radio-camp` passes;
 2. `make verify-radio-registration` proves one accepted update and steady camp;
