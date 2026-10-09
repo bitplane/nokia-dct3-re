@@ -2900,9 +2900,9 @@ void tms320c54x_device::execute_one(u16 op)
 			m_st1 = (m_st1 & ~u16(0x001f)) | (op & 0x001f);
 			return;
 		}
-		if ((op & 0xff80) == 0x4a00) // PSHM MMR (seven-bit address)
+		if ((op & 0xff00) == 0x4a00) // PSHM MMR, direct or indirect page-zero address.
 		{
-			push(data_read(low & 0x7f));
+			push(data_read(mmr_address(low)));
 			return;
 		}
 		if ((op & 0xff80) == 0x8a00) // POPM MMR (seven-bit address)
@@ -2988,7 +2988,7 @@ void tms320c54x_device::execute_run()
 		// One-cycle stack-operation group from SPRU131G table 7-9.
 		// Calls/returns use the architectural SP, not this DAGEN snapshot.
 		m_sp_address_pending = (m_op & 0xff00) == 0xee00 ||
-			((m_op & 0xff80) == 0x4a00) ||
+			((m_op & 0xff00) == 0x4a00) ||
 			((m_op & 0xff80) == 0x8a00 && (m_op & 0x7f) != 0x18);
 		if (m_sp_address_pending) m_sp_address_base = previous_sp;
 		if (!m_illegal)

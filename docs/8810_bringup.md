@@ -31,7 +31,7 @@ to the editor in the erased-retry negative control. Initializing the synthetic
 retry count permits the same physical code to be accepted, reaching a Menu /
 Names frame with the earlier stalled-core compatibility fixture. Correcting
 native TRN storage advances DSP execution but changes this result: the current
-fresh run stops at unsupported `0x4ac0` (DSP PC `0x0803`), leaves the MCU in
+fresh run stops at unsupported `0xae31` (DSP PC `0x0816`), leaves the MCU in
 its verifier loop, and captures a blank menu frame. No reset-control write is
 observed through 40 seconds in that run; this is not a successful boot.
 The menu/input observations below remain evidence for the earlier composition,
@@ -91,6 +91,14 @@ stores, bit patterns, preservation and instruction cost. The fresh native run
 then encounters `0x4ac0` at `0x0803`, with blank display and MCU verifier
 activity through 40 seconds. CMPS/TRN update semantics remain unimplemented;
 the store correction alone is not complete trellis-unit emulation.
+`0x4ac0` is a valid indirect PSHM form, not a new data-memory push opcode.
+The decoder now uses its existing page-zero MMR address generator for PSHM,
+including auxiliary-register modification and upper-bit clearing. Eight
+executable cases cover direct, indirect, post-decrement and circular forms
+with nonzero DP and CPL set, checking the stack word, register effects and
+one-cycle execution. The fresh native run advances to `0xae31` at `0x0816`;
+the MCU verifier and blank-frame boundary persist through 40 seconds. Indirect
+POPM remains a separate decoder gap; it has not been implied by this PSHM fix.
 This advances native execution; it does not yet prove the stalled DSP causes
 the reset or establish compatibility with the handset's fitted DSP mask.
 The late phonebook-save attempt crosses this restart boundary, so persistence
