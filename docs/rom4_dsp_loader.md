@@ -914,10 +914,42 @@ Pipeline-flush-on-halt mode changes observation and profiling behavior;
 an eventual comparison must identify the selected device and execution mode.
 TI's [C54x simulator support clarification](https://e2e.ti.com/support/tools/code-composer-studio-group/ccs/f/code-composer-studio-forum/249280/how-to-use-ccs-v5-1-for-tms320c54xx)
 places that simulator in CCS 3.x or earlier, not CCS 5.x. The referenced
-CCS 3.3.83.20 public archive paths currently return HTTP 404; no runnable C54x
-simulator engine has been obtained or executed. The acquired SR12 update
-described below is not that engine. This does not exhaust software-only
-evidence or establish a physical-hardware requirement.
+CCS 3.3.83.20 TI archive paths returned HTTP 404, but the independent mirror
+acquisition below now supplies the C54x driver and legacy automation package.
+No simulator execution or timing comparison has yet been performed. The
+acquired SR12 update described below is not itself that engine.
+
+### Acquired CCS 3.3 C54x simulator package
+
+The [FreeCalypso CCS archive](https://www.freecalypso.org/pub/GSM/TI_tools/CCS/CCS_3.3.83.20_win32.zip)
+returned HTTP 200 and supplied a complete 677,575,677-byte ZIP. The ignored
+collection retains `roms/research/ti-ccs/CCS_3.3.83.20_win32.zip`, SHA-256
+`77e20d9daf28ffe188d4430d06667e49b79f9698dc77b088b51096f2b401715f`.
+This is a third-party mirror of a vendor package, not an authenticated TI
+download or a silicon timing capture.
+
+Static cabinet inspection establishes these available components:
+
+- `Drivers_C5400_SIM.CAB`: `TISIM54X.DVR` (528,384 bytes), C541 through
+  C5416 target configurations and corresponding GEL initialization files.
+  Driver strings identify simulator version 4.6.5 and pipeline information
+  support; configuration descriptions include Timer0 on C549.
+- `CCS_Scripting.CAB`: legacy server/COM/Perl interfaces, a C server header
+  and register/memory/GEL examples. These are not modern DSS bindings.
+- `Tools_C54x_sim_analysis.CAB`: the accompanying analysis component.
+
+Only static extraction/inspection has been performed; no installer, driver
+or scripting binary has been executed. The PE import table includes
+`CCReg.dll`, MFC42 and Windows runtime dependencies. Availability is not
+proof that this package runs under the current host or licensed setup.
+
+The next comparison must first establish a runnable C54x target and explicitly
+select pipelined rather than flush-on-halt execution. Then run the existing
+firmware-free short/long PRD and direct/indirect IMR-mask fixtures unchanged,
+recording cycle markers, IMR/IFR, SP and return continuation. Identify the
+target, package hash and execution mode in the result. Do not change Nokia
+timing, cancel accepted requests or add a foreground-instruction delay from
+archive availability alone. Native recorder completion remains unresolved.
 TI's [C5400 scripting support answer](https://e2e.ti.com/support/tools/code-composer-studio-group/ccs/f/code-composer-studio-forum/1026307/code-composer-c5400-debugging-with-dss-api)
 also rules out a modern DSS-based shortcut: C54x simulation ends at CCS
 3.3, whereas DSS begins at CCS 4. TI explicitly states that no version
