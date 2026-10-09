@@ -452,6 +452,37 @@ def verify(image):
     if instructions(0x307008, 8) != [
             ('adds', 'r0, r4, #0'), ('bl', '#0x2ba010'), ('b', '#0x3070d0')]:
         raise ValueError('type-9c transport callback worker route differs')
+    if instructions(0x305ec6, 20) != [
+            ('adds', 'r4, r1, #0'), ('cmp', 'r2, #1'),
+            ('beq', '#0x305f06'), ('ldrb', 'r0, [r4, #4]'),
+            ('cmp', 'r0, #0xb0'), ('beq', '#0x305f06'),
+            ('ldr', 'r1, [pc, #0x16c]'), ('ldrb', 'r5, [r1, #3]'),
+            ('cmp', 'r0, r5'), ('beq', '#0x305eee')]:
+        raise ValueError('type-9c flag/tag forwarding predicates differ')
+    if instructions(0x305edc, 18) != [
+            ('strb', 'r0, [r6, #3]'), ('movs', 'r0, #0x18'),
+            ('ldr', 'r1, [pc, #0x160]'), ('bl', '#0x288d0c'),
+            ('cmp', 'r0, #0'), ('bne', '#0x305f0e'),
+            ('strb', 'r5, [r6, #3]'), ('b', '#0x305f0e')]:
+        raise ValueError('type-9c changed-tag marker/rollback differs')
+    if instructions(0x305eee, 18) != [
+            ('ldrb', 'r0, [r4, #5]'), ('cmp', 'r0, #1'),
+            ('beq', '#0x305f06'), ('ldr', 'r0, [pc, #0x150]'),
+            ('strh', 'r0, [r4]'), ('movs', 'r0, #0x18'),
+            ('adds', 'r1, r4, #0'), ('bl', '#0x288d0c')]:
+        raise ValueError('type-9c stable-tag packet forwarding differs')
+    if instructions(0x305f06, 14) != [
+            ('movs', 'r0, #0x18'), ('ldr', 'r1, [pc, #0x140]'),
+            ('bl', '#0x288d0c'), ('adds', 'r0, r4, #0'),
+            ('bl', '#0x288e44')]:
+        raise ValueError('type-9c marker-only packet disposal differs')
+    if [int.from_bytes(read(address, 4), 'big') for address in (
+            0x306040, 0x306044, 0x306048, 0x30604c)] != [
+            0x136cac, 0x33ea20, 0x3f7, 0x33ea14]:
+        raise ValueError('type-9c tag root/marker literals differ')
+    if [int.from_bytes(read(address, 2), 'big') for address in (
+            0x33ea20, 0x33ea14)] != [0x3fa, 0x3f8]:
+        raise ValueError('type-9c changed-tag/flag marker IDs differ')
     default_selectors = (0x21bcdc, 0x21bce4, 0x21bd24,
                          0x21bd28, 0x21bd2c, 0x21bd7c)
     if [int.from_bytes(read(address, 4), 'big') for address in default_selectors] != [

@@ -1562,6 +1562,20 @@ This establishes `9c -> registered callback -> 03f7 -> decoder -> 0411`
 as an eligible chain, not that ordinary DCS camping requires it or that it
 has a particular GSM message meaning. Packet lifetime, payload meaning and
 task-24 forwarding remain evidence requirements before implementing it.
+The callback has a separate marker/data lifecycle. Its tracked tag is byte
+`136caf` (root `136cac + 3`). A changed packet byte `+4` updates that tag,
+posts the descriptor at `33ea20` (ID `03fa`) to task 24, and disposes the
+original packet; a failed post restores the previous tag. A callback flag
+of 1 (`packet[5]&1`), tag `b0`, or exact packet byte `+5 == 1` instead posts
+the descriptor at `33ea14` (ID `03f8`) and disposes the packet. Only the
+stable-tag, non-marker route writes ID `03f7` into the original packet and
+forwards that packet. These predicates, marker IDs, tag root, rollback and
+disposal instructions are checked against the acquired image by
+`noki8210_radio_contract.py`. Thus the first packet of a changed-tag sequence
+does not reach the `03f7` decoder as data. This bounds the forwarding grammar;
+it does not name either marker's GSM meaning, authorize a `9c` publication,
+or prove that this sequence supplies late-PIN recovery. The legitimate sender
+and marker consumers remain to be identified before any peer implementation.
 The expanded passive run `run_8210_late_pin_status_forward_04` also watches
 constructor `305ec4`, its `03f7` store at `305ef4`, and the six shared-decoder
 returns `2ff4d4`, `303cb6`, `30511c`, `30951a`, `30a0d8`, `30a576`.
