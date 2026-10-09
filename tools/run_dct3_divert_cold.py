@@ -133,9 +133,10 @@ def main():
         if args.check_corrupt_storage:
             corrupt = run / 'corrupt'
             prepare(corrupt)
-            shutil.copytree(retained / 'nvram', corrupt / 'nvram')
+            shutil.copytree(retained / 'nvram', corrupt / 'nvram', dirs_exist_ok=True)
             damaged = bytearray(before)
             damaged[-1] ^= 1
+            (corrupt / 'damaged-subscription.bin').write_bytes(damaged)
             (corrupt / f'nvram/{machine}/gsm_network').write_bytes(damaged)
             rejected = execute(corrupt, 'corrupt-query', f'noki{product}_divert_input.lua')
             console = (corrupt / 'corrupt-query-console.log').read_text(errors='replace')
@@ -143,7 +144,7 @@ def main():
                 raise ValueError('damaged subscription was not rejected by the NVRAM loader')
             check_query(rejected, False, product)
             if product == '6250':
-                check_supplementary(rejected, corrupt / 'snap', 'divert')
+                check_supplementary(rejected, corrupt / 'snap', 'divert', idle=active_idle)
             else:
                 check_divert(rejected, corrupt / 'snap')
         (run / 'acceptance.json').write_text(json.dumps({'product': product, 'native_speech_claim': False,

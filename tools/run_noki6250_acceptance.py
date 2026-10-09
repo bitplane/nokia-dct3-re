@@ -72,7 +72,8 @@ def check_ussd(text, frames):
     check_supplementary(text, frames, 'ussd')
 
 
-def check_supplementary(text, frames, service):
+def check_supplementary(text, frames, service,
+                        idle='7c541cfc93c2da8e854421941df0ac81755b73f47c3af98f2f6a40efac181b0b'):
     from tools import radio_ussd_trace_check
     from tools import radio_call_divert_trace_check
     from tools.noki8210_supplementary_check import verify_transaction
@@ -85,7 +86,7 @@ def check_supplementary(text, frames, service):
                    '0218f879565b696f4768f55215c45166b725b1897d0d78715da54278c74244b4'),
     }[service]
     verify_transaction(text, frames, service, keys, protocol, result,
-                       '7c541cfc93c2da8e854421941df0ac81755b73f47c3af98f2f6a40efac181b0b',
+                       idle,
                        product='6250', geometry=(96, 60))
 
 

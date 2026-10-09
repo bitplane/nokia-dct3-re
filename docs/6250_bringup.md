@@ -52,8 +52,20 @@ This scenario does not establish save-state or cold-process persistence.
 registration, restores exact CPU/RAM/time, one-second protocol and pixel
 replay, then resumes physical query/deactivate/query and checks the same
 reviewed results/idle. It rejects an active query before restore as evidence
-of retained state. The network fixture's forwarding state is saved by MAME,
-not persisted to NVRAM across a new emulator process.
+of retained state. Save-state and cold-process acceptance are separate.
+`verify-6250-call-divert-cold` independently registers through physical input,
+exits normally, and interrogates active forwarding in a second process using
+only its own retained storage. An external incoming call forwards without
+handset paging; a third fresh-storage process reports inactive. The
+network-owned subscription NVRAM remains unchanged by the read-only query.
+This retains the declared research PMM comparison and does not promote native
+DSP execution or speech.
+The optional `--check-corrupt-storage` control copies only retained own
+handset state and damages the network subscription checksum. MAME rejects the
+store and a physical query returns inactive. The retained handset still draws
+its forwarding arrow; this reviewed frame differs from fresh storage and does
+not establish active network forwarding. The damaged input is retained beside
+the process logs rather than replacing the original subscription evidence.
 
 `verify-6250-sim-toolkit` independently exercises a Phase-2+ card: the own
 firmware submits a nine-byte TERMINAL PROFILE, STATUS returns `91 16`, FETCH
