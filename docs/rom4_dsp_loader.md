@@ -2961,6 +2961,12 @@ extension (`run_c54x_asm_core_retry_20261009.log`). This asserts one positive
 left-shift outcome, not all ASM values, saturation, Nokia RF behavior or
 native speech. The suite deliberately exits via its completion exception
 after printing `TMS320C54x core conformance: PASS`.
+`check-c54x-core` uses `tools/run_c54x_core.py` to retain independent
+`run_c54x_core_*` directories containing `console.log` and the opcode
+assertions in `error.log`. Acceptance requires all 16 existing markers,
+exit status 3 and the terminal test-completion exception; a marker followed
+by an unrelated crash is not success. The isolated native run passed in
+`run_c54x_core_ycwnst8i`; seven runner tests cover negative outcomes.
 Four additional ASM=0 `f480` vectors cover positive and negative 32-bit
 overflow with OVM clear/set: guard-preserving 40-bit results versus signed
 32-bit saturation, A-owned sticky overflow, low-word carry, unchanged B and

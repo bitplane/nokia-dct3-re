@@ -1207,24 +1207,7 @@ check-mu4-nand: build
 		cat output.log; cat error.log; grep -q 'nandflash_conformance: PASS' error.log
 
 check-c54x-core: build
-	@$(MAME_DIR)/mame tms54test -rompath $(MAME_DIR)/roms -video none -sound none -nothrottle -seconds_to_run 1 2>&1 | \
-		tee /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x core conformance: PASS" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x ASM accumulator subtract conformance: PASS overflow_variants=4 source_preserved=1" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x ASM arithmetic shifts: PASS variants=128 shifts=32 sxm_settings=2" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x shifted high store conformance: PASS variants=128" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x XF output: PASS status_variants=8 debugger=1 restore=1" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x stack address latency conformance: PASS" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x RC ALT conformance: PASS" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x software interrupt conformance: PASS" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x software interrupt fast return: PASS variants=64" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x immediate repeat conformance: PASS variants=256" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x short immediate load conformance: PASS variants=512 sxm_settings=2" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0" /tmp/tms320c54x-core-check.log
-	@grep -q "TMS320C54x control disassembler: PASS vectors=47 pages=2" /tmp/tms320c54x-core-check.log
+	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms
 
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.
