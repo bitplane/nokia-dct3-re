@@ -2187,8 +2187,14 @@ as 8 kHz. Source: [original manual mirror](https://electronicsandbooks.com/edt/m
 The original PDF could not be acquired for visual verification; this is an
 indexed primary-document lead, not a validated bus profile. The separate
 [System Module contents](https://www.manualslib.com/manual/1616779/Nokia-Nsb-6-Series.html)
-identify an Audio Control / PCM Serial Interface section. Recover that page
-and corroborate clocks, ownership, word width, alignment and edges before
+identify an Audio Control / PCM Serial Interface section on printed page 25.
+Its indexed page summary independently gives 512 kHz / 8 kHz and says
+COBBA-GJP generates PCMSClk by dividing PCMDClk. That clock direction must
+be reconciled with the troubleshooting table's MAD-to-COBBA annotation;
+neither summary resolves the full timing diagram. The public page and
+alternate [manual index](https://guidessimo.com/document/1337506/nokia-nsb-6-series-technical-documentation-manual-56.html)
+did not provide an acquirable original (HTTP 403 / unavailable page).
+Recover page 25 and corroborate clock ownership, word width, alignment and edges before
 enabling PCM. Do not import the 8850's 1 MHz profile or infer a 16-bit word
 from the two clock labels. Existing 8890 signaling and native/HLE limits
 remain unchanged.
