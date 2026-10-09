@@ -183,6 +183,11 @@ normal upload/self-test phase, registration and exact registered-idle pixels.
 in the Snooze-induced off interval, checks exact CPU/banked state, SRAM,
 time and silent RTC/frame replay, then validates recurrence and physical No.
 
+`verify-6250-calendar-midnight` proves own-product physical 23:59/date entry,
+natural midnight, firmware day-counter consumption/reset, reviewed 8 October
+pixels and a separate cold boot retaining that date without replacement input.
+It validates research HLE, not native DSP or offline elapsed time.
+
 `verify-6210-calendar-cold` independently proves physical Menu-8 Calendar
 entry, firmware-owned CCONT programming to 13:47, physical date entry and
 the reviewed 7 October 2026 Wednesday pixels. A separate process retaining

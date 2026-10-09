@@ -15710,6 +15710,14 @@
                  "arguments": ["$(RUN_DIR)", "--restore-snooze", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-calendar-midnight",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki6250_calendar.py",
+                 "arguments": ["$(RUN_DIR)", "--midnight", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-calendar-cold",
       "prerequisites": ["build"],
       "variables": {},

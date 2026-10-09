@@ -1237,15 +1237,17 @@ rendered pages: damaged text extraction loses diagram labels and scope data.
 
 ## Physical Calendar And Cold Storage
 
-The own-product midnight observation
-`run_6250_midnight_named_key_20261009` physically enters 23:59 and
+`verify-6250-calendar-midnight` independently passes
+(`run_6250_midnight_acceptance_20261009`) with physical entry of 23:59 and
 Wednesday 7 October 2026. CCONT naturally reaches `00:00:00 day=1` at
 second 102. The open Calendar remains on the selected date; physical
 `Right Softkey / C` followed by Calendar re-entry renders Thursday
 8 October. Firmware reads day 1 and subsequently resets the day register
-to 0. The observation fixture is `tools/noki6250_calendar_midnight.lua`;
-promotion still requires a permanent checker, independently reviewed pixel
-expectations and cold persistence coverage. This is research HLE, not native
+to 0. Exact independently reviewed frames cover entry, the unchanged open
+Calendar and the refreshed next date. A separate cold process retaining only
+own-product NVRAM reproduces 8 October without new time/date input, reads
+00:00 and independently passes retained-location registration. The fixture
+is `tools/noki6250_calendar_midnight.lua`. This is research HLE, not native
 DSP evidence. Coordinate `(1,2)` is Scroll Up, not Back: using it can select
 the previous Calendar date and manufacture an apparent rollover regression.
 
