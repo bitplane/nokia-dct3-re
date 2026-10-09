@@ -4,6 +4,49 @@ local cpu = machine.devices[':maincpu']
 local memory = cpu.spaces['program']
 local writes = 0
 local handles = {}
+local sim_sends = 0
+handles[#handles + 1] = memory:install_read_tap(0x27641c, 0x27641f,
+    'nsm1_sim_sender', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x27641c or cpu.state['R0'].value ~= 0x16 then return end
+        sim_sends = sim_sends + 1
+        if sim_sends > 32 then return end
+        machine:logerror(string.format(
+            'nsm1_sim_send: argument=%08x caller=%08x count=%u t=%.9f\n',
+            cpu.state['R1'].value, cpu.state['R14'].value, sim_sends,
+            machine.time:as_double()))
+    end)
+local sim_receive_entries = 0
+handles[#handles + 1] = memory:install_read_tap(0x288114, 0x288117,
+    'nsm1_sim_receive_entry', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x288114 then return end
+        sim_receive_entries = sim_receive_entries + 1
+        if sim_receive_entries > 16 then return end
+        local task = memory:read_u8(0x100022)
+        local descriptor = 0x1014ac + task * 0x1c
+        machine:logerror(string.format(
+            'nsm1_sim_receive_entry: caller=%08x task=%02x descriptor=%08x receive_head=%02x receive_tail=%02x count=%u t=%.9f\n',
+            cpu.state['R14'].value, task, descriptor,
+            memory:read_u8(descriptor + 0x10), memory:read_u8(descriptor + 0x11),
+            sim_receive_entries, machine.time:as_double()))
+    end)
+for _, address in ipairs({0x28812a, 0x288140}) do
+    local count = 0
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'nsm1_sim_receive_' .. address,
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= address or count >= 32 then return end
+            local pointer = cpu.state['R0'].value
+            if pointer < 0x100000 or pointer > 0x11fff4 then return end
+            count = count + 1
+            local bytes = {}
+            for index = 0, 11 do
+                bytes[#bytes + 1] = string.format('%02x', memory:read_u8(pointer + index))
+            end
+            machine:logerror(string.format(
+                'nsm1_sim_receive: pc=%08x pointer=%08x bytes=%s count=%u t=%.9f\n',
+                address, pointer, table.concat(bytes), count, machine.time:as_double()))
+        end)
+end
 local readiness_writes = 0
 handles[#handles + 1] = memory:install_write_tap(0x10e6c8, 0x10e6d3,
     'nsm1_readiness_writers', function(offset, value, mask)

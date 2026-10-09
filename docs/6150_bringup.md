@@ -110,11 +110,34 @@ loop persists through thirty seconds. Observed control writes initialize
 the UART; no bit-7 activation write solicits the card's ATR. This is not a
 falsification of card protocol behavior: the firmware has not requested it.
 
-Next: decode the owning task's event dispatch and the producer that should
-start card activation, alongside a complete writer census of the object.
-Keep validating NSM-1 GPIO ownership independently. Do not inject a task
-event, force the readiness byte, replace the verifier result or infer a
-missing DSP message solely from the blank display.
+### Task delivery frontier
+
+The task's receive loop is `0x288114`, calling RTOS receive primitive
+`0x275db4`. It consumes event byte `+4` for ordinary objects, or `+8` for
+class `0x1f` objects, subject to its class filter. The receive primitive
+indexes descriptors at `0x1014ac + task * 0x1c` using current task byte
+`0x100022`; descriptor offsets `0x10/0x11` are compared for available input.
+Sender `0x27641c` indexes the same descriptor table by its task argument.
+These instructions and literals are checked by `verify-6150-static`.
+
+Cold observation confirms task `0x16` (decimal 22) enters this loop from
+`0x2893de` at approximately 2.650 seconds, descriptor `0x101714`, with
+receive head/tail both zero. No return object is observed through nine
+seconds, and no task-22 invocation of sender `0x27641c` is observed in that
+window. The entry trace confirms that the receiver probe was reached;
+this is narrower evidence than claiming every possible sender is absent.
+
+The static gate enumerates 27 direct Thumb BL candidates targeting
+`0x27641c` over CPU addresses `0x200000..0x2e0eff`. This is a linear,
+even-halfword candidate scan, not a control-flow proof: embedded data,
+indirect calls, descriptor interpreters and other sender primitives are
+not closed. Candidate sites and scan bounds are in the generated report.
+
+Next: identify the legitimate initial task-22 delivery and its producer
+boundary, including interpreted/event-table paths. Keep validating NSM-1
+GPIO ownership independently. Do not inject an event, force the readiness
+byte, replace the verifier result or infer a missing DSP message solely
+from the blank display.
 
 ## Own-firmware contract
 

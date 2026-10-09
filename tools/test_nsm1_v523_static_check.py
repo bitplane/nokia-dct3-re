@@ -5,6 +5,12 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_direct_call_candidates_decode_thumb_big_endian_and_bounds(self):
+        self.assertEqual([check.BASE],
+                         check.direct_call_candidates(bytes.fromhex("f000f800"), check.BASE + 4))
+        self.assertEqual([], check.direct_call_candidates(bytes.fromhex("f000f800"), check.BASE + 8))
+        self.assertEqual([], check.direct_call_candidates(bytes.fromhex("f000f8"), check.BASE + 4))
+
     def test_readiness_selector_and_all_three_inputs(self):
         for selector in (0, 1, 0xFF):
             for first in (0, 1):

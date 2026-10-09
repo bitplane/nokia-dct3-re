@@ -23,6 +23,9 @@ EEPROM_SHA256 = "95d3326ab9bbcdb31838696c552f56295aac9b234cad53813aff7af9e0a73cb
 EEPROM_MEMBER = "NokiX/scripts/scripts/misc/repair_external_eeprom/nsm-1.bin"
 STREAM_WORDS = 127 * 512 + 510
 SPANS = (
+    (0x288114, 0x28815A, "6927513769a28c69288e13adfd7f301cd2548c7823320115fed0bc1ea09c0d99"),
+    (0x275DB4, 0x275E06, "b1409adc6dfb6739309ddbb27934b183e20103aedbb20573d522b3b02d598aea"),
+    (0x27641C, 0x276454, "c70d553f7b1c3b3e10f278ce81b9084d065fec84f120b42c6425ec274a5e6f30"),
     (0x2AF080, 0x2AF116, "7617a9a4984fe7823883249da0c269800a5f42a11f962b9888bd9641d999bc64"),
     (0x288FAC, 0x288FBC, "30d931c8e5fd355fa351c119b4fca147da420f44ebb2b718cd5a3b34ffb15afd"),
     (0x288EC8, 0x288EE4, "ef72919340162330a78477445d24d7a9795b5c1dc389671f7ca2d5a7a4503ffe"),
@@ -164,6 +167,20 @@ def security_fixture(eeprom: bytes, contract: dict) -> bytes:
     return bytes(result)
 
 
+def direct_call_candidates(image: bytes, target: int) -> list[int]:
+    """Linear Thumb BL candidates; data/indirect/table paths are not resolved."""
+    decoder = capstone.Cs(capstone.CS_ARCH_ARM,
+                          capstone.CS_MODE_THUMB | capstone.CS_MODE_BIG_ENDIAN)
+    result = []
+    for offset in range(0, min(len(image), 0xE0F00) - 3, 2):
+        if image[offset] & 0xF8 != 0xF0 or image[offset + 2] & 0xF8 != 0xF8:
+            continue
+        insn = next(decoder.disasm(image[offset:offset + 4], BASE + offset, count=1), None)
+        if insn and insn.mnemonic == "bl" and insn.op_str == f"#{target:#x}":
+            result.append(insn.address)
+    return result
+
+
 def readiness(first: int, selector: int, second: int, third: int) -> bool:
     """Own 0x29ed4c / 0x27bde4 byte-state predicate, not a state setter."""
     if any(not 0 <= value <= 0xFF for value in (first, selector, second, third)):
@@ -178,6 +195,18 @@ def verify(image: bytes) -> dict:
         if hashlib.sha256(image[begin - BASE:end - BASE]).hexdigest() != expected:
             raise ValueError(f"instruction span changed at {begin:#x}")
     anchors = {
+        0x288126: ("bl", "#0x275db4"),
+        0x28812A: ("adds", "r4, r0, #0"),
+        0x288148: ("ldrb", "r0, [r4, #4]"),
+        0x28814C: ("ldrb", "r0, [r4, #8]"),
+        0x275DC4: ("ldrb", "r0, [r5, #2]"),
+        0x275DC6: ("movs", "r1, #0x1c"),
+        0x275DC8: ("muls", "r1, r0, r1"),
+        0x275DFC: ("ldrb", "r0, [r0, #0x11]"),
+        0x275E00: ("ldrb", "r1, [r1, #0x10]"),
+        0x275E04: ("beq", "#0x275ec4"),
+        0x276426: ("movs", "r0, #0x1c"),
+        0x276428: ("muls", "r0, r5, r0"),
         0x288EDE: ("strb", "r5, [r4, #6]"),
         0x288FB2: ("strb", "r6, [r4, #6]"),
         0x288FB4: ("strb", "r6, [r4, #8]"),
@@ -279,6 +308,9 @@ def verify(image: bytes) -> dict:
         if (insn.mnemonic, insn.op_str) != expected:
             raise ValueError(f"instruction mismatch at {address:#x}")
     expected_literals = {
+        0x275DC2: 0x100020,
+        0x275DCA: 0x1014AC,
+        0x27642A: 0x1014AC,
         0x288ED6: 0x10E6C8,
         0x2AF08E: 0x20000,
         0x2AF0F8: 0x20037,
@@ -320,6 +352,14 @@ def verify(image: bytes) -> dict:
         "reset_stack_literals": [literal(image, pc, thumb=False)
                                  for pc in (0x200068, 0x200090, 0x2000B0)],
         "loader": 0x2A479E,
+        "sim_delivery": {"receive_loop": 0x288114, "receive": 0x275DB4,
+                         "sender": 0x27641C, "current_task": 0x100022,
+                         "descriptor_base": 0x1014AC, "descriptor_stride": 0x1C,
+                         "receive_head_offset": 0x10, "receive_tail_offset": 0x11,
+                         "direct_sender_candidates": direct_call_candidates(image, 0x27641C),
+                         "scan_start": BASE, "scan_end": BASE + 0xE0F00,
+                         "scan_kind": "linear_even_thumb_bl_candidates",
+                         "producer_closure_proven": False},
         "simi": {"reset": 0x2AF080, "receive": 0x2AF0F6,
                  "interrupt_cause": 0x20038, "control": 0x20039,
                  "rx_data": 0x20037, "rx_count": 0x2003C,
