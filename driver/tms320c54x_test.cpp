@@ -16672,6 +16672,56 @@ private:
 				return;
 			}
 			osd_printf_info("TMS320C54x ASM accumulator subtract conformance: PASS overflow_variants=4 source_preserved=1\n");
+			program.write_word(0x05e2, 0xf580); // ADD A,ASM,B; first vector ASM=-16, SXM clear.
+			m_port_writes = 0;
+			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffeffffULL);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 17);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0010);
+			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_phase = 41000;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if (m_phase >= 41000 && m_phase < 41128)
+		{
+			const unsigned index = m_phase - 41000;
+			const bool subtract = BIT(index, 0);
+			const bool sign_fill = BIT(index, 1);
+			const int shift = int(index >> 2) - 16;
+			// Signed right shifts round toward minus infinity; avoid depending
+			// on the host's negative right-shift behavior in the reference result.
+			const s64 operand = shift >= 0 ? -65537LL * (1LL << shift) :
+				(sign_fill ? -((65537LL + (1LL << -shift) - 1) / (1LL << -shift)) :
+				s64(0xfffffeffffULL / (1ULL << -shift)));
+			const s64 result = subtract ? 17 - operand : 17 + operand;
+			const bool carry = subtract ? 17 >= u32(operand) : u64(17) + u32(operand) > 0xffffffffULL;
+			const u16 status = (carry ? 0x0800 : 0) |
+				((result > 0x7fffffffLL || result < -0x80000000LL) ? 0x0200 : 0);
+			expect_opcode(subtract ? 0xf581 : 0xf580,
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0xfffffeffffULL &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (u64(result) & 0xffffffffffULL) &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0e00) == status &&
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
+				"ASM ADD/SUB covers every signed shift, SXM fill and B-owned result/status in one cycle");
+			if (index < 127)
+			{
+				const unsigned next = index + 1;
+				program.write_word(0x05e2, BIT(next, 0) ? 0xf581 : 0xf580);
+				m_port_writes = 0;
+				m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xfffffeffffULL);
+				m_cpu->set_state_int(tms320c54x_device::STATE_B, 17);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
+					((int(next >> 2) - 16) & 0x1f) | (BIT(next, 1) ? 0x0100 : 0));
+				m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			osd_printf_info("TMS320C54x ASM arithmetic shifts: PASS variants=128 shifts=32 sxm_settings=2\n");
 			program.write_word(0x05e2, 0xf58c); // MPYA T,B.
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080000000ULL);

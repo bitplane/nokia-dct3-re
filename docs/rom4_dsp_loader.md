@@ -2950,7 +2950,7 @@ working. The core now shifts the selected source by ST1.ASM with SXM-controlled
 right fill, then performs the signed addition/subtraction into the selected
 destination. Fixture-only `f480` checks negative ASM, sign fill and carry;
 `f681` checks B-to-A subtraction, unchanged B and borrow. Additional selected
-overflow boundaries are covered below; other ASM values remain unasserted.
+overflow and shift/fill combinations are covered below.
 An additional exact `f480` vector checks ASM=3: A=1 becomes 9, B's full
 40-bit sentinel remains unchanged, carry stays clear, and the instruction
 retains its one-cycle cost. The native `tms54test` suite passes after this
@@ -2972,6 +2972,17 @@ marker and whole-core conformance pass in
 `run_c54x_asm_sub_core_20261009.log`. ADD's A-owned result is not substituted
 for this cross-accumulator test. Nonzero subtraction shifts, all other
 operand/status combinations and native RF/speech remain outside this claim.
+Systematic `f580/f581` (`ADD/SUB A,ASM,B`) fixtures cover all 32 signed
+ASM values with SXM clear/set, for 128 selected vectors. Source A is fixed
+at -65537 and destination B at 17, so negative right shifts distinguish
+sign fill from zero fill and positive shifts include 32-bit overflow.
+Expected signed right-shift values use explicit division/rounding rather
+than the host's negative shift behavior. Each vector checks unchanged A,
+the 40-bit B result, B-owned overflow, low-word carry/borrow and one-cycle
+cost with OVM clear. The dedicated family marker and whole-core conformance
+pass in `run_c54x_asm_all_shifts_core_20261009.log`. This closes shift/fill
+coverage for these operands/encodings, not all operands, OVM combinations,
+sticky-status initial states, RF acquisition or speech.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
