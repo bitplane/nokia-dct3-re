@@ -5,6 +5,19 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_serial_reader_contract_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        contract = check.verify(image.read_bytes())["eeprom"]["serial_receive"]
+        self.assertEqual(0x20020, contract["gpio_data_address"])
+        self.assertEqual(0x20024, contract["gpio_direction_address"])
+        self.assertEqual((0, 2), (contract["sda_bit"], contract["scl_bit"]))
+        self.assertTrue(contract["release_sda_clears_direction_bit"])
+        self.assertTrue(contract["sample_on_scl_high"])
+        self.assertTrue(contract["msb_first"])
+        self.assertFalse(contract["runtime_verified"])
+
     def test_projection_uses_entire_two_megabyte_source_and_terminators(self):
         image = bytearray(check.SIZE)
         image[0x40:0x42] = b"\x12\x34"

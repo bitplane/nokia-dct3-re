@@ -82,6 +82,14 @@ unchanged; no record decoder intervenes. The security record is loaded into
 `0x112820`, putting the compared checksum at offset `+6`, independently
 agreeing with nested record `0x070b` at physical EEPROM `0x03d2`.
 
+Receiver `0x2bdece` independently establishes the serial wiring: it builds
+PUP GenIO data address `0x20020` and direction address `0x20024`, releases
+SDA by clearing direction bit 0, raises SCL with data bit 2, samples data
+bit 0 while SCL is high, then lowers SCL. Its shifting `0x80` receive mask
+establishes MSB-first byte reception. The static gate pins these instructions;
+this is not yet runtime verification of the complete serial transaction.
+An executable NSM-1 profile must select SCL bit 2, not the NSE-8 default bit 3.
+
 Identity wrapper `0x2ab73a` invokes `0x27e254` with selector 3. This reads
 eight EEPROM bytes at `0x000c`, renders the first seven bytes as high/low
 packed-BCD decimal digits, computes the fifteenth decimal check digit and
