@@ -423,6 +423,18 @@ calibration are preserved. This derived fixture is explicitly not a factory
 handset dump. The static proof and remaining runtime boundary are in
 `docs/6150_bringup.md`.
 
+The acquired NSM-1 installers `nsm-1_v5.17.exe`, `nsm-1_v5.20.exe`,
+`nsm1_522.exe`, `nsm-1_v5.23up.exe` and `nsm1_523.exe` were inspected
+as ZIP archives, without execution. Their member inventories contain
+firmware and service/package configuration, but no standalone handset
+EEPROM dump. The `Nsm1.PDF` member of `nsm1_522.exe` is a one-page
+language-package table, not a hardware manual or provisioning specification.
+It is retained as ignored `research/nsm1-v523/reference/Nsm1.PDF`, SHA-256
+`d0e6587b27febec941939537f9415aaa808d21d7c28f7c66083ddee6b31cde1e`.
+The repair template remains the only acquired NSM-1 EEPROM artifact;
+its native record-validation failure is documented separately and must
+not be relabeled as a compatible factory dump.
+
 ### Nokia 6110 NSE-3
 
 The primary service manual specifies a 1 MiB Intel TE28F800 program flash and
