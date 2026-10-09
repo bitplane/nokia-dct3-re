@@ -29,6 +29,11 @@ class InteractiveToolkitTest(unittest.TestCase):
 
     def test_menu_round_trip(self):
         verify_menu('\n'.join(menu_events('6210')), '6210')
+        verify_menu('\n'.join(menu_events('6250')), '6250')
+
+    def test_menu_product_mismatch(self):
+        with self.assertRaises(ValueError):
+            verify_menu('\n'.join(menu_events('6250')), '6210')
 
     def test_menu_wrong_item_result_and_fetch_length(self):
         trace = '\n'.join(menu_events('6210'))

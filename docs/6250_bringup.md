@@ -1333,5 +1333,15 @@ status `9000`. No task messages, editor state or response bytes are injected.
 The shared protocol checker requires ordered commands, physical actions,
 APDU lengths and exact response payloads. Own 96x60 frame checks cover
 DISPLAY TEXT, INKEY, empty INPUT, entered `42` and registered idle; normal
-own upload/registration/storage checks remain independent. This does not
-promote SET UP MENU, network Toolkit commands or native DSP/audio.
+own upload/registration/storage checks remain independent.
+
+`verify-6250-sim-toolkit-menu` extends the same physical sequence with card
+profile 4. SET UP MENU is announced by `9128`, fetched with length `28` and
+accepted by TERMINAL RESPONSE `810304250002028281030100`. Physical Menu,
+Scroll Up and left-softkey inputs open the installed card menu and select
+item 1. Firmware emits ENVELOPE `d30702020181100101`, receiving `9000`;
+physical End returns to registered idle. Four additional own 96x60 frames
+cover the menu entry, item list, selection result and idle recovery. The
+fresh isolated acceptance also requires normal own upload, laboratory
+registration and persisted SIM location checks. Network Toolkit commands
+and native DSP/audio remain unpromoted.

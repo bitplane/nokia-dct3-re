@@ -500,7 +500,10 @@ PROFILE, card-owned DISPLAY TEXT, physical OK, successful TERMINAL RESPONSE
 and reviewed idle recovery. `verify-6250-sim-toolkit-interactive` separately
 proves card-owned GET INKEY and GET INPUT, physical `5` and `42`, exact
 successful terminal-response text TLVs and five own frames through idle.
-Other proactive commands remain unpromoted.
+`verify-6250-sim-toolkit-menu` additionally proves card-owned SET UP MENU,
+physical navigation and item-1 selection, exact firmware ENVELOPE and four
+own menu/recovery frames with independently checked registration/storage.
+Network Toolkit commands remain unpromoted for this product.
 
 `verify-8890-minute-redraw` extends the retained cold clock to a serviced minute
 interrupt and reviewed 13:48 idle. The four GSM900/PCS incoming/outgoing

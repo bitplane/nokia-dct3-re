@@ -68,13 +68,15 @@ def check_toolkit(text, frames):
                 raise ValueError('missing reviewed NHM-3 Toolkit frame: ' + phase)
 
 
-def check_interactive_toolkit(text, frames):
+def check_interactive_toolkit(text, frames, *, menu=False):
     import re
-    from tools.dct3_toolkit_check import verify_interactive
+    from tools.dct3_toolkit_check import verify_interactive, verify_menu
     from tools.run_noki6250_calendar import check_frame
-    verify_interactive(text, '6250')
-    if re.findall(r'6250_toolkit_interactive: action=(\w+)\b', text) != [
-            'dismiss', 'inkey_5', 'input_4', 'input_2', 'confirm']:
+    (verify_menu if menu else verify_interactive)(text, '6250')
+    actions = ['dismiss', 'inkey_5', 'input_4', 'input_2', 'confirm']
+    if menu:
+        actions.extend(['menu', 'menu_last', 'menu_open', 'menu_select', 'menu_exit'])
+    if re.findall(r'6250_toolkit_interactive: action=(\w+)\b', text) != actions:
         raise ValueError('NHM-3 interactive Toolkit physical sequence differs')
     expected = {
         'display': '1c27b5e561a2183e01fffc11e71a78f5df35e342fde2c01d6df3fffc26c4199b',
@@ -85,6 +87,15 @@ def check_interactive_toolkit(text, frames):
     }
     for phase, digest in expected.items():
         check_frame(frames / f'6250_toolkit_interactive_{phase}.png', digest)
+    if menu:
+        menu_frames = {
+            'entry': '7dbd340f978d32f74d91fbd54ffbb1b3f07e5c5a12375aea0b74ca78e2a192be',
+            'items': 'a9d5d7e7caa5f074af70d12c5b25ec7dfcad057e7bebc49a91f181cf0a1cfcea',
+            'result': 'a9d5d7e7caa5f074af70d12c5b25ec7dfcad057e7bebc49a91f181cf0a1cfcea',
+            'idle': expected['idle'],
+        }
+        for phase, digest in menu_frames.items():
+            check_frame(frames / f'6250_toolkit_menu_{phase}.png', digest)
 
 
 def check_ussd(text, frames):
@@ -170,7 +181,7 @@ def main():
     parser.add_argument("run_directory", type=Path,
                         help="new directory; existing directories are refused")
     parser.add_argument("--mame", type=Path)
-    parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "divert-lifecycle", "toolkit", "toolkit-interactive", "incoming-call", "outgoing-call",
+    parser.add_argument("--scenario", choices=("calculator", "ussd", "divert", "divert-lifecycle", "toolkit", "toolkit-interactive", "toolkit-menu", "incoming-call", "outgoing-call",
                                               "sms-read", "sms-delete", "sms-reply",
                                               "phonebook", "registration", "coherent-registration", "slow-pin-registration", "power-cycle", "accessory", "idle-state", "call-state", "sms-state", "divert-state",
                                               "host-incoming-call", "host-incoming-sms", "host-incoming-sms-text", "host-outgoing-sms",
@@ -208,11 +219,11 @@ def main():
         host_sms = host_incoming_sms or args.scenario in ("host-outgoing-sms", "host-rejected-sms", "host-silent-sms")
         call = args.scenario in ("incoming-call", "outgoing-call", "host-incoming-call", "host-outgoing-call")
         sms = args.scenario.startswith("sms-") or host_sms
-        if args.scenario in ('toolkit', 'toolkit-interactive'):
+        if args.scenario in ('toolkit', 'toolkit-interactive', 'toolkit-menu'):
             config = ET.Element('mameconfig', version='10')
             inputs = ET.SubElement(ET.SubElement(config, 'system', name='nhm3hle'), 'input')
             ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
-                          mask='15', defvalue='0', value='3' if args.scenario == 'toolkit-interactive' else '1')
+                          mask='15', defvalue='0', value={'toolkit': '1', 'toolkit-interactive': '3', 'toolkit-menu': '4'}[args.scenario])
             ET.ElementTree(config).write(run / 'cfg/nhm3hle.cfg', encoding='utf-8', xml_declaration=True)
         if args.scenario == "incoming-call":
             shutil.copyfile(root / "fixtures/radio_incoming_call_answered/nhm3hle.cfg",
@@ -261,6 +272,8 @@ def main():
             script = f'noki6250_{args.scenario}_input.lua'
         if args.scenario == 'toolkit-interactive':
             script = 'noki6250_toolkit_interactive.lua'
+        if args.scenario == 'toolkit-menu':
+            script = 'noki6250_toolkit_menu.lua'
         if args.scenario == 'divert-lifecycle':
             script = 'noki6250_divert_lifecycle_input.lua'
         if host_call:
@@ -270,6 +283,8 @@ def main():
         if args.scenario == "host-silent-sms":
             script = "noki6250_sms_silence_input.lua"
         seconds = "50" if args.scenario in ("sms-reply", "host-outgoing-sms") else "35" if call or sms else "45"
+        if args.scenario == 'toolkit-menu':
+            seconds = '75'
         if args.scenario == 'toolkit-interactive':
             seconds = '65'
         if args.scenario == 'power-cycle':
@@ -349,8 +364,9 @@ def main():
                        str(run / 'error.log'), '--profile', 'nhm3']
         elif args.scenario == 'toolkit':
             check_toolkit((run / 'error.log').read_text(errors='replace'), run / 'snap')
-        elif args.scenario == 'toolkit-interactive':
-            check_interactive_toolkit((run / 'error.log').read_text(errors='replace'), run / 'snap')
+        elif args.scenario in ('toolkit-interactive', 'toolkit-menu'):
+            check_interactive_toolkit((run / 'error.log').read_text(errors='replace'), run / 'snap',
+                                      menu=args.scenario == 'toolkit-menu')
             checker = [sys.executable, str(root / 'tools/radio_registration_trace_check.py'),
                        str(run / 'error.log'), '--profile', 'nhm3']
         elif args.scenario in ('ussd', 'divert'):
