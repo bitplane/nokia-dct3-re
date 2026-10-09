@@ -121,7 +121,7 @@ profile; — = not established.
 | `0x0a/0x0b` | FIQ / IRQ mask | ✓ |
 | `0x0c` | interrupt control; bit 5 ninth-IRQ status, write bit 6 ninth-IRQ acknowledge | paired-ROM decode; source unknown |
 | `0x0d` | clock control; bit 1 pulses ARM clock-stop, bits 5--6 are SIMI-owned, with bit 5 wired to its clock input | paired-ROM decode; bit-6 effect unknown |
-| `0x0e` | **interrupt trigger** (r; read-only — why `assert_irq(4)` can't be SW-triggered) | ✓ |
+| `0x0e` | External three-bit status input (read-only); physical pin ownership unresolved | partial |
 | `0x0f–0x13` | programmable timer (divider/counter/compare) | ✓ |
 
 Timer 0's divider/counter/compare behavior is modeled with the retained

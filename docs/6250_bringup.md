@@ -944,6 +944,15 @@ Attached-accessory identification, microphone bias switching, headset
 buttons and calibrated voltage/ADC units remain unvalidated. Do not infer
 those contracts from this unattached-input regression.
 
+The own state-`0f` reader also has a separate inclusive raw window
+`012c..01f4` (`3b279e..3b27b4`). With MAD2 external status `2000e` bit 2 clear,
+this branches to `3b28f8` before the ordinary high-threshold decision.
+The contract checker pins the comparisons and shift/carry guard. This
+window is not an identified accessory resistance or button voltage:
+its physical meaning and the external status pin ownership remain unresolved. A dynamic
+HEADDET model must account for that branch rather than treating every
+non-high value as the same attachment.
+
 ### Input layout and phonebook save
 
 The separate power map at `288f98` is `5a 5a 5a 5a 0d`; only column 4

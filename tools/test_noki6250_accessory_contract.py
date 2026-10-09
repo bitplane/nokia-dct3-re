@@ -16,6 +16,8 @@ class AccessoryContractTest(unittest.TestCase):
         contract = verify(path.read_bytes())
         self.assertEqual(contract['selector'], 0)
         self.assertEqual(contract['high_threshold'], 0x312)
+        self.assertEqual(contract['state_0f_guarded_window'], [300, 500])
+        self.assertEqual(contract['window_guard_address'], 0x2000e)
         self.assertEqual(contract['electrical_unattached_level'], 'VBB pull-up; raw scale unmeasured')
 
 
