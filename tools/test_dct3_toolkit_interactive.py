@@ -1,6 +1,6 @@
 import unittest
 
-from tools.dct3_toolkit_check import interactive_events, verify_interactive
+from tools.dct3_toolkit_check import interactive_events, verify_interactive, menu_events, verify_menu
 
 
 class InteractiveToolkitTest(unittest.TestCase):
@@ -26,6 +26,17 @@ class InteractiveToolkitTest(unittest.TestCase):
     def test_lua_error_rejected(self):
         with self.assertRaises(ValueError):
             verify_interactive(self.trace() + '\n[LUA ERROR]', '6250')
+
+    def test_menu_round_trip(self):
+        verify_menu('\n'.join(menu_events('6210')), '6210')
+
+    def test_menu_wrong_item_result_and_fetch_length(self):
+        trace = '\n'.join(menu_events('6210'))
+        for old, new in (('d30702020181100101', 'd30702020181100102'),
+                         ('810304250002028281030100', '810304250002028281030101'),
+                         ('sw=9128', 'sw=9000'), ('action=menu_exit', 'action=absent')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_menu(trace.replace(old, new), '6210')
 
 
 if __name__ == '__main__':

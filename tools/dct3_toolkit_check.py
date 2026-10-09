@@ -47,3 +47,24 @@ def verify_interactive(text, product, profile_length=9):
         raise ValueError(f'{product} physical interactive Toolkit fixture failed')
     require_in_order(text.replace('[:sim_card] ', ''),
                      interactive_events(product, profile_length))
+
+
+def menu_events(product, profile_length=9):
+    return (*interactive_events(product, profile_length)[:-1],
+            'proactive SET UP MENU ready', 'SIM status ins=14 sw=9128',
+            'header cla=a0 ins=12 p1=00 p2=00 p3=28',
+            'terminal-response data=810304250002028281030100',
+            'SIM status ins=14 sw=9000',
+            f'{product}_toolkit_interactive: action=menu',
+            f'{product}_toolkit_interactive: action=menu_last',
+            f'{product}_toolkit_interactive: action=menu_open',
+            f'{product}_toolkit_interactive: action=menu_select',
+            'header cla=a0 ins=c2 p1=00 p2=00 p3=09',
+            'envelope data=d30702020181100101', 'SIM status ins=c2 sw=9000',
+            f'{product}_toolkit_interactive: action=menu_exit')
+
+
+def verify_menu(text, product, profile_length=9):
+    if '[LUA ERROR]' in text:
+        raise ValueError(f'{product} physical Toolkit menu fixture failed')
+    require_in_order(text.replace('[:sim_card] ', ''), menu_events(product, profile_length))

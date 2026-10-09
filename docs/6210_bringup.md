@@ -386,7 +386,17 @@ TERMINAL RESPONSE and pending-status lengths are shared protocol checks;
 five reviewed NPE-3 frames and its own registration/EF_LOCI remain separate.
 The final idle hash is product-local, not inherited from 6250.
 
-This establishes these three command lifecycles, not all Toolkit commands or native
+`verify-6210-sim-toolkit-menu` additionally accepts card-owned SET UP MENU:
+the preceding GET INPUT response returns `9128`, FETCH length `28`, and the
+handset returns successful command-4 response `810304250002028281030100`.
+Physical Menu/Scroll Up opens `DCT3 menu`; selecting Continue sends menu-item
+1 ENVELOPE `d30702020181100101` through `A0 C2` and receives `9000`.
+Physical End returns to the reviewed registered idle. Four extra own frames
+cover the menu entry, items, selection result and idle, independently of the
+existing five interactive frames. No callbacks or menu objects are injected.
+Menu-triggered SMS/calls and the second item's behavior remain unvalidated.
+
+This establishes these command lifecycles, not all Toolkit commands or native
 DSP execution. The completion trace records the status bytes actually appended
 to data-bearing card replies; ordinary `9000` and proactive `9116` responses
 use the same observation-only path.

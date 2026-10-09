@@ -29,6 +29,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'security': ('npe3hle', 'security_input', 37),
              'toolkit': ('npe3hle', 'toolkit_input', 40),
              'toolkit-interactive': ('npe3hle', 'toolkit_interactive', 65),
+             'toolkit-menu': ('npe3hle', 'toolkit_menu', 75),
              'ussd': ('npe3hle', 'ussd_input', 40),
              'divert': ('npe3hle', 'divert_input', 35),
              'divert-lifecycle': ('npe3hle', 'divert_lifecycle_input', 80),
@@ -229,14 +230,14 @@ def main():
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
         host = args.scenario.startswith('host-')
-        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit', 'toolkit-interactive') or host
+        configured = args.scenario in ('incoming-call', 'incoming-sms', 'state-sms', 'toolkit', 'toolkit-interactive', 'toolkit-menu') or host
         if configured or args.coherent_cell:
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
             ports = ET.SubElement(system, 'input')
-            if args.scenario in ('toolkit', 'toolkit-interactive'):
-                tag, mask, value = ':SATCFG', '15', '3' if args.scenario == 'toolkit-interactive' else '1'
+            if args.scenario in ('toolkit', 'toolkit-interactive', 'toolkit-menu'):
+                tag, mask, value = ':SATCFG', '15', {'toolkit': '1', 'toolkit-interactive': '3', 'toolkit-menu': '4'}[args.scenario]
             else:
                 tag = ':CALLHOST' if host else ':NETCFG'
                 mask = '1' if host else '2' if args.scenario == 'incoming-call' else '4'
@@ -306,13 +307,18 @@ def main():
             if args.scenario == 'accessory':
                 with Image.open(run / 'snap/6210_before_menu.png') as frame:
                     check_accessory(text, frame)
-        elif args.scenario == 'toolkit-interactive':
+        elif args.scenario in ('toolkit-interactive', 'toolkit-menu'):
             import re
             from tools.dct3_toolkit_check import verify_interactive
             from PIL import Image
-            verify_interactive(text, '6210')
-            if re.findall(r'6210_toolkit_interactive: action=(\w+)\b', text) != [
-                    'dismiss', 'inkey_5', 'input_4', 'input_2', 'confirm']:
+            actions = ['dismiss', 'inkey_5', 'input_4', 'input_2', 'confirm']
+            if args.scenario == 'toolkit-menu':
+                from tools.dct3_toolkit_check import verify_menu
+                verify_menu(text, '6210')
+                actions.extend(['menu', 'menu_last', 'menu_open', 'menu_select', 'menu_exit'])
+            else:
+                verify_interactive(text, '6210')
+            if re.findall(r'6210_toolkit_interactive: action=(\w+)\b', text) != actions:
                 raise ValueError('NPE-3 interactive Toolkit physical sequence differs')
             check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
             expected = {
@@ -325,6 +331,15 @@ def main():
             for phase, digest in expected.items():
                 with Image.open(run / 'snap' / f'6210_toolkit_interactive_{phase}.png') as frame:
                     check_frame(frame, digest, 'interactive Toolkit ' + phase)
+            if args.scenario == 'toolkit-menu':
+                for phase, digest in {
+                    'entry': '904ec53842abe3b1dcf50fc5e6bc93d61ad352295e07dcbb7d13cf0e3594c5d1',
+                    'items': 'a9d5d7e7caa5f074af70d12c5b25ec7dfcad057e7bebc49a91f181cf0a1cfcea',
+                    'result': 'a9d5d7e7caa5f074af70d12c5b25ec7dfcad057e7bebc49a91f181cf0a1cfcea',
+                    'idle': OPERATOR_SHA256,
+                }.items():
+                    with Image.open(run / 'snap' / f'6210_toolkit_menu_{phase}.png') as frame:
+                        check_frame(frame, digest, 'Toolkit menu ' + phase)
         elif args.scenario == 'toolkit':
             from tools.noki6210_toolkit_check import verify as check_toolkit
             check_toolkit(text)
