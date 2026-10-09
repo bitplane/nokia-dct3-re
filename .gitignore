@@ -27,8 +27,9 @@ ghidra/decompiled*/
 mame/
 .venv/
 venv/
-run_*/
-run_*.log
+# Root research runs, including loose Lua/C++ probes, binaries and censuses.
+# Anchored so maintained tools/run_*.py and run manifests remain visible.
+/run_*
 /run-*/
 !tools/run_manifests/
 !tools/run_manifests/*.json
@@ -57,10 +58,6 @@ __pycache__/
 capture/
 captures/
 
-# ad-hoc message-topology census outputs (canonical conclusions live in docs/)
-run_*_events.json
-run_*_events.txt
-
 # MAME writes a default configuration beside named negative-network fixtures.
 fixtures/radio_cell_barred/default.cfg
 fixtures/radio_cell_rxlev/default.cfg
@@ -70,3 +67,5 @@ fixtures/radio_paging_wrong_group/default.cfg
 fixtures/radio_paging_unmatched/default.cfg
 fixtures/radio_paging_malformed/default.cfg
 fixtures/radio_paging_unsuitable/default.cfg
+fixtures/noki6210_sip_cancel/default.cfg
+fixtures/radio_a5_1_outgoing_call_degraded/default.cfg

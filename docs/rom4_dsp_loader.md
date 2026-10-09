@@ -1079,7 +1079,7 @@ and `plugin-install-error.png`. Additional evidence is `mono-install.log`,
 `run_ccs33_oracle_wineboot_repair.log` and `plugin-prefix-repair-error.png`.
 Current verification evidence is `full-install-wow32.log` and
 `run_ccs33_oracle_automation_registered.log`,
-`run_ccs33_oracle_automation_com_trace.log.zst`,
+`run_archive/cleanup-20261009/root/run_ccs33_oracle_automation_com_trace.log.zst`,
 `automation-observed-screen.png` and `run_ccs33_oracle_automation_import.log`.
 The direct-API results are in `run_ccs33_oracle_system_setup_direct.log`,
 `run_ccs33_oracle_system_setup_import.log` and
@@ -1332,7 +1332,7 @@ The opt-in `mad2_static_census.py --constant-indexes` analysis tracks immediate
 MOV values after each literal seed and admits register-indexed accesses with
 known constants. On the same NSE-1 image it produces 691 candidates from
 the same 235 seeds, versus the original 562; all still lie at offsets
-`00..3f` (`run_5110_constant_index_census_20261009.json`). This removes one
+`00..3f` (`run_archive/cleanup-20261009/root/run_5110_constant_index_census_20261009.json`). This removes one
 specific census blind spot without identifying SCU. The scanner remains
 linear rather than control-flow complete; pre-seed constants, computed
 indexes, table pointers, ARM-mode code and other address windows remain
@@ -1340,7 +1340,7 @@ outside this result. Do not promote a candidate to silicon ownership
 without checking its branch path and observed transaction.
 A wider literal-seeded Thumb scan over `000000..0fffff` yields 942
 linear candidates from 6,029 seeds
-(`run_5110_internal_window_census_20261009.json`). Candidates above
+(`run_archive/cleanup-20261009/root/run_5110_internal_window_census_20261009.json`). Candidates above
 `040000` originate at seeds `2a8026` and `2ab3b2`, in data-like instruction
 streams; they are not established executable MMIO paths. Passive taps on
 `040000..07ffff` during an isolated 30-second native boot observe just one
