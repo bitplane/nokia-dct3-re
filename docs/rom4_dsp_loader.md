@@ -889,6 +889,24 @@ recognizes a Nokia address or loader byte pattern.
 
 ## Executed-opcode coverage
 
+### Debugger control-flow decoding
+
+The native core disassembler decodes the reviewed branch/call/return,
+repeat, idle, interrupt and status-bit forms. `check-c54x-core` checks 38
+exact encodings at two program addresses, including an extension word crossing
+the 16-bit page boundary. Near targets retain their program page; far targets
+carry their explicit extended address. The native 5110 Phone book menu gate
+also passes with this decoder enabled.
+
+This is bounded debugger coverage, not a complete ISA disassembler or new
+execution/timing evidence. Other forms remain unsupported raw words.
+Non-delayed calls and returns carry debugger stepping flags. Delayed calls
+and returns deliberately omit those flags: C54x delay slots count words,
+whereas MAME's extra-step count counts instructions, so blindly requesting
+two extra instructions would be wrong for a two-word slot instruction.
+Encodings and delay-slot rules follow the
+[TI C54x instruction reference](https://www.ti.com/lit/ug/spru172c/spru172c.pdf).
+
 `tools/c54x_opcode_coverage.py` compares `[opcov]` records from a verbose
 30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
 idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256

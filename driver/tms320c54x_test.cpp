@@ -31,6 +31,81 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void check_control_disassembler()
+	{
+		using dasm = util::disasm_interface;
+		class words : public dasm::data_buffer
+		{
+		public:
+			words(u32 pc, u16 op, u16 next) : m_pc(pc), m_op(op), m_next(next) { }
+			virtual u16 r16(u32 pc) const override
+			{
+				if (pc == m_pc) return m_op;
+				if (pc == ((m_pc & 0x7f0000) | u16(m_pc + 1))) return m_next;
+				throw emu_fatalerror("C54x disassembler read beyond fixture");
+			}
+			virtual u8 r8(u32 pc) const override { throw emu_fatalerror("unexpected byte disassembly read"); }
+			virtual u32 r32(u32 pc) const override { throw emu_fatalerror("unexpected long disassembly read"); }
+			virtual u64 r64(u32 pc) const override { throw emu_fatalerror("unexpected quad disassembly read"); }
+		private:
+			u32 const m_pc;
+			u16 const m_op, m_next;
+		};
+		struct vector { u16 op; u32 result; const char *text; };
+		vector const vectors[] = {
+			{0xf495, 1 | dasm::SUPPORTED, "NOP"},
+			{0xf4e1, 1 | dasm::SUPPORTED, "IDLE    1"},
+			{0xf6e1, 1 | dasm::SUPPORTED, "IDLE    2"},
+			{0xf5e1, 1 | dasm::SUPPORTED, "IDLE    3"},
+			{0xf7e1, 1, ".word   $F7E1"},
+			{0xf073, 2 | dasm::SUPPORTED, "B       $012345"},
+			{0xf074, 2 | dasm::SUPPORTED | dasm::STEP_OVER, "CALL    $012345"},
+			{0xf273, 2 | dasm::SUPPORTED, "BD      $012345"},
+			{0xf274, 2 | dasm::SUPPORTED, "CALLD   $012345"},
+			{0xf803, 2 | dasm::SUPPORTED | dasm::STEP_COND, "BC      $012345, BIO"},
+			{0xfa02, 2 | dasm::SUPPORTED | dasm::STEP_COND, "BCD     $012345, NBIO"},
+			{0xf80c, 2 | dasm::SUPPORTED | dasm::STEP_COND, "BC      $012345, C"},
+			{0xf808, 2 | dasm::SUPPORTED | dasm::STEP_COND, "BC      $012345, NC"},
+			{0xfc00, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "RET"},
+			{0xf4eb, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "RETE"},
+			{0xf49b, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "RETF"},
+			{0xfe00, 1 | dasm::SUPPORTED, "RETD"},
+			{0xf4e2, 1 | dasm::SUPPORTED, "BACC    A"},
+			{0xf5e2, 1 | dasm::SUPPORTED, "BACC    B"},
+			{0xf4e3, 1 | dasm::SUPPORTED | dasm::STEP_OVER, "CALA    A"},
+			{0xf7e3, 1 | dasm::SUPPORTED, "CALAD   B"},
+			{0xf072, 2 | dasm::SUPPORTED, "RPTB    $012345"},
+			{0xf272, 2 | dasm::SUPPORTED, "RPTBD   $012345"},
+			{0xf070, 2 | dasm::SUPPORTED, "RPT     #$2345"},
+			{0xf071, 2 | dasm::SUPPORTED, "RPTZ    A, #$2345"},
+			{0xf171, 2 | dasm::SUPPORTED, "RPTZ    B, #$2345"},
+			{0xecff, 1 | dasm::SUPPORTED, "RPT     #255"},
+			{0xf6bb, 1 | dasm::SUPPORTED, "RSBX    1, 11"},
+			{0xf5b0, 1 | dasm::SUPPORTED, "SSBX    0, 0"},
+			{0xf7bb, 1 | dasm::SUPPORTED, "SSBX    1, 11"},
+			{0xf7c1, 1 | dasm::SUPPORTED | dasm::STEP_OVER, "INTR    1"},
+			{0xf884, 2 | dasm::SUPPORTED, "FB      $042345"},
+			{0xf984, 2 | dasm::SUPPORTED | dasm::STEP_OVER, "FCALL   $042345"},
+			{0xfa84, 2 | dasm::SUPPORTED, "FBD     $042345"},
+			{0xfb84, 2 | dasm::SUPPORTED, "FCALLD  $042345"},
+			{0xf4e4, 1 | dasm::SUPPORTED | dasm::STEP_OUT, "FRET"},
+			{0xf6e5, 1 | dasm::SUPPORTED, "FRETED"},
+			{0xffff, 1, ".word   $FFFF"},
+		};
+		auto &decoder = m_cpu->get_disassembler();
+		expect(decoder.opcode_alignment() == 1 && decoder.interface_flags() == dasm::PAGED &&
+			decoder.page_address_bits() == 16, "C54x debugger uses word-addressed program pages");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (auto const &test : vectors)
+			{
+				words const buffer(pc, test.op, 0x2345);
+				std::ostringstream text;
+				u32 const result = decoder.disassemble(text, pc, buffer, buffer);
+				expect(result == test.result && text.str() == test.text,
+					"control disassembly preserves mnemonic, operand, word length, page and bounded stepping flags");
+			}
+		osd_printf_info("TMS320C54x control disassembler: PASS vectors=38 pages=2\n");
+	}
 	void start_idle_nmi_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -1245,6 +1320,7 @@ private:
 			if (index < 11) { start_idle_nmi_case(index + 1); return; }
 			osd_printf_info("TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0\n");
 			osd_printf_info("TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0\n");
+			check_control_disassembler();
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

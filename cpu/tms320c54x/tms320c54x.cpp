@@ -26,14 +26,93 @@ s32 accumulator_high17(u64 value)
 class tms320c54x_disassembler : public util::disasm_interface
 {
 public:
+	explicit tms320c54x_disassembler(bool extended) : m_extended(extended) { }
 	virtual u32 opcode_alignment() const override { return 1; }
+	virtual u32 interface_flags() const override { return PAGED; }
+	virtual u32 page_address_bits() const override { return 16; }
 
 	virtual offs_t disassemble(std::ostream &stream, offs_t pc,
 			const data_buffer &opcodes, const data_buffer &params) override
 	{
-		util::stream_format(stream, ".word   $%04X", opcodes.r16(pc));
-		return 1 | SUPPORTED;
+		u16 const op = opcodes.r16(pc);
+		auto const next_word = [&]() { return opcodes.r16((pc & 0x7f0000) | u16(pc + 1)); };
+		auto const target = [&]() { return (pc & 0x7f0000) | next_word(); };
+		if ((op & 0xffe0) == 0xf7c0)
+		{
+			util::stream_format(stream, "INTR    %u", op & 31);
+			return 1 | SUPPORTED | STEP_OVER;
+		}
+		if (m_extended && (op & 0xfc80) == 0xf880)
+		{
+			bool const call = BIT(op, 8), delayed = BIT(op, 9);
+			const char *name = call ? (delayed ? "FCALLD" : "FCALL") : (delayed ? "FBD" : "FB");
+			util::stream_format(stream, "%-8s$%06X", name,
+				(u32(op & 0x7f) << 16) | next_word());
+			return 2 | SUPPORTED | (call && !delayed ? STEP_OVER : 0);
+		}
+		if (m_extended && (op & 0xfdfe) == 0xf4e4)
+		{
+			bool const delayed = BIT(op, 9);
+			util::stream_format(stream, "%s%s", BIT(op, 0) ? "FRETE" : "FRET", delayed ? "D" : "");
+			return 1 | SUPPORTED | (delayed ? 0 : STEP_OUT);
+		}
+		if ((op & 0xfdfe) == 0xf802 || (op & 0xfdfb) == 0xf808)
+		{
+			const char *condition = (op & 0xfdfe) == 0xf802 ?
+				(BIT(op, 0) ? "BIO" : "NBIO") : (BIT(op, 2) ? "C" : "NC");
+			util::stream_format(stream, "%-8s$%06X, %s", BIT(op, 9) ? "BCD" : "BC", target(), condition);
+			return 2 | SUPPORTED | STEP_COND;
+		}
+		if ((op & 0xfcff) == 0xf4e1 && op != 0xf7e1)
+		{
+			util::stream_format(stream, "IDLE    %u", BIT(op, 9) ? 2 : BIT(op, 8) ? 3 : 1);
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xfdf0) == 0xf5b0 || (op & 0xfdf0) == 0xf4b0)
+		{
+			util::stream_format(stream, "%s    %u, %u", BIT(op, 8) ? "SSBX" : "RSBX", BIT(op, 9), op & 15);
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xff00) == 0xec00)
+		{
+			util::stream_format(stream, "RPT     #%u", op & 255);
+			return 1 | SUPPORTED;
+		}
+		switch (op)
+		{
+		case 0xf495: stream << "NOP"; return 1 | SUPPORTED;
+		case 0xfc00: stream << "RET"; return 1 | SUPPORTED | STEP_OUT;
+		case 0xf4eb: stream << "RETE"; return 1 | SUPPORTED | STEP_OUT;
+		case 0xf49b: stream << "RETF"; return 1 | SUPPORTED | STEP_OUT;
+		case 0xfe00: stream << "RETD"; return 1 | SUPPORTED;
+		case 0xf4e2: case 0xf5e2:
+			util::stream_format(stream, "BACC    %c", BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		case 0xf4e3: case 0xf5e3: case 0xf6e3: case 0xf7e3:
+			util::stream_format(stream, "%-8s%c", BIT(op, 9) ? "CALAD" : "CALA", BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED | (BIT(op, 9) ? 0 : STEP_OVER);
+		case 0xf073: case 0xf273: case 0xf074: case 0xf274:
+		{
+			const char *name = (op & 255) == 0x74 ? (BIT(op, 9) ? "CALLD" : "CALL") : (BIT(op, 9) ? "BD" : "B");
+			util::stream_format(stream, "%-8s$%06X", name, target());
+			return 2 | SUPPORTED | (op == 0xf074 ? STEP_OVER : 0);
+		}
+		case 0xf072: case 0xf272:
+			util::stream_format(stream, "%-8s$%06X", BIT(op, 9) ? "RPTBD" : "RPTB", target());
+			return 2 | SUPPORTED;
+		case 0xf070:
+			util::stream_format(stream, "RPT     #$%04X", next_word());
+			return 2 | SUPPORTED;
+		case 0xf071: case 0xf171:
+			util::stream_format(stream, "RPTZ    %c, #$%04X", BIT(op, 8) ? 'B' : 'A', next_word());
+			return 2 | SUPPORTED;
+		}
+		// Unknown forms retain their raw word without claiming a decoded length.
+		util::stream_format(stream, ".word   $%04X", op);
+		return 1;
 	}
+private:
+	bool const m_extended;
 };
 
 } // anonymous namespace
@@ -63,7 +142,7 @@ device_memory_interface::space_config_vector tms320c54x_device::memory_space_con
 
 std::unique_ptr<util::disasm_interface> tms320c54x_device::create_disassembler()
 {
-	return std::make_unique<tms320c54x_disassembler>();
+	return std::make_unique<tms320c54x_disassembler>(m_extended_program);
 }
 
 void tms320c54x_device::device_start()
