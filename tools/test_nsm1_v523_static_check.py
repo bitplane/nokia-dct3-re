@@ -5,6 +5,17 @@ from tools import nsm1_v523_static_check as check
 
 
 class Nsm1V523StaticCheckTests(unittest.TestCase):
+    def test_own_activation_wrapper_objects_when_available(self):
+        image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
+        if not image.exists():
+            self.skipTest("acquired NSM-1 input not present")
+        data = image.read_bytes()
+        wrapper = check.verify(data)["sim_delivery"]["activation_wrapper"]
+        self.assertEqual([0x2077E4, 0x207BB0], wrapper["call_candidates"])
+        self.assertEqual(0x10E6D6, wrapper["selector"])
+        self.assertEqual(1, data[wrapper["normal_object"] - check.BASE + 4])
+        self.assertEqual(0x20, data[wrapper["alternate_object"] - check.BASE + 4])
+
     def test_own_descriptor_event_delivery_when_available(self):
         image = Path(__file__).resolve().parents[1] / "roms/research/nsm1-v523/6150-v523-ppm-c.fls"
         if not image.exists():

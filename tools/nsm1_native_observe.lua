@@ -6,6 +6,20 @@ local writes = 0
 local handles = {}
 local sim_sends = 0
 local activation_requests = 0
+for _, address in ipairs({0x207718, 0x207afc, 0x208a7c}) do
+    local count = 0
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'nsm1_activation_owner_' .. address,
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= address or count >= 16 then return end
+            count = count + 1
+            machine:logerror(string.format(
+                'nsm1_activation_owner: pc=%08x caller=%08x r8=%08x sl=%08x gate=%02x t=%.9f\n',
+                address, cpu.state['R14'].value, cpu.state['R8'].value,
+                cpu.state['R10'].value, memory:read_u8(0x111e71),
+                machine.time:as_double()))
+        end)
+end
 handles[#handles + 1] = memory:install_read_tap(0x29cb90, 0x29cb93,
     'nsm1_activation_request', function(offset, value, mask)
         if cpu.state['PC'].value ~= 0x29cb90 or activation_requests >= 16 then return end

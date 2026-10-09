@@ -358,6 +358,14 @@ def verify(image: bytes) -> dict:
         "sim_delivery": {"receive_loop": 0x288114, "receive": 0x275DB4,
                          "sender": 0x27641C, "current_task": 0x100022,
                          "blocking_sender": 0x275B60,
+                         "activation_wrapper": {
+                             "entry": 0x29CB90,
+                             "call_candidates": direct_call_candidates(image, 0x29CB90),
+                             "normal_object": literal(image, 0x29CBD8),
+                             "alternate_object": literal(image, 0x29CBF2),
+                             "selector": literal(image, 0x29CBE0),
+                             "owner_entries": [0x207718, 0x207AFC],
+                             "shared_application_branch": 0x208A7C},
                          "descriptor_event": {
                              "pointer_column": literal(image, 0x275FAC),
                              "stride": 8, "index": 0xE3,

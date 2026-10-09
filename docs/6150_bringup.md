@@ -194,7 +194,18 @@ invocation of the wrapper. Thus an activation producer exists in this
 ROM; its caller lifecycle, not a manufactured SIM event, is the next
 boundary to investigate.
 
-Next: decode the two activation-wrapper caller contexts and their gates,
+The direct calls belong to entries `0x207718` and `0x207afc`. The former
+guards the wrapper with `0x111e71 == 0`; the latter calls it after resetting
+its local state. Shared application branch `0x208a7c` selects between them
+via `0x2a7e44` (`0x208a90` / `0x208a96`), after a context-byte `+15`
+check. Entry `0x2079b0` can also call `0x207718` at `0x2079d6`.
+Read-only entry probes for both owner entries and the shared branch observe
+none in a fresh nine-second cold run. This does not close indirect callers
+or later activity, but places the observed failure before the SIM controller's
+activation-request consumption rather than in its response timing.
+
+Next: identify the containing application dispatcher and the input/state
+selecting `0x208a7c`,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
 queue/event-table paths, not only the two send wrappers. Keep validating NSM-1
