@@ -102,6 +102,13 @@ class AlarmChecks(unittest.TestCase):
     def test_power_off_snooze_no(self):
         check_power_off_alarm(self.power_off_snooze_text(), 'no', snooze=True)
 
+    def test_power_off_snooze_yes(self):
+        text = self.power_off_snooze_text().replace('activate_no', 'activate_yes').replace(
+            'ccont_power: event=off t=86\n', '')
+        check_power_off_alarm(text, 'yes', snooze=True)
+        with self.assertRaisesRegex(ValueError, 'Yes activation'):
+            check_power_off_alarm(text + 'ccont_power: event=off t=390\n', 'yes', snooze=True)
+
     def test_power_off_snooze_requires_recurrence_deadline_and_ack(self):
         text = self.power_off_snooze_text()
         for old, new in [('cause=80 t=360', 'cause=80 t=361'),

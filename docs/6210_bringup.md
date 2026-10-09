@@ -725,6 +725,13 @@ phone off; the repeated alarm displays `Alarm! 13:53`, Stop presents
 No 6250 clock/status/loader or pixel contract is inherited. This is
 research-HLE lifecycle acceptance, not native DSP or audible-output proof.
 
+`verify-6210-alarm-off-snooze-yes` independently validates physical Yes
+after the recurrence (`run_6210_off_snooze_yes_20261009`). Both alarm-only
+upload phases are checked separately from the subsequent firmware-owned
+software restart, which must pass runtime/self-test upload validation,
+retained-location registration and the exact registered-idle frame. No
+extra rail wake or post-decision rail drop is allowed.
+
 The repeated alarm must finish booting before Stop is pressed. An earlier
 fixture pressed Stop before the second RTC acknowledgement: its labelled
 action did not dismiss the alarm, so the subsequent right softkey could

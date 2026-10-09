@@ -176,6 +176,9 @@ Stop, the reviewed activation question, and physical No returning to a blank
 powered-off display. Its recurrence input waits for the second alarm boot;
 scripted key labels alone are not evidence that the intended UI consumed them.
 This remains research HLE, not native DSP or audible-output acceptance.
+The paired `verify-6210-alarm-off-snooze-yes` independently requires
+firmware-owned software restart after physical Yes, a separately validated
+normal upload/self-test phase, registration and exact registered-idle pixels.
 
 `verify-6210-calendar-cold` independently proves physical Menu-8 Calendar
 entry, firmware-owned CCONT programming to 13:47, physical date entry and
