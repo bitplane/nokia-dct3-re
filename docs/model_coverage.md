@@ -99,7 +99,10 @@ re-arm to 13:53, natural second expiry and Stop with two additional exact
 frames. `verify-6250-alarm-off-restore` and `-restore-yes` additionally
 check exact 37-register ARM/RAM/time restoration and off-rail RTC replay,
 then natural deadline wake and the respective physical activation choice.
-Powered-off Snooze and audible/native media remain unproved.
+`verify-6250-alarm-off-snooze-no` additionally proves two natural RTC wakes,
+physical Snooze/Stop/No, silent intervening rail-off intervals, independent
+verifier/uploads on each wake and exact recurrence/final-off frames.
+Powered-off Snooze with Yes or restoration and audible/native media remain unproved.
 `verify-6250-alarm-cold` additionally proves own physically saved alarm
 reconstruction in a new process, natural expiry and Stop, with independent
 uploaded-stage/registration checks and exact retained-alarm frames. It does

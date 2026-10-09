@@ -15314,6 +15314,13 @@
                  "arguments": ["$(RUN_DIR)", "--power-choice", "no", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-alarm-off-snooze-no",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_alarm.py",
+                 "arguments": ["$(RUN_DIR)", "--snooze", "--power-choice", "no", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6250-alarm-off-yes",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",

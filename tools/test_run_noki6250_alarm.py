@@ -89,6 +89,42 @@ class AlarmCheckTest(unittest.TestCase):
         for choice in ("yes", "no"):
             check_alarm(self.power_trace(choice), choice)
 
+    def off_snooze_trace(self, choice):
+        text = self.snooze_trace().replace(
+            "ccont_rtc: event=second time=13:48:00",
+            "6250_alarm_physical: action=power_off\n"
+            "ccont_power: event=off\n6250_alarm_physical: action=power_release\n"
+            "ccont_power: event=wake cause=80\nccont_rtc: event=second time=13:48:00", 1)
+        text = text.replace(
+            "status=b1 mask=10", "status=b1 mask=50").replace(
+            "ccont_rtc: event=second time=13:53:00",
+            "ccont_power: event=off\nccont_power: event=wake cause=80\n"
+            "ccont_rtc: event=second time=13:53:00", 1)
+        text += "6250_alarm_physical: action=activate_" + choice + "\n"
+        if choice == "no":
+            text += "ccont_power: event=off\n"
+        return text
+
+    def test_powered_off_snooze_choices(self):
+        for choice in ("yes", "no"):
+            check_alarm(self.off_snooze_trace(choice), choice, snooze=True)
+
+    def test_powered_off_snooze_missing_wake_and_wrong_mask(self):
+        text = self.off_snooze_trace("no")
+        for broken in (text.replace("ccont_power: event=wake cause=80\n", "", 1),
+                       text.replace("mask=50", "mask=10"),
+                       text.replace("cause=80", "cause=02")):
+            with self.assertRaises(ValueError):
+                check_alarm(broken, "no", snooze=True)
+
+    def test_powered_off_snooze_requires_endpoint_silence(self):
+        text = self.off_snooze_trace("no").replace(
+            "ccont_power: event=off\nccont_power: event=wake",
+            "ccont_power: event=off\ndspif_transport: peer RAM W\n"
+            "ccont_power: event=wake", 1)
+        with self.assertRaises(ValueError):
+            check_alarm(text, "no", snooze=True)
+
     def test_wrong_power_cause_and_missing_off_rejected(self):
         for text in (self.power_trace("no").replace("cause=80", "cause=02"),
                      self.power_trace("no").replace("ccont_power: event=off\n", "", 1),

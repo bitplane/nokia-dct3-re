@@ -1300,17 +1300,20 @@ recurring alarm. No deadline, status or firmware state is injected. This
 does not validate powered-off Snooze, nor does programmed buzzer activity
 establish audible/native audio.
 
-The bounded physical-input probe `run_6250_off_snooze_probe_20261009`
-additionally observes the powered-off combination: rail-off at 41.673777s,
-RTC wake (`80`) at 60s, physical Snooze, a second rail-off at 85.876950s,
-and another natural RTC wake at 360s before recurrence and physical Stop.
-This is not acceptance: the 395-second window ends before the final
-Stop/activation-choice settlement, and the existing checker explicitly
-rejects the unvalidated combination. A complete gate needs a longer window,
-two independently checked RTC wakes and silent off-rail intervals, then
-the physical activation choice and its final rail/registration outcome.
-The temporary input restrictions used for the probe were restored;
-no firmware or device behavior changed.
+`verify-6250-alarm-off-snooze-no` independently proves powered-off Snooze
+through final physical No. The fresh run
+`run_6250_off_snooze_verified_20261009` enters rail-off at 41.673777s,
+wakes from RTC (`80`) at 60s, accepts physical Snooze, returns to rail-off
+at 85.876950s and wakes again at 360s. The second expiry has status `b1`,
+mask `50`, and acknowledgement `a1`. Physical Stop presents the activation
+question; No returns to rail-off at 403.874356s. Both off-rail intervals and
+the final declined interval require silence from named powered endpoints;
+each wake independently passes the native verifier/upload checks. Alarm-only
+wakes must not register. Exact frames cover the blank Snooze/off state,
+13:53 recurrence, activation question and final blank state. The 430-second
+window includes final settlement; the shorter probe did not. No device or
+firmware behavior changed. Powered-off Snooze with Yes or save/load remains
+unpromoted, and audible/native speech is not established.
 
 `verify-6250-alarm-off-restore` and `-restore-yes` save the powered-off
 countdown at emulated second 49. All 37 exported ARM/banked registers,

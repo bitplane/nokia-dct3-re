@@ -56,7 +56,6 @@ local input = coroutine.create(function()
     -- This phase shows the firmware's Stop/Snooze controls during title blink.
     machine.screens[':screen']:snapshot('6250_alarm_elapsed.png')
     if os.getenv('NOKIA_DCT3_6250_ALARM_SNOOZE') == '1' then
-        assert(not powered_off, 'Snooze probe requires awake alarm')
         if not press(named('Right Softkey / C'), 'snooze') then return end
         if not emu.wait(3) then return end
         machine.screens[':screen']:snapshot('6250_alarm_snoozed.png')

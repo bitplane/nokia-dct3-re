@@ -33,9 +33,7 @@ def check_alarm(text, power_choice=None, snooze=False):
         expected[-1:-1] = ["power_off", "power_release"]
         expected.append("activate_" + power_choice)
     if snooze:
-        if power_choice:
-            raise ValueError("combined Snooze/off fixture is not validated")
-        expected.insert(-1, "snooze")
+        expected.insert(expected.index("stop"), "snooze")
     if "[LUA ERROR]" in text or actions != expected:
         raise ValueError("NHM-3 physical alarm sequence differs")
     cursor = 0
@@ -65,7 +63,7 @@ def check_alarm(text, power_choice=None, snooze=False):
             r"ccont_rtc: event=alarm_write reg=0b data=35 armed=1\b",
             r"ccont_rtc: event=alarm_write reg=0c data=0d armed=1\b",
             r"6250_alarm_physical: event=snoozed_presented\b",
-            r"ccont_rtc: event=second time=13:53:00 day=0 status=b1 mask=10\b",
+            rf"ccont_rtc: event=second time=13:53:00 day=0 status=b1 mask={'50' if power_choice else '10'}\b",
             r"ccont_rtc: event=status_ack data=a1 old=b1\b",
             r"buzzer: enabled=1 divider=\d+ frequency=\d+ volume=[1-9]\d*\b",
             r"6250_alarm_physical: event=recurrence_observed\b",
@@ -81,15 +79,23 @@ def check_alarm(text, power_choice=None, snooze=False):
         off = list(re.finditer(r"ccont_power: event=off\b", text))
         wakes = list(re.finditer(r"ccont_power: event=wake cause=([0-9a-f]+)\b", text))
         activation = text.index("6250_alarm_physical: action=activate_" + power_choice)
-        if len(off) != (2 if power_choice == "no" else 1) or len(wakes) != 1 or wakes[0][1] != "80":
-            raise ValueError("NHM-3 alarm must wake once from RTC, with the selected rail-off outcome")
+        wake_count = 2 if snooze else 1
+        if (len(off) != wake_count + (power_choice == "no") or
+                len(wakes) != wake_count or any(wake[1] != "80" for wake in wakes)):
+            raise ValueError("NHM-3 alarm RTC wake count or selected rail-off outcome differs")
         if not off[0].end() < wakes[0].start() < activation:
             raise ValueError("NHM-3 alarm power boundaries out of order")
         require_endpoint_silence(text[off[0].end():wakes[0].start()], "NHM-3 powered-off alarm interval")
+        if snooze:
+            snoozed = text.index("6250_alarm_physical: action=snooze")
+            if not wakes[0].end() < snoozed < off[1].start() < wakes[1].start() < activation:
+                raise ValueError("NHM-3 powered-off Snooze boundaries out of order")
+            require_endpoint_silence(text[off[1].end():wakes[1].start()],
+                                    "NHM-3 powered-off Snooze interval")
         if power_choice == "no":
-            if off[1].start() < activation:
+            if off[-1].start() < activation:
                 raise ValueError("NHM-3 declined activation powered off before the choice")
-            require_endpoint_silence(text[off[1].end():], "NHM-3 declined activation interval")
+            require_endpoint_silence(text[off[-1].end():], "NHM-3 declined activation interval")
 
 
 def check_alarm_seed(text):
@@ -174,10 +180,10 @@ def main():
     parser.add_argument("--restore-off", action="store_true")
     parser.add_argument("--cold", action="store_true")
     args = parser.parse_args()
-    if args.snooze and args.power_choice:
-        parser.error("Snooze/off combination is not validated")
     if args.restore_off and not args.power_choice:
         parser.error("off-state restoration requires an explicit activation choice")
+    if args.restore_off and args.snooze:
+        parser.error("powered-off Snooze restoration is not validated")
     if args.cold and (args.snooze or args.restore_off or args.power_choice):
         parser.error("cold alarm is an independent awake lifecycle")
     root = Path(__file__).resolve().parents[1]
@@ -197,7 +203,7 @@ def main():
                    "-cfg_directory", "cfg", "-noreadconfig", "-autoboot_script",
                    str(root / "tools" / ("noki6250_alarm_restore.lua" if args.restore_off
                                          else "noki6250_alarm_input.lua")), "-autoboot_delay", "0",
-                   "-seconds_to_run", "40" if args.cold else "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
+                   "-seconds_to_run", "40" if args.cold else "430" if args.snooze and args.power_choice else "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
                    "-nothrottle", "-log", "-verbose"]
         environment = os.environ.copy()
         for key in ("NOKIA_DCT3_6250_ALARM_POWER_OFF", "NOKIA_DCT3_6250_ALARM_POWER_CHOICE",
@@ -250,8 +256,12 @@ def main():
         frames = dict(FRAMES)
         if args.snooze:
             frames.update(
-                snoozed="360ff6d56fc11b9b4447678eb0e11f6568d7171ea3c611633137f9f14c785b76",
-                recurred="a17ae41b186da6b422d94484b171c0766749f27c4ce0c1747a5a49b24e6d7c18")
+                snoozed=("907c2e3cc0dc7d0dc17827521badb7be0f647b6b945f1bac2e68094fd47568a7"
+                         if args.power_choice else
+                         "360ff6d56fc11b9b4447678eb0e11f6568d7171ea3c611633137f9f14c785b76"),
+                recurred=("1d07bdbc7c561fe1ea613620416b9e1daa7fab88f96961c64499346b20cb3aff"
+                          if args.power_choice else
+                          "a17ae41b186da6b422d94484b171c0766749f27c4ce0c1747a5a49b24e6d7c18"))
         if args.power_choice:
             from tools.noki6250_staged_check import check as check_uploads
             from tools.radio_registration_trace_check import verify
@@ -260,7 +270,13 @@ def main():
             wake = text.index("ccont_power: event=wake cause=80")
             activation = text.index("6250_alarm_physical: action=activate_" + args.power_choice)
             check_uploads(text[:off], runtime=True)
-            check_uploads(text[wake:activation], runtime=True)
+            if args.snooze:
+                wakes = list(re.finditer(r"ccont_power: event=wake cause=80\b", text))
+                snooze_off = text.index("ccont_power: event=off", wakes[0].end())
+                check_uploads(text[wakes[0].start():snooze_off], runtime=True)
+                check_uploads(text[wakes[1].start():activation], runtime=True)
+            else:
+                check_uploads(text[wake:activation], runtime=True)
             verify(text[:off], "nhm3", preserved=True)
             if "LAPDm Location Updating Accept acknowledged" in text[wake:activation]:
                 raise ValueError("alarm-only wake unexpectedly registered before activation")
