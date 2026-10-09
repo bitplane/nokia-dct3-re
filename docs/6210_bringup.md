@@ -862,6 +862,18 @@ timings or treat a missing timer message as a firmware failure. Physical
 MIC2/EAR wiring is known, but product-owned clock/framing evidence remains
 required before enabling the media path.
 
+The own System Module issue 1 (09/00), printed page 24, table 8 also supplies
+analog reference conditions, separate from the missing digital framing.
+EARP/EARN typical output is 14 mV at network level -16 dBm0 with nominal
+RLR +2 dB and volume eight dB below maximum; the listed maximum is 220 mV
+at 0 dBm0 with maximum volume and codec gain -11 dB. MIC2P/MIC2N typical
+input is 2 mV, maximum 12.5 mV; the maximum corresponds to a 1 kHz, 0 dBm0
+network signal with input amplifier gain 32 dB. These are electrical test
+conditions, not PCM sample amplitudes or recovered runtime register values.
+Do not turn them directly into MAME route gains: first establish the codec
+mux, gain-register encoding, sample format and product-owned serial clocks.
+Unity board routes currently prove connectivity only.
+
 ## Missing native bootstrap observation
 
 No matching raw NPE-3 final publication or ROM6 mask image was identified in
