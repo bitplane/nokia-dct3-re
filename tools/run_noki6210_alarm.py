@@ -24,6 +24,11 @@ SNOOZE_FRAMES = {
     'snooze': 'eabf1aaefdeba24b26ef44a8c4873004544d9d742b96a82265b7d94461176896',
     'repeated': '1c5b09187d9fd5df3e66f36fc6029730848da6a9ecc512f5d0644e3c03744d61',
 }
+POWER_OFF_FRAMES = {
+    'powered_off': '907c2e3cc0dc7d0dc17827521badb7be0f647b6b945f1bac2e68094fd47568a7',
+    'woke': 'd1c7925c3a9dd1c116cc09133fcab3e32e7bf871597055965ac15e2ccea858e7',
+    'stopped': '66e40d0bd8e655b0ac6400b6e83c1acd01c58b0247d51ed4f341ccf6f7cab615',
+}
 
 
 def check_alarm_set(text):
@@ -116,6 +121,49 @@ def check_snooze(text):
         raise ValueError('Snooze buzzer remains enabled after physical Stop')
 
 
+def check_power_off_alarm(text, choice):
+    from tools.power_domain_contract import require_endpoint_silence
+    cursor = check_alarm_set(text)
+
+    def require(token):
+        nonlocal cursor
+        position = text.find(token, cursor)
+        if position < 0:
+            raise ValueError('missing ordered powered-off alarm evidence: ' + token)
+        cursor = position + len(token)
+        return position
+
+    require('6210_alarm_probe: action=power_off\n')
+    require('6210_alarm_probe: action=power_release\n')
+    off = require('ccont_power: event=off ')
+    wake = require('ccont_power: event=wake cause=80 ')
+    require_endpoint_silence(text[off:wake], 'alarm rail-off domain generated activity')
+    require('event=second time=13:48:00 day=0 ')
+    wake_time = re.search(r'ccont_power: event=wake cause=80 t=([0-9.]+)', text[wake:])
+    deadline = re.search(r'event=second time=13:48:00 day=0 [^\n]*t=([0-9.]+)', text[wake:])
+    if wake_time is None or deadline is None or float(wake_time[1]) != float(deadline[1]):
+        raise ValueError('rail wake did not occur at the natural RTC deadline')
+    require('event=cause_read data=b1 ')
+    require('event=status_ack data=81 ')
+    require('buzzer: enabled=1 ')
+    require('6210_alarm_probe: action=stop\n')
+    require('buzzer: enabled=0 ')
+    decision = require(f'6210_alarm_probe: action=activate_{choice}\n')
+    if re.findall(r'ccont_power: event=wake cause=(\w+)', text) != ['80']:
+        raise ValueError('alarm wake used an extra power-key/charger wake')
+    if choice == 'no':
+        final_off = require('ccont_power: event=off ')
+        require_endpoint_silence(text[final_off:], 'No activation did not leave endpoints off')
+        if len(re.findall(r'ccont_power: event=off ', text)) != 2:
+            raise ValueError('No activation requires exactly two rail-off transitions')
+    else:
+        if 'ccont_power: event=off ' in text[decision:]:
+            raise ValueError('Yes activation unexpectedly removed the rails')
+    if '6210_calendar_probe:' in text:
+        raise ValueError('alarm wake process replaced the clock through Calendar input')
+    return off, wake, decision
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
@@ -125,6 +173,8 @@ def main():
                         help='exit with an armed alarm, then verify expiry in a separate cold boot')
     mode.add_argument('--snooze', action='store_true',
                       help='physically Snooze and verify natural five-minute recurrence and Stop')
+    mode.add_argument('--power-off', choices=('yes', 'no'),
+                      help='physically shut down, verify autonomous alarm wake and activation choice')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -142,15 +192,31 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki6210_alarm_arm.lua' if args.cold else
+                       f'noki6210_alarm_power_{args.power_off}.lua' if args.power_off else
                        'noki6210_alarm_snooze.lua' if args.snooze else 'noki6210_alarm_input.lua')),
-                   '-seconds_to_run', '385' if args.snooze else '85', '-video', 'none', '-sound', 'none',
+                   '-seconds_to_run', '385' if args.snooze else '115' if args.power_off else '85',
+                   '-video', 'none', '-sound', 'none',
                    '-nothrottle', '-log', '-verbose']
         with (alarm / 'console.log').open('w') as output:
             subprocess.run(command, cwd=alarm, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=400 if args.snooze else 180)
         check_output((alarm / 'console.log').read_text(errors='replace'))
         text = (alarm / 'error.log').read_text(errors='replace')
-        verify_stage(text, runtime=True, selftest=True)
+        if args.power_off:
+            off, wake, decision = check_power_off_alarm(text, args.power_off)
+            verify_stage(text[:off], runtime=True, selftest=True)
+            # Alarm-only startup is not normal telephony/analogue initialization.
+            if args.power_off == 'yes':
+                restart = re.search(r'mad2_clock: event=W off=01 data=05 ', text[decision:])
+                if restart is None:
+                    raise ValueError('Yes did not request a firmware-owned software restart')
+                boundary = decision + restart.start()
+                verify_stage(text[wake:boundary], runtime=True)
+                verify_stage(text[boundary:], runtime=True, selftest=True)
+            else:
+                verify_stage(text[wake:], runtime=True)
+        else:
+            verify_stage(text, runtime=True, selftest=True)
         check_registration(text, (alarm / 'nvram/npe3hle/sim_card').read_bytes(),
                            preserved_location=True)
         if args.cold:
@@ -173,13 +239,15 @@ def main():
                                preserved_location=True)
         if args.snooze:
             check_snooze(text)
-        else:
+        elif not args.power_off:
             check_alarm(text, cold=args.cold)
         from PIL import Image
         if args.cold:
             with Image.open(alarm / 'snap/6210_alarm_cold_idle.png') as frame:
                 check_frame(frame, COLD_IDLE_SHA256, 'cold registered idle with armed-alarm icon')
         for name, digest in FRAMES.items():
+            if args.power_off and name != 'confirm':
+                continue
             if args.cold and name == 'confirm':
                 continue
             with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
@@ -188,8 +256,18 @@ def main():
             for name, digest in SNOOZE_FRAMES.items():
                 with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
                     check_frame(frame, digest, 'physical Snooze ' + name)
+        if args.power_off:
+            for name, digest in POWER_OFF_FRAMES.items():
+                with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
+                    check_frame(frame, digest, 'powered-off alarm ' + name)
+            digest = (OPERATOR_SHA256 if args.power_off == 'yes'
+                      else POWER_OFF_FRAMES['powered_off'])
+            with Image.open(alarm / 'snap/6210_alarm_power_choice.png') as frame:
+                check_frame(frame, digest, 'physical activation ' + args.power_off)
         print('6210 alarm: PASS ' + ('armed cold retention, ' if args.cold else '') +
               ('physical Snooze, natural five-minute recurrence, ' if args.snooze else '') +
+              (f'autonomous rail wake, physical activation {args.power_off}, '
+               if args.power_off else '') +
               'physical set, natural RTC expiry, reviewed pixels, '
               'buzzer control and physical Stop; research HLE, not audible-output acceptance')
         return 0

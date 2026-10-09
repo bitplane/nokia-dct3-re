@@ -1346,7 +1346,8 @@ private:
 	TIMER_CALLBACK_MEMBER(deferred_mad2_reset);
 	void ccont_irq_w(int state);
 	void ccont_power_w(int state);
-	void reset_digital_baseband();
+	void reset_digital_baseband(bool retain_sram = false);
+	void reset_board_state(bool clear_sram);
 	void sim_irq_w(int state);
 	void sim_detect_w(int state);
 	void mbus_fiq2_w(int state);
@@ -1672,7 +1673,13 @@ void nokia_dct3_state::apply_sms_config()
 
 void nokia_dct3_state::machine_reset()
 {
-	std::fill_n(m_ram.get(), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1, 0);
+	reset_board_state(true);
+}
+
+void nokia_dct3_state::reset_board_state(bool clear_sram)
+{
+	if (clear_sram)
+		std::fill_n(m_ram.get(), (NOKIA_RAM_END - NOKIA_RAM_BASE) >> 1, 0);
 
 	// The MAD2 mask ROM is undumped. Its established exit contract branches to
 	// flash at 0x200040, so execute that branch through the normal ARM reset
@@ -1942,10 +1949,12 @@ void nokia_dct3_state::mad2_reset_w(int state)
 
 TIMER_CALLBACK_MEMBER(nokia_dct3_state::deferred_mad2_reset)
 {
-	reset_digital_baseband();
-	// Bit 2 records the MCU-initiated reset that brought the new boot up;
-	// device_reset supplies the persistent power-reset bit 0.
-	m_mad2->set_reset_cause(0x04);
+	// MCU reset does not remove SRAM supply. Firmware consumes its saved
+	// restart reason before clearing its ordinary workspace on the next boot.
+	reset_digital_baseband(true);
+	// A software reset is not a new rail-on event. Both 3210/6210 startup
+	// readers distinguish cold-power bit 0 from software-reset bit 2.
+	m_mad2->set_reset_status(0x04);
 }
 
 void nokia_dct3_state::mad2_irq_ack_w(u16 mask)
@@ -2017,6 +2026,20 @@ void nokia_dct3_state::ccont_irq_w(int state)
 
 void nokia_dct3_state::ccont_power_w(int state)
 {
+	if (m_trace_enabled && bool(state) != m_baseband_powered)
+	{
+		LOGMASKED(LOG_CCONT_RTC, "ccont_route: event=power state=%u pc=%08x lr=%08x t=%.9f\n",
+			state, m_maincpu->pc(), m_maincpu->state_int(arm7_cpu_device::ARM7_R14),
+			machine().time().as_double());
+		const uint32_t sp = m_maincpu->state_int(arm7_cpu_device::ARM7_R13);
+		if (!state && !(sp & 3) && sp >= 0x100000 && sp <= 0x17ffec)
+		{
+			auto &space = m_maincpu->space(AS_PROGRAM);
+			LOGMASKED(LOG_CCONT_RTC, "ccont_route: event=off_stack sp=%08x words=%08x/%08x/%08x/%08x/%08x\n",
+				sp, space.read_dword(sp), space.read_dword(sp + 4),
+				space.read_dword(sp + 8), space.read_dword(sp + 12), space.read_dword(sp + 16));
+		}
+	}
 	if (!state && m_baseband_powered)
 	{
 		m_baseband_powered = false;
@@ -2035,7 +2058,7 @@ void nokia_dct3_state::ccont_power_w(int state)
 	}
 }
 
-void nokia_dct3_state::reset_digital_baseband()
+void nokia_dct3_state::reset_digital_baseband(bool retain_sram)
 {
 	// These blocks share the switched digital-baseband domain. CCONT, flash and
 	// EEPROM intentionally survive this reset and retain their state.
@@ -2058,7 +2081,7 @@ void nokia_dct3_state::reset_digital_baseband()
 	if (m_sed_lcd) m_sed_lcd->reset();
 	// nokia_gsm_network_device contains immutable cell data; the session, link
 	// and radio peers above own the reset-sensitive protocol phases.
-	machine_reset();
+	reset_board_state(!retain_sram);
 }
 
 void nokia_dct3_state::sim_irq_w(int state)

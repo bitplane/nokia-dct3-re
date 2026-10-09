@@ -42,7 +42,9 @@ local input = coroutine.create(function()
         machine:logerror('6210_alarm_probe: action=power_release\n')
         if not emu.wait(9) then return end
         machine.screens[':screen']:snapshot('6210_alarm_powered_off.png')
-        if not emu.wait(32) then return end
+        if not emu.wait(19) then return end
+        machine.screens[':screen']:snapshot('6210_alarm_woke.png')
+        if not emu.wait(13) then return end
     else
         if not emu.wait(45) then return end
     end
@@ -57,6 +59,16 @@ local input = coroutine.create(function()
     if not press(1, 'Left Softkey / Menu', 'stop') then return end
     if not emu.wait(3) then return end
     machine.screens[':screen']:snapshot('6210_alarm_stopped.png')
+    if _G.noki6210_alarm_power_choice then
+        local yes = _G.noki6210_alarm_power_choice == 'yes'
+        -- Re-arm debugger-only log caps for the separate activation boot.
+        -- These temporaries do not alter firmware, MMIO or device state.
+        if yes then machine.debugger:command('do temp5=0;do temp6=0;do temp9=0') end
+        if not press(1, yes and 'Left Softkey / Menu' or 'Right Softkey / C',
+                     yes and 'activate_yes' or 'activate_no') then return end
+        if not emu.wait(20) then return end
+        machine.screens[':screen']:snapshot('6210_alarm_power_choice.png')
+    end
 end)
 _G.noki6210_alarm_probe = input
 assert(coroutine.resume(input))

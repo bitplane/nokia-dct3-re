@@ -42,7 +42,7 @@ Address-map coverage therefore must not be read as peripheral completeness.
 | Offsets | Current behavior | Fidelity | Required next evidence |
 | --- | --- | --- | --- |
 | `00` ASIC version | constant `0x40` | Inferred | Compare MAD2 revisions across phone service manuals/ROM checks. |
-| `01` MCU reset | bit 2 requests a deferred digital-baseband reset; power bit 0 and retained cause bits are readable | Cross-ROM partial | Both ROMs contain three bit-2 reset sites. A mapped-MMIO fixture proves the reset extent and post-reset value `0x05`; exact rail timing remains unknown. |
+| `01` MCU reset | bit 2 requests a deferred warm digital-baseband reset with SRAM retained; cold-power bit 0 clears in software-reset status `04` | Cross-ROM partial | Matching 3210/6210 readers distinguish cold bit 0 from software bit 2. The 6210 physical post-alarm Yes fixture proves reason retention and registered-idle restart; mapped-MMIO gates prove reset extent. Silicon encoding and exact rail timing remain unmeasured. |
 | `02` DSP reset | ordinary latch by default; an atomic product wiring contract may select a release mask and running-status readback | Product-specific partial | NHM-2 releases through bit 2 and then observes `0x53`; reset reassertion clears ready bit 4. Recover the physical clock/ready timing and validate another MAD2/DSP combination before generalizing the values. |
 | `03` watchdog | nonzero writes reload an eight-bit seconds counter; expiry resets the digital baseband and retains cause `0x03` | Focus-tested partial | The mapped-MMIO fixture proves reload, expiry and reset extent. Determine the physical tick source and exact rail timing. |
 | `04..07` timer 1 | current counter wrapping after fixed terminal count `0x7fff`; FIQ5 at the terminal; continues while ARM clock is stopped | Cross-ROM partial | Both ROMs use identical stable-read and FIQ5 race handling, and convert the unsigned terminal-minus-current interval by rounded division by 8 before comparing it with Timer 0. A 16-bit free-running model breaks organic shutdown timing. Absolute input/divider provenance remains calibrated. |
@@ -185,7 +185,14 @@ that is awake-state responsiveness, not proof of a suspended-ARM wake.
 `make verify-mad2-timer1` proves destination `0x7fff`, FIQ5/status `0x020` and
 firmware acknowledgement. `make verify-mad2-reset` runs two mapped-MMIO
 fixtures. Reset-control bit 2 causes a complete digital-baseband restart and
-retains reset cause `0x05`; MAD2-watchdog expiry resets the same domain and
+retains software reset status `0x04` with SRAM preserved; cold rail-on
+initialization instead starts at `0x01`. Matching 3210/6210 readers select the saved software reason
+with bit 1 clear and bit 2 set. A proposed `0x07` correction was falsified:
+`BHS` after `LSRS #2` selects cold reason when bit 1 is set, not clear.
+Bit 0 must also clear so the second startup reader does not initialize cold
+history. The 6210 post-alarm Yes acceptance proves the resulting registered
+idle restart; this remains inferred reset behavior, not measured silicon.
+MAD2-watchdog expiry resets the same domain and
 retains cause `0x03`. Flash, EEPROM and CCONT remain outside that domain.
 CCONT watchdog expiry uses the same reset extent with its own retained cause.
 Exact rail sequencing, oscillator start latency, the SIMI bit-6 effect and the

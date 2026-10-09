@@ -244,9 +244,21 @@ void nokia_ccont_device::advance_rtc()
 		m_regs[RTC_MINUTE] == (m_regs[RTC_ALARM_MINUTE] & 0x3f) &&
 		m_regs[RTC_HOUR] == (m_regs[RTC_ALARM_HOUR] & 0x1f))
 	{
-		latch_irq_sources(IRQ_RTC_ALARM);
+		// The always-powered alarm comparator also restores switched rails.
+		// Retain its cause, rather than manufacturing a power-key/charger cause,
+		// and present the held IRQ after the digital-domain reset callback.
+		m_regs[IRQ_STATUS] |= IRQ_RTC_ALARM;
 		m_rtc_alarm_armed = false;
 		m_regs[RTC_ALARM_HOUR] &= 0x7f;
+		if (!m_powered)
+		{
+			m_powered = true;
+			if (m_adc_trace)
+				LOGMASKED(LOG_CCONT, "ccont_power: event=wake cause=%02x t=%.9f\n",
+					IRQ_RTC_ALARM, machine().time().as_double());
+			m_power_cb(1);
+		}
+		update_irq();
 	}
 	if (m_rtc_trace)
 		LOGMASKED(LOG_CCONT, "ccont_rtc: event=second time=%02u:%02u:%02u day=%u status=%02x mask=%02x t=%.9f\n",

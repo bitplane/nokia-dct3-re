@@ -636,7 +636,9 @@ class MachineProfileTest(unittest.TestCase):
         self.assertIn("m_dsp_backend->reset_backend()", power_body)
         self.assertNotIn("m_gsm_network->reset()", power_body)
         self.assertIn("immutable cell data", power_body)
-        self.assertIn("machine_reset()", power_body)
+        self.assertIn("reset_board_state(!retain_sram)", power_body)
+        self.assertIn("reset_digital_baseband(bool retain_sram = false)", self.driver)
+        self.assertIn("reset_digital_baseband(true)", self.driver)
         self.assertIn("m_kbgpio->clear_power_on_latch()", power_body)
 
         callback = self.driver.split("void nokia_dct3_state::ccont_power_w", 1)[1]

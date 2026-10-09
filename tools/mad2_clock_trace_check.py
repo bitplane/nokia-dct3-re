@@ -63,12 +63,12 @@ def check(events, require_software_reset=False, require_watchdog_reset=False,
         for write in reset_writes:
             if write["data"] & 0x04:
                 reset_completed = any(
-                    read["data"] == 0x05 and events.index(read) > events.index(write)
+                    read["data"] == 0x04 and events.index(read) > events.index(write)
                     for read in reset_reads)
                 if reset_completed:
                     break
         if not reset_completed:
-            errors.append("MCU reset request was not followed by reset-cause value 0x05")
+            errors.append("MCU reset request was not followed by reset-cause value 0x04")
     watchdog_reset_completed = False
     if require_watchdog_reset:
         for write in watchdog_writes:

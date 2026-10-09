@@ -54,6 +54,7 @@ public:
 	void set_fiq_mask_bits(u8 mask);
 	bool watchdog_tick();
 	void set_reset_cause(u8 mask) { m_regs[0x01] |= mask; }
+	void set_reset_status(u8 status) { m_regs[0x01] = status; }
 
 	u16 fiq_status() const { return m_fiq_status; }
 	u16 irq_status() const { return m_irq_status; }

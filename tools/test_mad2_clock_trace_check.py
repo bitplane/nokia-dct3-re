@@ -58,14 +58,24 @@ class Mad2ClockTraceCheckTest(unittest.TestCase):
         )
 
     def test_requires_post_request_reset_cause(self):
-        reset = VALID + "mad2_clock: event=R off=01 data=05 counter=0000 pc=0023060c t=0.7\n"
+        reset = VALID + "mad2_clock: event=R off=01 data=04 counter=0000 pc=0023060c t=0.7\n"
         errors, counts = check(parse(reset), require_software_reset=True)
         self.assertEqual([], errors)
         self.assertTrue(counts["software_reset_completed"])
 
     def test_rejects_request_without_completed_reset(self):
         errors, _ = check(parse(VALID), require_software_reset=True)
-        self.assertIn("MCU reset request was not followed by reset-cause value 0x05", errors)
+        self.assertIn("MCU reset request was not followed by reset-cause value 0x04", errors)
+
+    def test_rejects_software_cause_selecting_cold_reason(self):
+        reset = VALID + "mad2_clock: event=R off=01 data=07 counter=0000 pc=0023060c t=0.7\n"
+        errors, _ = check(parse(reset), require_software_reset=True)
+        self.assertIn("MCU reset request was not followed by reset-cause value 0x04", errors)
+
+    def test_rejects_software_reset_retaining_cold_power_flag(self):
+        reset = VALID + "mad2_clock: event=R off=01 data=05 counter=0000 pc=0023060c t=0.7\n"
+        errors, _ = check(parse(reset), require_software_reset=True)
+        self.assertIn("MCU reset request was not followed by reset-cause value 0x04", errors)
 
     def test_requires_watchdog_reset_cause(self):
         watchdog = VALID.replace("off=03 data=31 old=ff", "off=03 data=01 old=ff")

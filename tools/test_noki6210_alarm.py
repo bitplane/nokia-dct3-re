@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6210_alarm import check_alarm, check_snooze
+from tools.run_noki6210_alarm import check_alarm, check_snooze, check_power_off_alarm
 
 
 class AlarmChecks(unittest.TestCase):
@@ -20,6 +20,43 @@ class AlarmChecks(unittest.TestCase):
 
     def test_complete_lifecycle(self):
         check_alarm(self.text)
+
+    def power_off_text(self):
+        prefix, expiry = self.text.split('event=second time=13:48:00', 1)
+        expiry = 'event=second time=13:48:00' + expiry
+        expiry = expiry.replace('day=0 status=b1', 'day=0 status=b1 t=60')
+        expiry = expiry.replace('event=read reg=0e data=b1', 'event=cause_read data=b1')
+        return prefix + (
+            '6210_alarm_probe: action=power_off\n'
+            '6210_alarm_probe: action=power_release\n'
+            'ccont_power: event=off t=38\n'
+            'ccont_power: event=wake cause=80 t=60\n'
+        ) + expiry + (
+            '6210_alarm_probe: action=activate_no\n'
+            'ccont_power: event=off t=86\n'
+        )
+
+    def test_power_off_alarm_no(self):
+        check_power_off_alarm(self.power_off_text(), 'no')
+
+    def test_power_off_alarm_rejects_wrong_deadline(self):
+        with self.assertRaisesRegex(ValueError, 'natural RTC deadline'):
+            check_power_off_alarm(self.power_off_text().replace('cause=80 t=60', 'cause=80 t=61'), 'no')
+
+    def test_power_off_alarm_rejects_extra_wake(self):
+        with self.assertRaises(ValueError):
+            check_power_off_alarm(self.power_off_text() + 'ccont_power: event=wake cause=01 t=90\n', 'no')
+
+    def test_power_off_alarm_rejects_endpoint_activity(self):
+        for text in [self.power_off_text().replace('ccont_power: event=wake',
+                     'dspif_transport: RX enqueue\n' + 'ccont_power: event=wake'),
+                     self.power_off_text() + 'dspif_transport: RX enqueue\n']:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                check_power_off_alarm(text, 'no')
+
+    def test_power_off_alarm_yes_rejects_shutdown(self):
+        with self.assertRaisesRegex(ValueError, 'Yes activation'):
+            check_power_off_alarm(self.power_off_text().replace('activate_no', 'activate_yes'), 'yes')
 
     def test_each_required_event(self):
         for line in self.text.splitlines(keepends=True):
