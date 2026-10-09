@@ -475,6 +475,26 @@ registration. Whole-register ST1 loads and other uploaded code may also
 change XF. Matching the manual's figures to firmware-owned callers remains
 necessary before assigning stage semantics.
 
+The active caller contract is now explicit. Entry `2523` branches to
+`25fe`, not to separately called helpers. `CMPM` tests the low B MMR at
+`000b` for **equality** with 1, then 2: selector 1 sets and clears XF,
+ending low at `2605`; selector 2 clears and sets XF, ending high at
+`260d`. Other selectors reach `260e`, whose `BITF` tests ST1.XF and
+selects the opposite state. That third arm is statically decoded, not
+observed in this run.
+
+Three live `2523` entries carry selectors `1,1,2`, with stack-top return
+addresses `0df3,30c8,30eb`. Read-only program windows confirm actual
+`CALL 2523` at `0df1,30c6,30e9` and the preceding immediate B selectors.
+The first site's program words are zero in the acquired flat program image
+but populated at runtime. A raw CALL/CALLD census finds ten candidate
+`2523` call sites in that image and therefore does not close the uploaded
+caller set. The two late callers sit in the `30xx` initialization/control
+spine; their execution alone does not establish network synchronization.
+`309c` independently sets XF during the periodic path, so observing XF high
+cannot by itself establish registration. The native RF-boundary regression
+remains unchanged under the extended observer.
+
 `tools/c54x_rom4_port_census.py` inventories candidate `PORTR`/`PORTW` sites
 in the recovered big-endian ROM image. It accounts for the extra Smem address
 word in absolute `74f8`/`75f8` instructions; treating that word as the port
