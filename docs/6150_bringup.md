@@ -563,6 +563,30 @@ is a useful mechanism cross-check, not permission to reuse its handset
 identity, factory constants or complete EEPROM profile. The shared codec
 arithmetic can be checked without donor provisioning.
 
+The validator's loop at `0x27e75a..0x27e794` checks object bytes
+`+0x0c..+0x12`, then the high nibble of `+0x13`. For each of the first
+seven bytes, a high or low nibble in `0xc..0xe` clears validity; `0xf`
+is permitted. The final byte's high nibble follows the same rule.
+This is a recovered representation constraint, not yet a field-name or
+lock-policy identification. If routed through that loop without the earlier
+block swap, the cold decoded record fails at byte 2 (`0x3c`), and the
+restart record fails at byte 3 (`0xc3`). Earlier format-specific branches
+at `0x27e688..0x27e758` can reject or swap blocks first, so these are
+conditional static failures, not the observed first failing instruction.
+Trace those branches before attributing the rejection to this loop.
+
+The bounded branch trace now identifies the earlier rejection in both
+exchanges: `0x27e688 -> 0x27e6b0 -> 0x27e6ea -> 0x27e796`.
+The format-specific path is selected by bit 6 of `0x11fdd1` (the carry
+from `lsrs #7`, not bit 7). The byte at object `+0x15` is `0xec` cold
+and `0x9d` after restart; neither selects the preceding accepted-format
+branches. The subsequent byte at `+0x21` is `0xb8` / `0x81`, outside
+the required inclusive `0x78..0x7f` range, so validity clears before
+the nibble loop. The new trace retains arithmetic agreement in both
+exchanges. Recover the source and meaning of the format flag and record
+bytes before choosing any external-storage fixture; these tests alone
+do not identify a valid phone identity or lock policy.
+
 Next: recover the NSM-1 record semantics and task-2 validation contract,
 including the retained-marker transform and the compatibility required
 between the own repair template and modeled COBBA. Keep the SIM/readiness backtrace

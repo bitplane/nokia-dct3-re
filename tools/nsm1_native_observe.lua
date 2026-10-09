@@ -70,6 +70,19 @@ handles[#handles + 1] = memory:install_read_tap(0x2ab7c8, 0x2ab7cb,
             object, bytes, cpu.state['R14'].value, memory:read_u8(0x100022),
             machine.time:as_double()))
     end)
+local validation_steps = 0
+for _, address in ipairs({0x27e688, 0x27e6b0, 0x27e6ea, 0x27e758,
+    0x27e75a, 0x27e786, 0x27e796, 0x27e798}) do
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'nsm1_record_validation', function(offset, value, mask)
+            if cpu.state['PC'].value ~= address or validation_steps >= 64 then return end
+            validation_steps = validation_steps + 1
+            machine:logerror(string.format(
+                'nsm1_record_validation: pc=%08x r0=%08x r1=%08x r5=%08x object=%08x t=%.9f\n',
+                address, cpu.state['R0'].value, cpu.state['R1'].value,
+                cpu.state['R5'].value, cpu.state['R6'].value, machine.time:as_double()))
+        end)
+end
 local restart_checks = 0
 handles[#handles + 1] = memory:install_read_tap(0x27e7cc, 0x27e7cf,
     'nsm1_restart_check', function(offset, value, mask)
