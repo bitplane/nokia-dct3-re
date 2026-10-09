@@ -882,6 +882,16 @@ The next executable timing fixture must distinguish request latching,
 Decode-stage acceptance, memory-write visibility and vector entry. Timer
 requests accepted before a later IMR write must not simply be cancelled by
 that write. The existing short/long-period probe does not resolve this order.
+An independent return-bus assertion covers `RETF` (`f49b`): SPRU172C
+section 4-141 and SPRU131G example 7-11 specify PC from RTN and an SP
+increment, without reading the stacked PC. A passive tap in the existing
+hardware-interrupt fixture detects the former discarded `pop()` read.
+The implementation now increments SP directly; return state and the
+three-cycle instruction cost are unchanged. This does not establish
+interrupt recognition/drain timing or native recorder completion.
+The full CPU suite and native NSE-1 receiver gate pass. The original MU4
+recorder replay retains cursor `27`, pending RX and PC `02:3d76`; eliminating
+the discarded stack read does not advance that independent boundary.
 The existing `RPT #3`/one-cycle `ADD` interrupt fixture also reports cycle
 markers without treating them as hardware acceptance. Four operand reads span
 three cycles; the final body operand read to the first vector operand read

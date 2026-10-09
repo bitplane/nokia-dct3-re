@@ -18105,6 +18105,9 @@ private:
 			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0300 &&
 					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
 					"RETF restores the fast return and interrupt-mask state");
+			expect(m_fast_stack_reads == 0,
+					"SPRU172C RETF increments SP without reading the stacked return address");
+			osd_printf_info("TMS320C54x fast return bus: PASS stack_reads=0\n");
 			m_cpu->set_input_line(2, CLEAR_LINE);
 			m_phase = 1;
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0300);
@@ -18229,6 +18232,12 @@ private:
 		program.write_word(0x004a, 0xf49b); // RETF
 		program.write_word(0x0400, 0xf5e1);
 		program.write_word(0x0401, 0xf5e1);
+		m_fast_stack_reads = 0;
+		data.install_read_tap(0x02ff, 0x02ff, "fast_return_stack",
+			[this](offs_t, u16 &, u16) {
+				if (m_phase == 3 && !machine().side_effects_disabled())
+					++m_fast_stack_reads;
+			});
 		m_phase = 3;
 		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0400);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0300);
@@ -18249,6 +18258,7 @@ private:
 	unsigned m_bleq_case = 0;
 	unsigned m_rom4_checks = 0;
 	bool m_irq_raised = false;
+	unsigned m_fast_stack_reads = 0;
 	unsigned m_repeat_reads = 0;
 	u16 m_stack_mmr[2] = {};
 	unsigned m_irq_trigger_read = 1;

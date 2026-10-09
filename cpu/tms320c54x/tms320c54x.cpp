@@ -2600,7 +2600,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xf49b: // RETF
 		m_pc = m_rtn;
-		pop();
+		++m_sp; // SPRU172C: RTN supplies PC; no stack-memory read occurs.
 		m_st1 &= ~0x0800;
 		m_icount -= 2;
 		return;
