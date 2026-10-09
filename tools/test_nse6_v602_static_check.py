@@ -40,6 +40,8 @@ class Nse6StaticTests(unittest.TestCase):
         self.assertFalse(result["dsp_verifier"]["resident_mask_proven"])
         self.assertEqual(result["dsp_verifier"]["full_blocks"], 127)
         self.assertEqual(result["eeprom_descriptor"]["page_bytes"], 32)
+        self.assertEqual(result["keypad"]["power_column_mask"], 16)
+        self.assertFalse(result["keypad"]["runtime_input_proven"])
         mutated = bytearray(image)
         mutated[0x168] ^= 1
         with self.assertRaises(ValueError):

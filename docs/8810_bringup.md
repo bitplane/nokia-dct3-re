@@ -95,8 +95,28 @@ into context `0x1205c0 + 0x0c/+0x0a`.
 
 This identifies a protocol shape shared with other recovered verifier streams,
 not a fitted DSP mask or a successful verdict. No resident-ROM compatibility
-is established and no DSP response is fabricated. Display and keypad contracts
-remain unexamined.
+is established and no DSP response is fabricated. Display attachment remains
+unexamined.
+
+### Keypad
+
+Own scanner `0x2de164` uses row register `0x31`, column register `0x30`,
+direction register `0x2f` and interrupt mask `0x33`. Ordinary scans select
+rows 1 through 4 and test five active-low columns; raw keys are `row*5+column`.
+The separate special-key scan yields `0x80+column`.
+
+Decoder `0x2e049a` maps normal keys through `0x3033b4` and special keys through
+`0x3033d0`, indexed by layout byte `0x1214af`. Recovered layout-zero tables:
+
+```text
+normal:  3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b
+special: 3e3e3e3e0d
+```
+
+Special column 4 maps to power key `0x0d`, requiring column mask `0x10`.
+The bytes coincide with independently recovered NSE-1/NSM-1 tables, but are
+checked against this image rather than assumed from those products. Host
+button labels and runtime input acceptance are not yet established.
 
 ## Acceptance Required Before Promotion
 

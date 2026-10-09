@@ -66,7 +66,9 @@ def check(image):
         (0x2B6144, 0x100F6), (0x2B6186, 0x100FE),
         (0x2B6188, 0x10200), (0x2B618C, 0x200040),
         (0x2B6202, 0xFFFF), (0x2DD102, 0x200005),
-        (0x2DD106, 0x121570))
+        (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
+        (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
+        (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4))
     for address, expected in expected_literals:
         thumb = address >= 0x2000EC
         decoder.mode = ((capstone.CS_MODE_THUMB if thumb else capstone.CS_MODE_ARM)
@@ -118,17 +120,39 @@ def check(image):
         (0x2DE4A2, "movs", "r7, #4"),
         (0x2DE4B2, "strb", "r2, [r3, #4]"),
         (0x2DE4F6, "ldrb", "r1, [r3]"),
-        (0x2DE4F8, "tst", "r1, r6"))
+        (0x2DE4F8, "tst", "r1, r6"),
+        (0x2DE1A6, "ldrb", "r0, [r6, #1]"),
+        (0x2DE1C8, "movs", "r4, #1"),
+        (0x2DE1F0, "ldrb", "r0, [r6, #2]"),
+        (0x2DE212, "lsls", "r0, r4, #2"),
+        (0x2DE214, "adds", "r0, r4, r0"),
+        (0x2DE216, "adds", "r0, r1, r0"),
+        (0x2DE22A, "cmp", "r1, #5"),
+        (0x2DE236, "cmp", "r4, #5"),
+        (0x2DE246, "subs", "r0, #0x80"),
+        (0x2E049C, "bl", "#0x2de164"),
+        (0x2E04C2, "movs", "r1, #0x19"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
         if (insn.mnemonic, insn.op_str) != (mnemonic, operands):
             raise ValueError(f"instruction contract changed at {address:#x}")
+    normal = image[0x1033B4:0x1033B4 + 25]
+    special = image[0x1033D0:0x1033D0 + 5]
+    if (normal.hex() != "3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b"
+            or special.hex() != "3e3e3e3e0d"):
+        raise ValueError("own NSE-6 keypad tables changed")
     return {"product": "NSE-6", "version": "6.02", "ppm": "A",
             "image_sha1": IMAGE_SHA1, "reset_literals": literals,
             "service_manual_sram_bytes": 0x40000,
             "service_manual_eeprom_bytes": 0x8000,
             "eeprom_descriptor": eeprom_descriptor(image[5]),
+            "keypad": {"scanner": "0x2de164", "decoder": "0x2e049a",
+                       "row_register": "0x31", "column_register": "0x30",
+                       "direction_register": "0x2f", "mask_register": "0x33",
+                       "columns": 5, "normal_table": normal.hex(),
+                       "special_table": special.hex(), "power_column_mask": 16,
+                       "runtime_input_proven": False},
             "eeprom_tx": {"entry": "0x2de3d4", "pup_data": "0x20020",
                           "pup_direction": "0x20024", "sda_bit": 0,
                           "scl_bit": 2},
