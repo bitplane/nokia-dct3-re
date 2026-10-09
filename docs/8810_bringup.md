@@ -32,7 +32,7 @@ retry count permits the same physical code to be accepted, reaching a Menu /
 Names frame with the earlier stalled-core compatibility fixture. Correcting
 native TRN storage advances DSP execution but changes this result: the current
 fresh run executes DSP code throughout 40 seconds without a logged unsupported
-opcode, but leaves the MCU in its verifier loop and captures a blank menu frame. No reset-control write is
+opcode, but corrupts the DSP receive ring and captures a blank menu frame. No reset-control write is
 observed through 40 seconds in that run; this is not a successful boot.
 The menu/input observations below remain evidence for the earlier composition,
 not acceptance of the current native instruction path.
@@ -86,14 +86,31 @@ TRN's MMR `0x0f` and page-zero indirect addressing follow
 | `ae31 / 0816` | Parallel LD with MAC/MAS, optionally rounded | 64 destination/rounding/SXM/FRCT/pointer cases preserving old T and carry |
 | `1780 / 1968` | LDR memory high plus bit 15, SXM-dependent, no status changes | 64 destination/sign/value/direct/indirect/post-decrement/absolute cases, OVM set |
 
-Current fresh-run boundary: blank display and MCU verifier activity through
+Current fresh-run boundary: blank display and MCU receive-ring drain activity through
 40 seconds, without a logged unsupported opcode. The native interface summary
 records 209 completion strobes, 139 mailbox writes, 8,591 slot expiries,
 8,654 frame expiries and 4,384 RF reads. DSP PC samples vary after 30 seconds;
 IMR is `0x0421`. CCONT clock control is `0x56`; no reset-control write occurs
-within that window. The next contract to decode is the MCU verifier's
-unsatisfied condition against these actual DSP publications. This is not a
+within that window. The verifier has already returned `0/4` at 0.230685 s;
+the repeatedly sampled `0x2b6026..0x2b60ba` is the receive-ring packet drain,
+not the verifier. This is not a
 boot success or fitted-mask compatibility proof, nor native speech evidence.
+
+The drain reads indices at `0x101ca` (consumer) and `0x101c8` (producer),
+packet headers at `0x10000 + 2*consumer`, with ring wrap at index `0xe4`
+back to `0x80`. A fresh read-only trace observes headers `1074`, `3474`,
+`0274`, `0474` and producer indices `0089`, `00a4`, `00a6`, `00a9` before
+one second. At 1.002106865 s the DSP writes `90e9` to data address `08e5`
+(consumer), with both PC=`90e9` and SP=`08e5`; subsequent PC-valued writes
+overwrite both indices. The MCU consequently reads an out-of-window packet
+at `0x16174` and continues draining corrupted headers. Earlier DSP producer
+writes at PC `3805` show SP declining from `1e47` to `1c7f`.
+This establishes stack overlap with shared ring state, not its cause. The next
+question is the first stack/control-flow divergence before those writes,
+including interrupt entry/return and frame-clock servicing. Do not synthesize
+ring indices, stop notifications, or restore the earlier stalled core to
+make the display reappear. The observer caps native index writes at 32 and
+header observations at 16; it is not a full writer census.
 CMPS/TRN update semantics and indirect POPM remain separate decoder gaps.
 The TRAP-only composition's post-reset `0xfce7 / 06ce` differs from its cold
 path; retained-state and instruction-stream provenance still need checking

@@ -7,6 +7,20 @@ local mad2_registers = emu.item(assert(machine.devices[':mad2'].items['0/m_regs'
 local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_regs']))
 local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
+if dsp then
+    local ring_writes = 0
+    handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x08e4, 0x08e5,
+        'nse6_native_rx_indices', function(offset, value, mask)
+            ring_writes = ring_writes + 1
+            if ring_writes > 32 then return end
+            machine:logerror(string.format(
+                'nse6_native_rx_index_write: address=%04x value=%04x mask=%04x pc=%04x sp=%04x previous_word=%04x a=%010x b=%010x ar0=%04x ar1=%04x t=%.9f\n',
+                offset, value, mask, dsp.state['PC'].value, dsp.state['SP'].value,
+                dsp.spaces['program']:read_u16((dsp.state['PC'].value - 1) & 0xffff), dsp.state['A'].value,
+                dsp.state['B'].value, dsp.state['AR0'].value, dsp.state['AR1'].value,
+                machine.time:as_double()))
+        end)
+end
 local counts = {}
 local result_readers = {}
 local report_events = {}
@@ -122,6 +136,7 @@ handles[#handles + 1] = memory:install_read_tap(0x1205c8, 0x1205cf,
             pc, offset, value, mask, machine.time:as_double()))
     end)
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
+        0x2b6026, 0x2b5fda,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
         0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
         0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca,
@@ -134,6 +149,13 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x2b5fda and counts[address] <= 16 then
+                local packet = cpu.state['R4'].value
+                machine:logerror(string.format(
+                    'nse6_dsp_rx_header: packet=%08x header=%04x read_index=%04x write_index=%04x lr=%08x t=%.9f\n',
+                    packet, memory:read_u16(packet), memory:read_u16(0x101ca),
+                    memory:read_u16(0x101c8), cpu.state['R14'].value, machine.time:as_double()))
+            end
             if (address == 0x293ccc or address == 0x293d0e)
                     and counts[address] <= 4 then
                 machine:logerror(string.format(
@@ -291,8 +313,8 @@ emu.register_frame_done(function()
         ccont_watchdog:read(0), mad2_registers:read(3), now))
     if dsp then
         machine:logerror(string.format(
-            'nse6_native_snapshot: pc=%04x imr=%04x ifr=%04x ccont_clock=%02x t=%.9f\n',
-            dsp.state['PC'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,
+            'nse6_native_snapshot: pc=%04x sp=%04x imr=%04x ifr=%04x ccont_clock=%02x t=%.9f\n',
+            dsp.state['PC'].value, dsp.state['SP'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,
             ccont_registers:read(6), now))
     end
     if now >= 28 and not late_captured then
