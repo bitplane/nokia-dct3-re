@@ -1,7 +1,8 @@
 import unittest
 from pathlib import Path
 
-from tools.noki8210_channel_config_contract import acquisition_descriptor, serialize, verify
+from tools.noki8210_channel_config_contract import (
+    acquisition_descriptor, serialize, verify, verify_bookkeeping_trace)
 
 
 class ChannelConfigContractTest(unittest.TestCase):
@@ -67,3 +68,18 @@ class ChannelConfigContractTest(unittest.TestCase):
         for length in (0, 23, 25):
             with self.assertRaises(ValueError):
                 acquisition_descriptor(bytes(length))
+
+    def test_bookkeeping_completion_and_failures(self):
+        lines = [
+            '8210_channel_config_bookkeeping: pc=002eaf74 caller=002eb25f argument=0013ac7c saved=00000000 data=none controller=000000000000000000000000 state=10 t=7.897816',
+            '8210_channel_config_bookkeeping: pc=002eaf74 caller=002df295 argument=00000000 saved=001132ac data=045000000000120003370000 controller=000000000000000000000000 state=10 t=7.908436',
+            '8210_channel_config_bookkeeping: pc=00305228 caller=002eafc5 argument=00000001 saved=00000000 data=none controller=000000000337001250000000 state=10 t=7.908521']
+        text = '\n'.join(lines)
+        self.assertEqual(verify_bookkeeping_trace(text), 1)
+        for bad in ('', '\n'.join(lines[:-1]), '\n'.join(lines[1:]),
+                    text.replace('0337001250', '0338001250'),
+                    text.replace('t=7.908521', 't=7.000000'),
+                    text.replace('saved=00000000 data=none controller=000000000337',
+                                 'saved=001132ac data=none controller=000000000337')):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                verify_bookkeeping_trace(bad)

@@ -11,6 +11,23 @@ local function bytes(pointer, count)
     return table.concat(result)
 end
 local acquisition_count = 0
+for _, address in ipairs({0x2eaf74, 0x305228}) do
+    local count = 0
+    handles[#handles + 1] = memory:install_read_tap(address & ~3,
+        (address & ~3) + 3, 'channel_config_bookkeeping_' .. address,
+        function(offset, value, mask)
+            if cpu.state['PC'].value ~= address or count >= 32 then return end
+            count = count + 1
+            local saved = memory:read_u32(0x137dc4)
+            local saved_bytes = 'none'
+            if saved >= 0x100000 and saved < 0x17fff4 then saved_bytes = bytes(saved, 12) end
+            machine:logerror(string.format(
+                '8210_channel_config_bookkeeping: pc=%08x caller=%08x argument=%08x saved=%08x data=%s controller=%s state=%02x t=%.6f\n',
+                address, cpu.state['R14'].value, cpu.state['R0'].value,
+                saved, saved_bytes, bytes(0x137968, 12), memory:read_u8(0x13817c),
+                machine.time:as_double()))
+        end)
+end
 handles[#handles + 1] = memory:install_read_tap(0x287390, 0x287393,
     'channel_config_acquisition', function(offset, value, mask)
         if cpu.state['PC'].value ~= 0x287390 or acquisition_count >= 32 then return end

@@ -1281,6 +1281,25 @@ The shared helper `2eaf74` also updates firmware bookkeeping; its complete
 lifecycle is not captured by the byte-copy translation. In particular,
 this acquisition-owned configuration still does not establish whether
 the DSP must cancel or finish the outstanding measurement window.
+Configuration completion itself is settled in both runs. Shared helper
+`2eaf74` saves a 12-byte descriptor copy at pointer `137dc4` when no copy
+exists. The type-`89` handler calls it with argument zero (`2df290`, return
+`2df295`); it copies the saved descriptor into controller record `137968`,
+frees the saved copy, clears `137dc4`, and calls controller dispatcher
+`305228`. The observed subtype-`50` completion sees controller word zero
+and state `10`, selecting the `10 -> 11` branch; subtype-`10` completion
+sees state `11`, selecting the other zero-word branch. Both configurations
+complete in both boots, so neither saved-descriptor ownership nor its
+type-`89` acknowledgement is the early/late-PIN discriminator. This helper
+does not contain an explicit measurement-stop packet construction; that
+absence is local, not a proof about all downstream controller behavior.
+`verify_bookkeeping_trace` checks complete ordered save/consume/release
+transactions against the ROM-derived field copies: six completions in
+the passing run and two in the failing run. Raw paired observations:
+`run_8210_channel_config_bookkeeping_pin{7,8}_20261009/error.log`.
+The unresolved boundary remains DSP-side type-`56` measurement lifetime
+when subtype-`50` channel configuration arrives, not an unanswered
+configuration or malformed serializer.
 Reference scope: the recovered NHM-5 trace-name catalogue in the sibling
 project (`tools/symbols/trace-names-nhm5.txt`) labels `1855`, `1856`, and
 `1857` as `INVALID_MDI_MSG`. Its useful names for `188b` and `1802` do not
