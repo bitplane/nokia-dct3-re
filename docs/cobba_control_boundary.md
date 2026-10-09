@@ -217,6 +217,17 @@ firmware's serial readiness/enable contract before introducing a codec clock;
 neither a fixed interrupt cadence nor shared tone-cell writes may be added
 merely to make this routine run.
 
+TI's CPU Reference Guide tables 6-24/6-25 identify vector 20 as BRINT0
+and vector 21 as BXINT0 on the buffered-port variants. This corroborates the
+local vector-20 receive handler; it is not a measured MAD2 pin assignment.
+The coherent native idle mask `035f` enables source bit 4 (vector 20) but
+not source bit 5 (vector 21). Therefore transmit-ready changes alone cannot
+be assumed to drive the observed sample ISR. The next attachment audit must
+establish the receive frame source and its ready edge, with the BSP receive
+enable and firmware interrupt mask observed independently. IMR/IFR are
+CPU-internal MMRs in this implementation and bypass data-space taps; an
+empty tap at data `0000/0001` would not prove absent mask activity.
+
 ### Organic tone request boundary
 
 `tools/c54x_rom4_tone_observe.lua` combines the physical-input harness with
