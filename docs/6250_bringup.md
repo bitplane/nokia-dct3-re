@@ -1300,6 +1300,18 @@ recurring alarm. No deadline, status or firmware state is injected. This
 does not validate powered-off Snooze, nor does programmed buzzer activity
 establish audible/native audio.
 
+The bounded physical-input probe `run_6250_off_snooze_probe_20261009`
+additionally observes the powered-off combination: rail-off at 41.673777s,
+RTC wake (`80`) at 60s, physical Snooze, a second rail-off at 85.876950s,
+and another natural RTC wake at 360s before recurrence and physical Stop.
+This is not acceptance: the 395-second window ends before the final
+Stop/activation-choice settlement, and the existing checker explicitly
+rejects the unvalidated combination. A complete gate needs a longer window,
+two independently checked RTC wakes and silent off-rail intervals, then
+the physical activation choice and its final rail/registration outcome.
+The temporary input restrictions used for the probe were restored;
+no firmware or device behavior changed.
+
 `verify-6250-alarm-off-restore` and `-restore-yes` save the powered-off
 countdown at emulated second 49. All 37 exported ARM/banked registers,
 modeled RAM digest and emulated time must match exactly on load. The
