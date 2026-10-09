@@ -276,23 +276,30 @@ and frame-sync behavior. Combined with the local ROM's `c008 -> c0c8`,
 BDXR write and BDRR poll, this corroborates the serial-port interpretation;
 it does not corroborate a COBBA parallel register-C transaction.
 
-The native backend retains data `0022` in DSP-owned saved control storage,
-cleared at device/core-reset assertion; it no longer forwards the word to
-COBBA's parallel bank. The current raw control latch is partial hardware,
-not a full BSPC decode: writable masks, read-only ready/status bits and
-external-clock transitions are still missing. The separately evidenced boot
-echo is unchanged. Fresh coherent boot and 30-second native processing retain
-865/6033 frame observations; the physical tone request remains accepted
-without operational PCM, and exact idle save/load restores `bspc22=c0c8`
-before drawing the unchanged Phone book oracle.
+The native backend owns data `20/21/22` through a saved standard-mode
+completed-word state model. Writable configuration is masked with `c0ff`;
+RRDY, XRDY and receive-overrun status derive from receive, transmit and reset
+transitions rather than firmware writes. An unread receive word is preserved
+on overrun, reception resumes after its acknowledgement, and transmit
+readiness returns at an explicit frame transfer. Executable C++ tests cover
+all 65,536 control-write values and these transitions. Fresh native coherent
+boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
+command delivery and exact idle save/load pass with this state model. The
+tone run still observes only the single boot echo, not operational samples.
+
+This remains partial hardware: clock-pin status, transmit-shifter status,
+autobuffering, reset-time transmit preloading and physical frame/bit timing
+are not established. Only the separately evidenced external boot echo
+provides an untimed transfer; ordinary pending samples do not acquire a
+fabricated frame or interrupt. No operational PCM is claimed.
 
 The coherent gate now checks real serial reset/release and echo observations
 instead of expecting synthetic COBBA parallel register-C logs. Data `0032`
 still uses the legacy forwarding path: the generic TI assignment varies by
 part, so that address needs its own local sequence/variant evidence, not a
 shared "interrupt-masked alias" assumption. Before attaching the 8 kHz frame
-clock, implement documented reset/readiness at the DSP endpoint and validate
-word timing. MFI port mapping remains an independent boundary; do not
+clock, establish the remaining enable, frame and interrupt-routing contract
+and validate word timing. MFI port mapping remains an independent boundary; do not
 double-drive both owners to preserve an old log predicate.
 
 ## Physical capture option

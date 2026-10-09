@@ -43,6 +43,13 @@ void nokia_dsp_c54x_device::device_start()
 	save_item(NAME(m_program));
 	save_item(NAME(m_data));
 	save_item(NAME(m_io));
+	save_item(NAME(m_bsp.control));
+	save_item(NAME(m_bsp.receive));
+	save_item(NAME(m_bsp.transmit));
+	save_item(NAME(m_bsp.receive_ready));
+	save_item(NAME(m_bsp.transmit_ready));
+	save_item(NAME(m_bsp.transmit_pending));
+	save_item(NAME(m_bsp.receive_overrun));
 	save_item(NAME(m_host_command_line));
 	save_item(NAME(m_reset_released));
 	save_item(NAME(m_host_command_vector));
@@ -67,7 +74,7 @@ void nokia_dsp_c54x_device::device_start()
 void nokia_dsp_c54x_device::device_reset()
 {
 	std::fill(m_io.begin(), m_io.end(), 0);
-	m_data[0x0022] = 0;
+	m_bsp.reset();
 	m_host_command_line = false;
 	m_reset_released = false;
 	m_host_command_vector = 0;
@@ -212,7 +219,7 @@ void nokia_dsp_c54x_device::reset_line_w(int released)
 	}
 	else
 	{
-		m_data[0x0022] = 0;
+		m_bsp.reset();
 		m_cobba->codec_serial_receive_ack();
 		m_frame_timer->adjust(attotime::never);
 		m_slot_timer->adjust(attotime::never);
@@ -242,12 +249,12 @@ void nokia_dsp_c54x_device::program_w(offs_t offset, u16 data)
 u16 nokia_dsp_c54x_device::data_r(offs_t offset)
 {
 	const u16 address = offset;
-	if (address == 0x0020 && m_cobba->codec_serial_receive_ready())
-	{
-		const u16 value = m_cobba->codec_serial_receive();
-		m_cobba->codec_serial_receive_ack();
-		return value;
-	}
+	if (address == 0x0020)
+		return m_bsp.receive_r();
+	if (address == 0x0021)
+		return m_bsp.transmit;
+	if (address == 0x0022)
+		return m_bsp.control_r();
 	if (address >= nokia_dspif_device::hpi_daram_base &&
 			address < nokia_dspif_device::hpi_daram_base +
 				nokia_dspif_device::hpi_daram_words)
@@ -261,9 +268,9 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 	if (address == 0x0022)
 	{
 		// Resident reset/release and BDXR/BDRR traffic corroborate BSPC0,
-		// not a COBBA parallel register-C write. Retain control state here;
-		// read-only readiness and external-clock transitions are not yet modeled.
-		m_data[address] = data;
+		// not a COBBA parallel register-C write. Status bits belong to the
+		// completed-word state, not the firmware's writable control value.
+		m_bsp.control_w(data);
 		return;
 	}
 	if (address == 0x0032)
@@ -279,7 +286,22 @@ void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 		return;
 	}
 	if (address == 0x0021)
-		m_cobba->codec_serial_transmit(data);
+	{
+		m_bsp.transmit_w(data);
+		// Preserve the existing untimed external boot echo only. Ordinary
+		// pending samples need a real external frame attachment, not this path.
+		u16 word;
+		if (m_cobba->codec_serial_loopback() && m_bsp.frame_transmit(word))
+		{
+			m_cobba->codec_serial_transmit(word);
+			if (m_cobba->codec_serial_receive_ready())
+			{
+				m_bsp.frame_receive(m_cobba->codec_serial_receive());
+				m_cobba->codec_serial_receive_ack();
+			}
+		}
+		return;
+	}
 	const bool shared = address >= nokia_dspif_device::hpi_daram_base &&
 			address < nokia_dspif_device::hpi_daram_base +
 				nokia_dspif_device::hpi_daram_words;

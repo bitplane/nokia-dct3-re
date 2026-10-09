@@ -9,6 +9,7 @@
 #include "nokia_ccont.h"
 #include "nokia_dsp_backend.h"
 #include "nokia_dspif.h"
+#include "tms320c54x_bsp_state.h"
 
 #include <array>
 
@@ -72,6 +73,7 @@ private:
 	std::array<u16, 0x10000> m_program{};
 	std::array<u16, 0x10000> m_data{};
 	std::array<u16, 0x100> m_io{};
+	tms320c54x_bsp_state m_bsp;
 	bool m_host_command_line = false;
 	bool m_reset_released = false;
 	u16 m_overlay_end = 0x2800;

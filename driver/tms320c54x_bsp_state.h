@@ -1,0 +1,76 @@
+// license:BSD-3-Clause
+// copyright-holders:Gaz
+
+#ifndef MAME_NOKIA_TMS320C54X_BSP_STATE_H
+#define MAME_NOKIA_TMS320C54X_BSP_STATE_H
+
+#include <cstdint>
+
+// Standard-mode completed-word state. The attachment owns frame/bit clocks
+// and routes ready transitions to interrupts; autobuffering is not modeled.
+struct tms320c54x_bsp_state
+{
+	std::uint16_t control = 0, receive = 0, transmit = 0;
+	bool receive_ready = false, transmit_ready = true;
+	bool transmit_pending = false, receive_overrun = false;
+
+	void reset() { *this = {}; }
+	void control_w(std::uint16_t value)
+	{
+		control = value & 0xc0ff; // Clock pins and status bits are read-only.
+		if (!(control & 0x0080))
+		{
+			receive_ready = false;
+			receive_overrun = false;
+		}
+		if (!(control & 0x0040))
+		{
+			transmit_ready = true;
+			transmit_pending = false;
+		}
+	}
+	std::uint16_t control_r() const
+	{
+		return control | (receive_ready ? 0x0400 : 0) |
+				(transmit_ready ? 0x0800 : 0) | (receive_overrun ? 0x2000 : 0);
+	}
+	void transmit_w(std::uint16_t value)
+	{
+		transmit = value;
+		if (control & 0x0040)
+		{
+			transmit_pending = true;
+			transmit_ready = false;
+		}
+	}
+	bool frame_transmit(std::uint16_t &value)
+	{
+		if (!(control & 0x0040) || !transmit_pending)
+			return false;
+		value = transmit;
+		transmit_pending = false;
+		transmit_ready = true;
+		return true;
+	}
+	bool frame_receive(std::uint16_t value)
+	{
+		if (!(control & 0x0080) || receive_overrun)
+			return false;
+		if (receive_ready)
+		{
+			receive_overrun = true;
+			return false;
+		}
+		receive = value;
+		receive_ready = true;
+		return true;
+	}
+	std::uint16_t receive_r()
+	{
+		receive_ready = false;
+		receive_overrun = false;
+		return receive;
+	}
+};
+
+#endif // MAME_NOKIA_TMS320C54X_BSP_STATE_H

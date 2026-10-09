@@ -35,6 +35,7 @@ DRIVER_COMPONENTS := driver/nokia_ccont.cpp driver/nokia_ccont.h \
 	driver/nokia_b3_flash.cpp driver/nokia_b3_flash.h \
 	driver/nokia_dsp_backend.h \
 	driver/nokia_dsp_c54x.cpp driver/nokia_dsp_c54x.h \
+	driver/tms320c54x_bsp_state.h \
 	driver/nokia_dsp_hle.cpp driver/nokia_dsp_hle.h \
 	driver/nokia_record_codec.h \
 	driver/nokia_dsp_staged.cpp driver/nokia_dsp_staged.h \
