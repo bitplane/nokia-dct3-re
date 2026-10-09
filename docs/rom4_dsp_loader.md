@@ -886,8 +886,18 @@ The five-step publication delay describes this simulator's pipeline, not
 a Nokia device latency or independently established MAME cycle correction.
 The runner rejects the reference's unknown-opcode-to-NOP fallback and
 retains each fixture's output in the isolated build directory. Only these
-two fixtures are validated; arithmetic, software INTR and hardware IRQ
-timing are not. Adding our own timer/request model would remove the
+two fixtures agree with the architectural expectations; arithmetic and
+hardware IRQ timing are not validated. A separate `INTR 16` probe executes
+`f7d0` at `0100`, with PMST `2000`, SP `1000`, IMR zero and IFR `ffff`.
+The original pipeline sets INTM and reaches the `2040` vector, but stacks
+`0102` instead of the next-instruction address `0101`, and leaves IFR
+`ffff` instead of clearing the selected bit to `fffe`. These are measured
+reference discrepancies, not desired native-core behavior. The runner
+explicitly reproduces and reports them; its PASS means reproduction, not
+INTR conformance. The native core's existing 64 INTR cases check next-PC
+stacking and selected-IFR clearing against SPRU172C. This reference cannot
+adjudicate the outstanding interrupt-pipeline question without separate
+validation. Adding our own timer/request model would remove the
 independence needed to validate that model.
 [DSPsim](https://mpcomplete.org/proj/dspsim/) instead implements a C audio
 interface, not instruction execution. Neither is a differential oracle for

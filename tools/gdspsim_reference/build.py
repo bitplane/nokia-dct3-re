@@ -43,14 +43,15 @@ def main():
     binary = output / "headless"
     subprocess.run(["gcc", *flags, str(adapter / "headless.c"), *objects,
                     *libs, "-lm", "-o", str(binary)], env=env, check=True)
-    for name, argv in (("nop", []), ("xf", ["xf"])):
+    for name, argv in (("nop", []), ("xf", ["xf"]), ("intr", ["intr"])):
         result = subprocess.run([str(binary), *argv], env=env, text=True,
                                 capture_output=True)
         (output / (name + ".log")).write_text(result.stdout + result.stderr)
         print(result.stdout, end="")
         if result.returncode or "Can't process" in result.stdout + result.stderr:
             raise SystemExit(f"Reference fixture failed: {name}; inspect {output}")
-    print(f"PASS external_objects={len(objects)}; no timer/IRQ validation")
+    print(f"PASS external_objects={len(objects)}; INTR discrepancies reproduced; "
+          "no timer/IRQ validation")
 
 
 if __name__ == "__main__":
