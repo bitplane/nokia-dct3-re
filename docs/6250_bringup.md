@@ -475,6 +475,16 @@ not saved; no passive replay interval is asserted during its invalidation.
 Lua waits cancelled by loading return normally, while the restore notifier
 explicitly starts the post-load physical cleanup schedule.
 
+`verify-6250-sip-pending-outgoing-restore` separately uses physical `123`/Send,
+real SIP 180 and a snapshot at 24 s. Exact R15/R13/RAM/time must restore,
+then CANCEL/487 and one cause-41 clear must close the request without redial
+or CONNECT/media. Own carrier-19 release uses
+`041202001117001a600000130000001400000001` with confirmation
+`body=00 input=0409 expected=00 pending=00`, followed by resumed paging and
+the reviewed registered-idle frame. The fixture's hold control omits its
+scheduled physical End; it never writes firmware state or supplies a
+handset completion event. Connected SIP and native speech remain unproved.
+
 `verify-6250-sip-outgoing-busy` independently verifies physical `123`/Send
 against real local PJSIP 486 on the same declared initial-record composition.
 The checker decodes the product's SETUP digits, requires a correlated busy

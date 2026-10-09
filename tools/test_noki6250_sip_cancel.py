@@ -25,6 +25,19 @@ class SipCancelTest(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 check.check_alerting_restoration(invalid)
 
+    def test_pending_restore_requires_own_digits_and_exact_architecture(self):
+        state = 'pc=00412345 sp=00170000 ram=12345678 t=24.000000000'
+        text = ('gsm_call_adapter: request id=1 epoch=1 digits=123\n'
+                '6250_state: event=saved ' + state + '\nsip_state: saved\n'
+                '6250_state: event=restored ' + state + '\nsip_state: restored\n'
+                'state_roundtrip: result=pass scenario=6250_outgoing_pending\n')
+        check.check_alerting_restoration(text, outgoing=True)
+        for invalid in (text.replace('digits=123', 'digits=1234'),
+                        text.replace('event=restored pc=00412345', 'event=restored pc=00412346'),
+                        text.replace('scenario=6250_outgoing_pending', 'scenario=6250_incoming_alerting')):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                check.check_alerting_restoration(invalid, outgoing=True)
+
     def test_restored_dialog_requires_fresh_epoch_and_no_media(self):
         good = {'passed': True, 'sip_status': 487, 'epoch': 2,
                 'media': dict.fromkeys(('uplink', 'downlink', 'pcm_transmitted', 'pcm_received', 'dropped'), 0)}
@@ -77,7 +90,9 @@ class SipCancelTest(unittest.TestCase):
                             ['--incoming', '--cancel-incoming', '--restore-idle'],
                             ['--incoming', '--cancel-incoming', '--restore-call'],
                             ['--incoming', '--restore-call', '--restore-phase', 'connected'],
-                            ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--record-media']):
+                            ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--record-media'],
+                            ['--restore-outgoing', '--sip-response', '200'],
+                            ['--restore-outgoing', '--sip-response', '180', '--record-media']):
                 result = subprocess.run([sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                     '--pjsua', 'absent', '--run-dir', directory, '--product', '6250', *options],
                     capture_output=True, text=True)

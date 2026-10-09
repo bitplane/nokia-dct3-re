@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 604 gates: 407 generated from typed steps, 197 copied verbatim (shell).
+# 605 gates: 407 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -60,14 +60,15 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8210-sip-pending-outgoing-restore verify-8210-sip-incoming-restore \
 	verify-8210-sip-alerting-incoming-restore verify-8210-sip-cancel \
 	verify-6250-sip-idle-restore verify-6250-sip-alerting-incoming-restore \
-	verify-6250-sip-cancel verify-6250-sip-outgoing-busy \
-	verify-6250-sip-outgoing-unavailable verify-6210-power-cycle \
-	verify-8890-power-off-restore verify-8890-minute-redraw \
-	verify-8890-calendar-year-end verify-8890-calendar-leap-day \
-	verify-8890-calendar-rollover verify-8890-cold-clock verify-8890-power-cycle \
-	verify-8850-sip-idle-restore verify-8850-sip-outgoing-busy \
-	verify-8850-sip-outgoing-unavailable verify-8850-sip-cancel \
-	verify-8890-sip-idle-restore verify-8890-sip-alerting-incoming-restore \
+	verify-6250-sip-pending-outgoing-restore verify-6250-sip-cancel \
+	verify-6250-sip-outgoing-busy verify-6250-sip-outgoing-unavailable \
+	verify-6210-power-cycle verify-8890-power-off-restore \
+	verify-8890-minute-redraw verify-8890-calendar-year-end \
+	verify-8890-calendar-leap-day verify-8890-calendar-rollover \
+	verify-8890-cold-clock verify-8890-power-cycle verify-8850-sip-idle-restore \
+	verify-8850-sip-outgoing-busy verify-8850-sip-outgoing-unavailable \
+	verify-8850-sip-cancel verify-8890-sip-idle-restore \
+	verify-8890-sip-alerting-incoming-restore \
 	verify-8890-sip-pending-outgoing-restore verify-8890-sip-outgoing-busy \
 	verify-8890-sip-outgoing-unavailable verify-8890-sip-cancel \
 	verify-8890-host-rejected-sms verify-8890-host-silent-sms \
@@ -518,6 +519,11 @@ verify-6250-sip-idle-restore: build
 verify-6250-sip-alerting-incoming-restore: build
 	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6250_sip_cancel.py $(RUN_DIR) --restore-incoming-alerting --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
+
+# shell: optional PJSIP stack; physical 123/Send then pending SIP 180 restoration, no redial/media
+verify-6250-sip-pending-outgoing-restore: build
+	@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6250_sip_cancel.py $(RUN_DIR) --restore-outgoing-pending --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'
 
 # shell: optional PJSIP stack; declared initial-record PMM comparison and unanswered coherent ARFCN19 call
 verify-6250-sip-cancel: build

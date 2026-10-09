@@ -619,6 +619,17 @@ are forbidden. The shared read-only snapshot helper carries no product
 radio, input or provisioning assumptions. This is unanswered restoration,
 not native speech or connected SIP coverage.
 
+`verify-6250-sip-pending-outgoing-restore` physically dials `123`/Send and
+requires a real SIP 180 before cancelling the request through save/load.
+The handset snapshot at 24 seconds restores exact R15/R13, complete-RAM
+digest and emulated time. One cause-41 clear completes CC/RR release with
+the own carrier-19 deconfiguration body and `expected=00` confirmation;
+resumed paging and reviewed registered-idle pixels are required. CANCEL/487
+must close the external request without redial, SIP confirmation, CONNECT
+or accepted media. This shares the NHM-3 architectural observer with the
+ringing fixture, not its physical-input or cleanup policy. External dialogs
+are discarded rather than saved; native speech remains unproved.
+
 `verify-8210-sip-cancel` covers NSM-3 v5.31 research HLE with the explicitly
 labelled acquired base-record comparison (invalid later journal omitted),
 not factory provisioning. Physical startup precedes a real INVITE/CANCEL/487

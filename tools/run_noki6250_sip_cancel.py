@@ -43,19 +43,24 @@ def check_frames(directory):
                 raise ValueError('NHM-3 reviewed SIP cleanup pixels differ: ' + name)
 
 
-def check_alerting_restoration(text):
+def check_alerting_restoration(text, outgoing=False):
+    if outgoing and not re.search(r'gsm_call_adapter: request id=1 epoch=1 digits=123\b', text):
+        raise ValueError('pending NHM-3 restoration lacks own dialed digits')
     states = re.findall(r'6250_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
     if (len(states) != 2 or [state[0] for state in states] != ['saved', 'restored'] or
             states[0][1:] != states[1][1:] or '6250_state: FAIL' in text):
         raise ValueError('NHM-3 ringing architecture did not restore exactly')
     cursor = 0
-    for marker in ('incoming state id=1 epoch=1 phase=alerting', 'sip_state: saved',
-                   'sip_state: restored', 'state_roundtrip: result=pass scenario=6250_incoming_alerting',
-                   '6250_sip_cancel: physical Exit'):
+    for marker in (('gsm_call_adapter: request id=1 epoch=1 digits=123' if outgoing else
+                    'incoming state id=1 epoch=1 phase=alerting'), 'sip_state: saved',
+                   'sip_state: restored', 'state_roundtrip: result=pass scenario=6250_' +
+                   ('outgoing_pending' if outgoing else 'incoming_alerting')):
         position = text.find(marker, cursor)
         if position < 0:
             raise ValueError('missing ordered NHM-3 restoration checkpoint: ' + marker)
         cursor = position + len(marker)
+    if not outgoing and text.find('6250_sip_cancel: physical Exit', cursor) < 0:
+        raise ValueError('missing post-load physical Exit')
 
 
 def check_product_result(run, *, restore_idle=False, restore_alerting=False):
@@ -100,16 +105,19 @@ def main():
     outgoing.add_argument('--outgoing-busy', action='store_true')
     outgoing.add_argument('--outgoing-unavailable', action='store_true')
     outgoing.add_argument('--restore-incoming-alerting', action='store_true')
+    outgoing.add_argument('--restore-outgoing-pending', action='store_true')
     args = parser.parse_args()
     outgoing_status = 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
-    if (outgoing_status or args.restore_incoming_alerting) and args.restore_idle:
+    outgoing_run = outgoing_status or args.restore_outgoing_pending
+    if (outgoing_run or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
         accessory, audit = prepare_run(run, root)
         apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
-        script = ('noki6250_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
+        script = ('noki6250_sip_outgoing_pending_restore.lua' if args.restore_outgoing_pending else
+                  'noki6250_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
                   'noki6250_call_observe.lua' if outgoing_status else
                   'noki6250_sip_idle_restore.lua' if args.restore_idle else 'noki6250_sip_cancel_observe.lua')
         handset = [str((args.mame or root / 'mame/mame').resolve()), 'nhm3hle',
@@ -123,7 +131,8 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6250',
-                   *(['--sip-response', str(outgoing_status)] if outgoing_status else
+                   *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
+                     ['--sip-response', str(outgoing_status)] if outgoing_status else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
                       str(run / 'snap/6250_sip_registered_idle.png')] if args.restore_incoming_alerting else
                      ['--incoming', '--cancel-incoming', '--ready-file',
@@ -131,15 +140,17 @@ def main():
                    '--http-port', str(args.http_port), '--sip-port', str(args.sip_port), '--', *handset]
         with (run / 'console.log').open('w') as output:
             environment = dict(os.environ)
-            if outgoing_status:
+            if outgoing_run:
                 environment['NOKIA_DCT3_6250_OUTGOING'] = '1'
             subprocess.run(command, cwd=run, env=environment, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
-        if outgoing_status:
+        if outgoing_run:
             text = (run / 'error.log').read_text(errors='replace')
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
+            if args.restore_outgoing_pending:
+                check_alerting_restoration(text, outgoing=True)
             require_ordered(text, (
                 ('physical Send', re.compile(r'6250_call_input: step=7 pressed=1')),
                 *((('own traffic carrier 19', re.compile(
@@ -150,11 +161,11 @@ def main():
                   if outgoing_status == 480 else ()),
                 ('own release carrier 19', re.compile(
                     r'TX packet type=02 payload=20 .*radio_phase=release_channel_change '
-                    + (r'data=041202001117001a600000130000001400000001' if outgoing_status == 480 else
+                    + (r'data=041202001117001a600000130000001400000001' if outgoing_status == 480 or args.restore_outgoing_pending else
                        r'data=041202000000001a600000130000000f00000000'))),
                 ('own release confirmation', re.compile(
                     r'6250_channel_confirmation: body=00 input=0409 expected='
-                    + ('00' if outgoing_status == 480 else '01') + r' pending=00')),
+                    + ('00' if outgoing_status == 480 or args.restore_outgoing_pending else '01') + r' pending=00')),
                 ('resumed idle paging', IDLE_PCH),
             ), 'NHM-3 outgoing SIP failure')
             with Image.open(run / 'snap/6250_call_4.png') as frame:
@@ -166,7 +177,8 @@ def main():
                                  restore_alerting=args.restore_incoming_alerting)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nhm3hle',
-            'scenario': ('incoming-sip-alerting-restore' if args.restore_incoming_alerting else
+            'scenario': ('outgoing-sip-pending-restore' if args.restore_outgoing_pending else
+                         'incoming-sip-alerting-restore' if args.restore_incoming_alerting else
                          'outgoing-sip-busy' if outgoing_status == 486 else
                          'outgoing-sip-unavailable' if outgoing_status else 'incoming-sip-cancel'),
             'provisioning': 'derived acquired initial-record PMM comparison',
@@ -174,6 +186,7 @@ def main():
             'native_dsp_complete': False, 'speech_tested': False,
             'idle_restored_before_fresh_sip': args.restore_idle,
             'incoming_alerting_restored': args.restore_incoming_alerting,
+            'outgoing_pending_restored': args.restore_outgoing_pending,
             'external_dialog_restored': False,
             'laboratory_carrier': 19, 'command': command, 'result': 'pass',
         }, indent=2) + '\n')

@@ -267,6 +267,14 @@
       ]
     },
     {
+      "name": "verify-6250-sip-pending-outgoing-restore", "prerequisites": ["build"], "variables": {},
+      "unstructured": "optional PJSIP stack; physical 123/Send then pending SIP 180 restoration, no redial/media",
+      "recipe": [
+        "\t@test -x '$(SIP_PJSUA_BIN)' || { echo 'build PJSIP 2.16 first; see docs/external_call_bridge.md'; exit 1; }",
+        "\tenv PYTHONPATH='$(SIP_PYTHON_PATH)' $(VENV)/bin/python tools/run_noki6250_sip_cancel.py $(RUN_DIR) --restore-outgoing-pending --pjsua '$(SIP_PJSUA_BIN)' --mame '$(abspath $(MAME_DIR))/mame'"
+      ]
+    },
+    {
       "name": "verify-6250-sip-cancel", "prerequisites": ["build"], "variables": {},
       "unstructured": "optional PJSIP stack; declared initial-record PMM comparison and unanswered coherent ARFCN19 call",
       "recipe": [
