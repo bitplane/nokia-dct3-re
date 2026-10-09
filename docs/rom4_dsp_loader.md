@@ -969,9 +969,12 @@ stack-only CALL implementation and passes with RTN assigned before the push
 is unchanged. This establishes the non-delayed immediate CALL contract, not
 delayed/conditional-call RTN behavior or interrupt-pipeline timing.
 The full executable core suite and tool suite pass. The post-change ROM4
-RF-boundary integration invocation (`run_c54x_call_rtn_rom4.log`) stopped
-before execution when EEPROM fixture generation hit a disk quota; this
-does not establish preserved native handset behavior and must be rerun.
+RF-boundary integration check also passes: 207,040 RF reads, three port-32
+writes, and no port-38/39 reads. This preserves the known native no-cell
+boundary, not completed radio operation. The initial invocation failed
+during fixture generation under `/tmp`; rerunning with workspace `TMPDIR`
+resolved that storage failure without changing the fixture or acceptance
+criteria (`run_c54x_call_rtn_rom4_workspace.log`).
 
 Software INTR publishes RTN just as hardware interrupt entry already does;
 the existing three-cycle cost is unchanged. These are 64 architectural
