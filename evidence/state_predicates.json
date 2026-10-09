@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb6_nonleap_february_cold",
+      "owner": "nsb6_rtc",
+      "status": "satisfied",
+      "predicate": "Own 8890 firmware skips the nonexistent leap day in 2025 and persists 1 March across an independent cold process",
+      "current": "verify-8890-calendar-non-leap physically enters 28/02/2025 and 23:59, observes midnight day-counter consumption and scalar d1468680 -> d147d800, then reloads only its own journal in a fresh process. Physical Calendar selection renders the reviewed 1 March 2025 Saturday frame. Both processes pass laboratory registration. No date-state forcing, donor provisioning, leap-day exit, century-rule or native-speech claim is made.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8890_calendar_nonleap_input.lua", "tools/run_noki8890_calendar.py", "tools/noki8890_calendar_check.py", "tools/test_noki8890_calendar_check.py", "gates.json"]
+    },
+    {
       "id": "nsb6_alarm_off_countdown_restore",
       "owner": "nsb6_firmware",
       "status": "satisfied",

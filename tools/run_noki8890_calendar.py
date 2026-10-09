@@ -14,6 +14,8 @@ from tools.noki8890_registration_check import verify as verify_registration
 from tools.run_noki8xxx_supplementary import PROFILES, verify_inputs
 
 BOUNDARIES = {
+    'non-leap': ('noki8890_calendar_nonleap_input.lua', '1 March 2025 Saturday',
+                 '4cebc9032f010a5dcf2b5388a3b0f9f6ffd617a750beca0e79c04f657d54a91f'),
     'ordinary': ('noki8890_calendar_rollover_input.lua', '8 October 2026 Thursday',
                  '33a22a0e0d1072996f2d4bbac4f1f67b54aa8eb919d23ad70b736d7502124c05'),
     'leap-day': ('noki8890_calendar_leap_input.lua', '29 February 2024 Thursday',

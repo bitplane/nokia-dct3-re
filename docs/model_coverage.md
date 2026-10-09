@@ -122,6 +122,10 @@ own flash-journal persistence and cold Calendar presentation of 8 October
 2026, 29 February 2024 and 1 January 2027, respectively. All require laboratory
 registration and exact date pixels. Offline elapsed time and full
 calendar-boundary coverage are not inferred from these three cases.
+`verify-8890-calendar-non-leap` independently covers physical 28 February
+2025 -> 1 March 2025, the observed day-scalar pair and cold registered
+Calendar with its own reviewed frame. Leap-day exit and century rules remain
+unproved.
 
 `verify-8210-dcs-registration` independently establishes no-PIN research-HLE
 DCS1800 acquisition, Location Updating, release, carrier-823 paging and

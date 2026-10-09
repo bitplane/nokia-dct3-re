@@ -4,6 +4,7 @@ import re
 
 # Observed own-ROM date scalars after physical entry, not an inferred epoch.
 SCALARS = {
+    'non-leap': ('d1468680', 'd147d800'),
     'ordinary': ('d44b1580', 'd44c6700'),
     'leap-day': ('cf640180', 'cf655300'),
     'year-end': ('d4bb2500', 'd4bc7680'),

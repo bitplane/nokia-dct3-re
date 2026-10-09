@@ -1212,6 +1212,13 @@ the December-to-January month/year boundary. Other month lengths, February
 exit, century rules and offline elapsed time remain outside the acceptance
 scope. No RTC/date RAM or provisioning record is forced by these fixtures.
 
+`verify-8890-calendar-non-leap` separately enters 23:59 and 28/02/2025
+through physical keys. Midnight consumes the CCONT day counter and advances
+the own-ROM scalar `d1468680` to `d147d800`. A separate process loads only
+that own saved journal and physically displays **1 March 2025, Saturday**,
+with its distinct full-frame oracle and preserved-location registration.
+This proves non-leap February exit, not leap-day exit or century rules.
+
 `make verify-8890-alarm RUN_DIR=RUN` independently seeds a physically entered
 13:47 clock using the checked cold-clock fixture, then enters Settings 4-1
 (`Erinnerungsfunktion`) and 13:48 with physical keys. Confirmation programs
