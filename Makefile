@@ -358,6 +358,7 @@ help:
 	@echo "make census-docs    refresh the committed report; refuses missing scoped runtime"
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
 	@echo "make test-tools     run the static-tool and EEPROM-profile unit tests"
+	@echo "make check-c54x-rom4-codec-tone verify native boot serial and physical tone-control boundaries; retains isolated evidence under RUN_DIR"
 	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-radio-authentication-boundary reproduce organic 3210 authenticated registration"
 	@echo "make verify-3310-radio-authentication-boundary reproduce organic 3310 authenticated registration"
@@ -1291,6 +1292,35 @@ check-c54x-rom4-compare: build
 			-autoboot_script $(abspath tools/c54x_rom4_compare_fixture.lua) >output.log 2>&1; \
 		cat output.log; \
 		grep -q '^ROM4 compare model conformance: PASS ' output.log
+
+.PHONY: check-c54x-rom4-codec-tone
+check-c54x-rom4-codec-tone: build
+	@set -eu; mkdir -p "$(abspath $(RUN_DIR))"; \
+		tmp="$$(mktemp -d "$(abspath $(RUN_DIR))/rom4-codec-tone.XXXXXX")"; \
+		echo "Native codec evidence: $$tmp"; \
+		mkdir -p "$$tmp/nvram/noki5110" "$$tmp/snap"; \
+		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
+			--eeprom $(abspath roms/noki5110/nse-1.bin) \
+			--flash $(abspath roms/noki5110/5110f530.fls) \
+			--output "$$tmp/nvram/noki5110/eeprom"; \
+		cd "$$tmp"; \
+		NOKIA_DCT3_POST_READY_KEYS=1 \
+		NOKIA_DCT3_POST_READY_KEY_DELAY_MS=8000 \
+		NOKIA_DCT3_POST_READY_KEY_DURATION_MS=220 \
+		NOKIA_DCT3_POST_READY_CAPTURE_DELAY_MS=1500 \
+		NOKIA_DCT3_SNAPSHOT_DIR="$$tmp/snap" \
+		$(abspath $(MAME_DIR))/mame noki5110 \
+			-rompath $(abspath $(MAME_DIR))/roms -nvram_directory "$$tmp/nvram" \
+			-video none -sound none -log -skip_gameinfo -nothrottle \
+			-seconds_to_run 11 \
+			-autoboot_script $(abspath tools/c54x_rom4_tone_observe.lua) >output.log 2>&1; \
+		$(PYTHON) $(abspath tools/c54x_rom4_codec_contract.py) \
+			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
+			--tone-log error.log; \
+		! grep -q 'rom4_reset_request' error.log; \
+		! grep -q 'TMS320C54x.*illegal' error.log; \
+		! grep -Eiq 'lua.*error|error.*lua' output.log; \
+		echo 'NSE-1 native serial and physical tone-control boundary: PASS (no operational audio claim)'
 
 check-c54x-rom4-coherent: build
 	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-c54x-coherent.XXXXXX)"; \

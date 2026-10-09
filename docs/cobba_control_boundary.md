@@ -354,6 +354,16 @@ must be `45c3` because fetch increments PC; the captured return address is
 read from ordinary stack RAM. Output is capped at 64 entries with an
 uncapped total, so a longer capture must check its truncation explicitly.
 
+Run `make check-c54x-rom4-codec-tone RUN_DIR=run_native_codec` for the
+isolated 11-second acceptance capture. Each invocation creates fresh own
+EEPROM/NVRAM and a separate working directory under that root, retaining
+stdout, error log and frames even on failure. It checks the local ROM
+signatures, reset/echo/receive ISR, masked transmit request, physical key
+delivery and register-8 activation caller, and rejects new data-`0032`
+traffic or reset/illegal failures. This is a native serial/control gate,
+not a waveform or speech gate; save/load remains independently tested by
+`verify-5110-save-state`.
+
 The [NSE-1 System Module manual](https://www.eserviceinfo.com/preview_html.php?fileid=26879&previewid=13251)
 (03/98, pp. 3-32--3-33) supplies product-specific clock evidence: COBBA
 divides the 13 MHz reference by 13 to generate a 1 MHz PCM data clock, then
