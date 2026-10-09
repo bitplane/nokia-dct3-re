@@ -322,8 +322,23 @@ Own table entries select `0x2258e4` for state `0x18`, `0x225b54` for
 live, event-driven owner; the report branch's absent lifecycle transition
 is the next question, not a stalled global scheduler.
 
-Next: decode the selected task-20 state handlers and the route into
-report branch `0x223a68`,
+Backward decode of the report branch finds an explicit entrance: common
+dispatch at `0x223688` compares its transformed input with `0x21` and
+branches at `0x22368c` to `0x2239f2`, which sets up timers/state and reaches
+`0x223a68`. Receiver `0x221ee0` preserves raw scalar input `0x21` at
+`0x221f80..0x221f86`; it does not derive it from the observed timer inputs.
+This is an input-driven initialization branch, not an automatic consequence
+of the measured retry states. The cold raw-input trace contains no `0x21`
+before its 64-return cap.
+
+The state-`0x1a` handler at `0x225b54` enters a retry loop that handles
+transformed input `0x49`, decrements context byte `+5`, and tests a signed
+measurement against `0x01fe`. Subsequent states four and three retain
+their own retry/timer branches. Their hardware meanings remain unassigned;
+do not choose analog values merely to steer them toward the report branch.
+
+Next: find the legitimate producer of task-20 scalar initialization input
+`0x21` and establish its startup scheduling/delivery boundary,
 keeping the alternate scalar `0xc7` lifecycle separate,
 while keeping the task-0 scheduling caller unresolved; determine what
 prevents ordinary boot from advancing into card activation. Include direct
