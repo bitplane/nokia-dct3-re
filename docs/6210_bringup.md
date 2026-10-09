@@ -560,6 +560,22 @@ Retained device counters while off do not imply untouched software time,
 cold-process calendar persistence, measured wake latency, complete
 peripheral power gating or native speech.
 
+## Physical Calendar entry
+
+`tools/noki6210_calendar_input.lua` navigates the own research-HLE handset
+through physical Menu, seven Down presses and Select. Fresh storage produces
+the Time prompt rather than Calendar immediately. Physical `13:47` and OK
+write CCONT's shared latch registers `0b=2f`, `0c=8d`, then expose the Date
+prompt. Physical `07-10-2026` and OK render `7 October 2026`, `Wednesday`
+and the ordinary Options/Back Calendar window. No calendar RAM, internal UI
+events, clock registers or foreign provisioning are written by the fixture.
+
+The isolated `run_6210_calendar_entry_probe` also passes the existing own
+laboratory-registration and persistent EF_LOCI checks. This is an observed
+physical-input result, not yet a wired calendar acceptance gate. Independent
+cold-process date/time persistence, midnight rollover and boundary-date
+arithmetic remain to be tested before promoting those capabilities.
+
 ## Unattached accessory input
 
 The NPE-3 schematic sheets 2/3 connect `HEADDET` to CCONT's EAD pin A2
