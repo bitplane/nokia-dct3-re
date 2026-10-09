@@ -20,6 +20,10 @@ FRAMES = {
     'stopped': OPERATOR_SHA256,
 }
 COLD_IDLE_SHA256 = 'e5b41cc3e22487969140eeb44414d1e47c32721c39938e3c3592efe163872904'
+SNOOZE_FRAMES = {
+    'snooze': 'eabf1aaefdeba24b26ef44a8c4873004544d9d742b96a82265b7d94461176896',
+    'repeated': '1c5b09187d9fd5df3e66f36fc6029730848da6a9ecc512f5d0644e3c03744d61',
+}
 
 
 def check_alarm_set(text):
@@ -180,13 +184,14 @@ def main():
                 continue
             with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
                 check_frame(frame, digest, 'physical alarm ' + name)
+        if args.snooze:
+            for name, digest in SNOOZE_FRAMES.items():
+                with Image.open(alarm / f'snap/6210_alarm_{name}.png') as frame:
+                    check_frame(frame, digest, 'physical Snooze ' + name)
         print('6210 alarm: PASS ' + ('armed cold retention, ' if args.cold else '') +
               ('physical Snooze, natural five-minute recurrence, ' if args.snooze else '') +
               'physical set, natural RTC expiry, reviewed pixels, '
               'buzzer control and physical Stop; research HLE, not audible-output acceptance')
-        if args.snooze:
-            print('6210 Snooze scope: original alarm and final idle pixels verified; '
-                  'repeated alarm title/time pixels remain unresolved')
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         print(f'6210 alarm: FAIL: {exc}', file=sys.stderr)

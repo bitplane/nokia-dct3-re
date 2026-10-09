@@ -657,10 +657,17 @@ DSP behavior.
 alarm entry. Right Softkey / C at 77 seconds makes firmware program CCONT
 `35/0d` (13:53): this ROM selects a five-minute interval. The gate requires
 natural 13:53:00, status `b1`, acknowledgement `a1` (minute plus alarm),
-renewed PUP buzzer programming and physical Stop. It preserves the exact
-original-alarm and final-idle pixel checks. The repeated capture at 377
-seconds shows Stop/Snooze controls but lacks the title/time text; those
-pixels and audible output are not accepted by this gate.
+renewed PUP buzzer programming and physical Stop. Exact frames cover the
+original alarm, `Snooze active`, repeated `Alarm! 13:53` and final idle.
+The repeated capture is at 361 seconds, in its independently observed visible
+phase. Audible output and powered-off wake remain outside this acceptance.
+
+Alarm title/time pixels are phase-dependent. The passive matched-phase run
+`run_6210_snooze_render` observes a blank text region at 61..73 seconds and
+visible `Alarm! 13:48` at 74..76; the repeated alarm shows `Alarm! 13:53`
+at 361..373 and blanks at 374..376. Therefore a blank 377-second repeated
+capture is not evidence of a missing repaint. No display state or rendering
+behavior is changed to obtain the visible capture.
 
 CCONT's held source must survive a MAD2 acknowledgement until firmware
 clears it over GENSIO. NPE-3's mask write can expose the minute IRQ before

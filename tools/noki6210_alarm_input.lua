@@ -37,14 +37,10 @@ local input = coroutine.create(function()
     machine.screens[':screen']:snapshot('6210_alarm_elapsed.png')
     if _G.noki6210_alarm_snooze then
         if not press(1, 'Right Softkey / C', 'snooze') then return end
-        -- Capture 17 seconds after the firmware-programmed 13:53 recurrence,
-        -- matching the first alarm phase, before unattended auto-Snooze.
-        if not emu.wait(299) then return end
+        -- The alarm title is phase-dependent. One second after the natural
+        -- 13:53 recurrence is independently observed to show its visible phase.
+        if not emu.wait(283) then return end
         machine.screens[':screen']:snapshot('6210_alarm_repeated.png')
-        for phase = 1, 8 do
-            if not emu.wait(0.25) then return end
-            machine.screens[':screen']:snapshot('6210_alarm_repeated_' .. phase .. '.png')
-        end
     end
     if not press(1, 'Left Softkey / Menu', 'stop') then return end
     if not emu.wait(3) then return end
