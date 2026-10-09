@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "nsb6_alarm_off_countdown_restore",
+      "owner": "nsb6_firmware",
+      "status": "satisfied",
+      "predicate": "The own-provisioned 8890 research-HLE powered-off alarm countdown survives exact architectural restoration and continues through natural RTC wake, physical security acceptance and Stop",
+      "current": "verify-8890-alarm-wake-restore saves at second 45 and restores all 37 exported ARM registers, mapped SRAM digest and emulated time exactly. Reference/restored 1.25-second windows reproduce the same RTC tick with observed DSP/radio endpoints silent and no early rail wake; both off frames match. The restored branch wakes at second 60 and independently passes both boot upload/HLE and registration checks, physical code acceptance and reviewed security/ringing/idle frames. No offline elapsed-time, activation-choice or native-speech claim is made.",
+      "evidence": ["docs/8xxx_bringup.md", "tools/noki8890_alarm_wake_restore.lua", "tools/run_noki8890_alarm_wake.py", "tools/test_noki8890_alarm_wake.py", "gates.json"]
+    },
+    {
       "id": "nsb6_own_provisioned_alarm_wake_security_stop",
       "owner": "nsb6_firmware",
       "status": "satisfied",

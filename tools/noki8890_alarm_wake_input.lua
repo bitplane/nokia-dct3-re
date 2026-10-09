@@ -32,9 +32,11 @@ local input = coroutine.create(function()
     machine:logerror('8890_alarm_wake_physical: action=power_release\n')
     assert(emu.wait(7))
     machine.screens[':screen']:snapshot('8890_alarm_wake_off.png')
+    local replayed = _G.noki8890_alarm_restore_checkpoint and
+        _G.noki8890_alarm_restore_checkpoint() or 0
     -- Re-arm only bounded debugger observations for the second native upload.
     machine.debugger:command('do temp6=0;do temp7=0;do temp8=0;do temp9=0')
-    assert(emu.wait(25))
+    assert(emu.wait(25 - replayed))
     machine.screens[':screen']:snapshot('8890_alarm_wake_security.png')
     for index, item in ipairs({{3, 'Keypad 5'}, {2, 'Keypad 4'}, {4, 'Keypad 3'},
                               {3, 'Keypad 2'}, {2, 'Keypad 1'}, {1, 'Menu'}}) do

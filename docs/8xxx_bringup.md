@@ -1348,6 +1348,16 @@ The permanent checker rejects additional rail events and failed comparisons.
 This proves research-HLE wake/unlock/Stop after user-owned provisioning,
 not an alarm-only Yes/No activation path, native speech or audible output.
 
+`verify-8890-alarm-wake-restore` additionally saves the powered-off countdown
+at second 45. All 37 exported ARM registers (including banked state), the
+mapped SRAM digest and emulated time restore exactly. Reference and restored
+1.25-second windows contain the same RTC tick, no observed DSP/radio endpoint
+activity and no early rail wake; both off frames are blank. The restored
+timeline then passes the same deadline, security, registration and full-frame
+checks through physical Stop. Fresh full-register acceptance is retained in
+`run_8890_alarm_wake_restore_fullarch`. This validates the emulated countdown,
+not offline wall-clock passage or native DSP speech.
+
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state
 hooks. Physical time confirmation near 25 seconds and date confirmation near

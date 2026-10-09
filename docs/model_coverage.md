@@ -47,6 +47,17 @@ the own observed 13:54 deadline, natural recurrent cause/acknowledgement,
 renewed buzzer control and physical Stop with reviewed recurrence/idle
 frames. Its deadline is not inherited from the 6210 fixture. Powered-off
 wake and audible output remain outside both 8890 alarm gates.
+`verify-8890-code-change` separately proves the phone's physical old/new/
+confirmation workflow, firmware-owned persistent storage and independent
+cold acceptance of the changed code. `verify-8890-alarm-wake-security`
+uses only that own saved state to prove physical power-off, RTC-only wake,
+security acceptance, alarm presentation and Stop to registered idle.
+Both boot phases independently pass upload/HLE and registration checks.
+There is no demonstrated 6210-style activation-choice prompt or native/audio
+promotion in this path.
+`verify-8890-alarm-wake-restore` additionally proves exact powered-off
+ARM/banked-register, SRAM and time restoration, matching RTC replay and blank
+off frames, followed by the same natural wake/security/Stop acceptance.
 
 `verify-6210-alarm` independently proves physical Menu-4-1 alarm entry,
 CCONT programming, naturally timed expiry, firmware alarm presentation and

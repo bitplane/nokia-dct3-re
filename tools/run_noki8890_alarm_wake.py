@@ -66,10 +66,43 @@ def check_wake(text):
     return text[:line_start], text[line_start:]
 
 
+def check_restore(text):
+    from tools.power_domain_contract import require_endpoint_silence
+    states = list(re.finditer(r'8890_alarm_state: event=(saved|restored) '
+                             r'pc=(\w+) sp=(\w+) ram=(\w+) cpu=([0-9a-f,]+) t=([0-9.]+)', text))
+    if len(states) != 2 or [state[1] for state in states] != ['saved', 'restored']:
+        raise ValueError('missing unique powered-off alarm save/load observations')
+    if any(not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}', state[5]) for state in states):
+        raise ValueError('powered-off CPU snapshot omits exported architectural registers')
+    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][6]) != 45:
+        raise ValueError('powered-off alarm architecture or checkpoint time differs')
+    windows = list(re.finditer(r'8890_alarm_replay: phase=(reference|restored) '
+                              r'event=(begin|end) t=([0-9.]+)', text))
+    if [(event[1], event[2]) for event in windows] != [
+            ('reference', 'begin'), ('reference', 'end'),
+            ('restored', 'begin'), ('restored', 'end')]:
+        raise ValueError('powered-off alarm replay windows absent or unordered')
+    if [float(event[3]) for event in windows] != [45, 46.25, 45, 46.25]:
+        raise ValueError('powered-off alarm replay window times differ')
+    reference = text[windows[0].end():windows[1].start()]
+    restored = text[windows[2].end():windows[3].start()]
+    rtc = r'ccont_rtc: event=second[^\r\n]+'
+    ticks = re.findall(rtc, reference)
+    if len(ticks) != 1 or ticks != re.findall(rtc, restored):
+        raise ValueError('powered-off RTC replay differs or is absent')
+    require_endpoint_silence(reference + restored, 'powered-off replay resumed endpoint activity')
+    if 'ccont_power: event=wake' in reference + restored:
+        raise ValueError('powered-off replay woke before its alarm deadline')
+    # Discard only the abandoned reference interval, not the restored lifecycle.
+    return text[:states[0].start()] + text[states[1].start():]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--restore-off', action='store_true',
+                        help='prove exact powered-off state restoration and RTC replay before natural wake')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -87,22 +120,31 @@ def main():
                    '-snapshot_directory', 'snap', '-noreadconfig', '-debug',
                    '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
-                   '-autoboot_script', str(root / 'tools/noki8890_alarm_wake_input.lua'),
+                   '-autoboot_script', str(root / 'tools' / (
+                       'noki8890_alarm_wake_restore.lua' if args.restore_off else 'noki8890_alarm_wake_input.lua')),
                    '-seconds_to_run', '100']
         with (alarm / 'console.log').open('w') as output:
             subprocess.run(command, cwd=alarm, stdout=output, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
         check_output((alarm / 'console.log').read_text(errors='replace'))
-        phases = check_wake((alarm / 'error.log').read_text(errors='replace'))
+        text = (alarm / 'error.log').read_text(errors='replace')
+        if args.restore_off:
+            text = check_restore(text)
+        phases = check_wake(text)
         for phase in phases:
             verify_stage(phase, runtime=True, selftest=True)
             verify_registration(phase, configured_gsm900=True, preserved_location=True)
         from PIL import Image
-        for name, expected in FRAMES.items():
+        frames = dict(FRAMES)
+        if args.restore_off:
+            frames.update(off_reference=FRAMES['off'], off_restored=FRAMES['off'])
+        for name, expected in frames.items():
             with Image.open(alarm / f'snap/8890_alarm_wake_{name}.png') as image:
                 if image.size != (84, 48) or hashlib.sha256(image.convert('L').tobytes()).hexdigest() != expected:
                     raise ValueError('reviewed alarm-wake frame differs: ' + name)
-        print('8890 alarm wake: PASS own physical provisioning, RTC-only rail wake, code acceptance and Stop to registered idle; research HLE, no activation-choice/native-audio claim')
+        print('8890 alarm wake: PASS ' + ('exact off-state/RTC replay, ' if args.restore_off else '') +
+              'own physical provisioning, RTC-only rail wake, code acceptance and Stop to registered idle; '
+              'research HLE, no activation-choice/native-audio claim')
         return 0
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         print(f'8890 alarm wake: FAIL: {error}', file=sys.stderr)

@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki8890_alarm_wake import check_wake
+from tools.run_noki8890_alarm_wake import check_restore, check_wake
 
 
 class AlarmWakeTest(unittest.TestCase):
@@ -54,6 +54,59 @@ class AlarmWakeTest(unittest.TestCase):
     def test_final_buzzer_active(self):
         with self.assertRaises(ValueError):
             check_wake(self.trace() + 'buzzer: enabled=1 \n')
+
+
+class AlarmRestoreTest(unittest.TestCase):
+    def trace(self):
+        tick = 'ccont_rtc: event=second time=13:48:46 day=0 t=46.000000000\n'
+        cpu = ','.join(['00000000'] * 37)
+        return (f'before\n8890_alarm_state: event=saved pc=00234566 sp=00139000 ram=12345678 cpu={cpu} t=45.000000000\n'
+                '8890_alarm_replay: phase=reference event=begin t=45.000000000\n' + tick +
+                '8890_alarm_replay: phase=reference event=end t=46.250000000\n'
+                f'8890_alarm_state: event=restored pc=00234566 sp=00139000 ram=12345678 cpu={cpu} t=45.000000000\n'
+                '8890_alarm_replay: phase=restored event=begin t=45.000000000\n' + tick +
+                '8890_alarm_replay: phase=restored event=end t=46.250000000\nafter\n')
+
+    def test_exact_replay(self):
+        result = check_restore(self.trace())
+        self.assertNotIn('phase=reference', result)
+        self.assertTrue(result.startswith('before\n8890_alarm_state: event=restored'))
+        self.assertTrue(result.endswith('after\n'))
+
+    def test_architecture_mismatch(self):
+        with self.assertRaises(ValueError):
+            check_restore(self.trace().replace('event=restored pc=00234566', 'event=restored pc=00234568'))
+
+    def test_missing_tick(self):
+        with self.assertRaises(ValueError):
+            check_restore(self.trace().replace('ccont_rtc: event=second', 'ccont_rtc: event=other'))
+
+    def test_banked_register_mismatch(self):
+        text = self.trace()
+        position = text.index('event=restored')
+        original = ','.join(['00000000'] * 37)
+        changed = ['00000000'] * 37
+        changed[17] = '00000001'  # FR8, the first FIQ-banked register.
+        with self.assertRaises(ValueError):
+            check_restore(text[:position] + text[position:].replace(original, ','.join(changed), 1))
+
+    def test_short_cpu_snapshot(self):
+        with self.assertRaises(ValueError):
+            check_restore(self.trace().replace('cpu=00000000,', 'cpu=', 1))
+
+    def test_changed_replay_tick(self):
+        with self.assertRaises(ValueError):
+            check_restore(self.trace().replace('time=13:48:46', 'time=13:48:47', 1))
+
+    def test_endpoint_activity(self):
+        with self.assertRaises(ValueError):
+            check_restore(self.trace().replace('ccont_rtc: event=second',
+                                               'dspif_transport: RX enqueue\nccont_rtc: event=second', 1))
+
+    def test_early_wake(self):
+        with self.assertRaises(ValueError):
+            check_restore(self.trace().replace('phase=reference event=end',
+                                               'ccont_power: event=wake\n8890_alarm_replay: phase=reference event=end'))
 
 
 if __name__ == '__main__':
