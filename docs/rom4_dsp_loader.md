@@ -1015,12 +1015,28 @@ does not supply that class. With the legacy class registered, the original
 registrar writes a 41,745-byte INI containing C54x analysis plugins, but
 exits 6 with an XML parse error. The installed IDE then displays
 **A problem has been detected in the component manager database**. Its log
-still reports missing Wine Mono. No target execution is established.
+reported missing Wine Mono. Installing the official Wine Mono 10.4.1 MSI
+does not clear the registrar's XML failure. Its SHA-256 is
+`071f4b2887e1c97a11d791ff3d65be9429eed6dec4c2708888bfd546ba358e23`,
+matching the value pinned in
+[Wine 11.0's addon source](https://raw.githubusercontent.com/wine-mirror/wine/wine-11.0/dlls/appwiz.cpl/addons.c).
+
+The IDE also reports RPC service startup failure; a registry query confirms
+RpcSs is absent. Wine's standard `wineboot -u` restores that service, but
+reveals a registration-view mismatch: the original Component Manager target
+exists in the 64-bit view and is absent with `/reg:32`. The 32-bit registrar
+then reports an empty path. The next repair must use the original installer
+in the correct 32-bit environment; neither Mono installation nor an IDE
+splash proves target execution. Do not infer database corruption solely from
+this incomplete registration state.
 
 Retain `full-install-expanded-path.log`, `installed-ide.log`,
 `installed-ide-screen.png`, `run_ccs33_oracle_plugin_msxml_legacy.log`,
 and the earlier `full-install-shell-registered.log`, `xds-install-error.png`
-and `plugin-install-error.png`. Resolve the remaining runtime/database
+and `plugin-install-error.png`. Additional evidence is `mono-install.log`,
+`run_ccs33_oracle_plugin_with_mono.log`,
+`run_ccs33_oracle_wineboot_repair.log` and `plugin-prefix-repair-error.png`.
+Resolve the remaining runtime/database
 registration boundary using the vendor tools; do not edit the generated
 component database or interpret copied files as a working simulator.
 
