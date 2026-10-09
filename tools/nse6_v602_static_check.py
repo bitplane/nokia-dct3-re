@@ -55,6 +55,26 @@ def read32(image, address):
     return int.from_bytes(image[offset:offset + 4], "big")
 
 
+def thumb_bl_callers(image, target, extent):
+    """Syntactic Thumb-1 BL census; data/indirect edges are not classified."""
+    if extent < 4 or extent > len(image) or extent % 2:
+        raise ValueError("invalid Thumb census extent")
+    callers = []
+    pairs = 0
+    for offset in range(0, extent - 3, 2):
+        first = int.from_bytes(image[offset:offset + 2], "big")
+        second = int.from_bytes(image[offset + 2:offset + 4], "big")
+        if first & 0xF800 != 0xF000 or second & 0xF800 != 0xF800:
+            continue
+        pairs += 1
+        displacement = ((first & 0x7FF) << 12) | ((second & 0x7FF) << 1)
+        if displacement & 0x400000:
+            displacement -= 0x800000
+        if BASE + offset + 4 + displacement == target:
+            callers.append(BASE + offset)
+    return pairs, callers
+
+
 def eeprom_descriptor(value):
     """Decode the fields used by NSE-6 routine 0x2dd100."""
     page_shift = ((value >> 3) & 7) - 1
@@ -227,7 +247,14 @@ def check(image):
         (0x2CA980, "strb", "r1, [r0, r4]"),
         (0x2CA98A, "ldrb", "r0, [r1, #5]"),
         (0x2CA996, "ldrb", "r2, [r1]"),
-        (0x2CA9A4, "bne", "#0x2ca992"))
+        (0x2CA9A4, "bne", "#0x2ca992"),
+        (0x2DCA92, "movs", "r0, #1"),
+        (0x2DCA94, "movs", "r1, #0x14"),
+        (0x2DCA96, "bl", "#0x27b318"),
+        (0x21FB94, "bl", "#0x294c90"),
+        (0x21FBA0, "bl", "#0x2dca88"),
+        (0x222546, "cmp", "r0, #0x1d"),
+        (0x222554, "mov", "pc, r0"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
@@ -246,6 +273,11 @@ def check(image):
             0x288D88, 0x2892DE, 0x28903A, 0x289084, 0x28905E,
             0x289110, 0x288C3A]:
         raise ValueError("own NSE-6 input-controller table changed")
+    report_pairs, report_callers = thumb_bl_callers(image, 0x2DCA88, 0x170000)
+    if report_pairs != 35774 or report_callers != [0x21FBA0]:
+        raise ValueError("own NSE-6 direct report-14 census changed")
+    if read32(image, 0x222558 + 0x1A * 4) != 0x221C8C:
+        raise ValueError("own NSE-6 report dispatcher state 1a changed")
     stream = verifier_stream(image)
     stream_sha1 = hashlib.sha1(stream).hexdigest()
     if stream_sha1 != VERIFIER_STREAM_SHA1:
@@ -275,6 +307,12 @@ def check(image):
                                  "report_low_nibble": 15,
                                  "missing_bit_report": "0x14",
                                  "unmask_instruction": "0x288d4c"},
+            "report14": {"stub": "0x2dca88", "post_primitive": "0x27b318",
+                         "direct_callers": [hex(address) for address in report_callers],
+                         "scanned_bytes": 0x170000, "syntactic_bl_pairs": report_pairs,
+                         "indirect_callers_closed": False,
+                         "dispatcher": "0x222532", "states": 30,
+                         "observed_state_1a_target": "0x221c8c"},
             "simi": {"initializer": "0x2ca910", "receiver": "0x2ca986",
                      "tx_register": "0x36", "rx_register": "0x37",
                      "iir_register": "0x38", "control_register": "0x39",

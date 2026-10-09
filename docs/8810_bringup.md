@@ -16,9 +16,30 @@ CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
 erased-storage failures and reaches SIMI initialization, but remains blank
 through 30 seconds. No usable handset or authentic provisioning is established.
-The current bounded question is the producer/prerequisite of startup report
-`0x14`: its missing bit leaves the input controller in state `0x10` with all
-keypad columns masked.
+The current bounded question is why dispatcher state `0x1a` (`0x221c8c`)
+does not reach the independently identified report-`0x14` path. The missing
+report bit leaves the input controller in state `0x10` with all keypad
+columns masked.
+
+### Report-0x14 Producer Boundary
+
+Stub `0x2dca88` posts target `1`, code `0x14`, through `0x27b318`.
+A halfword-aligned Thumb-1 BL scan of the complete `0x170000`-byte MCU
+extent finds 35,774 syntactic BL pairs and one direct call to that stub,
+at `0x21fba0`. This is not an indirect-call or data-driven-producer closure.
+The call follows `0x294c90` at `0x21fb94` and a flag update at
+`0x21fb98..0x21fb9e`; no subsystem name is inferred from the report number.
+
+Dispatcher `0x222532` bounds its state index to `0x1d` and branches through
+30 big-endian words starting at `0x222558`. Its state `0x18` target is
+`0x221a1c`; state `0x1a` targets `0x221c8c`.
+A fresh 12-second ROM4-compatibility run with the six-byte integrity-only
+fixture observes state `0x18` at 0.459572 seconds, followed by repeated
+state `0x1a` from 0.926731 seconds. The eight-second counters record 86
+dispatcher selections and no hits on the report stub, `0x294c90`, or the
+direct report path. Readiness remains `0x06` and report bits remain `0x0e`.
+The observer is read-only; no report, column-mask change, or firmware state
+was injected. Follow the active state-`0x1a` event/predicate contract next.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM

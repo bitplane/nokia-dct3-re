@@ -6,6 +6,18 @@ from tools.nse6_integrity_fixture import fixture
 
 
 class Nse6StaticTests(unittest.TestCase):
+    def test_thumb_bl_census_signed_offsets_and_scope(self):
+        forward = bytes.fromhex("f000f802")
+        self.assertEqual(check.thumb_bl_callers(forward, check.BASE + 8, 4),
+                         (1, [check.BASE]))
+        backward = bytes.fromhex("f7fffffc")
+        self.assertEqual(check.thumb_bl_callers(backward, check.BASE - 4, 4),
+                         (1, [check.BASE]))
+        self.assertEqual(check.thumb_bl_callers(bytes(4), check.BASE, 4), (0, []))
+        for extent in (0, 3, 6):
+            with self.assertRaises(ValueError):
+                check.thumb_bl_callers(forward, check.BASE, extent)
+
     def test_integrity_fixture_changes_only_checksum(self):
         image = fixture()
         self.assertEqual(len(image), 0x8000)

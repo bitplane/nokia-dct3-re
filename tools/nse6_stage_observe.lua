@@ -59,11 +59,19 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
         0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
-        0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a}) do
+        0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a,
+        0x21fb1e, 0x21fb94, 0x21fb98, 0x2dca88, 0x294c90,
+        0x222532, 0x22254e}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x22254e and counts[address] <= 32 then
+                machine:logerror(string.format(
+                    'nse6_report14_dispatch: state=%08x context=%08x lr=%08x t=%.9f\n',
+                    cpu.state['R0'].value, cpu.state['R4'].value,
+                    cpu.state['R14'].value, machine.time:as_double()))
+            end
             if address == 0x288a7a and counts[address] <= 32 then
                 local context = cpu.state['R4'].value
                 if context >= 0x100000 and context <= 0x13fff8 then
