@@ -922,6 +922,15 @@ restoration must release CC/RR and return to idle; the same impaired-media,
 FACCH and SACCH predicates remain required. This proves saved HLE protocol
 and digital-media continuity, not persistence of an external SIP dialog.
 
+NHM-6 v4.50E also independently carries an encrypted impaired incoming call
+after its own physical first-boot PMM provisioning and cold phone-code entry.
+The product-local degraded fixture passes A5 and the unchanged NHM-6 physical
+Answer/End lifecycle: 500 microphone frames, 471 earpiece frames, 60 impaired
+bursts per direction, 28 impairment-induced bad blocks, FACCH 3/2 uplink/
+downlink and 83 SACCH/TF slots. This is a verified fixture probe; a combined
+permanent encrypted-degradation gate and its restoration variant remain to
+be added. Existing NHM-6 A5/0 resilience and clean A5/1 gates remain separate.
+
 1. `make verify-radio-camp` passes;
 2. `make verify-radio-registration` proves one accepted update and steady camp;
 3. `make verify-radio-authentication-boundary` and its 3310 counterpart prove
