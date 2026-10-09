@@ -1682,6 +1682,13 @@ downstream of replacement promotion in the passing lifecycle, not an
 independent missing hardware event. The metadata difference therefore adds
 no justification for a DSP reply; the frontier remains legitimate
 reevaluation of the later queued request. Runtime watches are observation-only.
+The hash-pinned image additionally contains no full-width big-endian pointers
+to promoter `2a0dc8` or selector `2a1380`, with either ARM/even or Thumb/odd
+address encoding. The census checks all 1,900,541 possible four-byte windows,
+not only aligned literal pools. Together with the four direct BL callers,
+this excludes an overlooked stored absolute callback pointer, not computed
+addresses, relative tables or MCU-generated events. It provides no evidence
+for retaining/replaying the peer's cancelled measurement report.
 
 Public-reference coverage is bounded. Gammu's
 [NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)

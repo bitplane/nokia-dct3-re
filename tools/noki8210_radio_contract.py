@@ -413,6 +413,11 @@ def verify(image):
             promotion_calls.append(0x200000 + offset)
     if promotion_calls != [0x2a13d0, 0x2a1484, 0x2a193a, 0x2a1988]:
         raise ValueError('direct queue-promotion candidate callsites differ')
+    # Scan all byte offsets, not just aligned literal pools. This excludes
+    # stored full-width pointers only; computed/relative dispatch is not closed.
+    for address in (0x2a0dc8, 0x2a0dc9, 0x2a1380, 0x2a1381):
+        if address.to_bytes(4, 'big') in image:
+            raise ValueError('stored queue-promotion/selector pointer requires classification')
     if instructions(0x2a187a, 8) != [
             ('cmp', 'r6, #2'), ('beq', '#0x2a197c'),
             ('cmp', 'r6, #3'), ('beq', '#0x2a18bc')]:
