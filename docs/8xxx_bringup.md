@@ -1333,6 +1333,15 @@ cold run `run_8890_security_change_cold` compares `54321` against
 Thus `0110` is a startup fallback source, not authority for every later
 code-validation transaction.
 
+`verify-8890-code-change` makes this a permanent isolated acceptance gate:
+generate an own physical clock seed, save `54321` through the menu, then
+cold-boot only the resulting storage. It requires the physical confirmation
+before the unique `0709` persistence call, the actual cold input and matched
+encoded comparison, reviewed save/cold frames, and runtime/self-test
+transport predicates. `run_8890_code_change_acceptance` reproduces it.
+This is firmware-owned user provisioning, not a shipped replacement PMM,
+security bypass or native DSP-verdict claim.
+
 `run_8890_alarm_changed_code_future` uses only that organically saved
 storage. Physical alarm `13:49` removes rails at 40.452288231 seconds;
 RTC wakes them at 60 seconds with cause `80`. Physical `54321`/Menu then
@@ -1344,6 +1353,11 @@ Stop/No activation acceptance. Preserve the shorter
 `run_8890_alarm_changed_code` negative control: its selected `13:48` was
 not a future deadline on this retained-clock seed and it correctly remained
 off during the observation window.
+The later physical Stop at 87 seconds in
+`run_8890_alarm_changed_code_stop` returns to registered idle. There is no
+activation-choice prompt in this unlocked full-startup path: the subsequent
+right softkey opens the phonebook rather than choosing No, and rails remain
+on. Do not import the 6210 Yes/No lifecycle as an 8890 assertion.
 
 NSB-6's passive persistent-flash census covers `0x3d0000..0x3fffff` under
 verbose logging, using the existing bus observer rather than firmware-state

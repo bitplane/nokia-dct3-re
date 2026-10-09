@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 621 gates: 423 generated from typed steps, 198 copied verbatim (shell).
+# 622 gates: 424 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -375,8 +375,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6250-coherent-host-outgoing-call \
 	verify-6250-coherent-host-incoming-sms verify-6250-coherent-host-outgoing-sms \
 	verify-6250-coherent-host-rejected-sms verify-6250-coherent-host-silent-sms \
-	verify-8890-alarm verify-8890-alarm-snooze verify-6210-alarm \
-	verify-6210-alarm-off-no verify-6210-alarm-off-restore \
+	verify-8890-code-change verify-8890-alarm verify-8890-alarm-snooze \
+	verify-6210-alarm verify-6210-alarm-off-no verify-6210-alarm-off-restore \
 	verify-6210-alarm-off-restore-yes verify-6210-alarm-off-yes \
 	verify-6210-alarm-cold verify-6210-alarm-snooze verify-6210-calendar-cold \
 	verify-6210-calendar-midnight verify-6210-calendar-leap-day \
@@ -4709,6 +4709,9 @@ verify-6250-coherent-host-rejected-sms: build
 
 verify-6250-coherent-host-silent-sms: build
 	$(VENV)/bin/python tools/run_noki6250_acceptance.py $(RUN_DIR) --scenario host-silent-sms --coherent-cell --mame $(MAME_DIR)/mame
+
+verify-8890-code-change: build
+	$(VENV)/bin/python tools/run_noki8890_code_change.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-8890-alarm: build
 	$(VENV)/bin/python tools/run_noki8890_alarm.py $(RUN_DIR) --mame $(MAME_DIR)/mame
