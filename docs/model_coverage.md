@@ -106,7 +106,10 @@ verifier/uploads on each wake and exact recurrence/final-off frames.
 and preserved registration after the same two alarm-only wakes.
 `verify-6250-alarm-off-snooze-restore` additionally proves exact architecture
 and off-rail RTC replay from the initial countdown, followed by the complete
-two-wake Snooze/Stop/No continuation. Save/load during Snooze, restored Yes
+two-wake Snooze/Stop/No continuation.
+`verify-6250-alarm-snooze-countdown-restore` separately proves exact state
+and RTC replay during the later Snooze-induced rail-off, then natural
+recurrence and final Stop/No. Awake alarm/editor restoration, restored Yes
 and audible/native media remain unproved.
 `verify-6250-alarm-cold` additionally proves own physically saved alarm
 reconstruction in a new process, natural expiry and Stop, with independent

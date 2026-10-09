@@ -47,7 +47,8 @@ local input = coroutine.create(function()
         machine:logerror('6250_alarm_physical: action=power_release\n')
         if not emu.wait(10) then return end
         machine.screens[':screen']:snapshot('6250_alarm_off.png')
-        local replayed = _G.noki6250_alarm_restore_checkpoint and
+        local replayed = os.getenv('NOKIA_DCT3_6250_ALARM_RESTORE_SNOOZE') ~= '1' and
+                         _G.noki6250_alarm_restore_checkpoint and
                          _G.noki6250_alarm_restore_checkpoint() or 0
         if not emu.wait(31 - replayed) then return end
     elseif not emu.wait(30) then
@@ -60,7 +61,13 @@ local input = coroutine.create(function()
         if not emu.wait(3) then return end
         machine.screens[':screen']:snapshot('6250_alarm_snoozed.png')
         machine:logerror('6250_alarm_physical: event=snoozed_presented\n')
-        if not emu.wait(310) then return end
+        local recurrence_observation = machine.time:as_double() + 310
+        if os.getenv('NOKIA_DCT3_6250_ALARM_RESTORE_SNOOZE') == '1' then
+            assert(powered_off, 'Snooze checkpoint requires powered-off lifecycle')
+            assert(emu.wait(100 - machine.time:as_double()))
+            assert(_G.noki6250_alarm_restore_checkpoint())
+        end
+        if not emu.wait(recurrence_observation - machine.time:as_double()) then return end
         machine.screens[':screen']:snapshot('6250_alarm_recurred.png')
         machine:logerror('6250_alarm_physical: event=recurrence_observed\n')
     end

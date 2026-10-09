@@ -169,6 +169,16 @@ class AlarmCheckTest(unittest.TestCase):
         self.assertIn("event=restored", result)
         self.assertEqual(result.count("event=second"), 1)
 
+    def test_snooze_countdown_checkpoint(self):
+        text = self.restore_trace().replace("t=49.000000000", "t=100.000000000").replace(
+            "t=50.250000000", "t=101.250000000")
+        check_restore(text, checkpoint=100)
+        with self.assertRaises(ValueError):
+            check_restore(text)
+        with self.assertRaises(ValueError):
+            check_restore(text.replace("t=101.250000000", "t=101.500000000", 1),
+                          checkpoint=100)
+
     def test_restore_architecture_time_and_tick_mismatch_rejected(self):
         for old, new in (("ram=12345678", "ram=12345679"),
                          ("t=50.250000000", "t=50.500000000"),

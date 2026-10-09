@@ -140,7 +140,7 @@ def check_cold_alarm(text):
         raise ValueError("cold alarm buzzer resumed after Stop")
 
 
-def check_restore(text):
+def check_restore(text, checkpoint=49):
     from tools.power_domain_contract import require_endpoint_silence
     states = list(re.finditer(
         r"6250_alarm_state: event=(saved|restored) pc=([0-9a-f]{8}) sp=([0-9a-f]{8}) "
@@ -149,7 +149,7 @@ def check_restore(text):
         raise ValueError("missing unique NHM-3 alarm save/load observations")
     if any(not re.fullmatch(r"[0-9a-f]{8}(?:,[0-9a-f]{8}){36}", state[5]) for state in states):
         raise ValueError("incomplete NHM-3 ARM/banked snapshot")
-    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][6]) != 49:
+    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][6]) != checkpoint:
         raise ValueError("NHM-3 restored architecture/checkpoint differs")
     windows = list(re.finditer(
         r"6250_alarm_replay: phase=(reference|restored) event=(begin|end) t=([0-9.]+)", text))
@@ -157,7 +157,8 @@ def check_restore(text):
             ("reference", "begin"), ("reference", "end"),
             ("restored", "begin"), ("restored", "end")]:
         raise ValueError("NHM-3 alarm replay windows absent/unordered")
-    if [float(event[3]) for event in windows] != [49, 50.25, 49, 50.25]:
+    if [float(event[3]) for event in windows] != [checkpoint, checkpoint + 1.25,
+                                                checkpoint, checkpoint + 1.25]:
         raise ValueError("NHM-3 alarm replay times differ")
     reference = text[windows[0].end():windows[1].start()]
     restored = text[windows[2].end():windows[3].start()]
@@ -178,11 +179,15 @@ def main():
                         help="power off before expiry, then physically choose activation")
     parser.add_argument("--snooze", action="store_true")
     parser.add_argument("--restore-off", action="store_true")
+    parser.add_argument("--restore-snooze", action="store_true",
+                        help="restore the later powered-off Snooze countdown at second 100")
     parser.add_argument("--cold", action="store_true")
     args = parser.parse_args()
     if args.restore_off and not args.power_choice:
         parser.error("off-state restoration requires an explicit activation choice")
-    if args.cold and (args.snooze or args.restore_off or args.power_choice):
+    if args.restore_snooze and (not args.snooze or not args.power_choice or args.restore_off):
+        parser.error("Snooze restoration requires powered-off Snooze without --restore-off")
+    if args.cold and (args.snooze or args.restore_off or args.restore_snooze or args.power_choice):
         parser.error("cold alarm is an independent awake lifecycle")
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -199,19 +204,21 @@ def main():
         command = [str(mame), "nhm3hle", "-rompath",
                    f"{phase / 'roms'};{root / 'roms'}", "-nvram_directory", "nvram",
                    "-cfg_directory", "cfg", "-noreadconfig", "-autoboot_script",
-                   str(root / "tools" / ("noki6250_alarm_restore.lua" if args.restore_off
+                   str(root / "tools" / ("noki6250_alarm_restore.lua" if args.restore_off or args.restore_snooze
                                          else "noki6250_alarm_input.lua")), "-autoboot_delay", "0",
                    "-seconds_to_run", "40" if args.cold else "430" if args.snooze and args.power_choice else "395" if args.snooze else "110" if args.power_choice else "80", "-video", "none", "-sound", "none",
                    "-nothrottle", "-log", "-verbose"]
         environment = os.environ.copy()
         for key in ("NOKIA_DCT3_6250_ALARM_POWER_OFF", "NOKIA_DCT3_6250_ALARM_POWER_CHOICE",
-                    "NOKIA_DCT3_6250_ALARM_SNOOZE"):
+                    "NOKIA_DCT3_6250_ALARM_SNOOZE", "NOKIA_DCT3_6250_ALARM_RESTORE_SNOOZE"):
             environment.pop(key, None)
         if args.power_choice:
             environment.update(NOKIA_DCT3_6250_ALARM_POWER_OFF="1",
                                NOKIA_DCT3_6250_ALARM_POWER_CHOICE=args.power_choice)
         if args.snooze:
             environment["NOKIA_DCT3_6250_ALARM_SNOOZE"] = "1"
+        if args.restore_snooze:
+            environment["NOKIA_DCT3_6250_ALARM_RESTORE_SNOOZE"] = "1"
         with (phase / "console.log").open("w") as console:
             subprocess.run(command, cwd=phase, env=environment, stdout=console,
                            stderr=subprocess.STDOUT, check=True)
@@ -243,8 +250,8 @@ def main():
                 check_frame(cold / "snap" / f"6250_alarm_cold_{name}.png", digest)
             print("6250 research-HLE retained cold alarm and physical Stop PASS; native/audio not tested")
             return
-        if args.restore_off:
-            text = check_restore(text)
+        if args.restore_off or args.restore_snooze:
+            text = check_restore(text, checkpoint=100 if args.restore_snooze else 49)
             for name in ("reference", "restored"):
                 check_frame(phase / "snap" / f"6250_alarm_off_{name}.png",
                             "907c2e3cc0dc7d0dc17827521badb7be0f647b6b945f1bac2e68094fd47568a7")

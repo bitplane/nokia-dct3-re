@@ -1324,6 +1324,17 @@ both natural wakes, physical Snooze/Stop/No and final rail-off. This is not
 a save/load inside the later Snooze interval or an awake editor transaction.
 Restored Yes and audible/native speech remain unpromoted.
 
+`verify-6250-alarm-snooze-countdown-restore` independently saves the later
+Snooze-induced rail-off state at second 100, after the first RTC wake and
+physical Snooze (`run_6250_snooze_countdown_restore_20261009`). All 37
+ARM/banked registers, RAM digest and time match on restoration; the
+100..101.25-second reference/restored RTC and blank-frame windows agree
+and contain no named powered-endpoint activity. The original 13:53 deadline
+still wakes naturally at second 360, followed by physical Stop/No and final
+rail-off. This separately validates state created by the wake/Snooze cycle,
+not just the initial countdown. It does not cover an awake alarm/editor
+save point or promote restored Yes.
+
 `verify-6250-alarm-off-restore` and `-restore-yes` save the powered-off
 countdown at emulated second 49. All 37 exported ARM/banked registers,
 modeled RAM digest and emulated time must match exactly on load. The
