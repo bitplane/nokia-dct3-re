@@ -16,8 +16,9 @@ CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
 erased-storage failures and reaches SIMI initialization, but remains blank
 through 30 seconds. No usable handset or authentic provisioning is established.
-The current bounded question is how the dispatcher reaches the identified
-report-`0x14` path after its state-3 countdown is exhausted. The missing
+The current bounded question is the product-specific source-7/source-8
+input and calibration contract: their transformed samples exceed the
+acquisition acceptance range. The missing
 report bit leaves the input controller in state `0x10` with all keypad
 columns masked.
 
@@ -77,6 +78,32 @@ longer than the initial 12-second window does not supply report `0x14`.
 At countdown zero the decoded branch reaches `0x221de0`; map its ensuing
 event/state selection and the predecessor of `0x21fb94` next. Do not
 replace this investigation with an asserted CCONT bit or injected report.
+
+### Report Event and Sample Acquisition
+
+Dispatcher comparison `0x21f7b4` routes event `0x21` to `0x21fb1e`,
+which leads to the report-`0x14` posting path. Receiver `0x21e00c` accepts
+raw `0x21` directly; it also maps raw `0x01a0` to the byte at `0x11eb59`.
+The latter route supplies the observed repeated event `0x26`.
+The read-only write watch observes initialization of that byte to `0x26`
+at PC `0x294e4c`, followed by repeated `0x26` writes on the `0x21faf0`
+path. This is runtime evidence, not a complete writer census.
+
+Event `0x26` invokes sample accumulator `0x293d94`. It calls acquisition
+helper `0x293cc0`, decrements the remaining-sample byte `0x11eb5e` only
+on success, and accumulates two transformed samples. Acquisition reads
+source 7 and, conditionally, source 8, then requires both result halfwords
+in the inclusive range `0x0708..0x157c` (1800..5500).
+A fresh integrity-only cold run observes acquisition return zero on all
+16 captured attempts, remaining count `0x0a`, and both transformed
+samples `0x19d6` (6614). Thus the high-bound checks explain the observed
+failure; a missing timer message does not.
+
+The current product uses an explicitly unvalidated CCONT ADC tuple.
+Decode this ROM's source mapping and calibration before changing it.
+Neither the acceptance range nor the observed numbers establishes physical
+units, a valid battery tuple, or authentic EEPROM calibration. Do not sweep
+inputs or edit the counter/event byte to manufacture report `0x14`.
 
 The original Nokia NSE-6 system-module chapter, pages 3-41/3-42, specifies
 16 Mbit flash (2 MiB), 2 Mbit SRAM (256 KiB), and 256 Kbit serial EEPROM

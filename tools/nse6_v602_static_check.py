@@ -111,6 +111,8 @@ def check(image):
         (0x288CC6, 0x13FFA8), (0x288D20, 0x12147D),
         (0x221C8C, 0x13FE18),
         (0x221E20, 0x9004),
+        (0x21E09A, 0x11EB59), (0x21F836, 0x11EB5E),
+        (0x293D7A, 0x157C), (0x293D8A, 0x157C),
         (0x2DD106, 0x121570), (0x2DE16E, 0x20033),
         (0x2DE18E, 0x20031), (0x2DE198, 0x2002F),
         (0x2E04B8, 0x3033D0), (0x2E04CC, 0x3033B4),
@@ -264,7 +266,19 @@ def check(image):
         (0x221E18, "beq", "#0x221de0"),
         (0x221E22, "bl", "#0x2dfc60"),
         (0x221E26, "cmp", "r0, #1"),
-        (0x221E28, "bne", "#0x221da0"))
+        (0x221E28, "bne", "#0x221da0"),
+        (0x21F7B4, "cmp", "r0, #0x21"),
+        (0x21F7B8, "b", "#0x21fb1e"),
+        (0x21E094, "adds", "r1, #0xa1"),
+        (0x293D9E, "bl", "#0x293cc0"),
+        (0x293DA4, "beq", "#0x293dc6"),
+        (0x293DAE, "subs", "r0, r0, #1"),
+        (0x293CC6, "movs", "r0, #7"),
+        (0x293D08, "movs", "r0, #8"),
+        (0x293D74, "lsls", "r2, r2, #3"),
+        (0x293D78, "blt", "#0x293d92"),
+        (0x293D7E, "bgt", "#0x293d92"),
+        (0x293D90, "movs", "r0, #1"))
     for address, mnemonic, operands in expected_instructions:
         offset = address - BASE
         insn = next(decoder.disasm(image[offset:offset + 4], address))
