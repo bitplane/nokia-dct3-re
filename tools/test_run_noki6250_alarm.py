@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6250_alarm import check_alarm, check_restore, check_cold_alarm
+from tools.run_noki6250_alarm import check_alarm, check_restore, check_cold_alarm, check_alarm_seed
 
 
 class AlarmCheckTest(unittest.TestCase):
@@ -25,6 +25,27 @@ class AlarmCheckTest(unittest.TestCase):
 
     def test_own_alarm_contract(self):
         check_alarm(self.trace())
+
+    def seed_trace(self):
+        return self.trace().split("ccont_rtc: event=second", 1)[0]
+
+    def test_pending_seed(self):
+        check_alarm_seed(self.seed_trace())
+
+    def test_seed_wrong_route_and_expired_deadline(self):
+        for text in (self.seed_trace().replace("action=clock", "action=settings", 1),
+                     self.seed_trace() + "ccont_rtc: event=second time=13:48:00\n",
+                     self.seed_trace() + "6250_alarm_physical: event=stopped_presented\n",
+                     self.seed_trace().replace("action=confirm", "action=idle", 1)):
+            with self.assertRaises(ValueError):
+                check_alarm_seed(text)
+
+    def test_seed_programming_before_confirmation_rejected(self):
+        text = self.seed_trace()
+        confirm = "6250_alarm_physical: action=confirm\n"
+        text = text.replace(confirm, "").replace("6250_alarm_physical: action=idle", confirm + "6250_alarm_physical: action=idle")
+        with self.assertRaises(ValueError):
+            check_alarm_seed(text)
 
     def cold_trace(self):
         return "\n".join((

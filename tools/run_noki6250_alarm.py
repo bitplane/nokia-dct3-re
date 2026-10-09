@@ -92,6 +92,23 @@ def check_alarm(text, power_choice=None, snooze=False):
             require_endpoint_silence(text[off[1].end():], "NHM-3 declined activation interval")
 
 
+def check_alarm_seed(text):
+    expected = ["menu", *[f"down_{i}" for i in range(1, 10)], "clock",
+                "clock_down_1", "alarm", *[f"time_{i}" for i in range(1, 5)],
+                "confirm", "idle"]
+    actions = re.findall(r"6250_alarm_physical: action=(\w+)\b", text)
+    if "[LUA ERROR]" in text or actions != expected:
+        raise ValueError("cold alarm seed physical sequence differs")
+    prefix = text.split("6250_alarm_physical: action=idle", 1)[0]
+    programming = re.search(
+        r"action=confirm\b.*?alarm_write reg=0b data=30 armed=1\b.*?"
+        r"alarm_write reg=0c data=0d armed=1\b", prefix, re.S)
+    if programming is None:
+        raise ValueError("cold alarm seed did not arm after confirmation")
+    if "event=second time=13:48:00" in text or "event=stopped_presented" in text:
+        raise ValueError("cold alarm seed expired or was dismissed")
+
+
 def check_cold_alarm(text):
     if "[LUA ERROR]" in text or "6250_alarm_physical:" in text:
         raise ValueError("cold alarm must not replay arming inputs")
@@ -198,19 +215,7 @@ def main():
         if args.cold:
             from tools.noki6250_staged_check import check as check_uploads
             from tools.radio_registration_trace_check import verify
-            if "action=stop" in text or "event=second time=13:48:00" in text:
-                raise ValueError("cold alarm seed expired or was dismissed")
-            # The arming process exits before expiry; it has no Stop tail.
-            prefix = text.split("6250_alarm_physical: action=idle", 1)[0]
-            expected = ["menu", *[f"down_{i}" for i in range(1, 10)], "clock",
-                        "clock_down_1", "alarm", *[f"time_{i}" for i in range(1, 5)],
-                        "confirm", "idle"]
-            actions = re.findall(r"6250_alarm_physical: action=(\w+)\b", text)
-            programming = re.search(
-                r"action=confirm\b.*?alarm_write reg=0b data=30 armed=1\b.*?"
-                r"alarm_write reg=0c data=0d armed=1\b", prefix, re.S)
-            if "[LUA ERROR]" in text or actions != expected or programming is None:
-                raise ValueError("cold alarm seed did not physically arm the own deadline")
+            check_alarm_seed(text)
             check_uploads(text, runtime=True)
             verify(text, "nhm3", preserved=True)
             check_frame(phase / "snap/6250_alarm_confirm.png", FRAMES["confirm"])
