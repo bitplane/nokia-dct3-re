@@ -994,6 +994,24 @@ evidence that a longer wait would succeed. Retain
 `run_ccs33_oracle/full-install-long.log`, `bios-installer-error.png` and
 `run_ccs33_oracle_full_long.log` for this boundary.
 
+Registering Wine's supplied `shell32.dll` resolves that prerequisite; a
+registry query verifies the Shell Link `InprocServer32` points to Wine's
+`C:\windows\system32\shell32.dll`. The unchanged installer then passes
+DSP/BIOS installation. Its XDS560 physical-debugger driver reports a DevCon
+installation error under Wine; acknowledging that error lets setup reach
+plugin registration, not proven target initialization.
+
+The remaining setup boundary is `SETUPinstallPlugins`. Its dialog prints
+the Component Manager path with literal `%SystemDrive%`, and the log also
+reports missing Wine Mono and `ConfigCodeGEL.tlb`. After the warning was
+acknowledged, the plugin process remained live but idle with no further MSI
+progress. This attempt was explicitly terminated (runner exit 1), not
+completed or timed out. Retain `full-install-shell-registered.log`,
+`xds-install-error.png`, `plugin-install-error.png` and
+`run_ccs33_oracle_full_shell_registered.log`. Resolve installer directory
+expansion and runtime prerequisites before retrying; do not interpret copied
+files or registered DLLs as a working simulator.
+
 The acquired vendor SDK's `CCDspUser.h` defines `GetSimMode()` and, under
 `USE_TI_INTERNAL_APIs`, `SetSimMode(long)`: mode 0 flushes the pipeline as an
 emulator, mode 1 does not. Its comments explicitly restrict support to
