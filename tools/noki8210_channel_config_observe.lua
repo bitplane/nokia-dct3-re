@@ -10,6 +10,18 @@ local function bytes(pointer, count)
     end
     return table.concat(result)
 end
+local acquisition_count = 0
+handles[#handles + 1] = memory:install_read_tap(0x287390, 0x287393,
+    'channel_config_acquisition', function(offset, value, mask)
+        if cpu.state['PC'].value ~= 0x287390 or acquisition_count >= 32 then return end
+        local pointer = cpu.state['R0'].value
+        if pointer < 0x100000 or pointer >= 0x17ffe8 then return end
+        acquisition_count = acquisition_count + 1
+        machine:logerror(string.format(
+            '8210_channel_config_acquisition: caller=%08x record=%08x data=%s t=%.6f\n',
+            cpu.state['R14'].value, pointer, bytes(pointer, 24),
+            machine.time:as_double()))
+    end)
 for _, address in ipairs({0x2b3910, 0x3052b2}) do
     local count = 0
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
@@ -28,9 +40,9 @@ for _, address in ipairs({0x2b3910, 0x3052b2}) do
                 end
             end
             machine:logerror(string.format(
-                '8210_channel_config: pc=%08x descriptor=%08x data=%s packet=%s t=%.6f\n',
+                '8210_channel_config: pc=%08x descriptor=%08x data=%s packet=%s t=%.6f caller=%08x\n',
                 address, descriptor, bytes(descriptor, 24), packet,
-                machine.time:as_double()))
+                machine.time:as_double(), cpu.state['R14'].value))
         end)
 end
 _G.nsm3_channel_config_handles = handles

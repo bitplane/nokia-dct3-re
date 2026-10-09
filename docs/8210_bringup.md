@@ -1267,6 +1267,20 @@ DSP transaction lifetimes. All eight captured entry/send pairs match both
 the outgoing envelope and the constructor's descriptor-byte-A mutation.
 Six focused tests include exact-`50` versus high-nibble-`50` tail handling,
 unknown-nibble preservation, input bounds and the acquired-ROM pin.
+The first subtype-`50` configuration is now traced to its own producer:
+`21ed82 -> 287390 -> 2eb226 -> 2b3910`. The fresh late-PIN observation
+records helper caller `21ed87`, carrier record `119690`, and serializer
+caller `2eb265`. Helper `287390` copies record halfword `+6`, byte `+a`
+and word `+0`; constructor `2eb226` creates a zeroed 24-byte descriptor
+with bytes `04 50`, placing those values at `+8`, `+6` and `+c`.
+This exactly reconstructs both the live descriptor and its outgoing packet.
+The later subtype-`10` packet instead comes from serializer caller `2eb0d1`.
+Raw evidence: `run_8210_channel_config_origin_20261009/error.log`; the
+contract tool pins all three producer spans and tests the record copy.
+The shared helper `2eaf74` also updates firmware bookkeeping; its complete
+lifecycle is not captured by the byte-copy translation. In particular,
+this acquisition-owned configuration still does not establish whether
+the DSP must cancel or finish the outstanding measurement window.
 Reference scope: the recovered NHM-5 trace-name catalogue in the sibling
 project (`tools/symbols/trace-names-nhm5.txt`) labels `1855`, `1856`, and
 `1857` as `INVALID_MDI_MSG`. Its useful names for `188b` and `1802` do not

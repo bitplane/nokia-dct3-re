@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from tools.noki8210_channel_config_contract import serialize, verify
+from tools.noki8210_channel_config_contract import acquisition_descriptor, serialize, verify
 
 
 class ChannelConfigContractTest(unittest.TestCase):
@@ -53,3 +53,17 @@ class ChannelConfigContractTest(unittest.TestCase):
         for length in (0, 23, 25):
             with self.assertRaises(ValueError):
                 serialize(bytes(length))
+
+    def test_live_acquisition_record_to_descriptor(self):
+        record = bytes.fromhex('00296ff90000033700c41200ffa4c60c0000000000000338')
+        descriptor = acquisition_descriptor(record)
+        self.assertEqual(descriptor.hex(),
+                         '04500000000012000337000000296ff90000000000000000')
+        packet, _ = serialize(descriptor)
+        self.assertEqual(packet.hex(),
+                         '000214020412020000000050500003370000000000296ff9')
+
+    def test_acquisition_capture_bounds(self):
+        for length in (0, 23, 25):
+            with self.assertRaises(ValueError):
+                acquisition_descriptor(bytes(length))
