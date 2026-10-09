@@ -39,10 +39,13 @@ requirement.
 incoming-call resilience: organic authentication/cipher completion, own
 physical Answer/End lifecycle, bidirectional impaired traffic bursts,
 bad-frame detection, handset/network concealment and non-silent recovery.
+The same gate independently requires organic FACCH stealing in both
+directions, BFI concealment and media recovery, plus four-phase SACCH/TF
+rotation while bidirectional speech continues.
 It uses NHM-2's evidenced 1 MHz/8 kHz, 125-clock, 16-bit PCM contract and
 external network fault selectors, not firmware state forcing. This gate
 does not establish native DSP speech, encrypted active-call restoration,
-FACCH/SACCH resilience parity or physical host duplex under impairment.
+or physical host duplex under impairment.
 
 `verify-6250-calendar-cold` independently proves physical NHM-3 Calendar
 time/date entry, the reviewed 7 October 2026 Wednesday frame, and the same

@@ -1992,6 +1992,8 @@ verify-3410-radio-a5-1-degraded: normalize-3410
 	$(PYTHON) tools/radio_a5_trace_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_3410_incoming_call_lifecycle_check.py $(RUN_DIR)/error.log
 	$(PYTHON) tools/radio_degraded_speech_trace_check.py $(RUN_DIR)/error.log $(COBBA_GJP_PCM_CHECK_ARGS)
+	$(PYTHON) tools/radio_facch_interruption_trace_check.py $(RUN_DIR)/error.log
+	$(PYTHON) tools/radio_sacch_coexistence_trace_check.py $(RUN_DIR)/error.log
 
 verify-3410-radio-a5-1-incoming-call: normalize-3410
 	@$(MAKE) --no-print-directory run $(DCT3_RUN_3410) RUN_DIR=$(RUN_DIR) SECONDS=40 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory ../fixtures/radio_a5_1_incoming_call_answered' RUN_ENV='NOKIA_DCT3_POST_READY_KEYS=end,waitalerting,send,wait3000,end NOKIA_DCT3_POST_READY_KEY_DELAY_MS=1000 $(DCT3_PRESS_200_300)'

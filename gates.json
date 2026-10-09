@@ -7091,7 +7091,11 @@
          "script": "tools/radio_3410_incoming_call_lifecycle_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
         {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
          "script": "tools/radio_degraded_speech_trace_check.py",
-         "arguments": ["$(RUN_DIR)/error.log", "$(COBBA_GJP_PCM_CHECK_ARGS)"], "options": []}
+         "arguments": ["$(RUN_DIR)/error.log", "$(COBBA_GJP_PCM_CHECK_ARGS)"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_facch_interruption_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []},
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [],
+         "script": "tools/radio_sacch_coexistence_trace_check.py", "arguments": ["$(RUN_DIR)/error.log"], "options": []}
       ]
     },
     {
