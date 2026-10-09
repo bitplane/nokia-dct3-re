@@ -41,7 +41,11 @@ physical Stop returning to registered idle. Its seed is a fresh physically
 entered Calendar/time fixture, not donor storage or register injection.
 Reviewed frames and ordered hardware/input checks cover alarm-on, active
 alarm and post-Stop idle; buzzer programming is checked but audible output
-and powered-off wake are not promoted.
+is not promoted. `verify-6210-alarm-off-no` and `-off-yes` separately prove
+autonomous RTC rail wake, physical Stop/activation choice and either return
+to rail-off or firmware-owned warm restart to the exact registered idle
+frame. Warm SRAM retention and distinct cold/software reset status are
+verified at firmware consumers; native DSP and silicon timing are not inferred.
 `verify-6210-alarm-snooze` additionally proves physical Snooze, firmware's
 five-minute reprogramming, natural recurrence, IRQ acknowledgement, renewed
 buzzer control and physical Stop. Exact frames additionally cover `Snooze

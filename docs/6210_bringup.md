@@ -689,79 +689,36 @@ remains unmeasured.
 
 ### Powered-off alarm boundary
 
-The Nokia-authored user guide states that the alarm operates while switched
-off; Stop then offers activation for calls. `noki6210_alarm_power_off.lua`
-physically sets 13:48 and shuts down before the deadline using the same
-product-local Calendar seed. In `run_6210_alarm_power_off_stopped_watchdog`,
-CCONT removes the rails at 38.68 seconds and its always-powered RTC reaches
-13:48:00 at 60 seconds, latching status `b1` with mask `30`. The screen stays
-blank through 100 seconds and firmware does not read the pending cause.
-That run isolates the missing rail restoration, not a firmware alarm failure.
-CCONT now restores the digital rails when its always-powered alarm comparator
-fires, retaining bit `80` and presenting the held source after domain reset.
-`run_6210_alarm_off_no_acceptance` passes a fresh physical fixture: off at
-38.68 seconds, autonomous cause-`80` wake at the natural 60-second deadline,
-firmware acknowledgement and buzzer control, reviewed alarm pixels, physical
-Stop, the "Switch the phone on?" prompt, and physical No returning to rail-off.
-Powered endpoints remain silent in both off windows. This is research-HLE
-alarm/control acceptance, not audible-output or native-DSP acceptance.
+The Nokia-authored user guide specifies alarm operation while switched off
+and a Stop/activation choice. `verify-6210-alarm-off-no` and
+`verify-6210-alarm-off-yes` physically set 13:48, shut down before expiry,
+and verify autonomous RTC wake at the natural deadline. CCONT retains alarm
+cause `80` and presents the held source after digital-domain reset. Firmware
+acknowledges it, programs the buzzer, paints the reviewed alarm frame and
+responds to physical Stop with "Switch the phone on?". No returns to rail-off
+with silent powered endpoints and a blank frame. Yes requests an MCU reset
+and returns to the exact registered DCT3 LAB idle frame. The gates verify
+each own-upload phase independently, including normal self-test/analogue
+acceptance after activation. This is research-HLE control/presentation
+acceptance, not audible-output or native-DSP acceptance.
 
-The superseded `run_6210_alarm_yes_boundary` returns to
-rail-off at 83.05 seconds and the checker rejects it. The passive power-route
-trace identifies the zero write at `0x5009f2` inside routine `0x5009a6`.
-An aligned Thumb BL scan finds five direct-call candidates (`0x39dace`,
-`0x3d7b92`, `0x4b0048`, `0x4b02d8`, `0x503410`), all passing zero; several
-are measurement/state guarded. `run_6210_alarm_yes_stack` resolves the
-observed caller independently of the inconclusive entry breakpoints: at both
-normal shutdown and post-alarm Yes shutdown, SP is `0x175b50` and the saved
-LR at SP+16 is `0x39dad3`. The prologue at `0x5009a6` saves five registers,
-so this identifies the call at `0x39dace`, excluding the other four direct
-candidates for this run. Its preceding dispatch reads a firmware state via
-`0x39c43c`. Read-only event-word observations in
-`run_6210_alarm_yes_events` establish that Yes first writes MAD2 reset
-control `05` at `0x5009a2` (81.05 seconds), then executes the boot sequence
-again. The shutdown occurs in that restarted boot, not directly in the
-prompt transaction. CCONT cause reads remain `11` after the software reset;
-the alarm bit was acknowledged at 63.14 seconds. This located the defect
-in reset/startup lifecycle, not the prompt transaction. Do not
-misclassify this as an unaccepted Yes key or invent a fresh power-key cause.
-The reset reader at `0x2b7a1a`, independently matched to `0x230608` on the
-3210, selects cold reason `6b` when bit 1 is set (`BHS` after `LSRS #2`).
-With bit 1 clear and bit 2 set it reads the saved software reason. A proposed
-`07` status change inverted that carry test; `run_6210_alarm_restart_reason`
-observed cold reason `6b` and continued shutdown, so the change was removed.
-The probe observed the saved byte at `0x17fe48` become
-zero around restart. Source inspection then established that the board's
-digital-reset helper called `machine_reset()`, clearing all SRAM before
-firmware could consume that byte. Own-ROM startup calls the reason reader
-at `0x20014c`, then clears only `0x100020..0x175668`, leaving the retained
-reason outside that workspace. MCU-requested warm reset now preserves SRAM
-while resetting digital devices and board controls; rail-on reset retains
-the existing cold initialization. This is a supply/reset-domain correction,
-not a reason-byte poke. `run_6210_alarm_yes_warm_sram_serial` independently
-reads status `05` but still shuts down at 83.06 seconds through the same
-saved caller `0x39dad3`. SRAM retention alone therefore does not settle
-activation; reset self-conformance alone does not prove the lifecycle.
-`run_6210_alarm_retained_reason` directly observes saved reason `0c` survive
-the MCU reset and become startup reason `0c` at 81.06 seconds. Its later
-consumption is therefore the frontier, not a lost SRAM byte.
-The second reset reader at `0x4b0272` matches the 3210 reader at `0x2a922e`:
-bit 0 set takes the cold-history initialization branch before testing
-software bit 2, whereas bit 0 clear permits the saved-reason branch.
-The former `05` status simultaneously selected software in the first reader
-and cold history in the second. Software reset now publishes `04`, with
-cold-power bit 0 clear, while cold rail-on retains `01`.
-`run_6210_alarm_yes_rearmed` passes the complete physical Yes lifecycle:
-natural alarm wake, reviewed alarm and activation prompt, firmware-owned
-reset request, independently verified uploads before and after restart,
-normal self-test/analogue acceptance and the exact registered DCT3 LAB idle
-frame. Debugger-only log counters are re-armed before Yes; firmware, MMIO
-and device state are untouched. `verify-6210-alarm-off-yes` preserves this
-contract. The separate No gate checks both off windows and blank final frame.
-`run_6210_alarm_off_no_warm_regression` retains the accepted natural alarm
-wake, prompt and physical No/off result on the SRAM-retaining build.
-No substitute power key,
-watchdog reset, firmware-state write or RTOS injection is an alarm wake.
+Warm MCU reset preserves SRAM. NPE-3 startup reads the reason at `0x17fe48`
+before clearing ordinary workspace `0x100020..0x175668`. Physical Yes stores
+reason `0c`; it survives reset and is consumed by startup. Clearing all SRAM
+in the board reset helper previously destroyed that firmware-owned reason.
+Software reset publishes MAD2 status `04`, distinct from cold rail-on `01`:
+readers `0x2b7a1a/0x4b0272` match the 3210 readers `0x230608/0x2a922e`.
+Bit 1 set selects cold reason `6b`; with bit 1 clear, bit 2 selects the saved
+software reason. The second reader separately tests cold-power bit 0 before
+software bit 2. Consequently `05` selects conflicting startup lifecycles;
+`07` is also wrong, not an internal-reset fix (`BHS` takes carry set).
+
+Acceptance evidence: `run_6210_alarm_yes_rearmed` and
+`run_6210_alarm_off_no_warm_regression`. Debugger-only log caps are re-armed
+before Yes so the second boot is observed, without changing firmware/MMIO.
+Do not substitute a power key, watchdog reset or injected event for alarm
+wake, or infer missing firmware work from exhausted trace caps. Exact silicon
+reset timing/encoding and off-process elapsed time remain unmeasured.
 
 ## Unattached accessory input
 

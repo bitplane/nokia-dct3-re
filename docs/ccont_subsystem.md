@@ -411,9 +411,13 @@ new CCONT cause bit. Watchdog data zero remains the distinct commanded rail-off
 path. A zero write stores zero, stops the counter and removes the rails;
 `watchdog_tick` cannot expire a retained reload while the baseband is off.
 The long NPE-3 power-cycle gate observes continuous RTC and endpoint silence
-beyond the previous 49-second reload before physical PWRONX restart. Autonomous
-alarm-driven rail restoration remains unimplemented; an IRQ indication alone
-cannot release the CPU's rail-off reset. See the
+beyond the previous 49-second reload before physical PWRONX restart. The
+always-powered alarm comparator now restores the digital rails with its own
+bit-7 cause retained; an IRQ indication alone cannot release rail-off reset.
+NPE-3's physical off-alarm gates prove natural wake, Stop and both activation
+choices, including firmware-owned warm restart to registered idle. MCU warm
+reset retains SRAM and publishes software status `04`, rather than cold-power
+status `01`; the counter/IRQ/rail model contains no firmware addresses. See the
 [powered-off alarm boundary](6210_bringup.md#powered-off-alarm-boundary).
 
 WDDISX is modeled at the CCONT device boundary rather than by suppressing the
