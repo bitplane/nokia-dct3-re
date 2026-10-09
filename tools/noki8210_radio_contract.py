@@ -582,6 +582,16 @@ def verify(image):
             ('ldrb', 'r1, [r5, #9]'), ('lsls', 'r0, r1, #0x18'),
             ('asrs', 'r0, r0, #0x18')]:
         raise ValueError('measurement signed RSSI layout differs')
+    if instructions(0x2875e4, 12) != [
+            ('movs', 'r1, #0xf0'), ('ldrb', 'r0, [r4, #0xd]'),
+            ('ands', 'r1, r0'), ('movs', 'r0, #2'),
+            ('orrs', 'r0, r1'), ('strb', 'r0, [r4, #0xd]')]:
+        raise ValueError('measurement parser candidate selector assignment differs')
+    if instructions(0x286790, 10) != [
+            ('ldrb', 'r0, [r6, #0xd]'), ('lsls', 'r0, r0, #0x1b'),
+            ('lsrs', 'r0, r0, #0x1b'), ('orrs', 'r1, r0'),
+            ('strb', 'r1, [r6, #0xd]')]:
+        raise ValueError('candidate metadata update selector preservation differs')
     if instructions(0x2df22e, 12) != [
             ('ldrb', 'r1, [r4, #4]'), ('lsls', 'r1, r1, #0x1f'),
             ('lsrs', 'r1, r1, #0x1f'), ('ldrb', 'r2, [r0, #2]'),

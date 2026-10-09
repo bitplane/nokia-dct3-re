@@ -1656,6 +1656,21 @@ case retains the registration failure. The late request lifecycle remains
 the next target, not pointer aliasing. The own-ROM contract verifier pins
 the roots and update instructions; the harness observation changes no state.
 
+Bounded write watches in `run_8210_context_writer_late_20261009` and
+`run_8210_context_writer_early_20261009` establish the record's history.
+Initialization writes its control byte `a0` at 3.181773s; RSSI parser
+`2875e4..2875ee` preserves the upper nibble and assigns selector 2 at
+5.540584s. Writer `286798` changes upper metadata to `c2` at 9.905260s
+while preserving the low five bits. Both runs share these writes. The
+passing early-PIN case additionally rewrites the control word through
+`287790` at 12.262220s and updates its byte to `a2` at 12.262347s;
+the failing late-PIN case instead reaches the mode-4 selector and retains
+`c2`. Thus selector 2 is an organic RSSI-candidate state, not a late-PIN
+injection or a direct received-block success state. Determine the cleanup
+branch's ownership and ordering before treating the retained metadata as
+the cause of the queued-request failure. The static contract pins the
+selector assignment and preservation; runtime watches are observation-only.
+
 Public-reference coverage is bounded. Gammu's
 [NHM-5 v5.87 trace catalogue](https://github.com/gammu/gammu/blob/master/gammu/depend/nokia/dct3trac/nhm5_587.txt)
 names `1811` as `NMEAS_INSTRUCTIONS`, but its
