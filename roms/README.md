@@ -377,6 +377,33 @@ The alternative `nsm3_531.zip` service archive matches its published SHA-1
 validation. Use the clean self-extracting package above for normalization;
 do not treat the ZIP's damaged member as firmware evidence.
 
+### Nokia 6150 NSM-1 v5.23
+
+The acquired original package `archive-dct3-packages/nsm1_523.exe` has
+SHA-256 `69b882a55bbf8ed5fb81f7e52bd950ec631d619a0e141084d766a98860627904`.
+Its own `nsm-1.ini` selects `nsm1ny_5.230` and, for EURO_C,
+`nsm1ny_5.23c`; its declared erase range is `0x200000..0x3fffff`.
+The structured Wintesla decoder validates every record: MCU covers
+`0x200000..0x2e0eff`, PPM C covers `0x360000..0x3fffff`, and the
+intervening gap is filled with erased bytes, not donor firmware.
+
+Reproduce the ignored normalized input after extracting those members:
+
+```sh
+.venv/bin/python tools/extract_dct3_wintesla.py \
+  --mcu roms/research/nsm1-v523/nsm1ny_5.230 \
+  --ppm roms/research/nsm1-v523/nsm1ny_5.23c \
+  --flash-output roms/research/nsm1-v523/6150-v523-ppm-c.fls \
+  --expect-flash-sha1 ea877d2ec204d0771b77fba414575407ccbc99ad
+```
+
+The resulting 2,097,152-byte image has SHA-256
+`8180cbf7ed53f33551ca49f308dd01b4dc48e4fed4d18aae3ee320ae107f922f`.
+This establishes a usable flash input, not an executable product profile.
+Matching EEPROM contents, resident DSP compatibility and product-specific
+hardware configuration remain to be established; no sibling provisioning
+is accepted by this normalization.
+
 ### Nokia 6110 NSE-3
 
 The primary service manual specifies a 1 MiB Intel TE28F800 program flash and
