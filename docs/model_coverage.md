@@ -35,6 +35,14 @@ requirement.
 
 ## Promotion rules
 
+`verify-6210-alarm` independently proves physical Menu-4-1 alarm entry,
+CCONT programming, naturally timed expiry, firmware alarm presentation and
+physical Stop returning to registered idle. Its seed is a fresh physically
+entered Calendar/time fixture, not donor storage or register injection.
+Reviewed frames and ordered hardware/input checks cover alarm-on, active
+alarm and post-Stop idle; buzzer programming is checked but audible output,
+Snooze, armed-alarm cold persistence and powered-off wake are not promoted.
+
 `verify-6210-calendar-cold` independently proves physical Menu-8 Calendar
 entry, firmware-owned CCONT programming to 13:47, physical date entry and
 the reviewed 7 October 2026 Wednesday pixels. A separate process retaining
