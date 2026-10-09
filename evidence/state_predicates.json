@@ -3,6 +3,14 @@
   "kind": "state_predicates",
   "entries": [
     {
+      "id": "npe3_alarm_countdown_full_arm_restore",
+      "owner": "npe3_firmware",
+      "status": "satisfied",
+      "predicate": "Both physical 6210 activation choices complete after exact powered-off restoration of all exported ARM architectural state",
+      "current": "verify-6210-alarm-off-restore and verify-6210-alarm-off-restore-yes compare all 37 exported ARM registers, including CPSR and banked registers, alongside full mapped SRAM digest and emulated time at second 45. The existing RTC replay, blank frames and endpoint-silence checks remain required. Independent fresh runs complete natural alarm wake and physical No to rail-off, or Yes through firmware-owned warm reset and independently checked upload/self-test to registered idle. Each register mismatch and a truncated snapshot are negative-tested. Native DSP speech and silicon timing are not established.",
+      "evidence": ["docs/6210_bringup.md", "tools/noki6210_alarm_power_restore.lua", "tools/run_noki6210_alarm.py", "tools/test_noki6210_alarm.py", "gates.json"]
+    },
+    {
       "id": "nsb6_nonleap_february_cold",
       "owner": "nsb6_rtc",
       "status": "satisfied",

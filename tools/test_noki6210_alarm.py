@@ -22,12 +22,13 @@ class AlarmChecks(unittest.TestCase):
         check_alarm(self.text)
 
     def restore_text(self):
+        cpu = ','.join(['00000000'] * 37)
         return (
-            '6210_alarm_state: event=saved pc=00123456 sp=00170000 ram=abcdef01 t=45.000000000\n'
+            f'6210_alarm_state: event=saved pc=00123456 sp=00170000 ram=abcdef01 cpu={cpu} t=45.000000000\n'
             '6210_alarm_replay: phase=reference event=begin t=45.000000000\n'
             'ccont_rtc: event=second time=13:47:46 day=0 status=31 t=46.000000000\n'
             '6210_alarm_replay: phase=reference event=end t=46.250000000\n'
-            '6210_alarm_state: event=restored pc=00123456 sp=00170000 ram=abcdef01 t=45.000000000\n'
+            f'6210_alarm_state: event=restored pc=00123456 sp=00170000 ram=abcdef01 cpu={cpu} t=45.000000000\n'
             '6210_alarm_replay: phase=restored event=begin t=45.000000000\n'
             'ccont_rtc: event=second time=13:47:46 day=0 status=31 t=46.000000000\n'
             '6210_alarm_replay: phase=restored event=end t=46.250000000\n')
@@ -41,6 +42,16 @@ class AlarmChecks(unittest.TestCase):
         for line in self.restore_text().splitlines(keepends=True):
             with self.subTest(line=line), self.assertRaises(ValueError):
                 check_off_restore(self.restore_text().replace(line, '', 1))
+
+    def test_off_restore_requires_every_register(self):
+        original = ','.join(['00000000'] * 37)
+        for index in range(37):
+            changed = ['00000000'] * 37
+            changed[index] = '00000001'
+            with self.subTest(register=index), self.assertRaises(ValueError):
+                check_off_restore(self.restore_text().replace(original, ','.join(changed), 1))
+        with self.assertRaises(ValueError):
+            check_off_restore(self.restore_text().replace('cpu=00000000,', 'cpu=', 1))
 
     def test_off_restore_rejects_state_or_tick_divergence(self):
         for old, new in [('ram=abcdef01', 'ram=abcdef02'),

@@ -706,8 +706,9 @@ acceptance after activation. This is research-HLE control/presentation
 acceptance, not audible-output or native-DSP acceptance.
 
 `verify-6210-alarm-off-restore` additionally saves the powered-off countdown
-at emulated second 45 and compares exact CPU PC/SP, full SRAM checksum and
-emulated time after restoration. Reference and restored windows span
+at emulated second 45 and compares all 37 exported ARM registers (including
+CPSR and banked state), full SRAM checksum and emulated time after restoration.
+Reference and restored windows span
 45..46.25 seconds, deliberately avoiding an endpoint at the RTC callback's
 timestamp. Both contain the same single RTC tick, blank reviewed frames,
 no premature wake and no powered DSP/radio activity. Only the restored

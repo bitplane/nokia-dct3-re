@@ -167,10 +167,12 @@ def check_power_off_alarm(text, choice):
 def check_off_restore(text):
     from tools.power_domain_contract import require_endpoint_silence
     states = list(re.finditer(r'6210_alarm_state: event=(saved|restored) '
-                             r'pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text))
+                             r'pc=(\w+) sp=(\w+) ram=(\w+) cpu=([0-9a-f,]+) t=([0-9.]+)', text))
     if len(states) != 2 or [state[1] for state in states] != ['saved', 'restored']:
         raise ValueError('missing unique alarm off-state save/load observations')
-    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][5]) != 45:
+    if any(not re.fullmatch(r'[0-9a-f]{8}(?:,[0-9a-f]{8}){36}', state[5]) for state in states):
+        raise ValueError('alarm off-state ARM/banked register snapshot incomplete')
+    if states[0].groups()[1:] != states[1].groups()[1:] or float(states[0][6]) != 45:
         raise ValueError('alarm off-state architecture or checkpoint time differs')
     windows = list(re.finditer(r'6210_alarm_replay: phase=(reference|restored) '
                               r'event=(begin|end) t=([0-9.]+)', text))

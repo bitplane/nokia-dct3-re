@@ -70,7 +70,8 @@ autonomous RTC rail wake, physical Stop/activation choice and either return
 to rail-off or firmware-owned warm restart to the exact registered idle
 frame. Warm SRAM retention and distinct cold/software reset status are
 verified at firmware consumers; native DSP and silicon timing are not inferred.
-`verify-6210-alarm-off-restore` additionally proves exact CPU/SRAM/time
+`verify-6210-alarm-off-restore` additionally proves exact 37-register ARM,
+banked-state, SRAM and time
 restoration during the powered-off countdown, matching RTC replay and blank
 frames, then natural deadline wake and physical Stop/No. It injects no alarm
 cause or clock value and does not establish audible output.
