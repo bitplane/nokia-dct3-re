@@ -1054,9 +1054,22 @@ Setup information**, not a usable target. The documented alternative
 with the same unsupported SystemSetup interface; it never reaches import of
 the package's `drivers/import/c549sim.ccs`. This rules out an unnoticed
 drag/drop dialog as a sufficient explanation for that attempt. The remaining
-dependency is functioning legacy SystemSetup COM initialization in this
-environment, not a changed DSP fixture. Do not invent a board database or
-modify the vendor binaries to conceal this failure.
+dependency is application-side setup activation, not a changed DSP fixture.
+Direct `CreateObject("CodeComposerSetup.SystemSetup")` succeeds and reports
+`ISystemSetup`. Its documented `Clear`, `Import` of the supplied
+`c549sim.ccs`, and `SaveConfig` methods each return zero. Thus setup is not
+universally unavailable, and the scripting convenience wrapper's failure
+does not prove a missing board configuration. Opening the application after
+that saved configuration still fails. The setup server's own `/RegServer`
+entry point also exits zero without resolving application initialization.
+
+A reversible isolated-prefix trial exported the original class registration
+and removed only its default `InprocHandler32` entry. The application still
+reports the same unsupported interface/failure; the original registration
+was restored. Do not repeat that handler-entry trial or claim it establishes
+a working simulator. No vendor binary or generated board database was
+patched. A different compatibility environment or a working direct
+application API is required before this route can provide timing evidence.
 
 Retain `full-install-expanded-path.log`, `installed-ide.log`,
 `installed-ide-screen.png`, `run_ccs33_oracle_plugin_msxml_legacy.log`,
@@ -1068,6 +1081,11 @@ Current verification evidence is `full-install-wow32.log` and
 `run_ccs33_oracle_automation_registered.log`,
 `run_ccs33_oracle_automation_com_trace.log.zst`,
 `automation-observed-screen.png` and `run_ccs33_oracle_automation_import.log`.
+The direct-API results are in `run_ccs33_oracle_system_setup_direct.log`,
+`run_ccs33_oracle_system_setup_import.log` and
+`run_ccs33_oracle_automation_direct_config.log`; the rejected handler trial
+is `run_ccs33_oracle_automation_without_handler.log` with registration backup
+`system-setup-original.reg`.
 The verbose COM trace is also retained uncompressed. Resolve the remaining COM
 initialization boundary using the vendor tools; do not edit the generated
 component database or interpret copied files as a working simulator.
