@@ -180,7 +180,6 @@ private:
 	u16 m_tcr = 0;
 	u16 m_timer_head_tim = 0xffff;
 	emu_timer *m_timer = nullptr;
-	bool m_block_repeat_active = false;
 	bool m_idle = false;
 	u8 m_idle_mode = 0;
 	u64 m_idle_timer_ticks = 0;

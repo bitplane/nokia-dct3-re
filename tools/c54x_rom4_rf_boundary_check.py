@@ -58,15 +58,18 @@ def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> d
         )
     writes = [tuple(int(value, 16 if index else 10) for index, value in enumerate(row))
               for row in RF_WRITE_RE.findall(text)]
-    expected_writes = [(1, 0x2A04, 6, 0xA240), (2, 0x2A04, 6, 0xA240),
-                       (3, 0x41, 0x40, 0x3712), (4, 0x2813, 0x30, 0x4028)]
-    expected_count = 4
+    expected_writes = [(1, 0x2A04, 6, 0xA240), (2, 0x41, 0x40, 0x3712),
+                       (3, 0x2A04, 6, 0xA240), (4, 0x2813, 0x30, 0x4028),
+                       (5, 0x41, 0x40, 0x3712)]
+    expected_count = 5
     if scan_30s:
-        expected_count = 1580
-        expected_writes += [(5, 0x2A04, 6, 0xA240), (6, 0x2A04, 6, 0xA240)]
-        expected_writes += [(sequence, 0x2727 + sequence - 7, 0x30, 0x4028)
-                            for sequence in range(7, 17)]
-        if (result["frame_expiries"], result["rf_reads"]) != (20288, 648288):
+        # Re-banked after architectural BRAF replaced the private repeat latch;
+        # two isolated cold runs reproduce this snapshot, not silicon timing.
+        expected_count = 1519
+        expected_writes += [(6, 0x2A04, 6, 0xA240), (7, 0x2A04, 6, 0xA240)]
+        expected_writes += [(sequence, 0x2727 + sequence - 8, 0x30, 0x4028)
+                            for sequence in range(8, 17)]
+        if (result["frame_expiries"], result["rf_reads"]) != (20282, 648096):
             raise ValueError("30-second scan frame/read snapshot changed")
         if not re.search(r"space=io direction=write address=000e value=0546 mask=ffff pc=0959\b", text):
             raise ValueError("missing uploaded scan reload")

@@ -2166,10 +2166,10 @@ after the native return, then parameter `7` with title `TEST` and two empty
 secondary strings. Its checksummed candidate packets are
 `1e 02 aa 01 49 04 fa 55` and
 `1e 0a aa 01 36 07 04 54 45 53 54 00 00 05 99 55`.
-The gate currently fails before the metadata packet is sent: only the first
-resident poll byte arrives, remaining unread at the 20-second endpoint.
-Native RX/TX totals are 36/47, with three replies, two subsequent ACKs,
-cursor 27 and RX-ready set. Do not interpret this as a failed metadata command.
+The gate fails before the metadata packet is sent: the resident poll remains
+incomplete at the 20-second endpoint. The current replay below reaches cursor
+28 with RX-ready set, three replies and two subsequent ACKs. Do not interpret
+this as a failed metadata command.
 
 Endpoint PC is `02:3d73` in the TINT handler; the live
 OVLY-folded vector and handler prologue match the original AA22 upload.
@@ -2207,7 +2207,7 @@ cursor 27, RX/TX 36/47 and no metadata delivery. It does not close this
 general timer/write/pipeline boundary.
 
 The `bootrecsave` reproduction reaches original resident
-startup and control return, but stops with cursor 27, RX-ready set, zero
+startup and control return, but stops with RX-ready set, zero
 tracks and PRD `1`; the metadata packet has not been delivered. This remains
 a CPU interrupt-recognition/pipeline-drain question, not evidence of metadata
 rejection. The independently verified stopped-PSC/read-only-TCR corrections
@@ -2293,13 +2293,17 @@ boundary. `tmp/mu4-recorder-control-xc/error.log` receives
 selector `36`/parameter `4` at 11.406 seconds with previous class/selector
 `1/36`; native receipt/acknowledgement passes, recording completion remains
 unclaimed.
-`tmp/mu4-recorder-save-xc/error.log` receives the selector-`49` poll at
+After architectural BRAF control replaces the private block-repeat latch,
+`tmp/mu4-recorder-save-braf/error.log` receives the selector-`49` poll at
 11.389 seconds and control at 11.449 seconds with previous selector `49`.
 Completion reaches `8009` and the resident image returns, but the endpoint
-is `02:3d7b`, ST1 `2900`, IMR `0ac9`, IFR `0c78`, cursor 27 and RX-ready set: 50
+is `02:3da4`, ST1 `6900`, IMR `0ac9`, IFR `0c78`, cursor 28 and RX-ready set: 50
 application calls, two dequeued messages and one processing-wait entry.
-RX/TX remain 36/47, with three responses and two ACKs; TIM/PRD/TCR are
-`0000/0001/0000`. It exits 3 because metadata has not been delivered.
+RX/TX are 37/47, with three responses and two ACKs; TIM/PRD/TCR are
+`0001/0001/0000`. It exits 3 because metadata has not been delivered.
+The preceding `tmp/mu4-recorder-save-xc/error.log` stopped at cursor 27 and
+RX/TX 36/47; the extra received poll byte is progress in this diagnostic,
+not a completed resident transaction or a resolved interrupt-drain contract.
 Both use the retained product's own NAND with NVRAM saving disabled and no
 firmware-state forcing. The control fixture's working warm dispatch does
 not close the save fixture's timer/interrupt recognition and drain boundary.

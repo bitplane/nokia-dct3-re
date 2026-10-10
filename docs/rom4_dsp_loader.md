@@ -822,6 +822,26 @@ store and an interrupt-return sequence: the ISR's stacked PC proves the
 following instruction completed before entry. These fixtures failed before
 the guard was implemented. They do not establish general six-stage pipeline
 drain timing or protect arbitrary writes to ST1.
+Block-repeat activation follows architectural ST1.BRAF, not a separate
+private latch (SPRU131G section 6.8). Clearing BRAF through `RSBX`, `STM`
+or `POPM` cancels looping without consuming another BRC iteration; restoring
+RSA/REA/BRC and setting BRAF resumes looping without a new `RPTB`.
+Four executable cases require `TMS320C54x BRAF control: PASS`, checking body
+counts, remaining BRC and stack balance. The old duplicated latch fails the
+cancellation assertion in `tmp/c54x-braf-control-red.log`. BRAF and its loop
+registers are already saved architectural state, so no parallel active flag
+is retained. These are execution-state checks, not Decode-stage BRC decrement
+timing or general interrupt-pipeline evidence.
+The correction deliberately changes the exact native NSE-1 scan snapshot:
+two isolated 30-second cold runs (`tmp/nse1-braf-control/error.log` and
+`tmp/nse1-braf-bus/error.log`) reproduce 20,282 frame expiries, 648,096 RF
+reads and 1,519 port-32 writes. The checker re-banks those exact counts and
+the observed programming sequence; a negative test rejects the previous
+private-latch snapshot rather than accepting both. Frame-30 activation,
+32-word read cadence, firmware queue producers, IMR `035f` and zero
+port-38/39 reads remain required. Native Phone book menu, save-state and
+original MU4 storage/native-entry gates pass. This is a deterministic emulator
+regression snapshot, not measured RF timing or acquisition.
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free
 instruction cases write PRD `1234`, reload with TSS set and each TDDR value,
@@ -855,8 +875,9 @@ Free/Soft storage combinations: bits 15..12 read zero, stopped PSC is retained,
 and Free/Soft remain writable (table 8-14). These storage checks do not
 establish debugger-dependent Free/Soft clock behavior.
 The full CPU suite passes, and the native NSE-1 receiver regression retains
-6,499 frames, 207,040 port-27 reads, three port-32 writes and no port-38/39
-reads. This preserves the existing no-cell boundary, not radio acquisition.
+frame-driven port-27 reads with no port-38/39 reads. The exact current scan
+snapshot is specified in the BRAF contract above. This preserves the existing
+no-cell boundary, not radio acquisition.
 
 `make probe-c54x-timer-boundary` runs a separate, firmware-free observation
 profile (`tms54test -bios timer`). It reloads PRD through indirect stores,

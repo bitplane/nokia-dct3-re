@@ -259,7 +259,6 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_prd));
 	save_item(NAME(m_tcr));
 	save_item(NAME(m_timer_head_tim));
-	save_item(NAME(m_block_repeat_active));
 	save_item(NAME(m_idle));
 	save_item(NAME(m_idle_mode));
 	save_item(NAME(m_idle_timer_ticks));
@@ -329,7 +328,6 @@ void tms320c54x_device::device_reset()
 	m_idle_timer_ticks = 0;
 	m_peripheral_clock_stop_cb(0);
 	arm_timer();
-	m_block_repeat_active = false;
 	m_idle = false;
 	m_illegal = false;
 }
@@ -958,7 +956,8 @@ void tms320c54x_device::finish_repeats()
 
 	// REA names the last program word in the block. This also covers a
 	// multiword CALL at the end of the block after its RET restores REA+1.
-	if (m_block_repeat_active && m_pc == u16(m_rea + 1))
+	// SPRU131G 6.8: software-visible BRAF is the loop's activation control.
+	if ((m_st1 & ST1_BRAF) && m_pc == u16(m_rea + 1))
 	{
 		if (m_brc)
 		{
@@ -967,7 +966,6 @@ void tms320c54x_device::finish_repeats()
 		}
 		else
 		{
-			m_block_repeat_active = false;
 			m_st1 &= ~ST1_BRAF;
 		}
 	}
@@ -2821,7 +2819,6 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xf072: // RPTB pmad
 		m_rsa = u16(m_pc + 1);
 		m_rea = fetch();
-		m_block_repeat_active = true;
 		m_st1 |= ST1_BRAF;
 		m_icount -= 3;
 		return;
@@ -2830,7 +2827,6 @@ void tms320c54x_device::execute_one(u16 op)
 		// The two words after the two-word instruction are delay slots.  The
 		// repeated block begins immediately after them.
 		m_rsa = u16(m_pc + 2);
-		m_block_repeat_active = true;
 		m_st1 |= ST1_BRAF;
 		--m_icount;
 		return;

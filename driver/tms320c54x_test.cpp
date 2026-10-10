@@ -42,6 +42,37 @@ private:
 	}
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
+	void start_braf_control_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		if (index < 3)
+		{
+			program.write_word(0x0800, 0xf072); // RPTB end
+			program.write_word(0x0801, index == 1 ? 0x0804 : 0x0803);
+			program.write_word(0x0802, 0x6d91); // MAR *AR1+
+			program.write_word(0x0803, index == 0 ? 0xf6bf : index == 1 ? 0x7707 : 0x8a07);
+			program.write_word(0x0804, index == 1 ? 0 : 0xf4e1);
+			program.write_word(0x0805, 0xf4e1);
+			for (unsigned i = 0; i < 4; ++i) data.write_word(0x1000 + i, 0);
+		}
+		else
+		{
+			// Restore the architectural loop registers and BRAF without RPTB.
+			data.write_word(0x001b, 0x0802); data.write_word(0x001c, 0x0803);
+			program.write_word(0x0800, 0x7707); program.write_word(0x0801, 0x8000);
+			program.write_word(0x0802, 0x6d91); program.write_word(0x0803, 0xf495);
+			program.write_word(0x0804, 0xf4e1);
+		}
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0800);
+		m_phase = 82000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_xc_irq_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -6022,6 +6053,8 @@ private:
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 3,
 					"ROM4 POPM AR2 restores the register in one cycle");
 			program.write_word(0x05e2, 0x8807); // STLM A, ST1
+			// This status-only test must not reactivate a predecessor's REA.
+			data.write_word(0x001c, 0xffff);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x8123);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
@@ -19430,6 +19463,20 @@ private:
 			m_xc_irq_tap.remove();
 			if (index < 3) { start_xc_irq_case(index + 1); return; }
 			osd_printf_info("TMS320C54x XC interrupt protection: PASS cases=4 spans=1,2 accepted,rejected=1 physical_pipeline_claim=0\n");
+			start_braf_control_case(0); return;
+		}
+		if (m_phase >= 82000 && m_phase < 82004)
+		{
+			unsigned const index = m_phase - 82000;
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "BRAF control fixture terminates");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == (index == 3 ? 4 : 1) &&
+				m_cpu->state_int(tms320c54x_device::STATE_BRC) == (index == 3 ? 0 : 3) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (index == 2 ? 0x1001 : 0x1000) &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
+				"Architectural BRAF controls repeat cancellation and software loop restoration");
+			if (index < 3) { start_braf_control_case(index + 1); return; }
+			osd_printf_info("TMS320C54x BRAF control: PASS cases=4 clear=RSBX,STM,POPM restored_loop=1\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

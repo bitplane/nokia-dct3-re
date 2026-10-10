@@ -3,16 +3,17 @@ import unittest
 from tools.c54x_rom4_rf_boundary_check import check
 
 
-def summary(*, frames=6499, reads=207040, first_frame=30, pairs=4,
+def summary(*, frames=6499, reads=207040, first_frame=30, pairs=5,
             port38=0, port39=0, ifr="0000", imr="035f"):
     return (
         f"rom4_rf_read: sample=1 pc=324b frame={first_frame} t=0.160944\n"
         "rom4_rf_port32: sequence=1 port31=2a04 port32=0006 pc=a240\n"
-        "rom4_rf_port32: sequence=2 port31=2a04 port32=0006 pc=a240\n"
+        "rom4_rf_port32: sequence=2 port31=0041 port32=0040 pc=3712\n"
         "rom4_speech_state: address=1922 value=0041 mask=ffff pc=a1bc t=1.5\n"
         "rom4_speech_state: address=1923 value=0040 mask=ffff pc=a1bc t=1.5\n"
-        "rom4_rf_port32: sequence=3 port31=0041 port32=0040 pc=3712\n"
+        "rom4_rf_port32: sequence=3 port31=2a04 port32=0006 pc=a240\n"
         "rom4_rf_port32: sequence=4 port31=2813 port32=0030 pc=4028\n"
+        "rom4_rf_port32: sequence=5 port31=0041 port32=0040 pc=3712\n"
         "rom4_interface_summary: completion_strobes=2 mailbox_writes=3 "
         f"slot_expiries=0 frame_expiries={frames} rf_reads={reads} "
         f"rf_port32_writes={pairs} rf_port38_reads={port38} "
@@ -23,22 +24,27 @@ def summary(*, frames=6499, reads=207040, first_frame=30, pairs=4,
 
 class C54xRom4RfBoundaryCheckTest(unittest.TestCase):
     def scan_summary(self):
-        text = summary(frames=20288, reads=648288, pairs=1580)
+        text = summary(frames=20282, reads=648096, pairs=1519)
         extra = "".join(
             f"rom4_rf_port32: sequence={n} port31={value:04x} port32={command:04x} pc={pc:04x}\n"
             for n, value, command, pc in
-            [(5, 0x2a04, 6, 0xa240), (6, 0x2a04, 6, 0xa240)] +
-            [(n, 0x2727 + n - 7, 0x30, 0x4028) for n in range(7, 17)])
+            [(6, 0x2a04, 6, 0xa240), (7, 0x2a04, 6, 0xa240)] +
+            [(n, 0x2727 + n - 8, 0x30, 0x4028) for n in range(8, 17)])
         return text + extra + (
             "rom4_serial_audit: space=io direction=write address=000e value=0546 mask=ffff pc=0959 t=6.454\n"
             "rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f t=6.426\n")
 
     def test_accepts_exact_scan_snapshot(self):
-        self.assertEqual(check(self.scan_summary(), scan_30s=True)["rf_port32_writes"], 1580)
+        self.assertEqual(check(self.scan_summary(), scan_30s=True)["rf_port32_writes"], 1519)
+
+    def test_rejects_previous_private_latch_snapshot(self):
+        with self.assertRaisesRegex(ValueError, "snapshot changed"):
+            check(self.scan_summary().replace("frame_expiries=20282", "frame_expiries=20288")
+                  .replace("rf_reads=648096", "rf_reads=648288"), scan_30s=True)
 
     def test_scan_requires_reload_selector_and_exact_sequence(self):
         for old, new in (("value=0546", "value=0547"), ("value=007c", "value=0001"),
-                         ("port31=2727", "port31=2728"), ("rf_port32_writes=1580", "rf_port32_writes=1581")):
+                         ("port31=2727", "port31=2728"), ("rf_port32_writes=1519", "rf_port32_writes=1520")):
             with self.assertRaises(ValueError):
                 check(self.scan_summary().replace(old, new), scan_30s=True)
 
