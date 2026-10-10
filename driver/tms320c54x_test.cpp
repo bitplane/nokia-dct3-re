@@ -750,6 +750,33 @@ private:
 				"MAR syntax preserves circular and long-offset modes without treating direct forms as indirect");
 		}
 		osd_printf_info("TMS320C54x MAR disassembler: PASS indirect=128 direct_unclaimed=128 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned family = 0x3c; family <= 0x43; ++family)
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, (family << 8) | mode, 0x2345);
+					std::ostringstream text;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == ((mode >= 0xe0 ? 2 : 1) | dasm::SUPPORTED) &&
+						buffer.seen() == (mode >= 0xe0 ? 3 : 1), "Shift-16 memory ALU decoder bounds address extensions");
+				}
+		vector const high_alu[] = {
+			{0x3c3a, 1 | dasm::SUPPORTED, "ADD     $3A, 16, A, A"},
+			{0x3ded, 2 | dasm::SUPPORTED, "ADD     *+AR5($2345), 16, A, B"},
+			{0x3ef8, 2 | dasm::SUPPORTED, "ADD     *($2345), 16, B, A"},
+			{0x3f81, 1 | dasm::SUPPORTED, "ADD     *AR1, 16, B, B"},
+			{0x4092, 1 | dasm::SUPPORTED, "SUB     *AR2+, 16, A, A"},
+			{0x41f5, 2 | dasm::SUPPORTED, "SUB     *+AR5($2345)%, 16, A, B"},
+			{0x4283, 1 | dasm::SUPPORTED, "SUB     *AR3, 16, B, A"},
+			{0x43f8, 2 | dasm::SUPPORTED, "SUB     *($2345), 16, B, B"},
+		};
+		for (auto const &test : high_alu)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Shift-16 memory ALU syntax preserves independent accumulator selectors");
+		}
+		osd_printf_info("TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

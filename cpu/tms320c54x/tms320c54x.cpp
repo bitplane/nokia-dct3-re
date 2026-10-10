@@ -87,6 +87,14 @@ public:
 				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
 			}
 		};
+		if ((family >= 0x3c00 && family <= 0x3f00) || (family >= 0x4000 && family <= 0x4300))
+		{
+			bool const extended = mode >= 0xe0;
+			util::stream_format(stream, "%-8s", family < 0x4000 ? "ADD" : "SUB");
+			smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", 16, %c, %c", BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family == 0x6d00 && mode >= 0x80)
 		{
 			bool const extended = mode >= 0xe0;
