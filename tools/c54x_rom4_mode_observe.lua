@@ -38,7 +38,7 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x5e62, 0x5e6a, 0x545d, 0x5463, 0x5eed,
     0x4677, 0x4695, 0x46e1, 0x46e6, 0x46f8, 0x46fd,
     0x990d, 0x996b, 0x9988, 0x6318, 0x659b, 0xa27d,
-    0x4701, 0x4798}
+    0x4701, 0x4798, 0x0acf, 0x0c16}
 local counts = {}
 local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,
@@ -115,6 +115,14 @@ for _, address in ipairs(sites) do
 end
 local stop = emu.add_machine_stop_notifier(function()
     _G.rom4_observation_read = true
+    for _, start in ipairs({0x0ac7, 0x0c0e}) do
+        local words = {}
+        for index = 0, 31 do
+            words[#words + 1] = string.format("%04x", program:read_u16(start + index))
+        end
+        machine:logerror(string.format("rom4_queue_caller_code: address=%04x words=%s\n",
+            start, table.concat(words, ",")))
+    end
     for _, target in ipairs({0x4677, 0x4701, 0x4798}) do
         local sites = {}
         for address = 0, 0xfffe do

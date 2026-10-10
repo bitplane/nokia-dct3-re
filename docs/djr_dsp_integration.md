@@ -1307,6 +1307,21 @@ fetch counters while reading the live image at shutdown so its own
 census cannot inflate execution counts. Trace the uploaded callers
 before treating queue processing as acquisition-lifecycle entry.
 
+A fresh-storage 60-second run identifies the active uploaded route:
+`0x0acf` and resident `0x4701` each execute 5159 times, while
+queue-empty entry `0x4798` executes 5157 times. Uploaded `0x0c16`
+and wrapper `0x4677` remain uncalled; frame positive control executes
+30351 times. The live-code window at `0x0ac7` contains the call
+followed by `B = A - data[0x219b]` and a delayed BLEQ branch to
+`0x0af3`. Its next comparison is `B = A - data[0x198d]`, with
+another delayed BLEQ to `0x0af3`; the surviving path ORs bit 0
+through AR5 (set to `0x1266`) and stores A at `0x198d`. These
+instruction bytes are captured by the passive observer, not imported
+from the resident ROM image. The comparisons are an executed-path
+candidate for result acceptance, not yet quantified predicate outcomes
+or physical signal-strength units. Follow this uploaded result path
+before extending the dormant resident acquisition-wrapper chain.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
