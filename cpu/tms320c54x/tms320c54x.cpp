@@ -5,6 +5,8 @@
 #include "emuopts.h"
 #include "tms320c54x.h"
 
+#include <sstream>
+
 namespace {
 
 constexpr u16 ST1_BRAF = 0x8000;
@@ -302,10 +304,31 @@ void tms320c54x_device::device_stop()
 	if (!machine().options().verbose())
 		return;
 
+	class opcode_buffer : public util::disasm_interface::data_buffer
+	{
+	public:
+		explicit opcode_buffer(u16 opcode) : m_opcode(opcode) { }
+		virtual u16 r16(u32 address) const override { return address ? 0 : m_opcode; }
+		virtual u8 r8(u32) const override { throw emu_fatalerror("C54x decoder census requires word reads"); }
+		virtual u32 r32(u32) const override { throw emu_fatalerror("C54x decoder census requires word reads"); }
+		virtual u64 r64(u32) const override { throw emu_fatalerror("C54x decoder census requires word reads"); }
+	private:
+		u16 const m_opcode;
+	};
 	for (unsigned opcode = 0; opcode != m_opcode_first_pc.size(); ++opcode)
 		if (m_opcode_first_pc[opcode] != 0xffff)
+		{
 			machine().logerror("[opcov] op=%04x first_pc=%04x count=%u\n",
 					opcode, m_opcode_first_pc[opcode], m_opcode_count[opcode]);
+			opcode_buffer const buffer(opcode);
+			std::ostringstream text;
+			u32 const result = get_disassembler().disassemble(text, 0, buffer, buffer);
+			bool const supported = result & util::disasm_interface::SUPPORTED;
+			// A raw-word fallback is not an instruction-length claim. Zero-valued
+			// extensions classify the decoder only; no target memory is read.
+			machine().logerror("[opdecode] op=%04x supported=%u words=%u\n", opcode,
+				supported, supported ? result & util::disasm_interface::LENGTHMASK : 0);
+		}
 }
 
 void tms320c54x_device::device_reset()

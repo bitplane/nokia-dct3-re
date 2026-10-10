@@ -1708,6 +1708,31 @@ recognizes a Nokia address or loader byte pattern.
 
 ## Executed-opcode coverage
 
+### Current audit boundary
+
+The current native cold-idle inventory is 626 words in 110 high-byte groups,
+SHA-256 `05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59`.
+Two isolated controls (`tmp/c54x-frontend-idle-a` and `-b`) reproduce the full
+ranked report exactly. The existing 594-word gate expectation is now stale
+and remains intentionally unrebanked: current fixture coverage is 601 asserted,
+one execution-only (`9a5f`) and 24 absent words. High-use absent forms begin
+with `6f95`, `1087`, `1182`, `6c8d`, `6db7`, `80b4`, `838a` and `f67b`.
+Earlier 594-word closure statements below apply to that earlier trace, not
+the current native execution set.
+
+With verbose logging, the core emits `[opdecode]` alongside `[opcov]`, using
+the actual debugger decoder and synthetic zero extensions without target
+memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
+consistent decoder record for every observed word, rejects invalid lengths
+and ranks unsupported forms as `length=unknown`; raw-word fallback is never
+promoted to a boundary. Current cold-idle coverage is 122 decoded and 504
+unsupported forms. This measures frontend coverage, not silicon legality or
+pipeline timing. The leading unsupported forms are `ff0c`, `10f8`, `fa45`
+and `0881`; their execution frequency is in the isolated report.
+`check-c54x-observed-coverage` requests this report but still stops at its
+stale primary fingerprint. Restore execution assertions and deliberately
+review the changed trace before rebanking it; do not bypass either check.
+
 ### Debugger control-flow decoding
 
 The native core disassembler decodes the reviewed branch/call/return,

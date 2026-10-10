@@ -10,6 +10,37 @@ from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
+    def test_frontend_report_requires_complete_actual_decode_inventory(self):
+        with TemporaryDirectory() as root:
+            log = Path(root) / "trace.log"
+            log.write_text("[opcov] op=7712 first_pc=0800 count=3\n")
+            with patch("sys.argv", ["coverage", str(log), "--frontend-report"]), redirect_stderr(StringIO()):
+                self.assertEqual(main(), 1)
+            log.write_text(log.read_text() + "[opdecode] op=7712 supported=0 words=0\n")
+            output = StringIO()
+            with patch("sys.argv", ["coverage", str(log), "--frontend-report"]), redirect_stdout(output):
+                self.assertEqual(main(), 0)
+            self.assertIn("decoded=0 unsupported=1 observed=1", output.getvalue())
+            self.assertIn("executions=3 length=unknown", output.getvalue())
+
+    def test_actual_decoder_records_do_not_promote_raw_word_lengths(self):
+        result = summarize("[opcov] op=7712 first_pc=0800 count=3\n"
+                           "[opdecode] op=7712 supported=1 words=2\n"
+                           "[opcov] op=1234 first_pc=0802 count=5\n"
+                           "[opdecode] op=1234 supported=0 words=0\n")
+        self.assertEqual(result["decoded"], {0x7712: (True, 2), 0x1234: (False, 0)})
+
+    def test_rejects_invalid_or_conflicting_decoder_records(self):
+        for records in ("[opdecode] op=7712 supported=0 words=1",
+                        "[opdecode] op=7712 supported=1 words=0",
+                        "[opdecode] op=7712 supported=1 words=4",
+                        "[opdecode] op=7712 supported=1 words=2\n"
+                        "[opdecode] op=7712 supported=0 words=0"):
+            with self.assertRaises(ValueError):
+                summarize("[opcov] op=7712 first_pc=0800\n" + records)
+        with self.assertRaisesRegex(ValueError, "absent"):
+            summarize("[opcov] op=7712 first_pc=0800\n[opdecode] op=1234 supported=0 words=0")
+
     def test_deduplicates_and_groups(self):
         result = summarize("\n".join((
             "[opcov] op=f074 first_pc=4b73",

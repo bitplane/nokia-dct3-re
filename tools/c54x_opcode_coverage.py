@@ -14,6 +14,7 @@ OPCODE = re.compile(
     r"^\[opcov\] op=([0-9a-fA-F]{4}) first_pc=([0-9a-fA-F]{4})(?: count=(\d+))?$"
 )
 ASSERTION = re.compile(r"^(?:\[:\] )?\[opassert\] op=([0-9a-fA-F]{4})$")
+DECODE = re.compile(r"^\[opdecode\] op=([0-9a-fA-F]{4}) supported=([01]) words=(\d+)$")
 # Free-running CTSI/absolute-compare baseline; provenance is in rom4_dsp_loader.md.
 ROM4_IDLE_OPCODE_COUNT = 594
 ROM4_IDLE_GROUP_COUNT = 107
@@ -47,6 +48,7 @@ def summarize(text: str) -> dict[str, object]:
     first_pc = {}
     counts = {}
     asserted = set()
+    decoded = {}
     for line in text.splitlines():
         match = OPCODE.match(line)
         if match:
@@ -56,10 +58,21 @@ def summarize(text: str) -> dict[str, object]:
         match = ASSERTION.match(line)
         if match:
             asserted.add(int(match.group(1), 16))
+        match = DECODE.match(line)
+        if match:
+            opcode = int(match.group(1), 16)
+            value = (bool(int(match.group(2))), int(match.group(3)))
+            if (value[0] and not 1 <= value[1] <= 3) or (not value[0] and value[1]):
+                raise ValueError("invalid supported/length decoder record")
+            if opcode in decoded and decoded[opcode] != value:
+                raise ValueError("conflicting decoder records")
+            decoded[opcode] = value
     if not first_pc:
         raise ValueError("no [opcov] records")
     if asserted - first_pc.keys():
         raise ValueError("assertion marker names an opcode absent from the execution trace")
+    if decoded.keys() - first_pc.keys():
+        raise ValueError("decoder record names an opcode absent from the execution trace")
     opcodes = sorted(first_pc)
     encoded = b"".join(opcode.to_bytes(2, "big") for opcode in opcodes)
     return {
@@ -69,6 +82,7 @@ def summarize(text: str) -> dict[str, object]:
         "first_pc": first_pc,
         "counts": counts,
         "asserted": asserted,
+        "decoded": decoded,
     }
 
 
@@ -136,6 +150,8 @@ def main() -> int:
                         help="list exact observed words and counts in a high-byte group")
     parser.add_argument("--all-gaps", action="store_true",
                         help="list every unasserted ROM4 word by observed execution count")
+    parser.add_argument("--frontend-report", action="store_true",
+                        help="require actual decoder records and rank unsupported instruction boundaries")
     parser.add_argument("--require-all-asserted", action="store_true",
                         help="fail unless every observed ROM4 word has a fixture assertion")
     args = parser.parse_args()
@@ -157,6 +173,8 @@ def main() -> int:
         additional = [(path, summarize(text)) for path, text in additional_texts]
         result = summarize("\n".join([primary_text] +
                                      [text for _, text in additional_texts]))
+        if args.frontend_report and result["decoded"].keys() != result["first_pc"].keys():
+            raise ValueError("frontend report requires decoder records for every observed opcode")
         fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
         declared = decoder_declared_words(args.decoder_source.read_text()) if args.decoder_source else None
         if args.require_rom4_idle:
@@ -176,6 +194,14 @@ def main() -> int:
         new = set(extra["first_pc"]) - set(primary["first_pc"])
         print(f"  additional ROM4 trace {path}: opcodes={extra['opcodes']} "
               f"new_vs_idle={len(new)}")
+    if args.frontend_report:
+        supported = {opcode for opcode, (valid, _) in result["decoded"].items() if valid}
+        missing = set(result["first_pc"]) - supported
+        print(f"Frontend boundaries: decoded={len(supported)} unsupported={len(missing)} "
+              f"observed={result['opcodes']} (decoder support, not stage timing)")
+        for opcode in sorted(missing, key=lambda word: (-result["counts"][word], word)):
+            print(f"  undecoded op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
+                  f"executions={result['counts'][opcode]} length=unknown")
     for group in sorted(set(args.observed_group)):
         print(f"Observed ROM4 words in group {group:02x} (exact execution counts):")
         words = sorted(((opcode, count) for opcode, count in result["counts"].items()

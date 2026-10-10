@@ -9,6 +9,12 @@ registration before the save boundary, independently of post-load events.
 Whole-run hardware/provisioning checks remain separate from that ordering
 requirement.
 
+Native NSE-1 opcode coverage is currently 601 asserted forms out of 626
+observed in cold idle, with 25 execution-assertion gaps. The older 594-word
+idle/Menu/power closure cited below is historical; its coverage oracle remains
+unrebanked pending those assertions. See the current audit boundary in
+`rom4_dsp_loader.md`. No native RF acquisition or speech is promoted.
+
 | Product / tested firmware | Booting | Interactive | Registered | Call control | Internal media | Physical duplex | Hardware-faithful | Principal evidence or next boundary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Nokia 3210 NSE-8 v6.00 | Yes | Yes | Yes | Yes | Yes | Yes | Partial | Structural, navigation, authentication, mobile-terminated and physical-dial mobile-originated call lifecycles, paired GSM-FR/FACCH/degraded media and isolated physical audio pass. Organic A5/1 gates cover ciphered SDCCH, SACCH, TCH/F/FACCH, incoming/outgoing calls, degradation and exact active-call save/load; A5/0 remains the default regression composition. Idle mobility proves same-/different-LAC reselection, replacement-cell paging, loss/recovery, persistent loss, preserved EF_LOCI and save-state boundaries. Ordinary MT SMS proves exact notification/storage, preserved cold-boot listing, physical read/delete/cancel, save-state continuation, pre-page malformed rejection, correlated duplicate suppression, organic ten-record capacity and two independently paged messages with selective deletion. Physical mobile-originated SMS additionally proves EF_SMSP editing, SMS-SUBMIT reassembly, success/rejection/timeout and retry outcomes, requested status-report persistence, and active CP-wait save/load. Smart Messaging additionally proves RAM-owned concatenation, port dispatch, RTPL playback, physical promptless Save/Discard, product-local 24C128 ownership and ordinary named listing with payload-correlated playback after preserved-NVRAM cold boot. The outgoing host suite additionally proves asynchronous outcomes, termination, overload/reconnect and sequential calls. Physical long-power shutdown reaches CCONT rail-off after save/load. Real COBBA DSP-controlled mux/gain semantics remain opaque. |
