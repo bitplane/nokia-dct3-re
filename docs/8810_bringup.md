@@ -2,6 +2,24 @@
 
 ## Current Result
 
+The native TX-space notification remains unresolved, but its MCU consumers
+are identified. IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
+shared-service counters and block uploads, not TX-queue wakeup. FIQ dispatch
+`0x2dec1c` sends FIQ1 to `0x2b5e78`, which posts control 1 to task 3. FIQ0
+handler `0x2b5e96` posts control 4 to RX task 4 and conditionally posts control
+6 to TX task 3 when bit 0 of `0x1205dc` is set, clearing that bit first.
+A fresh 12-second compatibility run records 1,656 FIQ0-handler entries and
+14 IRQ4-handler entries, but no FIQ1-handler or conditional control-6 post.
+The native backend currently rings FIQ0 on port-1 completion writes. Next
+recover the DSP-to-MAD2 completion-bit routing and the ownership of
+`0x1205dc`; do not reinterpret IRQ4 or inject a queue wakeup.
+
+DSP MMR `0x0029` bit-3 pulses are present during bootstrap and at 6.482857
+seconds (PC `0x38f9` / `0x38fc`). The latter resident path tests and clears
+DSP word `0x086e` (MCU shared offset `0xdc`), not the TX consumer pointer.
+The backend already routes these transitions to MAD2 IRQ4; an entirely
+absent IRQ4 connection is not the explanation.
+
 The acquired v6.02 PPM A package normalizes to a complete, contiguous 2 MiB
 CPU-big-endian flash image. Research machine `nse6stage` now executes its own
 reset/initialization and reaches the verifier's first DSP acknowledgement wait.
