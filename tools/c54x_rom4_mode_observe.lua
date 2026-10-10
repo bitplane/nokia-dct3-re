@@ -37,7 +37,8 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x5514, 0x5516, 0x5536, 0x5554, 0x6943,
     0x5e62, 0x5e6a, 0x545d, 0x5463, 0x5eed,
     0x4677, 0x4695, 0x46e1, 0x46e6, 0x46f8, 0x46fd,
-    0x990d, 0x996b, 0x9988, 0x6318, 0x659b, 0xa27d}
+    0x990d, 0x996b, 0x9988, 0x6318, 0x659b, 0xa27d,
+    0x4701, 0x4798}
 local counts = {}
 local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,
@@ -88,6 +89,7 @@ for _, address in ipairs(sites) do
     counts[address] = 0
     taps[#taps + 1] = program:install_read_tap(address, address,
         string.format("dispatch_%04x", address), function(offset, data)
+            if _G.rom4_observation_read then return end
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
@@ -112,6 +114,19 @@ for _, address in ipairs(sites) do
         end)
 end
 local stop = emu.add_machine_stop_notifier(function()
+    _G.rom4_observation_read = true
+    for _, target in ipairs({0x4677, 0x4701, 0x4798}) do
+        local sites = {}
+        for address = 0, 0xfffe do
+            local opcode = program:read_u16(address)
+            if (opcode == 0xf074 or opcode == 0xf274 or opcode == 0xf073 or opcode == 0xf273)
+                and program:read_u16(address + 1) == target then
+                sites[#sites + 1] = string.format("%04x:%04x", address, opcode)
+            end
+        end
+        machine:logerror(string.format("rom4_direct_target: target=%04x sites=%s\n",
+            target, table.concat(sites, ",")))
+    end
     for _, start in ipairs({0xee38, 0xee3e, 0xee45, 0xee4e, 0xee57}) do
         local words = {}
         local terminated = false
@@ -124,6 +139,7 @@ local stop = emu.add_machine_stop_notifier(function()
             "rom4_schedule_list: address=%04x terminated=%d words=%s\n",
             start, terminated and 1 or 0, table.concat(words, ",")))
     end
+    _G.rom4_observation_read = false
     for pc, count in pairs(upload_reads) do
         machine:logerror(string.format(
             "rom4_upload_reader_count: pc=%04x count=%d\n", pc, count))

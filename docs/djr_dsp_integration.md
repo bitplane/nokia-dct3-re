@@ -1294,6 +1294,19 @@ between the neighbouring flag words: their mapped lifecycle is
 unentered. The open boundary remains selection of that lifecycle
 from the active scan/request path, not a fabricated control flag.
 
+Queue processing does not require the `0x4677` wrapper. A bounded
+scan of the live program image finds direct-call candidates to
+`0x4701` at uploaded addresses `0x0acf` and `0x0c16`, as well as
+resident `0x4695`. An eight-second reused-profile run observes one
+execution of `0x4701` and zero of `0x4677`; it does not reach
+`0x4798` within that window. This reconciles the earlier post-scan
+queue-consumer observations with inactive acquisition wrappers.
+The opcode scan reports candidates, not an exhaustive disassembly
+or proof either uploaded callsite executed. The observer suppresses
+fetch counters while reading the live image at shutdown so its own
+census cannot inflate execution counts. Trace the uploaded callers
+before treating queue processing as acquisition-lifecycle entry.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
