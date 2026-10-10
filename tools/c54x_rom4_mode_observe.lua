@@ -35,7 +35,8 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x9a7a, 0x9aa8, 0x9b15, 0x9a99, 0x9acc, 0x9b20,
     0x98b7, 0x9903, 0x55bb, 0x5783, 0x578f, 0x579b, 0x57a3,
     0x5514, 0x5516, 0x5536, 0x5554, 0x6943,
-    0x5e62, 0x5e6a, 0x545d, 0x5463, 0x5eed}
+    0x5e62, 0x5e6a, 0x545d, 0x5463, 0x5eed,
+    0x4677, 0x4695, 0x46e1, 0x46e6, 0x46f8, 0x46fd}
 local counts = {}
 local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,
@@ -89,6 +90,12 @@ for _, address in ipairs(sites) do
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
+                if address >= 0x46e1 and address <= 0x46fd and counts[address] <= 4 then
+                    machine:logerror(string.format(
+                        "rom4_receive_result: t=%.9f address=%04x state1956=%04x result198c=%04x count1f24=%04x\n",
+                        machine.time:as_double(), address, memory:read_u16(0x1956),
+                        memory:read_u16(0x198c), memory:read_u16(0x1f24)))
+                end
                 if control_sites[address] and counts[address] <= 4 then
                     machine:logerror(string.format(
                         "rom4_control_fetch: t=%.9f address=%04x mode=%04x\n",

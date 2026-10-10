@@ -1238,6 +1238,18 @@ flag-writer census. They tie this lifecycle entrance to sample-processing
 results rather than an invented DSP completion message. The port-`0x27`
 input remains zero by default, and successful acquisition remains unproven.
 
+A fresh-storage 60-second observation counts zero executions of
+routine `0x4677`, queue-processing callsite `0x4695`, and result-tail
+sites `0x46e1/0x46e6/0x46f8/0x46fd`; frame-loop positive control
+`0x33f3` executes 30351 times. Thus this run cannot attribute the
+missing lifecycle flag to any of the three result predicates: none
+is evaluated. The observer retains bounded result snapshots for a
+future run that reaches them. Static annotations identify candidate
+callers at `0x9975` and `0x9995`; their selection and actual instruction
+contracts require verification before interpreting the flag as an
+acquisition failure. Fresh storage here means a newly created private
+NVRAM directory containing only the generated NSE-1 EEPROM profile.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
