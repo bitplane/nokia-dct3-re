@@ -1938,6 +1938,17 @@ acquisition-update branch, and what its mode-4 instruction expects.
 Evidence: `tmp/noki8210_candidate_control_dcs/error.log`, SHA-256
 `f69b9c7e5bd15c3cc98b249028f223c65e7fae9c1cb4a85a5e4827477a43deda`.
 
+The own-ROM acquisition updater `285f04` targets the current pointer at
+`137224`, not every candidate in the table. Incoming byte `+6 == 0` takes
+the branch that sets its target's nibble to 4 and clears byte `+0b`;
+nonzero increments that byte and, unless it wraps, sets nibble 1 instead.
+The verifier pins the target literal, byte selector and success branch.
+A linear aligned Thumb scan finds one direct `bl` candidate at `286194`,
+bracketed by decrement/increment calls to the candidate-count updater.
+That scan does not close indirect entrances or establish runtime caller
+ownership.
+No secondary-candidate response contract follows from this static decode.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:

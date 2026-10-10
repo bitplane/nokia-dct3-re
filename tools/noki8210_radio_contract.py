@@ -31,6 +31,18 @@ def verify(image):
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     def instructions(address, size):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
+    if int.from_bytes(read(0x286214, 4), 'big') != 0x137224:
+        raise ValueError('acquisition updater current-candidate pointer differs')
+    if instructions(0x285f0c, 8) != [
+            ('ldr', 'r4, [r1]'), ('ldrb', 'r1, [r0, #6]'),
+            ('cmp', 'r1, #0'), ('bne', '#0x285f36')]:
+        raise ValueError('acquisition updater response-byte branch differs')
+    if instructions(0x285f26, 16) != [
+            ('movs', 'r0, #0xf0'), ('ldrb', 'r1, [r4, #0xd]'),
+            ('ands', 'r0, r1'), ('movs', 'r1, #4'),
+            ('orrs', 'r1, r0'), ('movs', 'r0, #0'),
+            ('strb', 'r0, [r4, #0xb]'), ('b', '#0x285f4c')]:
+        raise ValueError('successful acquisition nibble-4 update differs')
     if instructions(0x2875e4, 12) != [
             ('movs', 'r1, #0xf0'), ('ldrb', 'r0, [r4, #0xd]'),
             ('ands', 'r1, r0'), ('movs', 'r0, #2'),
