@@ -9,6 +9,7 @@ local maximum = 0
 local observing = false
 local publication_counts = {}
 local flag_writes = 0
+local counter_min, counter_max = 0xffff, 0
 local taps = {}
 taps[#taps + 1] = memory:install_write_tap(0x1266, 0x1266,
     "rf_candidate_flags", function(offset, value)
@@ -33,12 +34,30 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         return value
     end)
 for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
-    0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe}) do
+    0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
+    0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
     taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(address, address,
         string.format("rf_score_%04x", address), function(offset)
             if observing then return end
             local pc = cpu.state["PC"].value
             if pc ~= offset and pc ~= offset + 1 then return end
+            if address >= 0x0b00 and address <= 0x0b4a then
+                publication_counts[address] = (publication_counts[address] or 0) + 1
+                if address == 0x0b0b then
+                    local counter = memory:read_u16(0x1256)
+                    counter_min = math.min(counter_min, counter)
+                    counter_max = math.max(counter_max, counter)
+                end
+                if publication_counts[address] <= 4 then
+                    machine:logerror(string.format(
+                        "rom4_rf_candidate_history: address=%04x t=%.9f a=%010x b=%010x ar1=%04x current=%04x previous=%04x phase=%04x counter1256=%04x counter1257=%04x count1344=%04x\n",
+                        address, machine.time:as_double(), cpu.state["A"].value & 0xffffffffff,
+                        cpu.state["B"].value & 0xffffffffff, cpu.state["AR1"].value,
+                        memory:read_u16(0x1258), memory:read_u16(0x1259), memory:read_u16(0x126a),
+                        memory:read_u16(0x1256), memory:read_u16(0x1257), memory:read_u16(0x1344)))
+                end
+                return
+            end
             if address == 0x0b6a or address == 0x0b6c or address == 0x0b78
                 or address == 0x2523 or address == 0x25fe then
                 publication_counts[address] = (publication_counts[address] or 0) + 1
@@ -115,10 +134,13 @@ local stop = emu.add_machine_stop_notifier(function()
         machine:logerror(string.format("rom4_rf_selection_code: address=%04x words=%s\n",
             start, table.concat(words, ",")))
     end
-    for _, address in ipairs({0x0ca3, 0x0cef, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe}) do
+    for _, address in ipairs({0x0ca3, 0x0cef, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
+        0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
         machine:logerror(string.format("rom4_rf_selection_tail_count: address=%04x count=%d\n",
             address, publication_counts[address] or 0))
     end
+    machine:logerror(string.format("rom4_rf_candidate_counter_range: minimum=%04x maximum=%04x\n",
+        counter_min, counter_max))
     machine:logerror(string.format(
         "rom4_rf_score_summary: mode=%s reads=%d results=%d nonzero=%d maximum=%010x second=%d accepted=%d acquisition_claim=0\n",
         mode, reads, results, nonzero, maximum, second, accepted))

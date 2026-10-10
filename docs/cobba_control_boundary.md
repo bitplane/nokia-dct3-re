@@ -230,6 +230,20 @@ are outside this census. The next backward boundary is the upstream
 candidate-validation branch reaching `0x0cef`, not an invented event
 to activate the bit-1 setter directly.
 
+The upstream rotating-input path reaches `0x0b00` 500 times and
+`0x0b0b` 499 times, but `0x0b0d` and the entire captured history path
+(`0x0b1e/24/2e/3a/42/4a`) execute zero times. At `0x0b0b` the live
+code tests A after incrementing `0x1256` and subtracting `0x05f3`
+(1523), branching back to the scan loop when A is negative. The
+uncapped counter observation over all 499 checks ranges from 1 to
+499; the separate `0x1344` counter exits at 500 before another check.
+Thus the history-comparison and continuation gates are downstream of
+an unsatisfied counter predicate in this mathematical-input run.
+Do not infer a firmware bug or remove either guard: initialization,
+other writers and product/request context of `0x1256` remain open.
+The next concrete query is that counter's initialization/write contract,
+not a missing MDI reply or an injected continuation return value.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
