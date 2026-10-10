@@ -344,6 +344,18 @@ the observer retains only the first address to avoid triple counting.
 This resolves the silent probe as an observation-boundary issue, not a
 missing firmware publication. It does not establish receiver processing.
 
+Static consumer candidate: the subtract cascade at `0x211cf2` uses
+base `0x1389`; cumulative decrements 1, 2, 2, 1 lead to a range test
+covering `0x138f/0x1390`, both targeting `0x211eb0`. That case calls
+`0x269266` with the incoming object and length 8, tests the shifted
+controller word at offset `0x7c`, and conditionally increments halfword
+`0x10fee0` (pool `0x211f58`). The carry-producing shifts must be
+decoded before assigning flag semantics. Task ownership and runtime
+receipt at this candidate are not yet established: a 60-second retained-
+storage repeat captures a second post from `0x26be5d` at 36.631877231
+seconds, but no candidate-case observation. That silent window is not
+an absence proof; confirm the actual task entry/receive loop first.
+
 The next boundary is task 10's consumption of status `0x1390` and the
 meaning of the native `006d` body before choosing an operational RF contract. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
