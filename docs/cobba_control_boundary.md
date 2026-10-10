@@ -333,9 +333,16 @@ An additional repeated run with retained storage observes the actual
 header store at 1.599568385 seconds: trace PC `0x26be48`, aligned
 object address `0x101438`, value `13900000`, mask `ffff0000`.
 This independently confirms the status rewrite, not task-10 receipt;
-its timing is not a fresh-storage baseline. A read tap on the post
-primitive did not fire even with its argument filter removed, so it
-was retired rather than interpreted as evidence of failed publication.
+its timing is not a fresh-storage baseline. A narrow read tap on the post
+primitive did not fire even with its argument filter removed. A wider
+`0x254c80..0x254cff` fetch window captures its actual entry: PC
+`0x254c84`, R0=`10`, R1=`0x101438`, R14=`0x26be5d`, at
+1.599574385 seconds in the retained-storage repeat. Thus the rewritten
+native response is submitted to task 10's RTOS post primitive. The entry
+generates fetches at `0x254c84/88/8c` with the same PC and arguments;
+the observer retains only the first address to avoid triple counting.
+This resolves the silent probe as an observation-boundary issue, not a
+missing firmware publication. It does not establish receiver processing.
 
 The next boundary is task 10's consumption of status `0x1390` and the
 meaning of the native `006d` body before choosing an operational RF contract. The

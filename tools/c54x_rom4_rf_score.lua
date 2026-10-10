@@ -16,6 +16,18 @@ local message_counts = {}
 local taps = {}
 local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
+local post_fetches = 0
+taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x254c80, 0x254cff,
+    "rf_post_fetch_window", function(offset)
+        if offset ~= 0x254c84 or mcu.state["PC"].value ~= 0x254c84
+            or mcu.state["R0"].value ~= 10 then return end
+        if post_fetches >= 16 then return end
+        post_fetches = post_fetches + 1
+        machine:logerror(string.format(
+            "rom4_rf_post_fetch: t=%.9f address=%08x pc=%08x r0=%08x r1=%08x lr=%08x\n",
+            machine.time:as_double(), offset, mcu.state["PC"].value,
+            mcu.state["R0"].value, mcu.state["R1"].value, mcu.state["R14"].value))
+    end)
 taps[#taps + 1] = mcu.spaces["program"]:install_write_tap(0x100000, 0x17ffff,
     "rf_status_header_write", function(offset, value, mask)
         if mcu.state["PC"].value == 0x26be48 then
