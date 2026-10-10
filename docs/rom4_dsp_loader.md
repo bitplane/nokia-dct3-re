@@ -1383,6 +1383,19 @@ interrupt guard retires by instruction words, so a single two-word guarded
 instruction releases a pending IRQ before the next instruction. Exact ROM4
 `ff4d` fixtures cover taken/rejected BEQ timing, and a port/ISR fixture
 checks the two-word guard boundary (SPRU172C, XC pages 4-198--200).
+The `XC 1` interrupt boundary is not established by that fixture. SPRU172C
+page 4-199 separately specifies a one-word conditional-execution span for
+`XC 1` and states that XC plus the two following instruction words are
+uninterruptible. The core currently assigns `m_xc_guard = words` only on the
+accepted path, coupling protection to the selected conditional span; rejected
+slots advance atomically without a retained guard. Existing `fd30`, `fd4b`
+and `fd4d` fixtures check conditional execution, not a pending interrupt after
+the first following word. Before changing this behavior, add a firmware-free
+accepted/rejected `XC 1` fixture with IRQ raised during the first slot and
+observe the stacked continuation after the second word. Keep word-counted XC
+protection distinct from the complete-instruction INTM guard above. This is a
+source-derived conformance gap, not evidence of the recorder's failure cause
+or a reason to add an arbitrary foreground-instruction delay.
 The long-immediate ALU decoder charges two cycles, including the separately
 decoded XOR form. A cycle-stamped LD fixture checks the additional cycle;
 the LD contract is SPRU172C page 4-68. This does not cover all extended-address
