@@ -113,6 +113,19 @@ tests bit 7, and clears that cache if bit 7 is zero. This establishes another
 policy interpretation, not a default value or exhaustive reader/writer census:
 computed IDs and table-driven callers remain outside that scan. No storage
 fixture is changed on this evidence alone.
+
+The selector caller belongs to DSP receive dispatch at `0x2e25d8`.
+It arms timer ID `0x1d` with delay `0x09cd`, receives queued notifications,
+and drains the packet reader `0x2b6026` on control value 4. Each dispatched
+packet increments halfword `0x12166e`. Status `0xdd` checks that count:
+nonzero rearms the timer and clears the count; zero calls `0x2c68c8(1)`.
+A fresh runtime observes `status=00dd packets=0000` at 31.000192 s,
+immediately followed by the previously mapped reset selector. Thus erased
+NV enables a reset policy whose live trigger is an empty DSP receive window;
+it is not established that changing NV would repair the underlying behavior.
+Native ring-index writes alone do not prove packets reach this dispatcher.
+The next transport check is producer publication versus MCU draining and
+task notification over this window, retaining the fitted-mask uncertainty.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

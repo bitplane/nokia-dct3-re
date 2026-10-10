@@ -199,7 +199,7 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
         0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x243c22,
         0x27a76e, 0x27b604, 0x2d3460, 0x2c68c8, 0x2c6908,
-        0x2b0adc, 0x240c1e,
+        0x2e2748, 0x2b0adc, 0x240c1e,
         0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
         0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a,
@@ -210,6 +210,12 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x2e2748 and counts[address] <= 16 then
+                machine:logerror(string.format(
+                    'nse6_dsp_window_expiry: status=%04x packets=%04x t=%.9f\n',
+                    cpu.state['R4'].value, memory:read_u16(cpu.state['R5'].value + 2),
+                    machine.time:as_double()))
+            end
             if address == 0x2c68c8 and counts[address] <= 64 then
                 machine:logerror(string.format(
                     'nse6_reset_selector_entry: input=%08x lr=%08x t=%.9f\n',
