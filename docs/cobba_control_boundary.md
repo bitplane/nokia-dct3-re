@@ -1056,7 +1056,13 @@ frame, DLB selects the transmitted word instead of external receive data;
 ordinary reset, sign extension, readiness and unread-word overrun rules
 still apply. Executable helper tests cover all 65,536 values in all four
 formats, absent TX, independently reset RX/TX, retained-word underrun,
-overrun and copied-state frame continuation. The MAME build, native
+overrun and copied-state frame continuation. Eight sustained 4,096-frame
+streams additionally cover every format with external input and DLB,
+loading TX every fourth frame and reading RX every third. An independent
+expected held-word model checks payloads and ready edges; copying state
+before each frame reproduces the next transfer, unread-word retention and
+acknowledgement state. These explicit frame calls prove neither clock
+timing nor CPU interrupt dispatch. The MAME build, native
 tone-control gate and exact 5110 save-state round trip pass with the
 additive interface; these existing gates do not exercise a periodic
 duplex attachment or promote its physical clock relationship. No production

@@ -93,6 +93,56 @@ int main()
 	assert(!port.frame_transmit(output));
 	port.reset();
 	assert(port.control_r() == 0x0800 && port.receive == 0 && port.transmit == 0);
+	// Explicit completed frames, not a claimed handset clock. Delayed reads
+	// exercise unread-word retention across a sustained stream and state copy.
+	for (unsigned mode = 0; mode < 8; ++mode)
+	{
+		port.reset();
+		const unsigned widths[] = {16, 8, 10, 12};
+		const unsigned format = mode % 4;
+		const unsigned width = widths[format];
+		const unsigned mask = (1U << width) - 1;
+		const std::uint16_t extension = format & 2 ? 0x0080 : 0;
+		const bool loopback = mode >= 4;
+		port.control_w(0x00c0 | (format & 1 ? 4 : 0) | (loopback ? 2 : 0));
+		std::uint16_t held_tx = 0, held_rx = 0;
+		bool unread = false;
+		for (unsigned frame = 0; frame < 4096; ++frame)
+		{
+			const bool load = frame % 4 == 0;
+			if (load)
+			{
+				held_tx = std::uint16_t(frame * 257U + 0x80a5U);
+				port.transmit_w(held_tx);
+			}
+			const std::uint16_t input = std::uint16_t(frame * 131U + 0x5a80U);
+			auto replay = port;
+			std::uint16_t replay_output = 0;
+			const auto result = port.duplex_frame(input, output, extension);
+			const auto repeated = replay.duplex_frame(input, replay_output, extension);
+			assert(result.transmitted && result.transmit_ready_edge == load);
+			assert(result.receive_ready_edge == !unread);
+			assert(output == (held_tx & mask));
+			assert(repeated.transmitted == result.transmitted &&
+				repeated.transmit_ready_edge == result.transmit_ready_edge &&
+				repeated.receive_ready_edge == result.receive_ready_edge && replay_output == output);
+			if (!unread)
+			{
+				const unsigned payload = (loopback ? held_tx : input) & mask;
+				held_rx = std::uint16_t(payload & (1U << (width - 1)) ? payload | ~mask : payload);
+			}
+			unread = true;
+			assert(port.receive == held_rx && replay.receive == held_rx);
+			assert(port.control_r() == replay.control_r());
+			if (frame % 3 == 2)
+			{
+				assert(port.receive_r() == held_rx && replay.receive_r() == held_rx);
+				assert(port.control_r() == replay.control_r());
+				unread = false;
+			}
+			port = replay;
+		}
+	}
 	for (unsigned value = 0; value <= 0xffff; ++value)
 	{
 		for (unsigned format = 0; format != 4; ++format)
