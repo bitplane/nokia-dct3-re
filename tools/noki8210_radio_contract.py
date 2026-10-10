@@ -33,6 +33,10 @@ def verify(image):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
     if int.from_bytes(read(0x286214, 4), 'big') != 0x137224:
         raise ValueError('acquisition updater current-candidate pointer differs')
+    if instructions(0x286190, 8) != [
+            ('adds', 'r0, r5, #0'), ('adds', 'r1, r6, #0'),
+            ('bl', '#0x285f04')]:
+        raise ValueError('observed acquisition updater caller differs')
     if instructions(0x285f0c, 8) != [
             ('ldr', 'r4, [r1]'), ('ldrb', 'r1, [r0, #6]'),
             ('cmp', 'r1, #0'), ('bne', '#0x285f36')]:

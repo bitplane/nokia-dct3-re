@@ -1949,6 +1949,18 @@ That scan does not close indirect entrances or establish runtime caller
 ownership.
 No secondary-candidate response contract follows from this static decode.
 
+Runtime entry observation confirms caller `286199` and two incoming
+class-`80` records: `18020e804012010004b0000400000000` at 5.53925s and
+`18020e804012000006af033700004800` at 7.89743s. The second has success byte
+`+6=0` and carrier `+a=0337`, immediately preceding the observed ARFCN 823
+nibble-4 update. At 12.26214s the mode-4 constructor instead uses the
+distinct ARFCN 824 candidate. The successful serving-candidate update is
+therefore positively observed; a missing call for 824 is not evidence that
+mode 4 owes this same record. The next contract remains its response family
+and eligibility, not a fabricated repetition of the serving response.
+Evidence: `tmp/noki8210_acquisition_update_r14/error.log`, SHA-256
+`3930b753d4ebdd19aad443dc6345a05c5998a90f0afcff2c47662a4ad1a086bd`.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
