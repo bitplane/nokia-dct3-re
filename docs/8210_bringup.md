@@ -1961,6 +1961,19 @@ and eligibility, not a fabricated repetition of the serving response.
 Evidence: `tmp/noki8210_acquisition_update_r14/error.log`, SHA-256
 `3930b753d4ebdd19aad443dc6345a05c5998a90f0afcff2c47662a4ad1a086bd`.
 
+The current-candidate pointer is not a permanent serving-record owner.
+Receiver `28612c` assembles the full response carrier from bytes `+a/+b`,
+looks it up through `285c0a`, and stores the result at `13721c+8` before
+calling the updater. The common fallback reached by state 13 accepts
+class `80` with channel byte `+4=40` at `21ebc4..21ebd2`, then invokes
+this receiver at `21ebf6` with argument 1. Thus an independently established
+synchronization result for 824 has a compatible MCU route; the previously
+observed 823 pointer does not exclude it. The own-ROM verifier pins the
+class/channel predicate, full-carrier reselection and receiver invocation.
+This closes a consumer-side possibility, not the missing mode-4 producer
+contract: it does not prove that the instruction owes SCH, establish its
+timing/eligibility, or justify replaying the serving-cell response.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:

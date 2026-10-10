@@ -33,6 +33,23 @@ def verify(image):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
     if int.from_bytes(read(0x286214, 4), 'big') != 0x137224:
         raise ValueError('acquisition updater current-candidate pointer differs')
+    if int.from_bytes(read(0x286384, 4), 'big') != 0x13721c:
+        raise ValueError('acquisition receiver candidate context differs')
+    if instructions(0x286136, 20) != [
+            ('ldrb', 'r1, [r5, #0xb]'), ('ldrb', 'r0, [r5, #0xa]'),
+            ('lsls', 'r0, r0, #8'), ('adds', 'r0, r1, r0'),
+            ('lsls', 'r0, r0, #0x10'), ('lsrs', 'r0, r0, #0x10'),
+            ('ldr', 'r1, [r4, #8]'), ('bl', '#0x285c0a'),
+            ('str', 'r0, [r4, #8]')]:
+        raise ValueError('acquisition receiver full-carrier candidate reselection differs')
+    if instructions(0x21ebc4, 16) != [
+            ('cmp', 'r0, #0x80'), ('beq', '#0x21ebca'), ('b', '#0x21ee2c'),
+            ('ldr', 'r2, [r4, #8]'), ('ldrb', 'r2, [r2, #4]'),
+            ('cmp', 'r2, #0x40'), ('beq', '#0x21ebd4'), ('b', '#0x21ee2c')]:
+        raise ValueError('common synchronization receive class/channel selector differs')
+    if instructions(0x21ebf2, 8) != [
+            ('ldr', 'r0, [r4, #8]'), ('movs', 'r1, #1'), ('bl', '#0x28612c')]:
+        raise ValueError('common synchronization receiver invocation differs')
     if instructions(0x286190, 8) != [
             ('adds', 'r0, r5, #0'), ('adds', 'r1, r6, #0'),
             ('bl', '#0x285f04')]:
