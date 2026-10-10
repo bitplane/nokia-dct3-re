@@ -73,6 +73,31 @@ private:
 		m_phase = 83000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_native_final_gap_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		static constexpr u16 opcodes[] = {0x9a5f, 0xf20f, 0xf47d, 0xf50f, 0xf736, 0xf761};
+		unsigned const family = index / 2;
+		bool const variant = index & 1;
+		program.write_word(0x0800, opcodes[family]);
+		program.write_word(0x0801, family == 1 ? 1 : 0xf4e1);
+		program.write_word(0x0802, 0xf4e1);
+		u64 const a = family == 0 || family == 3 ? (variant ? 0xfffffffffeULL : 2) :
+			family == 2 ? 0xfffffffff7ULL : 3;
+		u64 const b = family == 1 ? (variant ? 0xfffffffff0ULL : 5) :
+			family == 4 ? (variant ? 0xfffffffc00ULL : 0x400) : family == 5 ? 0x40000000 : 5;
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, a);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0600);
+		m_cpu->space(AS_DATA).write_word(0x0600, 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
+			family == 2 ? (variant ? 0 : 0x0100) : family == 4 ? 0x0100 : family == 5 && variant ? 0x0200 : 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_phase = 150000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_native_memory_gap_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -19990,6 +20015,31 @@ private:
 				"Native memory gaps preserve exact flags, word lanes, guard extension and pointer updates");
 			if (index < 11) { start_native_memory_gap_case(index + 1); return; }
 			osd_printf_info("TMS320C54x native gap memory: PASS words=6 cases=12 sxm=0,1 frct=0,1 circular=0,8 double_step=2\n");
+			start_native_final_gap_case(0); return;
+		}
+		if (m_phase >= 150000 && m_phase < 150012)
+		{
+			unsigned const index = m_phase - 150000, family = index / 2;
+			bool const variant = index & 1;
+			static constexpr u16 opcodes[] = {0x9a5f, 0xf20f, 0xf47d, 0xf50f, 0xf736, 0xf761};
+			u64 const a = family == 0 || family == 3 ? (variant ? 0xfffffffffeULL : 2) :
+				family == 1 ? (variant ? 0x7ff0 : 0x8005) :
+				family == 2 ? (variant ? 0x1ffffffffeULL : 0xfffffffffeULL) : 3;
+			u64 const b = family == 1 ? (variant ? 0xfffffffff0ULL : 5) :
+				family == 3 ? (variant ? 0xffffff0005ULL : 0x10005) :
+				family == 4 ? (variant ? 0xfffffffc01ULL : 0x3ff) :
+				family == 5 ? (variant ? 0x7fffffff : 0x80000000) : 5;
+			u16 const flags = family == 2 || (family == 1 && variant) || (family == 4 && !variant) ? 0x0800 : family == 5 ? 0x0200 : 0;
+			expect_opcode(opcodes[family], m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == a &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == flags &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (family == 0 ? 0x05ff : 0x0600) &&
+				m_cpu->space(AS_DATA).read_word(0x0600) == (family == 0 ? (variant ? 0xffff : 1) : 0xdead),
+				"Final native gaps preserve shift/add/subtract results, saturation, carry and compact store addressing");
+			if (index < 11) { start_native_final_gap_case(index + 1); return; }
+			osd_printf_info("TMS320C54x native final gaps: PASS words=6 cases=12 signed_shift=1 saturation=1 compact_store=1\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

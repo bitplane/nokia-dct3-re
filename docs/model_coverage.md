@@ -9,10 +9,11 @@ registration before the save boundary, independently of post-load events.
 Whole-run hardware/provisioning checks remain separate from that ordering
 requirement.
 
-Native NSE-1 opcode coverage is currently 620 asserted forms out of 626
-observed in cold idle, with six execution-assertion gaps. The older 594-word
-idle/Menu/power closure cited below is historical; its coverage oracle remains
-unrebanked pending those assertions. See the current audit boundary in
+Native NSE-1 opcode coverage is currently 626 asserted forms out of 626
+observed in cold idle; Menu and long-power runs add no unasserted forms.
+The older 594-word closure cited below is historical; the current exact
+fingerprint is deliberately rebanked with a negative control rejecting the
+old set. See the current audit boundary in
 `rom4_dsp_loader.md`. No native RF acquisition or speech is promoted.
 
 | Product / tested firmware | Booting | Interactive | Registered | Call control | Internal media | Physical duplex | Hardware-faithful | Principal evidence or next boundary |

@@ -1713,10 +1713,10 @@ recognizes a Nokia address or loader byte pattern.
 The current native cold-idle inventory is 626 words in 110 high-byte groups,
 SHA-256 `05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59`.
 Two isolated controls (`tmp/c54x-frontend-idle-a` and `-b`) reproduce the full
-ranked report exactly. The existing 594-word gate expectation is now stale
-and remains intentionally unrebanked: current fixture coverage is 620 asserted,
-one execution-only (`9a5f`) and five absent words (`f20f`, `f47d`, `f50f`,
-`f736`, `f761`). Each remaining word occurs once in this trace.
+ranked report exactly. All 626 forms now have executable fixture assertions,
+with no execution-only or absent words. The reviewed fingerprint deliberately
+replaces the former 594-word expectation after those gaps were closed; a unit
+negative control rejects the previous fingerprint and a wrong current hash.
 Earlier 594-word closure statements below apply to that earlier trace, not
 the current native execution set.
 
@@ -1729,9 +1729,11 @@ promoted to a boundary. Current cold-idle coverage is 122 decoded and 504
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. The leading unsupported forms are `ff0c`, `10f8`, `fa45`
 and `0881`; their execution frequency is in the isolated report.
-`check-c54x-observed-coverage` requests this report but still stops at its
-stale primary fingerprint. Restore execution assertions and deliberately
-review the changed trace before rebanking it; do not bypass either check.
+`check-c54x-observed-coverage` passes the reviewed cold-idle fingerprint,
+physical Menu and long-power runs, and all 626 union assertions. Menu adds no
+new words; long power executes 625, also adding none. Decoder support remains
+a separate gap: passing execution assertions must not promote unsupported
+raw-word lengths into a pipeline frontend.
 
 Exact acquired `6f95/0e20` (`SUB *AR5+,0,B,A`) and indirect loads `1087`
 (`LD *AR7,A`) and `1182` (`LD *AR2,B`) have six independent execution cases,
@@ -1767,6 +1769,14 @@ low-word store with postdecrement. They check selected result/status values,
 unchanged T/source/memory where applicable and exact AR2/AR3 changes. The
 required marker is `TMS320C54x native gap memory: PASS`; other operand/flag
 combinations and physical timing remain outside this coverage.
+
+The final twelve cases assert `9a5f` shifted high-word store/postdecrement,
+`f20f` immediate ADD, `f47d` signed/logical right shift, `f50f` shifted
+accumulator ADD, `f736` shifted accumulator SUB and `f761` overflow/saturation.
+They check full results, exact carry/overflow flags, source preservation and
+the compact store's address update. The runner requires
+`TMS320C54x native final gaps: PASS`. This closes assertion coverage for the
+captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger control-flow decoding
 

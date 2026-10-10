@@ -15,10 +15,11 @@ OPCODE = re.compile(
 )
 ASSERTION = re.compile(r"^(?:\[:\] )?\[opassert\] op=([0-9a-fA-F]{4})$")
 DECODE = re.compile(r"^\[opdecode\] op=([0-9a-fA-F]{4}) supported=([01]) words=(\d+)$")
-# Free-running CTSI/absolute-compare baseline; provenance is in rom4_dsp_loader.md.
-ROM4_IDLE_OPCODE_COUNT = 594
-ROM4_IDLE_GROUP_COUNT = 107
-ROM4_IDLE_SET_SHA256 = "5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e"
+# Current core corrections; two isolated cold controls and full assertions are
+# documented in rom4_dsp_loader.md. This is an exact trace, not ISA completeness.
+ROM4_IDLE_OPCODE_COUNT = 626
+ROM4_IDLE_GROUP_COUNT = 110
+ROM4_IDLE_SET_SHA256 = "05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59"
 DECODER_MASK = re.compile(r"\(op\s*&\s*0x([0-9a-fA-F]+)\)\s*==\s*0x([0-9a-fA-F]+)")
 DECODER_EXACT = re.compile(r"\bop\s*==\s*0x([0-9a-fA-F]{4})\b")
 DECODER_CASE = re.compile(r"\bcase\s+0x([0-9a-fA-F]{4})\s*:")
@@ -84,6 +85,13 @@ def summarize(text: str) -> dict[str, object]:
         "asserted": asserted,
         "decoded": decoded,
     }
+
+
+def require_rom4_idle(result: dict[str, object]) -> None:
+    actual = (result["opcodes"], result["high_byte_groups"], result["set_sha256"])
+    expected = (ROM4_IDLE_OPCODE_COUNT, ROM4_IDLE_GROUP_COUNT, ROM4_IDLE_SET_SHA256)
+    if actual != expected:
+        raise ValueError(f"ROM4 idle coverage mismatch: {actual!r}")
 
 
 def group_gaps(result: dict[str, object], fixture: dict[str, object]) -> list[tuple[int, int, int, int, int]]:
@@ -178,11 +186,7 @@ def main() -> int:
         fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
         declared = decoder_declared_words(args.decoder_source.read_text()) if args.decoder_source else None
         if args.require_rom4_idle:
-            actual = (primary["opcodes"], primary["high_byte_groups"], primary["set_sha256"])
-            expected = (ROM4_IDLE_OPCODE_COUNT, ROM4_IDLE_GROUP_COUNT,
-                        ROM4_IDLE_SET_SHA256)
-            if actual != expected:
-                raise ValueError(f"ROM4 idle coverage mismatch: {actual!r}")
+            require_rom4_idle(primary)
     except (OSError, ValueError) as error:
         print(f"C54x opcode coverage rejected: {error}", file=sys.stderr)
         return 1

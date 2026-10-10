@@ -6,10 +6,21 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main,
-                                        ranked_gaps, ranked_variant_candidates, summarize)
+                                        ranked_gaps, ranked_variant_candidates, summarize,
+                                        require_rom4_idle)
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
+    def test_current_fingerprint_rejects_previous_native_trace(self):
+        current = {"opcodes": 626, "high_byte_groups": 110,
+                   "set_sha256": "05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59"}
+        require_rom4_idle(current)
+        with self.assertRaisesRegex(ValueError, "coverage mismatch"):
+            require_rom4_idle({"opcodes": 594, "high_byte_groups": 107,
+                               "set_sha256": "5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e"})
+        with self.assertRaisesRegex(ValueError, "coverage mismatch"):
+            require_rom4_idle(dict(current, set_sha256="0" * 64))
+
     def test_frontend_report_requires_complete_actual_decode_inventory(self):
         with TemporaryDirectory() as root:
             log = Path(root) / "trace.log"
