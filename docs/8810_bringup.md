@@ -29,13 +29,13 @@ digits through physical contacts: the 12.5-second snapshot shows five masked
 characters, and OK produces Code error at 13.5 seconds. The late frame returns
 to the editor in the erased-retry negative control. Initializing the synthetic
 retry count permits the same physical code to be accepted, reaching a Menu /
-Names frame with the earlier stalled-core compatibility fixture. Correcting
-native TRN storage advances DSP execution but changes this result: the current
-fresh run executes DSP code throughout 40 seconds without a logged unsupported
-opcode, but corrupts the DSP receive ring and captures a blank menu frame. No reset-control write is
-observed through 40 seconds in that run; this is not a successful boot.
-The menu/input observations below remain evidence for the earlier composition,
-not acceptance of the current native instruction path.
+Names frame. The current native compatibility configuration preserves the own
+upload through `0x2fff`; a fresh 40-second run executes without a logged
+unsupported opcode, accepts the physical code at 13.022352 s and presents
+Messages, Call register and Missed calls under physical navigation. The
+previous stack/ring corruption is resolved by retaining the executable upload
+bank, not by changing CALL/RET semantics or firmware state. The firmware still
+requests a reset at 31.967763 s, so stable long-running boot remains open.
 No donor identity or lock state is supplied.
 
 The display-transport observer records 15,684 data bytes, 2,774 nonzero,
@@ -86,62 +86,41 @@ TRN's MMR `0x0f` and page-zero indirect addressing follow
 | `ae31 / 0816` | Parallel LD with MAC/MAS, optionally rounded | 64 destination/rounding/SXM/FRCT/pointer cases preserving old T and carry |
 | `1780 / 1968` | LDR memory high plus bit 15, SXM-dependent, no status changes | 64 destination/sign/value/direct/indirect/post-decrement/absolute cases, OVM set |
 
-Current fresh-run boundary: blank display and MCU receive-ring drain activity through
-40 seconds, without a logged unsupported opcode. The native interface summary
-records 209 completion strobes, 139 mailbox writes, 8,591 slot expiries,
-8,654 frame expiries and 4,384 RF reads. DSP PC samples vary after 30 seconds;
-IMR is `0x0421`. CCONT clock control is `0x56`; no reset-control write occurs
-within that window. The verifier has already returned `0/4` at 0.230685 s;
-the repeatedly sampled `0x2b6026..0x2b60ba` is the receive-ring packet drain,
-not the verifier. This is not a
-boot success or fitted-mask compatibility proof, nor native speech evidence.
+### Native Upload Geometry
 
-The drain reads indices at `0x101ca` (consumer) and `0x101c8` (producer),
-packet headers at `0x10000 + 2*consumer`, with ring wrap at index `0xe4`
-back to `0x80`. A fresh read-only trace observes headers `1074`, `3474`,
-`0274`, `0474` and producer indices `0089`, `00a4`, `00a6`, `00a9` before
-one second. At 1.002106865 s the DSP writes `90e9` to data address `08e5`
-(consumer), with both PC=`90e9` and SP=`08e5`; subsequent PC-valued writes
-overwrite both indices. The MCU consequently reads an out-of-window packet
-at `0x16174` and continues draining corrupted headers. Earlier DSP producer
-writes at PC `3805` show SP declining from `1e47` to `1c7f`.
-Bounded stack-depth observations locate the rapid descent before corruption:
-SP crosses `1bff` at 0.929342 s, then successive 128-word boundaries roughly
-every 1.9 ms, predominantly on PC-valued writes at `3f50`; from 0.948210 s
-the corresponding repeated PC is `90e9`. This is a control-flow target for
-entry/return analysis, not proof of interrupt nesting or a particular opcode
-defect. The depth observer records at most 32 boundary crossings.
-An instruction-window trace at 0.928016..0.928046 s shows the sampled
-`3f4e -> 23d4` CALL/RET and `3f50 -> 8dd0` conditional-return paths balance
-SP. The later `30b8 -> 2464` call branches to overlaid program address
-`1ca4`, whose observed stream contains stack-like `30ba/3e1f` words and
-later saved contexts. Thus repeated calls alone are not the demonstrated
-defect: execution is already entering damaged overlaid code. Locate the
-earliest write into that code and earlier stack imbalance; the short window
-does not establish that all calls, returns or interrupts are correct.
-The entry is initially intact: executions from 0.256693 s read `f7bb` at
-`1ca4`. Its first observed non-initialization writes are stack writes at
-0.926814346 s (`1ca5=a507`, SP=`1ca5`) and 0.926814423 s
-(`1ca4=4612`, SP=`1ca4`, PMST=`ffac`). This distinguishes later stack
-corruption from an initially malformed entry. The first 128-word depth
-crossing at 0.385015 s is inside the `a4f7/4612` call/context-save path;
-its sampled saves/restores balance. At 0.385020596 s the return-address
-helper entered through `24cf -> 266b` instead selects `2677`: its ROM
-sequence compares the stacked continuation with `a53b`, restores ST0/AR2,
-uses `FRAME +1` to discard the return word. The resident ROM branches to
-`27aa`, but the live MCU-uploaded overlay patches that destination to
-`2946`, confirmed by the instruction words fetched at `2677`.
-This bypasses ordinary return after the `a539` call inside the `a51b`
-interrupt-servicing path. Subsequent vector entries have lower SP. The next
-contract is how this recognized-continuation path at `2946` should unwind
-or transfer the saved context; a matched conditional branch is not itself
-proof of a CPU defect or proof that the firmware intended to leak a frame.
-This establishes stack overlap with shared ring state, not its cause. The next
-question is the first stack/control-flow divergence before those writes,
-including interrupt entry/return and frame-clock servicing. Do not synthesize
-ring indices, stop notifications, or restore the earlier stalled core to
-make the display reappear. The observer caps native index writes at 32 and
-header observations at 16; it is not a full writer census.
+NSE-6 uploads executable words at `0x2946..0x295d` from DSP PC `31d7`
+at 0.256053 s with PMST=`ffac` (OVLY enabled). The continuation helper
+`24cf -> 266b` recognizes stacked return address `a53b`, restores ST0/AR2,
+discards one return word with `FRAME +1`, and follows the uploaded branch
+at `2678` to `2946` (resident ROM destination: `27aa`). The NSE-1-sized
+overlay ending at `2800` discarded these program writes and executed zeros
+at that target. This retained interrupt contexts, drove the stack into
+executable entry `1ca4` at 0.926814 s, then into shared ring indices at
+1.002107 s. Sampled ordinary CALL/RET and context-save paths balanced;
+their semantics did not require a workaround.
+
+The NSE-6 compatibility fixture now configures the existing overlay through
+`2fff`, retaining the own upload without changing the default NSE-1 geometry.
+This is an evidenced executable-bank requirement, not a fitted-silicon
+capacity measurement or proof that NSE-1 ROM4 is the correct mask.
+`tools/nse6_native_overlay_check.py` verifies all 24 observed upload words
+against subsequent program/data readback, stack samples through 28 seconds,
+and the observed receive-ring index range. The corrected 40-second run has
+41 snapshots (SP=`1ec4` outside active handlers), eight valid producer
+publications, and no logged unsupported instruction. Read-only index/header
+taps remain bounded, not an exhaustive writer census.
+Run the checker on the isolated menu fixture's log with
+`python tools/nse6_native_overlay_check.py <run-directory>/error.log`.
+The C54x conformance suite, 3210 default/frontier gates and native 5110 menu
+gate pass with this product-only geometry change. The checker does not
+establish security/menu presentation, late-reset stability or service parity.
+
+MCU packet drain `2b6026..2b60ba` reads consumer `101ca`, producer `101c8`,
+and headers at `10000 + 2*consumer`, wrapping indices `e4 -> 80`.
+The verifier returned `0/4` at 0.230685 s; packet-drain activity is not a
+verifier wait. Current remaining boundary is the software-requested reset
+described above, followed by SIM/phonebook/service parity. No ring indices,
+notifications, context state or watchdogs are forced to improve presentation.
 CMPS/TRN update semantics and indirect POPM remain separate decoder gaps.
 The TRAP-only composition's post-reset `0xfce7 / 06ce` differs from its cold
 path; retained-state and instruction-stream provenance still need checking

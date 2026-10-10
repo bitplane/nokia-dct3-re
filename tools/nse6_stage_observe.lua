@@ -8,6 +8,16 @@ local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_reg
 local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
 if dsp then
+    local upload_writes = 0
+    handles[#handles + 1] = dsp.spaces['program']:install_write_tap(0x2946, 0x295d,
+        'nse6_native_context_upload', function(offset, value, mask)
+            upload_writes = upload_writes + 1
+            if upload_writes > 32 then return end
+            machine:logerror(string.format(
+                'nse6_native_context_upload: address=%04x value=%04x mask=%04x pc=%04x pmst=%04x t=%.9f\n',
+                offset, value, mask, dsp.state['PC'].value, dsp.state['PMST'].value,
+                machine.time:as_double()))
+        end)
     local overlay_writes = 0
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x1ca4, 0x1ca5,
         'nse6_native_overlay_entry', function(offset, value, mask)
@@ -18,33 +28,22 @@ if dsp then
                 offset, value, mask, dsp.state['PC'].value, dsp.state['SP'].value,
                 dsp.state['PMST'].value, machine.time:as_double()))
         end)
-    local inspecting_call = false
-    for _, address in ipairs({0x3f4e, 0x90e7, 0x23d4, 0x23e2, 0x1ca4,
-            0x266b, 0x2677, 0x2946}) do
-        local calls = 0
-        handles[#handles + 1] = dsp.spaces['program']:install_read_tap(address, address,
-            'nse6_native_stack_call_' .. address, function(offset, value)
-                if inspecting_call or dsp.state['PC'].value ~= address + 1 then return end
-                local context_exit = address == 0x266b or address == 0x2677 or address == 0x2946
-                if address ~= 0x1ca4 and machine.time:as_double() < (context_exit and 0.38 or 0.928) then return end
-                calls = calls + 1
-                if calls > 16 then return end
-                inspecting_call = true
-                local words, stack = {}, {}
-                local sp = dsp.state['SP'].value
-                for index = 0, 23 do
-                    words[#words + 1] = string.format('%04x', dsp.spaces['program']:read_u16(address + index))
-                    if index < 8 then
-                        stack[#stack + 1] = string.format('%04x', dsp.spaces['data']:read_u16((sp + index) & 0xffff))
-                    end
-                end
-                machine:logerror(string.format(
-                    'nse6_native_stack_call: address=%04x word=%04x hit=%d sp=%04x words=%s stack=%s t=%.9f\n',
-                    address, value, calls, sp, table.concat(words, ','), table.concat(stack, ','),
-                    machine.time:as_double()))
-                inspecting_call = false
-            end)
-    end
+    local context_observed = false
+    handles[#handles + 1] = dsp.spaces['program']:install_read_tap(0x2677, 0x2677,
+        'nse6_native_context_target', function()
+            if context_observed or dsp.state['PC'].value ~= 0x2678 then return end
+            context_observed = true
+            local target = dsp.spaces['program']:read_u16(0x2679)
+            local program_words, data_words = {}, {}
+            for index = 0, 23 do
+                program_words[#program_words + 1] = string.format('%04x', dsp.spaces['program']:read_u16(target + index))
+                data_words[#data_words + 1] = string.format('%04x', dsp.spaces['data']:read_u16(target + index))
+            end
+            machine:logerror(string.format(
+                'nse6_native_context_target: address=%04x pmst=%04x program=%s data=%s t=%.9f\n',
+                target, dsp.state['PMST'].value, table.concat(program_words, ','),
+                table.concat(data_words, ','), machine.time:as_double()))
+        end)
     local stack_floor = 0x2000
     local stack_samples = 0
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x0800, 0x1fff,

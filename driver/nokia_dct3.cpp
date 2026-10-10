@@ -4049,6 +4049,9 @@ void nokia_dct3_state::nse6r4t(machine_config &config)
 	// Compatibility instrument only: the fitted NSE-6 DSP mask is unknown.
 	config.device_remove("dsp_hle");
 	NOKIA_DSP_C54X(config, m_dsp_c54x, 52'000'000);
+	// Own NSE-6 upload writes executable words at 0x2946; the patched
+	// continuation enters that bank. The fitted mask identity remains unknown.
+	m_dsp_c54x->set_overlay_end(0x3000);
 	m_dsp_c54x->tone_update_cb().set(FUNC(nokia_dct3_state::dsp_tone_update_w));
 }
 
