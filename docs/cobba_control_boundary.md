@@ -133,6 +133,22 @@ lane is I versus Q. The Lua override is a diagnostic port-input
 fixture, not a shipped RF model. Those remaining physical mappings
 must be explicit assumptions in any independent waveform experiment.
 
+The downstream queue helper is not adequately described as an energy
+detector. Byte-pinned `0x47e6..0x47f5` reads previous pair `(x1,y1)`
+from `0x1252/1253` and current pair `(x2,y2)` from `0x1254/1255`.
+With TC clear, it forms A=`x2*x1 + y2*y1` and
+B=`x2*y1 - y2*x1`, subject to the core's multiply modes.
+These are adjacent-pair dot/cross products, consistent with a complex
+lag correlation without identifying which physical lane is I.
+TC set selects a different, reduced path and copies the current pair
+back into the previous-pair storage; do not apply the TC-clear formula
+to that path. The byte-pinned result tail `0x4778..0x4797` normalizes,
+squares and combines accumulated terms, then performs 15 SUBC steps
+against a nonzero denominator. Accordingly the uploaded caller's
+threshold comparison is a processed correlation-score boundary, not
+an established raw ADC-energy or dBm threshold. Exact score units and
+the active TC-mode interpretation remain to be validated numerically.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
