@@ -454,6 +454,37 @@ the volume and extracted-input hashes. No author-published canonical digest is
 known, so this establishes a strong provenance chain rather than cryptographic
 identity with AlexD's original upload.
 
+### Recovered IDA annotations
+
+The archive's `dsp_full.idb` uses legacy `IDA0` / B-tree 1.5 format.
+`python-idb` 0.8.0 rejects its signature; this is a reader limitation, not
+evidence of archive corruption. The independent
+[pyidbutil reader](https://github.com/nlitsme/pyidbutil/tree/e77d0e79e5c11507a207d503883dcccd15f9c696)
+opens it and enumerates 132 names:
+
+```sh
+python /tmp/nse1-pyidbutil/idbtool.py --names /tmp/nse1-rom4-annotations/dsp_full.idb
+```
+
+Relevant original annotations, still requiring independent verification:
+
+| DSP address | Original label | Evidence use |
+| --- | --- | --- |
+| Data `0x32` | `SPC1` | Candidate second serial-control register; not proof of MAD2 board attachment |
+| Data `0x1390` | `FR_prm` | Candidate full-rate parameter buffer |
+| Program `0x80e7` / `0x80ff` | `FR_prm2bits` / `FR_bits2prm` | Candidate native codec packing boundary |
+| Program `0x812f` | `EFR_FR_crc3_AR4` | Candidate CRC helper used by the type-`0x50` buffer consumer |
+| Program `0x8458` / `0x860c` | `FR_decoder` / `FR_coder` | Candidate software-only codec validation entry points, not validated speech |
+| Program `0xc8dc` | `EFR_decoder` | Candidate enhanced-full-rate decoder |
+
+There are no named addresses in `0x8d00..0x93ff`. Querying both ordinary
+comment slots (`S,0` and `S,1`) at every address in that range and at
+`0x34`, `0x35`, `0x36`, `0x3b92`, `0x7e9c` returns no comments.
+Thus the annotated database does not resolve the NSE-6 port-36 completion
+contract. Codec labels are useful leads, not grounds to rename unknown
+peripherals or claim native speech. The external reader remains in `/tmp`;
+no reader implementation is imported into the driver.
+
 The practical software-only route is therefore:
 
 1. preserve the recovered historical volumes and extracted inputs outside Git;

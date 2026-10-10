@@ -30,6 +30,11 @@ instruction-boundary or computed-port census. The other entry at `0x9116`
 is not observed in this run; do not infer its callers from the blocked
 `0x9129` path.
 
+The recovered legacy IDA database also has no names or comments for this
+serial-control region; see the [archive annotation contract](djr_dsp_integration.md#recovered-ida-annotations).
+Its codec-function labels are independent research leads, not a peripheral
+register specification.
+
 The acquired archive's `full.s54` agrees with the independently decoded
 `BITF 0x4000` / `BC NTC` loop but does not name the physical block. A fresh
 12-second NSE-1 cold run with its own EEPROM profile and the same native
