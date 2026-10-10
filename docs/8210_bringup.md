@@ -1872,6 +1872,26 @@ reaches the completion gate. Consequently the next predecessor is the
 selector-result-3 entrance and its record publication, not the mere
 presence of periodic `1802` packets or the state-17 dispatch table.
 
+The current-`03eb` branch of argument-zero selection calls `2a1110`, a
+column-first scan of the seven nine-byte rows at `137248`. It scans
+columns 0..8, then rows 0..6 within each column. A first hit in column 0
+returns 1 and retains the row index as record kind; a hit in another
+column returns that column and sets kind 7. No hit returns 8 with kind 7.
+The checker pins scan stride/order and normalization; its separate pure
+projection tests cover all 63 single-flag positions and the observed tables.
+These tests establish the decoded projection, not native DSP behavior.
+
+Fresh GSM observation returns 4 with kind 7, flag `+4=1`, then compares
+candidate pointers `119690 == 119690` at `2a1676`, selecting result 3.
+DCS returns 1 with kind 6 at the serving acknowledgement; it skips that
+kind-7 equality route, reaches flag `+4=1`, clears the flag and selects
+result 0 through `2a16f4..2a1700`. GSM's table first hits column 4, row 5;
+DCS's first hit is column 0, row 6. The actionable predecessor is the
+writer/meaning of row 6 column 0 (`13727e`), not an injected completion.
+Evidence: `tmp/noki8210_initial_scan_{gsm,dcs}/error.log`, respective SHA-256
+`cc0c3295aef7fbdeb84254d3f78a0c2a9d3b64ad1bda52824531ad176e3d24f1`
+and `c68dc4f95465d761ae7adab6b6ec27252861f9bb98f340105d0593909ac84cf2`.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:

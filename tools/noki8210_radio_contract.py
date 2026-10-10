@@ -6,6 +6,17 @@ from pathlib import Path
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
 
 
+def scan_initial_record_flags(rows):
+    """Project decoded 2a1110 priority; return (scan result, record kind)."""
+    if len(rows) != 7 or any(len(row) != 9 for row in rows):
+        raise ValueError('initial record scan requires seven nine-byte rows')
+    for column in range(9):
+        for index, row in enumerate(rows):
+            if row[column]:
+                return (1, index) if column == 0 else (column, 7)
+    return 8, 7
+
+
 def verify(image):
     if hashlib.sha1(image).hexdigest() != 'c1a0fe95cedb89a92b19654208cc4855e1a4988e':
         raise ValueError('requires acquired 8210 v5.31 PPM C')
@@ -20,6 +31,25 @@ def verify(image):
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     def instructions(address, size):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
+    if int.from_bytes(read(0x2a1378, 4), 'big') != 0x137248:
+        raise ValueError('initial record scan table root differs')
+    if instructions(0x2a1126, 18) != [
+            ('ldrb', 'r6, [r5]'), ('cmp', 'r6, #0'),
+            ('bne', '#0x2a1138'), ('adds', 'r5, #9'),
+            ('adds', 'r3, #1'), ('subs', 'r4, #1'),
+            ('cmp', 'r4, #0'), ('bne', '#0x2a1126'), ('b', '#0x2a1142')]:
+        raise ValueError('initial record scan row order/stride differs')
+    if instructions(0x2a1142, 18) != [
+            ('adds', 'r2, #1'), ('movs', 'r3, #0'), ('adds', 'r1, #1'),
+            ('cmp', 'r1, #9'), ('blt', '#0x2a114e'), ('movs', 'r3, #1'),
+            ('orrs', 'r3, r7'), ('cmp', 'r3, #0'), ('beq', '#0x2a1120')]:
+        raise ValueError('initial record scan column priority differs')
+    if instructions(0x2a1154, 16) != [
+            ('cmp', 'r0, #0'), ('beq', '#0x2a1160'), ('movs', 'r2, #7'),
+            ('mov', 'r1, ip'), ('strb', 'r2, [r1]'),
+            ('pop', '{r4, r5, r6, r7, pc}'), ('movs', 'r0, #1'),
+            ('pop', '{r4, r5, r6, r7, pc}')]:
+        raise ValueError('initial record scan result/kind normalization differs')
     if instructions(0x2b303a, 26) != [
             ('movs', 'r0, #0xc'), ('strb', 'r0, [r4, #2]'),
             ('movs', 'r0, #2'), ('strh', 'r0, [r4]'),
