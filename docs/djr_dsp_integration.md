@@ -1142,6 +1142,18 @@ Investigate the scheduling/configuration that selects those routines
 before adjusting a local gate or supplying a synthetic completion.
 This is bounded runtime coverage, not proof of exhaustive caller absence.
 
+The scheduling census must include indirect data-memory call lists.
+Byte-pinned dispatcher `0x98b7` reads index `0x07fc`, looks up a
+program-space branch target in the five entries at `0x98c1`, and jumps
+indirectly. Its branch wrappers select AR5 values `0xee38`, `0xee3e`,
+`0xee45`, `0xee4e` and `0xee57`. Byte-pinned interpreter `0x9903`
+loads a function address from data memory through `*AR5+`, preserves
+AR5 around an indirect call, and repeats until the next data word is
+`0x00ff`. Those list contents are not program words at the same numeric
+addresses: ROM-image indexing alone cannot recover them. Capture the
+DSP data-space lists or establish their initialization before claiming
+that the receive-operation callers have no scheduling producer.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
