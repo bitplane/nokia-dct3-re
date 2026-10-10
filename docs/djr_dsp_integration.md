@@ -1226,6 +1226,18 @@ channel request: the transition through bit `0x0080` has its own
 default initialization. The next predecessor is that flag's producer
 and its main-loop consumption, not a forced pending-channel value.
 
+A byte-pinned direct flag producer ends the routine that calls RF
+sample-queue processor `0x4701` at `0x4695`. Its result tail at
+`0x46e1` returns for signed `0x1956 < 0` or signed `0x198c <= 0`,
+otherwise publishes a shifted value from `0x198f` to `0x1933` and,
+for channel high nibble `0x20`, copies a double word to `0x177e`.
+It then returns when `0x1f24 >= 0x01f4`; only the remaining path
+ORs `0x0080` into `0x1949` at `0x46fd`. These are firmware numeric
+result predicates, not yet calibrated RF units or an exhaustive
+flag-writer census. They tie this lifecycle entrance to sample-processing
+results rather than an invented DSP completion message. The port-`0x27`
+input remains zero by default, and successful acquisition remains unproven.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
