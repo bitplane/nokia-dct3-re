@@ -609,6 +609,33 @@ private:
 				"Load decoder retains address modifiers and accumulator destination");
 		}
 		osd_printf_info("TMS320C54x load disassembler: PASS modes=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned family = 0; family < 16; ++family)
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, (family << 8) | mode, 0x2345);
+					std::ostringstream text;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == ((mode >= 0xe0 ? 2 : 1) | dasm::SUPPORTED) &&
+						buffer.seen() == (mode >= 0xe0 ? 3 : 1), "Memory ALU decoder preserves length and bounded page-wrapped extension reads");
+				}
+		vector const memory_alu[] = {
+			{0x0082, 1 | dasm::SUPPORTED, "ADD     *AR2, A"},
+			{0x033a, 1 | dasm::SUPPORTED, "ADDS    $3A, B"},
+			{0x04f8, 2 | dasm::SUPPORTED, "ADD     *($2345), TS, A"},
+			{0x0795, 1 | dasm::SUPPORTED, "ADDC    *AR5+, B"},
+			{0x0881, 1 | dasm::SUPPORTED, "SUB     *AR1, A"},
+			{0x0aed, 2 | dasm::SUPPORTED, "SUBS    *+AR5($2345), A"},
+			{0x0df5, 2 | dasm::SUPPORTED, "SUB     *+AR5($2345)%, TS, B"},
+			{0x0ef8, 2 | dasm::SUPPORTED, "SUBB    *($2345), A"},
+		};
+		for (auto const &test : memory_alu)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Memory ALU decoding distinguishes unsigned, TS and carry/borrow families");
+		}
+		osd_printf_info("TMS320C54x memory ALU disassembler: PASS modes=4096 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
