@@ -1140,6 +1140,32 @@ private:
 						"Immediate LD decoder does not promote undocumented source-bit aliases");
 				}
 		osd_printf_info("TMS320C54x immediate load disassembler: PASS forms=34 rejected=34 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x1200, 0x1300})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) &&
+						buffer.seen() == (length == 2 ? 3 : 1), "Unsigned load decoder bounds extensions for both destinations");
+				}
+		vector const unsigned_load_forms[] = {
+			{0x1212, 1 | dasm::SUPPORTED, "LDU     $12, A"},
+			{0x1383, 1 | dasm::SUPPORTED, "LDU     *AR3, B"},
+			{0x1294, 1 | dasm::SUPPORTED, "LDU     *AR4+, A"},
+			{0x13ed, 2 | dasm::SUPPORTED, "LDU     *+AR5($2345), B"},
+			{0x12f8, 2 | dasm::SUPPORTED, "LDU     *($2345), A"},
+			{0x13f8, 2 | dasm::SUPPORTED, "LDU     *($2345), B"},
+		};
+		for (auto const &test : unsigned_load_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Unsigned load syntax retains memory addressing and destination selectors");
+		}
+		osd_printf_info("TMS320C54x unsigned load disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

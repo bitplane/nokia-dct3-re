@@ -202,6 +202,13 @@ public:
 			if (load) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}
+		if (family == 0x1200 || family == 0x1300)
+		{
+			bool const extended = mode >= 0xe0;
+			stream << "LDU     "; smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family == 0x1000 || family == 0x1100 || family == 0x1400 || family == 0x1500 ||
 			family == 0x4400 || family == 0x4500)
 		{
