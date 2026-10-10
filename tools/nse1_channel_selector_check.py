@@ -18,6 +18,7 @@ from unicorn.arm_const import (
     UC_ARM_REG_SP,
     UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R6,
     UC_ARM_REG_R9,
+    UC_ARM_REG_R8,
 )
 
 
@@ -105,10 +106,17 @@ def check_request_fields(cpu, raw):
 
 
 def check_mode_writer(cpu):
+    cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+    cpu.emu_start(0x24ea71, 0x24ea90, count=32)
+    if cpu.reg_read(UC_ARM_REG_PC) != 0x24ea90:
+        raise ValueError("source binding did not reach initialization boundary")
+    if (cpu.reg_read(UC_ARM_REG_R8), cpu.reg_read(UC_ARM_REG_R9)) != (
+            0x10961a, 0x10963c):
+        raise ValueError("channel/mode staging record bindings differ")
     for mode in range(256):
-        cpu.mem_write(0x10b100, bytes((0, mode, mode ^ 0xff)))
+        cpu.mem_write(0x10963c, bytes((0, mode, mode ^ 0xff)))
         cpu.reg_write(UC_ARM_REG_R0, 0x109739)
-        cpu.reg_write(UC_ARM_REG_R9, 0x10b100)
+        cpu.reg_write(UC_ARM_REG_R9, 0x10963c)
         cpu.emu_start(0x24fa29, 0x24fa34, count=16)
         if cpu.reg_read(UC_ARM_REG_PC) != 0x24fa34:
             raise ValueError("mode writer did not reach its boundary")

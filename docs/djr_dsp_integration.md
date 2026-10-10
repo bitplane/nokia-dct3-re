@@ -863,10 +863,22 @@ at `0x24fa24`; the following call at `0x24fa38` constructs request
 fragment for all 256 mode values. This establishes an unmodified source
 byte, not its valid protocol domain or runtime lifecycle. Channel-record
 writers at `0x24f7f4` and `0x24f9fa` copy `[R8+0x1a]` into `0x109650`;
-the surrounding source-object ownership remains open. A bounded literal
+the staging records' upstream population remains open. A bounded literal
 reference scan finds 56 candidates for exact pointers `0x109650`,
 `0x109736`, or `0x109739`; aliases, computed addresses and indirect
 writes remain outside that coverage.
+
+Dispatcher entry `0x24ea70` binds R8 to fixed record `0x10961a` and SB
+to fixed record `0x10963c` at `0x24ea84/0x24ea8e`. Isolated execution
+checks both bindings before any initialization calls. Consequently the
+mode writer reads staged byte `0x10963d`, and the channel writers read
+staged byte `0x109634`; neither source is a transient incoming pointer.
+The mode-copy test now uses that actual staging record. The next unresolved
+ownership boundary is population of these staging records, not recovery
+of the dispatcher's register aliases. The receive/parser helper
+`0x26c8cc` calls `0x23d980` from `0x26c9c0` for one accepted incoming
+packet path; whether that parser populates these exact fields remains
+unproved.
 
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
