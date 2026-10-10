@@ -37,8 +37,9 @@ the VHF PLL uses a 16/17 prescaler. The divider relation is `M = N*P + A`.
 
 These are physical constraints, not decoded MAD2 SCU registers. In particular,
 the observed DSP port-31/32 pairs are not established as these 23-bit words.
-The MCU/DSP programming owner, word layout, bit order, address mapping and
-timed latch mechanism remain unknown. A future tuning model must connect
+The native MCU upload and resident accumulator packing are mapped below;
+physical bit order, address mapping and timed latch mechanism remain unknown.
+A future tuning model must connect
 an evidenced software write path to this bus rather than infer an ARFCN
 from arbitrary COBBA control values. RF sample encoding remains a separate
 unresolved MFI contract.
@@ -106,11 +107,42 @@ request index 2 can be remapped by `0x28dd00` to index 11 (return 2)
 or 26 (return 3). It then indexes the descriptor-pointer table and copies
 five halfwords to the shared header, derives the staging pointer from
 descriptor offset 6, and advances the source by 12 bytes. The live
-descriptor address establishes the selected record; it does not by itself
-name the hardware/configuration bits read by `0x28dd00`. The values are
+descriptor address establishes the selected record. Static decoding of
+`0x28dd00..0x28dd20`, with pools `0x28ddec=0002000e` and
+`0x28ddd8=00020000`, identifies its inputs as MAD2 external-status
+byte `0x2000e` bit 3 and PUP GenIO byte `0x20020` bit 1. Both clear
+select return 3; otherwise the status bit chooses return 1 or 2. This
+names the register predicates, not their external pin functions. The values are
 firmware-uploaded configuration, not a backend-invented addend. Physical
-units and the selector's input semantics remain unresolved; do not equate
-`13a6` with a frequency or prescaler setting without that contract.
+the selector's input semantics remain unresolved. The numeric physical
+consistency test below does not replace the missing port-to-wire contract.
+
+#### Frequency-plan consistency
+
+The [Nokia NSE-1 manual](https://www.scribd.com/document/74806191/41-Mobile100-Technical)
+(03/98, pp. 3-48, 3-51--53) specifies a 64/65 UHF prescaler with
+200 kHz reference, upper-side receive injection at 71 MHz IF and
+116 MHz transmit IF. [ETSI TS 45.005, section 2, table 2-2](https://www.etsi.org/deliver/etsi_ts/145000_145099/145005/11.03.00_60/ts_145005v110300p.pdf)
+gives P-GSM 900 carriers `935 + 0.2*n` MHz receive and
+`890 + 0.2*n` MHz transmit for channels 1..124.
+
+**Inference:** the recovered addend `13a6` is 5030; at 200 kHz that
+is 1006 MHz. Adding selected entry 109 gives divider 5139, whose
+64-based quotient/remainder are 80/19, exactly the captured packing
+`00302813`. Its inferred LO is 1027.8 MHz, simultaneously equal to
+channel-109 RX 956.8 MHz plus 71 MHz and TX 911.8 MHz plus 116 MHz.
+Thus two independent IF relationships support a channel/divider
+interpretation, rather than an arbitrary numeric coincidence.
+`nse1_gsm900_tuning_consistency` checks this relation in integer Hz;
+unit coverage of all 124 channels is reference arithmetic, not native
+execution coverage. Cold-run summaries label it
+`numeric-consistency-inference` with `wire_validated=false`.
+
+This does not prove that the DSP pair is serialized unchanged onto
+PLUSSA, decode control bits `0x30`, establish settling/readiness, or
+validate sample cadence/encoding. Keep it out of the operational hardware
+decoder until the port-to-wire path is evidenced. No DCS/PCS/extended-band
+mapping or native acquisition follows from this bounded P-GSM result.
 
 ### Software RF reference boundary
 

@@ -71,6 +71,24 @@ def pack_tuning_nonnegative(value):
     return (quotient << 7) | remainder | (0x30 << 16)
 
 
+def nse1_gsm900_tuning_consistency(packed):
+    """Manual/ROM numeric inference, not a validated synthesizer-wire decoder."""
+    if not 0 <= packed <= 0xffffffff or packed >> 16 != 0x30 or packed & 0x40:
+        raise ValueError("not the bounded NSE-1 packing family")
+    low = packed & 0xffff
+    divisor = (low >> 7) * 64 + (low & 0x3f)
+    channel = divisor - 0x13a6
+    if not 1 <= channel <= 124:
+        raise ValueError("numeric inference is bounded to P-GSM 900")
+    lo_hz = divisor * 200000
+    rx_hz = 935000000 + channel * 200000
+    tx_hz = 890000000 + channel * 200000
+    if lo_hz - rx_hz != 71000000 or lo_hz - tx_hz != 116000000:
+        raise ValueError("divider does not match the NSE-1 frequency plan")
+    return dict(channel=channel, lo_hz=lo_hz, rx_hz=rx_hz, tx_hz=tx_hz,
+                evidence_class="numeric-consistency-inference", wire_validated=False)
+
+
 def check_tuning_stages(text):
     stages = [dict(FIELDS.findall(match[1])) for match in
               re.finditer(r"rom4_rf_tuning_stage: (.*)", text)]

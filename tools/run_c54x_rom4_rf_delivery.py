@@ -10,9 +10,11 @@ import tempfile
 
 try:
     from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
+    from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
     from tools.c54x_rom4_rf_score_check import check as check_score
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
+    from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
     from c54x_rom4_rf_score_check import check as check_score
 
 
@@ -58,14 +60,17 @@ def main():
             text = (case / "error.log").read_text()
             actual_mode, results, accepted = check_score(text)
             object_address, body = check_delivery(text)
-            check_tuning_upload(text)
+            tuning = nse1_gsm900_tuning_consistency(check_tuning_upload(text))
             check_tuning_blob(text)
             if check_request(text) != int(body, 16):
                 raise ValueError("response body differs from selected request entry")
+            if tuning["channel"] != int(body, 16):
+                raise ValueError("tuning inference differs from requested entry")
             if actual_mode != mode:
                 raise ValueError("RF stimulus mode differs from requested case")
             observations.append(dict(mode=mode, repeat=repeat, results=results,
-                                     accepted=accepted, object=object_address, native_body=body))
+                                     accepted=accepted, object=object_address, native_body=body,
+                                     tuning_consistency=tuning))
             print(f"Native RF delivery: PASS mode={mode} repeat={repeat} "
                   f"results={results} accepted={accepted} body={body}", flush=True)
     (run / "summary.json").write_text(json.dumps(dict(cases=observations,

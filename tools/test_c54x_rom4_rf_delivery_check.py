@@ -2,6 +2,7 @@ import unittest
 
 from tools.c54x_rom4_rf_delivery_check import (check, check_request, check_tuning,
     check_tuning_stages, check_tuning_upload, check_tuning_blob, pack_tuning_nonnegative, decode_search_bitmap)
+from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -15,6 +16,20 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_manual_frequency_consistency(self):
+        actual = nse1_gsm900_tuning_consistency(0x302813)
+        self.assertEqual((actual["channel"], actual["lo_hz"], actual["rx_hz"], actual["tx_hz"]),
+                         (109, 1027800000, 956800000, 911800000))
+        self.assertFalse(actual["wire_validated"])
+        for channel in range(1, 125):
+            result = nse1_gsm900_tuning_consistency(pack_tuning_nonnegative(5030 + channel))
+            self.assertEqual(result["channel"], channel)
+            self.assertEqual(result["lo_hz"], 1006000000 + 200000 * channel)
+        for packed in (-1, 0x100000000, 0x302853, 0x312813,
+                       pack_tuning_nonnegative(5030), pack_tuning_nonnegative(5155)):
+            with self.subTest(packed=packed), self.assertRaises(ValueError):
+                nse1_gsm900_tuning_consistency(packed)
+
     def test_blob_selection(self):
         rows = [("00272122", "00299894", "216a0000", "ffff0000"),
                 ("00272122", "00299894", "00001e80", "0000ffff"),
