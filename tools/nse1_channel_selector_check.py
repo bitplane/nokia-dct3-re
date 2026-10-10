@@ -193,6 +193,32 @@ def check_optional_mode_parser(cpu):
     return 512
 
 
+def check_channel_description(cpu, raw):
+    if raw[0xaab90:0xaab98] != bytes.fromhex("2f20408000010307"):
+        raise ValueError("channel description mapping tables differ")
+    for first in range(256):
+        cpu.mem_write(0x109650, bytes([0xee]) * 12)
+        cpu.mem_write(0x10b100, bytes((first, 0, 1)))
+        cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+        cpu.reg_write(UC_ARM_REG_R0, 0x64)
+        cpu.reg_write(UC_ARM_REG_R1, 0x10b100)
+        cpu.reg_write(UC_ARM_REG_R2, 3)
+        cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
+        cpu.emu_start(0x23ca45, RETURN, count=512)
+        if cpu.reg_read(UC_ARM_REG_PC) != RETURN:
+            raise ValueError("channel description did not return within bound")
+        kind = first >> 3
+        actual = bytes(cpu.mem_read(0x109650, 12))
+        if 1 <= kind < 16:
+            group = kind.bit_length() - 1
+            channel = (kind & (0, 1, 3, 7)[group]) | (0x2f, 0x20, 0x40, 0x80)[group]
+            if actual[:9] != bytes((channel, first & 7, 0, 0, 0, 0, 0, 1, 0)):
+                raise ValueError(f"channel description differs for {first:#x}")
+        elif actual != bytes([0xee]) * 12:
+            raise ValueError(f"rejected channel description wrote fields for {first:#x}")
+    return 256
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -228,6 +254,7 @@ def check_image(raw):
             "mode_writer_cases": check_mode_writer(cpu),
             "mode_parser_cases": check_mode_parser(cpu, raw),
             "optional_mode_parser_cases": check_optional_mode_parser(cpu),
+            "channel_description_cases": check_channel_description(cpu, raw),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

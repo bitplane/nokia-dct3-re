@@ -905,6 +905,16 @@ element-to-record link, not the complete message parser, its live receive
 route, or native speech activation. No packet is injected into a handset
 run by this isolated test.
 
+Channel-description element `0x64` independently reaches `0x23cf3a`
+and writes the request constructor's channel record at `0x109650`.
+For a non-hopping channel number 1, all 256 first-byte values are executed:
+type bits 1 map to channel `0x2f`, 2/3 to `0x20/0x21`, 4..7 to
+`0x40..0x43`, and 8..15 to `0x80..0x87`; type 0 and 16..31 preserve
+the record. The low three bits become the timeslot. The mapping uses the
+ROM tables at `0x2aab90/0x2aab94`. Thus parsed types 1/2/3 supply exactly
+the three channel values that enable request `0x03ed`. This test does not
+cover hopping, the full channel-number domain, or a live assignment.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
