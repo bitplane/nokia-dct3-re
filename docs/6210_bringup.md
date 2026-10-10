@@ -573,14 +573,13 @@ presses physical End and verifies release and resumed paging; the SMS fixture
 opens the delivered message and verifies its persistent read status and frame.
 These remain signaling/storage checks, not speech validation.
 
-All three scenarios reproduce on the built `d57d91b` source checkpoint
-(`run_6210_post_native_fixture_{idle,call,sms}_20261009`), including the
-bounded cipher-observation and physical-capture harness changes and the
-native arithmetic fixture additions. The accompanying tools suite passes
-2,266 tests with one skip (`run_post_native_fixture_tools_20261009.log`).
-Independently fresh accessory boots also pass the cold-repeat comparison on
-the earlier `f3d15b3` build, including identical protocol, CCONT/flash/SIM storage and idle/Menu
-pixels. Each state scenario requires a distinct evidence directory; the
+All three restoration scenarios and the independent accessory cold-repeat
+comparison reproduce on source checkpoint `622c86c1`. Retained evidence is
+under `tmp/6210-{idle,call,sms}-after-native-bsp/` and
+`tmp/6210-cold-after-native-bsp/{first,second}/`, with per-run
+`acceptance.json` and raw logs. The cold comparison checks identical
+protocol, CCONT/flash/SIM storage and idle/Menu pixels; it is not a comparison
+of copies of one completed run. Each state scenario requires a distinct evidence directory; the
 runner refuses an existing directory rather than overwriting a previous run.
 The acceptance covers
 exact saved architectural state/time, selected protocol replay and the
