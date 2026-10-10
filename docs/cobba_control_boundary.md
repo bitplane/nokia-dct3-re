@@ -306,10 +306,17 @@ fresh eight-second capture reaches the publisher's port-1 doorbell
 instruction at `0x3807` for type `008a`, length 2, at 1.644837058
 seconds, with producer `00ab`, consumer `00a9` and control `0x06e1=0`.
 This establishes ring publication and notification for the first response;
-the device's port-1 handler invokes the transport RX notification. MCU
-consumption remains unverified. DSP-local data-space write taps cannot
+the device's port-1 handler invokes the transport RX notification. A fresh
+eight-second MCU-side write capture then observes the consumer advance
+from `00a9` to `00aa` at 1.645136923 seconds (PC `00271908`), and to
+`00ab` at 1.645150077 seconds (PC `00271998`). These are low-halfword
+writes at aligned MCU address `000101c8`, mask `0000ffff`, selecting
+the consumer halfword at `000101ca`. Thus firmware drains both header
+and body of this native response. This proves ring consumption, not
+application-level interpretation or successful RF acquisition.
+DSP-local data-space write taps cannot
 establish absence of MCU-side shared-memory consumer updates.
-The next boundary is to classify and observe the MCU consumer of this
+The next boundary is to classify the downstream MCU handler of this
 naturally constructed type-`0x8a` response before choosing an operational RF contract. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
 nine accepted stores); it does not validate packet delivery or acquisition.
