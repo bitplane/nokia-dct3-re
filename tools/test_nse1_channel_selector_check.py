@@ -28,6 +28,7 @@ class ChannelSelectorTests(unittest.TestCase):
             self.skipTest("acquired NSE-1 ROM is not distributed with sources")
         result = check_image(rom.read_bytes())
         self.assertEqual(result["cases"], 65536)
+        self.assertEqual(result["ring_copy_start_positions"], 82)
         self.assertEqual(result["c3_first_arguments"], [0x21, 0xe4])
 
 

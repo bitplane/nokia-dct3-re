@@ -797,9 +797,8 @@ that is not a second evidenced speech mode.
 MCU image's leaf routine with Unicorn and checks all 65,536 byte-input
 pairs, including a bounded clean return. This is an isolated algorithm
 fixture, not a handset-state intervention. The live writers and valid
-domains of controller bytes `6/7/0x48`, and the packet-body-to-native-word
-correspondence, remain necessary before constructing any native traffic
-assignment fixture.
+domains of controller bytes `6/7/0x48` remain necessary before constructing
+any native traffic assignment fixture.
 
 The native side of that correspondence is byte-checked: `0x387b` consumes
 the ring header with `*AR2+%`; `0x387f` extracts its low-byte type while
@@ -807,9 +806,20 @@ the ring header with `*AR2+%`; `0x387f` extracts its low-byte type while
 the first payload word, not at the header. Its reads at `0x3a0c/15/1b/1d/26`
 consume payload words 1 through 5; `0x3a27` writes word 5's high byte to
 `0x1869`. The existing transport's `tx_payload_byte` independently uses
-header cursor + 1 and high-byte-first packing. The MCU task-3 copy from
-object byte 4 into that ring remains a separate boundary to verify; only
-with that copy established does object byte `0x0c` map to `0x1869`.
+header cursor + 1 and high-byte-first packing.
+
+The MCU copy closes the field alignment: `0x2869a6..0x2869aa` loads length
+from object byte 2 and calls `0x27185a` with object + 3. That wrapper forms
+the length/type header and advances the source to object + 4. Its sole
+direct ring-writer call at `0x271886` reaches `0x2717de`, whose loop packs
+two source bytes high-byte first and publishes the producer at `0x27183e`.
+The isolated checker executes this wrapper through producer commit for
+all 82 start cursors, verifies all eleven words of a 20-byte payload,
+and checks wrap and producer advancement. It stops before scheduler calls;
+this is not a live handset transaction. Together with the native parser,
+this establishes object byte `0x0c` -> payload byte 8 -> pending word
+`0x1869`. Valid live controller arguments and traffic assignment remain
+unproved; packet alignment is no longer the open question.
 
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
