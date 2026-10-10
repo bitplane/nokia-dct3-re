@@ -183,6 +183,18 @@ public:
 			util::stream_format(stream, "RPT     #%u", op & 255);
 			return 1 | SUPPORTED;
 		}
+		u16 const immediate_form = op & 0xfcf0;
+		u16 const immediate_high = op & 0xfcff;
+		if (immediate_form == 0xf000 || immediate_form == 0xf010 || immediate_form == 0xf050 ||
+			immediate_high == 0xf060 || immediate_high == 0xf061 || immediate_high == 0xf065)
+		{
+			bool const high = immediate_high == 0xf060 || immediate_high == 0xf061 || immediate_high == 0xf065;
+			char const *name = high ? (immediate_high == 0xf060 ? "ADD" : immediate_high == 0xf061 ? "SUB" : "XOR") :
+				(immediate_form == 0xf000 ? "ADD" : immediate_form == 0xf010 ? "SUB" : "XOR");
+			util::stream_format(stream, "%-8s#$%04X, %u, %c, %c", name, next_word(), high ? 16 : op & 15,
+				BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
+			return 2 | SUPPORTED;
+		}
 		if ((op & 0xfce0) == 0xf460 || (op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf0c0)
 		{
 			int const shift = (op & 0x10) ? int(op & 31) - 32 : int(op & 31);

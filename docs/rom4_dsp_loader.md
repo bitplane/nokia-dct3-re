@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 230 decoded and 396
+promoted to a boundary. Current cold-idle coverage is 243 decoded and 383
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1780,6 +1780,13 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger control-flow decoding
+
+Immediate ADD, SUB and XOR decode the literal, independent accumulator
+selectors and shifts 0 through 16, including the separate shift-16 opcode
+forms. The gate checks 204 forms on two pages with bounded literal reads,
+seven exact syntax examples and a negative unsupported-family example.
+Its marker is `TMS320C54x immediate ALU disassembler: PASS`. Other immediate
+families remain raw until reviewed; execution and timing are unchanged.
 
 Accumulator SFTA, shifted LD and shifted XOR decode the signed five-bit
 shift and independent source/destination bits. ROL, ROR and ROLTC decode

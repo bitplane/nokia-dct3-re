@@ -668,6 +668,36 @@ private:
 					"Accumulator decoding retains signed shift and rotate source");
 			}
 		osd_printf_info("TMS320C54x accumulator disassembler: PASS shift_forms=384 rotate_forms=6 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xf000, 0xf010, 0xf050})
+				for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
+					for (unsigned shift = 0; shift <= 16; ++shift)
+					{
+						u16 const high = family == 0xf000 ? 0xf060 : family == 0xf010 ? 0xf061 : 0xf065;
+						u16 const op = (shift == 16 ? high : family | shift) | (accumulators << 8);
+						words const buffer(pc, op, 0x2345);
+						std::ostringstream text;
+						expect(decoder.disassemble(text, pc, buffer, buffer) == (2 | dasm::SUPPORTED) && buffer.seen() == 3,
+							"Immediate arithmetic decoder reads one page-wrapped literal");
+					}
+		vector const immediate_alu[] = {
+			{0xf000, 2 | dasm::SUPPORTED, "ADD     #$2345, 0, A, A"},
+			{0xf10f, 2 | dasm::SUPPORTED, "ADD     #$2345, 15, A, B"},
+			{0xf21f, 2 | dasm::SUPPORTED, "SUB     #$2345, 15, B, A"},
+			{0xf350, 2 | dasm::SUPPORTED, "XOR     #$2345, 0, B, B"},
+			{0xf360, 2 | dasm::SUPPORTED, "ADD     #$2345, 16, B, B"},
+			{0xf161, 2 | dasm::SUPPORTED, "SUB     #$2345, 16, A, B"},
+			{0xf065, 2 | dasm::SUPPORTED, "XOR     #$2345, 16, A, A"},
+			{0xf020, 1, ".word   $F020"},
+		};
+		for (auto const &test : immediate_alu)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Immediate decoder retains shift and independent accumulators without claiming other families");
+		}
+		osd_printf_info("TMS320C54x immediate ALU disassembler: PASS forms=204 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
