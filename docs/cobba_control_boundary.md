@@ -90,6 +90,11 @@ the census excludes the observer's own memory reads. This demonstrates
 interleaved circular-history consumption in the executed core, but does
 not assign physical I/Q names to either lane. The capture uses zero RF
 input and is not an impulse-response or nonzero arithmetic test.
+Validate a captured log with
+`tools/c54x_rom4_scan_filter_check.py /path/to/error.log`. The checker
+requires both bounded state captures and the exact 32-read prefix,
+including coefficient values; it deliberately allows nonzero history
+values so it does not encode silence as an RF-format requirement.
 Recover lane impulse responses and output scaling before converting an
 independently generated complex waveform to words.
 
