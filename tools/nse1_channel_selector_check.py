@@ -171,6 +171,28 @@ def expected_selector(first, second):
     return choices.get(first, (first - 33) & 0xffffffff)
 
 
+def check_optional_mode_parser(cpu):
+    allowed = (0, 1, 0x21, 0x41, 0x0f, 3, 0x0b, 0x13)
+    for present in (0, 1):
+        for value in range(256):
+            cpu.mem_write(0x109738, bytes((present, 0xee)))
+            cpu.mem_write(0x10b100, bytes((0x63, value)))
+            cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+            cpu.reg_write(UC_ARM_REG_R0, 0x2e)
+            cpu.reg_write(UC_ARM_REG_R1, 0x10b100)
+            cpu.reg_write(UC_ARM_REG_R2, 2)
+            cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
+            cpu.emu_start(0x23d335, RETURN, count=1024)
+            if cpu.reg_read(UC_ARM_REG_PC) != RETURN:
+                raise ValueError("optional mode parser did not return within bound")
+            expected = (bytes((1, value)) if not present and value in allowed
+                        else bytes((present, 0xee)))
+            if bytes(cpu.mem_read(0x109738, 2)) != expected:
+                raise ValueError(
+                    f"optional mode parser differs for {value:#x}, present={present}")
+    return 512
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -205,6 +227,7 @@ def check_image(raw):
             "request_field_cases": check_request_fields(cpu, raw),
             "mode_writer_cases": check_mode_writer(cpu),
             "mode_parser_cases": check_mode_parser(cpu, raw),
+            "optional_mode_parser_cases": check_optional_mode_parser(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

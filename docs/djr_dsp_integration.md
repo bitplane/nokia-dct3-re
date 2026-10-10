@@ -896,6 +896,15 @@ It supplies an independently accepted `0x21` mode value without using
 the unmatched `0xe4` arithmetic residue. Tracing the enclosing message
 parser and its physical ingress is still required for native speech.
 
+The enclosing optional-element parser `0x23d334` is independently executed
+with message selector `0x2e` and the two-byte element `63 <mode>`. Its call
+at `0x23d448` reaches the same element dispatcher. All 256 byte values,
+with both absent and already-present mode fields (512 cases), reproduce
+the acceptance and preservation contract above. This closes the optional
+element-to-record link, not the complete message parser, its live receive
+route, or native speech activation. No packet is injected into a handset
+run by this isolated test.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
