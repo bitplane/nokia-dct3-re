@@ -975,6 +975,15 @@ headers leave the cleared region, although the length metadata is still
 stored. This verifies one record-population branch without claiming the
 segmented branch, incoming-kind meanings, or native RF delivery.
 
+A distinct unsegmented branch of the same processor is executed for kind
+0, address/control bytes `03/03`, and all 256 length-header bytes. Header
+low bits `01` and length 1..20 clear the 23-byte record region, copy exactly
+the declared length from input offset 17, and store that length at record
+`0x12b`. All other length headers preserve the payload region and length
+field (the earlier metadata-byte write is separate). This verifies 256
+cases of the non-fixed block path, not its sequence-number/reassembly
+branches or the semantics of incoming kind 0.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
