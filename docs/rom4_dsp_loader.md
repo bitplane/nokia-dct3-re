@@ -2592,6 +2592,19 @@ an immediate store. The marker span verifies their combined 1+1+2+2+2 cycles.
 Exact `7718`, `7728`, and `7758` check direct `STM` writes to SP, page-zero
 data, and CLKMD at two cycles each. A fixture-only `LDM CLKMD,A` reads back
 the model's status bit; this is not a silicon PLL-lock timing assertion.
+The separate 16-case CLKMD fixture exercises writes through original
+`STM`, reads through `LDM` and captures through `STL`: once in PLL mode,
+attempted changes to PLLMUL, PLLDIV, PLLCOUNT and PLLON/OFF preserve the
+active configuration. PLLNDIV can still select DIV, after which new control
+fields are accepted; software cannot assign PLLSTATUS. This follows
+[SPRU131G table 8-18 and the mode-switch procedure](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+The old core fails the protected-field assertion (`tmp/c54x-clkmd-red.log`);
+the corrected core passes all 16 settings and the full native suite
+(`tmp/c54x-clkmd-green.log`). The native NSE-1 RF-boundary regression also
+passes (`tmp/c54x-clkmd-rom4-rf.log`: 648,288 reads, 1,580 port-32 writes,
+no port-38/39 reads). These tests establish register write eligibility,
+not PLL lock latency, input-clock geometry or clock-rate switching. The
+existing immediate status transition remains a declared model limitation.
 Exact `8812`, `881a`, `8915`, and `891a` check direct `STLM` writes to AR2,
 BRC, AR5, and BRC. An intervening `MVMD BRC,dmad` preserves A's first BRC
 write before B overwrites it; the marker span checks four one-cycle stores and

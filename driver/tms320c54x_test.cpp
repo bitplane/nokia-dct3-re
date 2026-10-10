@@ -410,6 +410,31 @@ private:
 			}
 		osd_printf_info("TMS320C54x timer reserved fields: PASS cases=64 debugger_free_soft_behavior_claim=0\n");
 	}
+	void start_clkmd_write_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		u16 const initial = u16((index << 12) | 0x0494);
+		u16 const replacement = u16((~initial & 0xfff8) | 4);
+		u16 pc = 0x0b00;
+		auto write = [&](u16 value) { program.write_word(pc++, 0x7758); program.write_word(pc++, value); };
+		auto capture = [&](u16 address) {
+			program.write_word(pc++, 0x4858); // LDM CLKMD,A
+			program.write_word(pc++, 0x80f8); program.write_word(pc++, address); // STL A,*(address)
+		};
+		write(0); // Leave PLL before programming any protected fields.
+		write(initial | 2); capture(0x0501);
+		write(replacement | 3); capture(0x0502); // PLLSTATUS is not writable.
+		write(replacement); // Only PLLNDIV may change while still in PLL.
+		write(replacement | 2); capture(0x0503); // Now in DIV: replacement is legal.
+		program.write_word(pc, 0xf4e1);
+		m_cpu->set_state_int(STATE_GENPC, 0x0b00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 79000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_timer_boundary_probe(unsigned index)
 	{
 		bool const short_period = !(index & 1);
@@ -19155,6 +19180,22 @@ private:
 			}
 			if (index < 8) { start_bsp_interrupt_case(index + 1); return; }
 			osd_printf_info("TMS320C54x BSP interrupt sources: PASS cases=9 save_replay=9 handset_audio_claim=0\n");
+			start_clkmd_write_case(0);
+			return;
+		}
+		if (m_phase >= 79000 && m_phase < 79016)
+		{
+			unsigned const index = m_phase - 79000;
+			u16 const initial = u16((index << 12) | 0x0494);
+			u16 const replacement = u16((~initial & 0xfff8) | 4);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE), "CLKMD fixture completes original STM/LDM/STL instructions");
+			expect(data.read_word(0x0501) == (initial | 3) &&
+				data.read_word(0x0502) == (initial | 3) &&
+				data.read_word(0x0503) == (replacement | 3),
+				"SPRU131G CLKMD protected fields require DIV mode; PLLNDIV remains writable and PLLSTATUS read-only");
+			if (index < 15) { start_clkmd_write_case(index + 1); return; }
+			osd_printf_info("TMS320C54x CLKMD write protection: PASS cases=16 physical_clock_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

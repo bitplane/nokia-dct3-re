@@ -555,6 +555,10 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 	}
 	else if (address == 0x58)
 	{
+		// SPRU131G table 8-18: only PLLNDIV may be modified in PLL mode.
+		// Multiplier, divider, lock count and PLL power require DIV mode.
+		if (BIT(m_clkmd, 0))
+			value = (m_clkmd & ~u16(3)) | (value & 2);
 		// CLKMD bit 0 is read-only PLLSTATUS. Model the mode transition as
 		// immediate until the input-clock-derived PLL lock timer is exposed.
 		m_clkmd = (value & ~u16(1)) | BIT(value, 1);

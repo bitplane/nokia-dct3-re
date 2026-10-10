@@ -12,6 +12,7 @@ REQUIRED = [
     "TMS320C54x RCD accumulator conditions: PASS variants=36",
     "TMS320C54x MIN/MAX conformance: PASS variants=256",
     "TMS320C54x BSP interrupt sources: PASS cases=9 save_replay=9 handset_audio_claim=0",
+    "TMS320C54x CLKMD write protection: PASS cases=16 physical_clock_claim=0",
     "TMS320C54x ROLTC conformance: PASS variants=256",
     "TMS320C54x core conformance: PASS",
     "TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4",
