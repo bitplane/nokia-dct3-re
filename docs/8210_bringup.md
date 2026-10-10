@@ -1852,14 +1852,25 @@ message ID `1802`. It later enters the first two sites in state 7 with
 phase `0a`, taking the nonzero alternative. The DCS PIN-eight-second
 control enters none of these three sites through 46 seconds. Thus a wrong
 phase at this gate is not observed in DCS: the divergence precedes entry.
-Receive-table entry 17 at `21bc28` selects `21f6fc`; its handling of `1802`
-and subsequent completion routing are the next ownership boundary.
+Receive-table entry 17 at `21bc28` selects `21f6fc`, but the observed
+completion uses a private receive loop rather than that table entry.
 GSM evidence is `tmp/noki8210_completion_phase_gsm_pin/error.log`, SHA-256
 `c12c67b714d81a49e810a698c1f66c3ea3aa56b638bd99a1b2497e780ea6a05b`;
 DCS evidence is `tmp/noki8210_completion_phase_dcs/error.log`, SHA-256
 `06c3002ba3130a39f8544aab57a9c2030c37f1e3b4ab10311a000c1d2e8833c5`.
 The exploratory GSM run without `configure_pin_topology` is not the
 passing-topology control. No phase, selector or packet was injected.
+
+At the first GSM completion, selector result 3 precedes `PH_1300` and
+the private receive loop `21f602..21f61c`. It receives bytes
+`180208890000000000000000` at 10.791743s. The pinned `21f624..21f644`
+predicate requires both ID `1802` and class `89`; periodic ID `1802` with
+class `83` is not interchangeable. It additionally dereferences `137f5c`
+and requires result-record byte `+2 == 1`. The successful branch calls
+`21bc58`, selects phase zero at `21bc5e`, stores it at `21c348`, and
+reaches the completion gate. Consequently the next predecessor is the
+selector-result-3 entrance and its record publication, not the mere
+presence of periodic `1802` packets or the state-17 dispatch table.
 
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon

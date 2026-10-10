@@ -209,6 +209,25 @@ def verify(image):
             ('adr', 'r0, #0x24c'), ('bl', '#0x2d5dcc'),
             ('bl', '#0x2a1d44')]:
         raise ValueError('initial request completion phase-zero gate differs')
+    if int.from_bytes(read(0x21f9a0, 4), 'big') != 0x1802:
+        raise ValueError('private completion wait input differs')
+    if int.from_bytes(read(0x21f960, 4), 'big') != 0x137f5c:
+        raise ValueError('private completion result-record root differs')
+    if instructions(0x21f624, 36) != [
+            ('ldr', 'r0, [pc, #0x378]'), ('cmp', 'r1, r0'),
+            ('beq', '#0x21f62c'), ('b', '#0x21efe6'),
+            ('ldrb', 'r0, [r4]'), ('cmp', 'r0, #0x89'),
+            ('beq', '#0x21f634'), ('b', '#0x21efe6'),
+            ('adr', 'r0, #0x378'), ('bl', '#0x2d5dcc'),
+            ('ldr', 'r0, [pc, #0x324]'), ('ldr', 'r0, [r0]'),
+            ('ldrb', 'r0, [r0, #2]'), ('cmp', 'r0, #1'),
+            ('bne', '#0x21f648'), ('bl', '#0x21bc58')]:
+        raise ValueError('private completion class/result predicate differs')
+    if instructions(0x21bc5e, 4) != [
+            ('movs', 'r0, #0'), ('b', '#0x21c348')]:
+        raise ValueError('private completion phase-zero selection differs')
+    if instructions(0x21c348, 2) != [('str', 'r0, [r4, #0xc]')]:
+        raise ValueError('completion phase storage differs')
     if int.from_bytes(read(0x2a110c, 4), 'big') != 0x137f58:
         raise ValueError('selected-cell request queue context differs')
     if instructions(0x2a0dcc, 10) != [
