@@ -1254,6 +1254,17 @@ contracts require verification before interpreting the flag as an
 acquisition failure. Fresh storage here means a newly created private
 NVRAM directory containing only the generated NSE-1 EEPROM profile.
 
+Both candidate callers are now byte-pinned. Entry `0x996b` calls
+`0x2472`, tests B bit `0x8000` using A, and returns when clear;
+otherwise it passes `0x195b & 0x0800` in A to `0x4677` and clears
+flag bits `0x0c00` in the delay slot. Entry `0x9988` instead masks
+B with `0x4000`; its branch at `0x9991` is **BEQ**, not AEQ,
+so loading and masking `0x195b` into A does not change that gate.
+When B is nonzero, it passes `0x195b & 0x0800` in A and sets
+bit `0x0800` in the delayed call's slot. These fragments establish
+the argument/branch contract only; the provenance of incoming B
+and the runtime contents of hook `0x2472` remain separate questions.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
