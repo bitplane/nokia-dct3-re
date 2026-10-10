@@ -649,8 +649,12 @@ adjacent gap about 115.384 ns. Across all 64 reads the zero stimulus spans
 4.611250000 ms and 4.611326923 ms respectively. The roughly 77 ns
 difference is an observed execution-timing difference, not a changed
 physical ADC clock. Counter snapshots again range from 1 through 6.
-The checker validates the reviewed scan-PC window separately from
-startup, and the cold-run summary retains both observations. These
+The checker requires the exact repeating advanced-PC sequence
+`330c,3312,3318,331e`, separately from startup. Each 32-word scan group
+spans about 4.115385 microseconds; the start intervals are
+4.615365384 ms (zero) and 4.615442307 ms (tone). The cold-run summary
+retains group spans and start intervals rather than inferring a sampling
+rate from aggregate reads. These
 captures constrain consumption scheduling but do not select a receive
 buffer depth, latch policy, lane order or sample-production clock.
 Do not connect read-indexed tone/GMSK data as an operational RF source

@@ -9,10 +9,32 @@ def fixture():
         "pc=3310 counter=0010" for i in range(1, 65))
 
 
+def scan_fixture():
+    pcs = (0x330c, 0x3312, 0x3318, 0x331e)
+    return "\n".join(
+        f"rom4_rf_scan_consumption: index={i} t={1 + i / 1000000:.12f} "
+        f"pc={pcs[(i - 1) % 4]:04x} counter=0010" for i in range(1, 65))
+
+
 class ConsumptionTests(unittest.TestCase):
     def test_scan_window(self):
-        text = fixture().replace("sample_consumption", "scan_consumption").replace("pc=3310", "pc=3311")
+        text = scan_fixture()
         self.assertEqual(check(text, scan=True)["window"], "scan")
+
+    def test_scan_sequence_order(self):
+        with self.assertRaises(ValueError):
+            check(scan_fixture().replace("pc=3312", "pc=3318", 1), scan=True)
+
+    def test_scan_missing_loop_read(self):
+        with self.assertRaises(ValueError):
+            check(scan_fixture().replace("pc=331e", "pc=330c", 1), scan=True)
+
+    def test_group_measurements(self):
+        result = check(scan_fixture(), scan=True)
+        self.assertAlmostEqual(result["group_start_interval_seconds"], 32e-6)
+        self.assertAlmostEqual(result["between_groups_gap_seconds"], 1e-6)
+        for span in result["group_spans_seconds"]:
+            self.assertAlmostEqual(span, 31e-6)
 
     def test_startup_not_scan_evidence(self):
         with self.assertRaises(ValueError):

@@ -18,6 +18,8 @@ def check(text, *, scan=False):
         raise ValueError("expected exactly the first 64 consecutive RF reads")
     if scan and any(not 0x330a <= row[2] <= 0x3326 for row in rows):
         raise ValueError("scan consumption escaped the reviewed filter window")
+    if scan and [row[2] for row in rows] != [0x330c, 0x3312, 0x3318, 0x331e] * 16:
+        raise ValueError("scan consumption differs from the byte-pinned four-read loop")
     times = [row[1] for row in rows]
     if any(not math.isfinite(t) or t < 0 for t in times):
         raise ValueError("invalid RF read timestamp")
@@ -27,6 +29,10 @@ def check(text, *, scan=False):
     return dict(window="scan" if scan else "startup", reads=len(rows), first_time=times[0], last_time=times[-1],
                 minimum_gap_seconds=min(deltas), maximum_gap_seconds=max(deltas),
                 span_seconds=times[-1] - times[0],
+                group_size_words=32,
+                group_spans_seconds=[times[31] - times[0], times[63] - times[32]],
+                group_start_interval_seconds=times[32] - times[0],
+                between_groups_gap_seconds=times[32] - times[31],
                 program_counters=sorted(set(row[2] for row in rows)),
                 frame_counter_values=sorted(set(row[3] for row in rows)),
                 evidence_class="native-read-consumption", physical_sample_rate_proven=False)
