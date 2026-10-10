@@ -379,6 +379,33 @@ Its negative tests reject every omitted link, mismatched objects/status,
 wrong masks/cursors and reversed time; ring wrap is covered. The checker
 passes this capture. It does not prove payload preservation into the task,
 candidate acquisition, or the downstream case's flag/counter semantics.
+
+The isolated cold-control runner is:
+
+```sh
+.venv/bin/python tools/run_c54x_rom4_rf_delivery.py --mame mame/mame --rompath mame/roms
+```
+
+It creates a unique evidence directory under `/tmp`, generates matching
+NSE-1 EEPROM for each case, and keeps MAME's working directory, logs and
+NVRAM separate. Default coverage is two fresh 60-second runs per mode.
+Both score and delivery checkers must pass; repeated score totals,
+accepted-store counts, first response body and received object address
+must agree within each mode. It is a standalone research gate, not a
+physical-RF or registered-network acceptance gate.
+
+| Port control | Fresh runs | Scores per run | Accepted stores | First native body | Task receipt |
+| --- | ---: | ---: | ---: | --- | --- |
+| Zero | 2 | 5158, all zero | 0 | `006d` | status `1390`, object `101438` |
+| Rotating pairs | 2 | 5146, all nonzero | 9 | `006d` | status `1390`, object `101438` |
+
+Both controls deliver the same first response despite different score
+behavior. Candidate scoring therefore does not by itself establish a
+successful acquisition result. The repeat checker has negative coverage
+for changes to every compared observable and treats the two modes
+independently. This is within-build repeatability, not a cross-host
+determinism claim.
+
 The consumer's `LSR #26; BCS` tests original controller bit 25: set
 skips the counter increment. A later `LSR #27; BCS` tests bit 26.
 One fresh capture with a case-window tap and narrow counter watch records
