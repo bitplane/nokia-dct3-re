@@ -18,6 +18,21 @@ local taps = {}
 local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
 local post_fetches = 0
+for _, address in ipairs({0x295444, 0x298688, 0x299894}) do
+    local reads_at_blob = 0
+    taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(address, address + 19,
+        string.format("rf_tuning_blob_%08x", address), function(offset, value, mask)
+            if observing then return end
+            reads_at_blob = reads_at_blob + 1
+            if reads_at_blob <= 24 then
+                machine:logerror(string.format(
+                    "rom4_rf_tuning_blob_read: t=%.9f blob=%08x address=%08x value=%08x mask=%08x pc=%08x r0=%08x r1=%08x r2=%08x r3=%08x\n",
+                    machine.time:as_double(), address, offset, value, mask,
+                    mcu.state["PC"].value, mcu.state["R0"].value,
+                    mcu.state["R1"].value, mcu.state["R2"].value, mcu.state["R3"].value))
+            end
+        end)
+end
 for _, window in ipairs({{0x211a00, 0x211bff}, {0x20cb80, 0x20cbff}}) do
     local observations = 0
     taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(window[1], window[2],

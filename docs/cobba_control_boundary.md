@@ -90,11 +90,27 @@ data-space-only watch therefore misses the load-bearing upload writes.
 `check_tuning_upload` requires the native copy-loop tuple before the
 already-validated programming stages. The original NSE-1 v5.30 MCU image
 contains the tuple at file offsets `0x095450`, `0x098694`, `0x0998a0`;
-each has nearby destination word `216a`, but matching bytes alone do not
-identify the selected blob or establish its layout. The values are
-firmware-uploaded configuration, not a backend-invented addend. MCU blob
-selection and physical units remain unresolved; do not equate `13a6`
-with a frequency or prescaler setting without that contract.
+each has nearby destination word `216a`. Native MCU reads identify the
+selected descriptor as CPU address `0x299894` (raw offset `0x099894`,
+catalogue record 26). At `0x272122`, firmware reads its five header
+halfwords `216a,1e80,011c,0130,0078`; at `0x2936f0`, it reads payload
+words `000413a6` and `13a62a04` from `0x2998a0/a4` before the DSP
+overlay writes. Big-endian ARM decoding identifies `0x2936f0` as the
+source LDM in the copy loop, not a Thumb instruction. Other blob copies
+are read later at PC `0x276e88`; those reads do not establish upload
+selection. `check_tuning_blob` checks the selected header, payload,
+read masks and ordering before the native upload in both fresh controls.
+
+Static Thumb decoding at `0x2720f8..0x272142` explains the selector:
+request index 2 can be remapped by `0x28dd00` to index 11 (return 2)
+or 26 (return 3). It then indexes the descriptor-pointer table and copies
+five halfwords to the shared header, derives the staging pointer from
+descriptor offset 6, and advances the source by 12 bytes. The live
+descriptor address establishes the selected record; it does not by itself
+name the hardware/configuration bits read by `0x28dd00`. The values are
+firmware-uploaded configuration, not a backend-invented addend. Physical
+units and the selector's input semantics remain unresolved; do not equate
+`13a6` with a frequency or prescaler setting without that contract.
 
 ### Software RF reference boundary
 

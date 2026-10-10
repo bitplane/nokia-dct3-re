@@ -1,7 +1,7 @@
 import unittest
 
 from tools.c54x_rom4_rf_delivery_check import (check, check_request, check_tuning,
-    check_tuning_stages, check_tuning_upload, pack_tuning_nonnegative, decode_search_bitmap)
+    check_tuning_stages, check_tuning_upload, check_tuning_blob, pack_tuning_nonnegative, decode_search_bitmap)
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -15,6 +15,26 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_blob_selection(self):
+        rows = [("00272122", "00299894", "216a0000", "ffff0000"),
+                ("00272122", "00299894", "00001e80", "0000ffff"),
+                ("00272122", "00299898", "011c0000", "ffff0000"),
+                ("00272122", "00299898", "00000130", "0000ffff"),
+                ("00272122", "0029989c", "00780000", "ffff0000"),
+                ("002936f0", "002998a0", "000413a6", "ffffffff"),
+                ("002936f0", "002998a4", "13a62a04", "ffffffff")]
+        lines = [f"rom4_rf_tuning_blob_read: t=0.{i + 1} blob=00299894 pc={pc} address={address} value={value} mask={mask}\n"
+                 for i, (pc, address, value, mask) in enumerate(rows)]
+        upload = "rom4_rf_tuning_field_write: space=program t=1.0\n"
+        self.assertEqual(check_tuning_blob("".join(lines) + upload), 0x299894)
+        for index in range(len(lines)):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                check_tuning_blob("".join(lines[:index] + lines[index + 1:]) + upload)
+        for old, new in (("13a62a04", "13a62804"), ("blob=00299894", "blob=00295444"),
+                         ("t=1.0", "t=0.0"), ("mask=ffffffff", "mask=ffff0000")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_tuning_blob(("".join(lines) + upload).replace(old, new))
+
     def test_packing_reference(self):
         self.assertEqual(pack_tuning_nonnegative(0x1413), 0x302813)
         for quotient in (0, 1, 0x50, 0x3ff):

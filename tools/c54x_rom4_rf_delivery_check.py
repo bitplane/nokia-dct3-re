@@ -117,6 +117,33 @@ def check_tuning_upload(text):
     return check_tuning_stages(text)
 
 
+def check_tuning_blob(text):
+    reads = [dict(FIELDS.findall(match[1])) for match in
+             re.finditer(r"rom4_rf_tuning_blob_read: (.*)", text)]
+    header = [read for read in reads if read.get("pc") == "00272122"]
+    expected = (("00299894", "216a0000", "ffff0000"),
+                ("00299894", "00001e80", "0000ffff"),
+                ("00299898", "011c0000", "ffff0000"),
+                ("00299898", "00000130", "0000ffff"),
+                ("0029989c", "00780000", "ffff0000"))
+    if tuple((read.get("address"), read.get("value"), read.get("mask"))
+             for read in header) != expected:
+        raise ValueError("selected tuning descriptor differs from native capture")
+    payload = [read for read in reads if read.get("pc") == "002936f0"]
+    if tuple((read.get("address"), read.get("value"), read.get("mask"))
+             for read in payload) != (("002998a0", "000413a6", "ffffffff"),
+                                     ("002998a4", "13a62a04", "ffffffff")):
+        raise ValueError("missing selected tuning payload source reads")
+    ordered = header + payload
+    if any(read.get("blob") != "00299894" for read in ordered):
+        raise ValueError("tuning reads refer to different blobs")
+    times = [float(read["t"]) for read in ordered]
+    upload = re.search(r"rom4_rf_tuning_field_write: space=program (.*)", text)
+    if upload is None or times != sorted(times) or times[-1] >= float(dict(FIELDS.findall(upload[1]))["t"]):
+        raise ValueError("selected blob was not read before native upload")
+    return 0x299894
+
+
 def check(text):
     events = []
     for line in text.splitlines():
