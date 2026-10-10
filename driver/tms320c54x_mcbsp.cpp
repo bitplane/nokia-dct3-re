@@ -27,6 +27,7 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_rx_clock_input)); save_item(NAME(m_rx_frame_input)); save_item(NAME(m_rx_data_input));
 	save_item(NAME(m_rx_frame_seen)); save_item(NAME(m_rx_shift_full)); save_item(NAME(m_rx_buffer_full)); save_item(NAME(m_rx_ready));
 	save_item(NAME(m_rx_overrun));
+	save_item(NAME(m_rx_sync_irq));
 	save_item(NAME(m_internal_clock_stopped)); save_item(NAME(m_paused_bit_time));
 }
 
@@ -86,6 +87,7 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 		if (!BIT(value, 0)) reset_receiver();
 		else if (!enabled)
 			m_rx_frame_seen = m_rx_frame_input != BIT(m_regs[14], 2); // Require a new sampled frame transition after release.
+		update_receive_error_irq();
 	}
 	else
 	{
@@ -177,7 +179,19 @@ void tms320c54x_mcbsp_device::reset_receiver()
 	m_rx_frame_words = m_rx_bits = m_rx_delay = m_rx_buffer_width = 0;
 	m_rx_frame_seen = m_rx_shift_full = m_rx_buffer_full = false;
 	m_rx_overrun = false;
+	m_regs[0] &= ~u16(8);
+	update_receive_error_irq();
 	set_rx_ready(false);
+}
+
+void tms320c54x_mcbsp_device::update_receive_error_irq()
+{
+	bool const asserted = BIT(m_regs[0], 0) && BIT(m_regs[0], 3) && (m_regs[0] & 0x30) == 0x30;
+	if (asserted != m_rx_sync_irq)
+	{
+		m_rx_sync_irq = asserted;
+		m_rx_irq_cb(asserted ? ASSERT_LINE : CLEAR_LINE);
+	}
 }
 
 void tms320c54x_mcbsp_device::set_rx_ready(bool ready)
@@ -191,7 +205,8 @@ void tms320c54x_mcbsp_device::begin_receive()
 {
 	unsigned const width = (m_regs[2] >> 5) & 7;
 	if (width > 2 || BIT(m_regs[3], 15) || (m_regs[3] & 0x18) || (m_regs[3] & 3) == 3 ||
-		(m_regs[0] & 0x9070) || ((m_regs[0] >> 13) & 3) == 3)
+		(m_regs[0] & 0x9040) || ((m_regs[0] >> 13) & 3) == 3 ||
+		((m_regs[0] & 0x30) != 0 && (m_regs[0] & 0x30) != 0x30))
 		fatalerror("McBSP unsupported active receive format rcr=%04x/%04x spcr1=%04x", m_regs[2], m_regs[3], m_regs[0]);
 	static constexpr unsigned widths[] = {8, 12, 16};
 	m_rx_frame_words = ((m_regs[2] >> 8) & 0x7f) + 1;
@@ -235,16 +250,29 @@ void tms320c54x_mcbsp_device::rx_clock_w(int state)
 		}
 		return;
 	}
-	// RBR -> DRR and RRDY become visible on the following sampling edge.
-	if (m_rx_buffer_full && !m_rx_ready) publish_receive();
 	bool const active = m_rx_frame_input != BIT(m_regs[14], 2);
 	bool const new_frame = active && !m_rx_frame_seen;
 	m_rx_frame_seen = active;
 	if (new_frame && !BIT(m_regs[14], 10))
 	{
 		if (!m_rx_frame_words) begin_receive();
-		else if (!BIT(m_regs[3], 2)) fatalerror("McBSP receive unexpected-frame recovery is not implemented");
+		else if (!BIT(m_regs[3], 2))
+		{
+			// Boundary-adjacent frame packing needs a separate overlap model.
+			if (m_rx_frame_words == 1 && m_rx_bits <= (m_regs[3] & 3) + 1)
+				fatalerror("McBSP receive terminal frame overlap is not implemented");
+			// SPRU302B 2.3.7.2: lose the partial RSR and pending RBR,
+			// preserve unread DRR, and restart using the new frame's delay.
+			m_rx_shift_full = m_rx_buffer_full = false;
+			m_rx_completed = m_rx_buffer = 0;
+			m_rx_buffer_width = 0;
+			m_regs[0] |= 8;
+			update_receive_error_irq();
+			begin_receive();
+		}
 	}
+	// Sync recovery above must discard RBR before it can be published.
+	if (m_rx_buffer_full && !m_rx_ready) publish_receive();
 	if (!m_rx_frame_words) return;
 	if (m_rx_delay) { --m_rx_delay; return; }
 	m_rx_shift = (m_rx_shift << 1) | m_rx_data_input;

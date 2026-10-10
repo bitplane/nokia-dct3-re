@@ -292,6 +292,50 @@ private:
 	{
 		while (count--) { m_mcbsp0->tx_clock_w(!inverted); m_mcbsp0->tx_clock_w(inverted); }
 	}
+	void check_receive_sync(unsigned i)
+	{
+		unsigned const widths[] = {8, 12, 16};
+		unsigned const width = widths[i];
+		u16 const mask = (1U << width) - 1;
+		for (unsigned ignore = 0; ignore < 2; ++ignore)
+		{
+			receive_setup(i << 5, ignore ? 4 : 0, 0, 0x31);
+			unsigned const irqs = m_rx_irqs;
+			receive_word(0x17, width); // Keep an earlier complete word in DRR.
+			m_mcbsp0->rx_frame_w(1);
+			for (unsigned bit = width; bit-- > width - 4; )
+			{
+				receive_bit(BIT(0xa55a, bit)); m_mcbsp0->rx_frame_w(0);
+			}
+			m_mcbsp0->rx_frame_w(1); // A new sync well before the final word bit.
+			if (ignore)
+				for (unsigned bit = width - 4; bit-- > 0; )
+				{
+					receive_bit(BIT(0xa55a, bit)); m_mcbsp0->rx_frame_w(0);
+				}
+			else
+				for (unsigned bit = width; bit-- > 0; )
+				{
+					receive_bit(BIT(0x5aa5, bit)); m_mcbsp0->rx_frame_w(0);
+				}
+			receive_bit(0);
+			if ((receive_status() & 0xf) != (ignore ? 3 : 11) || m_rx_irqs != irqs + !ignore ||
+				m_mcbsp0->data_r(1) != 0x17)
+				fatalerror("McBSP receive sync must preserve DRR and report only non-ignored errors through RINTM=3");
+			receive_bit(0);
+			if (m_mcbsp0->data_r(1) != ((ignore ? 0xa55a : 0x5aa5) & mask) ||
+				(receive_status() & 8) != (ignore ? 0 : 8) || m_rx_irqs != irqs + !ignore)
+				fatalerror("McBSP receive sync replacement/ignore or sticky error contract mismatch");
+			external_reg_w(0, 0x31); // Software clears RSYNCERR without resetting RX.
+			if (receive_status() & 8) fatalerror("McBSP receive sync error did not clear on software zero");
+			external_reg_w(0, 0x39); // It is R/W: software can also assert it.
+			if (!(receive_status() & 8) || m_rx_irqs != irqs + !ignore + 1)
+				fatalerror("McBSP receive sync software assertion did not drive RINT");
+			external_reg_w(0, 0);
+			if (receive_status() & 8) fatalerror("McBSP receive reset retained RSYNCERR");
+		}
+		if (i == 2) logerror("mu4_mcbsp_receive_sync: PASS cases=6 widths=8,12,16 replacement=1 ignore=1 drr_retained=1 sticky=1 software_clear=1 software_set=1 reset=1 error_irq=1\n");
+	}
 	void check_external_overwrite(unsigned i)
 	{
 		static constexpr unsigned widths[] = {8, 12, 16};
@@ -2219,7 +2263,11 @@ private:
 		if (m_phase >= 70 && m_phase <= 73)
 		{
 			// Each physical-input variant yields so synchronized IRQ events can drain.
-			if (m_phase < 73) check_external_overwrite(m_phase - 70);
+			if (m_phase < 73)
+			{
+				check_receive_sync(m_phase - 70);
+				check_external_overwrite(m_phase - 70);
+			}
 			check_external_underrun(m_phase - 70);
 			if (m_phase < 73) { ++m_phase; m_check->adjust(attotime::from_usec(1)); return; }
 			m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1); external_clocks(7, false);
@@ -2269,6 +2317,45 @@ private:
 			if (m_mcbsp0->data_r(1) != 0x22 || (receive_status() & 6)) fatalerror("MU4 overrun save/restore lost buffered RBR");
 			if (m_phase == 68) { m_phase = 69; m_check->adjust(attotime::from_usec(1)); return; }
 			logerror("mu4_mcbsp_overrun_restore: PASS rfull=1 drr=1 rbr=1 read_clear=1\n");
+			receive_setup(0, 0, 0, 0x31);
+			m_mcbsp0->rx_frame_w(1);
+			for (unsigned bit = 8; bit-- > 4; ) { receive_bit(BIT(0xab, bit)); m_mcbsp0->rx_frame_w(0); }
+			m_mcbsp0->rx_frame_w(1);
+			for (unsigned bit = 8; bit-- > 4; ) { receive_bit(BIT(0x5a, bit)); m_mcbsp0->rx_frame_w(0); }
+			m_phase = 75; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase == 75 || m_phase == 76)
+		{
+			if (!machine().scheduler().can_save()) fatalerror("MU4 receive sync checkpoint has pending synchronized inputs");
+			if (m_phase == 75)
+			{
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 receive sync save failed");
+			}
+			else
+			{
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 receive sync restore failed");
+			}
+			unsigned const irqs = m_rx_irqs;
+			external_reg_w(0, 0x39); // Rewriting an already asserted error must not make a new edge.
+			if ((receive_status() & 0xf) != 9 || m_rx_irqs != irqs)
+				fatalerror("MU4 receive sync restoration lost sticky error or held IRQ state");
+			for (unsigned bit = 4; bit-- > 0; ) receive_bit(BIT(0x5a, bit));
+			receive_bit(0);
+			if ((receive_status() & 0xf) != 11 || m_mcbsp0->data_r(1) != 0x5a || m_rx_irqs != irqs)
+				fatalerror("MU4 receive sync partial replacement word did not replay exactly");
+			external_reg_w(0, 0x31);
+			if (m_phase == 75)
+			{
+				receive_word(0xa5, 8); external_reg_w(0, 0); // Overwrite serial state before restoring.
+				m_phase = 76; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			external_reg_w(0, 0x39);
+			if (m_rx_irqs != irqs + 1) fatalerror("MU4 receive sync IRQ did not reassert after clear");
+			external_reg_w(0, 0);
+			if (receive_status() & 8) fatalerror("MU4 receive sync reset retained an error");
+			logerror("mu4_mcbsp_receive_sync_restore: PASS partial_word=1 sticky_error=1 irq_level=1 no_duplicate_irq=1 payload_replay=1 reset=1\n");
 			m_saved_dma.str(std::string()); m_phase = 25; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)

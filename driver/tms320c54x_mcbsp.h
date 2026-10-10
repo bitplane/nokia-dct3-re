@@ -37,6 +37,7 @@ private:
 	void shift_bit();
 	void reset_receiver();
 	void set_rx_ready(bool ready);
+	void update_receive_error_irq();
 	void begin_receive();
 	void publish_receive();
 	u16 m_regs[32] = {};
@@ -55,6 +56,7 @@ private:
 	u8 m_rx_bits = 0, m_rx_delay = 0, m_rx_buffer_width = 0;
 	bool m_rx_clock_input = false, m_rx_frame_input = false, m_rx_data_input = false;
 	bool m_rx_frame_seen = false, m_rx_shift_full = false, m_rx_buffer_full = false, m_rx_ready = false, m_rx_overrun = false;
+	bool m_rx_sync_irq = false;
 	emu_timer *m_bit_timer = nullptr;
 	devcb_write16 m_tx_word_cb;
 	devcb_write_line m_tx_bit_cb;

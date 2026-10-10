@@ -1199,11 +1199,12 @@ two-word frame, not the original 64-frame receive block. It does not inject a
 receive register, readiness event or firmware buffer.
 
 RX registers, pin levels, partial shifts and buffering are saved. Dual phase,
-words wider than 16 bits, companding, loopback/SPI/A-bis receive, nonzero RINTM,
-unexpected-frame recovery, active format changes, internal receive
+words wider than 16 bits, companding, loopback/SPI/A-bis receive, RINTM modes
+1/2, terminal frame-overlap packing, active format changes, internal receive
 clocks and reset-activation timing remain unsupported or unvalidated. Unsupported
-active data formats and unexpected-frame recovery fail explicitly; supported
-receive overrun behavior is covered by the error-state gates below.
+active data formats and terminal frame overlap fail explicitly. Mid-word receive
+frame recovery and receive overrun are covered by the error-state gates below;
+unexpected transmit-frame recovery remains unsupported.
 
 The native stream explicitly supplies converted fixture samples `1234/5678`
 through the codec's DOUT pin, not DRR, DMA readiness or firmware-buffer writes.
@@ -2445,6 +2446,21 @@ save-state gates. The complete gate passes with
 retains the original storage, native entry, serial/DMA and error-state
 results. This extends generic serial error behavior, not native
 recording completion or speech.
+
+SPRU302B sections 2.3.6.2/2.3.7.2 define unexpected receive-frame sync:
+with RFIG clear, discard the partial word and pending RBR, retain unread DRR,
+restart reception at the new frame, and set sticky RSYNCERR (SPCR1 bit 3).
+With RFIG set, ignore the early frame and finish the original word. RSYNCERR
+is software-writable, clears on receiver reset, and drives the receive IRQ
+in RINTM mode 3; DRR reads do not clear it. Six external-pin cases cover both
+behaviors at 8/12/16 bits, retained DRR, software set/clear and reset. A separate
+save/replay case restores a half-received replacement word with RSYNCERR and
+its IRQ held, checking exact payload replay and no duplicate IRQ edge.
+The full original-storage gate requires `mu4_mcbsp_receive_sync: PASS` and
+`mu4_mcbsp_receive_sync_restore: PASS`; both pass in
+`MU4_STORAGE_RUN_DIR=tmp/mcbsp-rsync-restore`. Terminal frame-overlap packing
+is deliberately fail-closed, not established by these mid-word tests. This
+is generic McBSP recovery evidence, not recorder completion or native speech.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero
