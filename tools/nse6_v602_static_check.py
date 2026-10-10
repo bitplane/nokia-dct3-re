@@ -149,6 +149,14 @@ def check(image):
         literals[f"{address:#x}"] = f"{value:#x}"
     decoder.mode = capstone.CS_MODE_THUMB | capstone.CS_MODE_BIG_ENDIAN
     expected_instructions = (
+        (0x2D323A, "bl", "#0x29c022"),
+        (0x29C08C, "bl", "#0x29ba3c"),
+        (0x29C090, "movs", "r0, #0"),
+        (0x29C092, "movs", "r1, #0"),
+        (0x29C094, "bl", "#0x29b9ea"),
+        (0x223F44, "bl", "#0x29b9d4"),
+        (0x223F62, "bl", "#0x29ba3c"),
+        (0x22446E, "bl", "#0x29ba3c"),
         (0x2000EC, "bl", "#0x27afe8"),
         (0x2000F0, "bl", "#0x23190e"),
         (0x200128, "bl", "#0x2d330e"),

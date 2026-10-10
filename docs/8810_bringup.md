@@ -65,10 +65,10 @@ identifies a serial accessory DSP-UART, while the
 [NSB-5 manual, System Module pp. 17--18](https://manualmachine.com/nokia/7190/5055290-service-manual/)
 describes AccIF encoding/decoding of infrared pulses on the FBUS path.
 Those are other products' physical descriptions; neither maps ROM4 I/O
-ports `0x34..0x36`. Do not promote the candidate to device ownership until
-the MCU type-`0x4c` producer/service contract or an independent register
-description corroborates that mapping. The completion bit remains unmapped,
-so no reset timer or UART-ready constant is yet justified.
+ports `0x34..0x36`. The MCU producer contract below corroborates serial
+configuration, but does not identify the exact AccIF wiring or status-bit
+implementation. The completion bit remains unmapped, so no reset timer or
+UART-ready constant is yet justified.
 
 The MCU producer is constructor `0x29b9ea`, called organically by initializer
 `0x29c022` at `0x29c094` (observed LR `0x29c099`, 3.648453 seconds).
@@ -83,6 +83,21 @@ and `0x2bb276` access RAM (`0x120564` and `0x120534` respectively), not
 peripheral registers. They do not corroborate AccIF ownership. The next
 ownership question is the initialized module's service/callback contract,
 not whether a missing MCU packet needs to be synthesized.
+
+The module's configuration setter `0x29ba3c` has five direct BL callers in
+the bounded MCU scan: `0x223f62`, `0x22446e`, `0x29bd94`, `0x29c08c`,
+`0x29c594`. The first two lie in AT-command handlers carrying the literal
+responses `+ICF: (0-6),(0-3)` at `0x224014` and
+`+IFC: (0-3),(0-2)` at `0x2242d8`; the adjacent handler advertises `+IPR`
+rates through 115200 at `0x2245b0` (the string starts with `+` at `0x2245b0`).
+[ITU V.25ter sections 6.2.10--12](https://www.itu.int/dms_pubrec/itu-t/rec/v/T-REC-V.25ter-199508-S%21%21TOC-HTM-E.htm)
+identify these commands as DTE rate, character framing and local flow control.
+This independently supports a serial-configuration role; it is not evidence
+for a particular baud value or completion delay in DSP port `0x36`.
+The getter `0x29b9d4` returns four stored configuration bytes; the setter
+stores its first three arguments and a separate mode byte. Initializer
+`0x29c022` supplies `(9,4,1,1)` to that setter before sending type `0x4c`
+with arguments `(0,0)`. These two argument tuples must not be conflated.
 
 Initializer callbacks `0x2affb0`, `0x2b00a4`, and `0x2affc8` post to task 25;
 this identifies a firmware delivery boundary, not the task's semantic name.
