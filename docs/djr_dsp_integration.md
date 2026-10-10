@@ -657,9 +657,15 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   `2894fd`. The byte reader `28e10e` accesses GPIO `20020`; stores at
   `28c4c0`/`28c4d0` assemble bytes `00 e0 df 29` at 0.157115692 through
   0.157406923 s. Thus the low halfword reaches the record refresh before
-  publication. The selector-to-storage mapping and the configuration
-  field's semantics remain to be decoded; a matching ROM literal alone
-  is not provenance. This observation does not establish
+  publication. Routine `28c308` sends the high address bits through the
+  EEPROM slave address and the low byte through the word address, so
+  `0210` is a physical storage offset. Both the seed EEPROM and the fresh
+  isolated NVRAM contain `00 e0 df 29` there; `make_5110_eeprom_profile.py`
+  preserves this region rather than deriving it. This is provenance from
+  the current seed, **not independent factory-default evidence** and not
+  a donor-free speech provisioning contract. The configuration field's
+  semantics remain unresolved; a matching ROM literal alone is not
+  provenance. This observation does not establish
   call-time speech activation or the semantics of every flag bit.
 - The decoder supplies destination `0x1496` before postprocessing at `0x94c9`
   and `0xab7c`; further gain/filter/mute stages precede output copying.

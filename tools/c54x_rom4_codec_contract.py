@@ -500,7 +500,7 @@ def check_tone(text: str) -> None:
     if (int(tx), int(rx)) != (2, 2) or int(reads) == 0 or int(copies) == 0 or float(time) < 11:
         raise ValueError("native tone/serial boundary changed; review actual sample activity")
     flag_events = re.findall(
-        r"rom4_tone_access: owner=(mcu|speech_shared|speech_flags) direction=(read|write) "
+        r"rom4_tone_access: owner=(mcu|speech_shared|speech_flags|speech_record) direction=(read|write) "
         r"address=([0-9a-f]{6}) value=([0-9a-f]+) mask=([0-9a-f]+) "
         r"pc=([0-9a-f]{6}) t=([0-9.]+)", text)
     entries = re.findall(
@@ -510,6 +510,11 @@ def check_tone(text: str) -> None:
                if 0x100000 <= int(source, 16) < 0x180000]
     if not entries:
         raise ValueError("missing original MCU speech-field caller")
+    record_writes = [float(t) for *fields, t in flag_events
+                     if tuple(fields) == ("speech_record", "write", "10b2b8", "df29", "ffff", "274cb8")
+                     and float(t) <= entries[0][1]]
+    if not record_writes:
+        raise ValueError("missing preceding speech-record lower-halfword initialization")
     cursor = entries[0][1]
     for expected, earliest in (
             (("mcu", "write", "0100bc", "df290000", "ffff0000", "272034"), 0.0),
