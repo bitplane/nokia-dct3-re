@@ -603,14 +603,28 @@ stack object, so attribution to `0x1390` rather than its shared `0x138f`
 case remains unclosed. Counter behavior is an observation discrepancy,
 not an established emulation defect; the additional probes were removed.
 
-The next boundary is the MCU bitmap producer and the native RF tuning path:
-establish how the selected software entry becomes a physical channel before
-choosing an operational RF input contract. Task 10's downstream handling remains
+The MCU bitmap-to-entry path and selected-entry tuning arithmetic are now
+correlated with the native capture; see the synthesizer sections above.
+The remaining operational boundaries are SCU serialization/settling and
+RF sample lane, scaling and cadence. Task 10's downstream handling remains
 independently open. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
 nine accepted stores); it does not validate packet delivery or acquisition.
 The 1523-versus-500 constraint remains a property of the pre-return scan,
 not proof that the resident lifecycle is blocked there.
+
+The present port-`27` receive implementation calls
+`nokia_cobba_device::rf_receive_sample()` synchronously for every DSP
+read. COBBA increments a saved observation counter and invokes its
+external callback; there is no independently clocked RF receive FIFO,
+sample-ready transition or overrun behavior. Consequently, read counts
+per second measure this execution's consumption, not a recovered ADC
+sample rate. A waveform fixture indexed by reads alone cannot establish
+physical cadence, even when the filter arithmetic and score checks pass.
+The next timing audit must distinguish the firmware's frame/slot pacing
+from a peripheral sampling clock before adding either buffering or a
+GSM waveform adapter. Codec serial PCM timing is a separate bus contract
+and must not be reused for RF samples.
 
 ### Product-specific physical buses
 
