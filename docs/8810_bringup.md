@@ -138,6 +138,18 @@ The next unresolved contract is what native DSP traffic the operational
 window expects after that MCU transition; the observed startup transport
 works. Do not substitute synthetic heartbeat packets or alter policy storage
 without recovering that contract.
+
+Per-second transport samples through 30 s show equal TX producer/consumer
+and equal RX producer/consumer, with native work flags `0x0866` zero at
+those samples. These samples exclude a persistent ring backlog, not brief
+in-flight work. A native write tap on TX consumer `0x0853` observes the
+resident dispatcher at PC `0x3909` consuming complete commands. After the
+last startup RX packet, it consumes header `0x5051` at 3.649007, 6.482854,
+6.533623 and 10.392084 s. No further consumer publication precedes reset.
+The tap covers the declared `0x52`-word TX ring and remains below its
+128-event cap. Consumption alone does not prove semantic handling of that
+command family. The next native boundary is decoding these own-MCU commands
+against the acquired resident DSP dispatcher, not repairing a proven backlog.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

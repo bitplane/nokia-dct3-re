@@ -59,6 +59,17 @@ if dsp then
                 dsp.state['IMR'].value, dsp.state['IFR'].value, machine.time:as_double()))
         end)
     local ring_writes = 0
+    local tx_consumptions = 0
+    handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x0853, 0x0853,
+        'nse6_native_tx_consumption', function(offset, value, mask)
+            local previous = dsp.spaces['data']:read_u16(0x0853)
+            if previous == value or previous >= 0x52 or tx_consumptions >= 128 then return end
+            tx_consumptions = tx_consumptions + 1
+            machine:logerror(string.format(
+                'nse6_native_tx_consumption: previous=%04x next=%04x header=%04x pc=%04x t=%.9f\n',
+                previous, value, dsp.spaces['data']:read_u16(0x0800 + previous),
+                dsp.state['PC'].value, machine.time:as_double()))
+        end)
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x08e4, 0x08e5,
         'nse6_native_rx_indices', function(offset, value, mask)
             ring_writes = ring_writes + 1
@@ -441,6 +452,14 @@ emu.register_frame_done(function()
             'nse6_native_snapshot: pc=%04x sp=%04x imr=%04x ifr=%04x ccont_clock=%02x t=%.9f\n',
             dsp.state['PC'].value, dsp.state['SP'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,
             ccont_registers:read(6), now))
+        machine:logerror(string.format(
+            'nse6_native_transport_snapshot: tx_producer=%04x tx_consumer=%04x command=%04x acknowledge=%04x rx_producer=%04x rx_consumer=%04x work=%04x mode_aa=%04x mode_ac=%04x t=%.9f\n',
+            memory:read_u16(0x100a4), memory:read_u16(0x100a6),
+            memory:read_u16(0x100a8), memory:read_u16(0x100aa),
+            memory:read_u16(0x101c8), memory:read_u16(0x101ca),
+            dsp.spaces['data']:read_u16(0x0866),
+            dsp.spaces['data']:read_u16(0x00aa),
+            dsp.spaces['data']:read_u16(0x00ac), now))
     end
     if now >= 28 and not late_captured then
         late_captured = true
