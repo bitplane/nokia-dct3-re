@@ -1801,6 +1801,17 @@ research-HLE observation, not native RF evidence. The complete run is
 the earlier `/tmp` receive-tap run had quota errors and is not an acceptance
 control.
 
+The pinned continuation distinguishes Manual Selection from registration
+readiness. At `21f5aa` it passes the received object to queue helper
+`2a1eaa`, then `21f5b0..21f5be` compares the input with `03ec` (`fb<<2`).
+Only `03ec` reaches the argument-3 selector; `03ea` instead calls
+`21b8ea`, which branches directly to the receive loop. The own-ROM checker
+now verifies this complete comparison and branch sequence. Consequently
+the Manual request does not independently exercise the selector's readiness
+gate. Queue acceptance, replacement ownership and the later drain trigger
+remain to be observed; the static helper call alone does not prove that
+`03ea` replaces the existing queued `03ec`.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:

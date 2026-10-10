@@ -209,6 +209,12 @@ def verify(image):
     if instructions(0x21f5aa, 6) != [
             ('ldr', 'r0, [r4, #8]'), ('bl', '#0x2a1eaa')]:
         raise ValueError('late readiness request queue insertion differs')
+    if instructions(0x21f5b0, 16) != [
+            ('movs', 'r0, #4'), ('ldrsh', 'r1, [r0, r4]'),
+            ('movs', 'r0, #0xfb'), ('lsls', 'r0, r0, #2'),
+            ('cmp', 'r1, r0'), ('beq', '#0x21f5c0'),
+            ('bl', '#0x21b8ea')]:
+        raise ValueError('queued non-03ec request receive-loop continuation differs')
     if instructions(0x2a1ec0, 4) != [
             ('ldrsh', 'r1, [r5, r1]'), ('strh', 'r1, [r0]')]:
         raise ValueError('queued request input copy differs')
