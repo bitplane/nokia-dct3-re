@@ -215,6 +215,13 @@ public:
 			if (load) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}
+		if (family == 0x3000 || family == 0x3200 || family == 0x4600)
+		{
+			bool const extended = mode >= 0xe0;
+			stream << "LD      "; smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", %s", family == 0x3000 ? "T" : family == 0x3200 ? "ASM" : "DP");
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family == 0x1200 || family == 0x1300)
 		{
 			bool const extended = mode >= 0xe0;
@@ -318,6 +325,11 @@ public:
 		if ((op & 0xfe00) == 0xe800)
 		{
 			util::stream_format(stream, "LD      #$%02X, %c", op & 255, BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xfff8) == 0xf4a0)
+		{
+			util::stream_format(stream, "LD      #%u, ARP", op & 7);
 			return 1 | SUPPORTED;
 		}
 		if ((op & 0xfe00) == 0xea00)

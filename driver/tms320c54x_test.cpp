@@ -1274,6 +1274,40 @@ private:
 				"MVDD syntax preserves X source and Y destination ordering");
 		}
 		osd_printf_info("TMS320C54x dual move/DP disassembler: PASS moves=256 dp=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x3000, 0x3200, 0x4600})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+						"Special-register memory loads bound their address extension");
+				}
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned arp = 0; arp < 8; ++arp)
+			{
+				words const buffer(pc, 0xf4a0 | arp, 0x2345);
+				std::ostringstream text, expected;
+				util::stream_format(expected, "LD      #%u, ARP", arp);
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1 && text.str() == expected.str(),
+					"Immediate ARP decoder preserves all three selector bits");
+			}
+		vector const special_load_forms[] = {
+			{0x3093, 1 | dasm::SUPPORTED, "LD      *AR3+, T"},
+			{0x32e2, 2 | dasm::SUPPORTED, "LD      *AR2($2345), ASM"},
+			{0x46f8, 2 | dasm::SUPPORTED, "LD      *($2345), DP"},
+			{0x4612, 1 | dasm::SUPPORTED, "LD      $12, DP"},
+			{0xf4a8, 1, ".word   $F4A8"},
+		};
+		for (auto const &test : special_load_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Special-register load syntax names destinations and rejects undocumented ARP aliases");
+		}
+		osd_printf_info("TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
