@@ -83,6 +83,29 @@ edit/delete coverage, native calls, SMS, or long-running stability. The
 six-byte integrity and initialized-retry diagnostic remain explicit inputs;
 identity is still erased and the fitted DSP mask is still unknown.
 
+The focused checker combines reviewed whole-frame pixels, the final physical
+save/detail contact, and exact A/123 card storage. It does not substitute a
+key log for visible recall or assert an APDU-level trace. Reproduce with a
+new diagnostic EEPROM directory, run `nse6_names_fixture.lua` for 32 s,
+then run `nse6_phonebook_recall_fixture.lua` for 30 s in a separate process
+**preserving the same NVRAM directory**. Use `run_mame_isolated.py` with
+separate run directories and the own normalized NSE-6 plus ROM4-compatible
+research ROM path. Validate each stage:
+
+```sh
+.venv/bin/python tools/nse6_phonebook_check.py save \
+  run_8810_phonebook_save/error.log \
+  mame/nvram-8810-phonebook-save/nse6r4t/sim_card \
+  run_8810_phonebook_save/snap/8810-names-save.png
+.venv/bin/python tools/nse6_phonebook_check.py recall \
+  run_8810_phonebook_recall/error.log \
+  mame/nvram-8810-phonebook-save/nse6r4t/sim_card \
+  run_8810_phonebook_recall/snap/8810-phonebook-recall-25.png
+```
+
+These paths are disposable run evidence, not shipped provisioning. The
+checker is currently a manual research gate, not a supported-product gate.
+
 The longer 40-second menu run returns to reset entry `0x200040` at
 31.967763462 seconds. At 31 seconds the CCONT countdown is `0x13` and MAD2
 watchdog register is `0xff`; neither expires. Firmware writes `0x31` to
