@@ -2281,9 +2281,28 @@ upload finds four `3766/3767` operands, all in this dispatcher: two reads
 and its two previous-command updates. This is direct-reference coverage,
 not proof that no indirect writer or initialization record exists.
 Reproduce it with `make check-mu4-bootstrap-original
-MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootreccontrol`.
+MU4_BOOTSTRAP_SOURCE_RUN=tmp/research-runs-20261010/run_mu4-retained.Yh686K
+MU4_BOOTSTRAP_BIOS=bootreccontrol`.
 Its receive PASS label proves native packet receipt and acknowledgement,
 not successful control-handler execution or recording.
+
+Fresh isolated diagnostics distinguish this duplicate filter from the save
+fixture's CPU boundary. `tmp/mu4-recorder-control-current/error.log` receives
+selector `36`/parameter `4` at 11.406 seconds with previous class/selector
+`1/36`; native receipt/acknowledgement passes, recording completion remains
+unclaimed (SHA-256
+`c20eb914ea08fed69e605021d5975381e6a54de0b98e9fddd0ac474eeb47f3ec`).
+`tmp/mu4-recorder-save-current/error.log` receives the selector-`49` poll at
+11.389 seconds and control at 11.449 seconds with previous selector `49`.
+Completion reaches `8009` and the resident image returns, but the endpoint
+is `02:3d7b`, IMR `0ac9`, IFR `0c78`, cursor 27 and RX-ready set: 50
+application calls, two dequeued messages and one processing-wait entry.
+It exits 3 because metadata has not been delivered (SHA-256
+`3e19b509647a8fda88db463e38bebb77f5f2950cf87fbbf955615763fa504c59`).
+Both use the retained product's own NAND with NVRAM saving disabled and no
+firmware-state forcing. The control fixture's working warm dispatch does
+not close the save fixture's timer/interrupt recognition and drain boundary.
+Packet-delay tuning is not a substitute for that CPU contract.
 
 Resident command and loader addresses are reused by the recorder overlay;
 their resident trace counters must stop when that overlay takes ownership.
