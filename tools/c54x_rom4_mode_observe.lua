@@ -38,8 +38,9 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x5e62, 0x5e6a, 0x545d, 0x5463, 0x5eed,
     0x4677, 0x4695, 0x46e1, 0x46e6, 0x46f8, 0x46fd,
     0x990d, 0x996b, 0x9988, 0x6318, 0x659b, 0xa27d,
-    0x4701, 0x4798, 0x0acf, 0x0c16}
+    0x4701, 0x4798, 0x0acf, 0x0c16, 0x0ad1, 0x0add, 0x0ae4}
 local counts = {}
+local result_counts = {total = 0, zero = 0}
 local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,
     [0x9b62] = true, [0x9b9f] = true, [0x9bb0] = true,
@@ -93,6 +94,17 @@ for _, address in ipairs(sites) do
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
+                if address == 0x0ad1 then
+                    local value = cpu.state["A"].value & 0xffffffffff
+                    result_counts.total = result_counts.total + 1
+                    if value == 0 then result_counts.zero = result_counts.zero + 1 end
+                    if counts[address] <= 4 then
+                        machine:logerror(string.format(
+                            "rom4_uploaded_result: t=%.9f a=%010x threshold219b=%04x prior198d=%04x\n",
+                            machine.time:as_double(), value, memory:read_u16(0x219b),
+                            memory:read_u16(0x198d)))
+                    end
+                end
                 if address >= 0x46e1 and address <= 0x46fd and counts[address] <= 4 then
                     machine:logerror(string.format(
                         "rom4_receive_result: t=%.9f address=%04x state1956=%04x result198c=%04x count1f24=%04x\n",
@@ -115,6 +127,8 @@ for _, address in ipairs(sites) do
 end
 local stop = emu.add_machine_stop_notifier(function()
     _G.rom4_observation_read = true
+    machine:logerror(string.format("rom4_uploaded_result_summary: total=%d zero=%d\n",
+        result_counts.total, result_counts.zero))
     for _, start in ipairs({0x0ac7, 0x0c0e}) do
         local words = {}
         for index = 0, 31 do

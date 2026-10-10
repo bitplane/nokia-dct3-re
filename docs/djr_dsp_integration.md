@@ -1314,13 +1314,26 @@ and wrapper `0x4677` remain uncalled; frame positive control executes
 30351 times. The live-code window at `0x0ac7` contains the call
 followed by `B = A - data[0x219b]` and a delayed BLEQ branch to
 `0x0af3`. Its next comparison is `B = A - data[0x198d]`, with
-another delayed BLEQ to `0x0af3`; the surviving path ORs bit 0
-through AR5 (set to `0x1266`) and stores A at `0x198d`. These
+another delayed BLEQ to `0x0af3`. Its delay slot ORs bit 0
+through AR5 (set to `0x1266`); only fallthrough stores A at `0x198d`.
+The flag alone is therefore not proof the second comparison passed. These
 instruction bytes are captured by the passive observer, not imported
 from the resident ROM image. The comparisons are an executed-path
 candidate for result acceptance, not yet quantified predicate outcomes
 or physical signal-strength units. Follow this uploaded result path
 before extending the dormant resident acquisition-wrapper chain.
+
+Fresh-storage 60-second operand observation quantifies the first
+rejection: all 5158 completed calls reach `0x0ad1` with A zero;
+the four bounded operand snapshots show threshold `0x219b=0x0574`
+and prior result `0x198d=0`. Neither second comparison `0x0add`
+nor accepted-value store `0x0ae4` executes. There are 5159 callsite
+executions, leaving one queue-processing call unfinished at shutdown.
+Thus a real executed comparison rejects the current zero-input RF
+result before the accepted-result update. This does not calibrate
+the threshold's physical units or prove how a valid waveform should
+be represented at port `0x27`; those remain the software sample-source
+contract needed before an acquisition fixture can be interpreted.
 
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
