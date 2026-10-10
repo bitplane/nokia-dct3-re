@@ -99,6 +99,21 @@ stores its first three arguments and a separate mode byte. Initializer
 `0x29c022` supplies `(9,4,1,1)` to that setter before sending type `0x4c`
 with arguments `(0,0)`. These two argument tuples must not be conflated.
 
+Measured control decoding sets `0x06f4=0x0880` at PC `0x3bb3`,
+`0x06f6=21` at `0x3bbd`, and `0x06f5=866` at `0x3bca`, before the
+restart wait. The `0x0800` flag is set by the delayed branch at `0x3ba0`;
+the control word is not a verbatim copy of payload `0x0080`.
+The timeout arithmetic is `(high_byte * 347) >> 4` and
+`(low_byte * 3467) >> 4`, with low byte `0xff` selecting sentinel `0xffff`.
+`0x9185..0x9189` compares counter `0x06c4` against `0x06f6`;
+`0x8e4b..0x8e67` compares `0x06b3` against `0x06f5`, bypassing the sentinel.
+Both counters increment in `0x8e6e..0x8e74`. At the measured 216--217 frame
+ticks/s these are approximately 0.1- and 4-second software deadlines, not
+baud divisors or evidence for hardware restart latency. Reproduce the
+ordered packet-to-parameter observation with
+`tools/nse6_serial_control_check.py run_8810_serial_parameters/error.log`.
+That check makes no peripheral-completion or native-search claim.
+
 Initializer callbacks `0x2affb0`, `0x2b00a4`, and `0x2affc8` post to task 25;
 this identifies a firmware delivery boundary, not the task's semantic name.
 Nearby MCU routine `0x29b830` builds type-`0x50` byte-buffer packets.

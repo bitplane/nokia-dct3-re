@@ -12,6 +12,16 @@ local handles = {}
 local pending_memory_uploads = {}
 local observing_native = false
 if dsp then
+    local parameter_writes = {}
+    handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x06f4, 0x06f6,
+        'nse6_native_serial_parameters', function(offset, value, mask)
+            local key = string.format('%04x:%04x', offset, dsp.state['PC'].value)
+            parameter_writes[key] = (parameter_writes[key] or 0) + 1
+            if parameter_writes[key] > 4 then return end
+            machine:logerror(string.format(
+                'nse6_native_serial_parameters: address=%04x value=%04x mask=%04x pc=%04x t=%.9f\n',
+                offset, value, mask, dsp.state['PC'].value, machine.time:as_double()))
+        end)
     local port_control_writers = {}
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x06f3, 0x06f3,
         'nse6_native_port_control', function(offset, value, mask)
