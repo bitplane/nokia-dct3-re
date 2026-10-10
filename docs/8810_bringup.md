@@ -57,8 +57,9 @@ board-level battery routing. Other ADC channels remain research defaults.
 
 ### Menu Execution and Restart Boundary
 
-**Open contract:** identify the legitimate operational-mode entrance after
-the MCU clears the DSP receive count at 6.533113 s. Startup packets, native
+**Open contract:** trace the own-MCU type-`1a` packet posted at 6.532938 s
+from mailbox 3 into the native DSP TX ring. It is constructed organically,
+but absent from native consumption. Startup packets, native
 memory uploads, control handlers, and frame interrupts execute; the processing
 tail remains dormant. Neither a fabricated heartbeat nor altered NV reset
 policy is an evidenced correction. The acquired NSE-1 mask remains a
@@ -348,7 +349,7 @@ NSE-6 runs the scheduler test but never publishes the enabling word or
 enters that branch. Both fixtures hold `06be = 0010`, so that word is not
 the observed cross-product distinction. No firmware state is forced.
 
-The own-MCU publication chain is `0837 -> 0445 -> type-1a`. Dispatcher
+One own-MCU publication chain is `0837 -> 0445 -> type-1a`. Dispatcher
 `262056..26205c` selects `262bf4` for input `0837`; that branch loads `0445`
 and enters the status constructor at `2a94f4` through shared tail `26225a`.
 Receive loop `218540` routes `0445` to `218a42`, then calls `2184b6` at
@@ -395,6 +396,19 @@ contains a `0434` constructor but does not execute in this fixture. Its
 entry and publication contract, and the distinction from `043c`, are the
 next boundary; neither status should be substituted by the model.
 The literal-seeded scan identifies candidates, not every computed publisher.
+
+There is also an independently recovered type-`1a` builder at `211100..2112a2`:
+it allocates a 72-byte object, builds the 68-byte search payload, and posts
+it to mailbox 3. The fresh fixture reaches its post-return site `2112a6`
+at 6.532938 s with object `10d758`, prefix `0002`, length `44`, type `1a`,
+and control byte `11`. Thus MCU search construction is **not absent**;
+the dormant `2184b6` path cannot close the complete publication surface.
+The native consumer still records no type-`1a`, while neighboring type-`51`
+uploads are consumed and read back. The next contract is mailbox-3 receive,
+packet selection, and ring publication for this specific object, not forcing
+`0a33/0837/0445` or modifying the DSP mode word. The monitoring timer is
+armed just after this organic post. The separately mapped `0434` constructor
+at `210f90` remains dormant and is not established as the source of `043c`.
 Identity/control payloads also
 differ, with NSE-6's records erased; no NSE-1 data may be copied into NSE-6
 to conceal these genuine input differences. The NSE-1 processing checker
