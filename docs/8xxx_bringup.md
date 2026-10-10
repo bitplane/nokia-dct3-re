@@ -2327,6 +2327,12 @@ enabling PCM. Do not import the 8850's 1 MHz profile or infer a 16-bit word
 from the two clock labels. Existing 8890 signaling and native/HLE limits
 remain unchanged.
 
+An additional [NSB-6 service archive listing](https://www.ciklon.org/bg/downloads/download/346-nokia/43823-nokia-service-manual-8890-nsb-6)
+identifies `Nokia service manual 8890 NSB-6.zip`, 5.66 MB, MD5
+`6ba2da15107783919ee4e2df8bf89d92`. Download requires an authenticated
+registered account; the archive has not been acquired or inspected. This
+is a retrieval lead only, not timing evidence or a reason to enable PCM.
+
 The acquired `8850v531.fls` (SHA1
 `9f966787403b68a09530680ad911302403eb1521`) now has a ROM-pinned static
 check:
