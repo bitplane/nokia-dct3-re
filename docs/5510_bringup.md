@@ -2293,18 +2293,19 @@ boundary. `tmp/mu4-recorder-control-xc/error.log` receives
 selector `36`/parameter `4` at 11.406 seconds with previous class/selector
 `1/36`; native receipt/acknowledgement passes, recording completion remains
 unclaimed.
-After architectural BRAF control replaces the private block-repeat latch,
-`tmp/mu4-recorder-save-braf/error.log` receives the selector-`49` poll at
-11.389 seconds and control at 11.449 seconds with previous selector `49`.
+The current replay after BRAF, operand-fetch ordering and CALA RTN corrections
+is `tmp/mu4-recorder-save-fetch/error.log`. It receives control at 12.236
+seconds with previous selector `49` (the earlier BRAF-only run received it
+at 11.449 seconds). The changed latency is an observation, not a calibrated
+peer delay or proof of correct pipeline timing.
 Completion reaches `8009` and the resident image returns, but the endpoint
 is `02:3da4`, ST1 `6900`, IMR `0ac9`, IFR `0c78`, cursor 28 and RX-ready set: 50
 application calls, two dequeued messages and one processing-wait entry.
 RX/TX are 37/47, with three responses and two ACKs; TIM/PRD/TCR are
 `0001/0001/0000`. It exits 3 because metadata has not been delivered.
-The preceding `tmp/mu4-recorder-save-xc/error.log` stopped at cursor 27 and
-RX/TX 36/47; the extra received poll byte is progress in this diagnostic,
-not a completed resident transaction or a resolved interrupt-drain contract.
-Both use the retained product's own NAND with NVRAM saving disabled and no
+The terminal snapshot remains identical to the BRAF-only replay, so the newer
+CPU corrections do not resolve this transaction. The source and isolated NAND
+copy compare byte-for-byte after the run with NVRAM saving disabled and no
 firmware-state forcing. The control fixture's working warm dispatch does
 not close the save fixture's timer/interrupt recognition and drain boundary.
 Packet-delay tuning is not a substitute for that CPU contract.
