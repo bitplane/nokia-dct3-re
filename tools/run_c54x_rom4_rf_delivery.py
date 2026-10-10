@@ -62,6 +62,7 @@ def main():
             text = (case / "error.log").read_text()
             actual_mode, results, accepted = check_score(text)
             consumption = check_consumption(text)
+            scan_consumption = check_consumption(text, scan=True)
             object_address, body = check_delivery(text)
             tuning = nse1_gsm900_tuning_consistency(check_tuning_upload(text))
             check_tuning_blob(text)
@@ -74,6 +75,7 @@ def main():
             observations.append(dict(mode=mode, repeat=repeat, results=results,
                                      accepted=accepted, object=object_address, native_body=body,
                                      consumption=consumption,
+                                     scan_consumption=scan_consumption,
                                      tuning_consistency=tuning))
             print(f"Native RF delivery: PASS mode={mode} repeat={repeat} "
                   f"results={results} accepted={accepted} body={body}", flush=True)

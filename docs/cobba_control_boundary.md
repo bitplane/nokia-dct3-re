@@ -641,6 +641,21 @@ records their measured span, gaps, PCs and counter values separately
 from the score and delivery results. Its summary explicitly denies a
 physical sample-rate claim.
 
+The separately bounded scan window starts at 1.640203134550 seconds in
+both fresh controls and captures advanced PCs `330c,3312,3318,331e`.
+Its first two 32-word groups are again frame-spaced bursts, with minimum
+adjacent gap about 115.384 ns. Across all 64 reads the zero stimulus spans
+4.619480769 ms and the tone spans 4.619557692 ms; their largest gaps are
+4.611250000 ms and 4.611326923 ms respectively. The roughly 77 ns
+difference is an observed execution-timing difference, not a changed
+physical ADC clock. Counter snapshots again range from 1 through 6.
+The checker validates the reviewed scan-PC window separately from
+startup, and the cold-run summary retains both observations. These
+captures constrain consumption scheduling but do not select a receive
+buffer depth, latch policy, lane order or sample-production clock.
+Do not connect read-indexed tone/GMSK data as an operational RF source
+merely because both windows are frame-paced.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's

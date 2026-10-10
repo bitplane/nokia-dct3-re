@@ -10,6 +10,19 @@ def fixture():
 
 
 class ConsumptionTests(unittest.TestCase):
+    def test_scan_window(self):
+        text = fixture().replace("sample_consumption", "scan_consumption").replace("pc=3310", "pc=3311")
+        self.assertEqual(check(text, scan=True)["window"], "scan")
+
+    def test_startup_not_scan_evidence(self):
+        with self.assertRaises(ValueError):
+            check(fixture(), scan=True)
+
+    def test_scan_pc_outside_filter(self):
+        text = fixture().replace("sample_consumption", "scan_consumption").replace("pc=3310", "pc=324b")
+        with self.assertRaises(ValueError):
+            check(text, scan=True)
+
     def test_bounded_measurement_not_adc_rate(self):
         result = check(fixture())
         self.assertEqual(result["reads"], 64)

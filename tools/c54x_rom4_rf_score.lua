@@ -5,6 +5,7 @@ local memory = cpu.spaces["data"]
 local mode = os.getenv("ROM4_RF_SCORE_MODE") or "zero"
 assert(mode == "zero" or mode == "dc" or mode == "tone")
 local reads, results, nonzero, second, accepted = 0, 0, 0, 0, 0
+local scan_reads = 0
 local maximum = 0
 local observing = false
 local publication_counts = {}
@@ -192,6 +193,16 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
                 "rom4_rf_sample_consumption: index=%d t=%.12f pc=%04x counter=%04x\n",
                 reads, machine.time:as_double(), cpu.state["PC"].value,
                 cpu.spaces["io"]:read_u16(0x0d)))
+        end
+        local pc = cpu.state["PC"].value
+        if pc >= 0x330a and pc <= 0x3326 then
+            scan_reads = scan_reads + 1
+            if scan_reads <= 64 then
+                machine:logerror(string.format(
+                    "rom4_rf_scan_consumption: index=%d t=%.12f pc=%04x counter=%04x\n",
+                    scan_reads, machine.time:as_double(), pc,
+                    cpu.spaces["io"]:read_u16(0x0d)))
+            end
         end
         return value
     end)
