@@ -16,6 +16,14 @@ local message_counts = {}
 local taps = {}
 local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
+taps[#taps + 1] = mcu.spaces["program"]:install_write_tap(0x100000, 0x17ffff,
+    "rf_status_header_write", function(offset, value, mask)
+        if mcu.state["PC"].value == 0x26be48 then
+            machine:logerror(string.format(
+                "rom4_rf_status_header_write: t=%.9f pc=%08x address=%08x value=%08x mask=%08x\n",
+                machine.time:as_double(), mcu.state["PC"].value, offset, value, mask))
+        end
+    end)
 taps[#taps + 1] = mcu.spaces["program"]:install_write_tap(0x101c8, 0x101cb,
     "rf_mcu_ring_consumer", function(offset, value, mask)
         mcu_ring_writes = mcu_ring_writes + 1

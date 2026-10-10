@@ -329,6 +329,13 @@ The post call itself has not yet been observed: a mid-block instruction
 tap is not an absence proof. At function entry R4 still belongs to the
 caller; R0 is the message pointer, and the branch observation confirms
 R4 becomes that pointer (`0x101438`).
+An additional repeated run with retained storage observes the actual
+header store at 1.599568385 seconds: trace PC `0x26be48`, aligned
+object address `0x101438`, value `13900000`, mask `ffff0000`.
+This independently confirms the status rewrite, not task-10 receipt;
+its timing is not a fresh-storage baseline. A read tap on the post
+primitive did not fire even with its argument filter removed, so it
+was retired rather than interpreted as evidence of failed publication.
 
 The next boundary is task 10's consumption of status `0x1390` and the
 meaning of the native `006d` body before choosing an operational RF contract. The
