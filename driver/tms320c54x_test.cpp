@@ -603,6 +603,32 @@ private:
 		}
 		osd_printf_info("TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xfc00, 0xfe00})
+				for (u8 predicate : predicates)
+				{
+					words const buffer(pc, family | predicate, 0x2345);
+					std::ostringstream text;
+					u32 const flags = dasm::SUPPORTED | dasm::STEP_COND | (family == 0xfc00 ? dasm::STEP_OUT : 0);
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | flags) && buffer.seen() == 1,
+						"Conditional return decoder uses one word and conservative delayed stepping");
+				}
+		vector const conditional_returns[] = {
+			{0xfc20, 1 | dasm::SUPPORTED | dasm::STEP_COND | dasm::STEP_OUT, "RC      NTC"},
+			{0xfc45, 1 | dasm::SUPPORTED | dasm::STEP_COND | dasm::STEP_OUT, "RC      AEQ"},
+			{0xfe44, 1 | dasm::SUPPORTED | dasm::STEP_COND, "RCD     ANEQ"},
+			{0xfe78, 1 | dasm::SUPPORTED | dasm::STEP_COND, "RCD     BOV"},
+			{0xfc10, 1, ".word   $FC10"},
+			{0xfe80, 1, ".word   $FE80"},
+		};
+		for (auto const &test : conditional_returns)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == 1,
+				"Conditional return syntax names reviewed predicates and leaves unknown combinations raw");
+		}
+		osd_printf_info("TMS320C54x conditional return disassembler: PASS forms=44 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
 			for (u16 family : {0x1000, 0x1100, 0x1400, 0x1500, 0x4400, 0x4500})
 				for (unsigned mode = 0; mode < 256; ++mode)
 				{

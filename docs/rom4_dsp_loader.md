@@ -1729,7 +1729,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 508 decoded and 118
+promoted to a boundary. Current cold-idle coverage is 516 decoded and 110
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1752,6 +1752,13 @@ one-word instructions, checked on ordinary and wrapping program pages without
 extension reads. Source is bit 9 and destination bit 8 (SPRU172C instruction
 definitions); the required marker is `TMS320C54x unary disassembler: PASS`.
 This adds debugger boundaries only, not arithmetic or pipeline validation.
+
+Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
+giving 44 one-word forms checked on two program pages. Non-delayed RC has
+conditional step-out flags; delayed RCD deliberately omits immediate step-out
+because two delay words still execute. Compound predicates remain unreviewed.
+The required marker is `TMS320C54x conditional return disassembler: PASS`
+(SPRU172C, RC[D]); no execution or physical delay timing is inferred from it.
 
 Exact acquired `6f95/0e20` (`SUB *AR5+,0,B,A`) and indirect loads `1087`
 (`LD *AR7,A`) and `1182` (`LD *AR2,B`) have six independent execution cases,

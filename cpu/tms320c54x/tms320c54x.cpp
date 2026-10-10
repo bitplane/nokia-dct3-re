@@ -59,6 +59,12 @@ public:
 			}
 		};
 		char const *const predicate = predicate_name(mode);
+		if (predicate && (op & 0xfd00) == 0xfc00)
+		{
+			bool const delayed = BIT(op, 9);
+			util::stream_format(stream, "%-8s%s", delayed ? "RCD" : "RC", predicate);
+			return 1 | SUPPORTED | STEP_COND | (delayed ? 0 : STEP_OUT);
+		}
 		if (predicate && ((op & 0xfd80) == 0xf800 || (op & 0xfd80) == 0xf900))
 		{
 			bool const call = BIT(op, 8), delayed = BIT(op, 9);
