@@ -196,6 +196,19 @@ def verify(image):
         raise ValueError('03eb to 07f0 status construction differs')
     if instructions(0x21bffa, 4) != [('bl', '#0x2a21a4')]:
         raise ValueError('observed selected-cell publication caller differs')
+    if instructions(0x21c41c, 24) != [
+            ('ldr', 'r0, [r4, #0xc]'), ('cmp', 'r0, #2'),
+            ('bne', '#0x21c424'), ('b', '#0x21c5e0'),
+            ('cmp', 'r0, #5'), ('bne', '#0x21c42a'),
+            ('b', '#0x21c5be'), ('cmp', 'r0, #3'),
+            ('beq', '#0x21c4ee'), ('cmp', 'r0, #4'),
+            ('beq', '#0x21c434'), ('b', '#0x21bf86')]:
+        raise ValueError('initial request completion phase dispatch differs')
+    if instructions(0x21bf86, 14) != [
+            ('cmp', 'r0, #0'), ('bne', '#0x21c01c'),
+            ('adr', 'r0, #0x24c'), ('bl', '#0x2d5dcc'),
+            ('bl', '#0x2a1d44')]:
+        raise ValueError('initial request completion phase-zero gate differs')
     if int.from_bytes(read(0x2a110c, 4), 'big') != 0x137f58:
         raise ValueError('selected-cell request queue context differs')
     if instructions(0x2a0dcc, 10) != [

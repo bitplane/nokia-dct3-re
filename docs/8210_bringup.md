@@ -1834,6 +1834,17 @@ by these stores. Fresh completion evidence:
 `tmp/noki8210_manual_queue_fields/error.log`, SHA-256
 `262cff505f7b459bdc28e718751965f41585136fa94bacc230b2f7b5c6795755`.
 
+The initial-request completion publisher has a separate phase gate worth
+observing. Continuation `21c41c` reads its caller context word `+0c`:
+2 branches to `21c5e0`, 5 to `21c5be`, 3 to `21c4ee`, and 4 to
+`21c434`; other values branch to `21bf86`. There, only zero proceeds
+through helper `2a1d44` toward the already observed `21bffa -> 2a21a4`
+publication; nonzero branches to `21c01c`. The pinned checker verifies
+both dispatch and zero gate. This context word is not the request queue's
+`137f58+0c` pointer: its runtime owner/value and the event selecting this
+continuation remain unresolved. Observe those before treating this as
+an available drain entrance or changing peer timing.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
