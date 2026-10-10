@@ -782,6 +782,25 @@ and selector from an indexed array at `[SP+0x28]`; its type and reachable
 selector values remain unresolved. Neither path yet proves that `0xc3`
 reaches the native pending speech-mode word.
 
+The stack selector has two mapped writers: `0x20ef26..0x20ef32` stores
+`0x80` when controller byte `[R5+6]` is zero; otherwise
+`0x20ef36..0x20ef44` calls `0x20e198` with controller bytes `[R5+7]` and
+`[R5+0x48]`, then stores its result at `SP+0x3a`. The leaf routine's
+explicit `0xc3` return at `0x20e1c0` selects first argument `0x21`,
+independent of the second argument. Other explicit first-argument cases
+are `0/1/3/11/15/19`, returning the `b0/b1`, `c0/c1`, `d9`, `d4/d5`,
+`db`, and `d2/d3` selector families. The unmatched cascade returns
+`R0-0x21`, so byte input `0xe4` also produces `0xc3` by residual arithmetic;
+that is not a second evidenced speech mode.
+
+`tools/nse1_channel_selector_check.py` executes the identified unswapped
+MCU image's leaf routine with Unicorn and checks all 65,536 byte-input
+pairs, including a bounded clean return. This is an isolated algorithm
+fixture, not a handset-state intervention. The live writers and valid
+domains of controller bytes `6/7/0x48`, and the packet-body-to-native-word
+correspondence, remain necessary before constructing any native traffic
+assignment fixture.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
