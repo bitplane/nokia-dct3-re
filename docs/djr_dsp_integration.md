@@ -880,6 +880,19 @@ of the dispatcher's register aliases. The receive/parser helper
 packet path; whether that parser populates these exact fields remains
 unproved.
 
+An additional direct mode producer is now executed: element dispatcher
+`0x23ca44` routes element ID `0x63` to `0x23d050`. With at least one
+source byte, it searches the ROM table at `0x2aab70`, accepting its first
+eight entries `00/01/21/41/0f/03/0b/13`; index 8 is rejected. When the
+presence byte at `0x109738` is zero, `0x23d08c` writes the accepted value
+to `0x109739` and `0x23cc1e` marks presence. The isolated checker runs
+all 256 source bytes through the full dispatcher and verifies accepted
+writes and rejected preservation. This is a firmware-derived element
+contract, not yet a named GSM field or a demonstrated live packet path.
+It supplies an independently accepted `0x21` mode value without using
+the unmatched `0xe4` arithmetic residue. Tracing the enclosing message
+parser and its physical ingress is still required for native speech.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

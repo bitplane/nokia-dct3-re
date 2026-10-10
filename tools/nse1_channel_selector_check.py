@@ -19,6 +19,7 @@ from unicorn.arm_const import (
     UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R6,
     UC_ARM_REG_R9,
     UC_ARM_REG_R8,
+    UC_ARM_REG_R2,
 )
 
 
@@ -127,6 +128,28 @@ def check_mode_writer(cpu):
     return 256
 
 
+def check_mode_parser(cpu, raw):
+    allowed = (0, 1, 0x21, 0x41, 0x0f, 3, 0x0b, 0x13)
+    if raw[0xaab70:0xaab78] != bytes(allowed):
+        raise ValueError("mode element acceptance table differs")
+    for value in range(256):
+        cpu.mem_write(0x109738, bytes((0, 0xee)))
+        cpu.mem_write(0x10b100, bytes([value]))
+        cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+        cpu.reg_write(UC_ARM_REG_R0, 0x63)
+        cpu.reg_write(UC_ARM_REG_R1, 0x10b100)
+        cpu.reg_write(UC_ARM_REG_R2, 1)
+        cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
+        cpu.emu_start(0x23ca45, RETURN, count=256)
+        if cpu.reg_read(UC_ARM_REG_PC) != RETURN:
+            raise ValueError("mode parser did not return within bound")
+        actual = bytes(cpu.mem_read(0x109738, 2))
+        expected = bytes((1, value)) if value in allowed else bytes((0, 0xee))
+        if actual != expected:
+            raise ValueError(f"mode parser acceptance differs for {value:#x}")
+    return 256
+
+
 def expected_selector(first, second):
     alternate = second in (0x20, 0x21)
     choices = {
@@ -175,6 +198,7 @@ def check_image(raw):
             "request_routes": routes,
             "request_field_cases": check_request_fields(cpu, raw),
             "mode_writer_cases": check_mode_writer(cpu),
+            "mode_parser_cases": check_mode_parser(cpu, raw),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,
