@@ -4,9 +4,29 @@ from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
                                           UPLOADED_COUNTER_BLOCKS, check_mcu_upload_counters,
                                           check_schedule_data, check_trace, check_restore, check_tone)
 from tools.c54x_rom4_codec_contract import MCU_SPEECH_FIELD_BYTES, check_mcu_speech_field
+from tools.c54x_rom4_codec_contract import decode_mcu_speech_descriptor
 
 
 class CodecContractTests(unittest.TestCase):
+    def test_speech_descriptor_metadata_and_bounds(self):
+        image = bytearray(0xa6460)
+        for address, data in MCU_SPEECH_FIELD_BYTES.items():
+            offset = address - 0x200000
+            image[offset:offset + len(data)] = data
+        self.assertEqual(decode_mcu_speech_descriptor(image),
+                         {"identifier": 0x301, "offset": 0x210, "length": 4,
+                          "record_address": 0x2a6110})
+        for address, replacement in ((0x28950c, bytes.fromhex("00100000")),
+                                     (0x2a6454, bytes(2)),
+                                     (0x2a6110, bytes(4))):
+            changed = bytearray(image)
+            offset = address - 0x200000
+            changed[offset:offset + len(replacement)] = replacement
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                decode_mcu_speech_descriptor(changed)
+        with self.assertRaises(ValueError):
+            decode_mcu_speech_descriptor(image[:0xa6454])
+
     def test_mcu_speech_field_bytes_and_every_byte_mutation(self):
         image = bytearray(max(address - 0x200000 + len(data)
                               for address, data in MCU_SPEECH_FIELD_BYTES.items()))

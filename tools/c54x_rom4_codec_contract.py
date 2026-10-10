@@ -535,6 +535,9 @@ def check_tone(text: str) -> None:
 
 
 MCU_SPEECH_FIELD_BYTES = {
+    0x28950c: bytes.fromhex("002a6438"),
+    0x2a6450: bytes.fromhex("002a610800030000"),
+    0x2a6110: bytes.fromhex("0000030102100004"),
     0x28367c: bytes.fromhex("b5304877497d2200f005ff20"),
     0x28385c: bytes.fromhex("0010a6c4"),
     0x283878: bytes.fromhex("00000301"),
@@ -568,6 +571,28 @@ def check_mcu_speech_field(image):
     return len(MCU_SPEECH_FIELD_BYTES)
 
 
+def decode_mcu_speech_descriptor(image):
+    """Decode the observed direct-index metadata path, not arbitrary descriptors."""
+    def read(address, length):
+        offset = address - 0x200000
+        if offset < 0 or offset + length > len(image):
+            raise ValueError("speech descriptor outside original MCU image")
+        return image[offset:offset + length]
+
+    catalogue = int.from_bytes(read(0x28950c, 4), "big")
+    group = read(catalogue + 3 * 8, 8)
+    table = int.from_bytes(group[:4], "big")
+    count = int.from_bytes(group[4:6], "big")
+    if count <= 1:
+        raise ValueError("speech descriptor index absent from group")
+    record = read(table + 8, 8)
+    identifier = int.from_bytes(record[:4], "big")
+    if identifier != 0x301:
+        raise ValueError("speech descriptor direct-index identifier differs")
+    return {"identifier": identifier, "offset": int.from_bytes(record[4:6], "big"),
+            "length": int.from_bytes(record[6:8], "big"), "record_address": table + 8}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
@@ -587,6 +612,9 @@ def main() -> int:
         if args.mcu_image is not None:
             upload_locations = check_mcu_upload_counters(args.mcu_image.read_bytes())
             check_mcu_speech_field(args.mcu_image.read_bytes())
+            descriptor = decode_mcu_speech_descriptor(args.mcu_image.read_bytes())
+            if (descriptor["offset"], descriptor["length"]) != (0x210, 4):
+                raise ValueError("speech descriptor storage contract differs")
         if args.data_image is not None:
             check_schedule_data(args.data_image.read_bytes())
         if args.trace is not None:
