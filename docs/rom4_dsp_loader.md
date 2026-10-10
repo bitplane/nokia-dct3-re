@@ -1725,10 +1725,11 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 161 decoded and 465
+promoted to a boundary. Current cold-idle coverage is 181 decoded and 445
 unsupported forms. This measures frontend coverage, not silicon legality or
-pipeline timing. The leading unsupported forms are `ff0c`, `10f8`, `fa45`
-and `0881`; their execution frequency is in the isolated report.
+pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
+reviewed boundaries; the isolated report ranks the remaining unsupported
+forms by execution frequency rather than preserving a stale leading-gap list.
 `check-c54x-observed-coverage` passes the reviewed cold-idle fingerprint,
 physical Menu and long-power runs, and all 626 union assertions. Menu adds no
 new words; long power executes 625, also adding none. Decoder support remains
@@ -1779,6 +1780,13 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger control-flow decoding
+
+Unshifted `LD Smem,A/B` exposes its one-word direct/short-indirect and
+two-word long-offset/absolute layouts. The gate checks 512 mode encodings
+on two pages, bounded extension reads and six exact address/destination
+examples. Its required marker is `TMS320C54x load disassembler: PASS`.
+This is a frontend contract; it neither changes execution nor supplies
+pipeline-stage timing.
 
 BC/BCD, CC/CCD and XC decode 22 explicit named predicates. The core gate
 checks 132 forms on two pages, bounded extension reads, stepping flags and

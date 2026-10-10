@@ -584,6 +584,31 @@ private:
 				"Named conditional predicates decode exactly; unreviewed forms stay unsupported");
 		}
 		osd_printf_info("TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x1000, 0x1100})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == ((mode >= 0xe0 ? 2 : 1) | dasm::SUPPORTED) &&
+						buffer.seen() == (mode >= 0xe0 ? 3 : 1), "Load decoder reads only its address extension within the program page");
+				}
+		vector const loads[] = {
+			{0x103a, 1 | dasm::SUPPORTED, "LD      $3A, A"},
+			{0x1182, 1 | dasm::SUPPORTED, "LD      *AR2, B"},
+			{0x1095, 1 | dasm::SUPPORTED, "LD      *AR5+, A"},
+			{0x11ed, 2 | dasm::SUPPORTED, "LD      *+AR5($2345), B"},
+			{0x10f5, 2 | dasm::SUPPORTED, "LD      *+AR5($2345)%, A"},
+			{0x10f8, 2 | dasm::SUPPORTED, "LD      *($2345), A"},
+		};
+		for (auto const &test : loads)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Load decoder retains address modifiers and accumulator destination");
+		}
+		osd_printf_info("TMS320C54x load disassembler: PASS modes=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
