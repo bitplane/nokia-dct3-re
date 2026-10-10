@@ -82,6 +82,14 @@ In the current C54x core, ST1 bit 8 (SXM) is set, bit 6 (FRCT) is clear,
 and bit 9 (OVM) is clear. These are bounded live observations, not a
 claim that every filter invocation uses the same arithmetic state.
 The passive `c54x_rom4_mode_observe.lua` observer reproduces this capture.
+Its bounded operand census observes history reads in order
+`84,85,87,86,88,89,8b,8a,8c,8d,8f,8e,80,81,83,82`
+at DSP PCs `0x330d..0x3322`, followed by a read of `0x0084` at
+`0x3323`. The coefficient reads advance through `0x21a9..0x21b0`;
+the census excludes the observer's own memory reads. This demonstrates
+interleaved circular-history consumption in the executed core, but does
+not assign physical I/Q names to either lane. The capture uses zero RF
+input and is not an impulse-response or nonzero arithmetic test.
 Recover lane impulse responses and output scaling before converting an
 independently generated complex waveform to words.
 

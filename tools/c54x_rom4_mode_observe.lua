@@ -40,6 +40,19 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x990d, 0x996b, 0x9988, 0x6318, 0x659b, 0xa27d,
     0x4701, 0x4798, 0x0acf, 0x0c16, 0x0ad1, 0x0add, 0x0ae4}
 local counts = {}
+local filter_operand_count = 0
+for _, range in ipairs({{0x0080, 0x008f}, {0x21a9, 0x21b0}}) do
+    taps[#taps + 1] = memory:install_read_tap(range[1], range[2],
+        string.format("scan_filter_operands_%04x", range[1]), function(offset, value)
+            if _G.rom4_observation_read then return end
+            local pc = cpu.state["PC"].value
+            if pc < 0x330a or pc > 0x3325 or filter_operand_count >= 32 then return end
+            filter_operand_count = filter_operand_count + 1
+            machine:logerror(string.format(
+                "rom4_scan_operand: index=%d pc=%04x address=%04x value=%04x\n",
+                filter_operand_count, pc, offset, value))
+        end)
+end
 local result_counts = {total = 0, zero = 0}
 local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,
@@ -96,10 +109,12 @@ for _, address in ipairs(sites) do
                 counts[address] = counts[address] + 1
                 if address == 0x330a and counts[address] <= 2 then
                     local coefficients = {}
+                    _G.rom4_observation_read = true
                     for index = 0, 7 do
                         coefficients[#coefficients + 1] = string.format("%04x",
                             memory:read_u16(0x21a9 + index))
                     end
+                    _G.rom4_observation_read = false
                     machine:logerror(string.format(
                         "rom4_scan_filter: t=%.9f st0=%04x st1=%04x coefficients=%s\n",
                         machine.time:as_double(), cpu.state["ST0"].value,
@@ -186,5 +201,5 @@ local stop = emu.add_machine_stop_notifier(function()
             address, counts[address]))
     end
 end)
-assert(#taps == #addresses + #sites + 3 and stop)
+assert(#taps == #addresses + #sites + 5 and stop)
 _G.rom4_mode_observer = {taps = taps, stop = stop}
