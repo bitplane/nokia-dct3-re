@@ -462,6 +462,21 @@ def check_incoming_block_constructors(cpu):
     return cases
 
 
+def check_type80_dispatch(cpu):
+    for state in (0, 1):
+        cpu.mem_write(0x10b000, bytes((0, state)))
+        cpu.mem_write(0x10b503, bytes([0x80]))
+        cpu.reg_write(UC_ARM_REG_R4, 0x10b000)
+        cpu.reg_write(UC_ARM_REG_R5, 0x10b500)
+        target = 0x291cda if state == 0 else 0x291cea
+        cpu.emu_start(0x291c35, target, count=32)
+        if cpu.reg_read(UC_ARM_REG_PC) != target:
+            raise ValueError("type80 dispatcher state route differs")
+        if state == 0 and cpu.reg_read(UC_ARM_REG_R0) != 0x10b500:
+            raise ValueError("type80 dispatcher changed handler argument")
+    return 2
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -506,6 +521,7 @@ def check_image(raw):
             "rr_segment_append_cases": check_rr_segment_append(cpu),
             "rr_record_selection_cases": check_rr_record_selection(cpu),
             "incoming_block_constructor_cases": check_incoming_block_constructors(cpu),
+            "type80_dispatch_cases": check_type80_dispatch(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

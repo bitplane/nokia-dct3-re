@@ -1019,6 +1019,17 @@ the post primitive are not executed by this check. The third constructor,
 computed/indirect producers, and these handlers' incoming DSP dispatch
 remain open; literal-scan coverage is not an absence proof.
 
+The containing handler for constructors `26bb1c/26bc6e` starts at
+`0x26ba64`; its direct BL candidate is `0x291cda`. Dispatcher
+`0x291c34` reads message byte 3 and, with dispatcher-state byte 1 zero,
+routes type `0x80` to that call with the unchanged message pointer.
+Isolated execution checks state zero and state one: zero reaches the
+handler call; one instead branches to `0x291cea`. Handler `0x26ba64`
+also calls `0x26b774` at `0x26bb6e`, whose branch contains constructor
+`26b8b8`. This connects the three observed `0x040b` constructors to
+the type-`0x80` handler statically; it does not yet prove which handler
+branch runs, ring-to-dispatch delivery, or a native DSP type-`0x80` packet.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
