@@ -2462,6 +2462,20 @@ The full original-storage gate requires `mu4_mcbsp_receive_sync: PASS` and
 is deliberately fail-closed, not established by these mid-word tests. This
 is generic McBSP recovery evidence, not recorder completion or native speech.
 
+The remaining TX sync-recovery contract is distinct: SPRU302B section
+2.3.7.5 and figure 2-36 show an early FSX with XFIG clear restarting the
+current XSR word from its first bit, while a newer word already queued in
+DXR remains queued. It sets sticky, software-writable XSYNCERR (SPCR2 bit 3),
+cleared by software zero or transmitter reset; XINTM mode 3 selects its IRQ.
+XFIG set ignores the pulse. The figure explicitly shows partial B followed
+by complete B, then queued C, without an extra XRDY transition at restart.
+The present `tx_frame_w` still fails explicitly on this case. Do not reuse
+`load_shift` to recover: that routine consumes DXR and would replace B with C.
+Required acceptance is pin-decoded partial-B/full-B/C ordering at 8/12/16
+bits, the frame-ignore negative control, sticky status/software/reset behavior,
+readiness-edge counts and save/replay during the restarted word. Terminal
+frame packing remains a separate boundary, not implied by mid-word recovery.
+
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero
 to six. Do not label either double-word pair as a byte cursor from this
