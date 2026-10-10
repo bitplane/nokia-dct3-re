@@ -886,8 +886,11 @@ source byte, it searches the ROM table at `0x2aab70`, accepting its first
 eight entries `00/01/21/41/0f/03/0b/13`; index 8 is rejected. When the
 presence byte at `0x109738` is zero, `0x23d08c` writes the accepted value
 to `0x109739` and `0x23cc1e` marks presence. The isolated checker runs
-all 256 source bytes through the full dispatcher and verifies accepted
-writes and rejected preservation. This is a firmware-derived element
+all 256 source bytes through the full dispatcher in three configurations
+(768 cases): absent field with one source byte, absent field with zero
+length, and already-present field with one source byte. Accepted writes
+occur only in the first configuration; rejected values, short input and
+an already-present field preserve the destination. This is a firmware-derived element
 contract, not yet a named GSM field or a demonstrated live packet path.
 It supplies an independently accepted `0x21` mode value without using
 the unmatched `0xe4` arithmetic residue. Tracing the enclosing message

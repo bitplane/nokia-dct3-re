@@ -32,7 +32,7 @@ class ChannelSelectorTests(unittest.TestCase):
         self.assertEqual(result["request_routes"], 4)
         self.assertEqual(result["request_field_cases"], 1024)
         self.assertEqual(result["mode_writer_cases"], 256)
-        self.assertEqual(result["mode_parser_cases"], 256)
+        self.assertEqual(result["mode_parser_cases"], 768)
         self.assertEqual(result["c3_first_arguments"], [0x21, 0xe4])
 
 

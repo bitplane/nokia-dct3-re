@@ -132,22 +132,28 @@ def check_mode_parser(cpu, raw):
     allowed = (0, 1, 0x21, 0x41, 0x0f, 3, 0x0b, 0x13)
     if raw[0xaab70:0xaab78] != bytes(allowed):
         raise ValueError("mode element acceptance table differs")
-    for value in range(256):
-        cpu.mem_write(0x109738, bytes((0, 0xee)))
+    for value, present, length in (
+            (value, present, length)
+            for present, length in ((0, 1), (0, 0), (1, 1))
+            for value in range(256)):
+        cpu.mem_write(0x109738, bytes((present, 0xee)))
         cpu.mem_write(0x10b100, bytes([value]))
         cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
         cpu.reg_write(UC_ARM_REG_R0, 0x63)
         cpu.reg_write(UC_ARM_REG_R1, 0x10b100)
-        cpu.reg_write(UC_ARM_REG_R2, 1)
+        cpu.reg_write(UC_ARM_REG_R2, length)
         cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
         cpu.emu_start(0x23ca45, RETURN, count=256)
         if cpu.reg_read(UC_ARM_REG_PC) != RETURN:
             raise ValueError("mode parser did not return within bound")
         actual = bytes(cpu.mem_read(0x109738, 2))
-        expected = bytes((1, value)) if value in allowed else bytes((0, 0xee))
+        expected = (bytes((1, value))
+                    if not present and length and value in allowed
+                    else bytes((present, 0xee)))
         if actual != expected:
-            raise ValueError(f"mode parser acceptance differs for {value:#x}")
-    return 256
+            raise ValueError(
+                f"mode parser differs for {value:#x}, present={present}, length={length}")
+    return 768
 
 
 def expected_selector(first, second):
