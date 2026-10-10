@@ -1308,6 +1308,19 @@ private:
 				"Special-register load syntax names destinations and rejects undocumented ARP aliases");
 		}
 		osd_printf_info("TMS320C54x special load disassembler: PASS memory_forms=768 arp=8 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xf080, 0xf0a0})
+				for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
+					for (unsigned shift = 0; shift < 32; ++shift)
+					{
+						words const buffer(pc, family | (accumulators << 8) | shift, 0x2345);
+						std::ostringstream text, expected;
+						util::stream_format(expected, "%-8s%c, %d, %c", family == 0xf080 ? "AND" : "OR",
+							accumulators & 2 ? 'B' : 'A', shift & 16 ? int(shift) - 32 : int(shift), accumulators & 1 ? 'B' : 'A');
+						expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1 && text.str() == expected.str(),
+							"Accumulator AND/OR decoder preserves signed shifts and both selectors without extensions");
+					}
+		osd_printf_info("TMS320C54x accumulator logical disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
