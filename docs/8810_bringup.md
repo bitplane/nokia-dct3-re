@@ -76,8 +76,18 @@ the counter to one, then clears it through `0x2c91c8` at 31.015760 s.
 At 31.966920 s it receives **D6**, enters `0x243af6`, and follows the shared
 reset-call tail `0x243c22` with reason `0x68` and counter zero. The shared
 caller return `0x243c27` alone cannot distinguish D4's timeout from D6.
-The current target is D6's actual delivery/trigger contract, not counter
-timing. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
+The receive primitive's timer-queue branch at `0x27b604` dequeues timer ID
+`0x16` from record `0x10b2ac` for task record `0x10c884` at 31.966903 s.
+Its ROM mapping at `0x2fa344 + 8 * 0x16` supplies status D6; the dispatcher
+receives it 17 microseconds later. Thus the observed D6 is a timer expiration,
+not a demonstrated DSP response. The unresolved contract is who arms/cancels
+timer `0x16` and which completion should prevent its reset action. A second
+fresh run identifies the arm call: `0x27a76e` receives ID `0x16` and delay
+`0x7d` at 31.000918 s, with caller return `0x2d3473`. This ties the expiration
+to the MCU idle/control loop; the delay's clock units and cancellation
+condition still require decoding.
+`0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
+does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
 Runtime taps and literal scans do not exclude table/indirect delivery.
 Do not disable a hardware watchdog to conceal this software-requested reset.
