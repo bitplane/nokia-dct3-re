@@ -1717,7 +1717,7 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, 0x010a00);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = 78000 + index * 2;
+		m_phase = 78000 + index * 4;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
@@ -19051,17 +19051,36 @@ private:
 			start_bsp_interrupt_case(0);
 			return;
 		}
-		if (m_phase >= 78000 && m_phase < 78018)
+		if (m_phase >= 78000 && m_phase < 78036)
 		{
-			unsigned const index = (m_phase - 78000) / 2;
+			unsigned const index = (m_phase - 78000) / 4;
+			unsigned const stage = (m_phase - 78000) % 4;
 			unsigned const source = index < 4 ? 4 : 5;
-			if (!(m_phase & 1))
+			if (!stage)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(STATE_GENPC) == 0x010a01,
 					"BSP source fixture waits in IDLE before completed-frame edge");
+				// Input-line changes synchronize asynchronously. Hold execution,
+				// then snapshot only after the delivered edge is visible in IFR.
+				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 				m_cpu->set_input_line(source, HOLD_LINE);
 				if (index == 8) m_cpu->set_input_line(4, HOLD_LINE);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			if (stage == 1)
+			{
+				expect(m_cpu->state_int(STATE_GENPC) == 0x010a01 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) ==
+						(index == 8 ? 0x30 : u16(1U << source)),
+					"BSP source edge reaches IFR before snapshot and dispatch");
+				m_saved_repeat.str(std::string());
+				m_saved_repeat.clear();
+				expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+					"save pending BSP interrupt sources before CPU dispatch");
+				m_cpu->resume(SUSPEND_REASON_DISABLE);
 				++m_phase;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
@@ -19077,8 +19096,22 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == pending &&
 				m_cpu->space(AS_DATA).read_word(0x0501) == (enabled && !serviced ? 1 : 0),
 				"BSP source vectors, masked pending state, INTM wake and simultaneous priority");
+			if (stage == 2)
+			{
+				m_saved_repeat.clear();
+				m_saved_repeat.seekg(0);
+				expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE &&
+					m_cpu->state_int(STATE_GENPC) == 0x010a01 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) ==
+						(index == 8 ? 0x30 : u16(1U << source)),
+					"restore sleeping CPU and complete pending BSP source set");
+				m_cpu->resume(SUSPEND_REASON_DISABLE);
+				m_phase = 78000 + index * 4 + 3;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
 			if (index < 8) { start_bsp_interrupt_case(index + 1); return; }
-			osd_printf_info("TMS320C54x BSP interrupt sources: PASS cases=9 handset_audio_claim=0\n");
+			osd_printf_info("TMS320C54x BSP interrupt sources: PASS cases=9 save_replay=9 handset_audio_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

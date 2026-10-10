@@ -1075,8 +1075,13 @@ source 5 enters BXINT0/vector 21. Nine synthetic cases cover enabled and
 masked IMR bits, clear/set INTM, IDLE wake versus vector entry, retained
 pending bits and simultaneous receive/transmit priority. With both pending,
 receive is serviced first and transmit remains pending. The mandatory result
-is `TMS320C54x BSP interrupt sources: PASS cases=9 handset_audio_claim=0`
-under `make check-c54x-core`. This tests CPU dispatch using explicit source
+is `TMS320C54x BSP interrupt sources: PASS cases=9 save_replay=9 handset_audio_claim=0`
+under `make check-c54x-core`. Each case also saves after the asynchronous
+source edge has reached IFR, before CPU dispatch, and restores the sleeping
+CPU and complete pending-source set. Replaying verifies the same vector,
+mask, INTM wake and priority result. This does not test saving an input edge
+that has not yet been delivered by MAME's scheduler.
+This tests CPU dispatch using explicit source
 edges; it does not exercise backend frame-to-source wiring, resident codec
 ISRs, physical frame timing or handset audio. Those remain distinct gates.
 The suite also checks all 65,536 control-write values and the state transitions. Native coherent
