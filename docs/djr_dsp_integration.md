@@ -631,8 +631,9 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   store at `272034`. The fresh capture reports selector `0028`, input
   and output `df29`, destination `000100bc` and merge mask zero. Thus
   this publication forwards the supplied word rather than constructing
-  its mute bit. Ten original-MCU byte spans protect entry, dispatch,
-  selected table entry, branch, store and pool; every byte has a negative
+  its mute bit. Eighteen original-MCU byte spans protect entry, dispatch,
+  selected table entry, branches, stores, pools and storage addressing;
+  every byte has a negative
   mutation test. Other selectors are not semantically decoded by that
   fixture. Entry-time capture identifies original caller `275445`
   (Thumb return from `275440`), parameter zero, index 9 and source
@@ -667,6 +668,12 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   semantics remain unresolved; a matching ROM literal alone is not
   provenance. This observation does not establish
   call-time speech activation or the semantics of every flag bit.
+  MCU lifecycle branches `27503c..275042` and `275054..27505a` respectively
+  set and clear bit 3 in record byte `[R5+13]` (the low byte of field
+  `[R5+12]`). Both preserve bit 0; they cannot by themselves release the
+  encoder's decoded bit-0 mute. Their full upstream branch meaning remains
+  unresolved. The gate requires the selector-`0210` read before record
+  initialization and rejects a changed selector or inverted event order.
 - The decoder supplies destination `0x1496` before postprocessing at `0x94c9`
   and `0xab7c`; further gain/filter/mute stages precede output copying.
 - `0xaa39` copies from the ring cursor in `0x6de` into the selected input

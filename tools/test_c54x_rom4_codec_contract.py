@@ -204,6 +204,7 @@ class NativeToneTests(unittest.TestCase):
             "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
             "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.09",
             "input-release: t=8.22 name=1 port=1d",
+            "rom4_speech_configuration_entry: selector=0210 destination=0010a6c4 length=0004 caller=002894fd t=0.156",
             "rom4_tone_access: owner=speech_record direction=write address=10b2b8 value=df29 mask=ffff pc=274cb8 t=0.157",
             "rom4_speech_field_entry: input=df29 parameter=0000 caller=00275445 pc=00271d70 source=0010b2b8 index=09 t=0.158",
             "rom4_tone_access: owner=mcu direction=write address=0100bc value=df290000 mask=ffff0000 pc=272034 t=0.159",
@@ -229,6 +230,12 @@ class NativeToneTests(unittest.TestCase):
         for old, new in (("value=df29 mask=ffff pc=274cb8", "value=df290000 mask=ffff0000 pc=274cb8"),
                          ("pc=274cb8 t=0.157", "pc=274cb8 t=0.170")):
             with self.subTest(new=new), self.assertRaisesRegex(ValueError, "speech-record"):
+                check_tone(self.trace().replace(old, new))
+
+    def test_speech_configuration_identity_and_order(self):
+        for old, new in (("selector=0210", "selector=0211"),
+                         ("caller=002894fd t=0.156", "caller=002894fd t=0.180")):
+            with self.subTest(new=new), self.assertRaisesRegex(ValueError, "EEPROM configuration"):
                 check_tone(self.trace().replace(old, new))
 
     def test_speech_shared_copy_requires_order(self):

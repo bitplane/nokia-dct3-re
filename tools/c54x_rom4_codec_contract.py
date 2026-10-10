@@ -515,6 +515,11 @@ def check_tone(text: str) -> None:
                      and float(t) <= entries[0][1]]
     if not record_writes:
         raise ValueError("missing preceding speech-record lower-halfword initialization")
+    configuration = re.findall(
+        r"rom4_speech_configuration_entry: selector=0210 destination=0010a6c4 "
+        r"length=0004 caller=002894fd t=([0-9.]+)", text)
+    if not any(float(t) <= min(record_writes) for t in configuration):
+        raise ValueError("missing preceding speech EEPROM configuration read")
     cursor = entries[0][1]
     for expected, earliest in (
             (("mcu", "write", "0100bc", "df290000", "ffff0000", "272034"), 0.0),
@@ -530,6 +535,14 @@ def check_tone(text: str) -> None:
 
 
 MCU_SPEECH_FIELD_BYTES = {
+    0x274cb8: bytes.fromhex("8ae08268"),
+    0x27500c: bytes.fromhex("0010a6b0"),
+    0x275044: bytes.fromhex("0010b2a8"),
+    0x27503c: bytes.fromhex("20087ce94308e00a"),
+    0x275054: bytes.fromhex("20f77ce9400874e8"),
+    0x28c308: bytes.fromhex("b5f04642b40446881c07"),
+    0x28c320: bytes.fromhex("210e09f84001205f43c0430806000e06"),
+    0x28c360: bytes.fromhex("06380e00f001fe72"),
     0x275426: bytes.fromhex("46442701886188684281d00c4649465072c848875dc088692200f7fcfc96"),
     0x275658: bytes.fromhex("002a5df8"),
     0x2a5df8: bytes.fromhex("08091b252021222324282d"),
