@@ -247,6 +247,28 @@ def check(image: bytes) -> list[str]:
     return results
 
 
+SCHEDULE_LISTS = {
+    0xee38: (0x990d, 0x99d5, 0x9aa8, 0x9bbb, 0x9d20, 0x00ff),
+    0xee3e: (0x990d, 0x99d5, 0x9aa8, 0x9bbb, 0x9d20, 0x9d3d, 0x00ff),
+    0xee45: (0x990d, 0x99d5, 0x9a56, 0x9a71, 0x9aa8, 0x9bbb, 0x9d20, 0x9d3d, 0x00ff),
+    0xee4e: (0x9aa8, 0x9b4a, 0x9b59, 0x9bbb, 0x9be0, 0x9d20, 0x9d3d, 0x9d49, 0x00ff),
+    0xee57: (0x99aa, 0x99d5, 0x99b3, 0x9a56, 0x9a71, 0x9a7a, 0x9aa8,
+             0x9b4a, 0x9a34, 0x9b59, 0x9bbb, 0x9be0, 0x9d20, 0x9d3d, 0x00ff),
+}
+
+
+def check_schedule_data(image: bytes) -> int:
+    if len(image) != 0x20000:
+        raise ValueError("schedule data requires a complete 64K-word data image")
+    for address, expected in SCHEDULE_LISTS.items():
+        raw = image[address * 2:(address + len(expected)) * 2]
+        words = tuple(int.from_bytes(raw[i:i + 2], "big")
+                      for i in range(0, len(raw), 2))
+        if words != expected:
+            raise ValueError(f"schedule data differs at {address:04x}")
+    return len(SCHEDULE_LISTS)
+
+
 def check_trace(text: str) -> None:
     records = re.findall(
         r"rom4_serial_audit: space=(data|io) direction=(read|write) "
@@ -335,6 +357,8 @@ def check_tone(text: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
+    parser.add_argument("--data-image", type=Path,
+                        help="check receive scheduling lists in the separate DSP data image")
     parser.add_argument("--trace", type=Path,
                         help="check a fresh four-second passive codec observer log")
     parser.add_argument("--restore-log", type=Path,
@@ -344,6 +368,8 @@ def main() -> int:
     args = parser.parse_args()
     try:
         results = check(args.image.read_bytes())
+        if args.data_image is not None:
+            check_schedule_data(args.data_image.read_bytes())
         if args.trace is not None:
             check_trace(args.trace.read_text(errors="replace"))
         if args.restore_log is not None:
@@ -353,6 +379,8 @@ def main() -> int:
     except (OSError, ValueError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print("PASS: " + ", ".join(results))
+    if args.data_image is not None:
+        print("DSP data-space receive scheduling lists: 5/5 PASS")
     print("Candidate immediate-port coverage: reads=9/9 writes=12/12; uploads excluded.")
     if args.trace is not None:
             print("Native echo, receive-ready ISR and three operational control readback cycles: PASS")

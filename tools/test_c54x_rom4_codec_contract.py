@@ -1,9 +1,30 @@
 import unittest
 
-from tools.c54x_rom4_codec_contract import SEQUENCES, check, check_trace, check_restore, check_tone
+from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
+                                          check_schedule_data, check_trace, check_restore, check_tone)
 
 
 class CodecContractTests(unittest.TestCase):
+    def test_schedule_data_words(self):
+        image = bytearray(0x20000)
+        for address, words in SCHEDULE_LISTS.items():
+            for offset, word in enumerate(words):
+                start = 2 * (address + offset)
+                image[start:start + 2] = word.to_bytes(2, "big")
+        self.assertEqual(check_schedule_data(image), 5)
+        for address, words in SCHEDULE_LISTS.items():
+            for offset in range(len(words)):
+                with self.subTest(address=address, offset=offset):
+                    mutated = bytearray(image)
+                    mutated[2 * (address + offset)] ^= 1
+                    with self.assertRaisesRegex(ValueError, f"{address:04x}"):
+                        check_schedule_data(mutated)
+
+    def test_schedule_data_requires_complete_image(self):
+        for image in (b"", bytes(0x1ffff), bytes(0x20001)):
+            with self.assertRaisesRegex(ValueError, "complete"):
+                check_schedule_data(image)
+
     def image(self):
         image = bytearray(0x10000 * 2)
         for address, words in SEQUENCES.values():

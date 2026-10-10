@@ -1170,6 +1170,10 @@ includes secondary wrapper `0x9a7a`. Thus a scheduling producer exists
 in data, although dispatcher `0x98b7` and interpreter `0x9903` both
 execute zero times in that bounded run. The next predecessor question
 is selection of this scheduler, not construction of missing call lists.
+The same five lists are independently checked against the complete
+acquired data image with `c54x_rom4_codec_contract.py --data-image
+mame/roms/noki5110/nse1_rom4_dsp_data.bin`; mutation tests cover all
+46 table words, including their sentinels, and reject incomplete images.
 
 Byte-pinned scheduler selections write callback cell `0x07fb`:
 `0x55bb` assigns `0x98b7` unless active-mode high nibble
