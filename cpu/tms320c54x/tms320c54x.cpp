@@ -142,6 +142,18 @@ public:
 			util::stream_format(stream, ", %s%s", (family & 0x0600) == 0x0400 ? "TS, " : "", BIT(op, 8) ? "B" : "A");
 			return (1 + extended) | SUPPORTED;
 		}
+		if ((family == 0x4800 || family == 0x4900 || family == 0x4a00 || family == 0x8800 || family == 0x8900 ||
+			family == 0x8a00) && mode < 0xe0)
+		{
+			bool const load = family == 0x4800 || family == 0x4900;
+			bool const store = family == 0x8800 || family == 0x8900;
+			char const *name = load ? "LDM" : store ? "STLM" : family == 0x4a00 ? "PSHM" : "POPM";
+			util::stream_format(stream, "%-8s", name);
+			if (store) util::stream_format(stream, "%c, ", BIT(op, 8) ? 'B' : 'A');
+			smem(0);
+			if (load) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
 		if (family == 0x1000 || family == 0x1100 || family == 0x1400 || family == 0x1500 ||
 			family == 0x4400 || family == 0x4500)
 		{

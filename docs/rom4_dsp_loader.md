@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 336 decoded and 290
+promoted to a boundary. Current cold-idle coverage is 415 decoded and 211
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1780,6 +1780,15 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger instruction boundaries
+
+LDM, STLM, PSHM and POPM decode their single-word direct/short-indirect
+MMR forms. The gate checks 1,344 forms and 192 rejected extended encodings
+on two pages, no extension reads and ten exact syntax/rejection examples.
+Its marker is `TMS320C54x MMR disassembler: PASS`. This primary-reference
+grammar coverage exposed a separate execution gap: the current POPM handler
+accepts only direct operands although TI specifies indirect operands too.
+Indirect POPM needs executable addressing/stack fixtures before promotion;
+decoder support alone does not close that gap.
 
 BANZ/BANZD decode short-indirect and long-offset Sind operands. The gate
 checks 240 supported forms and 272 unclaimed direct/absolute forms on two

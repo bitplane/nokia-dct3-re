@@ -868,6 +868,35 @@ private:
 				"BANZ syntax retains program page and displacement-before-target ordering");
 		}
 		osd_printf_info("TMS320C54x BANZ disassembler: PASS indirect=240 unclaimed=272 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x4800, 0x4900, 0x4a00, 0x8800, 0x8900, 0x8a00})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (mode < 0xe0 ? 1 | dasm::SUPPORTED : 1) && buffer.seen() == 1,
+						"MMR decoder excludes forbidden extended modes and reads no extensions");
+				}
+		vector const mmr_forms[] = {
+			{0x4810, 1 | dasm::SUPPORTED, "LDM     $10, A"},
+			{0x4993, 1 | dasm::SUPPORTED, "LDM     *AR3+, B"},
+			{0x4a14, 1 | dasm::SUPPORTED, "PSHM    $14"},
+			{0x4a8b, 1 | dasm::SUPPORTED, "PSHM    *AR3-"},
+			{0x8810, 1 | dasm::SUPPORTED, "STLM    A, $10"},
+			{0x89dc, 1 | dasm::SUPPORTED, "STLM    B, *AR4+0%"},
+			{0x8a14, 1 | dasm::SUPPORTED, "POPM    $14"},
+			{0x8a93, 1 | dasm::SUPPORTED, "POPM    *AR3+"},
+			{0x48e0, 1, ".word   $48E0"},
+			{0x8af8, 1, ".word   $8AF8"},
+		};
+		for (auto const &test : mmr_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == 1,
+				"MMR syntax retains register/accumulator ordering and rejects extended forms");
+		}
+		osd_printf_info("TMS320C54x MMR disassembler: PASS modes=1344 rejected=192 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
