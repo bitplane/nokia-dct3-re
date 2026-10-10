@@ -21,6 +21,7 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_xempty));
 	save_item(NAME(m_clock_input)); save_item(NAME(m_frame_input)); save_item(NAME(m_ready_pending));
 	save_item(NAME(m_async_bit)); save_item(NAME(m_frame_words)); save_item(NAME(m_async_time));
+	save_item(NAME(m_tx_frame_pending)); save_item(NAME(m_tx_next_delay));
 	save_item(NAME(m_rx_shift)); save_item(NAME(m_rx_completed)); save_item(NAME(m_rx_buffer));
 	save_item(NAME(m_rx_word)); save_item(NAME(m_rx_high)); save_item(NAME(m_rx_frame_words));
 	save_item(NAME(m_rx_bits)); save_item(NAME(m_rx_delay)); save_item(NAME(m_rx_buffer_width));
@@ -44,6 +45,7 @@ void tms320c54x_mcbsp_device::device_reset()
 	m_xempty = false;
 	m_clock_input = m_frame_input = m_ready_pending = m_async_bit = false;
 	m_frame_words = 0; m_async_time = attotime::zero;
+	m_tx_frame_pending = false; m_tx_next_delay = 0;
 	m_internal_clock_stopped = false;
 	m_paused_bit_time = attotime::never;
 	m_bit_timer->adjust(attotime::never);
@@ -77,6 +79,7 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 			m_buffer = 0; m_xempty = false;
 			m_ready_pending = m_async_bit = false; m_frame_words = 0;
 			m_bits = m_delay = 0;
+			m_tx_frame_pending = false; m_tx_next_delay = 0;
 			m_bit_timer->adjust(attotime::never);
 		}
 		else if (!enabled)
@@ -385,6 +388,14 @@ void tms320c54x_mcbsp_device::shift_bit()
 		if (!m_buffer_full) m_xempty = false;
 		if (m_frame_words) --m_frame_words;
 		m_tx_word_cb(m_shift);
+		if (!m_frame_words && m_tx_frame_pending)
+		{
+			u8 const delay = m_tx_next_delay;
+			m_tx_frame_pending = false; m_tx_next_delay = 0;
+			load_shift(true, true);
+			m_delay = delay;
+			m_frame_words = ((m_regs[4] >> 8) & 0x7f) + 1;
+		}
 	}
 }
 
@@ -396,9 +407,17 @@ void tms320c54x_mcbsp_device::tx_frame_w(int state)
 	if (BIT(m_regs[14], 9)) fatalerror("McBSP external frame with internal clock is not implemented");
 	if (m_frame_words)
 	{
+		// The TX delay includes its first shift edge, unlike sampled RX delay.
+		// Preserve the final XSR tail when the next legal frame overlaps it.
+		if (m_frame_words == 1 && m_shift_active && !m_delay && m_bits < (m_regs[5] & 3))
+		{
+			if (m_tx_frame_pending) fatalerror("McBSP multiple pending transmit frames are not implemented");
+			m_tx_frame_pending = true;
+			m_tx_next_delay = (m_regs[5] & 3) - m_bits;
+			return;
+		}
 		if (BIT(m_regs[5], 2)) return;
-		if (!m_shift_active || (m_frame_words == 1 && m_bits <= (m_regs[5] & 3) + 1))
-			fatalerror("McBSP transmit terminal frame overlap is not implemented");
+		if (!m_shift_active) fatalerror("McBSP transmit sync between words is not implemented");
 		// SPRU302B figure 2-36: restart XSR, retaining the next DXR word.
 		// Loading DXR here would incorrectly replace the interrupted word.
 		static constexpr unsigned widths[] = {8, 12, 16};

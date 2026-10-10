@@ -1200,9 +1200,9 @@ receive register, readiness event or firmware buffer.
 
 RX registers, pin levels, partial shifts and buffering are saved. Dual phase,
 words wider than 16 bits, companding, loopback/SPI/A-bis receive, RINTM modes
-1/2, transmit terminal frame-overlap packing, active format changes, internal receive
+1/2, active format changes, internal receive
 clocks and reset-activation timing remain unsupported or unvalidated. Unsupported
-active data formats and transmit terminal frame overlap fail explicitly. Mid-word receive
+active data formats fail explicitly. Mid-word receive
 frame recovery and receive overrun are covered by the error-state gates below;
 mid-word transmit-frame recovery is covered by the same error-state gates.
 
@@ -2495,12 +2495,34 @@ sticky status/software/reset behavior and readiness-edge counts. A save/replay
 case retains a half-shifted restarted XSR, queued DXR and held error IRQ,
 checking the remaining physical bits and no duplicate IRQ edge. The full
 original-storage gate requires `mu4_mcbsp_transmit_sync: PASS` and
-`mu4_mcbsp_transmit_sync_restore: PASS`. Terminal frame packing remains
-fail-closed and is not implied by mid-word recovery; XINTM modes 1/2 and
+`mu4_mcbsp_transmit_sync_restore: PASS`. Terminal frame packing has separate
+pin-level coverage below; XINTM modes 1/2 and
 internal-clock sync recovery remain unvalidated.
 The complete gate passes with
 `MU4_STORAGE_RUN_DIR=tmp/mcbsp-txsync-restore-final`, retaining the original
 storage, loader/native-entry, DMA and existing serial error-state results.
+
+Transmit frame packing uses the same minimum frame period from SPRU302B
+section 2.3.5.3, but not the receiver's delay counter convention. Zero-delay
+TX emits its first bit asynchronously at FSX; nonzero delay includes the
+first shifting edge. An expected next-frame sync that overlaps the final XSR
+tail retains both that tail and the queued DXR word, then starts the next
+frame with the unelapsed delay. It does not restart XSR or assert XSYNCERR,
+even with XFIG set. The fixture drives FSX before the selected shift edge and
+checks the bit count after every clock as well as complete payloads and
+ready IRQ edges: 36 cases at 8/12/16 bits, delays 0/1/2, gaps 0/1 and both
+XFIG values. A save/replay test retains the final old bit, queued DXR and
+pending next frame, checking every remaining output bit and one new ready
+edge. The full original-storage gate requires
+`mu4_mcbsp_transmit_packing: PASS` and
+`mu4_mcbsp_transmit_packing_restore: PASS`. Multiple pending transmit frames,
+sync between words of an active multiword frame, and other sub-clock FSX
+phases remain unsupported or unvalidated. This is controller evidence, not
+native recorder or speech completion.
+The old controller's terminal-overlap abort is reproduced in
+`tmp/mcbsp-txpack-red.log`; the full original-storage gate, including overlap
+save/replay and per-edge assertions, passes with
+`MU4_STORAGE_RUN_DIR=tmp/mcbsp-txpack-final`.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero

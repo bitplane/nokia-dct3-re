@@ -61,7 +61,7 @@ public:
 		});
 		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
 		m_mcbsp0->tx_bit_cb().set([this](int state) {
-			if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73) || m_phase == 77 || m_phase == 78) m_external_bits.push_back(state);
+			if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73) || m_phase == 77 || m_phase == 78 || (m_phase >= 99 && m_phase <= 118)) m_external_bits.push_back(state);
 			subdevice<tlv320aic23_device>("codec")->din_w(state);
 		});
 		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
@@ -391,6 +391,46 @@ private:
 		}
 		if (i == 2) logerror("mu4_mcbsp_receive_sync: PASS cases=6 widths=8,12,16 replacement=1 ignore=1 drr_retained=1 sticky=1 software_clear=1 software_set=1 reset=1 error_irq=1\n");
 	}
+	void check_transmit_packing(unsigned index)
+	{
+		static constexpr unsigned widths[] = {8, 12, 16};
+		static constexpr u16 words[] = {0xa55a, 0x5aa5, 0x1357};
+		unsigned const i = index / 6, delay = (index / 2) % 3, ignore = index % 2;
+		unsigned const width = widths[i];
+		u16 const mask = (1U << width) - 1;
+		for (unsigned gap = 0; gap < 2; ++gap)
+		{
+			external_reg_w(1, 0); external_reg_w(4, i << 5);
+			external_reg_w(5, delay | (ignore ? 4 : 0)); external_reg_w(14, 0);
+			m_mcbsp0->tx_clock_w(0); m_mcbsp0->tx_frame_w(0);
+			m_external_words.clear(); m_external_bits.clear(); external_reg_w(1, 1);
+			unsigned const irqs = m_external_tx_irqs, period = width + gap;
+			m_mcbsp0->data_w(3, words[0]);
+			unsigned queued = 1;
+			for (unsigned cycle = 0; cycle < 3 * period + delay; ++cycle)
+			{
+				m_mcbsp0->tx_frame_w(cycle < 3 * period && cycle % period == 0);
+				external_clocks(1, false);
+				unsigned expected_bits = 0;
+				for (unsigned word = 0; word < 3; ++word)
+				{
+					unsigned const first = word * period + (delay ? delay - 1 : 0);
+					if (cycle >= first) expected_bits += std::min(width, cycle - first + 1);
+				}
+				if (m_external_bits.size() != expected_bits) fatalerror("McBSP transmit packing shifted on the wrong external clock edge");
+				m_mcbsp0->control_w(0, 1);
+				if (m_mcbsp0->control_r(1) & 8) fatalerror("McBSP legal transmit packing created XSYNCERR");
+				if (queued < 3 && (m_mcbsp0->control_r(1) & 2)) m_mcbsp0->data_w(3, words[queued++]);
+			}
+			if (m_external_words != std::vector<u16>({u16(words[0] & mask), u16(words[1] & mask), u16(words[2] & mask)}) ||
+				m_external_bits.size() != 3 * width || m_external_tx_irqs != irqs + 3)
+				fatalerror("McBSP transmit packing lost a complete word or ready edge");
+			for (unsigned bit = 0; bit < m_external_bits.size(); ++bit)
+				if (m_external_bits[bit] != BIT(words[bit / width], width - 1 - bit % width))
+					fatalerror("McBSP transmit packing changed physical bit order");
+		}
+		if (index == 17) logerror("mu4_mcbsp_transmit_packing: PASS cases=36 widths=8,12,16 delays=0,1,2 gaps=0,1 ignore=0,1 exact_words=1 physical_bits=1 ready_edges=1 no_false_error=1\n");
+	}
 	void check_transmit_sync(unsigned i)
 	{
 		static constexpr unsigned widths[] = {8, 12, 16};
@@ -549,7 +589,7 @@ private:
 			m_continuous_tx[(m_continuous_tx_head + m_continuous_tx_count) % m_continuous_tx.size()] = value;
 			++m_continuous_tx_count;
 		}
-		if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73) || m_phase == 77 || m_phase == 78) m_external_words.push_back(value);
+		if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73) || m_phase == 77 || m_phase == 78 || (m_phase >= 99 && m_phase <= 118)) m_external_words.push_back(value);
 		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
 		finish_stream_if_ready();
 	}
@@ -2534,6 +2574,44 @@ private:
 			// Yield between pin cases so real CPU interrupt synchronization can drain.
 			check_receive_packing(m_phase - 81);
 			if (m_phase < 98) { ++m_phase; m_check->adjust(attotime::from_usec(1)); return; }
+			m_phase = 99; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase >= 99 && m_phase <= 116)
+		{
+			check_transmit_packing(m_phase - 99);
+			if (m_phase < 116) { ++m_phase; m_check->adjust(attotime::from_usec(1)); return; }
+			external_reg_w(1, 0); external_reg_w(4, 0); external_reg_w(5, 2);
+			m_mcbsp0->tx_clock_w(0); m_mcbsp0->tx_frame_w(0); external_reg_w(1, 1);
+			m_mcbsp0->data_w(3, 0x5a); m_mcbsp0->tx_frame_w(1); external_clocks(8, false);
+			m_mcbsp0->data_w(3, 0xa5); m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1);
+			m_phase = 117; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase == 117 || m_phase == 118)
+		{
+			if (!machine().scheduler().can_save()) fatalerror("MU4 packed transmit checkpoint has pending synchronized inputs");
+			if (m_phase == 117)
+			{
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 packed transmit save failed");
+			}
+			else
+			{
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 packed transmit restore failed");
+			}
+			m_external_words.clear(); m_external_bits.clear();
+			unsigned const irqs = m_external_tx_irqs;
+			external_clocks(9, false); m_mcbsp0->control_w(0, 1);
+			if (m_external_words != std::vector<u16>({0x5a, 0xa5}) || m_external_bits.size() != 9 ||
+				(m_mcbsp0->control_r(1) & 8) || m_external_tx_irqs != irqs + 1)
+				fatalerror("MU4 packed transmit replay lost XSR tail, queued DXR or next frame");
+			for (unsigned bit = 0; bit < 9; ++bit)
+				if (m_external_bits[bit] != (bit ? BIT(0xa5, 8 - bit) : BIT(0x5a, 0)))
+					fatalerror("MU4 packed transmit replay changed physical bits");
+			external_reg_w(1, 0);
+			if (m_phase == 117) { m_phase = 118; m_check->adjust(attotime::from_usec(1)); return; }
+			logerror("mu4_mcbsp_transmit_packing_restore: PASS old_tail=1 queued_dxr=1 pending_frame=1 physical_bits=1 ready_edges=1 no_false_error=1\n");
+			m_saved_dma.str(std::string());
 			m_phase = 25; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)

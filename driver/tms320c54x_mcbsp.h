@@ -51,6 +51,8 @@ private:
 	bool m_internal_clock_stopped = false;
 	attotime m_paused_bit_time = attotime::never;
 	u16 m_frame_words = 0;
+	bool m_tx_frame_pending = false;
+	u8 m_tx_next_delay = 0;
 	attotime m_async_time;
 	u16 m_rx_shift = 0, m_rx_completed = 0, m_rx_buffer = 0, m_rx_word = 0, m_rx_high = 0;
 	u16 m_rx_frame_words = 0;
