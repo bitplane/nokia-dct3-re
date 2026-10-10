@@ -188,11 +188,28 @@ class NativeToneTests(unittest.TestCase):
             "rom4_tone_access: owner=dsp direction=read address=000856 value=00e1 mask=ffff pc=00a59a t=8.08",
             "rom4_tone_access: owner=dsp direction=write address=0000fe value=00e1 mask=ffff pc=00a5de t=8.09",
             "input-release: t=8.22 name=1 port=1d",
+            "rom4_tone_access: owner=mcu direction=write address=0100bc value=df290000 mask=ffff0000 pc=272034 t=0.159",
+            "rom4_tone_access: owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc=0027ad t=0.160",
+            "rom4_tone_access: owner=speech_flags direction=write address=001f2b value=df29 mask=ffff pc=0027ae t=0.160",
+            "rom4_tone_access: owner=speech_shared direction=read address=00085e value=df29 mask=ffff pc=0027ad t=8.084",
+            "rom4_tone_access: owner=speech_flags direction=write address=001f2b value=df29 mask=ffff pc=0027ae t=8.084",
             "rom4_tone_summary: tx_words=2 rx_reads=2 tone_reads=29 tone_copies=7 t=11.01",
         ])
 
     def test_organic_tone_boundary(self):
         check_tone(self.trace())
+
+    def test_speech_shared_copy_requires_correct_lane(self):
+        with self.assertRaisesRegex(ValueError, "speech-control copy"):
+            check_tone(self.trace().replace("value=df290000 mask=ffff0000", "value=df29 mask=ffff"))
+
+    def test_speech_shared_copy_requires_order(self):
+        with self.assertRaisesRegex(ValueError, "speech-control copy"):
+            check_tone(self.trace().replace("pc=272034 t=0.159", "pc=272034 t=9.159"))
+
+    def test_speech_shared_copy_requires_post_key_observation(self):
+        with self.assertRaisesRegex(ValueError, "speech-control copy"):
+            check_tone(self.trace().replace("t=8.084", "t=1.584"))
 
     def test_missing_transmit_irq_rejected(self):
         with self.assertRaisesRegex(ValueError, "masked transmit-ready"):

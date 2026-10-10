@@ -29,6 +29,11 @@ watch(mcu, 'program', 0x100ac, 'mcu', 0x100af)
 watch(dsp, 'data', 0x0856, 'dsp')
 watch(dsp, 'data', 0x00fe, 'dsp')
 watch(dsp, 'data', 0x06be, 'dsp')
+watch(mcu, 'program', 0x100bc, 'mcu', 0x100bf)
+watch(dsp, 'data', 0x085e, 'speech_shared')
+watch(dsp, 'data', 0x1f2b, 'speech_flags')
+-- Program-overlay stores can bypass data-space taps; retain both owners.
+watch(dsp, 'program', 0x1f2b, 'speech_overlay')
 watch(dsp, 'io', 0x002c, 'cobba_select')
 watch(dsp, 'io', 0x002d, 'cobba_data')
 -- Fetch increments PC before the program tap. Restrict this to actual helper

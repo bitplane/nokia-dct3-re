@@ -499,6 +499,22 @@ def check_tone(text: str) -> None:
     tx, rx, reads, copies, time = summaries[0]
     if (int(tx), int(rx)) != (2, 2) or int(reads) == 0 or int(copies) == 0 or float(time) < 11:
         raise ValueError("native tone/serial boundary changed; review actual sample activity")
+    flag_events = re.findall(
+        r"rom4_tone_access: owner=(mcu|speech_shared|speech_flags) direction=(read|write) "
+        r"address=([0-9a-f]{6}) value=([0-9a-f]+) mask=([0-9a-f]+) "
+        r"pc=([0-9a-f]{6}) t=([0-9.]+)", text)
+    cursor = 0.0
+    for expected, earliest in (
+            (("mcu", "write", "0100bc", "df290000", "ffff0000", "272034"), 0.0),
+            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ad"), 0.0),
+            (("speech_flags", "write", "001f2b", "df29", "ffff", "0027ae"), 0.0),
+            (("speech_shared", "read", "00085e", "df29", "ffff", "0027ad"), start),
+            (("speech_flags", "write", "001f2b", "df29", "ffff", "0027ae"), start)):
+        matches = [float(t) for *fields, t in flag_events
+                   if tuple(fields) == expected and float(t) >= max(cursor, earliest)]
+        if not matches:
+            raise ValueError("missing ordered shared speech-control copy: " + str(expected))
+        cursor = matches[0]
 
 
 def main() -> int:
