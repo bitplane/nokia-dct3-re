@@ -157,6 +157,25 @@ public:
 			util::stream_format(stream, ", %s%s", (family & 0x0600) == 0x0400 ? "TS, " : "", BIT(op, 8) ? "B" : "A");
 			return (1 + extended) | SUPPORTED;
 		}
+		if ((family == 0x7200 || family == 0x7300) && mode < 0xe0)
+		{
+			if (family == 0x7200)
+			{
+				util::stream_format(stream, "MVDM    $%04X, ", next_word()); smem(0);
+			}
+			else
+			{
+				stream << "MVMD    "; smem(0); util::stream_format(stream, ", $%04X", next_word());
+			}
+			return 2 | SUPPORTED;
+		}
+		if (family == 0x4b00 || family == 0x8b00)
+		{
+			bool const extended = mode >= 0xe0;
+			util::stream_format(stream, "%-8s", family == 0x4b00 ? "PSHD" : "POPD");
+			smem(extended ? next_word() : 0);
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family >= 0x8000 && family <= 0x8700)
 		{
 			bool const extended = mode >= 0xe0;

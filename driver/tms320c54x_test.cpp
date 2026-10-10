@@ -987,6 +987,38 @@ private:
 				"Store/short-immediate syntax retains ASM selection and signed immediate endpoints");
 		}
 		osd_printf_info("TMS320C54x store/short disassembler: PASS stores=2048 immediates=544 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x7200, 0x7300, 0x4b00, 0x8b00})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					bool const move = family == 0x7200 || family == 0x7300;
+					bool const supported = !move || mode < 0xe0;
+					unsigned const length = move ? 2 : mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (supported ? length | dasm::SUPPORTED : 1) &&
+						buffer.seen() == (supported && length == 2 ? 3 : 1), "MMR move and memory-stack decoders bound extensions by operand class");
+				}
+		vector const move_stack[] = {
+			{0x7212, 2 | dasm::SUPPORTED, "MVDM    $2345, $12"},
+			{0x7293, 2 | dasm::SUPPORTED, "MVDM    $2345, *AR3+"},
+			{0x7312, 2 | dasm::SUPPORTED, "MVMD    $12, $2345"},
+			{0x738b, 2 | dasm::SUPPORTED, "MVMD    *AR3-, $2345"},
+			{0x4b81, 1 | dasm::SUPPORTED, "PSHD    *AR1"},
+			{0x4bf8, 2 | dasm::SUPPORTED, "PSHD    *($2345)"},
+			{0x8bed, 2 | dasm::SUPPORTED, "POPD    *+AR5($2345)"},
+			{0x8bf8, 2 | dasm::SUPPORTED, "POPD    *($2345)"},
+			{0x72e0, 1, ".word   $72E0"},
+			{0x73f8, 1, ".word   $73F8"},
+		};
+		for (auto const &test : move_stack)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"MMR move syntax preserves direction without admitting forbidden addressing");
+		}
+		osd_printf_info("TMS320C54x move/stack disassembler: PASS forms=960 rejected=64 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

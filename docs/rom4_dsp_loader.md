@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 484 decoded and 142
+promoted to a boundary. Current cold-idle coverage is 497 decoded and 129
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1780,6 +1780,14 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger instruction boundaries
+
+MVDM/MVMD decode their two-word MMR transfers; PSHD/POPD decode ordinary
+and extended Smem addresses. The gate checks 960 forms, 64 rejected MMR
+encodings, bounded extension reads and ten exact examples on two pages.
+Its marker is `TMS320C54x move/stack disassembler: PASS`. A separate execution
+ordering candidate remains: POPD currently evaluates `pop()` before fetching
+an extended destination. That stack-read visibility needs an executable
+fetch-order fixture; decoder coverage is not evidence that it is correct.
 
 Ordinary and ASM-shifted STL/STH decode their accumulator and Smem address;
 short accumulator and signed ASM loads decode without extensions. The gate
