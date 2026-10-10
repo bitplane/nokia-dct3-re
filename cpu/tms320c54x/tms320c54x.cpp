@@ -1229,9 +1229,11 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 			m_pc += words;
 			m_icount -= words; // Rejected slots execute as NOPs.
+			m_xc_guard = 2 - words;
 		}
 		else
-			m_xc_guard = words;
+			// SPRU172C 4-199 protects two following words even for XC 1.
+			m_xc_guard = 2;
 		return;
 	}
 	if ((op & 0xfcf0) == 0xf050) // XOR #lk, shift, source, destination

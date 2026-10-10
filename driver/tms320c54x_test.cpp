@@ -42,6 +42,36 @@ private:
 	}
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
+	void start_xc_irq_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		bool const two = index >= 2, accepted = !(index & 1);
+		program.write_word(0x0800, two ? 0xff4d : 0xfd4d); // XC n,BEQ
+		program.write_word(0x0801, 0xe801); // LD #1,A: conditionally executed.
+		program.write_word(0x0802, 0xe809); // LD #9,A: outside XC 1, inside protection.
+		program.write_word(0x0803, 0xf4e1); // IDLE1
+		program.write_word(0x0048, 0x0083); // ISR reads *AR3 to observe entry A.
+		program.write_word(0x0049, 0xf4eb); // RETE
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, accepted ? 0 : 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0061);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 4);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0800);
+		m_irq_accumulator = 0xdead;
+		m_xc_irq_fetches = 0;
+		m_xc_irq_tap.remove();
+		m_xc_irq_tap = program.install_read_tap(0x0800, 0x0800, "xc_pending_irq",
+			[this](offs_t, u16 &, u16) {
+				if (!machine().side_effects_disabled() && !m_xc_irq_fetches++)
+					m_cpu->set_input_line(2, ASSERT_LINE);
+			});
+		m_phase = 81000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void check_control_disassembler()
 	{
 		using dasm = util::disasm_interface;
@@ -19344,8 +19374,7 @@ private:
 				if (m_vector_case == 2) { start_vector_prefetch_case(3); return; }
 				m_vector_stack_tap.remove();
 				osd_printf_info("TMS320C54x vector prefetch: PASS sources=irq,nmi before_stack=1 sp_access=1 retained_opcode=1 extension_fetch=1 save_replay=2 single_ack=1 later_mask=1 reset=1 debugger_redirect=1 physical_latency_claim=0\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_xc_irq_case(0); return;
 			}
 			if (m_phase == 80000)
 			{
@@ -19387,6 +19416,22 @@ private:
 				}
 			}
 			m_check_timer->adjust(attotime::from_usec(100)); return;
+		}
+		if (m_phase >= 81000 && m_phase < 81004)
+		{
+			unsigned const index = m_phase - 81000;
+			osd_printf_info("C54x XC IRQ case=%u entry_a=%llx continuation=%04x\n", index,
+				(unsigned long long)m_irq_accumulator, data.read_word(0x0fff));
+			expect(m_xc_irq_fetches == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "XC pending-IRQ fixture terminates normally");
+			expect(m_irq_accumulator == (index == 3 ? 0 : 9) && data.read_word(0x0fff) == 0x0803,
+				"XC protects two following words independently of conditional span and acceptance");
+			m_cpu->set_input_line(2, CLEAR_LINE);
+			m_xc_irq_tap.remove();
+			if (index < 3) { start_xc_irq_case(index + 1); return; }
+			osd_printf_info("TMS320C54x XC interrupt protection: PASS cases=4 spans=1,2 accepted,rejected=1 physical_pipeline_claim=0\n");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
@@ -19825,6 +19870,8 @@ private:
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
 	unsigned m_timer_probe_entries = 0;
 	u16 m_timer_probe_return_pc = 0;
+	memory_passthrough_handler m_xc_irq_tap;
+	unsigned m_xc_irq_fetches = 0;
 	unsigned m_phase = 0;
 	unsigned m_bleq_case = 0;
 	unsigned m_rom4_checks = 0;

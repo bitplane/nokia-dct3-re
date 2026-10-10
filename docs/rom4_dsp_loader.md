@@ -1383,19 +1383,24 @@ interrupt guard retires by instruction words, so a single two-word guarded
 instruction releases a pending IRQ before the next instruction. Exact ROM4
 `ff4d` fixtures cover taken/rejected BEQ timing, and a port/ISR fixture
 checks the two-word guard boundary (SPRU172C, XC pages 4-198--200).
-The `XC 1` interrupt boundary is not established by that fixture. SPRU172C
-page 4-199 separately specifies a one-word conditional-execution span for
-`XC 1` and states that XC plus the two following instruction words are
-uninterruptible. The core currently assigns `m_xc_guard = words` only on the
-accepted path, coupling protection to the selected conditional span; rejected
-slots advance atomically without a retained guard. Existing `fd30`, `fd4b`
-and `fd4d` fixtures check conditional execution, not a pending interrupt after
-the first following word. Before changing this behavior, add a firmware-free
-accepted/rejected `XC 1` fixture with IRQ raised during the first slot and
-observe the stacked continuation after the second word. Keep word-counted XC
-protection distinct from the complete-instruction INTM guard above. This is a
-source-derived conformance gap, not evidence of the recorder's failure cause
-or a reason to add an arbitrary foreground-instruction delay.
+SPRU172C page 4-199 separately specifies a one-word conditional-execution
+span for `XC 1` and states that XC plus the two following instruction words
+are uninterruptible. Protection therefore remains two words for accepted
+`XC 1`; rejecting its first slot leaves one protected word. The core keeps
+this word-counted protection distinct from the complete-instruction INTM
+guard above. Four firmware-free fixtures assert IRQ during XC's opcode fetch
+and check accepted/rejected `XC 1` and `XC 2`: the ISR samples A only after
+the two following words, with stacked continuation `0803`. Conditional
+execution remains unchanged. The new assertion fails on the previous core
+(`tmp/c54x-xc-irq-red.log`); the corrected core passes in
+`tmp/c54x-xc-irq-green.log`, and conformance requires the
+`TMS320C54x XC interrupt protection: PASS` marker. This is an architectural
+interrupt boundary, not physical pipeline latency or evidence of the
+recorder's failure cause.
+The timer-boundary observer and original ROM4 RF gate still pass
+(`tmp/c54x-xc-irq-regression.log`), preserving short-period mask starvation
+and the no-acquisition boundary. Original MU4 storage/native-entry regressions
+also pass (`tmp/mu4-xc-irq-regression.log`).
 The long-immediate ALU decoder charges two cycles, including the separately
 decoded XOR form. A cycle-stamped LD fixture checks the additional cycle;
 the LD contract is SPRU172C page 4-68. This does not cover all extended-address
