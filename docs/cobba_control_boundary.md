@@ -103,7 +103,7 @@ Validate a captured log with
 requires both bounded state captures and the exact 32-read prefix,
 including coefficient values; it deliberately allows nonzero history
 values so it does not encode silence as an RF-format requirement.
-The diagnostic `c54x_rom4_rf_impulse.lua` supplies a single `0x4000`
+The diagnostic `c54x_rom4_rf_impulse.lua` supplies a single configured
 word through the I/O read boundary at port `0x27`, followed by zeros.
 It never writes firmware RAM, registers or messages. Its external event
 starts at emulated time 1.6402 seconds (a fixture alignment, not physical
@@ -112,16 +112,26 @@ observation excludes earlier initialization and filter writes.
 With `ROM4_RF_IMPULSE_INDEX=0`, the first 16 output words have nonzero
 values only at indices 1,3,5,7: `0469 1000 0ab6 00e2`.
 With index 1, the same values appear at indices 0,2,4,6 instead.
-Both eight-second runs execute the native firmware with unchanged
-instructions. Thus these two adjacent input words feed separate,
-oppositely ordered output lanes. The observed values equal the high
-halfword of `0x4000` multiplied by coefficients `11a3 4000 2ad6 0387`.
-This is a positive-word impulse observation, not a proof of negative
-sample handling, all 32 input positions, continuous sample cadence,
-physical ADC scaling, or which lane is I versus Q. The Lua override is
-a diagnostic port-input fixture, not a shipped RF model. Recover the
-remaining impulse phases and signed scaling before converting an
-independently generated complex waveform to words.
+The isolated runner `run_c54x_rom4_rf_impulse.py` verifies all 32 input
+positions with both `0x4000` and `0xc000` (-16384), using a fresh
+generated EEPROM and independent run directory per case. All 64
+eight-second cases pass against 48 captured output words, including
+tails crossing an invocation boundary. For input position n, the
+output starts at `2*floor(n/4) + 1 - (n mod 2)`, with stride 2.
+Its four coefficients are entries `phase, phase+2, phase+4, phase+6`
+of the captured table, where `phase = 1-floor((n mod 4)/2)`.
+Each expected word is `((signed_input*coefficient + 0x8000) >> 16)`
+modulo 65536. Thus adjacent words feed separate, oppositely ordered
+output lanes, and the two tested signed amplitudes agree with rounded
+fixed-point multiplication in the executed core.
+
+Reproduce with `.venv/bin/python tools/run_c54x_rom4_rf_impulse.py
+--mame mame/mame --rompath mame/roms`. This validates the numerical
+firmware/core contract for impulses, not arbitrary-input linearity,
+saturation, continuous sample cadence, physical ADC scaling or which
+lane is I versus Q. The Lua override is a diagnostic port-input
+fixture, not a shipped RF model. Those remaining physical mappings
+must be explicit assumptions in any independent waveform experiment.
 
 ### Product-specific physical buses
 
