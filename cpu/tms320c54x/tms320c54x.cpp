@@ -2126,9 +2126,14 @@ void tms320c54x_device::execute_one(u16 op)
 		m_icount -= low >= 0xe0;
 		return;
 	case 0x8b00: // POPD Smem
-		indirect_write(low, pop());
+	{
+		const u16 destination = prepare_smem_address(low);
+		const u16 value = pop();
+		data_write(destination, value);
+		finish_smem_access(low);
 		m_icount -= low >= 0xe0;
 		return;
+	}
 	case 0x7f00: // WRITA Smem
 	{
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&

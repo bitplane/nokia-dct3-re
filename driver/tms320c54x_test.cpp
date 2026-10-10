@@ -241,7 +241,7 @@ private:
 		auto &data = m_cpu->space(AS_DATA);
 		unsigned const family = index >= 25 ? 6 + (index - 25) / 4 : index / 4;
 		unsigned const form = index >= 25 ? (index - 25) % 4 : index % 4;
-		static constexpr u16 families[] = { 0x7100, 0x7d00, 0x7500, 0x7400, 0x7e00, 0x7000, 0x6000, 0x6100 };
+		static constexpr u16 families[] = { 0x7100, 0x7d00, 0x7500, 0x7400, 0x7e00, 0x7000, 0x6000, 0x6100, 0x8b00 };
 		static constexpr u8 modes[] = { 0x00, 0x92, 0xe2, 0xf8 };
 		static constexpr u16 operands[] = { 0x0700, 0x0700, 0x0124, 0x0123, 0, 0x0700, 0xbeef, 0x8000 };
 		u16 pc = 0x0800;
@@ -258,7 +258,7 @@ private:
 				if (family == 0 || family == 4 || family == 5 || family >= 6)
 				{
 					program.write_word(pc++, 5);
-					if (family != 4) program.write_word(pc++, operands[family]);
+					if (family != 4 && family != 8) program.write_word(pc++, operands[family]);
 				}
 				else
 				{
@@ -269,15 +269,16 @@ private:
 			else
 			{
 				if (form == 3) program.write_word(pc++, 0x0600);
-				if (family != 4) program.write_word(pc++, operands[family]);
+				if (family != 4 && family != 8) program.write_word(pc++, operands[family]);
 			}
 		}
 		m_operand_extension_count = pc - 0x0801;
 		program.write_word(pc, 0xf4e1);
 		program.write_word(0x0900, 0xbeef);
 		program.write_word(0x0700, 0);
-		data.write_word(0x0600, 0xbeef); data.write_word(0x0601, 0xcafe);
-		data.write_word(0x0700, family == 5 ? 0xbeef : 0);
+		data.write_word(0x0600, family == 8 ? 0xdead : 0xbeef); data.write_word(0x0601, 0xcafe);
+		data.write_word(0x0700, family == 5 || family == 8 ? 0xbeef : 0);
+		if (family == 8) m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0700);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, form == 2 ? 0x05fb : 0x0600);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0601);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, index == 24 ? 0 : 0x0900);
@@ -20328,7 +20329,7 @@ private:
 			osd_printf_info("TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi\n");
 			start_operand_fetch_case(0); return;
 		}
-		if (m_phase >= 86000 && m_phase < 86033)
+		if (m_phase >= 86000 && m_phase < 86037)
 		{
 			unsigned const index = m_phase - 86000;
 			unsigned const family = index >= 25 ? 6 + (index - 25) / 4 : index / 4;
@@ -20351,12 +20352,14 @@ private:
 				if (family == 1) expect(m_cpu->space(AS_PROGRAM).read_word(0x0700) == 0xbeef, "MVDP operand data preserved");
 				if (family == 2) expect(m_port_writes == 1 && m_first_port_value == 0xbeef, "PORTW operand data preserved");
 				if (family >= 3) expect(data.read_word(0x0600) == (family == 3 ? 0xabcd : 0xbeef), "Input operand data preserved");
-				if (family >= 6) expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000, "Comparison/test publishes TC");
+				if (family == 6 || family == 7) expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000, "Comparison/test publishes TC");
+				if (family == 8) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0701 &&
+					data.read_word(0x0700) == 0xbeef, "POPD increments SP once and preserves popped stack contents");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
 					(form == 1 ? 0x0601 : form == 2 ? 0x05fb : 0x0600), "Address modifier preserved");
 			}
-			if (index < 32) { start_operand_fetch_case(index + 1); return; }
-			osd_printf_info("TMS320C54x operand fetch order: PASS cases=33 families=9 forms=direct,indirect,long,absolute\n");
+			if (index < 36) { start_operand_fetch_case(index + 1); return; }
+			osd_printf_info("TMS320C54x operand fetch order: PASS cases=37 families=10 forms=direct,indirect,long,absolute\n");
 			start_cala_rtn_case(0); return;
 		}
 		if (m_phase >= 87000 && m_phase < 87004)

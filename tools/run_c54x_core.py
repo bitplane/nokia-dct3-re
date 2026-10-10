@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 REQUIRED = [
-    "TMS320C54x operand fetch order: PASS cases=33 families=9 forms=direct,indirect,long,absolute",
+    "TMS320C54x operand fetch order: PASS cases=37 families=10 forms=direct,indirect,long,absolute",
     "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
     "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1",
     "TMS320C54x native gap branch/address: PASS words=6 cases=12 zero_nonzero=1 ar0_signed=1 stores=low,high",

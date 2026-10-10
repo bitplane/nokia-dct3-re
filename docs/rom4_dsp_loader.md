@@ -877,14 +877,18 @@ interrupt pipeline.
 5110 save-state round trip and original MU4 storage/native entry. The separate
 timer observation still exposes short-period starvation.
 Operand-fetch conformance separates Smem address preparation from its read/write
-so MVDK, MVDP, PORTW, PORTR, READA, MVKD, CMPM and BITF fetch their instruction extensions
+so MVDK, MVDP, PORTW, PORTR, READA, MVKD, CMPM, BITF and POPD fetch their instruction extensions
 before reading data, I/O or program operands. FIRS likewise fetches its coefficient
-address before reading X/Y. Thirty-three passive bus-tap cases cover direct,
+address before reading X/Y. Thirty-seven passive bus-tap cases cover direct,
 postincrement, long-offset and absolute forms plus FIRS; the runner requires
 `TMS320C54x operand fetch order: PASS`. The original MVDK direct case reads
 data before its destination extension and fails this check. The original CMPM
 direct case independently fails before its immediate fetch. Comparison/test
 cases also check TC and retain displacement-before-immediate encoding.
+POPD's long-offset negative control observes the stack read before its address
+extension; resolving the destination before `pop()` closes that ordering defect.
+Its four forms also check a distinct destination sentinel, unchanged stack word,
+single SP increment and selected pointer updates.
 Instruction-family
 extension layouts, address updates and aggregate cycle charges remain unchanged.
 This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
@@ -1784,10 +1788,11 @@ captured 626-word trace, not complete ISA, stage timing or native speech.
 MVDM/MVMD decode their two-word MMR transfers; PSHD/POPD decode ordinary
 and extended Smem addresses. The gate checks 960 forms, 64 rejected MMR
 encodings, bounded extension reads and ten exact examples on two pages.
-Its marker is `TMS320C54x move/stack disassembler: PASS`. A separate execution
-ordering candidate remains: POPD currently evaluates `pop()` before fetching
-an extended destination. That stack-read visibility needs an executable
-fetch-order fixture; decoder coverage is not evidence that it is correct.
+Its marker is `TMS320C54x move/stack disassembler: PASS`. POPD separately
+has four executable fetch-order cases: destination extensions precede the
+stack read, with preserved value, SP and pointer results. Those assertions
+are part of `TMS320C54x operand fetch order: PASS`, not inferred from
+debugger coverage or promoted to physical pipeline timing.
 
 Ordinary and ASM-shifted STL/STH decode their accumulator and Smem address;
 short accumulator and signed ASM loads decode without extensions. The gate
