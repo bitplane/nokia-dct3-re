@@ -1731,7 +1731,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 544 decoded and 82
+promoted to a boundary. Current cold-idle coverage is 546 decoded and 80
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1741,6 +1741,10 @@ physical Menu and long-power runs, and all 626 union assertions. Menu adds no
 new words; long power executes 625, also adding none. Decoder support remains
 a separate gap: passing execution assertions must not promote unsupported
 raw-word lengths into a pipeline frontend.
+The synthetic-extension report cannot characterize `6Fxx` forms whose
+operation is selected by a second opcode word. Those need captured instruction
+extensions and an extension-sensitive census before reporting native frontend
+coverage; a zero extension must not be treated as the executed operation.
 
 ADDM immediate-memory decoding covers all 256 addressing forms on ordinary
 and wrapping program pages, with bounded two/three-word extension reads and
@@ -1788,6 +1792,12 @@ reads on two program pages and four exact syntax cases. Its required marker is
 `TMS320C54x WRITA disassembler: PASS` (SPRU172C, WRITA). Separate executable
 fetch-order cases validate its existing data-to-program transfer, not physical
 pipeline or repeat timing.
+
+Parallel ST/LD decodes 1,536 one-word forms: four accumulator source/destination
+combinations and two accumulator-to-T variants across all dual-memory modifiers.
+The gate checks two program pages, bounded reads and four exact syntax examples.
+Its required marker is `TMS320C54x parallel load disassembler: PASS`
+(SPRU172C, ST||LD). Parallel syntax does not establish physical overlap timing.
 
 Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
 giving 44 one-word forms checked on two program pages. Non-delayed RC has

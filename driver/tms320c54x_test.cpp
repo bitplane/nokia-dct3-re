@@ -1189,6 +1189,31 @@ private:
 				"WRITA syntax preserves data source addressing");
 		}
 		osd_printf_info("TMS320C54x WRITA disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xc800, 0xc900, 0xca00, 0xcb00, 0xe400, 0xe600})
+				for (unsigned operands = 0; operands < 256; ++operands)
+				{
+					words const buffer(pc, family | operands, 0x2345);
+					std::ostringstream text;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+						"Parallel store/load decoder reads no extensions for dual-memory operands");
+				}
+		vector const parallel_load_forms[] = {
+			{0xc849, 1 | dasm::SUPPORTED, "ST      A, *AR3+ || LD *AR2-, A"},
+			{0xcba5, 1 | dasm::SUPPORTED, "ST      B, *AR3- || LD *AR4+, B"},
+			{0xe4e9, 1 | dasm::SUPPORTED, "ST      A, *AR3+ || LD *AR4+0%, T"},
+			{0xe623, 1 | dasm::SUPPORTED, "ST      B, *AR5 || LD *AR4, T"},
+			{0xe500, 1, ".word   $E500"},
+			{0xe700, 1, ".word   $E700"},
+		};
+		for (auto const &test : parallel_load_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == 1,
+				"Parallel store/load syntax preserves source, destination and dual-memory modifiers");
+		}
+		osd_printf_info("TMS320C54x parallel load disassembler: PASS forms=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
