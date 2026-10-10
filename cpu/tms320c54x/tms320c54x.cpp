@@ -87,6 +87,16 @@ public:
 				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
 			}
 		};
+		if (family == 0x4e00 || family == 0x4f00 || family == 0x5600 || family == 0x5700)
+		{
+			bool const extended = mode >= 0xe0;
+			bool const store = family < 0x5000;
+			util::stream_format(stream, "%-8s", store ? "DST" : "DLD");
+			if (store) util::stream_format(stream, "%c, ", BIT(op, 8) ? 'B' : 'A');
+			smem(extended ? next_word() : 0);
+			if (!store) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
 		if ((family >= 0x3c00 && family <= 0x3f00) || (family >= 0x4000 && family <= 0x4300))
 		{
 			bool const extended = mode >= 0xe0;

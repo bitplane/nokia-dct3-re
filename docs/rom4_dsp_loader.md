@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 276 decoded and 350
+promoted to a boundary. Current cold-idle coverage is 288 decoded and 338
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1780,6 +1780,13 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger control-flow decoding
+
+DLD/DST decode the accumulator and Lmem operand in load/store order,
+including one-word ordinary and two-word extended-address layouts. The gate
+checks 1,024 mode encodings on two pages, bounded address reads and eight
+exact examples. Its marker is `TMS320C54x double memory disassembler: PASS`.
+These frontend checks do not establish memory alignment, address-update or
+write-stage timing beyond the existing execution fixtures.
 
 Shift-16 Smem ADD/SUB decode independent accumulator selectors and the
 one-word direct/short-indirect or two-word extended-address layout. The gate

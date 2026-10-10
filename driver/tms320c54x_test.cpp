@@ -777,6 +777,33 @@ private:
 				"Shift-16 memory ALU syntax preserves independent accumulator selectors");
 		}
 		osd_printf_info("TMS320C54x high memory ALU disassembler: PASS modes=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x4e00, 0x4f00, 0x5600, 0x5700})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == ((mode >= 0xe0 ? 2 : 1) | dasm::SUPPORTED) &&
+						buffer.seen() == (mode >= 0xe0 ? 3 : 1), "Double load/store decoder bounds address extensions");
+				}
+		vector const double_memory[] = {
+			{0x4e3a, 1 | dasm::SUPPORTED, "DST     A, $3A"},
+			{0x4f81, 1 | dasm::SUPPORTED, "DST     B, *AR1"},
+			{0x4eed, 2 | dasm::SUPPORTED, "DST     A, *+AR5($2345)"},
+			{0x4ff8, 2 | dasm::SUPPORTED, "DST     B, *($2345)"},
+			{0x5681, 1 | dasm::SUPPORTED, "DLD     *AR1, A"},
+			{0x5793, 1 | dasm::SUPPORTED, "DLD     *AR3+, B"},
+			{0x56f5, 2 | dasm::SUPPORTED, "DLD     *+AR5($2345)%, A"},
+			{0x57f8, 2 | dasm::SUPPORTED, "DLD     *($2345), B"},
+		};
+		for (auto const &test : double_memory)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Double load/store syntax preserves operand order and address modifiers");
+		}
+		osd_printf_info("TMS320C54x double memory disassembler: PASS modes=1024 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
