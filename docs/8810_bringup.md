@@ -2,26 +2,33 @@
 
 ## Current Result
 
-The native TX-space notification remains unresolved, but its MCU consumers
-are identified. IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
+Native TX completion now wakes the MCU pending queue through MAD2 FIQ1.
+IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
 shared-service counters and block uploads, not TX-queue wakeup. FIQ dispatch
 `0x2dec1c` sends FIQ1 to `0x2b5e78`, which posts control 1 to task 3. FIQ0
 handler `0x2b5e96` posts control 4 to RX task 4 and conditionally posts control
 6 to TX task 3 when bit 0 of shared word `0x101f0` (DSP `0x08f8`) is set,
 clearing that bit first. The separately adjacent literal `0x1205dc` is the
 TX payload source-pointer slot, not this notification flag.
-A fresh 12-second compatibility run records 1,656 FIQ0-handler entries and
-14 IRQ4-handler entries, but no FIQ1-handler or conditional control-6 post.
-The native backend currently rings FIQ0 on port-1 completion writes. Next
-recover the DSP-to-MAD2 completion-bit routing and the ownership of
-shared word `0x101f0`; do not reinterpret IRQ4 or inject a queue wakeup.
+The missing route was native port-1 completion bit 1: the backend previously
+sent every completion to FIQ0 and had no FIQ1 output. The corrected transport
+pulses FIQ1 when the resident DSP writes that bit. It retains the existing RX
+doorbell pending a complete decode of higher-bit routing; this is a partial
+completion model, not closure of every port-1 bit.
 
 The completion census observes port-1 value `0x0002` from resident PC
 `0x395e`, following the TX service routine's call to `0x3860`, and value
-`0x0001` from RX publication PC `0x380a`. The native backend currently sends
-both values to FIQ0 and has no FIQ1 transport output. Together with the MCU's
-distinct FIQ0/FIQ1 handlers, this supports testing bit-selective completion
-routing (bit 0 RX, bit 1 TX), rather than inventing periodic queue wakeups.
+`0x0001` from RX publication PC `0x380a`. With the bit-1 route restored, a
+fresh 30-second compatibility run observes 13 FIQ1 handler entries. The real
+type-`0x1a` object `0x10d758` passes the free-space test (162 bytes for a
+68-byte payload) and reaches ring publication at 6.565502 seconds. The
+checker `tools/nse6_tx_wakeup_check.py` requires ordered same-object mailbox,
+space-check and writer observations, plus native completion and FIQ1 evidence.
+It does not claim DSP consumption or search execution. The resident DSP
+subsequently remains near `0x913e..0x9142`; mode initialization still does not
+run. That loop is the next native boundary, not a reason to force the queued
+search command. Overlay integrity and the four measured memory uploads pass;
+both 3210 baseline gates and the native 5110 Phone book menu also pass.
 The fresh trace observes no native write to the conditional shared flag
 `0x08f8`; that negative result is bounded to twelve seconds, not a complete
 writer census. Other port-1 bits (`0x001c`, `0x0100`, and bootstrap values)

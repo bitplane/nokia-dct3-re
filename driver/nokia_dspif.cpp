@@ -40,6 +40,7 @@ nokia_dspif_device::nokia_dspif_device(
 	m_shared_100_read_cb(*this),
 	m_shared_100_write_cb(*this),
 	m_fiq0_cb(*this),
+	m_fiq1_cb(*this),
 	m_service_irq_cb(*this)
 {
 }
@@ -278,6 +279,12 @@ void nokia_dspif_device::notify_rx()
 				m_ram[RX_PRODUCER], m_ram[RX_CONSUMER], machine().time().as_double());
 	m_fiq0_cb(1);
 	m_fiq0_cb(0);
+}
+
+void nokia_dspif_device::notify_tx()
+{
+	m_fiq1_cb(1);
+	m_fiq1_cb(0);
 }
 
 u16 nokia_dspif_device::service_pending() const

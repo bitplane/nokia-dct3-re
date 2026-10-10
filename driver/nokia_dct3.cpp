@@ -1379,6 +1379,7 @@ private:
 	void mbus_fiq3_w(int state);
 	void mbus_tx_w(u8 data);
 	void dsp_fiq0_w(int state);
+	void dsp_fiq1_w(int state);
 	void dsp_service_irq_w(int state);
 	void dsp_tx_commit_w(int state);
 	void dsp_service_pending_w(int state);
@@ -2132,6 +2133,12 @@ void nokia_dct3_state::dsp_fiq0_w(int state)
 {
 	if (state)
 		m_mad2->assert_fiq(0);
+}
+
+void nokia_dct3_state::dsp_fiq1_w(int state)
+{
+	if (state)
+		m_mad2->assert_fiq(1);
 }
 
 void nokia_dct3_state::dsp_service_irq_w(int state)
@@ -3571,6 +3578,7 @@ void nokia_dct3_state::dct3_base(machine_config &config)
 	m_dspif->shared_100_read_cb().set(FUNC(nokia_dct3_state::dsp_shared_100_read_w));
 	m_dspif->shared_100_write_cb().set(FUNC(nokia_dct3_state::dsp_shared_100_write_w));
 	m_dspif->fiq0_cb().set(FUNC(nokia_dct3_state::dsp_fiq0_w));
+	m_dspif->fiq1_cb().set(FUNC(nokia_dct3_state::dsp_fiq1_w));
 	m_dspif->service_irq_cb().set(FUNC(nokia_dct3_state::dsp_service_irq_w));
 	NOKIA_SIMI(config, m_simi);
 	NOKIA_SIM_CARD(config, m_sim_card);

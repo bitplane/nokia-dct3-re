@@ -471,13 +471,16 @@ void nokia_dsp_c54x_device::io_w(offs_t offset, u16 data)
 	else if (port == 0x01)
 	{
 		// Port 1 writes are DSP status/completion strobes, not writes back to
-		// the port-1 request latch read above. The same physical strobe is the
-		// DSP-to-MCU doorbell; the MCU's FIQ0 handler decides whether the receive
-		// ring contains work.
+		// the request latch. Retain the RX doorbell while higher-bit routing
+		// is unresolved; the MCU checks whether its receive ring contains work.
 		acknowledge_host_command(data);
 		++m_completion_strobes;
 		update_host_command_line();
 		m_transport->notify_rx();
+		// Resident TX completion publishes bit 1 after ring consumption;
+		// MAD2 FIQ1 wakes the MCU's pending-transmit task independently of RX.
+		if (BIT(data, 1))
+			m_transport->notify_tx();
 	}
 	else if (port == 0x27)
 	{

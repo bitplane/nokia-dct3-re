@@ -32,6 +32,7 @@ public:
 	auto shared_100_read_cb() { return m_shared_100_read_cb.bind(); }
 	auto shared_100_write_cb() { return m_shared_100_write_cb.bind(); }
 	auto fiq0_cb() { return m_fiq0_cb.bind(); }
+	auto fiq1_cb() { return m_fiq1_cb.bind(); }
 	auto service_irq_cb() { return m_service_irq_cb.bind(); }
 
 
@@ -48,6 +49,7 @@ public:
 	void consume_tx_packet(const packet &value);
 	bool enqueue_rx_packet(u8 type, const u8 *payload, unsigned payload_length);
 	void notify_rx();
+	void notify_tx();
 	void service_irq_w(int state) { m_service_irq_cb(state); }
 	u16 service_pending() const;
 	void complete_service();
@@ -79,6 +81,7 @@ private:
 	devcb_write_line m_shared_100_read_cb;
 	devcb_write_line m_shared_100_write_cb;
 	devcb_write_line m_fiq0_cb;
+	devcb_write_line m_fiq1_cb;
 	devcb_write_line m_service_irq_cb;
 	u16 m_ram[0x800] = { 0 };
 	u8 m_dspif[4] = { 0 };
