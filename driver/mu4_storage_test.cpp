@@ -61,7 +61,7 @@ public:
 		});
 		m_mcbsp0->tx_word_cb().set(FUNC(mu4_storage_test_state::stream_tx));
 		m_mcbsp0->tx_bit_cb().set([this](int state) {
-			if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73)) m_external_bits.push_back(state);
+			if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73) || m_phase == 77 || m_phase == 78) m_external_bits.push_back(state);
 			subdevice<tlv320aic23_device>("codec")->din_w(state);
 		});
 		m_mcbsp0->tx_event_cb().set([this](int state) { m_dma->sync_w(2, state); });
@@ -336,6 +336,51 @@ private:
 		}
 		if (i == 2) logerror("mu4_mcbsp_receive_sync: PASS cases=6 widths=8,12,16 replacement=1 ignore=1 drr_retained=1 sticky=1 software_clear=1 software_set=1 reset=1 error_irq=1\n");
 	}
+	void check_transmit_sync(unsigned i)
+	{
+		static constexpr unsigned widths[] = {8, 12, 16};
+		unsigned const width = widths[i];
+		u16 const mask = (1U << width) - 1;
+		for (unsigned ignore = 0; ignore < 2; ++ignore)
+		{
+			external_reg_w(1, 0); external_reg_w(4, 0x100 | (i << 5));
+			external_reg_w(5, 1 | (ignore ? 4 : 0)); external_reg_w(14, 0);
+			m_mcbsp0->tx_clock_w(0); m_mcbsp0->tx_frame_w(0);
+			m_external_words.clear(); m_external_bits.clear(); external_reg_w(1, 1);
+			unsigned const irqs = m_external_tx_irqs;
+			m_mcbsp0->data_w(3, 0xa55a); m_mcbsp0->tx_frame_w(1);
+			external_clocks(4, false);
+			m_mcbsp0->data_w(3, 0x5aa5);
+			m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1);
+			m_mcbsp0->control_w(0, 1);
+			if ((m_mcbsp0->control_r(1) & 0xa) != (ignore ? 0 : 8) || m_external_tx_irqs != irqs + 1)
+				fatalerror("McBSP transmit sync changed DXR readiness or error status incorrectly");
+			external_clocks(2 * width - (ignore ? 4 : 0), false);
+			if (m_external_words != std::vector<u16>({u16(0xa55a & mask), u16(0x5aa5 & mask)}) ||
+				m_external_bits.size() != 2 * width + (ignore ? 0 : 4) || m_external_tx_irqs != irqs + 2)
+				fatalerror("McBSP transmit sync must restart XSR and preserve queued DXR without extra ready IRQs");
+			for (unsigned bit = 0; bit < m_external_bits.size(); ++bit)
+			{
+				unsigned const stream_bit = !ignore && bit >= 4 ? bit - 4 : bit;
+				if (m_external_bits[bit] != BIT(stream_bit < width ? 0xa55a : 0x5aa5, width - 1 - stream_bit % width))
+					fatalerror("McBSP transmit sync physical restart bit order mismatch");
+			}
+			external_reg_w(1, 1);
+			if (m_mcbsp0->control_r(1) & 8) fatalerror("McBSP transmit sync software clear failed");
+			unsigned const error_irqs = m_external_tx_irqs;
+			external_reg_w(1, 0x39);
+			if (!(m_mcbsp0->control_r(1) & 8) || m_external_tx_irqs != error_irqs + 1)
+				fatalerror("McBSP transmit sync software set must drive XINTM=3");
+			external_reg_w(1, 0x39);
+			if (m_external_tx_irqs != error_irqs + 1) fatalerror("McBSP held transmit sync IRQ duplicated");
+			external_reg_w(1, 0x31);
+			external_reg_w(1, 0x39);
+			if (m_external_tx_irqs != error_irqs + 2) fatalerror("McBSP transmit sync clear did not rearm error IRQ");
+			external_reg_w(1, 0);
+			if (m_mcbsp0->control_r(1) & 8) fatalerror("McBSP transmit reset retained sync error");
+		}
+		if (i == 2) logerror("mu4_mcbsp_transmit_sync: PASS cases=6 widths=8,12,16 xsr_restart=1 dxr_retained=1 ignore=1 physical_bits=1 ready_edges=1 sticky=1 software_clear=1 software_set=1 reset=1 error_irq=1\n");
+	}
 	void check_external_overwrite(unsigned i)
 	{
 		static constexpr unsigned widths[] = {8, 12, 16};
@@ -449,7 +494,7 @@ private:
 			m_continuous_tx[(m_continuous_tx_head + m_continuous_tx_count) % m_continuous_tx.size()] = value;
 			++m_continuous_tx_count;
 		}
-		if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73)) m_external_words.push_back(value);
+		if ((m_phase >= 51 && m_phase <= 53) || m_phase == 66 || m_phase == 67 || (m_phase >= 70 && m_phase <= 73) || m_phase == 77 || m_phase == 78) m_external_words.push_back(value);
 		if (m_phase == 30 && m_stream_words <= 8) logerror("mu4_native_stream: word=%04x\n", value);
 		finish_stream_if_ready();
 	}
@@ -2266,6 +2311,7 @@ private:
 			if (m_phase < 73)
 			{
 				check_receive_sync(m_phase - 70);
+				check_transmit_sync(m_phase - 70);
 				check_external_overwrite(m_phase - 70);
 			}
 			check_external_underrun(m_phase - 70);
@@ -2356,6 +2402,46 @@ private:
 			external_reg_w(0, 0);
 			if (receive_status() & 8) fatalerror("MU4 receive sync reset retained an error");
 			logerror("mu4_mcbsp_receive_sync_restore: PASS partial_word=1 sticky_error=1 irq_level=1 no_duplicate_irq=1 payload_replay=1 reset=1\n");
+			external_reg_w(1, 0); external_reg_w(4, 0x100); external_reg_w(5, 1); external_reg_w(14, 0);
+			m_mcbsp0->tx_clock_w(0); m_mcbsp0->tx_frame_w(0); external_reg_w(1, 0x31);
+			m_mcbsp0->data_w(3, 0x5a); m_mcbsp0->tx_frame_w(1); external_clocks(4, false);
+			m_mcbsp0->data_w(3, 0xa5);
+			m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1); external_clocks(4, false);
+			m_phase = 77; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase == 77 || m_phase == 78)
+		{
+			if (!machine().scheduler().can_save()) fatalerror("MU4 transmit sync checkpoint has pending synchronized inputs");
+			if (m_phase == 77)
+			{
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 transmit sync save failed");
+			}
+			else
+			{
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 transmit sync restore failed");
+			}
+			m_external_words.clear(); m_external_bits.clear();
+			unsigned const irqs = m_external_tx_irqs;
+			external_reg_w(1, 0x39);
+			if ((m_mcbsp0->control_r(1) & 0xf) != 13 || m_external_tx_irqs != irqs)
+				fatalerror("MU4 transmit sync restoration lost sticky error, buffered DXR or held IRQ state");
+			external_clocks(12, false);
+			if (m_external_words != std::vector<u16>({0x5a, 0xa5}) || m_external_bits.size() != 12 || m_external_tx_irqs != irqs)
+				fatalerror("MU4 transmit sync partial XSR and queued DXR did not replay");
+			for (unsigned bit = 0; bit < 12; ++bit)
+				if (m_external_bits[bit] != BIT(bit < 4 ? 0x5a : 0xa5, bit < 4 ? 3 - bit : 11 - bit))
+					fatalerror("MU4 transmit sync restored physical bits mismatch");
+			external_reg_w(1, 0x31);
+			if (m_phase == 77)
+			{
+				external_reg_w(1, 0); m_phase = 78; m_check->adjust(attotime::from_usec(1)); return;
+			}
+			external_reg_w(1, 0x39);
+			if (m_external_tx_irqs != irqs + 1) fatalerror("MU4 transmit sync restored IRQ did not reassert after clear");
+			external_reg_w(1, 0);
+			logerror("mu4_mcbsp_transmit_sync_restore: PASS partial_xsr=1 queued_dxr=1 sticky_error=1 irq_level=1 no_duplicate_irq=1 physical_bits=1\n");
 			m_saved_dma.str(std::string()); m_phase = 25; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)

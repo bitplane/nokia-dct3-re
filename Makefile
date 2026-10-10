@@ -1083,6 +1083,8 @@ check-mu4-storage-original: build
 		grep -q 'mu4_mcbsp_overwrite: PASS widths=8,12,16 dxr_replaced=1 xsr_retained=1 ready_edges=1 physical_bits=1' error.log; \
 		grep -q 'mu4_mcbsp_receive_sync: PASS cases=6 widths=8,12,16 replacement=1 ignore=1 drr_retained=1 sticky=1 software_clear=1 software_set=1 reset=1 error_irq=1' error.log; \
 		grep -q 'mu4_mcbsp_receive_sync_restore: PASS partial_word=1 sticky_error=1 irq_level=1 no_duplicate_irq=1 payload_replay=1 reset=1' error.log; \
+		grep -q 'mu4_mcbsp_transmit_sync: PASS cases=6 widths=8,12,16 xsr_restart=1 dxr_retained=1 ignore=1 physical_bits=1 ready_edges=1 sticky=1 software_clear=1 software_set=1 reset=1 error_irq=1' error.log; \
+		grep -q 'mu4_mcbsp_transmit_sync_restore: PASS partial_xsr=1 queued_dxr=1 sticky_error=1 irq_level=1 no_duplicate_irq=1 physical_bits=1' error.log; \
 		grep -q 'mu4_mcbsp_underrun: PASS' error.log; grep -q 'mu4_mcbsp_underrun_restore: PASS' error.log; \
 		grep -q 'mu4_mcbsp_overrun: PASS' error.log; grep -q 'mu4_mcbsp_overrun_restore: PASS' error.log; \
 		grep -q 'mu4_dma_sync_conformance: PASS' error.log; \

@@ -28,12 +28,14 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_rx_frame_seen)); save_item(NAME(m_rx_shift_full)); save_item(NAME(m_rx_buffer_full)); save_item(NAME(m_rx_ready));
 	save_item(NAME(m_rx_overrun));
 	save_item(NAME(m_rx_sync_irq));
+	save_item(NAME(m_tx_sync_irq));
 	save_item(NAME(m_internal_clock_stopped)); save_item(NAME(m_paused_bit_time));
 }
 
 void tms320c54x_mcbsp_device::device_reset()
 {
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
+	update_transmit_error_irq();
 	m_index = 0;
 	m_buffer = m_shift = 0;
 	m_bits = m_delay = 0;
@@ -68,6 +70,7 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 		m_regs[1] = value & 0x03f9; // XRDY/XEMPTY are hardware-owned; reserved bits read zero.
 		if (!BIT(value, 0))
 		{
+			m_regs[1] &= ~u16(8);
 			set_ready(false);
 			m_buffer_full = m_shift_active = false;
 			m_buffer = 0; m_xempty = false;
@@ -77,6 +80,7 @@ void tms320c54x_mcbsp_device::control_w(offs_t offset, u16 value)
 		}
 		else if (!enabled)
 			set_ready(true); // SPRU302B 2.3.2.2: empty DXR becomes ready on XRST release.
+		update_transmit_error_irq();
 	}
 	else if (m_index == 0)
 	{
@@ -194,6 +198,16 @@ void tms320c54x_mcbsp_device::update_receive_error_irq()
 	}
 }
 
+void tms320c54x_mcbsp_device::update_transmit_error_irq()
+{
+	bool const asserted = BIT(m_regs[1], 0) && BIT(m_regs[1], 3) && (m_regs[1] & 0x30) == 0x30;
+	if (asserted != m_tx_sync_irq)
+	{
+		m_tx_sync_irq = asserted;
+		m_tx_irq_cb(asserted ? ASSERT_LINE : CLEAR_LINE);
+	}
+}
+
 void tms320c54x_mcbsp_device::set_rx_ready(bool ready)
 {
 	bool const rising = ready && !m_rx_ready;
@@ -300,7 +314,7 @@ void tms320c54x_mcbsp_device::data_w(offs_t offset, u16 value)
 	bool const external = !BIT(m_regs[14], 9) && !BIT(m_regs[14], 11);
 	if (BIT(m_regs[5], 15) || (!external && ((m_regs[4] & 0x7f00) || BIT(m_regs[7], 12) || BIT(m_regs[5], 2))) ||
 		((m_regs[4] >> 5) & 7) > 2 || (m_regs[5] & 0x0018) ||
-		(m_regs[5] & 3) == 3 || (m_regs[1] & 0x0030) || (m_regs[0] & 0x8040))
+		(m_regs[5] & 3) == 3 || ((m_regs[1] & 0x0030) != 0 && (m_regs[1] & 0x0030) != 0x30) || (m_regs[0] & 0x8040))
 		fatalerror("McBSP unsupported active transmit format xcr=%04x/%04x srgr2=%04x", m_regs[4], m_regs[5], m_regs[7]);
 	// SPRU302B 2.3.7.3: a premature DXR write replaces the buffered word;
 	// it does not change the word already being shifted from XSR.
@@ -367,10 +381,20 @@ void tms320c54x_mcbsp_device::tx_frame_w(int state)
 	if (m_frame_words)
 	{
 		if (BIT(m_regs[5], 2)) return;
-		fatalerror("McBSP unexpected frame recovery is not implemented");
+		if (!m_shift_active || (m_frame_words == 1 && m_bits <= (m_regs[5] & 3) + 1))
+			fatalerror("McBSP transmit terminal frame overlap is not implemented");
+		// SPRU302B figure 2-36: restart XSR, retaining the next DXR word.
+		// Loading DXR here would incorrectly replace the interrupted word.
+		static constexpr unsigned widths[] = {8, 12, 16};
+		unsigned const width = (m_regs[4] >> 5) & 7;
+		if (width > 2) fatalerror("McBSP transmit width changed during a frame");
+		m_bits = widths[width];
+		m_delay = m_regs[5] & 3;
+		m_regs[1] |= 8;
+		update_transmit_error_irq();
 	}
+	else load_shift(true, true);
 	m_frame_words = ((m_regs[4] >> 8) & 0x7f) + 1;
-	load_shift(true, true);
 	// SPRU302B: zero-delay first bit is asynchronous to the bit clock.
 	if (!m_delay)
 	{
