@@ -218,12 +218,25 @@ availability flag. In the fresh run, initialization sets it to zero;
 `0x10d608`, header `0x0067`, returned by `0x2bb768`. Its byte `+0x12=1`
 selects value 5; fields `+0x18/+0x1c` are `0x030140b3/0x0a01b881`.
 Thus value 5 is MCU-decoded object state, not a direct DSP hardware verdict.
-The object's producer and field semantics remain unresolved.
+The selector field's SIM provenance is established below; other object
+fields retain no assigned semantics here.
 At the later monitoring transition `0x211318` (6.533039 s), context
 `0x11d040` has count `+8=1`, flags `+0x1b=0`, and the companion mode
 byte is `0x12`; the status is already 5. This narrows the next MCU contract
 to the source object and transition ownership without assigning meaning to
 those numeric states from another ROM.
+
+Own caller `0x2bb768` constructs a SIM STATUS command (`A0 F2`), queues it,
+and waits for the result object. The live writer of object `+0x12` is
+`0x298b28`: parser `0x298b1a..0x298b2a` extracts bit 7 from response-buffer
+byte `+0x10`. A fresh trace sees response buffer `0x11bfc0`, characteristics
+`0x81`, and selector value 1 at 6.081262 s. This is the directory status's
+CHV1-disabled characteristic: the card model's `queue_fcp` supplies
+`fcp[13] = 1 | 0x80` when CHV1 is disabled. With that normal synthetic card
+state, the MCU status decoder takes its value-5 branch. This is not a
+SIM failure, a DSP verdict, or evidence that CHV must be enabled to boot.
+Changing the card security policy merely to escape the reset selector would
+conceal the empty DSP window rather than resolve its traffic contract.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

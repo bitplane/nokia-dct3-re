@@ -197,6 +197,19 @@ handles[#handles + 1] = memory:install_write_tap(0x20000, 0x20003,
     end)
 local window_writes = 0
 local status_writes = 0
+local object_selector_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x10d618, 0x10d61b,
+    'nse6_status_object_selector', function(offset, value, mask)
+        local now = machine.time:as_double()
+        if (mask & 0x0000ff00) == 0 or now < 6.05 or now > 6.1
+                or object_selector_writes >= 16 then return end
+        object_selector_writes = object_selector_writes + 1
+        machine:logerror(string.format(
+            'nse6_status_object_selector_write: value=%02x pc=%08x lr=%08x source=%08x characteristics=%02x t=%.9f\n',
+            (value >> 8) & 0xff, cpu.state['PC'].value,
+            cpu.state['R14'].value, cpu.state['R4'].value,
+            memory:read_u8(cpu.state['R4'].value + 0x10), now))
+    end)
 handles[#handles + 1] = memory:install_write_tap(0x11f534, 0x11f537,
     'nse6_reset_status_source', function(offset, value, mask)
         if (mask & 0x00ff0000) == 0 or status_writes >= 32 then return end
