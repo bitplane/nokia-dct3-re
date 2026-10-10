@@ -301,10 +301,16 @@ length 2, and bodies `006d` at 1.644835731 seconds and `0001` at
 38.523456633 seconds. These are not the contemporaneous `0x1983`
 request values (`03fe` and `047a`). Do not conflate those fields.
 
-Publisher entry proves the native call arguments, not successful ring
-commit or MCU delivery. The next boundary is to verify the publisher's
-commit and classify the MCU consumer of this naturally constructed
-type-`0x8a` response before choosing an operational RF contract. The
+Publisher entry alone proves call arguments, not delivery. A separate
+fresh eight-second capture reaches the publisher's port-1 doorbell
+instruction at `0x3807` for type `008a`, length 2, at 1.644837058
+seconds, with producer `00ab`, consumer `00a9` and control `0x06e1=0`.
+This establishes ring publication and notification for the first response;
+the device's port-1 handler invokes the transport RX notification. MCU
+consumption remains unverified. DSP-local data-space write taps cannot
+establish absence of MCU-side shared-memory consumer updates.
+The next boundary is to classify and observe the MCU consumer of this
+naturally constructed type-`0x8a` response before choosing an operational RF contract. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
 nine accepted stores); it does not validate packet delivery or acquisition.
 The 1523-versus-500 constraint remains a property of the pre-return scan,

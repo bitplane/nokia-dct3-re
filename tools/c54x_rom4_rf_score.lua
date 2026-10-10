@@ -57,6 +57,7 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
 for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
     0x0a5c, 0x0ac2, 0x2420, 0x3129, 0x3130, 0x3132,
     0x3138, 0x313a, 0x313d, 0x313f, 0x3142, 0x314d, 0x3151, 0x3153, 0x315c, 0x316b, 0x37ce,
+    0x37e1, 0x3807,
     0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
     0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
     taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(address, address,
@@ -64,6 +65,17 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
             if observing then return end
             local pc = cpu.state["PC"].value
             if pc ~= offset and pc ~= offset + 1 then return end
+            if address == 0x37e1 or address == 0x3807 then
+                publication_counts[address] = (publication_counts[address] or 0) + 1
+                if publication_counts[address] <= 16 then
+                    machine:logerror(string.format(
+                        "rom4_rf_native_publish_exit: address=%04x t=%.9f type=%04x bytes=%d producer=%04x consumer=%04x control6e1=%04x\n",
+                        address, machine.time:as_double(), cpu.state["AR4"].value,
+                        cpu.state["AR5"].value, memory:read_u16(0x08e4),
+                        memory:read_u16(0x08e5), memory:read_u16(0x06e1)))
+                end
+                return
+            end
             if address == 0x37ce then
                 local kind, length = cpu.state["AR4"].value, cpu.state["AR5"].value
                 message_counts[kind] = (message_counts[kind] or 0) + 1
