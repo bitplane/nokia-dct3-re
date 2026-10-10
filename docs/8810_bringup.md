@@ -211,6 +211,19 @@ from the type-`0x1b` path, plus indirect range handling near
 no type-`0x1b` consumer is captured in this fixture. Changing the flag or
 provisioning the erased records to satisfy that dormant gate would not be
 an evidenced repair of the live receive-window reset.
+
+The MCU status getter `0x2a1e3c` reads byte `0x11f535` after checking its
+availability flag. In the fresh run, initialization sets it to zero;
+`0x20b43c` publishes `5` at 6.081712 s. That writer decodes object
+`0x10d608`, header `0x0067`, returned by `0x2bb768`. Its byte `+0x12=1`
+selects value 5; fields `+0x18/+0x1c` are `0x030140b3/0x0a01b881`.
+Thus value 5 is MCU-decoded object state, not a direct DSP hardware verdict.
+The object's producer and field semantics remain unresolved.
+At the later monitoring transition `0x211318` (6.533039 s), context
+`0x11d040` has count `+8=1`, flags `+0x1b=0`, and the companion mode
+byte is `0x12`; the status is already 5. This narrows the next MCU contract
+to the source object and transition ownership without assigning meaning to
+those numeric states from another ROM.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

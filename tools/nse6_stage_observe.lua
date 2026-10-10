@@ -196,6 +196,16 @@ handles[#handles + 1] = memory:install_write_tap(0x20000, 0x20003,
             machine.time:as_double()))
     end)
 local window_writes = 0
+local status_writes = 0
+handles[#handles + 1] = memory:install_write_tap(0x11f534, 0x11f537,
+    'nse6_reset_status_source', function(offset, value, mask)
+        if (mask & 0x00ff0000) == 0 or status_writes >= 32 then return end
+        status_writes = status_writes + 1
+        machine:logerror(string.format(
+            'nse6_reset_status_source: value=%02x pc=%08x lr=%08x t=%.9f\n',
+            (value >> 16) & 0xff, cpu.state['PC'].value,
+            cpu.state['R14'].value, machine.time:as_double()))
+    end)
 handles[#handles + 1] = memory:install_write_tap(0x12166c, 0x12166f,
     'nse6_dsp_window_count', function(offset, value, mask)
         if (mask & 0xffff) == 0 or window_writes >= 64 then return end
@@ -299,7 +309,7 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
         0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x243c22,
         0x27a76e, 0x27b604, 0x2d3460, 0x2c68c8, 0x2c6908,
-        0x2e2748, 0x2e25f6, 0x2b0adc, 0x240c1e,
+        0x2e2748, 0x2e25f6, 0x211318, 0x20b3c4, 0x2b0adc, 0x240c1e,
         0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
         0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a,
@@ -310,6 +320,22 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x20b3c4 and counts[address] <= 16 then
+                local object = cpu.state['R7'].value
+                machine:logerror(string.format(
+                    'nse6_reset_status_object: object=%08x header=%04x selector=%02x field18=%08x field1c=%08x t=%.9f\n',
+                    object, memory:read_u16(object), memory:read_u8(object + 0x12),
+                    memory:read_u32(object + 0x18), memory:read_u32(object + 0x1c),
+                    machine.time:as_double()))
+            end
+            if address == 0x211318 and counts[address] <= 16 then
+                local context = cpu.state['R4'].value
+                machine:logerror(string.format(
+                    'nse6_operational_window_entry: context=%08x count=%04x flags=%02x mode=%02x status=%02x lr=%08x t=%.9f\n',
+                    context, memory:read_u16(context + 8), memory:read_u8(context + 0x1b),
+                    memory:read_u8(cpu.state['R5'].value + 0x8d), memory:read_u8(0x11f535),
+                    cpu.state['R14'].value, machine.time:as_double()))
+            end
             if address == 0x2e25f6 and counts[address] <= 32 then
                 machine:logerror(string.format(
                     'nse6_dsp_dispatch_entry: packet=%08x source=%08x counter_base=%08x t=%.9f\n',
