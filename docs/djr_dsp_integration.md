@@ -995,6 +995,18 @@ preserve that byte and the 251-byte accumulation region. This exercises
 one sequence value and the append bound, not acknowledgement, completion,
 all sequence numbers, or the caller-owned record lifecycle.
 
+Receive loop `0x238280` binds its two records to `0x108094` and
+`0x107f2c`; its dispatcher routes incoming message `0x040b` to block
+processing at `0x238400`. Both facts are executed in isolation. Selector
+`0x237f78` is checked in 4,096 cases (eight input kinds, flag 0/1, all
+address bytes). Kinds `40/50/60/a0`, or kind `80` with nonzero byte 12,
+select return 0 directly. Other inputs use address bits `0x1c` from input
+byte 14 (byte 16 for kind `70`): zero returns 0, `0x0c` returns 3,
+and other values return `0xff`. The caller uses 0 for the first record,
+3 for the second, and rejects other results. Incoming `0x040b` ownership
+is now the concrete lower-producer query; these checks do not establish
+its native DSP origin.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

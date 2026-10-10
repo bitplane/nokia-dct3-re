@@ -16,7 +16,7 @@ from unicorn import Uc, UC_ARCH_ARM, UC_MODE_BIG_ENDIAN, UC_MODE_THUMB
 from unicorn.arm_const import (
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1,
     UC_ARM_REG_SP,
-    UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R6,
+    UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R6, UC_ARM_REG_R7,
     UC_ARM_REG_R9,
     UC_ARM_REG_R8,
     UC_ARM_REG_R2,
@@ -403,6 +403,39 @@ def check_rr_segment_append(cpu):
     return cases
 
 
+def check_rr_record_selection(cpu):
+    cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+    cpu.emu_start(0x238281, 0x23829a, count=32)
+    if (cpu.reg_read(UC_ARM_REG_R4), cpu.reg_read(UC_ARM_REG_R5)) != (
+            0x108094, 0x107f2c):
+        raise ValueError("receive-loop record bindings differ")
+    cpu.mem_write(0x10b500, (0x040b).to_bytes(2, "big"))
+    cpu.reg_write(UC_ARM_REG_R7, 0x10b500)
+    cpu.emu_start(0x2382a7, 0x238400, count=32)
+    if cpu.reg_read(UC_ARM_REG_PC) != 0x238400:
+        raise ValueError("incoming 040b did not reach block processing")
+    cases = 0
+    for kind in (0, 0x40, 0x50, 0x60, 0x70, 0x80, 0xa0, 0xff):
+        for flag in (0, 1):
+            for address in range(256):
+                source = bytearray(20)
+                source[11], source[12] = kind, flag
+                source[16 if kind == 0x70 else 14] = address
+                cpu.mem_write(0x10b500, bytes(source))
+                cpu.reg_write(UC_ARM_REG_R0, 0x10b500)
+                cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
+                cpu.emu_start(0x237f79, RETURN, count=64)
+                bits = address & 0x1c
+                expected = (0 if kind in (0x40, 0x50, 0x60, 0xa0)
+                            or (kind == 0x80 and flag) or bits == 0
+                            else 3 if bits == 0x0c else 0xff)
+                if (cpu.reg_read(UC_ARM_REG_PC), cpu.reg_read(UC_ARM_REG_R0)) != (
+                        RETURN, expected):
+                    raise ValueError("receive record selector differs")
+                cases += 1
+    return cases
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -445,6 +478,7 @@ def check_image(raw):
             "rr_fixed_block_cases": check_rr_fixed_block(cpu),
             "rr_unsegmented_block_cases": check_rr_unsegmented_block(cpu),
             "rr_segment_append_cases": check_rr_segment_append(cpu),
+            "rr_record_selection_cases": check_rr_record_selection(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,
