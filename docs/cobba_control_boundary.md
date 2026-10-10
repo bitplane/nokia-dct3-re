@@ -257,6 +257,20 @@ lifecycle's counter constraint, not an exhaustive static writer census
 or proof that all valid request/product contexts share it. Independently
 audit the guard's decoding and uploaded request context before treating
 the apparent 1523-versus-500 incompatibility as a firmware defect.
+The independent encoding audit uses TI
+[SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf),
+SUB syntax 7 (pp. 4-187/188) and BC conditions (p. 4-18): `0xf010`
+selects immediate subtraction from A with zero shift, `0xf843` tests
+A less than zero, and `0xf842` tests A greater than or equal to zero.
+Original NSE-1 v5.30 MCU flash contains the reset block at byte
+`0x0959ec`, the 500-result guard at `0x095a68`, and the 1523 counter
+guard at `0x095a74`. Their relative positions agree with the captured
+DSP program layout. `c54x_rom4_codec_contract.py --mcu-image
+roms/noki5110/5110f530.fls` verifies unique aligned source occurrences
+and that common layout; mutation tests cover every checked word.
+This rules out these constants being introduced by the live-code
+observer or a swapped upload capture. It does not validate all core
+pipeline effects or establish the request's intended physical context.
 
 ### Product-specific physical buses
 

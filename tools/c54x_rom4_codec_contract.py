@@ -35,6 +35,29 @@ SEQUENCES = {
     )),
 }
 
+UPLOADED_COUNTER_BLOCKS = {
+    "counter_reset": (0x0ac2, (0xe900, 0x81f8, 0x198d, 0x81f8,
+                              0x1256, 0x81f8, 0x1344)),
+    "result_limit": (0x0b00, (0x10f8, 0x1344, 0xf010, 0x01f4, 0xf842, 0x0ca3)),
+    "candidate_counter_guard": (0x0b06, (0xe801, 0x0084, 0x8094,
+                                         0xf010, 0x05f3, 0xf843, 0x0acf)),
+}
+
+
+def check_mcu_upload_counters(image):
+    locations = {}
+    bases = set()
+    for name, (address, words) in UPLOADED_COUNTER_BLOCKS.items():
+        pattern = b"".join(word.to_bytes(2, "big") for word in words)
+        start = image.find(pattern)
+        if start < 0 or start % 2 or image.find(pattern, start + 1) >= 0:
+            raise ValueError(f"missing, unaligned or ambiguous MCU upload block: {name}")
+        locations[name] = start
+        bases.add(start - 2 * address)
+    if len(bases) != 1:
+        raise ValueError("MCU upload counter blocks do not share the captured program layout")
+    return locations
+
 # Each additional immediate port reader preserves/modifies specific bits and
 # writes the result back. These are ROM observations, not register field names.
 MASK_SEQUENCES = {
@@ -411,6 +434,8 @@ def main() -> int:
     parser.add_argument("image", type=Path)
     parser.add_argument("--data-image", type=Path,
                         help="check receive scheduling lists in the separate DSP data image")
+    parser.add_argument("--mcu-image", type=Path,
+                        help="verify uploaded counter guards against original NSE-1 MCU flash")
     parser.add_argument("--trace", type=Path,
                         help="check a fresh four-second passive codec observer log")
     parser.add_argument("--restore-log", type=Path,
@@ -420,6 +445,8 @@ def main() -> int:
     args = parser.parse_args()
     try:
         results = check(args.image.read_bytes())
+        if args.mcu_image is not None:
+            upload_locations = check_mcu_upload_counters(args.mcu_image.read_bytes())
         if args.data_image is not None:
             check_schedule_data(args.data_image.read_bytes())
         if args.trace is not None:
@@ -431,6 +458,9 @@ def main() -> int:
     except (OSError, ValueError) as error:
         parser.exit(1, f"FAIL: {error}\n")
     print("PASS: " + ", ".join(results))
+    if args.mcu_image is not None:
+        print("MCU upload counter blocks: PASS " + ", ".join(
+            f"{name}=0x{offset:06x}" for name, offset in upload_locations.items()))
     if args.data_image is not None:
         print(f"DSP data-space receive scheduling lists: {len(SCHEDULE_LISTS)}/{len(SCHEDULE_LISTS)} PASS")
     print("Candidate immediate-port coverage: reads=9/9 writes=12/12; uploads excluded.")

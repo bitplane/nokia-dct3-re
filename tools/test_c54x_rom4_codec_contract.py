@@ -1,10 +1,29 @@
 import unittest
 
 from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
+                                          UPLOADED_COUNTER_BLOCKS, check_mcu_upload_counters,
                                           check_schedule_data, check_trace, check_restore, check_tone)
 
 
 class CodecContractTests(unittest.TestCase):
+    def test_original_upload_counter_blocks(self):
+        image = bytearray(0x2000)
+        for address, words in UPLOADED_COUNTER_BLOCKS.values():
+            for index, word in enumerate(words):
+                start = (address + index) * 2
+                image[start:start + 2] = word.to_bytes(2, "big")
+        self.assertEqual(len(check_mcu_upload_counters(image)), 3)
+        for name, (address, words) in UPLOADED_COUNTER_BLOCKS.items():
+            for index in range(len(words)):
+                with self.subTest(name=name, index=index):
+                    changed = bytearray(image)
+                    changed[(address + index) * 2] ^= 1
+                    with self.assertRaises(ValueError):
+                        check_mcu_upload_counters(changed)
+        pattern = b"".join(word.to_bytes(2, "big") for word in next(iter(UPLOADED_COUNTER_BLOCKS.values()))[1])
+        with self.assertRaises(ValueError):
+            check_mcu_upload_counters(image + pattern)
+
     def test_schedule_data_words(self):
         image = bytearray(0x20000)
         for address, words in SCHEDULE_LISTS.items():
