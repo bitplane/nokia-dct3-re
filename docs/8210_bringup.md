@@ -1974,6 +1974,25 @@ This closes a consumer-side possibility, not the missing mode-4 producer
 contract: it does not prove that the instruction owes SCH, establish its
 timing/eligibility, or justify replaying the serving-cell response.
 
+The official [NokiX release archive](https://sourceforge.net/projects/nokix/files/)
+does not close this mode-4 contract in the three inspected packages:
+
+- `NokiX-SDK-doc-0.95.zip`: 201 files; its firmware menu links to the
+  separately hosted Blacksphere documentation rather than bundling it.
+  SHA-256 `bd88df4ec72acd7b94dc07a49dc09934bcd352e232922cc8b62e834c5ea268ee`.
+- `NokiX-SDK-2011.04.14.zip`: 155 extracted files; a case-insensitive search
+  for `NMEAS`, `BSIC` and neighbour/neighbor measurement found no matching
+  definitions. SHA-256
+  `f35b8a198a495c49017570e860746e2f359856f7e6ab793fa5bb607e456de5a1`.
+- `NokiX-libs-4.7.1.zip`: four Windows runtime DLLs (Qt and MSVC), not a
+  handset L1/protocol library. SHA-256
+  `1e428b2f86b459bdd5540f23b519177bc123b4d509c921da49499b2a4a94db4e`.
+
+The archives and extracted references are retained under ignored `tmp/`;
+no bundled executable was run or source transplanted. This is bounded
+archive coverage, not proof that a preserved Blacksphere/nlib specification
+or an independent mode-4 trace does not exist elsewhere.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
