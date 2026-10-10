@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 122 decoded and 504
+promoted to a boundary. Current cold-idle coverage is 161 decoded and 465
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. The leading unsupported forms are `ff0c`, `10f8`, `fa45`
 and `0881`; their execution frequency is in the isolated report.
@@ -1779,6 +1779,14 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger control-flow decoding
+
+BC/BCD, CC/CCD and XC decode 22 explicit named predicates. The core gate
+checks 132 forms on two pages, bounded extension reads, stepping flags and
+exact asymmetric examples; unreviewed predicate combinations remain raw.
+This validates debugger syntax and lengths, not execution of every condition
+or physical pipeline timing. The required marker is
+`TMS320C54x conditional disassembler: PASS`. A fresh native coverage run
+retains all 626 asserted words and the protected opcode-set fingerprint.
 
 The native core disassembler decodes the reviewed branch/call/return,
 repeat, idle, interrupt and status-bit forms, including extended accumulator

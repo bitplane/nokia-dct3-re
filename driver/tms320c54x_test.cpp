@@ -554,6 +554,36 @@ private:
 				"Move/test decoding retains family-specific operand ordering and modifiers");
 		}
 		osd_printf_info("TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0\n");
+		static constexpr u8 predicates[] = {0x02,0x03,0x08,0x0c,0x20,0x30,0x42,0x43,0x44,0x45,0x46,0x47,
+			0x4a,0x4b,0x4c,0x4d,0x4e,0x4f,0x60,0x68,0x70,0x78};
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xf800,0xfa00,0xf900,0xfb00,0xfd00,0xff00})
+				for (u8 predicate : predicates)
+				{
+					words const buffer(pc, family | predicate, 0x2345);
+					std::ostringstream text;
+					bool const xc = family == 0xfd00 || family == 0xff00;
+					u32 const flags = dasm::SUPPORTED | dasm::STEP_COND | (family == 0xf900 ? dasm::STEP_OVER : 0);
+					expect(decoder.disassemble(text, pc, buffer, buffer) == ((xc ? 1 : 2) | flags) &&
+						buffer.seen() == (xc ? 1 : 3), "Conditional decoder preserves length, page and bounded stepping flags");
+				}
+		vector const conditional[] = {
+			{0xff0c, 1 | dasm::SUPPORTED | dasm::STEP_COND, "XC      2, C"},
+			{0xfd68, 1 | dasm::SUPPORTED | dasm::STEP_COND, "XC      1, BNOV"},
+			{0xfa45, 2 | dasm::SUPPORTED | dasm::STEP_COND, "BCD     $012345, AEQ"},
+			{0xf94d, 2 | dasm::SUPPORTED | dasm::STEP_COND | dasm::STEP_OVER, "CC      $012345, BEQ"},
+			{0xfb70, 2 | dasm::SUPPORTED | dasm::STEP_COND, "CCD     $012345, AOV"},
+			{0xfd80, 1, ".word   $FD80"},
+			{0xff10, 1, ".word   $FF10"},
+		};
+		for (auto const &test : conditional)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Named conditional predicates decode exactly; unreviewed forms stay unsupported");
+		}
+		osd_printf_info("TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

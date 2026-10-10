@@ -41,6 +41,36 @@ public:
 		auto const target = [&]() { return (pc & 0x7f0000) | next_word(); };
 		u8 const mode = op;
 		u16 const family = op & 0xff00;
+		auto const predicate_name = [](u8 predicate) -> char const * {
+			switch (predicate)
+			{
+			case 0x02: return "NBIO"; case 0x03: return "BIO";
+			case 0x08: return "NC"; case 0x0c: return "C";
+			case 0x20: return "NTC"; case 0x30: return "TC";
+			case 0x42: return "AGEQ"; case 0x43: return "ALT";
+			case 0x44: return "ANEQ"; case 0x45: return "AEQ";
+			case 0x46: return "AGT"; case 0x47: return "ALEQ";
+			case 0x4a: return "BGEQ"; case 0x4b: return "BLT";
+			case 0x4c: return "BNEQ"; case 0x4d: return "BEQ";
+			case 0x4e: return "BGT"; case 0x4f: return "BLEQ";
+			case 0x60: return "ANOV"; case 0x68: return "BNOV";
+			case 0x70: return "AOV"; case 0x78: return "BOV";
+			default: return nullptr;
+			}
+		};
+		char const *const predicate = predicate_name(mode);
+		if (predicate && ((op & 0xfd80) == 0xf800 || (op & 0xfd80) == 0xf900))
+		{
+			bool const call = BIT(op, 8), delayed = BIT(op, 9);
+			char const *name = call ? (delayed ? "CCD" : "CC") : (delayed ? "BCD" : "BC");
+			util::stream_format(stream, "%-8s$%06X, %s", name, target(), predicate);
+			return 2 | SUPPORTED | STEP_COND | (call && !delayed ? STEP_OVER : 0);
+		}
+		if (predicate && (op & 0xfd80) == 0xfd00)
+		{
+			util::stream_format(stream, "XC      %u, %s", BIT(op, 9) ? 2 : 1, predicate);
+			return 1 | SUPPORTED | STEP_COND;
+		}
 		auto const smem = [&](u16 offset) {
 			if (mode < 0x80)
 				util::stream_format(stream, "$%02X", mode);
@@ -121,13 +151,6 @@ public:
 			const char *name = call ? (delayed ? "FCALAD" : "FCALA") : (delayed ? "FBACCD" : "FBACC");
 			util::stream_format(stream, "%-8s%c", name, BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED | (call && !delayed ? STEP_OVER : 0);
-		}
-		if ((op & 0xfdfe) == 0xf802 || (op & 0xfdfb) == 0xf808)
-		{
-			const char *condition = (op & 0xfdfe) == 0xf802 ?
-				(BIT(op, 0) ? "BIO" : "NBIO") : (BIT(op, 2) ? "C" : "NC");
-			util::stream_format(stream, "%-8s$%06X, %s", BIT(op, 9) ? "BCD" : "BC", target(), condition);
-			return 2 | SUPPORTED | STEP_COND;
 		}
 		if ((op & 0xfcff) == 0xf4e1 && op != 0xf7e1)
 		{
