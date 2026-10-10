@@ -407,11 +407,27 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x21cd2e, 0x21b312, 0x210fca, 0x210f90, 0x210fac, 0x210fbc,
         0x2110d6, 0x2110f0, 0x21111e, 0x2112e6, 0x2112a6, 0x212470,
         0x2d354c, 0x2d36ee, 0x2b5f62,
-        0x2b5e78, 0x2b5e96, 0x2b5ecc, 0x2b66fc}) do
+        0x2b5e78, 0x2b5e96, 0x2b5ecc, 0x2b66fc, 0x27b1c8, 0x29b9ea}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x29b9ea and counts[address] <= 8 then
+                machine:logerror(string.format(
+                    'nse6_native_control_constructor: r0=%08x r1=%08x lr=%08x t=%.9f\n',
+                    cpu.state['R0'].value, cpu.state['R1'].value,
+                    cpu.state['R14'].value, machine.time:as_double()))
+            end
+            if address == 0x27b1c8 and cpu.state['R0'].value == 3 then
+                local packet = cpu.state['R1'].value
+                if memory:read_u16(packet) == 2 and memory:read_u8(packet + 3) == 0x4c then
+                    machine:logerror(string.format(
+                        'nse6_native_control_post: object=%08x length=%02x payload=%04x,%04x lr=%08x t=%.9f\n',
+                        packet, memory:read_u8(packet + 2), memory:read_u16(packet + 4),
+                        memory:read_u16(packet + 6), cpu.state['R14'].value,
+                        machine.time:as_double()))
+                end
+            end
             if address == 0x2d354c and counts[address] <= 128 then
                 local packet = memory:read_u32(cpu.state['R13'].value + 0xb4)
                 machine:logerror(string.format(

@@ -70,6 +70,32 @@ the MCU type-`0x4c` producer/service contract or an independent register
 description corroborates that mapping. The completion bit remains unmapped,
 so no reset timer or UART-ready constant is yet justified.
 
+The MCU producer is constructor `0x29b9ea`, called organically by initializer
+`0x29c022` at `0x29c094` (observed LR `0x29c099`, 3.648453 seconds).
+Its arguments are both zero. It allocates eight bytes, writes prefix 2,
+length 4 and type `0x4c`, then encodes payload bytes as
+`r0, 0x80 | (r1 << 2), 1, (r0 == 0 ? 4 : 0xff)` with byte truncation.
+The resulting `0080,0104` object reaches task 3 through `0x27b1c8` at
+3.648771 seconds. A bounded direct-Thumb-BL scan of the MCU extent finds
+four constructor callers: `0x231db2`, `0x29ba90`, `0x29c094`, `0x29c69e`;
+computed callers remain outside that coverage. Nearby helpers `0x2bb268`
+and `0x2bb276` access RAM (`0x120564` and `0x120534` respectively), not
+peripheral registers. They do not corroborate AccIF ownership. The next
+ownership question is the initialized module's service/callback contract,
+not whether a missing MCU packet needs to be synthesized.
+
+Initializer callbacks `0x2affb0`, `0x2b00a4`, and `0x2affc8` post to task 25;
+this identifies a firmware delivery boundary, not the task's semantic name.
+Nearby MCU routine `0x29b830` builds type-`0x50` byte-buffer packets.
+Do not infer that these use the same peripheral from code proximity:
+resident dispatch `0x398d..0x3995` indexes data-ROM table `0xb00f + type`,
+whose entries map `0x4c` to `0x3b92` and `0x50` to `0x3e72`.
+The latter calls `0x7e9c`, fills buffer `0x1896`, and sets `0x1f25` bit 4;
+it does not directly call the port-34 transmitter. Continuity from that
+buffer to the serial peripheral is unproven. These are acquired ROM4
+consumer contracts, not evidence that the unknown fitted NSE-6 DSP mask
+has identical packet semantics.
+
 Native TX completion now wakes the MCU pending queue through MAD2 FIQ1.
 IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
 shared-service counters and block uploads, not TX-queue wakeup. FIQ dispatch
