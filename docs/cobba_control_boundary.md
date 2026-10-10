@@ -175,6 +175,29 @@ transfer or settling timer exists. The next evidence needed is the SCU
 register/serializer contract or an independently captured pin transfer,
 not a guessed busy bit or a replayed firmware result.
 
+#### Sibling RF documentation
+
+The [Nokia RAE-2 service manual](https://www.scribd.com/document/969092511/nokia-9110-rae-2-1),
+BS8_RF pp. 3-35..3-36, explicitly specifies the GSM channel-1..124
+UHF counters as `N=INT((channel+5030)/64)` and
+`A=MOD((channel+5030)/64)`, with reference divider 65. This independently
+corroborates the recovered NSE-1 arithmetic; it does not validate its
+physical transfer.
+
+That board uses SUMMA, not NSE-1's PLUSSA. Its external serial protocol
+places a three-bit address before register data; address 3 selects the
+18-bit UHF divider. The adjacent timing diagrams describe 23-bit
+transfers. These are sibling-device facts, not a license to interpret
+the captured `00302813` as an unchanged NSE-1 wire frame. Neither the
+external register table nor the timing diagrams map MAD2 DSP ports
+`30..32` to serial launch, length, latch or completion behavior.
+
+The bounded public-document search therefore supplies a stronger
+divider interpretation, but leaves the SCU serializer contract open.
+Do not invent a transfer timer or control-bit decoder from the sibling
+format. Native acquisition still needs that contract and independently
+supported RF sample timing/encoding.
+
 ### Software RF reference boundary
 
 An independent baseband waveform source is available in
