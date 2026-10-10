@@ -7,12 +7,25 @@ are identified. IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
 shared-service counters and block uploads, not TX-queue wakeup. FIQ dispatch
 `0x2dec1c` sends FIQ1 to `0x2b5e78`, which posts control 1 to task 3. FIQ0
 handler `0x2b5e96` posts control 4 to RX task 4 and conditionally posts control
-6 to TX task 3 when bit 0 of `0x1205dc` is set, clearing that bit first.
+6 to TX task 3 when bit 0 of shared word `0x101f0` (DSP `0x08f8`) is set,
+clearing that bit first. The separately adjacent literal `0x1205dc` is the
+TX payload source-pointer slot, not this notification flag.
 A fresh 12-second compatibility run records 1,656 FIQ0-handler entries and
 14 IRQ4-handler entries, but no FIQ1-handler or conditional control-6 post.
 The native backend currently rings FIQ0 on port-1 completion writes. Next
 recover the DSP-to-MAD2 completion-bit routing and the ownership of
-`0x1205dc`; do not reinterpret IRQ4 or inject a queue wakeup.
+shared word `0x101f0`; do not reinterpret IRQ4 or inject a queue wakeup.
+
+The completion census observes port-1 value `0x0002` from resident PC
+`0x395e`, following the TX service routine's call to `0x3860`, and value
+`0x0001` from RX publication PC `0x380a`. The native backend currently sends
+both values to FIQ0 and has no FIQ1 transport output. Together with the MCU's
+distinct FIQ0/FIQ1 handlers, this supports testing bit-selective completion
+routing (bit 0 RX, bit 1 TX), rather than inventing periodic queue wakeups.
+The fresh trace observes no native write to the conditional shared flag
+`0x08f8`; that negative result is bounded to twelve seconds, not a complete
+writer census. Other port-1 bits (`0x001c`, `0x0100`, and bootstrap values)
+have unresolved routing and must not be assigned meaning from this pair.
 
 DSP MMR `0x0029` bit-3 pulses are present during bootstrap and at 6.482857
 seconds (PC `0x38f9` / `0x38fc`). The latter resident path tests and clears

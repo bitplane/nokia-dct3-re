@@ -12,6 +12,27 @@ local handles = {}
 local pending_memory_uploads = {}
 local observing_native = false
 if dsp then
+    local completion_sites = {}
+    handles[#handles + 1] = dsp.spaces['io']:install_write_tap(1, 1,
+        'nse6_native_completion_bits', function(offset, value, mask)
+            local pc = dsp.state['PC'].value
+            local key = string.format('%04x:%04x', pc, value)
+            completion_sites[key] = (completion_sites[key] or 0) + 1
+            if completion_sites[key] > 4 then return end
+            machine:logerror(string.format(
+                'nse6_native_completion_bits: value=%04x pc=%04x t=%.9f\n',
+                value, pc, machine.time:as_double()))
+        end)
+    local wakeup_writers = {}
+    handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x08f8, 0x08f8,
+        'nse6_native_tx_wakeup_flag', function(offset, value, mask)
+            local pc = dsp.state['PC'].value
+            wakeup_writers[pc] = (wakeup_writers[pc] or 0) + 1
+            if wakeup_writers[pc] > 8 then return end
+            machine:logerror(string.format(
+                'nse6_native_tx_wakeup_flag: value=%04x mask=%04x pc=%04x t=%.9f\n',
+                value, mask, pc, machine.time:as_double()))
+        end)
     local service_irq_writes = 0
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x0029, 0x0029,
         'nse6_native_service_irq', function(offset, value, mask)
