@@ -1091,6 +1091,20 @@ sample-progress prerequisites, not yet a named DMA register contract.
 The cell's producer and actual sample contents must be established
 before an operation result can be treated as a native radio decode.
 
+Data `0x00b1` has firmware-owned pointer producers: the filtered-sample
+frame branch reads it into AR3 at `0x33b6`, consumes port `0x27` at
+`0x33c9/33cf/33d5/33db`, filters into successive AR3 words, and stores
+the advanced AR3 back at `0x33e9`. Its loop runs eight iterations with
+two destination writes each. Configuration routine `0x4414` conditionally
+seeds the same pointer at `0x4424` when input A bit 1 is set, and writes
+AR2 to `0x00b0`. These instruction sequences are byte-pinned; this is
+not evidence for an autonomous DMA register. The native receive-decode
+chain therefore bottoms out at the already-open port-`0x27` sample
+boundary plus its scheduling/configuration, rather than requiring an
+invented message peer. Authentic or independently generated RF sample
+vectors and validation of their format remain required to demonstrate
+successful native type-`0x80` reception.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
