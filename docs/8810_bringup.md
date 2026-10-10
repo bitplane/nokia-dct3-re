@@ -173,6 +173,20 @@ Their consumption times are 0.473622, 0.473762, 0.478238, 0.482854,
 before reset in this fixture. This bounds the exercised control sequence;
 it does not assign native command semantics from another MCU build or prove
 that every command received a valid response.
+
+Runtime dispatch distinguishes the native special controls from the generic
+host-packet table: all six type-`0x70` packets execute CALL `0x4951` at
+`0x3982`, with A=`0x70`, before their consumer publication. They do not
+execute the generic BACC at `0x3995`. Thus generic table entry
+`0xb00f + 0x70 = 0x037e` is not their observed handler.
+Resident code `0x4951..0x4963` extracts the command byte, bounds it against
+`0x18`, then branches through data-ROM table `0xb0a6`. Static entries for
+the captured command bytes are `0x0a -> 0x49fc`, `0x0d -> 0x4a16`,
+`0x13 -> 0x4ac7`, `0x14 -> 0x4b1f`, `0x15 -> 0x4b3e`,
+`0x16 -> 0x4b73`. These are concrete candidate consumers for the next
+native control audit; their per-command execution and effects are not yet
+validated. The acquired table is compatible-reference evidence, not proof
+of the fitted NSE-6 mask identity.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

@@ -9,6 +9,29 @@ local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
 local pending_memory_uploads = {}
 if dsp then
+    for _, site in ipairs({0x3982, 0x3987}) do
+        local hits = 0
+        handles[#handles + 1] = dsp.spaces['program']:install_read_tap(site, site,
+            'nse6_native_special_' .. site, function()
+                if dsp.state['PC'].value ~= site + 1 or hits >= 32 then return end
+                hits = hits + 1
+                machine:logerror(string.format(
+                    'nse6_native_special_dispatch: site=%04x a=%04x b=%04x control=%04x t=%.9f\n',
+                    site, dsp.state['A'].value & 0xffff, dsp.state['B'].value & 0xffff,
+                    dsp.spaces['data']:read_u16(0x06e1), machine.time:as_double()))
+            end)
+    end
+    local host_dispatches = 0
+    handles[#handles + 1] = dsp.spaces['program']:install_read_tap(0x3995, 0x3995,
+        'nse6_native_host_dispatch', function()
+            if dsp.state['PC'].value ~= 0x3996 or host_dispatches >= 128 then return end
+            host_dispatches = host_dispatches + 1
+            machine:logerror(string.format(
+                'nse6_native_host_dispatch: target=%04x table70=%04x ar0=%04x ar1=%04x t=%.9f\n',
+                dsp.state['A'].value & 0xffff, dsp.spaces['data']:read_u16(0xb07f),
+                dsp.state['AR0'].value, dsp.state['AR1'].value,
+                machine.time:as_double()))
+        end)
     local upload_writes = 0
     handles[#handles + 1] = dsp.spaces['program']:install_write_tap(0x2946, 0x295d,
         'nse6_native_context_upload', function(offset, value, mask)
