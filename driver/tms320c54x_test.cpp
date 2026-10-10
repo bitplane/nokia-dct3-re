@@ -73,6 +73,26 @@ private:
 		m_phase = 83000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_nested_repeat_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		bool const long_count = index >= 2;
+		u16 const count = index & 1 ? 2 : 0;
+		u16 const body = long_count ? 0x0804 : 0x0803;
+		program.write_word(0x0800, 0xf072); // RPTB body
+		program.write_word(0x0801, body);
+		program.write_word(0x0802, long_count ? 0xf070 : 0xec00 | count);
+		if (long_count) program.write_word(0x0803, count);
+		program.write_word(body, 0x6d91); // MAR *AR1+
+		program.write_word(body + 1, 0xf4e1); // IDLE1
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0800);
+		m_phase = 84000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_braf_control_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -19528,6 +19548,23 @@ private:
 			m_cpu->set_input_line(index >= 6 ? INPUT_LINE_NMI : 0, CLEAR_LINE);
 			if (index < 11) { start_repeat_endpoint_case(index + 1); return; }
 			osd_printf_info("TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi\n");
+			start_nested_repeat_case(0); return;
+		}
+		if (m_phase >= 84000 && m_phase < 84004)
+		{
+			unsigned const index = m_phase - 84000;
+			osd_printf_info("C54x nested repeat case=%u ar1=%04x brc=%04x st1=%04x\n", index,
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_AR1)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_BRC)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Nested repeat fixture terminates");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == (index & 1 ? 12 : 4) &&
+				m_cpu->state_int(tms320c54x_device::STATE_BRC) == 0 &&
+				!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x8000),
+				"Single repeat at block endpoint completes both architectural loop counts");
+			if (index < 3) { start_nested_repeat_case(index + 1); return; }
+			osd_printf_info("TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

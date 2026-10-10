@@ -847,7 +847,21 @@ cancellation assertion in `tmp/c54x-braf-control-red.log`. BRAF and its loop
 registers are already saved architectural state, so no parallel active flag
 is retained. These are execution-state checks, not Decode-stage BRC decrement
 timing or general interrupt-pipeline evidence.
-The correction deliberately changes the exact native NSE-1 scan snapshot:
+Single-instruction repeat completion must also honor an active block boundary.
+In particular, `RPT #0` executes its body once but does not cancel or bypass
+the enclosing BRAF loop. Four executable fixtures place that body at REA,
+with short/long counts zero and two and BRC three; they require respectively
+four/twelve body address updates, exhausted BRC and cleared BRAF. The old
+early return leaves AR1 one, BRC three and BRAF set in
+`tmp/c54x-nested-repeat-red.log`; the corrected core passes all four cases in
+`tmp/c54x-nested-repeat-green.log`. The runner requires
+`TMS320C54x nested repeats: PASS`. This checks architectural execution counts,
+not Decode-stage loop-counter timing or a physical pipeline implementation.
+`tmp/c54x-nested-repeat-regression.log` preserves the exact native RF snapshot,
+5110 save-state restoration and original MU4 storage/native-entry acceptance.
+The timer observer still exposes short-period starvation; recorder finalization
+and native speech are not established by these gates.
+The architectural BRAF correction deliberately changes the exact native NSE-1 scan snapshot:
 two isolated 30-second cold runs (`tmp/nse1-braf-control/error.log` and
 `tmp/nse1-braf-bus/error.log`) reproduce 20,282 frame expiries, 648,096 RF
 reads and 1,519 port-32 writes. The checker re-banks those exact counts and

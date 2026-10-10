@@ -928,13 +928,15 @@ void tms320c54x_device::finish_repeats()
 			--m_rptc;
 			++m_rpt_iteration;
 			m_pc = m_rpt_address;
+			return;
 		}
 		else
 		{
 			m_rpt_end = REPEAT_END_UNSET;
 			m_rpt_iteration = 0;
 		}
-		return;
+		// RPT #0 still retires a body instruction. If it ends an active
+		// block repeat, the outer boundary must be processed below too.
 	}
 
 	if (m_rptc)

@@ -7,6 +7,7 @@ import sys
 import tempfile
 
 REQUIRED = [
+    "TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long",
     "TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi",
     "TMS320C54x BRAF control: PASS cases=4 clear=RSBX,STM,POPM restored_loop=1",
     "TMS320C54x XC interrupt protection: PASS cases=4 spans=1,2 accepted,rejected=1 physical_pipeline_claim=0",
