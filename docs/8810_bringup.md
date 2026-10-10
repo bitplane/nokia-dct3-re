@@ -372,7 +372,16 @@ Own routine `218c24` frees a linked list, clears its stored pointer, and
 unconditionally constructs that status. Thus this observed path is explicit
 MCU cleanup, not a failed attempt to send the search packet. The literal
 `0a33` constructor at `21a8e2` calls the same helper and then sets a context
-byte to 2; its entry condition remains the next software boundary. The
+byte to 2. Its branch at `21a870` requires receive-helper `218fb4` to return
+`1587` at the later wait `21a864`. A distinct initial wait at `21a748` also
+consumes `1587`, but proceeds through initialization rather than publishing
+`0a33`. The fresh run observes the initial producer `2896fc` at 3.612416 s,
+posting to mailbox `13`, and its initial consumption at `21a74c` at
+3.612529 s. The helper subsequently receives `1592`, `158b`, and `043c`;
+no return at the later wait or entry at `21a8dc` is observed. Thus `1587`
+has a working producer and initial delivery; the unresolved condition is
+entry into the later lifecycle, not inventing that status or reusing its
+initial publication. The
 literal-seeded scan identifies candidates, not every computed publisher.
 Identity/control payloads also
 differ, with NSE-6's records erased; no NSE-1 data may be copied into NSE-6

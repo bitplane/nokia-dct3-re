@@ -332,11 +332,23 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x222532, 0x22254e, 0x21e012, 0x293da2, 0x293ccc, 0x293d0e,
         0x2dd07e, 0x2d6f28, 0x28ced8, 0x2c90c2, 0x2dd18a, 0x2dd344,
         0x2184b6, 0x218a42, 0x2185f4, 0x2a94f4, 0x262bf4, 0x262056,
-        0x202cb0, 0x206584, 0x206598, 0x2007f8, 0x218c66}) do
+        0x202cb0, 0x206584, 0x206598, 0x2007f8, 0x218c66,
+        0x2896fc, 0x218fbc, 0x21a74c, 0x21a868, 0x21a8dc}) do
     handles[#handles + 1] = memory:install_read_tap(address & ~3,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if address == 0x218fbc and counts[address] <= 64 then
+                local message = cpu.state['R0'].value
+                machine:logerror(string.format(
+                    'nse6_search_controller_message: object=%08x status=%04x t=%.9f\n',
+                    message, memory:read_u16(message), machine.time:as_double()))
+            end
+            if (address == 0x21a74c or address == 0x21a868) and counts[address] <= 64 then
+                machine:logerror(string.format(
+                    'nse6_search_controller_return: site=%08x status=%04x t=%.9f\n',
+                    address, cpu.state['R0'].value & 0xffff, machine.time:as_double()))
+            end
             if address == 0x218c66 and counts[address] <= 64 then
                 machine:logerror(string.format(
                     'nse6_search_lifecycle_construct: status=%04x lr=%08x t=%.9f\n',
