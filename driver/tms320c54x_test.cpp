@@ -8,6 +8,7 @@
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "nokia_dspif.h"
 #include "nokia_cobba.h"
+#include "nokia_dsp_c54x.h"
 #include "gsm_tch_f_l1.h"
 #include "util/gsmfr.h"
 #include "tms320c54x_mcbsp.h"
@@ -19624,6 +19625,117 @@ void tms320c54x_test_state::rom4(machine_config &config)
 	m_cpu->set_addrmap(AS_DATA, &tms320c54x_test_state::rom4_data_map);
 }
 
+class c54x_backend_bsp_test_state : public driver_device
+{
+public:
+	c54x_backend_bsp_test_state(const machine_config &config, device_type type,
+			const char *tag) : driver_device(config, type, tag),
+		m_backend(*this, "backend"), m_cpu(*this, "backend:cpu") { }
+	void test(machine_config &config)
+	{
+		NOKIA_DSPIF(config, "dspif", 0);
+		NOKIA_COBBA(config, "cobba", 0);
+		NOKIA_CCONT(config, "ccont", 0);
+		NOKIA_DSP_C54X(config, m_backend, 13'000'000);
+	}
+protected:
+	virtual void machine_start() override
+	{
+		m_timer = timer_alloc(FUNC(c54x_backend_bsp_test_state::check), this);
+	}
+	virtual void machine_reset() override
+	{
+		m_stage = 0;
+		m_case = 0;
+		m_timer->adjust(attotime::from_usec(100));
+	}
+private:
+	void expect(bool condition, const char *message)
+	{
+		if (!condition) throw emu_fatalerror("C54x backend BSP: %s", message);
+	}
+	TIMER_CALLBACK_MEMBER(check)
+	{
+		if (m_stage == 0)
+		{
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			m_backend->reset_line_w(1);
+		}
+		else if (m_stage == 1)
+		{
+			// Synthetic overlay code, not a recovered handset ISR or clock.
+			m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0x00a0);
+			auto &data = m_cpu->space(AS_DATA);
+			data.write_word(0x0800, 0xf4e1);
+			data.write_word(0x00d0, 0xf4e1);
+			data.write_word(0x00d4, 0xf4e1);
+			data.write_word(0x0022, m_case == 0 ? 0x0080 : m_case == 1 ? 0x0040 : 0x00c0);
+			if (m_case != 0) data.write_word(0x0021, 0x1234);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0x0030);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+			m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x0010);
+			m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+			m_cpu->set_state_int(STATE_GENPC, 0x0800);
+			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else if (m_stage == 2)
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == 0x0801 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE), "initial IDLE");
+			m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			u16 output = 0;
+			expect(m_backend->codec_duplex_frame(0x5678, output) == (m_case != 0),
+				"backend transmit completion");
+			if (m_case != 0) expect(output == 0x1234, "backend transmitted payload");
+		}
+		else if (m_stage == 3)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) ==
+				(m_case == 0 ? 0x10 : m_case == 1 ? 0x20 : 0x30), "backend ready edges reach IFR");
+			m_saved.str(std::string());
+			m_saved.clear();
+			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save backend and pending CPU");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+		}
+		else
+		{
+			expect(m_cpu->state_int(STATE_GENPC) == (m_case == 1 ? 0x00d5 : 0x00d1) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_case == 2 ? 0x20 : 0),
+				"backend vector and simultaneous receive priority");
+			if (m_case != 1)
+				expect(m_cpu->space(AS_DATA).read_word(0x0020) == 0x5678, "backend retained RX payload");
+			if (m_stage == 4)
+			{
+				m_saved.clear();
+				m_saved.seekg(0);
+				expect(machine().save().read_stream(m_saved) == STATERR_NONE, "restore backend and CPU");
+				m_cpu->resume(SUSPEND_REASON_DISABLE);
+			}
+			else
+			{
+				if (++m_case == 3)
+				{
+					osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 handset_audio_claim=0\n");
+					throw emu_fatalerror(0, "C54x backend BSP tests complete");
+				}
+				m_backend->reset_line_w(0);
+				m_stage = 0;
+				m_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+		}
+		++m_stage;
+		m_timer->adjust(attotime::from_usec(100));
+	}
+	required_device<nokia_dsp_c54x_device> m_backend;
+	required_device<tms320c54x_device> m_cpu;
+	emu_timer *m_timer = nullptr;
+	unsigned m_stage = 0, m_case = 0;
+	std::stringstream m_saved;
+};
+
 // Execute the stock flash-staged verifier without supplying a DSP mask ROM.
 // This is a protocol investigation fixture, not an NSM-3 compatibility backend.
 class nsm3_verifier_state : public driver_device
@@ -19911,10 +20023,18 @@ ROM_START(tms54rom4)
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
 ROM_END
 
+ROM_START(tms54bsp)
+	ROM_REGION16_LE(0x20000, "dsp_program", ROMREGION_ERASE00)
+	ROM_REGION16_LE(0x20000, "dsp_data", ROMREGION_ERASE00)
+ROM_END
+
 } // anonymous namespace
 
 SYST(2026, tms54test, 0, 0, test, 0, tms320c54x_test_state, empty_init,
 		"MAME", "TMS320C54x core conformance tests",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, tms54bsp, 0, 0, test, 0, c54x_backend_bsp_test_state, empty_init,
+		"MAME", "C54x native backend completed-frame fixture",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, nsm3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NSM-3 stock staged DSP verifier fixture",

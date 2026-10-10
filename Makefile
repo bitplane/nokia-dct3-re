@@ -18,6 +18,7 @@ MAME_PATCHES := patches/mame-nokia-dct3-driver-name.patch \
 	patches/mame-sound-input-stride.patch \
 	patches/mame-tms320c54x-build.patch \
 	patches/mame-tms320c54x-test.patch \
+	patches/mame-c54x-backend-bsp-test.patch \
 	patches/mame-sed1565-test.patch \
 	patches/mame-nandflash-test.patch \
 	patches/mame-nse5-rom4-compat.patch \
@@ -360,6 +361,7 @@ help:
 	@echo "make evidence-check validate reviewed evidence ledgers and runtime manifests"
 	@echo "make test-tools     run the static-tool and EEPROM-profile unit tests"
 	@echo "make check-c54x-rom4-codec-tone verify native boot serial and physical tone-control boundaries; retains isolated evidence under RUN_DIR"
+	@echo "make check-c54x-backend-bsp verify actual native backend completed-frame interrupts and save/load (no handset clock/audio claim)"
 	@echo "make verify-gsm-a3a8 verify the explicitly profiled laboratory A3/A8 example"
 	@echo "make verify-radio-authentication-boundary reproduce organic 3210 authenticated registration"
 	@echo "make verify-3310-radio-authentication-boundary reproduce organic 3310 authenticated registration"
@@ -1205,6 +1207,10 @@ check-mu4-nand: build
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) nandtest -video none -sound none \
 		-nothrottle -debugger none -log -nonvram_save -seconds_to_run 1 >output.log 2>&1; \
 		cat output.log; cat error.log; grep -q 'nandflash_conformance: PASS' error.log
+
+.PHONY: check-c54x-backend-bsp
+check-c54x-backend-bsp: build
+	$(PYTHON) tools/run_c54x_backend_bsp.py --mame $(MAME_DIR)/mame --output-root tmp
 
 check-c54x-core: build
 	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms

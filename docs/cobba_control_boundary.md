@@ -1084,9 +1084,22 @@ that has not yet been delivered by MAME's scheduler.
 The fixture derives source edges from the standard-mode BSP state's completed
 duplex-frame result with receive-only, transmit-only or both directions
 released. It checks ready transitions and transmitted payload before routing
-them to the CPU. This tests completed-word state plus CPU dispatch; it does
-not exercise the production backend frame-to-source wiring, resident codec
-ISRs, physical frame timing or handset audio. Those remain distinct gates.
+them to the CPU. This tests completed-word state plus CPU dispatch; the
+production backend is covered separately below. Resident codec ISRs,
+physical frame timing and handset audio remain distinct boundaries.
+
+`make check-c54x-backend-bsp` instantiates the actual `nokia_dsp_c54x_device`
+with its ordinary transport, CCONT and COBBA dependencies and blank synthetic
+ROM regions. Synthetic overlay IDLE/vector code exercises receive-only,
+transmit-only and duplex completions through `codec_duplex_frame`, including
+the transmitted/received words, CPU IFR bits, vector entry and simultaneous
+receive priority. Each case saves the backend and CPU after source delivery
+but before dispatch, restores, and repeats the vector and payload checks.
+The mandatory marker is `C54x native backend BSP: PASS cases=3 save_replay=3
+handset_audio_claim=0`. This establishes completed-frame wiring and backend
+state restoration, not a production frame-clock caller, handset ISR,
+COBBA control interpretation or native audio. No physical clock is supplied
+by the fixture's explicit completions.
 The suite also checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The
