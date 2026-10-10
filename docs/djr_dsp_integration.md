@@ -604,8 +604,15 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   clear returns without changing the PCM buffer; set repeats the zero store
   160 times through AR2. The acquired resident hook is a return, but future
   uploaded replacement behavior is outside this bounded contract. Both
-  sequences are byte-pinned and word-mutation tested. The flag's producer
-  and organic call-time value remain unclassified; silence alone must not
+  sequences are byte-pinned and word-mutation tested. The isolated
+  `check-c54x-rom4-fr-encoder` gate also executes the acquired helper with
+  flags `0000/0001/fffe/ffff` at two buffer bases: all 1,280 sample results,
+  16 adjacent guards, return-stack balance and AR2 advancement pass.
+  Its runner requires this result separately from the bit-exact encoder
+  comparison and rejects absent or duplicate completion markers. This is
+  isolated algorithm validation, not an organic handset fixture or proof
+  that speech mode activates. Boot-time flag provenance is mapped below;
+  its organic call-time value remains unclassified. Silence alone must not
   be attributed to a broken encoder or used to force the flag clear.
   A raw operand scan of the checked program image finds 35 `1f2b` words:
   31 bit-test contexts and four write contexts. The whole-word copies at

@@ -18,6 +18,7 @@ DECODER_COMPARISON = "TMS320C54x ROM4 FR decoder comparison: frames=32 samples=5
 ENCODER_PASS = "TMS320C54x ROM4 FR encoder: PASS frames=32 parameters=2432 handset_audio_claim=0"
 ENCODER_COMPLETE = "Fatal error: TMS320C54x ROM4 FR encoder complete"
 ENCODER_COMPARISON = "ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=0"
+PCM_MUTE_PASS = "TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0"
 
 
 def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False):
@@ -33,6 +34,8 @@ def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=Fa
         marker, complete = ENCODER_PASS, ENCODER_COMPLETE
         if lines.count(ENCODER_COMPARISON) != 1:
             raise ValueError("missing unique bit-exact parameter comparison")
+        if lines.count(PCM_MUTE_PASS) != 1:
+            raise ValueError("missing unique native PCM mute buffer-boundary result")
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit {returncode}; expected fixture completion 3")
     if lines.count(marker) != 1 or not lines or lines[-1] != complete:
@@ -53,7 +56,7 @@ def main():
     mode.add_argument("--fr-decoder", action="store_true", help="compare native FR decoding against independent PCM")
     mode.add_argument("--fr-encoder", action="store_true", help="compare native FR encoding against independent parameters")
     args = parser.parse_args()
-    run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=Path.cwd()))
+    run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_"))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",

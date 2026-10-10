@@ -1692,6 +1692,31 @@ private:
 		m_check_timer->adjust(attotime::from_msec(5));
 	}
 
+	void start_rom4_pcm_mute(unsigned index)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		static constexpr u16 flags[] = { 0x0000, 0x0001, 0xfffe, 0xffff };
+		u16 const base = index < 4 ? 0x1500 : 0x1600;
+		data.write_word(base - 1, 0x1357);
+		data.write_word(base + 160, 0x2468);
+		for (unsigned i = 0; i < 160; ++i)
+			data.write_word(base + i, u16(0x8001U + i * 257U));
+		data.write_word(0x1f2b, flags[index % 4]);
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0xa0b8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, base);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 74100 + index;
+		m_check_timer->adjust(attotime::from_msec(5));
+	}
+
 	void start_zero_bk_case(unsigned index)
 	{
 		static constexpr u16 addresses[] = { 0, 1, 0x007f, 0x0100, 0x7fff, 0x8000, 0xfffe, 0xffff };
@@ -19064,6 +19089,28 @@ private:
 			osd_printf_info("ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=%u\n", m_rom4_pcm_mismatches);
 			expect(!m_rom4_pcm_mismatches, "native FR encoder parameters match independent codec");
 			osd_printf_info("TMS320C54x ROM4 FR encoder: PASS frames=32 parameters=2432 handset_audio_claim=0\n");
+			start_rom4_pcm_mute(0);
+			return;
+		}
+		if (m_phase >= 74100 && m_phase < 74108)
+		{
+			unsigned const index = m_phase - 74100;
+			u16 const base = index < 4 ? 0x1500 : 0x1600;
+			bool const muted = index & 1;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"native conditional PCM mute returns with balanced stack");
+			for (unsigned i = 0; i < 160; ++i)
+				expect(data.read_word(base + i) == (muted ? 0 : u16(0x8001U + i * 257U)),
+					"native conditional PCM mute preserves or zeros each sample");
+			expect(data.read_word(base - 1) == 0x1357 && data.read_word(base + 160) == 0x2468,
+				"native conditional PCM mute does not overwrite adjacent words");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) == base + (muted ? 160 : 0),
+				"native conditional PCM mute advances only the muted buffer");
+			if (index < 7) { start_rom4_pcm_mute(index + 1); return; }
+			osd_printf_info("TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 FR encoder complete");
 		}
 		if (m_phase >= 71000 && m_phase < 71879)

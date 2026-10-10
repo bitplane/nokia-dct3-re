@@ -3,14 +3,17 @@ import unittest
 from tools.run_c54x_rom4_crc import COMPLETE, PASS, PACKED_COMPLETE, PACKED_PASS, FR_COMPLETE, FR_PASS, check_result
 from tools.run_c54x_rom4_crc import DECODER_PASS, DECODER_COMPLETE, DECODER_COMPARISON
 from tools.run_c54x_rom4_crc import ENCODER_PASS, ENCODER_COMPLETE, ENCODER_COMPARISON
+from tools.run_c54x_rom4_crc import PCM_MUTE_PASS
 
 
 class Rom4HelperResultTest(unittest.TestCase):
     def test_encoder_completion(self):
-        text = "\n".join((ENCODER_COMPARISON, ENCODER_PASS, ENCODER_COMPLETE))
+        text = "\n".join((ENCODER_COMPARISON, ENCODER_PASS, PCM_MUTE_PASS, ENCODER_COMPLETE))
         check_result(text, 3, fr_encoder=True)
         for invalid in (text.replace("mismatches=0", "mismatches=1"),
                         text.replace(ENCODER_COMPARISON, ""),
+                        text.replace(PCM_MUTE_PASS, ""),
+                        text.replace(PCM_MUTE_PASS, PCM_MUTE_PASS + "\n" + PCM_MUTE_PASS),
                         text.replace(ENCODER_PASS, DECODER_PASS),
                         text.replace(ENCODER_PASS, ENCODER_PASS + "\n" + ENCODER_PASS)):
             with self.subTest(text=invalid), self.assertRaises(ValueError):
