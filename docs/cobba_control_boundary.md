@@ -175,6 +175,22 @@ these results establish neither acquisition nor registration. Next recover
 what the accepted selection publishes and attach an independently generated
 waveform only with explicit lane, scaling and cadence assumptions.
 
+The fresh rotating-input selection trace reproduces 5146 scores and
+nine stores at `0x0ae4`. Those stores increase `0x198d` through
+`060c,0d62,17e5,250e,3589,4885,5efa,77c9,7fff`; AR4=`0x1257`
+and AR5=`0x1266` throughout. Live uploaded code after that store
+maintains candidate-associated records, counters and flags; it does
+not immediately call the MDI publisher. The traced exit `0x0ca3`
+executes twice: once during setup and once at 38.52345 seconds with
+score=`0x7fff`, flags at `0x1266`=`1`, and count at `0x1344`=`500`.
+Its live instructions are `CALL 0x44b6; RET`. Follow-on routine
+`0x0cef` executes zero times. The captured decision stream tests
+`0x1266` bit 1 before branching toward the follow-on path; accepting
+ever-better scores sets bit 0 but does not establish that second flag.
+Consequently these inputs prove candidate selection, not publication
+of acquired radio data. Recover the flag's producer and the follow-on
+branch contract before expecting an MCU acquisition indication.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
