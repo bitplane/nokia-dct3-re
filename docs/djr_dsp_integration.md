@@ -1078,6 +1078,19 @@ channel modes. Their producers, decoder input vectors, and successful
 result predicates remain open; the existence of publication code does
 not supply the physical input needed to execute it successfully.
 
+Two operation producers are byte-pinned to common routine `0x4c6f`:
+`0x9a99` stores its result directly to `0x1950`, while `0x9acc`
+stores its result in `0x194f` through AR2 at `0x9ad5` after a delayed
+mask operation. This indirect store is why a direct-address-store scan
+cannot close selector ownership. Within `0x4c6f`, `0x4c8e` waits for
+data `0x00b1` to reach the selected sample-buffer start plus `0x7c`,
+and `0x4ca3` waits for the final threshold (`0x1b1a` for operation
+`0x40`, otherwise `0x1c24`); both loops use IDLE while waiting.
+The first buffer choices are `0x1a00/0x1b72`. These are recovered
+sample-progress prerequisites, not yet a named DMA register contract.
+The cell's producer and actual sample contents must be established
+before an operation result can be treated as a native radio decode.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
