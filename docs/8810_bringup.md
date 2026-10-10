@@ -41,6 +41,35 @@ portable passive comparison instrument. Complete ownership of the port's
 fields remains a software-research target; this negative control alone does
 not establish a hardware-only blocker.
 
+### Native port-34/35/36 contract
+
+The static port census finds five writes to `0x34` and two reads from
+`0x35`. The following meanings are firmware-consumer contracts, not a
+validated silicon register map:
+
+| Site / field | Recovered use | Remaining uncertainty |
+| --- | --- | --- |
+| Port `0x34` | Data writes at `0x34e8`, `0x34f4`, `0x920a`, `0xb821`, `0xb8bf` | Wire, framing, width and transmit cadence |
+| Port `0x35` | Data reads at `0x8ed8`, `0xb792`; `0x8ed3` feeds the `0x8fxx` framed-byte state machine | Receive-ready cause and data delivery |
+| Port `0x36`, bit `0x2000` | Set permits data writes in `0x34da..0x34f4` and `0xb8b7..0xb8bf` | FIFO depth / holding-register behavior |
+| Bits `0x0600` | `0x8ee8` tests the combined mask; bit `0x0400` selects parser state 4 rather than 2 | Error/event identities and acknowledgement |
+| Bit `0x0080` | Read by parser and buffer-reset policy; parser also sets/clears it in control writeback | Direction and clearing semantics |
+| Bits `0x001e` | Restart temporarily sets them to `0x001c`, then restores them from `0x06f3` | Format/rate/mode meaning |
+| Bits `0x8000` / `0x4000` | Restart writes the former, waits for the latter, then clears the former | Completion source and elapsed time |
+
+The parser at `0x8f41..0x8f86` recognizes byte markers `0x1c` and `0x1e`
+and accumulates bytes into word buffers. This is evidence of a framed data
+path, not an RF sample or PLL-lock contract. AccIF is a candidate owner:
+Nokia's [NSW-5 manual](https://www.manualslib.com/manual/2113842/Nokia-Nsw-5-Series.html)
+identifies a serial accessory DSP-UART, while the
+[NSB-5 manual, System Module pp. 17--18](https://manualmachine.com/nokia/7190/5055290-service-manual/)
+describes AccIF encoding/decoding of infrared pulses on the FBUS path.
+Those are other products' physical descriptions; neither maps ROM4 I/O
+ports `0x34..0x36`. Do not promote the candidate to device ownership until
+the MCU type-`0x4c` producer/service contract or an independent register
+description corroborates that mapping. The completion bit remains unmapped,
+so no reset timer or UART-ready constant is yet justified.
+
 Native TX completion now wakes the MCU pending queue through MAD2 FIQ1.
 IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
 shared-service counters and block uploads, not TX-queue wakeup. FIQ dispatch
