@@ -1204,7 +1204,7 @@ private:
 			{0xe4e9, 1 | dasm::SUPPORTED, "ST      A, *AR3+ || LD *AR4+0%, T"},
 			{0xe623, 1 | dasm::SUPPORTED, "ST      B, *AR5 || LD *AR4, T"},
 			{0xe500, 1, ".word   $E500"},
-			{0xe700, 1, ".word   $E700"},
+			{0xe790, 1, ".word   $E790"},
 		};
 		for (auto const &test : parallel_load_forms)
 		{
@@ -1214,6 +1214,35 @@ private:
 				"Parallel store/load syntax preserves source, destination and dual-memory modifiers");
 		}
 		osd_printf_info("TMS320C54x parallel load disassembler: PASS forms=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned operand = 0; operand < 256; ++operand)
+			{
+				words const frame(pc, 0xee00 | operand, 0x2345);
+				std::ostringstream frame_text, expected;
+				util::stream_format(expected, "FRAME   #%d", operand & 128 ? int(operand) - 256 : int(operand));
+				expect(decoder.disassemble(frame_text, pc, frame, frame) == (1 | dasm::SUPPORTED) &&
+					frame.seen() == 1 && frame_text.str() == expected.str(), "FRAME decoder retains signed immediate values without extensions");
+				words const move(pc, 0xe700 | operand, 0x2345);
+				std::ostringstream move_text;
+				bool const valid = (operand >> 4) <= 8 && (operand & 15) <= 8;
+				expect(decoder.disassemble(move_text, pc, move, move) == (valid ? 1 | dasm::SUPPORTED : 1) && move.seen() == 1,
+					"MVMM decoder admits only the nine documented registers");
+			}
+		vector const frame_move_forms[] = {
+			{0xee80, 1 | dasm::SUPPORTED, "FRAME   #-128"},
+			{0xee7f, 1 | dasm::SUPPORTED, "FRAME   #127"},
+			{0xe781, 1 | dasm::SUPPORTED, "MVMM    SP, AR1"},
+			{0xe718, 1 | dasm::SUPPORTED, "MVMM    AR1, SP"},
+			{0xe723, 1 | dasm::SUPPORTED, "MVMM    AR2, AR3"},
+		};
+		for (auto const &test : frame_move_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"FRAME/MVMM syntax preserves signed endpoints and SP identity");
+		}
+		osd_printf_info("TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

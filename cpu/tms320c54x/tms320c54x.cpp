@@ -321,6 +321,21 @@ public:
 			util::stream_format(stream, "LD      #%d, ASM", immediate);
 			return 1 | SUPPORTED;
 		}
+		if (family == 0xee00)
+		{
+			util::stream_format(stream, "FRAME   #%d", mode & 0x80 ? int(mode) - 256 : int(mode));
+			return 1 | SUPPORTED;
+		}
+		if (family == 0xe700 && (mode >> 4) <= 8 && (mode & 15) <= 8)
+		{
+			stream << "MVMM    ";
+			if ((mode >> 4) == 8) stream << "SP";
+			else util::stream_format(stream, "AR%u", mode >> 4);
+			stream << ", ";
+			if ((mode & 15) == 8) stream << "SP";
+			else util::stream_format(stream, "AR%u", mode & 15);
+			return 1 | SUPPORTED;
+		}
 		if ((op & 0xff00) == 0xec00)
 		{
 			util::stream_format(stream, "RPT     #%u", op & 255);

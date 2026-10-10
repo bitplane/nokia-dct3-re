@@ -1731,7 +1731,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 546 decoded and 80
+promoted to a boundary. Current cold-idle coverage is 560 decoded and 66
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1798,6 +1798,16 @@ combinations and two accumulator-to-T variants across all dual-memory modifiers.
 The gate checks two program pages, bounded reads and four exact syntax examples.
 Its required marker is `TMS320C54x parallel load disassembler: PASS`
 (SPRU172C, ST||LD). Parallel syntax does not establish physical overlap timing.
+
+FRAME decodes all 256 signed eight-bit immediates. MVMM admits only AR0–AR7
+and SP: 81 register pairs, with 175 rejected pairs. Both are one word, checked
+on two program pages; the required marker is
+`TMS320C54x frame/MMR move disassembler: PASS` (SPRU172C, FRAME/MVMM).
+FRAME latency has conflicting primary wording: SPRU172C says no next-instruction
+address latency, while SPRU131G table 7-9 assigns category-I latency 1 and
+category-II latency 0 in compiler mode. Existing execution and its 24-case
+stack-address gate follow the latter detailed table; decoding does not resolve
+that physical-timing discrepancy or justify changing the execution model.
 
 Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
 giving 44 one-word forms checked on two program pages. Non-delayed RC has
