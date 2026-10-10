@@ -2,6 +2,19 @@
 
 ## Current Result
 
+The current native execution boundary is DSP I/O port `0x36`, not an MCU
+message producer. At 3.649008 seconds, resident routine `0x9129..0x9161`
+reads `0x0080`, clears bits 1--4, sets `0x801c`, and writes `0x809c` to
+the port. It then reads the same retained value at `0x913e` and loops at
+`0x9142` while bit `0x4000` is clear. A passive I/O trace confirms the
+write followed by unchanged reads; AR2 is `0x0060` and control word
+`0x06f3` is zero. The backend currently provides only opaque saved storage
+for this port. Completion would leave the loop, clear bit 15, and write
+the port again. The physical block, status-bit ownership, trigger and
+latency are not established. Recover the surrounding port-0/port-36
+transaction and its callers before modeling a ready bit; do not assign
+the port to COBBA or a PLL from the polling shape alone.
+
 Native TX completion now wakes the MCU pending queue through MAD2 FIQ1.
 IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
 shared-service counters and block uploads, not TX-queue wakeup. FIQ dispatch

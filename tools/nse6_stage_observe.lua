@@ -12,6 +12,20 @@ local handles = {}
 local pending_memory_uploads = {}
 local observing_native = false
 if dsp then
+    for _, direction in ipairs({'read', 'write'}) do
+        local sites = {}
+        local install = direction == 'read' and 'install_read_tap' or 'install_write_tap'
+        handles[#handles + 1] = dsp.spaces['io'][install](dsp.spaces['io'], 0x36, 0x36,
+            'nse6_native_port36_' .. direction, function(offset, value, mask)
+                local pc = dsp.state['PC'].value
+                sites[pc] = (sites[pc] or 0) + 1
+                if sites[pc] > 4 then return end
+                machine:logerror(string.format(
+                    'nse6_native_port36: direction=%s value=%04x mask=%04x pc=%04x ar2=%04x control=%04x t=%.9f\n',
+                    direction, value, mask, pc, dsp.state['AR2'].value,
+                    dsp.spaces['data']:read_u16(0x06f3), machine.time:as_double()))
+            end)
+    end
     local completion_sites = {}
     handles[#handles + 1] = dsp.spaces['io']:install_write_tap(1, 1,
         'nse6_native_completion_bits', function(offset, value, mask)
