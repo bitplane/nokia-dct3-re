@@ -698,6 +698,32 @@ private:
 				"Immediate decoder retains shift and independent accumulators without claiming other families");
 		}
 		osd_printf_info("TMS320C54x immediate ALU disassembler: PASS forms=204 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned word = 0; word < 4608; ++word)
+			{
+				u16 const op = word < 512 ? 0xa400 + word : 0xb000 + word - 512;
+				words const buffer(pc, op, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+					"Dual-memory multiply decoder does not read an extension");
+			}
+		vector const dual_multiply[] = {
+			{0xa43a, 1 | dasm::SUPPORTED, "MPY     *AR5, *AR4+, A"},
+			{0xa5be, 1 | dasm::SUPPORTED, "MPY     *AR5+, *AR4+0%, B"},
+			{0xb03a, 1 | dasm::SUPPORTED, "MAC     *AR5, *AR4+, A, A"},
+			{0xb336, 1 | dasm::SUPPORTED, "MAC     *AR5, *AR4-, B, B"},
+			{0xb736, 1 | dasm::SUPPORTED, "MACR    *AR5, *AR4-, B, B"},
+			{0xbabe, 1 | dasm::SUPPORTED, "MAS     *AR5+, *AR4+0%, B, A"},
+			{0xbd00, 1 | dasm::SUPPORTED, "MASR    *AR2, *AR2, A, B"},
+		};
+		for (auto const &test : dual_multiply)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == 1,
+				"Dual-memory multiply decoding retains modifiers, rounding and accumulator selectors");
+		}
+		osd_printf_info("TMS320C54x dual multiply disassembler: PASS forms=4608 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

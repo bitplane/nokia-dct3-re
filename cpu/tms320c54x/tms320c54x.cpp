@@ -87,6 +87,20 @@ public:
 				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
 			}
 		};
+		if ((op & 0xfe00) == 0xa400 || (op & 0xf000) == 0xb000)
+		{
+			auto const dual = [&](u8 operand) {
+				static constexpr char const *forms[] = {"*AR%u", "*AR%u-", "*AR%u+", "*AR%u+0%%"};
+				util::stream_format(stream, forms[(operand >> 2) & 3], 2 + (operand & 3));
+			};
+			bool const multiply = (op & 0xfe00) == 0xa400;
+			char const *name = multiply ? "MPY" : BIT(op, 11) ? (BIT(op, 10) ? "MASR" : "MAS") : (BIT(op, 10) ? "MACR" : "MAC");
+			util::stream_format(stream, "%-8s", name);
+			dual(op >> 4); stream << ", "; dual(op);
+			if (!multiply) util::stream_format(stream, ", %c", BIT(op, 9) ? 'B' : 'A');
+			util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
 		if (family <= 0x0f00)
 		{
 			static constexpr char const *names[] = {"ADD", "ADDS", "ADD", "ADDC", "SUB", "SUBS", "SUB", "SUBB"};
