@@ -1321,6 +1321,33 @@ private:
 							"Accumulator AND/OR decoder preserves signed shifts and both selectors without extensions");
 					}
 		osd_printf_info("TMS320C54x accumulator logical disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x2000, 0x2100, 0x2200, 0x2300, 0x2400, 0x2500, 0x3400})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+						"Memory multiply and BITT decoders bound source address extensions");
+				}
+		vector const multiply_bit_forms[] = {
+			{0x2082, 1 | dasm::SUPPORTED, "MPY     *AR2, A"},
+			{0x218a, 1 | dasm::SUPPORTED, "MPY     *AR2-, B"},
+			{0x22f8, 2 | dasm::SUPPORTED, "MPYR    *($2345), A"},
+			{0x23e2, 2 | dasm::SUPPORTED, "MPYR    *AR2($2345), B"},
+			{0x2494, 1 | dasm::SUPPORTED, "MPYU    *AR4+, A"},
+			{0x2512, 1 | dasm::SUPPORTED, "MPYU    $12, B"},
+			{0x34f8, 2 | dasm::SUPPORTED, "BITT    *($2345)"},
+		};
+		for (auto const &test : multiply_bit_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Memory multiply syntax retains signed/rounded/unsigned distinction and BITT has no accumulator selector");
+		}
+		osd_printf_info("TMS320C54x memory multiply/bit disassembler: PASS forms=1792 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

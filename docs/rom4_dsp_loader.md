@@ -1731,7 +1731,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 579 decoded and 47
+promoted to a boundary. Current cold-idle coverage is 585 decoded and 41
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1829,6 +1829,13 @@ one-word bounded reads on two program pages; the required marker is
 `TMS320C54x accumulator logical disassembler: PASS` (SPRU172C, AND/OR syntax 4).
 This complements the reviewed XOR form without changing logical execution or
 claiming physical pipeline timing.
+
+Smem MPY, MPYR and MPYU retain separate signed/rounded/unsigned mnemonics
+and both destinations; BITT names the T-selected bit test without an accumulator
+operand. All 1,792 addressing forms have bounded one/two-word reads on two
+program pages, with seven exact syntax cases. The required marker is
+`TMS320C54x memory multiply/bit disassembler: PASS` (SPRU172C, MPY syntax 1,
+MPYU and BITT). Arithmetic and timing execution are unchanged.
 
 Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
 giving 44 one-word forms checked on two program pages. Non-delayed RC has

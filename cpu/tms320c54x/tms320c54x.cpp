@@ -215,6 +215,14 @@ public:
 			if (load) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}
+		if ((family >= 0x2000 && family <= 0x2500) || family == 0x3400)
+		{
+			bool const extended = mode >= 0xe0;
+			char const *name = family == 0x3400 ? "BITT" : family >= 0x2400 ? "MPYU" : family >= 0x2200 ? "MPYR" : "MPY";
+			util::stream_format(stream, "%-8s", name); smem(extended ? next_word() : 0);
+			if (family != 0x3400) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family == 0x3000 || family == 0x3200 || family == 0x4600)
 		{
 			bool const extended = mode >= 0xe0;
