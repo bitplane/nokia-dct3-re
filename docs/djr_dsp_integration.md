@@ -485,6 +485,23 @@ contract. Codec labels are useful leads, not grounds to rename unknown
 peripherals or claim native speech. The external reader remains in `/tmp`;
 no reader implementation is imported into the driver.
 
+#### Native carry/XOR helper acceptance
+
+`make check-c54x-rom4-crc-helper` executes acquired program ROM at
+`0x8179..0x8180`, the inner loop called by `0x812f`. It checks 512 cases:
+eight accumulator patterns, both initial carry values, and 1..32 iterations.
+The independent reference rotates the low 32 accumulator bits right through
+carry and XORs `6` when the outgoing bit is set. Native execution agrees on
+the accumulator, carry, scratch accumulator, return PC and stack pointer.
+Only a return-to-IDLE sentinel is fixture code; no handset state or peer
+response is injected. The gate also requires the acquired ROM checksums.
+
+This validates the helper's arithmetic, not the historical label's GSM
+meaning. `0x812f` packs several input words before three helper calls and
+complements a three-bit result. Its packed-input ABI and bit ordering remain
+the next software-only question; neither GSM frame CRC correctness nor
+native speech is established by the inner-loop gate.
+
 The practical software-only route is therefore:
 
 1. preserve the recovered historical volumes and extracted inputs outside Git;

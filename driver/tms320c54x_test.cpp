@@ -1075,6 +1075,12 @@ private:
 				data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "crc-helper"))
+		{
+			start_rom4_crc_helper(0);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "cold"))
 		{
 			m_phase = 4;
@@ -1437,6 +1443,26 @@ private:
 	void stack_mmr_w(offs_t offset, u16 value)
 	{
 		m_stack_mmr[offset] = value;
+	}
+
+	void start_rom4_crc_helper(unsigned index)
+	{
+		// Only the return sentinel is fixture code; 8179..8180 stays acquired ROM.
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		m_cpu->space(AS_DATA).write_word(0x1ec3, 0x0f00);
+		static constexpr u32 seeds[] = { 0, 1, 7, 0x80000000, 0xffffffff,
+			0x12345678, 0xaaaaaaaa, 0x55555555 };
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x8179);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, seeds[index / 64]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BRC, (index / 2) % 32);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, index & 1 ? 0x0800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 63000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
 	void rom4_program_map(address_map &map) ATTR_COLD
@@ -18546,6 +18572,32 @@ private:
 			start_idle_wake_case(0);
 			return;
 		}
+		if (m_phase >= 63000 && m_phase < 63512)
+		{
+			unsigned const index = m_phase - 63000;
+			static constexpr u32 seeds[] = { 0, 1, 7, 0x80000000, 0xffffffff,
+				0x12345678, 0xaaaaaaaa, 0x55555555 };
+			u32 expected = seeds[index / 64];
+			unsigned carry = index & 1;
+			for (unsigned bit = 0; bit <= (index / 2) % 32; ++bit)
+			{
+				unsigned const outgoing = expected & 1;
+				expected = (expected >> 1) | (carry << 31);
+				if (outgoing) expected ^= 6;
+				carry = outgoing;
+			}
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == expected &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 6 &&
+				((m_cpu->state_int(tms320c54x_device::STATE_ST0) >> 11) & 1) == carry,
+				"acquired ROM4 8179 carry/XOR helper arithmetic and return contract");
+			if (index < 511) { start_rom4_crc_helper(index + 1); return; }
+			osd_printf_info("TMS320C54x ROM4 CRC helper: PASS cases=512 gsm_packing_claim=0 speech_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 CRC helper complete");
+		}
 		if (m_phase == 4)
 		{
 			if (!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
@@ -19063,6 +19115,7 @@ ROM_END
 ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(0, "entry", "Transform-entry snapshot")
 	ROM_SYSTEM_BIOS(1, "cold", "Cold reset from mask ROM and DROM")
+	ROM_SYSTEM_BIOS(2, "crc-helper", "Isolated acquired ROM carry/XOR helper")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -19070,6 +19123,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(1))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(2))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -19077,6 +19133,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(1))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(2))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))

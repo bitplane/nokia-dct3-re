@@ -1209,6 +1209,10 @@ check-mu4-nand: build
 check-c54x-core: build
 	$(PYTHON) tools/run_c54x_core.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms
 
+.PHONY: check-c54x-rom4-crc-helper
+check-c54x-rom4-crc-helper: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms
+
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.
 .PHONY: probe-c54x-timer-boundary
