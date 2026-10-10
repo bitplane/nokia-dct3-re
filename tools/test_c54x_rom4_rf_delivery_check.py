@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_rf_delivery_check import check
+from tools.c54x_rom4_rf_delivery_check import check, check_request, decode_search_bitmap
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -14,6 +14,43 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_request_selection_contract(self):
+        words = [0x10, 0x9800] + [0] * 31
+        words[26] = 0x1000
+        request = "rom4_rf_search_request: t=1.0 ar2=0816 words=" + ",".join(f"{word:04x}" for word in words) + "\n"
+        scan = "rom4_rf_scan_entry: address=3129 t=1.1 selected1867=006d cursor_word=006d\n"
+        self.assertEqual(check_request(request + scan), 109)
+        for text in (scan, request, scan + request,
+                     request + scan.replace("t=1.1", "t=0.9"),
+                     request + scan.replace("selected1867=006d", "selected1867=0001"),
+                     request + scan.replace("cursor_word=006d", "cursor_word=7fff"),
+                     request.replace("words=0010", "words=0011") + scan,
+                     request.replace("1000", "1001") + scan):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                check_request(text)
+
+    def test_captured_bitmap(self):
+        words = [0x10, 0x9800] + [0] * 31
+        words[26] = 0x1000
+        self.assertEqual(decode_search_bitmap(words), [109])
+
+    def test_bitmap_basis(self):
+        for group in range(32):
+            for bit in range(16):
+                words = [0x10, 0] + [0] * 31
+                words[32 - group] = 1 << bit
+                expected = (1 + group * 16 if group < 8 else 512 + (group - 8) * 16) + bit
+                if group == 31 and bit >= 8:
+                    expected_entries = []  # High byte of word 1 is not copied into scratch.
+                else:
+                    expected_entries = [expected]
+                self.assertEqual(decode_search_bitmap(words), expected_entries)
+
+    def test_bitmap_rejects_wrong_contract(self):
+        for words in ([0] * 32, [1] + [0] * 32, [0x10000] + [0] * 32):
+            with self.assertRaises(ValueError):
+                decode_search_bitmap(words)
+
     def test_complete_chain(self):
         self.assertEqual(check(TRACE), ("00101438", "006d"))
 

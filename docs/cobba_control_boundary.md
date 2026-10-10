@@ -312,6 +312,23 @@ entry being overwritten. These words are software search-list entries;
 physical ARFCN interpretation and RF tuning must be tied to the request
 producer rather than inferred from their plausible numeric values.
 
+The native type-`0x1a` request captured at `0x3d5e` contains 33 words:
+control `0010`, then `9800`, with `1000` at zero-based word index 26
+and all remaining words zero. The byte-pinned receiver at `0x3d97`
+copies the low byte of word 1 and words 2..32 into scratch
+`0x1200..0x121f`. With control bit 0 clear, helper `0x48f7/0x4909`
+walks those scratch words backwards, testing bits low-to-high. Its first
+eight words select entries 1..128; the remaining 24 select 512..895.
+The captured bit therefore selects entry 109 (`006d`), matching both
+the live selected-list word and the native response body. This is a
+static general mapping with one live single-bit corroboration, not an
+executed native basis test. The later control `0011` request bypasses
+bitmap expansion and must not be decoded by this rule.
+`c54x_rom4_rf_delivery_check.py --search-list` checks this request-to-list
+correlation; the isolated cold-control runner also requires it. Physical
+band/channel interpretation still requires the MCU request producer and
+RF tuning contract, independently of these numeric list entries.
+
 Publisher entry alone proves call arguments, not delivery. A separate
 fresh eight-second capture reaches the publisher's port-1 doorbell
 instruction at `0x3807` for type `008a`, length 2, at 1.644837058
@@ -336,8 +353,8 @@ at 1.645216538 seconds and its non-discard branch `0x26be3c` at
 Static decoding shows state 1 frees the message; other states clear
 bit 1 at controller offset `0x7c`, rewrite its status to `0x1390`
 (pool `0x26c034`), and post the same object to task 10 via `0x254c84`.
-The post call itself has not yet been observed: a mid-block instruction
-tap is not an absence proof. At function entry R4 still belongs to the
+The narrow post-call tap was silent; the wider capture below establishes
+the actual post. At function entry R4 still belongs to the
 caller; R0 is the message pointer, and the branch observation confirms
 R4 becomes that pointer (`0x101438`).
 An additional repeated run with retained storage observes the actual
@@ -431,8 +448,10 @@ stack object, so attribution to `0x1390` rather than its shared `0x138f`
 case remains unclosed. Counter behavior is an observation discrepancy,
 not an established emulation defect; the additional probes were removed.
 
-The next boundary is task 10's handling of the received status `0x1390` and the
-meaning of the native `006d` body before choosing an operational RF contract. The
+The next boundary is the MCU bitmap producer and the native RF tuning path:
+establish how the selected software entry becomes a physical channel before
+choosing an operational RF input contract. Task 10's downstream handling remains
+independently open. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
 nine accepted stores); it does not validate packet delivery or acquisition.
 The 1523-versus-500 constraint remains a property of the pre-return scan,

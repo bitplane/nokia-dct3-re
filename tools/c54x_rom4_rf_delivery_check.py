@@ -10,6 +10,38 @@ EVENT = re.compile(r"rom4_rf_(\w+): (.*)")
 FIELDS = re.compile(r"(\w+)=([^ ]+)")
 
 
+def decode_search_bitmap(words):
+    """Static 48f7/4909 reference; physical band interpretation is separate."""
+    if len(words) != 33 or any(not 0 <= word <= 0xffff for word in words):
+        raise ValueError("search request requires 33 captured words")
+    if words[0] & 1:
+        raise ValueError("default-range request bypasses bitmap expansion")
+    scratch = [words[1] & 0xff] + words[2:]
+    entries = []
+    for group, word in enumerate(reversed(scratch)):
+        base = 1 + group * 16 if group < 8 else 512 + (group - 8) * 16
+        entries.extend(base + bit for bit in range(16) if word & (1 << bit))
+    return entries
+
+
+def check_request(text):
+    request = re.search(r"rom4_rf_search_request: t=([\d.]+) ar2=[0-9a-f]+ words=([0-9a-f,]+)", text)
+    if request is None:
+        raise ValueError("missing native search request")
+    entries = decode_search_bitmap([int(word, 16) for word in request[2].split(",")])
+    if len(entries) != 1:
+        raise ValueError("single-entry control did not decode exactly one entry")
+    scan = re.search(r"rom4_rf_scan_entry: address=3129 (.*)", text[request.end():])
+    if scan is None:
+        raise ValueError("missing subsequent native scan entry")
+    fields = dict(FIELDS.findall(scan[1]))
+    if float(fields["t"]) < float(request[1]):
+        raise ValueError("scan precedes request")
+    if int(fields["selected1867"], 16) != entries[0] or int(fields["cursor_word"], 16) != entries[0]:
+        raise ValueError("native selected entry differs from request bitmap")
+    return entries[0]
+
+
 def check(text):
     events = []
     for line in text.splitlines():
@@ -62,9 +94,13 @@ def check(text):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
+    parser.add_argument("--search-list", action="store_true", help="also validate the first single-entry request bitmap")
     args = parser.parse_args()
     try:
-        object_address, body = check(args.log.read_text())
+        text = args.log.read_text()
+        object_address, body = check(text)
+        if args.search_list and check_request(text) != int(body, 16):
+            raise ValueError("native response body differs from requested entry")
     except (OSError, ValueError, KeyError) as error:
         print(f"ROM4 RF delivery: FAIL: {error}", file=sys.stderr)
         return 1

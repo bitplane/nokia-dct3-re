@@ -13,6 +13,7 @@ local counter_min, counter_max = 0xffff, 0
 local counter_writers = {}
 local mode_writers = {}
 local message_counts = {}
+local search_requests = 0
 local taps = {}
 local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
@@ -128,7 +129,7 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
 for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
     0x0a5c, 0x0ac2, 0x2420, 0x3129, 0x3130, 0x3132,
     0x3138, 0x313a, 0x313d, 0x313f, 0x3142, 0x314d, 0x3151, 0x3153, 0x315c, 0x316b, 0x37ce,
-    0x37e1, 0x3807,
+    0x37e1, 0x3807, 0x3d5e,
     0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
     0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
     taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(address, address,
@@ -136,6 +137,22 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
             if observing then return end
             local pc = cpu.state["PC"].value
             if pc ~= offset and pc ~= offset + 1 then return end
+            if address == 0x3d5e then
+                search_requests = search_requests + 1
+                if search_requests <= 4 then
+                    local cursor = cpu.state["AR2"].value
+                    local origin = cursor
+                    local words = {}
+                    for index = 1, 33 do
+                        words[#words + 1] = string.format("%04x", memory:read_u16(cursor))
+                        cursor = cursor == 0x0851 and 0x0800 or (cursor + 1) & 0xffff
+                    end
+                    machine:logerror(string.format(
+                        "rom4_rf_search_request: t=%.9f ar2=%04x words=%s\n",
+                        machine.time:as_double(), origin, table.concat(words, ",")))
+                end
+                return
+            end
             if address == 0x37e1 or address == 0x3807 then
                 publication_counts[address] = (publication_counts[address] or 0) + 1
                 if publication_counts[address] <= 16 then
