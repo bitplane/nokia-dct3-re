@@ -341,10 +341,18 @@ public:
 			util::stream_format(stream, "CMPL    %c, %c", BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}
-		if ((op & 0xfce0) == 0xf460 || (op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf0c0)
+		if ((op & 0xfcff) == 0xf480 || (op & 0xfcff) == 0xf481 || (op & 0xfcff) == 0xf482)
+		{
+			char const *name = (op & 255) == 0x80 ? "ADD" : (op & 255) == 0x81 ? "SUB" : "LD";
+			util::stream_format(stream, "%-8s%c, ASM, %c", name, BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xfce0) == 0xf460 || (op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf0c0 ||
+			(op & 0xfce0) == 0xf400 || (op & 0xfce0) == 0xf420)
 		{
 			int const shift = (op & 0x10) ? int(op & 31) - 32 : int(op & 31);
-			char const *name = (op & 0xfce0) == 0xf460 ? "SFTA" : (op & 0xfce0) == 0xf440 ? "LD" : "XOR";
+			char const *name = (op & 0xfce0) == 0xf460 ? "SFTA" : (op & 0xfce0) == 0xf440 ? "LD" :
+				(op & 0xfce0) == 0xf400 ? "ADD" : (op & 0xfce0) == 0xf420 ? "SUB" : "XOR";
 			util::stream_format(stream, "%-8s%c, %d, %c", name, BIT(op, 9) ? 'B' : 'A', shift, BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}

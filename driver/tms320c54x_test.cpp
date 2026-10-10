@@ -1108,6 +1108,22 @@ private:
 					"Normalization/min-max decoder preserves selector width without reading extensions");
 			}
 		osd_printf_info("TMS320C54x normalization disassembler: PASS forms=12 rejected=4 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xf400, 0xf420, 0xf480, 0xf481, 0xf482})
+				for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
+					for (unsigned shift = 0; shift < (family < 0xf480 ? 32U : 1U); ++shift)
+					{
+						words const buffer(pc, family | (accumulators << 8) | shift, 0x2345);
+						std::ostringstream text, expected;
+						char const *name = family == 0xf400 || family == 0xf480 ? "ADD" : family == 0xf482 ? "LD" : "SUB";
+						util::stream_format(expected, "%-8s%c, ", name, accumulators & 2 ? 'B' : 'A');
+						if (family >= 0xf480) expected << "ASM";
+						else expected << (shift & 16 ? int(shift) - 32 : int(shift));
+						util::stream_format(expected, ", %c", accumulators & 1 ? 'B' : 'A');
+						expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) &&
+							buffer.seen() == 1 && text.str() == expected.str(), "Accumulator ALU decoder preserves signed shift and ASM source/destination selectors");
+					}
+		osd_printf_info("TMS320C54x accumulator ALU disassembler: PASS shifts=256 asm=12 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
