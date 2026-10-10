@@ -711,14 +711,15 @@ ring cursors. A fresh four-second native NSE-1 boot initializes `0x6de=0x400`,
 input pointers remain zero. This is evidence that boot alone does not activate
 the speech wrappers, not proof that the runtime activation path is absent.
 
-The four-second fresh-profile RF observation contains four ordered pairs: `2a04/0006`
-twice, `0041/0040`, then `2813/0030`. The added pair comes from request words
+The four-second fresh-profile RF observation contains five ordered pairs:
+`2a04/0006`, `0041/0040`, `2a04/0006`, `2813/0030`, then `0041/0040`.
+The queue-owned `0041/0040` pair comes from request words
 copied by resident `0xa1ba` from `0x216d` into queue `0x1920`; runtime taps
 observe `0x1922=0x41` and `0x1923=0x40` at reported PC `0xa1bc`.
 The slot handler reads them through cursor `0x197d` at `0x370c/0x3710`, then
 advances the cursor. Both producer and consumer sequences are byte-checked.
 
-An isolated A/B test establishes causality: suppressing native TX-completion
+The earlier isolated A/B test established causality: suppressing native TX-completion
 FIQ1 reproduces the old three-pair oracle and terminal TX pointers `0038/0038`;
 restoring it yields four pairs and `0041/0041`. Reverting MAX equality or BK=0
 behavior individually, or removing all memory taps, does not remove the pair.
@@ -729,8 +730,10 @@ assign physical tuning semantics to `0041/0040`.
 The 30-second acceptance profile captures a scan in progress: a fresh run
 receives another queue request at 6.431 seconds, repeats `2a04/0006` twice,
 then writes `2727/0030`, `2728/0030` and subsequent values. Its terminal
-summary records 1,580 port-32 writes, 20,288 frame expiries, 648,288 RF reads,
-PC `09ac` and mode-AC `0004`. The four-write short-run check rejects this
+summary now records 1,519 port-32 writes, 20,282 frame expiries and 648,096 RF
+reads after the architectural BRAF correction. Two isolated cold runs reproduce
+this snapshot; see [the repeat-control acceptance contract](rom4_dsp_loader.md).
+The five-write short-run check rejects this
 run by design. The explicit `--scan-30s` profile instead requires these
 exact counts, all sixteen logged initial writes, the uploaded shorter-reload
 write and the later search-list selector. A fresh isolated rerun reproduces

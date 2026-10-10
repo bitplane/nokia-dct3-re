@@ -3,9 +3,9 @@
 ## Current result
 
 The current native boundary profiles are distinct: the four-second coherent
-boot observes four ordered RF control writes, including the firmware-owned
+boot observes five ordered RF control writes, including the firmware-owned
 `0041/0040` queue item released by TX-completion FIQ1. The 30-second RF
-gate observes the later multi-entry scan in progress (1,580 writes); a
+gate observes the later multi-entry scan in progress (1,519 writes); a
 60-second passive run proves its return at 36.156 seconds, frame-period
 restoration and ordinary receive/FIR queue consumption. Neither establishes
 RF acquisition or handset speech. See
