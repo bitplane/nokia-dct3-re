@@ -74,8 +74,16 @@ stores two high-accumulator output words through AR3 into the
 and emits 16 intermediate words per invocation. This is a software
 word-consumption contract, not proof of four samples per GSM symbol,
 which lane is I/Q, ADC sign extension, or continuous physical cadence.
-Recover coefficient values, arithmetic modes and lane impulse responses
-before converting an independently generated complex waveform to words.
+A fresh provisioned eight-second native run captures the first two loop
+entries at about 1.6402 seconds with ST0=`0x181f`, ST1=`0xe900`, and
+coefficient words at `0x21a9..0x21b0`:
+`0387 11a3 2ad6 4000 4000 2ad6 11a3 0387`.
+In the current C54x core, ST1 bit 8 (SXM) is set, bit 6 (FRCT) is clear,
+and bit 9 (OVM) is clear. These are bounded live observations, not a
+claim that every filter invocation uses the same arithmetic state.
+The passive `c54x_rom4_mode_observe.lua` observer reproduces this capture.
+Recover lane impulse responses and output scaling before converting an
+independently generated complex waveform to words.
 
 ### Product-specific physical buses
 

@@ -94,6 +94,17 @@ for _, address in ipairs(sites) do
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
+                if address == 0x330a and counts[address] <= 2 then
+                    local coefficients = {}
+                    for index = 0, 7 do
+                        coefficients[#coefficients + 1] = string.format("%04x",
+                            memory:read_u16(0x21a9 + index))
+                    end
+                    machine:logerror(string.format(
+                        "rom4_scan_filter: t=%.9f st0=%04x st1=%04x coefficients=%s\n",
+                        machine.time:as_double(), cpu.state["ST0"].value,
+                        cpu.state["ST1"].value, table.concat(coefficients, ",")))
+                end
                 if address == 0x0ad1 then
                     local value = cpu.state["A"].value & 0xffffffffff
                     result_counts.total = result_counts.total + 1
