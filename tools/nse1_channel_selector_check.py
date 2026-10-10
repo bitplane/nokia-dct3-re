@@ -61,6 +61,21 @@ def check_ring_copy(raw):
     return cases
 
 
+def check_request_routes(cpu):
+    """Stop at selected handler entry, before timer/allocator side effects."""
+    cpu.mem_map(0x100000, 0x1000)
+    routes = {0x03ed: 0x20f102, 0x03ef: 0x20f0f2,
+              0x03f1: 0x20f0ec, 0x03f2: 0x20f0e8}
+    for request, target in routes.items():
+        cpu.mem_write(0x100000, request.to_bytes(2, "big"))
+        cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+        cpu.reg_write(UC_ARM_REG_R0, 0x100000)
+        cpu.emu_start(0x20f095, target, count=64)
+        if cpu.reg_read(UC_ARM_REG_PC) != target:
+            raise ValueError(f"request {request:#x} did not select {target:#x}")
+    return len(routes)
+
+
 def expected_selector(first, second):
     alternate = second in (0x20, 0x21)
     choices = {
@@ -105,6 +120,7 @@ def check_image(raw):
     if speech_inputs != {0x21, 0xe4}:
         raise ValueError(f"unexpected c3 input set: {speech_inputs}")
     return {"cases": count, "c3_first_arguments": sorted(speech_inputs),
+            "request_routes": check_request_routes(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

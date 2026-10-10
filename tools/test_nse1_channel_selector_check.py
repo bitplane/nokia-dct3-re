@@ -29,6 +29,7 @@ class ChannelSelectorTests(unittest.TestCase):
         result = check_image(rom.read_bytes())
         self.assertEqual(result["cases"], 65536)
         self.assertEqual(result["ring_copy_start_positions"], 82)
+        self.assertEqual(result["request_routes"], 4)
         self.assertEqual(result["c3_first_arguments"], [0x21, 0xe4])
 
 

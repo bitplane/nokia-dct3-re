@@ -783,8 +783,8 @@ selector values remain unresolved. Neither path yet proves that `0xc3`
 reaches the native pending speech-mode word.
 
 The stack selector has two mapped writers: `0x20ef26..0x20ef32` stores
-`0x80` when controller byte `[R5+6]` is zero; otherwise
-`0x20ef36..0x20ef44` calls `0x20e198` with controller bytes `[R5+7]` and
+`0x80` when incoming request byte `[R5+6]` is zero; otherwise
+`0x20ef36..0x20ef44` calls `0x20e198` with request bytes `[R5+7]` and
 `[R5+0x48]`, then stores its result at `SP+0x3a`. The leaf routine's
 explicit `0xc3` return at `0x20e1c0` selects first argument `0x21`,
 independent of the second argument. Other explicit first-argument cases
@@ -797,7 +797,7 @@ that is not a second evidenced speech mode.
 MCU image's leaf routine with Unicorn and checks all 65,536 byte-input
 pairs, including a bounded clean return. This is an isolated algorithm
 fixture, not a handset-state intervention. The live writers and valid
-domains of controller bytes `6/7/0x48` remain necessary before constructing
+domains of request bytes `6/7/0x48` remain necessary before constructing
 any native traffic assignment fixture.
 
 The native side of that correspondence is byte-checked: `0x387b` consumes
@@ -820,6 +820,19 @@ this is not a live handset transaction. Together with the native parser,
 this establishes object byte `0x0c` -> payload byte 8 -> pending word
 `0x1869`. Valid live controller arguments and traffic assignment remain
 unproved; packet alignment is no longer the open question.
+
+The request object is identifiable independently of selector semantics:
+constructor entry `0x20ebec` saves argument R0 in R5 at `0x20ebfa`.
+Its single candidate direct-BL caller, `0x20f144`, forwards the incoming
+object unchanged from dispatcher `0x20f094` (R0 saved in R5 at `0x20f096`).
+That dispatcher compares the signed object halfword against literal
+`0x03ed` and selects the constructor-containing handler `0x20f102` on
+equality. The isolated checker verifies that route and the neighboring
+`0x03ef/0x03f1/0x03f2` routes before any handler side effects. A direct-BL
+scan finds one candidate caller of the dispatcher, `0x211ca0`, passing
+`[SP+0x18]`; indirect calls remain unclosed. The next producer boundary is
+therefore the incoming `0x03ed` object's fields `6/7/0x48`, not a guessed
+global controller write. No protocol name is assigned to `0x03ed` yet.
 
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
