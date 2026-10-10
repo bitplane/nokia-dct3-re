@@ -35,8 +35,34 @@ public:
 			const data_buffer &opcodes, const data_buffer &params) override
 	{
 		u16 const op = opcodes.r16(pc);
-		auto const next_word = [&]() { return opcodes.r16((pc & 0x7f0000) | u16(pc + 1)); };
+		auto const next_word = [&](unsigned index = 1) { return opcodes.r16((pc & 0x7f0000) | u16(pc + index)); };
 		auto const target = [&]() { return (pc & 0x7f0000) | next_word(); };
+		u8 const mode = op;
+		u16 const family = op & 0xff00;
+		if (family == 0x6800 || family == 0x6900 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
+		{
+			bool const extended = family != 0x7700 && mode >= 0xe0;
+			bool const immediate_first = (family == 0x6800 || family == 0x6900) && mode >= 0xe0 && mode < 0xf8;
+			u16 const immediate = next_word(extended && !immediate_first ? 2 : 1);
+			u16 const offset = extended ? next_word(immediate_first ? 2 : 1) : 0;
+			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x7600 ? "ST" : "STM";
+			util::stream_format(stream, "%-8s#$%04X, ", name, immediate);
+			if (mode < 0x80)
+				util::stream_format(stream, "$%02X", mode);
+			else if (mode >= 0xf8)
+				util::stream_format(stream, "*($%04X)", offset);
+			else if (mode >= 0xe0)
+				util::stream_format(stream, "%sAR%u($%04X)%s", mode < 0xe8 ? "*" : "*+", mode & 7, offset, mode >= 0xf0 ? "%" : "");
+			else
+			{
+				static constexpr char const *forms[] = {
+					"*AR%u", "*AR%u-", "*AR%u+", "*+AR%u", "*AR%u-0B", "*AR%u-0",
+					"*AR%u+0", "*AR%u+0B", "*AR%u-%%", "*AR%u-0%%", "*AR%u+%%", "*AR%u+0%%"
+				};
+				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
+			}
+			return (2 + extended) | SUPPORTED;
+		}
 		if ((op & 0xffe0) == 0xf7c0 || (op & 0xffe0) == 0xf4c0)
 		{
 			util::stream_format(stream, "%s    %u", BIT(op, 8) ? "INTR" : "TRAP", op & 31);

@@ -1608,11 +1608,31 @@ recognizes a Nokia address or loader byte pattern.
 
 The native core disassembler decodes the reviewed branch/call/return,
 repeat, idle, interrupt and status-bit forms, including extended accumulator
-branches and calls. `check-c54x-core` checks 46
+branches and calls. `check-c54x-core` checks 48
 exact encodings at two program addresses, including an extension word crossing
 the 16-bit page boundary. Near targets retain their program page; far targets
 carry their explicit extended address. The native 5110 Phone book menu gate
 also passes with this decoder enabled.
+
+The timer reload/mask families `STM #lk,MMR`, `ST #lk,Smem`,
+`ANDM #lk,Smem` and `ORM #lk,Smem` are decoded as complete two- or
+three-word instructions, with direct, short-indirect, long-offset and absolute
+operands. STM excludes the long-offset/absolute modes forbidden for MMR
+addressing by SPRU131G section 5.6. The gate checks 992 decoded mode encodings
+at ordinary and page-end addresses, all 32 invalid STM/MMR encodings, exact
+extension-read bounds and twelve asymmetric operand/modifier examples.
+Operand ordering matches the reviewed executable decoder fixtures:
+long-offset logical immediates precede the offset; immediate stores and
+absolute logical forms put the address extension first. This agreement is not
+an independent silicon oracle for extension ordering. Evidence is
+`tmp/c54x-literal-boundary-final.log`, requiring
+`TMS320C54x literal disassembler: PASS`. This checks debugger decoding, not
+the runtime legality of every addressing mode or the physical pipeline.
+
+Unknown forms still return a raw one-word display entry without `SUPPORTED`.
+That fallback is not a verified instruction boundary and must not be used to
+populate a future decoded-instruction pipeline. Coverage beyond these families
+is still required before replacing retirement-time interrupt recognition.
 
 This is bounded debugger coverage, not a complete ISA disassembler or new
 execution/timing evidence. Other forms remain unsupported raw words.

@@ -48,19 +48,21 @@ private:
 		class words : public dasm::data_buffer
 		{
 		public:
-			words(u32 pc, u16 op, u16 next) : m_pc(pc), m_op(op), m_next(next) { }
+			words(u32 pc, u16 op, u16 next, u16 third = 0x6789) : m_pc(pc), m_words{op, next, third} { }
 			virtual u16 r16(u32 pc) const override
 			{
-				if (pc == m_pc) return m_op;
-				if (pc == ((m_pc & 0x7f0000) | u16(m_pc + 1))) return m_next;
+				for (unsigned i = 0; i < 3; ++i)
+					if (pc == ((m_pc & 0x7f0000) | u16(m_pc + i))) { m_seen |= 1 << i; return m_words[i]; }
 				throw emu_fatalerror("C54x disassembler read beyond fixture");
 			}
+			u8 seen() const { return m_seen; }
 			virtual u8 r8(u32 pc) const override { throw emu_fatalerror("unexpected byte disassembly read"); }
 			virtual u32 r32(u32 pc) const override { throw emu_fatalerror("unexpected long disassembly read"); }
 			virtual u64 r64(u32 pc) const override { throw emu_fatalerror("unexpected quad disassembly read"); }
 		private:
 			u32 const m_pc;
-			u16 const m_op, m_next;
+			u16 const m_words[3];
+			mutable u8 m_seen = 0;
 		};
 		struct vector { u16 op; u32 result; const char *text; };
 		vector const vectors[] = {
@@ -127,6 +129,40 @@ private:
 			}
 		osd_printf_info("TMS320C54x control disassembler: PASS vectors=%u pages=2\n",
 			unsigned(std::size(vectors)));
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x6800, 0x6900, 0x7600, 0x7700})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					u32 const result = decoder.disassemble(text, pc, buffer, buffer);
+					bool const valid = family != 0x7700 || mode < 0xe0;
+					unsigned const length = valid ? 2 + (family != 0x7700 && mode >= 0xe0) : 1;
+					expect(result == (length | (valid ? dasm::SUPPORTED : 0)) && buffer.seen() == (1U << length) - 1,
+						"Literal disassembly bounds extension reads, wraps within XPC and rejects invalid MMR modes");
+				}
+		vector const literals[] = {
+			{0x7711, 2 | dasm::SUPPORTED, "STM     #$2345, $11"},
+			{0x7781, 2 | dasm::SUPPORTED, "STM     #$2345, *AR1"},
+			{0x7681, 2 | dasm::SUPPORTED, "ST      #$2345, *AR1"},
+			{0x76f8, 3 | dasm::SUPPORTED, "ST      #$6789, *($2345)"},
+			{0x76e1, 3 | dasm::SUPPORTED, "ST      #$6789, *AR1($2345)"},
+			{0x68f8, 3 | dasm::SUPPORTED, "ANDM    #$6789, *($2345)"},
+			{0x68e1, 3 | dasm::SUPPORTED, "ANDM    #$2345, *AR1($6789)"},
+			{0x69e9, 3 | dasm::SUPPORTED, "ORM     #$2345, *+AR1($6789)"},
+			{0x69f1, 3 | dasm::SUPPORTED, "ORM     #$2345, *+AR1($6789)%"},
+			{0x6891, 2 | dasm::SUPPORTED, "ANDM    #$2345, *AR1+"},
+			{0x69d9, 2 | dasm::SUPPORTED, "ORM     #$2345, *AR1+0%"},
+			{0x77e1, 1, ".word   $77E1"},
+		};
+		for (auto const &test : literals)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Literal disassembly preserves asymmetric immediate/offset ordering and indirect modifiers");
+		}
+		osd_printf_info("TMS320C54x literal disassembler: PASS decoded_modes=992 pages=2 invalid_mmr=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
