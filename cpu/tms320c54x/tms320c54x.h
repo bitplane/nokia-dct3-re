@@ -157,7 +157,8 @@ private:
 	u16 m_rtn = 0;
 	u16 m_rptc = 0;
 	u16 m_rpt_address = 0;
-	u16 m_rpt_end = 0xffff;
+	static constexpr u32 REPEAT_END_UNSET = 0x10000;
+	u32 m_rpt_end = REPEAT_END_UNSET; // Every 16-bit PC is a valid repeat endpoint.
 	u16 m_rpt_iteration = 0;
 	bool m_rpt_armed = false;
 	u16 m_delayed_target = 0;

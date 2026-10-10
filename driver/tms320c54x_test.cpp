@@ -42,6 +42,37 @@ private:
 	}
 	bool m_xf_pin = true;
 	unsigned m_xf_publications = 0;
+	void start_repeat_endpoint_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		u16 const body = index % 3 == 0 ? 0x0802 : index % 3 == 1 ? 0xfffd : 0xfffe;
+		bool const long_count = (index / 3) & 1, nmi = index >= 6;
+		u16 const start = body - (long_count ? 2 : 1);
+		program.write_word(0x010000 | start, long_count ? 0xf070 : 0xec02);
+		if (long_count) program.write_word(0x010000 | u16(start + 1), 2);
+		program.write_word(0x010000 | body, 0x7312); // MVMD AR2,dmad
+		program.write_word(0x010000 | u16(body + 1), 0x0600);
+		program.write_word(0x010000 | u16(body + 2), 0xf4e1);
+		program.write_word(nmi ? 0x010004 : 0x010040, 0xf4e1); // Stop at accepted vector.
+		for (unsigned i = 0; i < 4; ++i) data.write_word(0x0600 + i, 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(STATE_GENPC, 0x010000 | start);
+		m_repeat_boundary_requests = 0;
+		m_repeat_boundary_tap.remove();
+		m_repeat_boundary_tap = data.install_write_tap(0x0601, 0x0601, "repeat_final_request",
+			[this, nmi](offs_t, u16 &, u16) {
+				if (!machine().side_effects_disabled() && !m_repeat_boundary_requests++)
+					m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE);
+			});
+		m_phase = 83000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_braf_control_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -19477,6 +19508,26 @@ private:
 				"Architectural BRAF controls repeat cancellation and software loop restoration");
 			if (index < 3) { start_braf_control_case(index + 1); return; }
 			osd_printf_info("TMS320C54x BRAF control: PASS cases=4 clear=RSBX,STM,POPM restored_loop=1\n");
+			start_repeat_endpoint_case(0); return;
+		}
+		if (m_phase >= 83000 && m_phase < 83012)
+		{
+			unsigned const index = m_phase - 83000;
+			u16 const body = index % 3 == 0 ? 0x0802 : index % 3 == 1 ? 0xfffd : 0xfffe;
+			osd_printf_info("C54x repeat endpoint case=%u body=%04x final_word=%04x continuation=%04x\n",
+				index, body, data.read_word(0x0602), data.read_word(0x0fff));
+			expect(m_repeat_boundary_requests == 1 && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Repeat endpoint fixture reaches interrupt vector");
+			expect(data.read_word(0x0600) == 0x1234 && data.read_word(0x0601) == 0x1234 &&
+				data.read_word(0x0602) == 0x1234 && data.read_word(0x0603) == 0xdead &&
+				data.read_word(0x0fff) == u16(body + 2) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+				m_cpu->state_int(STATE_GENPC) == (index >= 6 ? 0x010005 : 0x010041),
+				"Repeat final iteration retains address progression and IRQ/NMI protection at every endpoint");
+			m_repeat_boundary_tap.remove();
+			m_cpu->set_input_line(index >= 6 ? INPUT_LINE_NMI : 0, CLEAR_LINE);
+			if (index < 11) { start_repeat_endpoint_case(index + 1); return; }
+			osd_printf_info("TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -19917,6 +19968,8 @@ private:
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
 	unsigned m_timer_probe_entries = 0;
 	u16 m_timer_probe_return_pc = 0;
+	memory_passthrough_handler m_repeat_boundary_tap;
+	unsigned m_repeat_boundary_requests = 0;
 	memory_passthrough_handler m_xc_irq_tap;
 	unsigned m_xc_irq_fetches = 0;
 	unsigned m_phase = 0;

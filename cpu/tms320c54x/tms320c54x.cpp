@@ -303,7 +303,7 @@ void tms320c54x_device::device_reset()
 	m_rtn = 0;
 	m_rptc = 0;
 	m_rpt_address = 0;
-	m_rpt_end = 0xffff;
+	m_rpt_end = REPEAT_END_UNSET;
 	m_rpt_iteration = 0;
 	m_rpt_armed = false;
 	m_delayed_target = 0;
@@ -931,7 +931,7 @@ void tms320c54x_device::finish_repeats()
 		}
 		else
 		{
-			m_rpt_end = 0xffff;
+			m_rpt_end = REPEAT_END_UNSET;
 			m_rpt_iteration = 0;
 		}
 		return;
@@ -939,7 +939,7 @@ void tms320c54x_device::finish_repeats()
 
 	if (m_rptc)
 	{
-		if (m_rpt_end == 0xffff)
+		if (m_rpt_end == REPEAT_END_UNSET)
 			m_rpt_end = m_pc;
 		if (m_pc == m_rpt_end)
 		{
@@ -948,9 +948,9 @@ void tms320c54x_device::finish_repeats()
 			m_pc = m_rpt_address;
 		}
 	}
-	else if (m_rpt_end != 0xffff && m_pc == m_rpt_end)
+	else if (m_rpt_end != REPEAT_END_UNSET && m_pc == m_rpt_end)
 	{
-		m_rpt_end = 0xffff;
+		m_rpt_end = REPEAT_END_UNSET;
 		m_rpt_iteration = 0;
 	}
 
@@ -982,7 +982,7 @@ bool tms320c54x_device::service_interrupt()
 	// instruction. IFR remains set and is reconsidered at the next legal
 	// instruction boundary. Taking it inside either atomic sequence can skip a
 	// vector prologue's context-save slots and corrupt the return stack.
-	const bool single_repeat_active = m_rpt_armed || m_rptc || m_rpt_end != 0xffff;
+	const bool single_repeat_active = m_rpt_armed || m_rptc || m_rpt_end != REPEAT_END_UNSET;
 	if ((!m_nmi_pending && (BIT(m_st1, 11) || !pending || m_intm_guard)) ||
 			m_delayed_words || m_xc_guard || single_repeat_active)
 		return false;
@@ -1421,7 +1421,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	if ((op & 0xff00) == 0xe000) // FIRS Xmem, Ymem, pmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		const u8 x = op >> 4;
 		const u8 y = op;
@@ -1859,7 +1859,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x4700: // RPT Smem
 		m_rptc = indirect_read(low);
 		m_rpt_address = m_pc;
-		m_rpt_end = 0xffff;
+		m_rpt_end = REPEAT_END_UNSET;
 		m_rpt_iteration = 0;
 		m_rpt_armed = true;
 		m_icount -= low >= 0xe0 ? 3 : 2;
@@ -1896,7 +1896,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x7f00: // WRITA Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		m_program.write_word(physical_program_address(m_a + (repeated ? m_rpt_iteration : 0)),
 				indirect_read(low));
@@ -2167,7 +2167,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0x7100: // MVDK Smem, dmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		u16 value;
 		u16 destination;
@@ -2188,7 +2188,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7300: // MVMD MMR, dmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		data_write(destination, data_read(mmr_address(low)));
@@ -2225,7 +2225,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7000: // MVKD dmad, Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		if (low >= 0xe0 && low < 0xf8)
 		{
@@ -2243,7 +2243,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7200: // MVDM dmad, MMR
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
 		data_write(mmr_address(low), data_read(source));
@@ -2282,7 +2282,7 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0x7800: case 0x7900: // MACP Smem, pmad, A/B
 	case 0x7a00: case 0x7b00: // MACD Smem, pmad, A/B
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		u16 coefficient_address;
 		u16 address;
@@ -2319,7 +2319,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7d00: // MVDP Smem, pmad
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		u16 value;
 		u16 destination;
@@ -2340,7 +2340,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7c00: // MVPD pmad, Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		u16 destination;
 		u16 source;
@@ -2364,7 +2364,7 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x7e00: // READA Smem
 	{
-		const bool repeated = (m_rptc || m_rpt_end != 0xffff) &&
+		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
 		const u16 value = m_program.read_word(physical_program_address(m_a +
 				(repeated ? m_rpt_iteration : 0)));
@@ -2835,7 +2835,7 @@ void tms320c54x_device::execute_one(u16 op)
 		accumulator(BIT(op, 8)) = 0;
 		m_rptc = fetch();
 		m_rpt_address = m_pc;
-		m_rpt_end = 0xffff;
+		m_rpt_end = REPEAT_END_UNSET;
 		m_rpt_iteration = 0;
 		m_rpt_armed = true;
 		--m_icount;
@@ -3066,7 +3066,7 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 			m_rptc = low;
 			m_rpt_address = m_pc;
-			m_rpt_end = 0xffff;
+			m_rpt_end = REPEAT_END_UNSET;
 			m_rpt_iteration = 0;
 			m_rpt_armed = true;
 			return;
@@ -3075,7 +3075,7 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 			m_rptc = fetch();
 			m_rpt_address = m_pc;
-			m_rpt_end = 0xffff;
+			m_rpt_end = REPEAT_END_UNSET;
 			m_rpt_iteration = 0;
 			m_rpt_armed = true;
 			return;

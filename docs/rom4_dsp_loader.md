@@ -822,6 +822,21 @@ store and an interrupt-return sequence: the ISR's stacked PC proves the
 following instruction completed before entry. These fixtures failed before
 the guard was implemented. They do not establish general six-stage pipeline
 drain timing or protect arbitrary writes to ST1.
+Single-repeat endpoints retain every 16-bit PC value: `ffff` is not an
+inactive-state sentinel. Twelve firmware-free `MVMD` cases cover ordinary,
+`ffff` and wrapped `0000` endpoints, compact/long repeat counts, and IRQ/NMI
+requested after the penultimate transfer. All three transfers and their
+destination progression must finish before entry, with the post-body PC
+stacked in the unchanged executing page (SPRU131G sections 6.7 and 6.10.7).
+The previous 16-bit sentinel fails at body `fffd`, leaving the final word
+unwritten and stacking `fffd` in `tmp/c54x-repeat-endpoint-red.log`.
+The internal endpoint uses an out-of-range sentinel and remains save-state
+registered; conformance requires `TMS320C54x repeat endpoints: PASS`.
+All twelve cases pass in `tmp/c54x-repeat-endpoint-green.log`. Native RF
+counts and save-state restoration retain their acceptance contracts in
+`tmp/c54x-repeat-endpoint-regression.log`; the timer observer still shows
+short-period starvation. This is repeat-state/protection evidence, not
+physical pipeline latency or recorder completion.
 Block-repeat activation follows architectural ST1.BRAF, not a separate
 private latch (SPRU131G section 6.8). Clearing BRAF through `RSBX`, `STM`
 or `POPM` cancels looping without consuming another BRC iteration; restoring
