@@ -11,6 +11,7 @@ REQUIRED = [
     "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
     "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1",
     "TMS320C54x native gap branch/address: PASS words=6 cases=12 zero_nonzero=1 ar0_signed=1 stores=low,high",
+    "TMS320C54x native gap math: PASS words=4 cases=8 sxm=0,1 frct=0,1 carry=0,1",
     "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0",
     "TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi",
     "TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long",

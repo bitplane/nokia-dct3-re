@@ -1714,9 +1714,9 @@ The current native cold-idle inventory is 626 words in 110 high-byte groups,
 SHA-256 `05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59`.
 Two isolated controls (`tmp/c54x-frontend-idle-a` and `-b`) reproduce the full
 ranked report exactly. The existing 594-word gate expectation is now stale
-and remains intentionally unrebanked: current fixture coverage is 610 asserted,
-one execution-only (`9a5f`) and 15 absent words. High-use absent forms begin
-with `f67b`, `3185`, `f301` and `f648`.
+and remains intentionally unrebanked: current fixture coverage is 614 asserted,
+one execution-only (`9a5f`) and 11 absent words. High-use absent forms begin
+with `6b82` and `4583`; the other remaining words occur once in this trace.
 Earlier 594-word closure statements below apply to that earlier trace, not
 the current native execution set.
 
@@ -1750,6 +1750,14 @@ accumulators are also checked. The core runner requires
 seconds because the expanded fixture chain exceeds the former one-second
 limit; completion still requires every marker and the intentional terminal
 exit, never a timeout. No instruction timing is changed by this deadline.
+
+Eight cases additionally assert `f67b` (`SFTA B,-5,A`) under both SXM
+settings, `3185` accumulator-high/memory multiply under both FRCT settings,
+`f301/4000` immediate addition with clear/set carry outcomes, and `f648`
+(`LD B,8,A`) with positive/negative source values. They check full 40-bit
+results, carry, T publication, unchanged source/memory and AR5. The required
+marker is `TMS320C54x native gap math: PASS`. Overflow/saturation boundaries
+and physical stage timing are not established by these selected operands.
 
 ### Debugger control-flow decoding
 
