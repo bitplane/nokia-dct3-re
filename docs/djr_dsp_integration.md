@@ -466,13 +466,13 @@ opens it and enumerates 132 names:
 python /tmp/nse1-pyidbutil/idbtool.py --names /tmp/nse1-rom4-annotations/dsp_full.idb
 ```
 
-Relevant original annotations, still requiring independent verification:
+Relevant original annotations and their current validation scope:
 
 | DSP address | Original label | Evidence use |
 | --- | --- | --- |
 | Data `0x32` | `SPC1` | Candidate second serial-control register; not proof of MAD2 board attachment |
 | Data `0x1390` | `FR_prm` | Candidate full-rate parameter buffer |
-| Program `0x80e7` / `0x80ff` | `FR_prm2bits` / `FR_bits2prm` | Candidate native codec packing boundary |
+| Program `0x80e7` / `0x80ff` | `FR_prm2bits` / `FR_bits2prm` | Native FR parameter round trip validated; see packing contract below |
 | Program `0x812f` | `EFR_FR_crc3_AR4` | Candidate CRC helper used by the type-`0x50` buffer consumer |
 | Program `0x8458` / `0x860c` | `FR_decoder` / `FR_coder` | Candidate software-only codec validation entry points, not validated speech |
 | Program `0xc8dc` | `EFR_decoder` | Candidate enhanced-full-rate decoder |
@@ -528,10 +528,37 @@ The first execution exposed missing `ROLTC A/B` support in the CPU. Its
 contract is now implemented and checked with 256 core vectors: insert TC,
 export source bit 31 to carry, clear guard bits, preserve TC and other status.
 
-This establishes the packed routine's CRC arithmetic, not that a complete
-speech frame reaches it with the correct GSM importance ordering. Connecting
-the packed buffer to `0x80e7` / `0x80ff` and the speech codec remains the next
-software-only boundary. No native speech or end-to-end call claim follows.
+This establishes the packed routine's CRC arithmetic. The parameter packing
+gate below connects its protected input to GSM importance ordering; the
+speech codec and handset delivery remain separate boundaries. No native
+speech or end-to-end call claim follows.
+
+#### Native FR parameter packing
+
+`make check-c54x-rom4-fr-packing` runs acquired routines `0x80e7` (pack),
+`0x812f` (CRC) and `0x80ff` (unpack), in that order. The parameter buffer
+contains the 76 standard full-rate parameters in serial order; `AR3` points
+to it and `AR4` points to a 17-word packed buffer. The shared DROM table at
+`0xb205` has 272 entries: its high byte selects the parameter word and its
+low nibble selects source bit `15-n`. Output consumes each group of sixteen
+entries MSB first. The table carries 260 speech bits, three parameter-word-0
+bits 13..15 reserved for parity, and nine zero-padding references to
+parameter-word-1 bit 15. This is a DSP storage format, not a libgsm 33-byte
+frame or a complete over-air channel-coded block.
+
+The gate passes all 260 serial speech-bit basis vectors, an all-zero frame,
+and 32 deterministic mixed frames (293 vectors). It verifies every packed
+word against the acquired table, compares the CRC's 50-bit input stream
+against the independent `gsm::tch_f::importance_order` reference, checks
+native CRC against polynomial division, and recovers all 76 parameters
+through native unpacking. Each call must return with a balanced stack.
+The fixture's 1 ms observation interval is a bounded execution allowance,
+not a peripheral-latency or cycle-accuracy claim.
+
+The next software-only boundary is the codec's PCM/parameter ABI and state
+initialization at the candidate `0x8458` / `0x860c` entries. Parameter packing
+and CRC tests do not prove those codec routines, handset audio delivery or
+native speech.
 
 The practical software-only route is therefore:
 

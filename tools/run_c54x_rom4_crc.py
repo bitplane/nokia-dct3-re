@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run acquired ROM4 helper arithmetic, not a handset or speech fixture."""
+"""Run acquired ROM4 CRC/parameter packing, not a handset or speech fixture."""
 import argparse
 from pathlib import Path
 import subprocess
@@ -10,11 +10,15 @@ PASS = "TMS320C54x ROM4 CRC helper: PASS cases=512 gsm_packing_claim=0 speech_cl
 COMPLETE = "Fatal error: TMS320C54x ROM4 CRC helper complete"
 PACKED_PASS = "TMS320C54x ROM4 packed CRC: PASS cases=516 basis_bits=192 gsm_crc_claim=1 speech_claim=0"
 PACKED_COMPLETE = "Fatal error: TMS320C54x ROM4 packed CRC complete"
+FR_PASS = "TMS320C54x ROM4 FR packing: PASS vectors=293 basis_bits=260 protected_bits=50 speech_claim=0"
+FR_COMPLETE = "Fatal error: TMS320C54x ROM4 FR packing complete"
 
 
-def check_result(text, returncode, packed=False):
+def check_result(text, returncode, packed=False, fr_packing=False):
     lines = text.splitlines()
     marker, complete = (PACKED_PASS, PACKED_COMPLETE) if packed else (PASS, COMPLETE)
+    if fr_packing:
+        marker, complete = FR_PASS, FR_COMPLETE
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit {returncode}; expected fixture completion 3")
     if lines.count(marker) != 1 or not lines or lines[-1] != complete:
@@ -29,20 +33,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mame", type=Path, required=True)
     parser.add_argument("--rompath", type=Path, required=True)
-    parser.add_argument("--packed", action="store_true", help="validate the outer packed-input CRC routine")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--packed", action="store_true", help="validate the outer packed-input CRC routine")
+    mode.add_argument("--fr-packing", action="store_true", help="validate FR parameter packing, CRC and unpacking")
     args = parser.parse_args()
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=Path.cwd()))
-    command = [str(args.mame.resolve()), "tms54rom4", "-bios", "crc-packed" if args.packed else "crc-helper",
+    bios = "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
+    command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
-               "-seconds_to_run", "1"]
+               "-seconds_to_run", "2"]
     print(f"ROM4 helper evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, args.packed)
+        check_result(text, result.returncode, args.packed, args.fr_packing)
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1

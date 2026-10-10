@@ -8,6 +8,7 @@
 #include "cpu/tms320c54x/tms320c54x.h"
 #include "nokia_dspif.h"
 #include "nokia_cobba.h"
+#include "gsm_tch_f_l1.h"
 #include "tms320c54x_mcbsp.h"
 #include "tms320c54x_dma.h"
 #include <sstream>
@@ -1075,6 +1076,12 @@ private:
 				data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "fr-packing"))
+		{
+			start_rom4_fr_packing(0, 0);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "crc-packed"))
 		{
 			start_rom4_crc_packed(0);
@@ -1514,6 +1521,59 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = 64000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
+	static gsm::tch_f::speech_bits rom4_fr_parameters(unsigned vector, u16 (&words)[76])
+	{
+		static constexpr unsigned widths[] = {
+			6, 6, 5, 5, 4, 4, 3, 3,
+			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+		};
+		gsm::tch_f::speech_bits serial{};
+		u32 random = 0x9e3779b9U ^ vector;
+		unsigned position = 0;
+		for (unsigned p = 0; p < 76; ++p)
+		{
+			words[p] = 0;
+			for (unsigned bit = 0; bit < widths[p]; ++bit, ++position)
+			{
+				random ^= random << 13;
+				random ^= random >> 17;
+				random ^= random << 5;
+				serial[position] = vector < 260 ? position == vector : vector == 260 ? 0 : random & 1;
+				words[p] = (words[p] << 1) | serial[position];
+			}
+		}
+		return serial;
+	}
+
+	void start_rom4_fr_packing(unsigned vector, unsigned stage)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (!stage)
+		{
+			u16 parameters[76];
+			rom4_fr_parameters(vector, parameters);
+			for (unsigned i = 0; i < 76; ++i) data.write_word(0x1400 + i, parameters[i]);
+			for (unsigned i = 0; i < 17; ++i) data.write_word(0x1500 + i, 0xdead);
+		}
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, stage == 0 ? 0x80e7 : stage == 1 ? 0x812f : 0x80ff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x1400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 71000 + vector * 3 + stage;
+		m_check_timer->adjust(attotime::from_msec(1));
 	}
 
 	void start_roltc_case(unsigned index)
@@ -18661,6 +18721,59 @@ private:
 			start_idle_wake_case(0);
 			return;
 		}
+		if (m_phase >= 71000 && m_phase < 71879)
+		{
+			unsigned const vector = (m_phase - 71000) / 3;
+			unsigned const stage = (m_phase - 71000) % 3;
+			auto &data = m_cpu->space(AS_DATA);
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+				osd_printf_info("ROM4 FR packing stop: vector=%u stage=%u pc=%04x illegal=%u sp=%04x\n",
+					vector, stage, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"native FR packing/CRC/unpacking reaches the return sentinel");
+			u16 parameters[76];
+			auto const serial = rom4_fr_parameters(vector, parameters);
+			u16 packed[12];
+			for (unsigned i = 0; i < 12; ++i) packed[i] = data.read_word(0x1500 + i);
+			if (stage == 0)
+			{
+				for (unsigned w = 0; w < 17; ++w)
+				{
+					u16 expected = 0;
+					for (unsigned bit = 0; bit < 16; ++bit)
+					{
+						u16 const entry = data.read_word(0xb205 + w * 16 + bit);
+						expect((entry >> 8) < 76, "FR table parameter offset bound");
+						expected = (expected << 1) | BIT(parameters[entry >> 8], 15 - (entry & 15));
+					}
+					expect(data.read_word(0x1500 + w) == expected, "native FR table packing");
+				}
+				auto const importance = gsm::tch_f::importance_order(serial);
+				u16 const combined = u16((packed[10] >> 9) | (packed[11] << 7));
+				for (unsigned j = 0; j < 16; ++j)
+				{
+					expect(BIT(packed[0], j) == importance[j * 2] &&
+						BIT(combined, 15 - j) == importance[j * 2 + 1], "native FR first 32 importance bits");
+				}
+				for (unsigned j = 0; j < 9; ++j)
+					expect(BIT(packed[1], j) == importance[32 + j * 2] &&
+						BIT(packed[10], 8 - j) == importance[33 + j * 2], "native FR final 18 protected bits");
+			}
+			else if (stage == 1)
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == rom4_crc_expected(packed), "native FR packed frame CRC");
+			else
+				for (unsigned i = 0; i < 76; ++i)
+					expect(data.read_word(0x1400 + i) == parameters[i], "native FR parameter round trip");
+			if (stage < 2) { start_rom4_fr_packing(vector, stage + 1); return; }
+			if (vector < 292) { start_rom4_fr_packing(vector + 1, 0); return; }
+			osd_printf_info("TMS320C54x ROM4 FR packing: PASS vectors=293 basis_bits=260 protected_bits=50 speech_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 FR packing complete");
+		}
 		if (m_phase >= 70000 && m_phase < 70256)
 		{
 			unsigned const index = m_phase - 70000;
@@ -19247,6 +19360,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(1, "cold", "Cold reset from mask ROM and DROM")
 	ROM_SYSTEM_BIOS(2, "crc-helper", "Isolated acquired ROM carry/XOR helper")
 	ROM_SYSTEM_BIOS(3, "crc-packed", "Isolated acquired ROM packed CRC")
+	ROM_SYSTEM_BIOS(4, "fr-packing", "Isolated acquired ROM FR parameter round trip")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -19260,6 +19374,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(3))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(4))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -19273,6 +19390,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(3))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(4))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))
