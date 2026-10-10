@@ -9,8 +9,9 @@ import re
 
 
 PACKET = re.compile(
-	r"dspif_transport: (?P<direction>TX consume|RX enqueue) type=(?P<type>[0-9a-f]+) "
-	r"payload=(?P<length>[0-9]+).*? data=(?P<data>[0-9a-f]*) t=(?P<time>[0-9.]+)",
+	r"dspif_transport: (?P<direction>TX consume|DSP consume|RX enqueue) type=(?P<type>[0-9a-f]+) "
+	r"payload=(?P<length>[0-9]+)\s+(?:.*?\s)?data=(?P<data>[0-9a-f]*) "
+	r"(?:.*?\s)?t=(?P<time>[0-9.]+)",
 	re.IGNORECASE,
 )
 NOTIFY = re.compile(r"dspif_transport: FIQ0 notify .* t=(?P<time>[0-9.]+)", re.IGNORECASE)
@@ -90,13 +91,17 @@ def parse(label: str, path: pathlib.Path) -> list[dict]:
 			length = int(match.group("length"))
 			if len(data) != length:
 				raise ValueError(f"{path}: payload length mismatch")
-			direction = "tx" if match.group("direction").lower().startswith("tx") else "rx"
+			native = match.group("direction").lower() == "dsp consume"
+			direction = "tx" if native or match.group("direction").lower().startswith("tx") else "rx"
 			packet_type = int(match.group("type"), 16)
 			semantic, disposition = classify(direction, packet_type, data)
+			if native:
+				disposition = "native ROM consumption observed; semantic label is a vocabulary cross-reference"
 			packets.append({
 				"profile": label, "direction": direction, "type": packet_type,
 				"length": length, "data": data.hex(), "time": float(match.group("time")),
 				"semantic": semantic, "disposition": disposition, "notified": False,
+				"backend": "native" if native else ("hle" if direction == "tx" else "transport"),
 			})
 			continue
 		match = NOTIFY.search(line)
@@ -117,24 +122,24 @@ def render_markdown(items: list[dict]) -> str:
 		f"Profiles: {', '.join(f'`{profile}`' for profile in profiles)}. "
 		f"Observed packets: **{len(items)}**.",
 		"",
-		"This report classifies behavior implemented at the current HLE boundary. "
+		"This report distinguishes native consumption, HLE handling and transport publication. "
 		"A packet marked unmodeled is valid firmware traffic that the HLE presently discards, not evidence that real DSP hardware ignores it.",
-		"Types `0x0d` and `0x3c` are named for their recovered wire structure only: the ROM-4 DSP consumer and physical purpose remain unidentified.",
+		"Semantic labels are vocabulary cross-references, not proof of native handler identity or physical peripheral ownership.",
 		"",
-		"| direction | type | semantic family | disposition | v5.01 | v6.00 | lengths | payload prefix examples |",
-		"| --- | ---: | --- | --- | ---: | ---: | --- | --- |",
+		"| direction | backend | type | semantic family | disposition | " + " | ".join(profiles) + " | lengths | payload prefix examples |",
+		"| --- | --- | ---: | --- | --- | " + " | ".join("---:" for _ in profiles) + " | --- | --- |",
 	]
 	groups = collections.defaultdict(list)
 	for item in items:
-		groups[(item["direction"], item["type"], item["semantic"], item["disposition"])].append(item)
+		groups[(item["direction"], item.get("backend", "unspecified"), item["type"], item["semantic"], item["disposition"])].append(item)
 	for key, group in sorted(groups.items()):
-		direction, packet_type, semantic, disposition = key
+		direction, backend, packet_type, semantic, disposition = key
 		counts = collections.Counter(item["profile"] for item in group)
 		lengths = ", ".join(str(value) for value in sorted({item["length"] for item in group}))
 		examples = sorted({item["data"][:32] for item in group})[:3]
 		lines.append(
-			f"| {direction.upper()} | `0x{packet_type:02x}` | {semantic} | {disposition} | "
-			f"{counts.get('v501', 0)} | {counts.get('v600', 0)} | {lengths} | "
+			f"| {direction.upper()} | {backend} | `0x{packet_type:02x}` | {semantic} | {disposition} | "
+			f"{' | '.join(str(counts.get(profile, 0)) for profile in profiles)} | {lengths} | "
 			f"{', '.join(f'`{value}`' for value in examples)} |"
 		)
 

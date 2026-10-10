@@ -710,6 +710,31 @@ organically produced samples; the observed polling PC is normal inter-frame
 waiting, not a missing producer. Zero-valued modeled RF input does not
 establish acquisition or justify synthetic queue completions.
 
+The pending speech-mode field has an indirect host-owned writer: resident
+`0x3a09` decodes type `0x02` payload words, and `0x3a21..0x3a2b` advances
+AR5 from `0x1868` to store the high byte of the fifth consumed word at
+`0x1869`. The annotated data dispatch table maps index `0xb00f+2` to
+`0x3a09`; the acquired cold-data image independently contains big-endian
+word `0x3a09` at byte offset `0x16022` (data address `0xb011`).
+`0x570f..0x5714` copies eight pending words `0x1863..0x186a` to active
+`0x1830..0x1837`, including this field at `0x1836`. Both instruction
+sequences are byte-checked against the acquired program image. This is
+a legitimate configuration path, not proof that sending an isolated
+type-`0x02` packet can establish an ordinary traffic-channel lifecycle.
+Pending modes are not copied indiscriminately: `0x55a7..0x55c0` selects
+transition tails using the high nibble and low two bits of `0x1869`, with
+the active `0x1836` family selecting additional setup. Multiple tails
+converge on `0x56ef`, which performs the checked pending-to-active copy.
+Resolve the MCU producer, uploaded dispatch interception and copy trigger
+before any handset experiment; do not set `0x1869` or `0x1836` directly.
+A fresh eight-second verbose native NSE-1 run observes no type-`0x02`
+TX publication or consumption. Its type-`0x1a` payloads begin `001098`
+at 1.552444 seconds and `001198` at 6.425143 seconds, both committed by
+MCU PC `0x0027183e`. This bounded boot trace does not close the type-`0x02`
+producer census; it establishes that ordinary initial scanning does not
+activate the mapped speech mode. Traffic assignment and its channel
+configuration must precede a handset speech claim.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

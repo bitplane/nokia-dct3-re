@@ -2,10 +2,27 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tools.dsp_packet_semantics_census import classify, parse
+from tools.dsp_packet_semantics_census import classify, parse, render_markdown
 
 
 class DspPacketSemanticsCensusTest(unittest.TestCase):
+	def test_parse_native_consumption_keeps_backend_distinct(self):
+		with TemporaryDirectory() as directory:
+			path = Path(directory) / "error.log"
+			path.write_text(
+				"dspif_transport: DSP consume type=1a payload=2 data=0011 next=012 t=6.4\n"
+				"dspif_transport: TX consume type=1a payload=2 words=2 consumer=12 data=0011 t=6.5\n")
+			items = parse("nse1", path)
+		self.assertEqual(["tx", "tx"], [item["direction"] for item in items])
+		self.assertEqual(["native", "hle"], [item["backend"] for item in items])
+		self.assertIn("native ROM consumption", items[0]["disposition"])
+		self.assertNotEqual(items[0]["disposition"], items[1]["disposition"])
+		report = render_markdown(items)
+		self.assertIn("| nse1 | lengths |", report)
+		self.assertIn("| TX | native |", report)
+		self.assertIn("| TX | hle |", report)
+		self.assertNotIn("v5.01", report)
+
 	def test_classification(self):
 		self.assertEqual(("service_control_request", "request-derived type-0x74 completion"),
 				classify("tx", 0x70, bytes.fromhex("0d00")))
