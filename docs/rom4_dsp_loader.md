@@ -906,16 +906,20 @@ The next executable timing fixture must distinguish request latching,
 Decode-stage acceptance, memory-write visibility and vector entry. Timer
 requests accepted before a later IMR write must not simply be cancelled by
 that write. The existing short/long-period probe does not resolve this order.
-SPRU131G section 6.10.4 adds an independently observable boundary: IACK
-occurs at the first vector-word fetch and clears the corresponding IFR bit.
-The current core instead clears IFR before its stack write and vector
-transfer. A future stage-aware fixture must therefore observe acceptance,
-the mask write, stack write and first vector fetch separately, including
-IFR at each boundary. It must retain the accepted source/continuation across
-later IMR changes, rather than recomputing acceptance at vector entry.
-This is an implementation constraint, not evidence that the existing timer
-probe has measured physical acknowledgement timing; no aggregate cycle
-constant is changed on this basis.
+SPRU131G section 6.10.4 ties IACK and IFR clearance to the first vector-word
+fetch. The rendered example 7-18 must be read alongside that prose: its
+vector fetch occurs in cycle 6, overlapping `i1` Execute, before the inserted
+INTR's stack write in cycle 7. Therefore moving IFR clearance to the core's
+present post-stack `fetch()` would implement the wrong bus order. The missing
+mechanism includes early vector prefetch and a retained fetched opcode, not
+merely a deferred flag clear or acknowledgement callback. The figure places
+INTR Access/Read/Execute in cycles 5/6/7; the prose's cycles 7--9 describe the
+interrupt overhead before first ISR execution in cycle 10, and must not be
+treated as three later foreground executions. A stage-aware fixture must
+observe acceptance, foreground mask write, vector prefetch, acknowledgement,
+stack write and ISR execution separately. Preserve the accepted source and
+continuation across later IMR changes. Neither the atomic core's fetch tap
+nor its aggregate five-cycle charge measures these physical boundaries.
 An independent return-bus assertion covers `RETF` (`f49b`): SPRU172C
 section 4-141 and SPRU131G example 7-11 specify PC from RTN and an SP
 increment, without reading the stacked PC. A passive tap in the existing
