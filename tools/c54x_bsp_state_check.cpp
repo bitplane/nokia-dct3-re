@@ -23,6 +23,25 @@ int main()
 	port.control_w(0x00c0);
 	frame = port.duplex_frame(0x5555, duplex_output);
 	assert(frame.receive_ready_edge && port.receive_r() == 0x5555);
+	port.control_w(0x0042); // DLB with receiver held in reset.
+	port.transmit_w(0xf234);
+	frame = port.duplex_frame(0, duplex_output);
+	assert(frame.transmitted && frame.transmit_ready_edge && !frame.receive_ready_edge);
+	assert(!port.receive_ready);
+	port.control_w(0x0082); // Transmitter reset cannot drive a looped frame.
+	frame = port.duplex_frame(0x5555, duplex_output);
+	assert(!frame.transmitted && !frame.transmit_ready_edge && !frame.receive_ready_edge);
+	port.control_w(0x00c2);
+	port.transmit_w(0x6789);
+	auto duplex_saved = port;
+	const auto original_frame = port.duplex_frame(0x5555, duplex_output);
+	std::uint16_t restored_output = 0;
+	const auto restored_frame = duplex_saved.duplex_frame(0x5555, restored_output);
+	assert(original_frame.transmitted == restored_frame.transmitted);
+	assert(original_frame.transmit_ready_edge == restored_frame.transmit_ready_edge);
+	assert(original_frame.receive_ready_edge == restored_frame.receive_ready_edge);
+	assert(duplex_output == restored_output && port.control_r() == duplex_saved.control_r());
+	assert(port.receive_r() == duplex_saved.receive_r());
 	port.reset();
 	assert(port.control_r() == 0x0800);
 	for (unsigned value = 0; value <= 0xffff; ++value)

@@ -1055,7 +1055,11 @@ Setting DLB or writing DXR alone produces no receive event. At a supplied
 frame, DLB selects the transmitted word instead of external receive data;
 ordinary reset, sign extension, readiness and unread-word overrun rules
 still apply. Executable helper tests cover all 65,536 values in all four
-formats, absent TX, retained-word underrun and overrun. No production
+formats, absent TX, independently reset RX/TX, retained-word underrun,
+overrun and copied-state frame continuation. The MAME build, native
+tone-control gate and exact 5110 save-state round trip pass with the
+additive interface; these existing gates do not exercise a periodic
+duplex attachment or promote its physical clock relationship. No production
 clock attachment calls the duplex interface yet; the existing independent
 boot-echo TX/RX methods are unchanged. This does not bypass the missing
 receive-clock attachment or establish handset playback.
