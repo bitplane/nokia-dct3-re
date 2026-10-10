@@ -1203,6 +1203,17 @@ not explain a local rejection in this run because the test itself is
 not reached. Caller/scheduling provenance of `0x5514` remains the
 next configuration-side boundary, distinct from valid RF acquisition.
 
+Byte-pinned initialization chain `0x545d` calls `0x481a`, `0x5a34`,
+`0x5514`, `0x5929` and `0x5475`. Its direct caller at `0x5e6a`
+lies in routine `0x5e62`, which later loads callback `0x07fb` and
+calls it indirectly at `0x5eef` (also byte-pinned). A separate
+eight-second passive boot observes zero executions at `0x5e62`,
+`0x5e6a`, `0x545d`, `0x5463` and `0x5eed`, with frame-loop positive
+control `0x33f3` executing 3724 times. The absent configuration is
+therefore already upstream of this enclosing routine in that run.
+These counts are from a reused generated-profile NVRAM directory,
+not a deterministic fresh-storage comparison with earlier runs.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

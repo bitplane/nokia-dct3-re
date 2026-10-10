@@ -55,6 +55,11 @@ MASK_SEQUENCES = {
 }
 SEQUENCES.update(MASK_SEQUENCES)
 SEQUENCES.update({
+    "receive_configuration_initialization_chain": (0x545d, (
+        0xf274, 0x481a, 0x7712, 0x0912, 0xf074, 0x5a34,
+        0xf074, 0x5514, 0xf074, 0x5929, 0xf074, 0x5475)),
+    "receive_callback_indirect_dispatch": (0x5eed, (
+        0x10f8, 0x07fb, 0xf4e3)),
     "receive_configuration_entry_gate": (0x5514, (
         0xf074, 0x23d0, 0x61f8, 0x1949, 0x0008, 0xf820, 0x58a7)),
     "receive_scheduler_selection_active_mode": (0x55b3, (
