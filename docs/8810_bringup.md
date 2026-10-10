@@ -100,6 +100,19 @@ DSP response. The remaining guards also pass in this run. No valid default
 or authentic replacement value for descriptor `0x0607` is established.
 The next boundary is that descriptor's storage/default contract and the
 status reader `0x2a1e3c`, not altering timer delay or suppressing expiration.
+
+The own descriptor resolver `0x2d6b98` uses eight-byte records selected by
+the descriptor's high byte. Group 6's directory entry at `0x2fcb40` points
+to `0x2fc748`; record `0x2fc780` contains `(0x0607, 0x03f2, 1)`.
+The live block read at 31.000221 s reads exactly one byte from EEPROM
+`0x03f2` into `0x122238`, independently confirming this mapping.
+A halfword-aligned Thumb PC-relative literal scan over the `0x170000`-byte
+MCU extent finds two loads of literal `0x0607`: the live selector at
+`0x2c68d8` and initialization at `0x2c6a76`. The latter reads a cached byte,
+tests bit 7, and clears that cache if bit 7 is zero. This establishes another
+policy interpretation, not a default value or exhaustive reader/writer census:
+computed IDs and table-driven callers remain outside that scan. No storage
+fixture is changed on this evidence alone.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
