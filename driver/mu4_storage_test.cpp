@@ -292,6 +292,61 @@ private:
 	{
 		while (count--) { m_mcbsp0->tx_clock_w(!inverted); m_mcbsp0->tx_clock_w(inverted); }
 	}
+	void check_receive_packing(unsigned index)
+	{
+		unsigned const i = index / 6;
+		unsigned const delay = (index / 2) % 3;
+		unsigned const ignore = index % 2;
+		static constexpr unsigned widths[] = {8, 12, 16};
+		unsigned const width = widths[i];
+		u16 const mask = (1U << width) - 1;
+		static constexpr u16 words[] = {0xa55a, 0x5aa5, 0x1357};
+			{
+				for (unsigned gap = 0; gap < 2; ++gap)
+				{
+					receive_setup(i << 5, delay | (ignore ? 4 : 0));
+					unsigned const irqs = m_rx_irqs;
+					unsigned const period = width + gap;
+					std::vector<u16> received;
+					for (unsigned cycle = 0; cycle <= delay + 3 * period; ++cycle)
+					{
+						m_mcbsp0->rx_frame_w(cycle < 3 * period && cycle % period == 0);
+						unsigned const bit = cycle >= delay ? cycle - delay : 3 * period;
+						receive_bit(bit < 3 * period && bit % period < width ? BIT(words[bit / period], width - 1 - bit % period) : 0);
+						if (receive_status() & 2) received.push_back(m_mcbsp0->data_r(1));
+						if (receive_status() & 0xc) fatalerror("McBSP packed receive created a false sync error or overrun");
+					}
+					if (received != std::vector<u16>({u16(words[0] & mask), u16(words[1] & mask), u16(words[2] & mask)}) ||
+						m_rx_irqs != irqs + 3)
+						fatalerror("McBSP packed receive must preserve each complete word and ready edge");
+				}
+				// One clock earlier than the minimum legal frame period.
+				receive_setup(i << 5, delay | (ignore ? 4 : 0), 0, 0x31);
+				unsigned const error_irqs = m_rx_irqs;
+				m_mcbsp0->rx_frame_w(1);
+				for (unsigned cycle = 0; cycle < width - 1; ++cycle)
+				{
+					receive_bit(cycle >= delay ? BIT(words[0], width - 1 - (cycle - delay)) : 0);
+					m_mcbsp0->rx_frame_w(0);
+				}
+				m_mcbsp0->rx_frame_w(1);
+				if (ignore)
+					for (unsigned bit = delay + 1; bit-- > 0; )
+					{
+						receive_bit(BIT(words[0], bit)); m_mcbsp0->rx_frame_w(0);
+					}
+				else
+				{
+					for (unsigned cycle = 0; cycle < delay; ++cycle) { receive_bit(0); m_mcbsp0->rx_frame_w(0); }
+					for (unsigned bit = width; bit-- > 0; ) { receive_bit(BIT(words[1], bit)); m_mcbsp0->rx_frame_w(0); }
+				}
+				receive_bit(0);
+				if ((receive_status() & 0xf) != (ignore ? 3 : 11) ||
+					m_mcbsp0->data_r(1) != ((ignore ? words[0] : words[1]) & mask) || m_rx_irqs != error_irqs + !ignore)
+					fatalerror("McBSP near-boundary premature frame must recover or ignore, not pack normally");
+			}
+		if (index == 17) logerror("mu4_mcbsp_receive_packing: PASS normal_cases=36 premature_cases=18 widths=8,12,16 delays=0,1,2 gaps=0,1 ignore=0,1 exact_words=1 ready_edges=1 no_false_error=1\n");
+	}
 	void check_receive_sync(unsigned i)
 	{
 		unsigned const widths[] = {8, 12, 16};
@@ -2442,7 +2497,44 @@ private:
 			if (m_external_tx_irqs != irqs + 1) fatalerror("MU4 transmit sync restored IRQ did not reassert after clear");
 			external_reg_w(1, 0);
 			logerror("mu4_mcbsp_transmit_sync_restore: PASS partial_xsr=1 queued_dxr=1 sticky_error=1 irq_level=1 no_duplicate_irq=1 physical_bits=1\n");
-			m_saved_dma.str(std::string()); m_phase = 25; machine().schedule_soft_reset(); return;
+			receive_setup(0, 2);
+			m_mcbsp0->rx_frame_w(1); receive_bit(0); m_mcbsp0->rx_frame_w(0); receive_bit(0);
+			for (unsigned bit = 8; bit-- > 2; ) receive_bit(BIT(0x5a, bit));
+			m_mcbsp0->rx_frame_w(1); receive_bit(BIT(0x5a, 1)); m_mcbsp0->rx_frame_w(0);
+			m_phase = 79; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase == 79 || m_phase == 80)
+		{
+			if (!machine().scheduler().can_save()) fatalerror("MU4 packed receive checkpoint has pending synchronized inputs");
+			if (m_phase == 79)
+			{
+				m_saved_dma.str(std::string()); m_saved_dma.clear();
+				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 packed receive save failed");
+			}
+			else
+			{
+				m_saved_dma.clear(); m_saved_dma.seekg(0);
+				if (machine().save().read_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 packed receive restore failed");
+			}
+			unsigned const irqs = m_rx_irqs;
+			receive_bit(BIT(0x5a, 0)); receive_bit(BIT(0xa5, 7));
+			if ((receive_status() & 0xf) != 3 || m_mcbsp0->data_r(1) != 0x5a)
+				fatalerror("MU4 packed receive restoration lost the old word tail");
+			for (unsigned bit = 7; bit-- > 0; ) receive_bit(BIT(0xa5, bit));
+			receive_bit(0);
+			if ((receive_status() & 0xf) != 3 || m_mcbsp0->data_r(1) != 0xa5 || m_rx_irqs != irqs + 2)
+				fatalerror("MU4 packed receive restoration lost the pending frame or its delay");
+			external_reg_w(0, 0);
+			if (m_phase == 79) { m_phase = 80; m_check->adjust(attotime::from_usec(1)); return; }
+			logerror("mu4_mcbsp_receive_packing_restore: PASS old_tail=1 pending_frame=1 exact_words=1 ready_edges=1 no_false_error=1\n");
+			m_saved_dma.str(std::string()); m_phase = 81; m_check->adjust(attotime::from_usec(1)); return;
+		}
+		if (m_phase >= 81 && m_phase <= 98)
+		{
+			// Yield between pin cases so real CPU interrupt synchronization can drain.
+			check_receive_packing(m_phase - 81);
+			if (m_phase < 98) { ++m_phase; m_check->adjust(attotime::from_usec(1)); return; }
+			m_phase = 25; machine().schedule_soft_reset(); return;
 		}
 		if (m_phase >= 25 && m_phase <= 29)
 		{

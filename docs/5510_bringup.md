@@ -1200,9 +1200,9 @@ receive register, readiness event or firmware buffer.
 
 RX registers, pin levels, partial shifts and buffering are saved. Dual phase,
 words wider than 16 bits, companding, loopback/SPI/A-bis receive, RINTM modes
-1/2, terminal frame-overlap packing, active format changes, internal receive
+1/2, transmit terminal frame-overlap packing, active format changes, internal receive
 clocks and reset-activation timing remain unsupported or unvalidated. Unsupported
-active data formats and terminal frame overlap fail explicitly. Mid-word receive
+active data formats and transmit terminal frame overlap fail explicitly. Mid-word receive
 frame recovery and receive overrun are covered by the error-state gates below;
 mid-word transmit-frame recovery is covered by the same error-state gates.
 
@@ -2458,9 +2458,28 @@ save/replay case restores a half-received replacement word with RSYNCERR and
 its IRQ held, checking exact payload replay and no duplicate IRQ edge.
 The full original-storage gate requires `mu4_mcbsp_receive_sync: PASS` and
 `mu4_mcbsp_receive_sync_restore: PASS`; both pass in
-`MU4_STORAGE_RUN_DIR=tmp/mcbsp-rsync-restore`. Terminal frame-overlap packing
-is deliberately fail-closed, not established by these mid-word tests. This
+`MU4_STORAGE_RUN_DIR=tmp/mcbsp-rsync-restore`. These mid-word tests do not
+establish terminal frame packing, which has separate coverage below. This
 is generic McBSP recovery evidence, not recorder completion or native speech.
+
+Receive frame packing follows SPRU302B section 2.3.5.3 and figures 2-23/2-24:
+the minimum frame period is the number of bits in the frame. With data delay
+`D`, an expected FSR can arrive while the previous final word has `B <= D`
+bits left. The receiver finishes that tail and retains the next frame with
+`D-B` delay clocks remaining, without RSYNCERR or discarding either word.
+RFIG ignores premature sync, not this legal overlap. An FSR one clock before
+the minimum period instead uses the documented recovery/ignore contract.
+The pin fixture covers 36 legal three-word streams (8/12/16 bits, delays
+0/1/2, gaps 0/1, both RFIG values) and 18 premature-sync controls, checking
+exact words, ready edges and error status. Save/replay retains a pending
+next frame while the previous word's last bit is still unreceived.
+The original-storage gate requires `mu4_mcbsp_receive_packing: PASS` and
+`mu4_mcbsp_receive_packing_restore: PASS`. Cases yield between scheduler
+callbacks so CPU interrupt synchronization drains normally; interrupt delivery
+is not suppressed. Multiple pending receive frames remain unsupported.
+The full gate passes with `MU4_STORAGE_RUN_DIR=tmp/mcbsp-rxpack-yield`,
+retaining the original storage, native-entry and DMA checks. This validates
+generic serial reception, not native recorder completion or speech.
 
 The TX sync-recovery contract is distinct: SPRU302B section
 2.3.7.5 and figure 2-36 show an early FSX with XFIG clear restarting the

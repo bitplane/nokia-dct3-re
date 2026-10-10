@@ -58,6 +58,8 @@ private:
 	bool m_rx_clock_input = false, m_rx_frame_input = false, m_rx_data_input = false;
 	bool m_rx_frame_seen = false, m_rx_shift_full = false, m_rx_buffer_full = false, m_rx_ready = false, m_rx_overrun = false;
 	bool m_rx_sync_irq = false;
+	bool m_rx_frame_pending = false;
+	u8 m_rx_next_delay = 0;
 	bool m_tx_sync_irq = false;
 	emu_timer *m_bit_timer = nullptr;
 	devcb_write16 m_tx_word_cb;

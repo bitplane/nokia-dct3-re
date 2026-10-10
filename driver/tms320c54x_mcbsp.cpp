@@ -28,6 +28,7 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_rx_frame_seen)); save_item(NAME(m_rx_shift_full)); save_item(NAME(m_rx_buffer_full)); save_item(NAME(m_rx_ready));
 	save_item(NAME(m_rx_overrun));
 	save_item(NAME(m_rx_sync_irq));
+	save_item(NAME(m_rx_frame_pending)); save_item(NAME(m_rx_next_delay));
 	save_item(NAME(m_tx_sync_irq));
 	save_item(NAME(m_internal_clock_stopped)); save_item(NAME(m_paused_bit_time));
 }
@@ -170,6 +171,7 @@ u16 tms320c54x_mcbsp_device::data_r(offs_t offset)
 				// the overwritten RSR word is lost and a new frame is required.
 				m_rx_overrun = m_rx_shift_full = false;
 				m_rx_frame_words = m_rx_bits = m_rx_delay = 0;
+				m_rx_frame_pending = false; m_rx_next_delay = 0;
 			}
 		}
 		return m_rx_word;
@@ -183,6 +185,7 @@ void tms320c54x_mcbsp_device::reset_receiver()
 	m_rx_frame_words = m_rx_bits = m_rx_delay = m_rx_buffer_width = 0;
 	m_rx_frame_seen = m_rx_shift_full = m_rx_buffer_full = false;
 	m_rx_overrun = false;
+	m_rx_frame_pending = false; m_rx_next_delay = 0;
 	m_regs[0] &= ~u16(8);
 	update_receive_error_irq();
 	set_rx_ready(false);
@@ -270,16 +273,22 @@ void tms320c54x_mcbsp_device::rx_clock_w(int state)
 	if (new_frame && !BIT(m_regs[14], 10))
 	{
 		if (!m_rx_frame_words) begin_receive();
+		else if (m_rx_frame_words == 1 && !m_rx_delay && m_rx_bits <= (m_regs[3] & 3))
+		{
+			if (m_rx_frame_pending) fatalerror("McBSP multiple pending receive frames are not implemented");
+			// SPRU302B 2.3.5.3: the next sync may overlap the old word's
+			// tail. Finish it, then apply only the unelapsed new-frame delay.
+			m_rx_frame_pending = true;
+			m_rx_next_delay = (m_regs[3] & 3) - m_rx_bits;
+		}
 		else if (!BIT(m_regs[3], 2))
 		{
-			// Boundary-adjacent frame packing needs a separate overlap model.
-			if (m_rx_frame_words == 1 && m_rx_bits <= (m_regs[3] & 3) + 1)
-				fatalerror("McBSP receive terminal frame overlap is not implemented");
 			// SPRU302B 2.3.7.2: lose the partial RSR and pending RBR,
 			// preserve unread DRR, and restart using the new frame's delay.
 			m_rx_shift_full = m_rx_buffer_full = false;
 			m_rx_completed = m_rx_buffer = 0;
 			m_rx_buffer_width = 0;
+			m_rx_frame_pending = false; m_rx_next_delay = 0;
 			m_regs[0] |= 8;
 			update_receive_error_irq();
 			begin_receive();
@@ -298,6 +307,13 @@ void tms320c54x_mcbsp_device::rx_clock_w(int state)
 		unsigned const width = (m_regs[2] >> 5) & 7;
 		if (width > 2) fatalerror("McBSP receive width changed during a frame");
 		m_rx_bits = widths[width];
+		if (!m_rx_frame_words && m_rx_frame_pending)
+		{
+			u8 const delay = m_rx_next_delay;
+			m_rx_frame_pending = false; m_rx_next_delay = 0;
+			begin_receive();
+			m_rx_delay = delay;
+		}
 	}
 }
 
