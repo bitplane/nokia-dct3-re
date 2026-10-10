@@ -44,13 +44,25 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         return value
     end)
 for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
-    0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
+    0x0a5c, 0x0ac2, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
     0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
     taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(address, address,
         string.format("rf_score_%04x", address), function(offset)
             if observing then return end
             local pc = cpu.state["PC"].value
             if pc ~= offset and pc ~= offset + 1 then return end
+            if address == 0x0a5c or address == 0x0ac2 then
+                publication_counts[address] = (publication_counts[address] or 0) + 1
+                if publication_counts[address] <= 4 then
+                    machine:logerror(string.format(
+                        "rom4_rf_scan_entry: address=%04x t=%.9f a=%010x b=%010x ar1=%04x ar4=%04x active1836=%04x pending1869=%04x flags6bc=%04x mode6fd=%04x\n",
+                        address, machine.time:as_double(), cpu.state["A"].value & 0xffffffffff,
+                        cpu.state["B"].value & 0xffffffffff, cpu.state["AR1"].value,
+                        cpu.state["AR4"].value, memory:read_u16(0x1836), memory:read_u16(0x1869),
+                        memory:read_u16(0x06bc), memory:read_u16(0x06fd)))
+                end
+                return
+            end
             if address >= 0x0b00 and address <= 0x0b4a then
                 publication_counts[address] = (publication_counts[address] or 0) + 1
                 if address == 0x0b0b then
@@ -117,24 +129,26 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
 end
 local stop = emu.add_machine_stop_notifier(function()
     observing = true
+    for _, target in ipairs({0x0b6a, 0x0a5c, 0x0ac2}) do
     for _, space_name in ipairs({"program", "data"}) do
         local space = cpu.spaces[space_name]
         local matches = 0
         for address = 0, 0xffff do
-            if space:read_u16(address) == 0x0b6a then
+            if space:read_u16(address) == target then
                 matches = matches + 1
                 local words = {}
                 for position = math.max(0, address - 4), math.min(0xffff, address + 4) do
                     words[#words + 1] = string.format("%04x", space:read_u16(position))
                 end
                 machine:logerror(string.format(
-                    "rom4_rf_continuation_reference: space=%s address=%04x words=%s\n",
-                    space_name, address, table.concat(words, ",")))
+                    "rom4_rf_continuation_reference: target=%04x space=%s address=%04x words=%s\n",
+                    target, space_name, address, table.concat(words, ",")))
             end
         end
         machine:logerror(string.format(
-            "rom4_rf_continuation_reference_summary: space=%s words=65536 matches=%d exhaustive_dispatch_claim=0\n",
-            space_name, matches))
+            "rom4_rf_continuation_reference_summary: target=%04x space=%s words=65536 matches=%d exhaustive_dispatch_claim=0\n",
+            target, space_name, matches))
+    end
     end
     for _, start in ipairs({0x0a5c, 0x0a9c, 0x0ae4, 0x0b24, 0x0b64, 0x0ba4, 0x0be4, 0x0ca3, 0x0cef, 0x2523, 0x25fe}) do
         local words = {}
@@ -147,7 +161,7 @@ local stop = emu.add_machine_stop_notifier(function()
     for pc, count in pairs(counter_writers) do
         machine:logerror(string.format("rom4_rf_counter_writer_count: pc=%04x count=%d\n", pc, count))
     end
-    for _, address in ipairs({0x0ca3, 0x0cef, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
+    for _, address in ipairs({0x0ca3, 0x0cef, 0x0a5c, 0x0ac2, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
         0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
         machine:logerror(string.format("rom4_rf_selection_tail_count: address=%04x count=%d\n",
             address, publication_counts[address] or 0))

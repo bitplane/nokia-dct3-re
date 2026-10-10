@@ -271,6 +271,21 @@ and that common layout; mutation tests cover every checked word.
 This rules out these constants being introduced by the live-code
 observer or a swapped upload capture. It does not validate all core
 pipeline effects or establish the request's intended physical context.
+The scan-entry census observes `0x0a5c` and the reset at `0x0ac2`
+three times each. At all entries active mode `0x1836`, pending mode
+`0x1869`, and `0x06fd` are zero; A at `0x0a5c` is 12. The final
+live program and data images each contain two exact `0x0a5c` words:
+the restart branch at `0x0b69` and gateway target at `0x2421`.
+The gateway is `GOTO 0x0a5c`, also present in the acquired image.
+Resident sequence `0x3129..0x3133` clears `0x06fd`, calls `0x3198`,
+then calls gateway `0x2420`, and sets `0x06fd=1` only after return.
+Both resident sequences are byte-pinned. Consequently the zero
+`0x06fd` observed in this scan is consistent with the pre-return
+lifecycle, not by itself a missing mode-setting input. Runtime census
+of `0x3130` (call) and `0x3132` (return continuation) remains necessary
+before declaring that gateway stalled or classifying the whole scan
+as ordinary post-boot acquisition. Exact-word scans do not cover
+computed entries or overwritten earlier tables.
 
 ### Product-specific physical buses
 
