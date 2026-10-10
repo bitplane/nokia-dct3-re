@@ -1020,6 +1020,29 @@ private:
 				"MMR move syntax preserves direction without admitting forbidden addressing");
 		}
 		osd_printf_info("TMS320C54x move/stack disassembler: PASS forms=960 rejected=64 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned mode = 0; mode < 256; ++mode)
+			{
+				words const buffer(pc, 0x6b00 | mode, 0x2345, 0x6789);
+				std::ostringstream text;
+				unsigned const length = mode >= 0xe0 ? 3 : 2;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) &&
+					buffer.seen() == (length == 3 ? 7 : 3), "ADDM decoder bounds address and literal extensions");
+			}
+		vector const addm_forms[] = {
+			{0x6b12, 2 | dasm::SUPPORTED, "ADDM    #$2345, $12"},
+			{0x6b8a, 2 | dasm::SUPPORTED, "ADDM    #$2345, *AR2-"},
+			{0x6bea, 3 | dasm::SUPPORTED, "ADDM    #$6789, *+AR2($2345)"},
+			{0x6bf8, 3 | dasm::SUPPORTED, "ADDM    #$6789, *($2345)"},
+		};
+		for (auto const &test : addm_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345, 0x6789);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"ADDM syntax retains displacement-before-immediate layout");
+		}
+		osd_printf_info("TMS320C54x ADDM disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

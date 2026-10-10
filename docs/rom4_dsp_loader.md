@@ -1729,7 +1729,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 497 decoded and 129
+promoted to a boundary. Current cold-idle coverage is 502 decoded and 124
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1739,6 +1739,13 @@ physical Menu and long-power runs, and all 626 union assertions. Menu adds no
 new words; long power executes 625, also adding none. Decoder support remains
 a separate gap: passing execution assertions must not promote unsupported
 raw-word lengths into a pipeline frontend.
+
+ADDM immediate-memory decoding covers all 256 addressing forms on ordinary
+and wrapping program pages, with bounded two/three-word extension reads and
+four exact syntax checks. Long-offset and absolute forms retain address-before-
+literal layout; this is debugger coverage, not a change to arithmetic execution
+or physical pipeline timing. The required gate marker is
+`TMS320C54x ADDM disassembler: PASS` (SPRU172C, ADDM and classes 18A/18B).
 
 Exact acquired `6f95/0e20` (`SUB *AR5+,0,B,A`) and indirect loads `1087`
 (`LD *AR7,A`) and `1182` (`LD *AR2,B`) have six independent execution cases,

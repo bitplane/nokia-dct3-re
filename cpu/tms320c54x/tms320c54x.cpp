@@ -242,13 +242,13 @@ public:
 			}
 			return (2 + extended) | SUPPORTED;
 		}
-		if (family == 0x6800 || family == 0x6900 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
+		if (family == 0x6800 || family == 0x6900 || family == 0x6b00 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
 		{
 			bool const extended = family != 0x7700 && mode >= 0xe0;
 			bool const immediate_first = (family == 0x6800 || family == 0x6900) && mode >= 0xe0 && mode < 0xf8;
 			u16 const immediate = next_word(extended && !immediate_first ? 2 : 1);
 			u16 const offset = extended ? next_word(immediate_first ? 2 : 1) : 0;
-			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x7600 ? "ST" : "STM";
+			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x6b00 ? "ADDM" : family == 0x7600 ? "ST" : "STM";
 			util::stream_format(stream, "%-8s#$%04X, ", name, immediate);
 			smem(offset);
 			return (2 + extended) | SUPPORTED;
