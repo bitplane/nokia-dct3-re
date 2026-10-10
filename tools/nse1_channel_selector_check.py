@@ -477,6 +477,36 @@ def check_type80_dispatch(cpu):
     return 2
 
 
+def check_receive_ring_copy(raw):
+    cpu = Uc(UC_ARCH_ARM, UC_MODE_THUMB | UC_MODE_BIG_ENDIAN)
+    cpu.mem_map(BASE, len(raw))
+    cpu.mem_write(BASE, raw)
+    cpu.mem_map(0x100000, 0x10000)
+    cpu.mem_map(0x10000, 0x1000)
+    payload = bytes(range(24))
+    for cursor in range(100):
+        for available in range(13):
+            cpu.mem_write(0x101ca, (0x80 + cursor).to_bytes(2, "big"))
+            for index in range(12):
+                cpu.mem_write(0x10100 + 2 * ((cursor + index) % 100),
+                              payload[2 * index:2 * index + 2])
+            cpu.mem_write(0x10b500, bytes([0xee]) * 32)
+            cpu.mem_write(0x10f000, (0x10b500).to_bytes(4, "big"))
+            cpu.reg_write(UC_ARM_REG_SP, 0x10f000)
+            cpu.reg_write(UC_ARM_REG_R0, 12)
+            cpu.reg_write(UC_ARM_REG_R4, available + 1)
+            cpu.emu_start(0x271939, 0x27199c, count=1024)
+            if cpu.reg_read(UC_ARM_REG_PC) != 0x27199c:
+                raise ValueError("receive-ring copy did not reach commit boundary")
+            expected = bytes([0xee]) * 4 + payload[:2 * available] + bytes([0xee]) * (28 - 2 * available)
+            if bytes(cpu.mem_read(0x10b500, 32)) != expected:
+                raise ValueError("receive-ring payload copy differs")
+            expected_cursor = 0x80 + (cursor + available) % 100
+            if int.from_bytes(cpu.mem_read(0x101ca, 2), "big") != expected_cursor:
+                raise ValueError("receive-ring consumer cursor differs")
+    return 1300
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -522,6 +552,7 @@ def check_image(raw):
             "rr_record_selection_cases": check_rr_record_selection(cpu),
             "incoming_block_constructor_cases": check_incoming_block_constructors(cpu),
             "type80_dispatch_cases": check_type80_dispatch(cpu),
+            "receive_ring_copy_cases": check_receive_ring_copy(raw),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

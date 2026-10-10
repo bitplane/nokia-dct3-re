@@ -1030,6 +1030,17 @@ also calls `0x26b774` at `0x26bb6e`, whose branch contains constructor
 the type-`0x80` handler statically; it does not yet prove which handler
 branch runs, ring-to-dispatch delivery, or a native DSP type-`0x80` packet.
 
+The dispatcher's receive loop calls `0x27191e` at `0x291d36` when
+draining the shared ring. Its payload-copy fragment is executed in 1,300
+cases: all 100 receive-ring cursors, with 0..12 available payload words
+and a requested 12 words. Unlike the 82-word transmit ring, the receive
+ring spans shared bytes `0x10100..0x101c7`; consumer word cursor
+`0x101ca` ranges `0x80..0xe3`. The fragment clamps to availability,
+copies big-endian words to object offset 4, wraps at the 100-word boundary,
+and commits the resulting consumer cursor. Header decoding/allocation,
+the receive loop's scheduler path, and native DSP publication have not
+been executed as one chain by this check.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

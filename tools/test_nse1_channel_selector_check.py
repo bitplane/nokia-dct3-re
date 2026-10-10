@@ -44,6 +44,7 @@ class ChannelSelectorTests(unittest.TestCase):
         self.assertEqual(result["rr_record_selection_cases"], 4096)
         self.assertEqual(result["incoming_block_constructor_cases"], 768)
         self.assertEqual(result["type80_dispatch_cases"], 2)
+        self.assertEqual(result["receive_ring_copy_cases"], 1300)
         self.assertEqual(result["c3_first_arguments"], [0x21, 0xe4])
 
 
