@@ -200,6 +200,17 @@ reset. This excludes a stalled special-control dispatcher for these inputs.
 Zero flags are an observation, not yet a proven error or permission to
 invent valid identity/security records. Their downstream control meaning
 and relationship to operational RX remain open.
+
+A full-window passive read tap on `0x1f11`, excluding the observer's own
+reads, sees only native PCs `0x4b3a`, `0x4b6f`, `0x4b9b` during the three
+bootstrap read-modify-write operations (and the same three after reset).
+No operational reader appears through 40 s. Static raw-word candidates
+include `0x3de6`, which compares the word against `7` before continuing
+from the type-`0x1b` path, plus indirect range handling near
+`0x49a7/0x4a88`. These are dormant possibilities, not observed blockers:
+no type-`0x1b` consumer is captured in this fixture. Changing the flag or
+provisioning the erased records to satisfy that dormant gate would not be
+an evidenced repair of the live receive-window reset.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
