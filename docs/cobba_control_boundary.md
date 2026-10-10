@@ -43,6 +43,27 @@ an evidenced software write path to this bus rather than infer an ARFCN
 from arbitrary COBBA control values. RF sample encoding remains a separate
 unresolved MFI contract.
 
+### Software RF reference boundary
+
+An independent baseband waveform source is available in
+[OsmoTRX's signal-processing implementation](https://github.com/osmocom/osmo-trx/blob/master/Transceiver52M/sigProcLib.cpp).
+Its `modulateBurst` accepts burst bits and produces a shaped complex
+GMSK signal; `generateDummyBurst` supplies a standard dummy-burst
+input. The [OsmoTRX manual](https://downloads.osmocom.org/docs/osmo-trx/master/osmotrx-usermanual.pdf)
+describes device-specific samples-per-symbol settings. These are
+waveform references, not Nokia register or sample-packing specifications.
+
+The software-only experiment must keep two contracts separate: generate
+known baseband I/Q with an independently validated implementation, then
+adapt it to the recovered Nokia sample lane/order, numeric scaling,
+clock cadence and tuning selection. None of those adapter properties is
+established by selecting OsmoTRX's four-sample setting. Do not transplant
+reference code into the BSD driver; use independently generated fixture
+data with recorded provenance and licensing. First validate the adapter
+against the resident filter's reads and arithmetic, then test acquisition
+with physical-interface input only. A passed energy threshold alone is
+not decoded FCCH/SCH, native registration or native speech.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
