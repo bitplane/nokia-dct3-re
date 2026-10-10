@@ -1330,6 +1330,13 @@ stack-only CALL implementation and passes with RTN assigned before the push
 (`run_c54x_call_rtn_red`, `run_c54x_call_rtn_green`). The four-cycle CALL cost
 is unchanged. This establishes the non-delayed immediate CALL contract, not
 delayed/conditional-call RTN behavior or interrupt-pipeline timing.
+Nondelayed `CALA A/B` also publishes the next-instruction address to RTN.
+Two executable cases pause in the callee, replace its stacked continuation
+with `dead`, then require RETF to return correctly and balance SP without
+reading that sentinel. Both accumulator forms retain their six-cycle charge;
+the core runner requires `TMS320C54x accumulator call fast return: PASS`.
+The former stack-only implementation fails this test. Delayed and far-call
+RTN publication remain separate, unvalidated contracts.
 The same executable case now saves the paused callee with a sentinel stack
 word, completes its fast return, then executes another CALL on page three
 with a different continuation. Restoring the snapshot must recover page two,

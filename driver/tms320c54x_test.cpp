@@ -73,6 +73,21 @@ private:
 		m_phase = 83000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_cala_rtn_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0800, index ? 0xf5e3 : 0xf4e3); // CALA A/B
+		program.write_word(0x0801, 0xf4e1);
+		program.write_word(0x0900, 0xf4e1); // Inspect the paused callee before RETF.
+		program.write_word(0x0901, 0xf49b);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0400);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_phase = 87000 + index * 2;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_operand_fetch_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -19715,6 +19730,30 @@ private:
 			}
 			if (index < 24) { start_operand_fetch_case(index + 1); return; }
 			osd_printf_info("TMS320C54x operand fetch order: PASS cases=25 families=7 forms=direct,indirect,long,absolute\n");
+			start_cala_rtn_case(0); return;
+		}
+		if (m_phase >= 87000 && m_phase < 87004)
+		{
+			unsigned const index = (m_phase - 87000) / 2;
+			auto &data = m_cpu->space(AS_DATA);
+			if (!(m_phase & 1))
+			{
+				expect(m_cpu->state_int(STATE_GENPC) == 0x0901 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x03ff &&
+					data.read_word(0x03ff) == 0x0801, "CALA stacks its continuation");
+				data.write_word(0x03ff, 0xdead);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(STATE_GENPC) == 0x0802 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0400 &&
+				data.read_word(0x03ff) == 0xdead, "CALA publishes RTN independently of its stack word");
+			if (!index) { start_cala_rtn_case(1); return; }
+			osd_printf_info("TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

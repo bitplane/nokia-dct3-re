@@ -2856,6 +2856,7 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xf4e3: // CALA A
 	case 0xf5e3: // CALA B
+		m_rtn = m_pc;
 		push(m_pc);
 		m_pc = u16(accumulator(BIT(op, 8)));
 		m_icount -= 5;
