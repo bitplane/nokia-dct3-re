@@ -1,6 +1,6 @@
 import unittest
 
-from tools.nse6_native_overlay_check import check
+from tools.nse6_native_overlay_check import check, check_memory_uploads
 
 
 def fixture():
@@ -18,6 +18,20 @@ def fixture():
 
 
 class NativeOverlayTests(unittest.TestCase):
+    def test_memory_uploads(self):
+        text = "\n".join(
+            f"nse6_native_memory_readback: address={address:04x} matched=39 words=39 consumed=3.5 t=4.0"
+            for address in (0x2286, 0x22ad, 0x22d4, 0x22fb))
+        self.assertEqual(check_memory_uploads(text), 156)
+        for old, new in (("matched=39", "matched=38"),
+                         ("words=39", "words=38"),
+                         ("address=22ad", "address=22ae"),
+                         ("t=4.0", "t=3.0")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_memory_uploads(text.replace(old, new))
+        with self.assertRaises(ValueError):
+            check_memory_uploads(text.split("\n", 1)[1])
+
     def test_valid(self):
         self.assertEqual(check(fixture())["words"], 24)
 

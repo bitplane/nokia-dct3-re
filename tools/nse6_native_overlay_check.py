@@ -12,6 +12,21 @@ TARGET = re.compile(r"nse6_native_context_target: address=2946 pmst=([0-9a-f]+) 
 SNAPSHOT = re.compile(r"nse6_native_snapshot: pc=[0-9a-f]+ sp=([0-9a-f]+) .*? t=([0-9.]+)")
 DEPTH = re.compile(r"nse6_native_stack_depth: .*? sp=([0-9a-f]+) ")
 INDEX = re.compile(r"nse6_native_rx_index_write: address=([0-9a-f]+) value=([0-9a-f]+) .*? t=([0-9.]+)")
+MEMORY_READBACK = re.compile(r"nse6_native_memory_readback: address=([0-9a-f]+) matched=(\d+) words=(\d+) consumed=([0-9.]+) t=([0-9.]+)")
+
+
+def check_memory_uploads(text):
+    """Check the four measured fragments; this does not establish their use."""
+    records = MEMORY_READBACK.findall(text)
+    if len(records) < 4:
+        raise ValueError("missing native memory-upload readbacks")
+    for record, address in zip(records[:4], (0x2286, 0x22ad, 0x22d4, 0x22fb)):
+        actual, matched, words, consumed, observed = record
+        if int(actual, 16) != address or int(words) != 39 or int(matched) != 39:
+            raise ValueError("native memory-upload span or readback mismatch")
+        if float(observed) <= float(consumed):
+            raise ValueError("memory readback does not follow consumption")
+    return 156
 
 
 def check(text):
@@ -55,13 +70,20 @@ def check(text):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
+    parser.add_argument("--memory-uploads", action="store_true",
+                        help="also require the measured operational data uploads")
     args = parser.parse_args()
     try:
-        result = check(args.log.read_text(errors="replace"))
+        text = args.log.read_text(errors="replace")
+        result = check(text)
+        if args.memory_uploads:
+            check_memory_uploads(text)
     except (OSError, ValueError) as error:
         print(f"NSE-6 native overlay: FAIL {error}", file=sys.stderr)
         return 1
     print(f"NSE-6 native overlay: PASS words={result['words']} snapshots={result['snapshots']} indices={result['indices']}")
+    if args.memory_uploads:
+        print("NSE-6 native memory uploads: PASS fragments=4 words=156")
     return 0
 
 

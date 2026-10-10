@@ -160,6 +160,19 @@ also match after the software reset. This confirms native semantic handling
 of these uploads beyond consumer-index advancement. It does not identify
 the data's use or establish an expected packet response. The operational
 silence must be investigated outside these successfully stored fragments.
+`nse6_native_overlay_check.py --memory-uploads` requires the four contiguous
+39-word readbacks after consumption; mutation tests reject missing fragments,
+wrong spans, mismatches and reversed timing. This remains a data-handling
+gate, not an operational radio or speech acceptance gate.
+
+The native consumer also observes own type-`0x70` control bodies:
+`1304 8547 df11`, `140c` plus six erased words, `1514` plus ten erased
+words, `1618` plus twelve erased words, `0d00`, then `0a09`.
+Their consumption times are 0.473622, 0.473762, 0.478238, 0.482854,
+0.483120 and 2.278256 s. No further type-`0x70` consumer event appears
+before reset in this fixture. This bounds the exercised control sequence;
+it does not assign native command semantics from another MCU build or prove
+that every command received a valid response.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

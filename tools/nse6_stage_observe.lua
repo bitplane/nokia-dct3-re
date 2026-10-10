@@ -68,6 +68,15 @@ if dsp then
             tx_consumptions = tx_consumptions + 1
             local header = dsp.spaces['data']:read_u16(0x0800 + previous)
             local payload = {}
+            if (header & 0xff) == 0x70 and (header >> 8) <= 0x80 then
+                for index = 1, (header >> 8) // 2 do
+                    payload[#payload + 1] = string.format('%04x',
+                        dsp.spaces['data']:read_u16(0x0800 + ((previous + index) % 0x52)))
+                end
+                machine:logerror(string.format(
+                    'nse6_native_control_packet: header=%04x words=%s t=%.9f\n',
+                    header, table.concat(payload, ','), machine.time:as_double()))
+            end
             if (header & 0xff) == 0x51 and (header >> 8) <= 0x80 then
                 local upload = {words = {}, consumed = machine.time:as_double()}
                 for index = 1, (header >> 8) // 2 do
