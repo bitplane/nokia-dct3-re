@@ -624,6 +624,18 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   stays set in this boot/tone lifecycle, while speech mode is inactive;
   this is not evidence of erroneous call-time muting. The gate rejects
   wrong MCU lanes, missing copy order and absent post-key observations.
+  MCU field writer `271d70` receives selector/value in R0/R1, retains
+  them in R4/R6 and dispatches through the 47-entry table at `271da4`.
+  Selector `28` uses table word `271e44 -> 271e9a`, loads destination
+  `100bc` from pool `272214`, and forwards R6 through the common halfword
+  store at `272034`. The fresh capture reports selector `0028`, input
+  and output `df29`, destination `000100bc` and merge mask zero. Thus
+  this publication forwards the supplied word rather than constructing
+  its mute bit. Seven original-MCU byte spans protect entry, dispatch,
+  selected table entry, branch, store and pool; every byte has a negative
+  mutation test. Other selectors are not semantically decoded by that
+  fixture. The remaining predecessor is the caller supplying selector
+  `28`'s value, not an assumed encoding inside the shared writer.
 - The decoder supplies destination `0x1496` before postprocessing at `0x94c9`
   and `0xab7c`; further gain/filter/mute stages precede output copying.
 - `0xaa39` copies from the ring cursor in `0x6de` into the selected input

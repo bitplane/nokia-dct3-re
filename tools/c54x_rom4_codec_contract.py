@@ -517,6 +517,26 @@ def check_tone(text: str) -> None:
         cursor = matches[0]
 
 
+MCU_SPEECH_FIELD_BYTES = {
+    0x271d70: bytes.fromhex("b5f04643b4081c151c0e1c04"),
+    0x271d94: bytes.fromhex("1c20282ed862a102008058084687"),
+    0x271e44: bytes.fromhex("00271e9a"),
+    0x271e9a: bytes.fromhex("4adee7e6"),
+    0x271e6c: bytes.fromhex("1c30e0d6"),
+    0x27201e: bytes.fromhex("2c2ed00946612900d005881146664031430104080c008010"),
+    0x272214: bytes.fromhex("000100bc"),
+}
+
+
+def check_mcu_speech_field(image):
+    """Original big-endian MCU bytes, not the Thumb swap16 analysis image."""
+    for address, expected in MCU_SPEECH_FIELD_BYTES.items():
+        offset = address - 0x200000
+        if image[offset:offset + len(expected)] != expected:
+            raise ValueError(f"MCU speech field contract differs at {address:08x}")
+    return len(MCU_SPEECH_FIELD_BYTES)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
@@ -535,6 +555,7 @@ def main() -> int:
         results = check(args.image.read_bytes())
         if args.mcu_image is not None:
             upload_locations = check_mcu_upload_counters(args.mcu_image.read_bytes())
+            check_mcu_speech_field(args.mcu_image.read_bytes())
         if args.data_image is not None:
             check_schedule_data(args.data_image.read_bytes())
         if args.trace is not None:

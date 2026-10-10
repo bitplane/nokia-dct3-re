@@ -3,9 +3,24 @@ import unittest
 from tools.c54x_rom4_codec_contract import (SEQUENCES, SCHEDULE_LISTS, check,
                                           UPLOADED_COUNTER_BLOCKS, check_mcu_upload_counters,
                                           check_schedule_data, check_trace, check_restore, check_tone)
+from tools.c54x_rom4_codec_contract import MCU_SPEECH_FIELD_BYTES, check_mcu_speech_field
 
 
 class CodecContractTests(unittest.TestCase):
+    def test_mcu_speech_field_bytes_and_every_byte_mutation(self):
+        image = bytearray(0x80000)
+        for address, data in MCU_SPEECH_FIELD_BYTES.items():
+            offset = address - 0x200000
+            image[offset:offset + len(data)] = data
+        self.assertEqual(check_mcu_speech_field(image), len(MCU_SPEECH_FIELD_BYTES))
+        for address, data in MCU_SPEECH_FIELD_BYTES.items():
+            for index in range(len(data)):
+                with self.subTest(address=address, index=index):
+                    changed = bytearray(image)
+                    changed[address - 0x200000 + index] ^= 1
+                    with self.assertRaises(ValueError):
+                        check_mcu_speech_field(changed)
+
     def test_original_upload_counter_blocks(self):
         image = bytearray(0x2000)
         for address, words in UPLOADED_COUNTER_BLOCKS.values():

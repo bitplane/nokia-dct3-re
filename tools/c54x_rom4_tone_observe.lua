@@ -34,6 +34,19 @@ watch(dsp, 'data', 0x085e, 'speech_shared')
 watch(dsp, 'data', 0x1f2b, 'speech_flags')
 -- Program-overlay stores can bypass data-space taps; retain both owners.
 watch(dsp, 'program', 0x1f2b, 'speech_overlay')
+local speech_publications = 0
+taps[#taps + 1] = mcu.spaces['program']:install_write_tap(
+    0x100bc, 0x100bf, 'speech_control_selector', function(_, value, mask)
+        if mask ~= 0xffff0000 or mcu.state['PC'].value ~= 0x272034 then return end
+        speech_publications = speech_publications + 1
+        if speech_publications <= 16 then
+            machine:logerror(string.format(
+                'rom4_speech_control_publish: selector=%04x input=%04x word=%04x destination=%08x merge=%08x lr=%08x t=%.9f\n',
+                mcu.state['R4'].value, mcu.state['R6'].value,
+                (value >> 16) & 0xffff, mcu.state['R2'].value,
+                mcu.state['R12'].value, mcu.state['R14'].value, machine.time:as_double()))
+        end
+    end)
 watch(dsp, 'io', 0x002c, 'cobba_select')
 watch(dsp, 'io', 0x002d, 'cobba_data')
 -- Fetch increments PC before the program tap. Restrict this to actual helper
