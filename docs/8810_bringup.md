@@ -90,8 +90,16 @@ A further fresh run enters that routine with caller return `0x2c6973` at
 reason `0x68` through `0x2d3408`. The selector uses local status bytes,
 several global guards, and helper returns; their semantics remain unresolved.
 This is not evidence of an idle-loop timeout or a missing DSP heartbeat.
-The next boundary is the status acquisition/selection in `0x2c68d0..0x2c696e`,
-not altering the timer's delay or suppressing its expiration.
+The selector entry is `0x2c68c8`. A fresh run enters with input `1`, caller
+return `0x2e25f5`, at 31.000193 s. Its NV read uses descriptor `0x0607`;
+at `0x2c6908` the local NV byte is `0xff`, the independently acquired status
+byte is `5`, and the selected reason is `0x68`. Input 1 tests bit 0 of the
+NV byte; input 2 separately tests bit 1 and can select `0x69`. Erased NV is
+therefore an observed input to the live reset decision, not proof of a missing
+DSP response. The remaining guards also pass in this run. No valid default
+or authentic replacement value for descriptor `0x0607` is established.
+The next boundary is that descriptor's storage/default contract and the
+status reader `0x2a1e3c`, not altering timer delay or suppressing expiration.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
