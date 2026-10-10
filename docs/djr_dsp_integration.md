@@ -1052,6 +1052,19 @@ with low byte `0x80` constructs the type byte consumed by `0x291c34`.
 Allocator semantics and native publication of such a ring entry remain
 outside this isolated execution proof.
 
+The acquired native DSP ROM contains type-`0x80` publication sites,
+independently pinned by `c54x_rom4_codec_contract.py`: `0x4f1c..0x4f23`
+sets AR5 length 14, AR4 type `0x80`, and AR3 payload `0x125b` for
+publisher `0x37ce`; `0x50d5..0x50de` sets length 33, the same payload
+address, and type `0x80` in the delayed call's instruction slot. The
+common publisher sets BK=100, combines length/type into a ring header,
+writes circularly, and conditionally commits data `0x08e4` before writing
+1 to port 1 (`0x37ff..0x3809`). These are native instruction contracts,
+not observed successful reception: the branches' decoder prerequisites,
+payload construction at `0x125b`, capacity/commit gates and physical
+input still need tracing. Native type-`0x80` publication is therefore
+present in the image, but not yet demonstrated in a handset run.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
