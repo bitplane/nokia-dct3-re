@@ -1069,6 +1069,16 @@ duplex attachment or promote its physical clock relationship. No production
 clock attachment calls the duplex interface yet; the existing independent
 boot-echo TX/RX methods are unchanged. This does not bypass the missing
 receive-clock attachment or establish handset playback.
+The separate native core gate now tests the two architectural interrupt
+sources used by the BSP backend: source 4 enters BRINT0/vector 20, and
+source 5 enters BXINT0/vector 21. Nine synthetic cases cover enabled and
+masked IMR bits, clear/set INTM, IDLE wake versus vector entry, retained
+pending bits and simultaneous receive/transmit priority. With both pending,
+receive is serviced first and transmit remains pending. The mandatory result
+is `TMS320C54x BSP interrupt sources: PASS cases=9 handset_audio_claim=0`
+under `make check-c54x-core`. This tests CPU dispatch using explicit source
+edges; it does not exercise backend frame-to-source wiring, resident codec
+ISRs, physical frame timing or handset audio. Those remain distinct gates.
 The suite also checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The

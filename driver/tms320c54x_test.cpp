@@ -1692,6 +1692,35 @@ private:
 		m_check_timer->adjust(attotime::from_msec(5));
 	}
 
+	void start_bsp_interrupt_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		// Architectural source fixture, not a handset codec clock or ROM patch.
+		program.write_word(0x010a00, 0xf4e1);
+		program.write_word(0x010a01, 0x76f8);
+		program.write_word(0x010a02, 0x0501);
+		program.write_word(0x010a03, 1);
+		program.write_word(0x010a04, 0xf4e1);
+		program.write_word(0x010050, 0xf4e1); // BRINT0, vector 20.
+		program.write_word(0x010054, 0xf4e1); // BXINT0, vector 21.
+		data.write_word(0x0501, 0);
+		m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, index < 8 && (index & 2) ? 0x0800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		unsigned const source = index < 4 ? 4 : 5;
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR,
+			index == 8 ? 0x30 : (index & 1) ? (1U << source) : 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x010a00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 78000 + index * 2;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
 	void start_rom4_pcm_mute(unsigned index)
 	{
 		auto &data = m_cpu->space(AS_DATA);
@@ -19019,6 +19048,37 @@ private:
 				"signed 40-bit MIN/MAX selects B and sets carry on equality");
 			if (index < 255) { start_minmax_case(index + 1); return; }
 			osd_printf_info("TMS320C54x MIN/MAX conformance: PASS variants=256\n");
+			start_bsp_interrupt_case(0);
+			return;
+		}
+		if (m_phase >= 78000 && m_phase < 78018)
+		{
+			unsigned const index = (m_phase - 78000) / 2;
+			unsigned const source = index < 4 ? 4 : 5;
+			if (!(m_phase & 1))
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(STATE_GENPC) == 0x010a01,
+					"BSP source fixture waits in IDLE before completed-frame edge");
+				m_cpu->set_input_line(source, HOLD_LINE);
+				if (index == 8) m_cpu->set_input_line(4, HOLD_LINE);
+				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			bool const enabled = index == 8 || (index & 1);
+			bool const serviced = enabled && (index == 8 || !(index & 2));
+			u32 const pc = serviced ? (index == 8 || source == 4 ? 0x010051 : 0x010055) :
+				enabled ? 0x010a05 : 0x010a01;
+			u16 const pending = index == 8 ? 0x20 : serviced ? 0 : u16(1U << source);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(STATE_GENPC) == pc &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == pending &&
+				m_cpu->space(AS_DATA).read_word(0x0501) == (enabled && !serviced ? 1 : 0),
+				"BSP source vectors, masked pending state, INTM wake and simultaneous priority");
+			if (index < 8) { start_bsp_interrupt_case(index + 1); return; }
+			osd_printf_info("TMS320C54x BSP interrupt sources: PASS cases=9 handset_audio_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
