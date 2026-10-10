@@ -81,11 +81,17 @@ The receive primitive's timer-queue branch at `0x27b604` dequeues timer ID
 Its ROM mapping at `0x2fa344 + 8 * 0x16` supplies status D6; the dispatcher
 receives it 17 microseconds later. Thus the observed D6 is a timer expiration,
 not a demonstrated DSP response. The unresolved contract is who arms/cancels
-timer `0x16` and which completion should prevent its reset action. A second
+timer `0x16` and which status check selects its reset action. A second
 fresh run identifies the arm call: `0x27a76e` receives ID `0x16` and delay
-`0x7d` at 31.000918 s, with caller return `0x2d3473`. This ties the expiration
-to the MCU idle/control loop; the delay's clock units and cancellation
-condition still require decoding.
+`0x7d` at 31.000918 s, with caller return `0x2d3473`. The arm routine starts
+at `0x2d3460`, queues control value `0x1b` to task 1, then arms the timer.
+A further fresh run enters that routine with caller return `0x2c6973` at
+31.000869 s. Own code at `0x2c696e` calls it after selecting and storing
+reason `0x68` through `0x2d3408`. The selector uses local status bytes,
+several global guards, and helper returns; their semantics remain unresolved.
+This is not evidence of an idle-loop timeout or a missing DSP heartbeat.
+The next boundary is the status acquisition/selection in `0x2c68d0..0x2c696e`,
+not altering the timer's delay or suppressing its expiration.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
