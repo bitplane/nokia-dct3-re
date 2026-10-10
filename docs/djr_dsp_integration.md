@@ -735,6 +735,53 @@ producer census; it establishes that ordinary initial scanning does not
 activate the mapped speech mode. Traffic assignment and its channel
 configuration must precede a handset speech claim.
 
+A bounded Thumb-pattern scan of NSE-1 v5.30 finds two independently decoded
+type-`0x02` construction sites, at `0x20d162` and `0x20e7be`. Both store
+wire length `0x14` at object byte 2, type `2` at byte 3 and initial operation
+`4` at byte 4. The first also stores object halfword `2`; the second has
+the same halfword store. This matches the independently recovered NSE-3
+constructor shape without borrowing its addresses or payload meanings.
+The scan examines 524,272 halfword offsets and returns six length/type-store
+candidates; four use dynamic type values and remain unclassified. This is
+not an exhaustive type-`0x02` producer census. Recover containing functions,
+all payload stores and submission callers before assigning native mode
+semantics or building a traffic fixture.
+
+The first containing function is `0x20d14c..0x20d1d8`: it allocates and
+zeroes a `0x18`-byte object, writes its pointer through argument R0, and
+stores argument R1 at object byte `0x0b`. If R1's high nibble is `0x10`
+or `0x50`, it sets byte `0x0c` to `0x60` or `0x50`, respectively; otherwise
+that byte retains the initialized zero. A halfword-wide direct-BL encoding
+scan finds four candidate callers (`0x20d312`, `0x20dbb0`, `0x210bba`,
+`0x210e5e`), not NSE-3's five-call topology. The first two visibly supply
+R1 `0x10` and `0x1a`; the third supplies a table-derived byte. Indirect
+calls remain outside this closure. The final caller at `0x210e5e` supplies
+R1 `0x50`, then submits to task 3 at `0x210e96`. The table-derived caller
+loads from `0x2aa404`, indexed by input byte `[R4+0x15]` plus stack byte
+`[SP+0x1e]`; the first nine bytes are `10..18`. The complete reachable
+index range is not proved, so adjacent ROM bytes are not table entries.
+The second inlined constructor submits its object to task 3 through
+`0x254c84` at `0x20e858`, while its channel selector at byte `0x0c` comes
+from controller offset `0xe4`. These are distinct producer paths, not
+interchangeable evidence of speech activation.
+
+The `0x20dbb0` caller submits to task 3 at `0x20dc0c`; the table-derived
+`0x210bba` caller submits at `0x210c5e`. Neither inspected constructor-to-
+submission interval changes object byte `0x0c`. This bounds those paths,
+not all aliases or callers of the surrounding functions.
+
+One previously dynamic candidate has an explicit type-`0x02` setup:
+`0x20ed02..0x20ed04` stores type `2` in stack slot
+`SP+0x4c`, which the construction sequence at `0x20ef98..0x20efa4` copies
+to the object halfword and byte 3. Its operation is held in FP (initialized
+to `4` at `0x20ecfe..0x20ed00`); its selector byte `0x0c` is copied from
+stack byte `SP+0x3a` at `0x20efbe..0x20efc6`. Recovering that stack byte's
+writers and the intervening branch paths is the next concrete MCU-side
+question. A second dynamic candidate at `0x20f3aa` copies type from `[SP]`
+and selector from an indexed array at `[SP+0x28]`; its type and reachable
+selector values remain unresolved. Neither path yet proves that `0xc3`
+reaches the native pending speech-mode word.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
