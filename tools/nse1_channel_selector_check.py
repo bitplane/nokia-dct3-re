@@ -17,6 +17,7 @@ from unicorn.arm_const import (
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1,
     UC_ARM_REG_SP,
     UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R6,
+    UC_ARM_REG_R9,
 )
 
 
@@ -103,6 +104,21 @@ def check_request_fields(cpu, raw):
     return cases
 
 
+def check_mode_writer(cpu):
+    for mode in range(256):
+        cpu.mem_write(0x10b100, bytes((0, mode, mode ^ 0xff)))
+        cpu.reg_write(UC_ARM_REG_R0, 0x109739)
+        cpu.reg_write(UC_ARM_REG_R9, 0x10b100)
+        cpu.emu_start(0x24fa29, 0x24fa34, count=16)
+        if cpu.reg_read(UC_ARM_REG_PC) != 0x24fa34:
+            raise ValueError("mode writer did not reach its boundary")
+        if bytes(cpu.mem_read(0x109739, 1)) != bytes([mode]):
+            raise ValueError("mode writer changed source byte 1")
+        if bytes(cpu.mem_read(0x109740, 1)) != bytes([mode ^ 0xff]):
+            raise ValueError("mode writer changed source byte 2")
+    return 256
+
+
 def expected_selector(first, second):
     alternate = second in (0x20, 0x21)
     choices = {
@@ -150,6 +166,7 @@ def check_image(raw):
     return {"cases": count, "c3_first_arguments": sorted(speech_inputs),
             "request_routes": routes,
             "request_field_cases": check_request_fields(cpu, raw),
+            "mode_writer_cases": check_mode_writer(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

@@ -855,6 +855,19 @@ conditions around those constructor calls, are the remaining producer
 questions. No acquired native boot trace has shown this request completing
 traffic assignment.
 
+One mode-record writer is mapped: `0x24fa28..0x24fa32` copies `[SB+1]`
+to `0x109739` and `[SB+2]` to `0x109740`. The entry is shared by a
+direct pointer load at `0x24f81e` and a channel-base + `0xe9` calculation
+at `0x24fa24`; the following call at `0x24fa38` constructs request
+`0x03f0`, not `0x03ed`. Isolated execution verifies the byte-copy
+fragment for all 256 mode values. This establishes an unmodified source
+byte, not its valid protocol domain or runtime lifecycle. Channel-record
+writers at `0x24f7f4` and `0x24f9fa` copy `[R8+0x1a]` into `0x109650`;
+the surrounding source-object ownership remains open. A bounded literal
+reference scan finds 56 candidates for exact pointers `0x109650`,
+`0x109736`, or `0x109739`; aliases, computed addresses and indirect
+writes remain outside that coverage.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
