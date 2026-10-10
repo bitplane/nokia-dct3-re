@@ -828,70 +828,57 @@ u16 tms320c54x_device::short_smem_address(u8 mode) const
 	return BIT(mode, 7) ? m_ar[indirect_ar(mode)] : direct_address(mode);
 }
 
-u16 tms320c54x_device::indirect_read(u8 mode)
+u16 tms320c54x_device::prepare_smem_address(u8 mode)
 {
 	if (!BIT(mode, 7))
-		return data_read(direct_address(mode));
+		return direct_address(mode);
 	if (mode >= 0xf8)
-		return data_read(fetch());
+		return fetch();
 	if (mode >= 0xe0)
-		return data_read(long_offset_address(mode));
+		return long_offset_address(mode);
 	const unsigned ar = indirect_ar(mode);
-	const bool preincrement = (mode & 0x78) == 0x18;
-	if (preincrement)
+	if ((mode & 0x78) == 0x18)
 		indirect_modify(mode);
-	const u16 value = data_read(m_ar[ar]);
-	if (!preincrement)
+	return m_ar[ar];
+}
+
+void tms320c54x_device::finish_smem_access(u8 mode)
+{
+	if (mode >= 0x80 && mode < 0xe0 && (mode & 0x78) != 0x18)
 		indirect_modify(mode);
+}
+
+u16 tms320c54x_device::indirect_read(u8 mode)
+{
+	const u16 address = prepare_smem_address(mode);
+	const u16 value = data_read(address);
+	finish_smem_access(mode);
 	return value;
 }
 
 u16 tms320c54x_device::immediate_smem_read(u8 mode, u16 &immediate)
 {
 	u16 address;
-	const bool preincrement = mode >= 0x80 && mode < 0xe0 && (mode & 0x78) == 0x18;
 	if (mode >= 0xe0 && mode < 0xf8)
 	{
 		immediate = fetch();
-		address = long_offset_address(mode);
+		address = prepare_smem_address(mode);
 	}
 	else
 	{
-		if (preincrement)
-			indirect_modify(mode);
-		address = mode >= 0xf8 ? fetch() : short_smem_address(mode);
+		address = prepare_smem_address(mode);
 		immediate = fetch();
 	}
 	const u16 value = data_read(address);
-	if (mode >= 0x80 && mode < 0xe0 && !preincrement)
-		indirect_modify(mode);
+	finish_smem_access(mode);
 	return value;
 }
 
 void tms320c54x_device::indirect_write(u8 mode, u16 value)
 {
-	if (!BIT(mode, 7))
-	{
-		data_write(direct_address(mode), value);
-		return;
-	}
-	if (mode >= 0xf8)
-	{
-		data_write(fetch(), value);
-		return;
-	}
-	if (mode >= 0xe0)
-	{
-		data_write(long_offset_address(mode), value);
-		return;
-	}
-	const unsigned ar = indirect_ar(mode);
-	const bool preincrement = (mode & 0x78) == 0x18;
-	if (preincrement)
-		indirect_modify(mode);
-	data_write(m_ar[ar], value);
-	if (!preincrement)
-		indirect_modify(mode);
+	const u16 address = prepare_smem_address(mode);
+	data_write(address, value);
+	finish_smem_access(mode);
 }
 
 u16 tms320c54x_device::long_offset_address(u8 mode)
@@ -1429,9 +1416,9 @@ void tms320c54x_device::execute_one(u16 op)
 		const u8 y = op;
 		const unsigned xar = 2 + (x & 3);
 		const unsigned yar = 2 + (y & 3);
+		const u16 coefficient_address = fetch();
 		const u16 xvalue = data_read(m_ar[xar]);
 		const u16 yvalue = data_read(m_ar[yar]);
-		const u16 coefficient_address = fetch();
 		const u16 coefficient = m_program.read_word(program_address(u16(coefficient_address +
 				(repeated ? m_rpt_iteration : 0))));
 		s64 product = s64(accumulator_high17(m_a)) * s64(s16(coefficient));
@@ -2171,18 +2158,10 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
-		u16 value;
-		u16 destination;
-		if (low >= 0xe0 && low < 0xf8)
-		{
-			value = indirect_read(low);
-			destination = fetch() + (repeated ? m_rpt_iteration : 0);
-		}
-		else
-		{
-			value = indirect_read(low);
-			destination = fetch() + (repeated ? m_rpt_iteration : 0);
-		}
+		const u16 address = prepare_smem_address(low);
+		const u16 destination = fetch() + (repeated ? m_rpt_iteration : 0);
+		const u16 value = data_read(address);
+		finish_smem_access(low);
 		data_write(destination, value);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 2 : 1;
@@ -2198,29 +2177,38 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	}
 	case 0x7400: // PORTR port, Smem
-		if (low == 0xf8)
-		{
-			const u16 destination = fetch();
-			data_write(destination, m_io.read_word(fetch()));
-		}
-		else
-			indirect_write(low, m_io.read_word(fetch()));
-		m_icount -= low >= 0xe0 ? 2 : 1;
-		return;
-	case 0x7500: // PORTW Smem, port
 	{
-		u16 value;
-		u16 port;
+		u16 address, port;
 		if (low >= 0xe0 && low < 0xf8)
 		{
 			port = fetch();
-			value = indirect_read(low);
+			address = prepare_smem_address(low);
 		}
 		else
 		{
-			value = indirect_read(low);
+			address = prepare_smem_address(low);
 			port = fetch();
 		}
+		data_write(address, m_io.read_word(port));
+		finish_smem_access(low);
+		m_icount -= low >= 0xe0 ? 2 : 1;
+		return;
+	}
+	case 0x7500: // PORTW Smem, port
+	{
+		u16 address, port;
+		if (low >= 0xe0 && low < 0xf8)
+		{
+			port = fetch();
+			address = prepare_smem_address(low);
+		}
+		else
+		{
+			address = prepare_smem_address(low);
+			port = fetch();
+		}
+		const u16 value = data_read(address);
+		finish_smem_access(low);
 		m_io.write_word(port, value);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
@@ -2231,14 +2219,17 @@ void tms320c54x_device::execute_one(u16 op)
 			u16(m_pc - 1) == m_rpt_address;
 		if (low >= 0xe0 && low < 0xf8)
 		{
-			const u16 destination = long_offset_address(low);
+			const u16 destination = prepare_smem_address(low);
 			const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
 			data_write(destination, data_read(source));
+			finish_smem_access(low);
 			if (!repeated || !m_rpt_iteration) m_icount -= 2;
 			return;
 		}
 		const u16 source = fetch() + (repeated ? m_rpt_iteration : 0);
-		indirect_write(low, data_read(source));
+		const u16 destination = prepare_smem_address(low);
+		data_write(destination, data_read(source));
+		finish_smem_access(low);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
@@ -2323,18 +2314,19 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
-		u16 value;
-		u16 destination;
+		u16 address, destination;
 		if (low >= 0xe0 && low < 0xf8)
 		{
 			destination = fetch() + (repeated ? m_rpt_iteration : 0);
-			value = indirect_read(low);
+			address = prepare_smem_address(low);
 		}
 		else
 		{
-			value = indirect_read(low);
+			address = prepare_smem_address(low);
 			destination = fetch() + (repeated ? m_rpt_iteration : 0);
 		}
+		const u16 value = data_read(address);
+		finish_smem_access(low);
 		m_program.write_word(program_address(destination), value);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 4 : 3;
@@ -2368,9 +2360,11 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const bool repeated = (m_rptc || m_rpt_end != REPEAT_END_UNSET) &&
 			u16(m_pc - 1) == m_rpt_address;
+		const u16 destination = prepare_smem_address(low);
 		const u16 value = m_program.read_word(physical_program_address(m_a +
 				(repeated ? m_rpt_iteration : 0)));
-		indirect_write(low, value);
+		data_write(destination, value);
+		finish_smem_access(low);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 5 : 4;
 		return;

@@ -876,6 +876,17 @@ interrupt pipeline.
 `tmp/c54x-loop-xc-regression.log` preserves the exact native RF counts,
 5110 save-state round trip and original MU4 storage/native entry. The separate
 timer observation still exposes short-period starvation.
+Operand-fetch conformance separates Smem address preparation from its read/write
+so MVDK, MVDP, PORTW, PORTR, READA and MVKD fetch their instruction extensions
+before reading data, I/O or program operands. FIRS likewise fetches its coefficient
+address before reading X/Y. Twenty-five passive bus-tap cases cover direct,
+postincrement, long-offset and absolute forms plus FIRS; the runner requires
+`TMS320C54x operand fetch order: PASS`. The original MVDK direct case reads
+data before its destination extension and fails this check. Instruction-family
+extension layouts, address updates and aggregate cycle charges remain unchanged.
+This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
+Access-stage address-update timing, overlapping execution or interrupt drain.
+
 The architectural BRAF correction deliberately changes the exact native NSE-1 scan snapshot:
 two isolated 30-second cold runs (`tmp/nse1-braf-control/error.log` and
 `tmp/nse1-braf-bus/error.log`) reproduce 20,282 frame expiries, 648,096 RF

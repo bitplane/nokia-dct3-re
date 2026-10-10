@@ -73,6 +73,77 @@ private:
 		m_phase = 83000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_operand_fetch_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		unsigned const family = index / 4, form = index % 4;
+		static constexpr u16 families[] = { 0x7100, 0x7d00, 0x7500, 0x7400, 0x7e00, 0x7000 };
+		static constexpr u8 modes[] = { 0x00, 0x92, 0xe2, 0xf8 };
+		static constexpr u16 operands[] = { 0x0700, 0x0700, 0x0124, 0x0123, 0, 0x0700 };
+		u16 pc = 0x0800;
+		if (index == 24)
+		{
+			program.write_word(pc++, 0xe001); // FIRS *AR2,*AR3,0900
+			program.write_word(pc++, 0x0900);
+		}
+		else
+		{
+			program.write_word(pc++, families[family] | modes[form]);
+			if (form == 2)
+			{
+				if (family == 0 || family == 4 || family == 5)
+				{
+					program.write_word(pc++, 5);
+					if (family != 4) program.write_word(pc++, operands[family]);
+				}
+				else
+				{
+					program.write_word(pc++, operands[family]);
+					program.write_word(pc++, 5);
+				}
+			}
+			else
+			{
+				if (form == 3) program.write_word(pc++, 0x0600);
+				if (family != 4) program.write_word(pc++, operands[family]);
+			}
+		}
+		m_operand_extension_count = pc - 0x0801;
+		program.write_word(pc, 0xf4e1);
+		program.write_word(0x0900, 0xbeef);
+		program.write_word(0x0700, 0);
+		data.write_word(0x0600, 0xbeef); data.write_word(0x0601, 0xcafe);
+		data.write_word(0x0700, family == 5 ? 0xbeef : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, form == 2 ? 0x05fb : 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0601);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, index == 24 ? 0 : 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x000c);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0800);
+		m_port_reads = m_port_writes = 0;
+		m_operand_extensions = m_operand_reads = 0;
+		m_operand_order_violation = false;
+		m_operand_fetch_tap = program.install_read_tap(0x0801, 0x0802, "operand_extension_fetch",
+			[this](offs_t address, u16 &, u16) {
+				if (!machine().side_effects_disabled() && address - 0x0801 < m_operand_extension_count)
+					m_operand_extensions |= 1U << (address - 0x0801);
+			});
+		auto observe = [this](offs_t, u16 &, u16) {
+			if (!machine().side_effects_disabled())
+			{
+				++m_operand_reads;
+				m_operand_order_violation |= m_operand_extensions != ((1U << m_operand_extension_count) - 1);
+			}
+		};
+		m_operand_data_tap = data.install_read_tap(0x0600, 0x0700, "operand_data_read", observe);
+		m_operand_io_tap = m_cpu->space(AS_IO).install_read_tap(0x0123, 0x0123, "operand_io_read", observe);
+		m_operand_program_tap = program.install_read_tap(0x0900, 0x0900, "operand_program_read", observe);
+		m_phase = 86000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_loop_xc_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -19616,6 +19687,34 @@ private:
 			m_cpu->set_input_line(index >= 2 ? INPUT_LINE_NMI : 2, CLEAR_LINE);
 			if (index < 3) { start_loop_xc_case(index + 1); return; }
 			osd_printf_info("TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi\n");
+			start_operand_fetch_case(0); return;
+		}
+		if (m_phase >= 86000 && m_phase < 86025)
+		{
+			unsigned const index = m_phase - 86000, family = index / 4, form = index % 4;
+			osd_printf_info("C54x operand fetch case=%u extensions=%u reads=%u early_read=%u\n",
+				index, m_operand_extension_count, m_operand_reads, m_operand_order_violation);
+			m_operand_fetch_tap.remove(); m_operand_data_tap.remove();
+			m_operand_io_tap.remove(); m_operand_program_tap.remove();
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Operand fetch fixture terminates");
+			expect(!m_operand_order_violation && m_operand_reads == (index == 24 ? 3 : 1),
+				"Instruction operand words are fetched before data, I/O or program operand reads");
+			auto &data = m_cpu->space(AS_DATA);
+			if (index == 24)
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0x189ed0000ULL &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0, "FIRS operand data preserved");
+			else
+			{
+				if (family == 0) expect(data.read_word(0x0700) == 0xbeef, "MVDK operand data preserved");
+				if (family == 1) expect(m_cpu->space(AS_PROGRAM).read_word(0x0700) == 0xbeef, "MVDP operand data preserved");
+				if (family == 2) expect(m_port_writes == 1 && m_first_port_value == 0xbeef, "PORTW operand data preserved");
+				if (family >= 3) expect(data.read_word(0x0600) == (family == 3 ? 0xabcd : 0xbeef), "Input operand data preserved");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
+					(form == 1 ? 0x0601 : form == 2 ? 0x05fb : 0x0600), "Address modifier preserved");
+			}
+			if (index < 24) { start_operand_fetch_case(index + 1); return; }
+			osd_printf_info("TMS320C54x operand fetch order: PASS cases=25 families=7 forms=direct,indirect,long,absolute\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -20060,6 +20159,9 @@ private:
 	unsigned m_repeat_boundary_requests = 0;
 	memory_passthrough_handler m_xc_irq_tap;
 	unsigned m_xc_irq_fetches = 0;
+	memory_passthrough_handler m_operand_fetch_tap, m_operand_data_tap, m_operand_io_tap, m_operand_program_tap;
+	unsigned m_operand_extension_count = 0, m_operand_extensions = 0, m_operand_reads = 0;
+	bool m_operand_order_violation = false;
 	unsigned m_phase = 0;
 	unsigned m_bleq_case = 0;
 	unsigned m_rom4_checks = 0;
