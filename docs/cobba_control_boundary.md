@@ -355,6 +355,17 @@ receipt at this candidate are not yet established: a 60-second retained-
 storage repeat captures a second post from `0x26be5d` at 36.631877231
 seconds, but no candidate-case observation. That silent window is not
 an absence proof; confirm the actual task entry/receive loop first.
+The contiguous 12-byte creation records begin at `0x2a4fa0`; record
+10 at `0x2a5018` contains Thumb entry `0x211a55`. Entry `0x211a54`
+calls initializer `0x20cb80` before reaching receive call `0x254ed8`
+at `0x211a96`. The received object is stored at `[SP+0x18]` and its
+signed status halfword is read at `0x211aa0`. Initializer `0x20cb80`
+independently passes task number 10 to `0x23f130` and calls `0x211f6c`
+with `(2,0,0)` before initializing controller state. This strengthens
+task ownership beyond address similarity. A bounded receive-window
+probe was uninformative and removed; first establish initializer
+completion and the scheduler's actual receive return before diagnosing
+an absent task consumer or introducing any readiness response.
 
 The next boundary is task 10's consumption of status `0x1390` and the
 meaning of the native `006d` body before choosing an operational RF contract. The
