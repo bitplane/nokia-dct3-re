@@ -324,6 +324,28 @@ pass readback checks. Unlike the current native NSE-1 fixture, this lifecycle
 never reaches the known mode-initialization entrances. This is a measured
 cross-product control-sequence difference, not an exhaustive indirect-call
 closure or evidence that a particular missing host command must be injected.
+
+### Native NSE-1 Control Comparison
+
+The same passive observer on fresh NSE-1 and NSE-6 fixtures gives this
+bounded comparison (30 s, acquired ROM4 resident code in both):
+
+| Contract | Native NSE-1 | NSE-6 compatibility fixture |
+| --- | --- | --- |
+| Search-list packet | `441a`, consumed 2.091369 s; handlers `3d5e/3d70` execute | No type-`1a` consumption observed |
+| Mode-initializer callers | `4de3` at 2.104560 s, `4e00` at 2.109178 s, `0ab8` at 2.138677 s | All three dormant |
+| Mode `00ac` | `0 -> 1 -> 2 -> 9 -> 1` | Zero |
+| First four memory-upload destinations | `2286`, `22ad`, `22d4`, `22fb` | Same |
+| Compared 156 uploaded words | All match except word `22c8 = 0202` | `22c8 = 0000` |
+
+The type-`1a` handler precedes mode activation but does not directly call
+the initializer; temporal order is not a causal closure. Identity/control
+payloads also differ, with NSE-6's records erased. No NSE-1 data may be copied
+into NSE-6 to conceal these genuine input differences. Next recover the
+own-MCU search-list publication condition and the native `4de3/4e00` control
+entrance, including any reader of uploaded word `22c8`. The NSE-1 processing
+checker passes on this capture; NSE-6's overlay/upload checks also pass.
+
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
