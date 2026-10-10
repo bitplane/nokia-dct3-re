@@ -626,6 +626,21 @@ from a peripheral sampling clock before adding either buffering or a
 GSM waveform adapter. Codec serial PCM timing is a separate bus contract
 and must not be reused for RF samples.
 
+The cold zero and tone controls independently capture the first 64
+port-`27` reads at advanced PCs `324b,3251,3257,325d`. Each initial
+32-word group spans approximately 4.788 microseconds, with group starts
+4.615385 milliseconds apart. Adjacent reads within the groups are as
+close as 115.384 ns; counter snapshots advance from 1 through 6 and
+restart for the next group. This establishes early burst consumption
+under the current frame-counter model, not uniformly clocked ADC
+sampling. It does not characterize the later `330a` scan-filter loop.
+The two stimuli produce identical timing for this bounded initial window.
+`c54x_rom4_rf_consumption_check.py` requires exactly 64 consecutive
+observations and non-regressing timestamps; the isolated cold runner
+records their measured span, gaps, PCs and counter values separately
+from the score and delivery results. Its summary explicitly denies a
+physical sample-rate claim.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's

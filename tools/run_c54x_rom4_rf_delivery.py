@@ -12,10 +12,12 @@ try:
     from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
     from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
     from tools.c54x_rom4_rf_score_check import check as check_score
+    from tools.c54x_rom4_rf_consumption_check import check as check_consumption
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
     from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
     from c54x_rom4_rf_score_check import check as check_score
+    from c54x_rom4_rf_consumption_check import check as check_consumption
 
 
 def check_repeats(observations):
@@ -59,6 +61,7 @@ def main():
                                stdout=console, stderr=subprocess.STDOUT, check=True)
             text = (case / "error.log").read_text()
             actual_mode, results, accepted = check_score(text)
+            consumption = check_consumption(text)
             object_address, body = check_delivery(text)
             tuning = nse1_gsm900_tuning_consistency(check_tuning_upload(text))
             check_tuning_blob(text)
@@ -70,6 +73,7 @@ def main():
                 raise ValueError("RF stimulus mode differs from requested case")
             observations.append(dict(mode=mode, repeat=repeat, results=results,
                                      accepted=accepted, object=object_address, native_body=body,
+                                     consumption=consumption,
                                      tuning_consistency=tuning))
             print(f"Native RF delivery: PASS mode={mode} repeat={repeat} "
                   f"results={results} accepted={accepted} body={body}", flush=True)

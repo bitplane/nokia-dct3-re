@@ -187,6 +187,12 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
             value = math.floor(2048 * component + 0.5) & 0xffff
         end
         reads = reads + 1
+        if reads <= 64 then
+            machine:logerror(string.format(
+                "rom4_rf_sample_consumption: index=%d t=%.12f pc=%04x counter=%04x\n",
+                reads, machine.time:as_double(), cpu.state["PC"].value,
+                cpu.spaces["io"]:read_u16(0x0d)))
+        end
         return value
     end)
 for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
