@@ -381,8 +381,20 @@ posting to mailbox `13`, and its initial consumption at `21a74c` at
 no return at the later wait or entry at `21a8dc` is observed. Thus `1587`
 has a working producer and initial delivery; the unresolved condition is
 entry into the later lifecycle, not inventing that status or reusing its
-initial publication. The
-literal-seeded scan identifies candidates, not every computed publisher.
+initial publication.
+
+The controller's current wait is `21b07c`, with context `11f2f8` and mode
+word `11f31e = 002d` after 6.533544 s. Before that it consumes `1592` from
+wait caller `21d76d`, then `158b` from `21b7ab`. Wait `21cd2a` returns the
+observed `043c`; its consumer at `21cd30` accepts `09f0` or `0434`, not
+`043c`, and runtime enters common fallback `21b312` at 6.533520 s.
+The main 66-entry mode table at `21b098` maps index `2d` back to `21cd30`.
+Thus this is a live controller state with an unmatched completion status,
+not evidence that the later search wait was entered. Own code `210fca`
+contains a `0434` constructor but does not execute in this fixture. Its
+entry and publication contract, and the distinction from `043c`, are the
+next boundary; neither status should be substituted by the model.
+The literal-seeded scan identifies candidates, not every computed publisher.
 Identity/control payloads also
 differ, with NSE-6's records erased; no NSE-1 data may be copied into NSE-6
 to conceal these genuine input differences. The NSE-1 processing checker
