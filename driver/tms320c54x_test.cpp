@@ -440,6 +440,7 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		m_vector_prefetch_tap.remove();
+		m_vector_stack_tap.remove();
 		m_vector_reads = m_vector_acks = 0;
 		m_vector_case = index;
 		u32 const address = index ? 4 : 0x40;
@@ -461,13 +462,20 @@ private:
 		m_vector_prefetch_tap = program.install_read_tap(address, address, "vector_prefetch",
 			[this](offs_t, u16 &, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
 					m_cpu->space(AS_DATA).read_word(0x0fff) == 0xbeef,
-					"SPRU131G vector fetch precedes interrupt stack write");
+					"SPRU131G INTR Access decrements SP before vector Fetch, but stack memory is not written yet");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_vector_case ? 3 : 2),
 					"Vector acknowledgement clears only the accepted maskable source");
 				++m_vector_reads;
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			});
+		m_vector_stack_tap = data.install_write_tap(0x0fff, 0x0fff, "vector_stack_write",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled() || m_phase != 80000) return;
+				expect(m_vector_reads == 1 && m_vector_acks == 1 && value == 0x0800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff,
+					"SPRU131G INTR Execute writes RTN after vector Fetch without decrementing SP again");
 			});
 		if (index) { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); }
 		m_check_timer->adjust(attotime::from_usec(100));
@@ -19298,7 +19306,8 @@ private:
 					"Reset discards the retained hardware vector opcode");
 				m_vector_prefetch_tap.remove();
 				if (m_vector_case == 2) { start_vector_prefetch_case(3); return; }
-				osd_printf_info("TMS320C54x vector prefetch: PASS sources=irq,nmi before_stack=1 retained_opcode=1 extension_fetch=1 save_replay=2 single_ack=1 later_mask=1 reset=1 debugger_redirect=1 physical_latency_claim=0\n");
+				m_vector_stack_tap.remove();
+				osd_printf_info("TMS320C54x vector prefetch: PASS sources=irq,nmi before_stack=1 sp_access=1 retained_opcode=1 extension_fetch=1 save_replay=2 single_ack=1 later_mask=1 reset=1 debugger_redirect=1 physical_latency_claim=0\n");
 				osd_printf_info("TMS320C54x core conformance: PASS\n");
 				throw emu_fatalerror(0, "TMS320C54x core tests complete");
 			}
@@ -19771,6 +19780,7 @@ private:
 	unsigned m_rom4_pcm_mismatches = 0;
 	emu_timer *m_check_timer = nullptr;
 	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload, m_timer_probe_stack, m_vector_prefetch_tap;
+	memory_passthrough_handler m_vector_stack_tap;
 	memory_passthrough_handler m_timer_probe_write, m_timer_probe_mask;
 	u64 m_timer_probe_write_cycle = 0, m_timer_probe_mask_cycle = 0;
 	unsigned m_timer_probe_writes = 0, m_timer_probe_masks = 0;
@@ -19822,6 +19832,9 @@ void tms320c54x_test_state::test(machine_config &config)
 		if (m_phase >= 80000 && m_phase <= 80003)
 		{
 			expect(line == (m_vector_case ? INPUT_LINE_NMI : 0), "Vector acknowledgement retains accepted source identity");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+				m_cpu->space(AS_DATA).read_word(0x0fff) == 0xbeef,
+				"SPRU131G vector acknowledgement follows SP Access but precedes the continuation memory write");
 			++m_vector_acks;
 		}
 		return 0;

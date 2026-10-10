@@ -979,13 +979,14 @@ bool tms320c54x_device::service_interrupt()
 	m_rtn = m_pc;
 	m_st1 |= 0x0800;
 	u16 const vector_pc = (m_pmst & 0xff80) | (vector << 2);
-	// SPRU131G example 7-18: first vector fetch precedes the INTR stack
-	// write. Retain that opcode; execute/fetch its extension in the normal path.
+	// SPRU131G example 7-18: INTR Access decrements SP before vector Fetch,
+	// but the continuation memory write follows Fetch at INTR Execute.
+	u16 const stack_address = --m_sp;
 	standard_irq_callback(acknowledged_source, logical_program_address(m_pc));
 	m_pc = vector_pc;
 	m_vector_prefetch_word = fetch();
 	m_vector_prefetch_valid = true;
-	push(m_rtn);
+	m_data.write_word(stack_address, m_rtn);
 	m_pc = vector_pc;
 	leave_idle();
 	m_icount -= 5;

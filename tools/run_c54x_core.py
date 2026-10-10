@@ -14,7 +14,7 @@ REQUIRED = [
     "TMS320C54x MIN/MAX conformance: PASS variants=256",
     "TMS320C54x BSP interrupt sources: PASS cases=9 save_replay=9 handset_audio_claim=0",
     "TMS320C54x CLKMD write protection: PASS cases=16 physical_clock_claim=0",
-    "TMS320C54x vector prefetch: PASS sources=irq,nmi before_stack=1 retained_opcode=1 extension_fetch=1 save_replay=2 single_ack=1 later_mask=1 reset=1 debugger_redirect=1 physical_latency_claim=0",
+    "TMS320C54x vector prefetch: PASS sources=irq,nmi before_stack=1 sp_access=1 retained_opcode=1 extension_fetch=1 save_replay=2 single_ack=1 later_mask=1 reset=1 debugger_redirect=1 physical_latency_claim=0",
     "TMS320C54x ROLTC conformance: PASS variants=256",
     "TMS320C54x core conformance: PASS",
     "TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4",

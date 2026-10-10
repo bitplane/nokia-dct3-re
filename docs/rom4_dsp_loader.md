@@ -932,7 +932,11 @@ INTR's stack write in cycle 7. Therefore moving IFR clearance to the core's
 former post-stack `fetch()` would implement the wrong bus order. The core
 now prefetches and retains the first hardware-vector opcode before the
 stack write, calling MAME's IRQ acknowledgement callback once for the accepted
-IRQ/NMI source. Extension words are fetched normally. This is a bus-order
+IRQ/NMI source. INTR Access decrements SP before that fetch; only the return
+word's memory write follows it. A combined post-fetch `push()` would preserve
+memory-write order but incorrectly leave the old SP visible at Fetch/IACK.
+The pointer update and memory write are therefore separate operations.
+Extension words are fetched normally. This is a bus-order
 correction, not a Decode-stage recognition/drain model. The figure places
 INTR Access/Read/Execute in cycles 5/6/7; the prose's cycles 7--9 describe the
 interrupt overhead before first ISR execution in cycle 10, and must not be
@@ -942,25 +946,22 @@ stack write and ISR execution separately. Preserve the accepted source and
 continuation across later IMR changes. Neither the atomic core's fetch tap
 nor its unchanged aggregate five-cycle charge measures these physical
 boundaries.
-An executable IRQ/NMI fixture observes the untouched stack at vector fetch,
-selective IFR clearance and one source acknowledgement. It changes the
+An executable IRQ/NMI fixture observes decremented SP with unchanged stack
+memory at vector fetch and acknowledgement, then one continuation write
+without a second pointer decrement. It checks selective IFR clearance and
+one source acknowledgement. It changes the
 vector opcode after that read and checks execution of the retained word,
 normal extension fetch, two save/replays, survival of later IMR masking,
-reset discard and explicit debugger-PC redirect discard. The unchanged core
-fails at the before-stack assertion in
-`tmp/c54x-vector-prefetch-red.log`; the complete core gate requires
-`TMS320C54x vector prefetch: PASS` and passes in
-`tmp/c54x-vector-prefetch-redirect.log`. Native NSE-1 RF acceptance also passes
-in `tmp/c54x-vector-prefetch-rf.log`; this does not establish native speech
-or recorder completion. The complete original MU4 storage/loader/serial gate
-passes in `tmp/c54x-vector-mu4-final.log`. An isolated recorder-control replay in
-`tmp/c54x-vector-reccontrol` reproduces the existing `error.log` SHA-256
-`c20eb914ea08fed69e605021d5975381e6a54de0b98e9fddd0ac474eeb47f3ec`:
-native packet receipt is unchanged and remains distinct from recording.
-The separate save diagnostic in `tmp/c54x-vector-recsave` also reproduces
-its documented checksum from `5510_bringup.md` and exits 3 at the same
-undelivered metadata boundary. Vector bus order is corrected; the recorder's
-recognition/drain timing question is not closed.
+reset discard and explicit debugger-PC redirect discard. The combined-push
+core fails the Access-before-Fetch assertion in `tmp/c54x-intr-access-red.log`.
+The complete core gate requires `TMS320C54x vector prefetch: PASS` with
+`sp_access=1`. Core, timer observation, original MU4 storage/loader/serial and
+native NSE-1 RF gates pass in `tmp/c54x-intr-access-final.log`; the RF boundary
+retains 648,288 reads and 1,580 port-32 writes, with no port-38/39 reads.
+The tool suite passes 2,452 tests with one skip. These gates do not include
+recorder save completion or handset speech. The separate recorder-control
+and undelivered-metadata observations remain documented in `5510_bringup.md`.
+Vector bus order is corrected; the recognition/drain timing question is open.
 An independent return-bus assertion covers `RETF` (`f49b`): SPRU172C
 section 4-141 and SPRU131G example 7-11 specify PC from RTN and an SP
 increment, without reading the stacked PC. A passive tap in the existing
