@@ -272,6 +272,27 @@ def check_rr_receive_route(cpu):
     return 512
 
 
+def check_rr_payload_allocation(cpu):
+    for kind in (0, 0x40, 0x50, 0x60, 0xa0, 0xff):
+        for length in range(256):
+            cpu.mem_write(0x10b000, bytes(12))
+            cpu.mem_write(0x10b257, bytes([length ^ 0xff]))
+            cpu.mem_write(0x10b264, bytes([kind]))
+            cpu.mem_write(0x10b22b, bytes([length]))
+            cpu.reg_write(UC_ARM_REG_R4, 0x10b000)
+            cpu.reg_write(UC_ARM_REG_R5, 0x10b100)
+            fixed = kind in (0x40, 0x50, 0x60, 0xa0)
+            target = 0x237ee0 if fixed else 0x237ec6
+            cpu.emu_start(0x237e99, target, count=64)
+            if cpu.reg_read(UC_ARM_REG_PC) != target:
+                raise ValueError("RR allocation branch did not reach its boundary")
+            if cpu.reg_read(UC_ARM_REG_R0) != (26 if fixed else length + 4):
+                raise ValueError("RR payload allocation size differs")
+            if bytes(cpu.mem_read(0x10b003, 2)) != bytes((length ^ 0xff, 1)):
+                raise ValueError("RR payload metadata differs")
+    return 1536
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -310,6 +331,7 @@ def check_image(raw):
             "channel_description_cases": check_channel_description(cpu, raw),
             "channel_parameter_cases": check_channel_parameters(cpu),
             "rr_receive_route_cases": check_rr_receive_route(cpu),
+            "rr_payload_allocation_cases": check_rr_payload_allocation(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

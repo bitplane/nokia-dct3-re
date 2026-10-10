@@ -935,6 +935,18 @@ of these messages, complete message parsing, and native physical ingress
 remain unproved. Subtract-cascade arithmetic is checked by execution,
 not inferred from neighboring message numbers.
 
+Constructor `0x237df8` allocates a 12-byte message and writes its requested
+ID. Its `0x05eb` branch at `0x237e98` marks message byte 4 as 1 and
+copies receive-record byte `0x157` to message byte 3. Receive-record byte
+`0x164` selects payload allocation: values `40/50/60/a0` request 26
+bytes; other values request receive-record byte `0x12b` plus 4 bytes.
+The isolated checker executes 1,536 metadata/allocation cases (six kinds,
+all 256 length bytes), stopping before allocation. Static instructions
+then store the payload pointer at message offset 8, write its length
+halfword, and copy from receive-record offset `0x114` to payload offset 4
+at `0x237efc`. Allocation, copying and delivery have not yet been executed
+as one chain; the receive-record's lower transport producer remains open.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
