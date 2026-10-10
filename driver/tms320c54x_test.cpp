@@ -443,6 +443,33 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = 7000 + index;
+		m_timer_probe_fetch.remove();
+		m_timer_probe_reload.remove();
+		m_timer_probe_entries = 0;
+		m_timer_probe_reload_cycle = 0;
+		m_timer_probe_first_entry_cycle = 0;
+		m_timer_probe_return_pc = 0;
+		// Observe scheduler-cycle accounting, not physical pipeline latency.
+		// Internal MMR writes bypass address-space taps; capture opcode fetch,
+		// explicitly not the execute/write phase of the TCR reload.
+		m_timer_probe_reload = program.install_read_tap(0x010606, 0x010606, "timer_probe_reload",
+			[this](offs_t address, u16 &, u16)
+			{
+				if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1)
+					m_timer_probe_reload_cycle = m_cpu->total_cycles();
+			});
+		m_timer_probe_fetch = program.install_read_tap(0x01004c, 0x01004c, "timer_probe_vector",
+			[this](offs_t address, u16 &, u16)
+			{
+				if (machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+				if (!m_timer_probe_entries++)
+				{
+					m_timer_probe_first_entry_cycle = m_cpu->total_cycles();
+					auto const disable = machine().disable_side_effects();
+					m_timer_probe_return_pc = m_cpu->space(AS_DATA).read_word(
+						m_cpu->state_int(tms320c54x_device::STATE_SP));
+				}
+			});
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 	void start_intm_protection_case(unsigned index)
@@ -2313,6 +2340,11 @@ private:
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)),
 				unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)));
+			osd_printf_info("TMS320C54x timer boundary accounting: case=%u reload_fetch_cycle=%llu first_vector_cycle=%llu vector_entries=%u first_return_pc=%04x physical_latency_claim=0\n",
+				index, static_cast<unsigned long long>(m_timer_probe_reload_cycle),
+				static_cast<unsigned long long>(m_timer_probe_first_entry_cycle),
+				m_timer_probe_entries, m_timer_probe_return_pc);
+			expect(m_timer_probe_reload_cycle != 0, "Timer observation captures the reload opcode fetch, not an internal MMR tap");
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Timer probe executes supported synthetic instructions");
 			if (!short_period)
 				expect(marker == 1 && !(m_cpu->state_int(tms320c54x_device::STATE_IMR) & 8),
@@ -19553,6 +19585,10 @@ private:
 	std::array<u16, 76> m_rom4_parameters{};
 	unsigned m_rom4_pcm_mismatches = 0;
 	emu_timer *m_check_timer = nullptr;
+	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload;
+	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
+	unsigned m_timer_probe_entries = 0;
+	u16 m_timer_probe_return_pc = 0;
 	unsigned m_phase = 0;
 	unsigned m_bleq_case = 0;
 	unsigned m_rom4_checks = 0;

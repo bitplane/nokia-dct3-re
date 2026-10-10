@@ -878,6 +878,19 @@ It reports four cases, with both long-period controls asserted and neither
 short-period outcome treated as physical acceptance. This rules out the
 extra pointer-setup instruction as the sole cause; it does not resolve
 Decode-stage acceptance versus write visibility.
+The passive probe also reports reload-opcode fetch and first-vector fetch
+in CPU-accounting cycles, vector-entry count and the first stacked return
+PC. On the current build both short-period forms have a seven-accounting-
+cycle gap and stack `0608`; the indirect/direct cases enter the vector
+108/107 times in their 100-us observation windows. Neither long-period
+control enters the vector after masking. Evidence is
+`tmp/c54x-timer-accounting.log`; the full native core suite also passes in
+`tmp/c54x-core-timer-accounting.log`. These observations preserve the four
+existing outcomes and do not assert physical latency. In particular, an
+address-space TCR write tap cannot timestamp the reload because internal
+MMR writes bypass that path; the reported timestamp is explicitly the
+reload opcode's fetch, not its Execute/write phase. This accounting trace
+is for comparing a future stage-aware correction, not choosing a delay.
 SPRU131G section 7.2, example 7-18, constrains that correction more tightly:
 recognition at the end of cycle 3 inserts INTR at Decode in cycle 4,
 replacing `i2`; already-decoded `i1` completes at Execute in cycle 6.
