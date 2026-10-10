@@ -17,6 +17,29 @@ local taps = {}
 local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
 local post_fetches = 0
+for _, window in ipairs({{0x211a00, 0x211bff}, {0x20cb80, 0x20cbff}}) do
+    local observations = 0
+    taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(window[1], window[2],
+        string.format("rf_task10_lifecycle_%08x", window[1]), function(offset)
+            local pc = mcu.state["PC"].value
+            local space = mcu.spaces["program"]
+            local status = 0
+            if window[1] == 0x211a00 then
+                if pc >= 0x211a9a and pc <= 0x211aa4 then
+                    local object = pc == 0x211a9a and mcu.state["R0"].value
+                        or space:read_u32(mcu.state["SP"].value + 0x18)
+                    if object >= 0x100000 and object < 0x180000 then status = space:read_u16(object) end
+                    if status ~= 0x1390 then return end
+                elseif pc ~= 0x211a54 and pc ~= 0x211a66 then return end
+            elseif pc ~= 0x20cb80 then return end
+            if observations >= 24 then return end
+            observations = observations + 1
+            machine:logerror(string.format(
+                "rom4_rf_task10_lifecycle: window=%08x t=%.9f address=%08x pc=%08x r0=%08x lr=%08x status=%04x\n",
+                window[1], machine.time:as_double(), offset, mcu.state["PC"].value,
+                mcu.state["R0"].value, mcu.state["R14"].value, status))
+        end)
+end
 taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x254c80, 0x254cff,
     "rf_post_fetch_window", function(offset)
         if offset ~= 0x254c84 or mcu.state["PC"].value ~= 0x254c84

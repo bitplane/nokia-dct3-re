@@ -366,8 +366,21 @@ task ownership beyond address similarity. A bounded receive-window
 probe was uninformative and removed; first establish initializer
 completion and the scheduler's actual receive return before diagnosing
 an absent task consumer or introducing any readiness response.
+The wider `0x211a00..0x211bff` window resolves that observation gap:
+fresh storage executes task entry at 1.082075385 seconds, initializer
+entry at 1.082077462 seconds and its return to `0x211a66` at
+1.082957154 seconds. A retained-storage repeat then observes receive
+return PC `0x211a9a` at 1.599812000 seconds, R0=`0x101438`,
+status `0x1390`: the same object submitted by `0x26be28`.
+`tools/c54x_rom4_rf_delivery_check.py` validates ordered construction,
+two-word publication, both consumer advances, the header rewrite,
+task-10 post and receipt with object identity and monotonic timestamps.
+Its negative tests reject every omitted link, mismatched objects/status,
+wrong masks/cursors and reversed time; ring wrap is covered. The checker
+passes this capture. It does not prove payload preservation into the task,
+candidate acquisition, or the downstream case's flag/counter semantics.
 
-The next boundary is task 10's consumption of status `0x1390` and the
+The next boundary is task 10's handling of the received status `0x1390` and the
 meaning of the native `006d` body before choosing an operational RF contract. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
 nine accepted stores); it does not validate packet delivery or acquisition.
