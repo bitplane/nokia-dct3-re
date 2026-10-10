@@ -1352,7 +1352,7 @@ check-c54x-rom4-codec-tone: build
 		echo 'NSE-1 native serial and physical tone-control boundary: PASS (no operational audio claim)'
 
 check-c54x-rom4-coherent: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-c54x-coherent.XXXXXX)"; \
+	@set -eu; tmp="$$(mktemp -d -t noki5110-c54x-coherent.XXXXXX)"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
@@ -1364,7 +1364,7 @@ check-c54x-rom4-coherent: build
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log -verbose \
 			-skip_gameinfo -nothrottle -seconds_to_run 4 \
 			-autoboot_script $(abspath mame_noki5110_c54x_check.lua) 2>&1 | \
-			tee /tmp/tms320c54x-rom4-coherent-check.log; \
+			tee output.log; \
 		grep -q "rom4_validator: event=continue r6=00000001" error.log; \
 		grep -q "rom4_port_write: port=21" error.log; \
 		grep -q "rom4_port_write: port=2c" error.log; \
@@ -1372,9 +1372,8 @@ check-c54x-rom4-coherent: build
 			$(abspath $(MAME_DIR)/roms/noki5110/nse1_rom4_dsp_program.bin) \
 			--trace error.log; \
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --minimum-frames 800; \
-		! grep -q "rom4_reset_request: reason=00000004" error.log
-	@grep -q "ROM4 DSP coherent execution: PASS completion=1074" \
-		/tmp/tms320c54x-rom4-coherent-check.log
+		! grep -q "rom4_reset_request: reason=00000004" error.log; \
+		grep -q "ROM4 DSP coherent execution: PASS completion=1074" output.log
 
 .PHONY: check-c54x-rom4-processing
 check-c54x-rom4-processing: build
@@ -1408,7 +1407,7 @@ check-c54x-rom4-rf-boundary: build
 		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --scan-30s
 
 verify-5110-menu: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-menu.XXXXXX)"; \
+	@set -eu; tmp="$$(mktemp -d -t noki5110-menu.XXXXXX)"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
@@ -1481,7 +1480,7 @@ verify-5110-power-lifecycle: build
 	done
 
 verify-5110-save-state: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-state.XXXXXX)"; \
+	@set -eu; tmp="$$(mktemp -d -t noki5110-state.XXXXXX)"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
