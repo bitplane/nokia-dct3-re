@@ -1777,6 +1777,29 @@ not prove absence of a later retry or that the UI initiated a new RF
 request; do not label either frame registration or a recovered lifecycle.
 The continuation/request-ownership boundary remains unresolved, rather
 than being bypassed by a physical menu operation.
+The Manual run's transport log contains 37 MCU-to-DSP TX commits, the
+last at 12.262565s, and none after physical navigation begins at 26s.
+Thus `Searching` does not establish submission of a fresh DSP scan request.
+The next tracing boundary is the firmware-owned Network Selection request
+and its delivery to the radio manager, before considering a peer response.
+The retained log is `/tmp/noki8210_network_retry_manual/error.log`, SHA-256
+`4e0e7221229399ec48d8cd4eb8fe26aa082ad2f9f6940a39ce09a7cc73c164b9`;
+these counts describe this bounded composition, not every possible retry.
+
+A fresh receive-breakpoint control resolves the UI submission question:
+Manual selection delivers internal `03ea` to the radio manager at
+39.972869s, with receive state 13 and bytes
+`03eaf9d50011329406000608`. The unchanged-state publication follows at
+39.972882s, then the `21f552` continuation logs `PH_9000b1` before returning
+to the receive loop. No new selector/promotion invocation accompanies this
+request. Thus the UI sends a request, but this observed lifecycle does not
+turn it into a DSP transmission. Follow the state-13 `03ea` handling and
+common continuation before positing a missing radio response. This is a
+research-HLE observation, not native RF evidence. The complete run is
+`tmp/noki8210_manual_receive_disk/error.log`, SHA-256
+`94fff0e863e29020ae452faf4afaa887237384f474051ccb4ec453862c0f888e`;
+the earlier `/tmp` receive-tap run had quota errors and is not an acceptance
+control.
 
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
