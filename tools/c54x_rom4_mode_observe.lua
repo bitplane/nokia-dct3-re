@@ -2,7 +2,9 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[":dsp_c54x:cpu"])
 local memory = cpu.spaces["data"]
-local addresses = {0x121f, 0x1835, 0x07fb, 0x1974, 0x00ac, 0x1973, 0x06bc, 0x06be, 0x06e3}
+local addresses = {0x121f, 0x1835, 0x07fb, 0x1974, 0x00ac, 0x1973, 0x06bc, 0x06be, 0x06e3,
+    0x00b1, 0x194f, 0x1950, 0x11fd}
+local bounded_addresses = {[0x00b1] = true, [0x194f] = true, [0x1950] = true, [0x11fd] = true}
 local taps = {}
 local write_counts = {}
 for _, address in ipairs(addresses) do
@@ -11,6 +13,7 @@ for _, address in ipairs(addresses) do
             local pc = cpu.state["PC"].value
             local key = string.format("%04x:%04x", offset, pc)
             write_counts[key] = (write_counts[key] or 0) + 1
+            if bounded_addresses[offset] and write_counts[key] > 4 then return end
             if offset >= 0x06bc and offset <= 0x06e3 and write_counts[key] > 4 then return end
             machine:logerror(string.format(
                 "rom4_mode_write: t=%.9f pc=%06x address=%04x data=%04x mask=%04x\n",
@@ -25,7 +28,8 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x3660, 0x3d5e, 0x3d70, 0x3db8, 0x4dce, 0x30a1, 0x30bf, 0x30d6,
     0x3204, 0x3268, 0x3274, 0x32c3, 0x33f3,
     0x4414, 0x4428, 0x4433, 0x4460, 0x32f4, 0x33b4, 0x3249,
-    0x330a, 0x3326, 0x332b, 0x3347, 0x3360, 0x337c, 0x33ac, 0x33b0, 0x42f6}
+    0x330a, 0x3326, 0x332b, 0x3347, 0x3360, 0x337c, 0x33ac, 0x33b0, 0x42f6,
+    0x33e9, 0x4424, 0x4c6f, 0x4ef7, 0x4f20, 0x50db}
 local counts = {}
 local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,

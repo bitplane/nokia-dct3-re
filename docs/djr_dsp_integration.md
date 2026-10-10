@@ -1105,6 +1105,21 @@ invented message peer. Authentic or independently generated RF sample
 vectors and validation of their format remain required to demonstrate
 successful native type-`0x80` reception.
 
+An eight-second NSE-1 native cold boot with a generated EEPROM and the
+passive `c54x_rom4_mode_observe.lua` observer exercises pointer seeding
+twice and filtered-frame pointer commits eleven times. The observed
+pointer starts at `0x121e` and advances in `0x10`-word increments; its
+final value is `0x125e`. The positive-control frame site `0x33f3` executes
+2617 times. In the same window, operation entry `0x4c6f`, decoder entry
+`0x4ef7`, and both type-`0x80` publication sites execute zero times;
+`0x194f`, `0x1950` and `0x11fd` finish zero. Thus sample-pointer movement
+already occurs without receive-operation activation. This bounded run
+does not prove those operations absent later or with valid RF input.
+COBBA's RF receive callback is currently unbound and supplies zero, so
+pointer movement is not evidence of valid received samples. The next
+discriminating boundary is the operation-start configuration alongside
+the RF sample contract, not a replacement pointer producer.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
