@@ -1183,6 +1183,16 @@ configuration routine runs during the observed scan. They connect
 scheduler choice to the pending/active channel configuration already
 mapped on the MCU side; do not set `0x07fb` directly to activate it.
 
+An eight-second native observation counts zero executions of stores
+`0x55bb`, `0x5783`, `0x578f`, `0x579b` and `0x57a3`. Channel
+`0x1835`, active mode `0x1836`, pending mode `0x1869` and callback
+`0x07fb` all finish zero; the added mode-word write observations contain
+only initialization clears. Therefore this boot does not demonstrate
+channel configuration arriving and being rejected by the scheduler's
+local mode tests. Investigate the configuration entry/request lifecycle
+upstream, retaining RF acquisition as an independent prerequisite;
+do not infer that a forced type-`0x02` request would establish reception.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
