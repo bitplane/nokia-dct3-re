@@ -607,6 +607,15 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   sequences are byte-pinned and word-mutation tested. The flag's producer
   and organic call-time value remain unclassified; silence alone must not
   be attributed to a broken encoder or used to force the flag clear.
+  A raw operand scan of the checked program image finds 35 `1f2b` words:
+  31 bit-test contexts and four write contexts. The whole-word copies at
+  `0xa53d` and `0x27ac` load from shared `0x085e` via AR4. The paired OR
+  `0x1ca0` at `0xb885` and AND `0xe35f` at `0xb891` preserve bit 0.
+  All four write contexts are byte-pinned; the second copy's execution
+  is not established merely by its duplicate words. This bounds literal
+  references in this image, not computed-address writers or future uploads.
+  The next mute-specific predecessor is the MCU/DSP owner of shared
+  `0x085e`, not a local encoder arithmetic correction.
 - The decoder supplies destination `0x1496` before postprocessing at `0x94c9`
   and `0xab7c`; further gain/filter/mute stages precede output copying.
 - `0xaa39` copies from the ring cursor in `0x6de` into the selected input
