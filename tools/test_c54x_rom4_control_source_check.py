@@ -21,7 +21,8 @@ def capture():
 
 class ControlSourceCheckTest(unittest.TestCase):
     def test_accepts_bounded_sources_and_native_boundary(self):
-        self.assertEqual(check(capture())['rf_port32_writes'], 3)
+        # Two table writes, the resident setup pair, and the scan pair.
+        self.assertEqual(check(capture())['rf_port32_writes'], 4)
 
     def test_rejects_changed_pointer_table_or_setup(self):
         for old, new in (('pointer197d=1920', 'pointer197d=1922'),
