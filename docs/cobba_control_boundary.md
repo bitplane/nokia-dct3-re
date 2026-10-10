@@ -379,6 +379,19 @@ Its negative tests reject every omitted link, mismatched objects/status,
 wrong masks/cursors and reversed time; ring wrap is covered. The checker
 passes this capture. It does not prove payload preservation into the task,
 candidate acquisition, or the downstream case's flag/counter semantics.
+The consumer's `LSR #26; BCS` tests original controller bit 25: set
+skips the counter increment. A later `LSR #27; BCS` tests bit 26.
+One fresh capture with a case-window tap and narrow counter watch records
+two halfword writes at trace PC `0x211ec4`, values `162f0000` and
+`16300000`, mask `ffff0000`, at 1.645476077 and 1.645605077 seconds.
+The counter had been initialized bytewise to `162e036b`; do not assume
+a zero initial count or assign physical meaning to that value. These
+writes were not reproduced by later retained-storage or a second fresh
+capture with revised probes, although the delivery checker continued
+to pass. The first capture did not correlate the write with the task's
+stack object, so attribution to `0x1390` rather than its shared `0x138f`
+case remains unclosed. Counter behavior is an observation discrepancy,
+not an established emulation defect; the additional probes were removed.
 
 The next boundary is task 10's handling of the received status `0x1390` and the
 meaning of the native `006d` body before choosing an operational RF contract. The
