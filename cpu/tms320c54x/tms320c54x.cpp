@@ -3149,11 +3149,13 @@ void tms320c54x_device::execute_run()
 		{
 			if (m_intm_guard)
 				--m_intm_guard;
+			// A repeat redirect is not an executed instruction word. Measure
+			// guard consumption before finish_repeats changes the continuation.
+			const unsigned words = u16(m_pc - instruction_pc);
 			// RPT/RPTZ arms the next instruction; its own retirement must not
 			// consume one of the requested body executions.
 			if (repeat_was_armed || !m_rpt_armed)
 				finish_repeats();
-			const unsigned words = u16(m_pc - instruction_pc);
 			if (delayed)
 			{
 				m_delayed_words = words >= m_delayed_words ? 0 : m_delayed_words - words;

@@ -861,6 +861,21 @@ not Decode-stage loop-counter timing or a physical pipeline implementation.
 5110 save-state restoration and original MU4 storage/native-entry acceptance.
 The timer observer still exposes short-period starvation; recorder finalization
 and native speech are not established by these gates.
+XC's two-word interrupt protection (SPRU172C page 4-199) must count the
+retired body's words before repeat handling redirects PC. Otherwise an
+ordinary one-word body ending a block appears to consume a large PC delta,
+admitting IRQ/NMI before the second protected word. Four executable cases
+cover one/two-word bodies and both sources: the short body requires ISR entry
+after the next loop's first word; the long body exhausts protection immediately.
+The old ordering stacks `0802` with observed A one for the short body in
+`tmp/c54x-loop-xc-red.log`; corrected short cases stack `0803` with A nine in
+`tmp/c54x-loop-xc-green.log`. The runner requires
+`TMS320C54x loop XC protection: PASS`. This is word-guard accounting across
+repeat redirection, not a general decoded-instruction frontend or the six-stage
+interrupt pipeline.
+`tmp/c54x-loop-xc-regression.log` preserves the exact native RF counts,
+5110 save-state round trip and original MU4 storage/native entry. The separate
+timer observation still exposes short-period starvation.
 The architectural BRAF correction deliberately changes the exact native NSE-1 scan snapshot:
 two isolated 30-second cold runs (`tmp/nse1-braf-control/error.log` and
 `tmp/nse1-braf-bus/error.log`) reproduce 20,282 frame expiries, 648,096 RF
