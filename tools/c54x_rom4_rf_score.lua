@@ -88,6 +88,25 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
 end
 local stop = emu.add_machine_stop_notifier(function()
     observing = true
+    for _, space_name in ipairs({"program", "data"}) do
+        local space = cpu.spaces[space_name]
+        local matches = 0
+        for address = 0, 0xffff do
+            if space:read_u16(address) == 0x0b6a then
+                matches = matches + 1
+                local words = {}
+                for position = math.max(0, address - 4), math.min(0xffff, address + 4) do
+                    words[#words + 1] = string.format("%04x", space:read_u16(position))
+                end
+                machine:logerror(string.format(
+                    "rom4_rf_continuation_reference: space=%s address=%04x words=%s\n",
+                    space_name, address, table.concat(words, ",")))
+            end
+        end
+        machine:logerror(string.format(
+            "rom4_rf_continuation_reference_summary: space=%s words=65536 matches=%d exhaustive_dispatch_claim=0\n",
+            space_name, matches))
+    end
     for _, start in ipairs({0x0ae4, 0x0b24, 0x0b64, 0x0ba4, 0x0be4, 0x0ca3, 0x0cef, 0x2523, 0x25fe}) do
         local words = {}
         for index = 0, 63 do

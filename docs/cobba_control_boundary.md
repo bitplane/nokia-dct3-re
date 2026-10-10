@@ -217,6 +217,18 @@ the raw ROM and are byte-pinned in the contract checker. Therefore the
 current missing link is the continuation's entry/selection contract,
 not an observed pop returning the wrong value. Search its code/data
 references and active dispatch source before modeling an external event.
+The live exact-word reference census checks 65536 words in each of the
+program and data spaces. Each contains one `0x0b6a` word, at `0x0b59`
+in the same uploaded sequence: `CMP #1,*(0x06fd); BC 0x0b6a,TC`.
+The duplicate code/data occurrence is not two independent producers.
+This recovered branch requires `0x06fd == 1`; the rotating-input run
+has `0x06fd == 0`. It also follows the unexecuted `0x0cef` routine,
+so mode selection is not proven to be the only missing prerequisite.
+No other exact pointer word is present in the final live images, but
+computed targets, earlier overwritten tables and other entry addresses
+are outside this census. The next backward boundary is the upstream
+candidate-validation branch reaching `0x0cef`, not an invented event
+to activate the bit-1 setter directly.
 
 ### Product-specific physical buses
 
