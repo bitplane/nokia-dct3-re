@@ -906,6 +906,16 @@ The next executable timing fixture must distinguish request latching,
 Decode-stage acceptance, memory-write visibility and vector entry. Timer
 requests accepted before a later IMR write must not simply be cancelled by
 that write. The existing short/long-period probe does not resolve this order.
+SPRU131G section 6.10.4 adds an independently observable boundary: IACK
+occurs at the first vector-word fetch and clears the corresponding IFR bit.
+The current core instead clears IFR before its stack write and vector
+transfer. A future stage-aware fixture must therefore observe acceptance,
+the mask write, stack write and first vector fetch separately, including
+IFR at each boundary. It must retain the accepted source/continuation across
+later IMR changes, rather than recomputing acceptance at vector entry.
+This is an implementation constraint, not evidence that the existing timer
+probe has measured physical acknowledgement timing; no aggregate cycle
+constant is changed on this basis.
 An independent return-bus assertion covers `RETF` (`f49b`): SPRU172C
 section 4-141 and SPRU131G example 7-11 specify PC from RTN and an SP
 increment, without reading the stacked PC. A passive tap in the existing
