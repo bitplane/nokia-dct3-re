@@ -11,7 +11,17 @@ local publication_counts = {}
 local flag_writes = 0
 local counter_min, counter_max = 0xffff, 0
 local counter_writers = {}
+local mode_writers = {}
 local taps = {}
+taps[#taps + 1] = memory:install_write_tap(0x06fd, 0x06fd,
+    "rf_scan_mode_writers", function(offset, value)
+        local pc = cpu.state["PC"].value
+        mode_writers[pc] = (mode_writers[pc] or 0) + 1
+        if mode_writers[pc] <= 4 then
+            machine:logerror(string.format("rom4_rf_scan_mode_write: t=%.9f pc=%04x value=%04x\n",
+                machine.time:as_double(), pc, value))
+        end
+    end)
 taps[#taps + 1] = memory:install_write_tap(0x1256, 0x1256,
     "rf_candidate_counter_writers", function(offset, value)
         local pc = cpu.state["PC"].value
@@ -44,14 +54,16 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         return value
     end)
 for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
-    0x0a5c, 0x0ac2, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
+    0x0a5c, 0x0ac2, 0x2420, 0x3129, 0x3130, 0x3132,
+    0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
     0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
     taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(address, address,
         string.format("rf_score_%04x", address), function(offset)
             if observing then return end
             local pc = cpu.state["PC"].value
             if pc ~= offset and pc ~= offset + 1 then return end
-            if address == 0x0a5c or address == 0x0ac2 then
+            if address == 0x0a5c or address == 0x0ac2 or address == 0x2420
+                or address == 0x3129 or address == 0x3130 or address == 0x3132 then
                 publication_counts[address] = (publication_counts[address] or 0) + 1
                 if publication_counts[address] <= 4 then
                     machine:logerror(string.format(
@@ -161,7 +173,11 @@ local stop = emu.add_machine_stop_notifier(function()
     for pc, count in pairs(counter_writers) do
         machine:logerror(string.format("rom4_rf_counter_writer_count: pc=%04x count=%d\n", pc, count))
     end
-    for _, address in ipairs({0x0ca3, 0x0cef, 0x0a5c, 0x0ac2, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
+    for pc, count in pairs(mode_writers) do
+        machine:logerror(string.format("rom4_rf_scan_mode_writer_count: pc=%04x count=%d\n", pc, count))
+    end
+    for _, address in ipairs({0x0ca3, 0x0cef, 0x0a5c, 0x0ac2, 0x2420, 0x3129, 0x3130, 0x3132,
+        0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
         0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
         machine:logerror(string.format("rom4_rf_selection_tail_count: address=%04x count=%d\n",
             address, publication_counts[address] or 0))

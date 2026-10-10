@@ -191,8 +191,8 @@ in the delayed-branch slot of the second comparison, including cases
 that do not reach the accepted-value store; it is not an acceptance
 predicate by itself.
 Consequently these inputs prove candidate selection, not publication
-of acquired radio data. Recover the flag's producer and the follow-on
-branch contract before expecting an MCU acquisition indication.
+of acquired radio data. The flag's decoded software producer is below;
+its presence does not establish acquisition in this fixture.
 
 The expanded live-code capture identifies an explicit bit-1 setter:
 `0x0b78` performs a delayed branch to `0x0b42` with
@@ -241,8 +241,8 @@ Thus the history-comparison and continuation gates are downstream of
 an unsatisfied counter predicate in this mathematical-input run.
 Do not infer a firmware bug or remove either guard: initialization,
 other writers and product/request context of `0x1256` remain open.
-The next concrete query is that counter's initialization/write contract,
-not a missing MDI reply or an injected continuation return value.
+Its initialization/write contract is recorded below; this guard does
+not justify supplying an MDI reply or continuation return value.
 The complete 60-second write census observes five writer PCs for
 `0x1256`: loader `0x0f15` (1), reset `0x3074` (2), filtered-buffer
 store at advanced PC `0x33e5` (2), uploaded reset `0x0ac7` (3), and
@@ -279,13 +279,24 @@ the restart branch at `0x0b69` and gateway target at `0x2421`.
 The gateway is `GOTO 0x0a5c`, also present in the acquired image.
 Resident sequence `0x3129..0x3133` clears `0x06fd`, calls `0x3198`,
 then calls gateway `0x2420`, and sets `0x06fd=1` only after return.
-Both resident sequences are byte-pinned. Consequently the zero
-`0x06fd` observed in this scan is consistent with the pre-return
-lifecycle, not by itself a missing mode-setting input. Runtime census
-of `0x3130` (call) and `0x3132` (return continuation) remains necessary
-before declaring that gateway stalled or classifying the whole scan
-as ordinary post-boot acquisition. Exact-word scans do not cover
-computed entries or overwritten earlier tables.
+Both resident sequences are byte-pinned. The runtime call/return census
+confirms three entries at `0x3129`, `0x3130` and gateway `0x2420`,
+with two returns to `0x3132`. Firmware writes `0x06fd=0` three times
+at advanced PC `0x312c`, and `0x06fd=1` twice at advanced PC `0x3135`.
+The returns occur at 1.644830615 and 38.523453018 seconds; the third
+scan remains in flight at the 60-second stop. Thus the gateway-stall
+hypothesis is falsified: the bounded scan can return without entering
+the dormant follow-on route. Zero mode inside the scan is the selected
+pre-return lifecycle, not an absent mode-setting hardware event.
+Exact-word scans do not cover computed entries or overwritten tables.
+
+The next unresolved question is which post-return branch selects the
+subsequent scan/restart instead of the operational configuration path.
+Trace the host-command call at `0x3138`, its `0x06e3` decisions, and
+the `0x1949` selection before attributing the dormant operational
+callbacks to a missing physical producer. The 1523-versus-500 counter
+constraint is an observed property of this pre-return scan, not proof
+that the resident lifecycle is blocked there.
 
 ### Product-specific physical buses
 
