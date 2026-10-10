@@ -157,6 +157,14 @@ public:
 			util::stream_format(stream, ", %s%s", (family & 0x0600) == 0x0400 ? "TS, " : "", BIT(op, 8) ? "B" : "A");
 			return (1 + extended) | SUPPORTED;
 		}
+		if (family >= 0x8000 && family <= 0x8700)
+		{
+			bool const extended = mode >= 0xe0;
+			util::stream_format(stream, "%-8s%c, %s", BIT(op, 9) ? "STH" : "STL", BIT(op, 8) ? 'B' : 'A',
+				BIT(op, 10) ? "ASM, " : "");
+			smem(extended ? next_word() : 0);
+			return (1 + extended) | SUPPORTED;
+		}
 		if ((family == 0x4800 || family == 0x4900 || family == 0x4a00 || family == 0x8800 || family == 0x8900 ||
 			family == 0x8a00) && mode < 0xe0)
 		{
@@ -260,6 +268,17 @@ public:
 		if ((op & 0xfdf0) == 0xf5b0 || (op & 0xfdf0) == 0xf4b0)
 		{
 			util::stream_format(stream, "%s    %u, %u", BIT(op, 8) ? "SSBX" : "RSBX", BIT(op, 9), op & 15);
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xfe00) == 0xe800)
+		{
+			util::stream_format(stream, "LD      #$%02X, %c", op & 255, BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xffe0) == 0xed00)
+		{
+			int const immediate = (op & 0x10) ? int(op & 31) - 32 : int(op & 31);
+			util::stream_format(stream, "LD      #%d, ASM", immediate);
 			return 1 | SUPPORTED;
 		}
 		if ((op & 0xff00) == 0xec00)

@@ -944,6 +944,49 @@ private:
 					"Parallel instruction syntax separates store and arithmetic selectors");
 			}
 		osd_printf_info("TMS320C54x parallel disassembler: PASS forms=4352 complement=4 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+		{
+			for (unsigned word = 0; word < 2048; ++word)
+			{
+				words const buffer(pc, 0x8000 + word, 0x2345);
+				std::ostringstream text;
+				bool const extended = (word & 255) >= 0xe0;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == ((1 + extended) | dasm::SUPPORTED) &&
+					buffer.seen() == (extended ? 3 : 1), "Accumulator store decoder bounds address extensions");
+			}
+			for (unsigned word = 0; word < 544; ++word)
+			{
+				words const buffer(pc, word < 512 ? 0xe800 + word : 0xed00 + word - 512, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+					"Short immediate decoder reads no extension words");
+			}
+		}
+		vector const store_short_forms[] = {
+			{0x8094, 1 | dasm::SUPPORTED, "STL     A, *AR4+"},
+			{0x81f8, 2 | dasm::SUPPORTED, "STL     B, *($2345)"},
+			{0x8283, 1 | dasm::SUPPORTED, "STH     A, *AR3"},
+			{0x83ed, 2 | dasm::SUPPORTED, "STH     B, *+AR5($2345)"},
+			{0x8410, 1 | dasm::SUPPORTED, "STL     A, ASM, $10"},
+			{0x8593, 1 | dasm::SUPPORTED, "STL     B, ASM, *AR3+"},
+			{0x86f5, 2 | dasm::SUPPORTED, "STH     A, ASM, *+AR5($2345)%"},
+			{0x87f8, 2 | dasm::SUPPORTED, "STH     B, ASM, *($2345)"},
+			{0xe801, 1 | dasm::SUPPORTED, "LD      #$01, A"},
+			{0xe9ff, 1 | dasm::SUPPORTED, "LD      #$FF, B"},
+			{0xed00, 1 | dasm::SUPPORTED, "LD      #0, ASM"},
+			{0xed0f, 1 | dasm::SUPPORTED, "LD      #15, ASM"},
+			{0xed10, 1 | dasm::SUPPORTED, "LD      #-16, ASM"},
+			{0xed1f, 1 | dasm::SUPPORTED, "LD      #-1, ASM"},
+			{0xed20, 1, ".word   $ED20"},
+		};
+		for (auto const &test : store_short_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Store/short-immediate syntax retains ASM selection and signed immediate endpoints");
+		}
+		osd_printf_info("TMS320C54x store/short disassembler: PASS stores=2048 immediates=544 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
