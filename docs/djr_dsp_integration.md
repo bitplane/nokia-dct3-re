@@ -1078,10 +1078,11 @@ channel modes. Their producers, decoder input vectors, and successful
 result predicates remain open; the existence of publication code does
 not supply the physical input needed to execute it successfully.
 
-Two operation producers are byte-pinned to common routine `0x4c6f`:
+Three known operation producers are byte-pinned to common routine `0x4c6f`:
 `0x9a99` stores its result directly to `0x1950`, while `0x9acc`
 stores its result in `0x194f` through AR2 at `0x9ad5` after a delayed
-mask operation. This indirect store is why a direct-address-store scan
+mask operation; `0x9b20` has the direct `0x194f` store described below.
+This indirect store is why a direct-address-store scan
 cannot close selector ownership. Within `0x4c6f`, `0x4c8e` waits for
 data `0x00b1` to reach the selected sample-buffer start plus `0x7c`,
 and `0x4ca3` waits for the final threshold (`0x1b1a` for operation
@@ -1119,6 +1120,14 @@ COBBA's RF receive callback is currently unbound and supplies zero, so
 pointer movement is not evidence of valid received samples. The next
 discriminating boundary is the operation-start configuration alongside
 the RF sample contract, not a replacement pointer producer.
+
+A further byte-pinned primary-operation writer starts at `0x9b15`:
+after `0x2476`, it returns when data `0x194c` is zero. Otherwise it sets
+AR3 to zero and AR4 to `0xffff`, calls `0x4c6f` at `0x9b20` with
+A masked by `0x195b & 0x0100` in the delay slot, clears that flag bit,
+and stores the result directly into `0x194f` at `0x9b27`. This additional
+caller is not an exhaustive ownership census. Its control-word
+provenance and runtime scheduling remain unresolved.
 
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
