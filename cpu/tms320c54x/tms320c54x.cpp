@@ -324,10 +324,16 @@ public:
 				BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
 			return 2 | SUPPORTED;
 		}
-		if ((op & 0xfcff) == 0xf484 || (op & 0xfcff) == 0xf485 || (op & 0xfcff) == 0xf48f)
+		if ((op & 0xfcff) == 0xf484 || (op & 0xfcff) == 0xf485 || (op & 0xfcff) == 0xf48f || (op & 0xfcff) == 0xf49f)
 		{
-			char const *name = (op & 255) == 0x84 ? "NEG" : (op & 255) == 0x85 ? "ABS" : "NORM";
+			char const *name = (op & 255) == 0x84 ? "NEG" : (op & 255) == 0x85 ? "ABS" : (op & 255) == 0x8f ? "NORM" : "RND";
 			util::stream_format(stream, "%-8s%c, %c", name, BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xfeff) == 0xf483 || (op & 0xfeff) == 0xf486 || (op & 0xfeff) == 0xf487 || (op & 0xfeff) == 0xf48e)
+		{
+			char const *name = (op & 255) == 0x83 ? "SAT" : (op & 255) == 0x86 ? "MAX" : (op & 255) == 0x87 ? "MIN" : "EXP";
+			util::stream_format(stream, "%-8s%c", name, BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}
 		if ((op & 0xfcff) == 0xf493)

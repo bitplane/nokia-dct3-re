@@ -1081,6 +1081,33 @@ private:
 						buffer.seen() == 1 && text.str() == expected.str(), "Unary accumulator syntax preserves both selectors without extension reads");
 				}
 		osd_printf_info("TMS320C54x unary disassembler: PASS forms=12 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		vector const normalization_forms[] = {
+			{0xf483, 1 | dasm::SUPPORTED, "SAT     A"},
+			{0xf583, 1 | dasm::SUPPORTED, "SAT     B"},
+			{0xf486, 1 | dasm::SUPPORTED, "MAX     A"},
+			{0xf586, 1 | dasm::SUPPORTED, "MAX     B"},
+			{0xf487, 1 | dasm::SUPPORTED, "MIN     A"},
+			{0xf587, 1 | dasm::SUPPORTED, "MIN     B"},
+			{0xf48e, 1 | dasm::SUPPORTED, "EXP     A"},
+			{0xf58e, 1 | dasm::SUPPORTED, "EXP     B"},
+			{0xf49f, 1 | dasm::SUPPORTED, "RND     A, A"},
+			{0xf59f, 1 | dasm::SUPPORTED, "RND     A, B"},
+			{0xf69f, 1 | dasm::SUPPORTED, "RND     B, A"},
+			{0xf79f, 1 | dasm::SUPPORTED, "RND     B, B"},
+			{0xf683, 1, ".word   $F683"},
+			{0xf786, 1, ".word   $F786"},
+			{0xf687, 1, ".word   $F687"},
+			{0xf78e, 1, ".word   $F78E"},
+		};
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (auto const &test : normalization_forms)
+			{
+				words const buffer(pc, test.op, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == 1,
+					"Normalization/min-max decoder preserves selector width without reading extensions");
+			}
+		osd_printf_info("TMS320C54x normalization disassembler: PASS forms=12 rejected=4 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
