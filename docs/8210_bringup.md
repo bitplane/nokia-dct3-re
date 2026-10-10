@@ -1763,6 +1763,21 @@ that missing contract. The remaining software route is to correlate these
 lifecycle distinctions with the own-ROM mode-4 producer and its consumers;
 do not promote an NHM-5 trace label into an NSM-3 semantic claim.
 
+Physical Network Selection does not establish late-PIN recovery in the
+tested composition. Fresh own-PMM DCS fixtures with PIN entry starting at
+eight seconds reproduce the queued `03ec`/result-4 boundary, accept phone
+security and navigate Menu -> Settings -> Phone settings -> Network
+selection (`4-5-6`) through ordinary keypad inputs. Selecting the already
+active Automatic choice returns `Done`; selecting Manual displays
+`Searching`. Neither bounded run observes another `2a0dc8` promotion
+after the original 12.262-second call (Automatic through 65 seconds,
+Manual through 68 seconds). Periodic peer broadcasts and the live
+`PH_9000` receive loop continue in the Manual run. These observations do
+not prove absence of a later retry or that the UI initiated a new RF
+request; do not label either frame registration or a recovered lifecycle.
+The continuation/request-ownership boundary remains unresolved, rather
+than being bypassed by a physical menu operation.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
