@@ -877,9 +877,9 @@ interrupt pipeline.
 5110 save-state round trip and original MU4 storage/native entry. The separate
 timer observation still exposes short-period starvation.
 Operand-fetch conformance separates Smem address preparation from its read/write
-so MVDK, MVDP, PORTW, PORTR, READA, MVKD, CMPM, BITF and POPD fetch their instruction extensions
+so MVDK, MVDP, PORTW, PORTR, READA, MVKD, CMPM, BITF, POPD and WRITA fetch their instruction extensions
 before reading data, I/O or program operands. FIRS likewise fetches its coefficient
-address before reading X/Y. Thirty-seven passive bus-tap cases cover direct,
+address before reading X/Y. Forty-one passive bus-tap cases cover direct,
 postincrement, long-offset and absolute forms plus FIRS; the runner requires
 `TMS320C54x operand fetch order: PASS`. The original MVDK direct case reads
 data before its destination extension and fails this check. The original CMPM
@@ -889,6 +889,8 @@ POPD's long-offset negative control observes the stack read before its address
 extension; resolving the destination before `pop()` closes that ordering defect.
 Its four forms also check a distinct destination sentinel, unchanged stack word,
 single SP increment and selected pointer updates.
+WRITA's four forms additionally check a distinct program destination and
+unchanged accumulator A; they verify existing execution, without a timing change.
 Instruction-family
 extension layouts, address updates and aggregate cycle charges remain unchanged.
 This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
@@ -1729,7 +1731,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 543 decoded and 83
+promoted to a boundary. Current cold-idle coverage is 544 decoded and 82
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1780,6 +1782,12 @@ forms, with bounded extension reads on ordinary and wrapping program pages
 and six exact syntax cases. The required marker is
 `TMS320C54x unsigned load disassembler: PASS` (SPRU172C, LDU). Its unsigned
 execution behavior is unchanged; decoder coverage is not a timing claim.
+
+WRITA decodes all 256 data-source addressing forms with bounded one/two-word
+reads on two program pages and four exact syntax cases. Its required marker is
+`TMS320C54x WRITA disassembler: PASS` (SPRU172C, WRITA). Separate executable
+fetch-order cases validate its existing data-to-program transfer, not physical
+pipeline or repeat timing.
 
 Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
 giving 44 one-word forms checked on two program pages. Non-delayed RC has

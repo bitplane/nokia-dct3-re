@@ -175,10 +175,10 @@ public:
 			}
 			return 2 | SUPPORTED;
 		}
-		if (family == 0x4b00 || family == 0x8b00)
+		if (family == 0x4b00 || family == 0x8b00 || family == 0x7f00)
 		{
 			bool const extended = mode >= 0xe0;
-			util::stream_format(stream, "%-8s", family == 0x4b00 ? "PSHD" : "POPD");
+			util::stream_format(stream, "%-8s", family == 0x4b00 ? "PSHD" : family == 0x8b00 ? "POPD" : "WRITA");
 			smem(extended ? next_word() : 0);
 			return (1 + extended) | SUPPORTED;
 		}

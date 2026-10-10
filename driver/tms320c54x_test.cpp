@@ -241,7 +241,7 @@ private:
 		auto &data = m_cpu->space(AS_DATA);
 		unsigned const family = index >= 25 ? 6 + (index - 25) / 4 : index / 4;
 		unsigned const form = index >= 25 ? (index - 25) % 4 : index % 4;
-		static constexpr u16 families[] = { 0x7100, 0x7d00, 0x7500, 0x7400, 0x7e00, 0x7000, 0x6000, 0x6100, 0x8b00 };
+		static constexpr u16 families[] = { 0x7100, 0x7d00, 0x7500, 0x7400, 0x7e00, 0x7000, 0x6000, 0x6100, 0x8b00, 0x7f00 };
 		static constexpr u8 modes[] = { 0x00, 0x92, 0xe2, 0xf8 };
 		static constexpr u16 operands[] = { 0x0700, 0x0700, 0x0124, 0x0123, 0, 0x0700, 0xbeef, 0x8000 };
 		u16 pc = 0x0800;
@@ -258,7 +258,7 @@ private:
 				if (family == 0 || family == 4 || family == 5 || family >= 6)
 				{
 					program.write_word(pc++, 5);
-					if (family != 4 && family != 8) program.write_word(pc++, operands[family]);
+					if (family != 4 && family < 8) program.write_word(pc++, operands[family]);
 				}
 				else
 				{
@@ -269,12 +269,12 @@ private:
 			else
 			{
 				if (form == 3) program.write_word(pc++, 0x0600);
-				if (family != 4 && family != 8) program.write_word(pc++, operands[family]);
+				if (family != 4 && family < 8) program.write_word(pc++, operands[family]);
 			}
 		}
 		m_operand_extension_count = pc - 0x0801;
 		program.write_word(pc, 0xf4e1);
-		program.write_word(0x0900, 0xbeef);
+		program.write_word(0x0900, family == 9 ? 0xdead : 0xbeef);
 		program.write_word(0x0700, 0);
 		data.write_word(0x0600, family == 8 ? 0xdead : 0xbeef); data.write_word(0x0601, 0xcafe);
 		data.write_word(0x0700, family == 5 || family == 8 ? 0xbeef : 0);
@@ -1166,6 +1166,29 @@ private:
 				"Unsigned load syntax retains memory addressing and destination selectors");
 		}
 		osd_printf_info("TMS320C54x unsigned load disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned mode = 0; mode < 256; ++mode)
+			{
+				words const buffer(pc, 0x7f00 | mode, 0x2345);
+				std::ostringstream text;
+				unsigned const length = mode >= 0xe0 ? 2 : 1;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+					"WRITA decoder bounds its source address extension");
+			}
+		vector const writa_forms[] = {
+			{0x7f12, 1 | dasm::SUPPORTED, "WRITA   $12"},
+			{0x7f92, 1 | dasm::SUPPORTED, "WRITA   *AR2+"},
+			{0x7fe2, 2 | dasm::SUPPORTED, "WRITA   *AR2($2345)"},
+			{0x7ff8, 2 | dasm::SUPPORTED, "WRITA   *($2345)"},
+		};
+		for (auto const &test : writa_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"WRITA syntax preserves data source addressing");
+		}
+		osd_printf_info("TMS320C54x WRITA disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
@@ -20475,7 +20498,7 @@ private:
 			osd_printf_info("TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi\n");
 			start_operand_fetch_case(0); return;
 		}
-		if (m_phase >= 86000 && m_phase < 86037)
+		if (m_phase >= 86000 && m_phase < 86041)
 		{
 			unsigned const index = m_phase - 86000;
 			unsigned const family = index >= 25 ? 6 + (index - 25) / 4 : index / 4;
@@ -20501,11 +20524,13 @@ private:
 				if (family == 6 || family == 7) expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x1000, "Comparison/test publishes TC");
 				if (family == 8) expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0701 &&
 					data.read_word(0x0700) == 0xbeef, "POPD increments SP once and preserves popped stack contents");
+				if (family == 9) expect(m_cpu->space(AS_PROGRAM).read_word(0x0900) == 0xbeef &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0900, "WRITA writes the distinct program destination without changing A");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
 					(form == 1 ? 0x0601 : form == 2 ? 0x05fb : 0x0600), "Address modifier preserved");
 			}
-			if (index < 36) { start_operand_fetch_case(index + 1); return; }
-			osd_printf_info("TMS320C54x operand fetch order: PASS cases=37 families=10 forms=direct,indirect,long,absolute\n");
+			if (index < 40) { start_operand_fetch_case(index + 1); return; }
+			osd_printf_info("TMS320C54x operand fetch order: PASS cases=41 families=11 forms=direct,indirect,long,absolute\n");
 			start_cala_rtn_case(0); return;
 		}
 		if (m_phase >= 87000 && m_phase < 87004)
