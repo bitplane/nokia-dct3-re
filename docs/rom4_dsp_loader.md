@@ -1731,7 +1731,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 560 decoded and 66
+promoted to a boundary. Current cold-idle coverage is 570 decoded and 56
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1808,6 +1808,13 @@ address latency, while SPRU131G table 7-9 assigns category-I latency 1 and
 category-II latency 0 in compiler mode. Existing execution and its 24-case
 stack-address gate follow the latter detailed table; decoding does not resolve
 that physical-timing discrepancy or justify changing the execution model.
+
+MVDD decodes all 256 packed dual-memory operands independently of ST/LD;
+immediate DP loads decode all 512 nine-bit values. Both are one word and checked
+on two program pages without extension reads, including four exact MVDD source/
+destination examples. The required marker is
+`TMS320C54x dual move/DP disassembler: PASS` (SPRU172C, MVDD and LD syntax 3).
+Execution, address visibility and physical timing are unchanged.
 
 Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
 giving 44 one-word forms checked on two program pages. Non-delayed RC has

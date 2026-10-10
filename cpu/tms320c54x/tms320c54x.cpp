@@ -129,6 +129,11 @@ public:
 			static constexpr char const *forms[] = {"*AR%u", "*AR%u-", "*AR%u+", "*AR%u+0%%"};
 			util::stream_format(stream, forms[(operand >> 2) & 3], 2 + (operand & 3));
 		};
+		if (family == 0xe500)
+		{
+			stream << "MVDD    "; dual(op >> 4); stream << ", "; dual(op);
+			return 1 | SUPPORTED;
+		}
 		if ((op & 0xfc00) == 0xc800 || (op & 0xfd00) == 0xe400)
 		{
 			bool const to_t = (op & 0xfd00) == 0xe400;
@@ -313,6 +318,11 @@ public:
 		if ((op & 0xfe00) == 0xe800)
 		{
 			util::stream_format(stream, "LD      #$%02X, %c", op & 255, BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xfe00) == 0xea00)
+		{
+			util::stream_format(stream, "LD      #%u, DP", op & 0x1ff);
 			return 1 | SUPPORTED;
 		}
 		if ((op & 0xffe0) == 0xed00)

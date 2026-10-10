@@ -1203,7 +1203,7 @@ private:
 			{0xcba5, 1 | dasm::SUPPORTED, "ST      B, *AR3- || LD *AR4+, B"},
 			{0xe4e9, 1 | dasm::SUPPORTED, "ST      A, *AR3+ || LD *AR4+0%, T"},
 			{0xe623, 1 | dasm::SUPPORTED, "ST      B, *AR5 || LD *AR4, T"},
-			{0xe500, 1, ".word   $E500"},
+			{0xe79f, 1, ".word   $E79F"},
 			{0xe790, 1, ".word   $E790"},
 		};
 		for (auto const &test : parallel_load_forms)
@@ -1243,6 +1243,37 @@ private:
 				"FRAME/MVMM syntax preserves signed endpoints and SP identity");
 		}
 		osd_printf_info("TMS320C54x frame/MMR move disassembler: PASS frames=256 moves=81 rejected=175 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned immediate = 0; immediate < 512; ++immediate)
+			{
+				words const buffer(pc, 0xea00 | immediate, 0x2345);
+				std::ostringstream text, expected;
+				util::stream_format(expected, "LD      #%u, DP", immediate);
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1 && text.str() == expected.str(),
+					"Immediate DP decoder retains all nine bits without reading extensions");
+			}
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned operands = 0; operands < 256; ++operands)
+			{
+				words const buffer(pc, 0xe500 | operands, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+					"MVDD decoder uses only the packed dual-memory word");
+			}
+		vector const dual_move_forms[] = {
+			{0xe5c9, 1 | dasm::SUPPORTED, "MVDD    *AR2+0%, *AR3+"},
+			{0xe598, 1 | dasm::SUPPORTED, "MVDD    *AR3+, *AR2+"},
+			{0xe5a8, 1 | dasm::SUPPORTED, "MVDD    *AR4+, *AR2+"},
+			{0xe5ca, 1 | dasm::SUPPORTED, "MVDD    *AR2+0%, *AR4+"},
+		};
+		for (auto const &test : dual_move_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"MVDD syntax preserves X source and Y destination ordering");
+		}
+		osd_printf_info("TMS320C54x dual move/DP disassembler: PASS moves=256 dp=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
