@@ -25,6 +25,23 @@ taps[#taps + 1] = mcu.spaces["program"]:install_write_tap(0x101c8, 0x101cb,
                 machine.time:as_double(), mcu.state["PC"].value, offset, value, mask))
         end
     end)
+for _, address in ipairs({0x291c34, 0x26be28, 0x26be3c, 0x26be58}) do
+    local count = 0
+    taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(address & ~3, address | 3,
+        string.format("rf_mcu_dispatch_%08x", address), function(offset)
+            local pc = mcu.state["PC"].value
+            if pc ~= address and pc ~= address + 2 then return end
+            count = count + 1
+            if count <= 16 then
+                local object = mcu.state[address == 0x291c34 and "R5" or "R4"].value
+                machine:logerror(string.format(
+                    "rom4_rf_mcu_dispatch: address=%08x t=%.9f object=%08x state=%02x r0=%08x r1=%08x\n",
+                    address, machine.time:as_double(), object,
+                    mcu.spaces["program"]:read_u8(0x108427),
+                    mcu.state["R0"].value, mcu.state["R1"].value))
+            end
+        end)
+end
 taps[#taps + 1] = memory:install_write_tap(0x06fd, 0x06fd,
     "rf_scan_mode_writers", function(offset, value)
         local pc = cpu.state["PC"].value

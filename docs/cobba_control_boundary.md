@@ -316,8 +316,22 @@ and body of this native response. This proves ring consumption, not
 application-level interpretation or successful RF acquisition.
 DSP-local data-space write taps cannot
 establish absence of MCU-side shared-memory consumer updates.
-The next boundary is to classify the downstream MCU handler of this
-naturally constructed type-`0x8a` response before choosing an operational RF contract. The
+For NSE-1 v5.30, the first-level switch at `0x291c34` selects table
+entry `0x291c70` for type `0x8a`; its corrected pool word targets
+`0x291ca0`, which calls handler `0x26be28`. This is not the adjacent
+`0x26bf18` handler. The native eight-second trace reaches `0x26be28`
+at 1.645216538 seconds and its non-discard branch `0x26be3c` at
+1.645217923 seconds, with controller state byte `0x108427=2`.
+Static decoding shows state 1 frees the message; other states clear
+bit 1 at controller offset `0x7c`, rewrite its status to `0x1390`
+(pool `0x26c034`), and post the same object to task 10 via `0x254c84`.
+The post call itself has not yet been observed: a mid-block instruction
+tap is not an absence proof. At function entry R4 still belongs to the
+caller; R0 is the message pointer, and the branch observation confirms
+R4 becomes that pointer (`0x101438`).
+
+The next boundary is task 10's consumption of status `0x1390` and the
+meaning of the native `006d` body before choosing an operational RF contract. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
 nine accepted stores); it does not validate packet delivery or acquisition.
 The 1523-versus-500 constraint remains a property of the pre-return scan,
