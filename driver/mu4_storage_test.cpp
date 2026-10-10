@@ -292,6 +292,32 @@ private:
 	{
 		while (count--) { m_mcbsp0->tx_clock_w(!inverted); m_mcbsp0->tx_clock_w(inverted); }
 	}
+	void check_external_overwrite(unsigned i)
+	{
+		static constexpr unsigned widths[] = {8, 12, 16};
+		unsigned const width = widths[i];
+		u16 const mask = (1U << width) - 1;
+		external_reg_w(1, 0); external_reg_w(4, 0x100 | (i << 5));
+		external_reg_w(5, 1); external_reg_w(14, 0);
+		m_mcbsp0->tx_clock_w(0); m_mcbsp0->tx_frame_w(0);
+		m_external_words.clear(); m_external_bits.clear(); external_reg_w(1, 1);
+		unsigned const irqs = m_external_tx_irqs;
+		m_mcbsp0->data_w(3, 0x1234); m_mcbsp0->data_w(3, 0xa55a);
+		m_mcbsp0->control_w(0, 1);
+		if ((m_mcbsp0->control_r(1) & 2) || m_external_tx_irqs != irqs)
+			fatalerror("McBSP buffered overwrite fabricated XRDY or a transmit interrupt");
+		m_mcbsp0->tx_frame_w(1); external_clocks(1, false);
+		// Overwrite the next DXR while the first word remains in XSR.
+		m_mcbsp0->data_w(3, 0xabcd); m_mcbsp0->data_w(3, 0x5aa5);
+		external_clocks(2 * width - 1, false);
+		if (m_external_words != std::vector<u16>({u16(0xa55a & mask), u16(0x5aa5 & mask)}) ||
+			m_external_bits.size() != 2 * width || m_external_tx_irqs != irqs + 2)
+			fatalerror("McBSP overwrite must replace only DXR, preserving XSR and its physical bit stream");
+		for (unsigned bit = 0; bit < 2 * width; ++bit)
+			if (m_external_bits[bit] != BIT(bit < width ? 0xa55a : 0x5aa5, width - 1 - bit % width))
+				fatalerror("McBSP overwritten transmit bit order mismatch");
+		if (i == 2) logerror("mu4_mcbsp_overwrite: PASS widths=8,12,16 dxr_replaced=1 xsr_retained=1 ready_edges=1 physical_bits=1\n");
+	}
 	void check_external_underrun(unsigned i)
 	{
 		static constexpr unsigned widths[] = {8, 12, 16};
@@ -2193,6 +2219,7 @@ private:
 		if (m_phase >= 70 && m_phase <= 73)
 		{
 			// Each physical-input variant yields so synchronized IRQ events can drain.
+			if (m_phase < 73) check_external_overwrite(m_phase - 70);
 			check_external_underrun(m_phase - 70);
 			if (m_phase < 73) { ++m_phase; m_check->adjust(attotime::from_usec(1)); return; }
 			m_mcbsp0->tx_frame_w(0); m_mcbsp0->tx_frame_w(1); external_clocks(7, false);

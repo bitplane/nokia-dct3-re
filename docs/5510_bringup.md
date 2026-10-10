@@ -1200,9 +1200,10 @@ receive register, readiness event or firmware buffer.
 
 RX registers, pin levels, partial shifts and buffering are saved. Dual phase,
 words wider than 16 bits, companding, loopback/SPI/A-bis receive, nonzero RINTM,
-overrun and unexpected-frame recovery, active format changes, internal receive
+unexpected-frame recovery, active format changes, internal receive
 clocks and reset-activation timing remain unsupported or unvalidated. Unsupported
-active data formats and overrun/recovery fail explicitly.
+active data formats and unexpected-frame recovery fail explicitly; supported
+receive overrun behavior is covered by the error-state gates below.
 
 The native stream explicitly supplies converted fixture samples `1234/5678`
 through the codec's DOUT pin, not DRR, DMA readiness or firmware-buffer writes.
@@ -2429,6 +2430,21 @@ not established by these tests. Routine profiles check the first 1,024 DIN
 words; the complete-startup measurement profile checks digital transport
 continuously as described above. Neither transfer counts nor pin-decoded
 output alone prove music decoding.
+
+SPRU302B section 2.3.7.3 additionally defines transmit overwrite: a new DXR
+write before DXR-to-XSR handoff replaces the buffered word rather than
+stopping the device. The supported external-frame implementation preserves
+any word already in XSR and does not invent another readiness edge. Three
+pin-driven cases exercise overwrite before the first frame and overwrite
+of the next word while XSR is active, checking exact serial bits, completed
+words and IRQ counts at 8/12/16 bits. The old abort is reproduced in
+`tmp/mcbsp-overwrite-red/output.log`; the full original-storage gate requires
+`mu4_mcbsp_overwrite: PASS` alongside its existing underflow/overrun and
+save-state gates. The complete gate passes with
+`MU4_STORAGE_RUN_DIR=tmp/mcbsp-overwrite-green`; its isolated `error.log`
+retains the original storage, native entry, serial/DMA and error-state
+results. This extends generic serial error behavior, not native
+recording completion or speech.
 
 Side-effect-free five-second boundary snapshots show words `142c/142d`
 and `145c/145d` both remaining `0001,e9ff`; word `145e` changes from zero

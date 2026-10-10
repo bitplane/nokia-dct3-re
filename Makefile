@@ -1080,6 +1080,7 @@ check-mu4-storage-original: build
 		grep -q 'mu4_dma_conformance: PASS' error.log; grep -q 'mu4_loader: PASS' error.log; \
 		grep -q 'mu4_dma_source_inspection: PASS' error.log; \
 		grep -q 'mu4_native_entry: PASS' error.log; grep -q 'mu4_mcbsp_conformance: PASS' error.log; \
+		grep -q 'mu4_mcbsp_overwrite: PASS widths=8,12,16 dxr_replaced=1 xsr_retained=1 ready_edges=1 physical_bits=1' error.log; \
 		grep -q 'mu4_mcbsp_underrun: PASS' error.log; grep -q 'mu4_mcbsp_underrun_restore: PASS' error.log; \
 		grep -q 'mu4_mcbsp_overrun: PASS' error.log; grep -q 'mu4_mcbsp_overrun_restore: PASS' error.log; \
 		grep -q 'mu4_dma_sync_conformance: PASS' error.log; \

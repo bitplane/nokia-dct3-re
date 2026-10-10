@@ -274,7 +274,8 @@ void tms320c54x_mcbsp_device::data_w(offs_t offset, u16 value)
 		((m_regs[4] >> 5) & 7) > 2 || (m_regs[5] & 0x0018) ||
 		(m_regs[5] & 3) == 3 || (m_regs[1] & 0x0030) || (m_regs[0] & 0x8040))
 		fatalerror("McBSP unsupported active transmit format xcr=%04x/%04x srgr2=%04x", m_regs[4], m_regs[5], m_regs[7]);
-	if (m_buffer_full) fatalerror("McBSP DXR overwritten before ready");
+	// SPRU302B 2.3.7.3: a premature DXR write replaces the buffered word;
+	// it does not change the word already being shifted from XSR.
 	m_buffer = value;
 	m_buffer_full = true;
 	set_ready(false);
