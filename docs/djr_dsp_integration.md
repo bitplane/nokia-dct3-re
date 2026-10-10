@@ -1193,6 +1193,16 @@ local mode tests. Investigate the configuration entry/request lifecycle
 upstream, retaining RF acquisition as an independent prerequisite;
 do not infer that a forced type-`0x02` request would establish reception.
 
+The byte-pinned configuration entry `0x5514` calls `0x23d0` and then
+tests `0x1949 & 0x0008`, branching to `0x58a7` when clear. An
+eight-second passive run observes zero executions of entry `0x5514`,
+the test `0x5516`, and downstream sites `0x5536/0x5554`. Cell
+`0x1949` receives only initialization clears and finishes zero; the
+candidate bit-set site `0x6943` is also unexecuted. The zero flag does
+not explain a local rejection in this run because the test itself is
+not reached. Caller/scheduling provenance of `0x5514` remains the
+next configuration-side boundary, distinct from valid RF acquisition.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
