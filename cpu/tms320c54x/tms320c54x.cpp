@@ -711,7 +711,11 @@ void tms320c54x_device::dual_modify(u8 operand)
 void tms320c54x_device::circular_modify(unsigned ar, s16 step)
 {
 	if (!m_bk)
+	{
+		// BK=0 makes the % modifier linear (SPRU429A section 3.3.6).
+		m_ar[ar] += step;
 		return;
+	}
 	unsigned address_bits = 0;
 	while ((1U << address_bits) <= m_bk && address_bits != 16)
 		++address_bits;

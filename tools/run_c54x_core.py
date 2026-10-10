@@ -7,6 +7,7 @@ import sys
 import tempfile
 
 REQUIRED = [
+    "TMS320C54x zero BK addressing: PASS variants=320",
     "TMS320C54x ROLTC conformance: PASS variants=256",
     "TMS320C54x core conformance: PASS",
     "TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4",

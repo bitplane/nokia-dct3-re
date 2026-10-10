@@ -9,6 +9,7 @@
 #include "nokia_dspif.h"
 #include "nokia_cobba.h"
 #include "gsm_tch_f_l1.h"
+#include "util/gsmfr.h"
 #include "tms320c54x_mcbsp.h"
 #include "tms320c54x_dma.h"
 #include <sstream>
@@ -1076,6 +1077,12 @@ private:
 				data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "fr-decoder"))
+		{
+			start_rom4_fr_decoder(0, true);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "fr-packing"))
 		{
 			start_rom4_fr_packing(0, 0);
@@ -1523,22 +1530,23 @@ private:
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
-	static gsm::tch_f::speech_bits rom4_fr_parameters(unsigned vector, u16 (&words)[76])
-	{
-		static constexpr unsigned widths[] = {
+	static constexpr unsigned ROM4_FR_WIDTHS[] = {
 			6, 6, 5, 5, 4, 4, 3, 3,
 			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 			7, 2, 2, 6, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
-		};
+	};
+
+	static gsm::tch_f::speech_bits rom4_fr_parameters(unsigned vector, u16 (&words)[76])
+	{
 		gsm::tch_f::speech_bits serial{};
 		u32 random = 0x9e3779b9U ^ vector;
 		unsigned position = 0;
 		for (unsigned p = 0; p < 76; ++p)
 		{
 			words[p] = 0;
-			for (unsigned bit = 0; bit < widths[p]; ++bit, ++position)
+			for (unsigned bit = 0; bit < ROM4_FR_WIDTHS[p]; ++bit, ++position)
 			{
 				random ^= random << 13;
 				random ^= random >> 17;
@@ -1574,6 +1582,78 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = 71000 + vector * 3 + stage;
 		m_check_timer->adjust(attotime::from_msec(1));
+	}
+
+	void start_rom4_fr_decoder(unsigned frame, bool initialize)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (initialize)
+		{
+			m_rom4_codec.reset();
+			if (!frame) m_rom4_pcm_mismatches = 0;
+		}
+		else
+		{
+			util::gsm_fr_codec::pcm_block input{};
+			u32 random = 0x12345678U ^ frame;
+			for (unsigned i = 0; i < input.size(); ++i)
+			{
+				random = random * 1664525U + 1013904223U;
+				switch (frame / 8)
+				{
+				case 0: input[i] = 0; break;
+				case 1: input[i] = i == frame % 160 ? 32767 : 0; break;
+				case 2: input[i] = i & 1 ? 12000 : -12000; break;
+				case 3: input[i] = s16(random >> 16); break;
+				}
+			}
+			util::gsm_fr_codec::speech_frame encoded{};
+			expect(m_rom4_codec.encode(input, encoded) && m_rom4_codec.decode(encoded, m_rom4_pcm), "FR reference codec available");
+			gsm::tch_f::speech_bits serial{};
+			expect(gsm::tch_f::unpack_speech(encoded, serial), "FR reference serial frame");
+			unsigned position = 0;
+			for (unsigned p = 0; p < 76; ++p)
+			{
+				u16 value = 0;
+				for (unsigned bit = 0; bit < ROM4_FR_WIDTHS[p]; ++bit) value = (value << 1) | serial[position++];
+				data.write_word(0x1390 + p, value);
+			}
+			for (unsigned i = 0; i < 160; ++i) data.write_word(0x1500 + i, 0xdead);
+		}
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, initialize ? 0x8449 : 0x8458);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x1500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 72000 + frame * 2 + (initialize ? 0 : 1);
+		m_check_timer->adjust(attotime::from_msec(5));
+	}
+
+	void start_zero_bk_case(unsigned index)
+	{
+		static constexpr u16 addresses[] = { 0, 1, 0x007f, 0x0100, 0x7fff, 0x8000, 0xfffe, 0xffff };
+		static constexpr u16 steps[] = { 0, 1, 3, 0xffff, 0xfffd, 0x7fff, 0x8000, 0x8001 };
+		static constexpr u16 opcodes[] = { 0x6dc2, 0x6dd2, 0x6dca, 0x6dda, 0xa4c1 };
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0700, opcodes[index % 5]);
+		program.write_word(0x0701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, steps[(index / 5) % 8]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, addresses[index / 40]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 73000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
 	void start_roltc_case(unsigned index)
@@ -18721,6 +18801,56 @@ private:
 			start_idle_wake_case(0);
 			return;
 		}
+		if (m_phase >= 73000 && m_phase < 73320)
+		{
+			unsigned const index = m_phase - 73000;
+			static constexpr u16 addresses[] = { 0, 1, 0x007f, 0x0100, 0x7fff, 0x8000, 0xfffe, 0xffff };
+			static constexpr s16 steps[] = { 0, 1, 3, -1, -3, 0x7fff, -0x8000, -0x7fff };
+			unsigned const form = index % 5;
+			s32 const step = form == 0 ? -1 : form == 1 ? 1 : form == 2 ? -s32(steps[(index / 5) % 8]) : steps[(index / 5) % 8];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == u16(addresses[index / 40] + step) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0f00,
+				"BK zero preserves linear modulo-16-bit address updates for Smem and dual operands");
+			if (index < 319) { start_zero_bk_case(index + 1); return; }
+			osd_printf_info("TMS320C54x zero BK addressing: PASS variants=320\n");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+		}
+		if (m_phase >= 72000 && m_phase < 72064)
+		{
+			unsigned const frame = (m_phase - 72000) / 2;
+			bool const initialize = !(m_phase & 1);
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+				osd_printf_info("ROM4 FR decoder stop: frame=%u initialize=%u pc=%04x illegal=%u sp=%04x\n",
+					frame, initialize, unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"native FR decoder/reset returns with balanced stack");
+			if (initialize) { start_rom4_fr_decoder(frame, false); return; }
+			unsigned differences = 0;
+			for (unsigned i = 0; i < 160; ++i)
+			{
+				s16 const actual = s16(m_cpu->space(AS_DATA).read_word(0x1500 + i));
+				if (actual != m_rom4_pcm[i])
+				{
+					if (!differences) osd_printf_info("ROM4 FR decoder mismatch: frame=%u sample=%u actual=%d expected=%d\n", frame, i, actual, m_rom4_pcm[i]);
+					++differences;
+				}
+			}
+			m_rom4_pcm_mismatches += differences;
+			osd_printf_info("ROM4 FR decoder comparison: frame=%u mismatches=%u\n", frame, differences);
+			if (frame < 31) { start_rom4_fr_decoder(frame + 1, (frame + 1) % 8 == 0); return; }
+			osd_printf_info("TMS320C54x ROM4 FR decoder comparison: frames=32 samples=5120 mismatches=%u\n", m_rom4_pcm_mismatches);
+			expect(!m_rom4_pcm_mismatches, "native FR decoder PCM matches independent codec");
+			osd_printf_info("TMS320C54x ROM4 FR decoder: PASS frames=32 samples=5120 handset_audio_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 FR decoder complete");
+		}
 		if (m_phase >= 71000 && m_phase < 71879)
 		{
 			unsigned const vector = (m_phase - 71000) / 3;
@@ -18791,8 +18921,8 @@ private:
 				"ROLTC inserts TC, exports bit31 to C, clears guard bits and preserves other status");
 			if (index < 255) { start_roltc_case(index + 1); return; }
 			osd_printf_info("TMS320C54x ROLTC conformance: PASS variants=256\n");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			start_zero_bk_case(0);
+			return;
 		}
 		if (m_phase >= 64000 && m_phase < 64516)
 		{
@@ -19052,6 +19182,9 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	int m_bio_level = 1;
 	optional_device<nokia_dspif_device> m_transport;
+	util::gsm_fr_codec m_rom4_codec;
+	util::gsm_fr_codec::pcm_block m_rom4_pcm{};
+	unsigned m_rom4_pcm_mismatches = 0;
 	emu_timer *m_check_timer = nullptr;
 	unsigned m_phase = 0;
 	unsigned m_bleq_case = 0;
@@ -19361,6 +19494,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(2, "crc-helper", "Isolated acquired ROM carry/XOR helper")
 	ROM_SYSTEM_BIOS(3, "crc-packed", "Isolated acquired ROM packed CRC")
 	ROM_SYSTEM_BIOS(4, "fr-packing", "Isolated acquired ROM FR parameter round trip")
+	ROM_SYSTEM_BIOS(5, "fr-decoder", "Isolated acquired ROM FR decoder")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -19377,6 +19511,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(4))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(5))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -19393,6 +19530,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(4))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(5))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))

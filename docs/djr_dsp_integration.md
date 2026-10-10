@@ -474,7 +474,7 @@ Relevant original annotations and their current validation scope:
 | Data `0x1390` | `FR_prm` | Candidate full-rate parameter buffer |
 | Program `0x80e7` / `0x80ff` | `FR_prm2bits` / `FR_bits2prm` | Native FR parameter round trip validated; see packing contract below |
 | Program `0x812f` | `EFR_FR_crc3_AR4` | Candidate CRC helper used by the type-`0x50` buffer consumer |
-| Program `0x8458` / `0x860c` | `FR_decoder` / `FR_coder` | Candidate software-only codec validation entry points, not validated speech |
+| Program `0x8458` / `0x860c` | `FR_decoder` / `FR_coder` | Decoder validated in isolation; encoder remains a candidate |
 | Program `0xc8dc` | `EFR_decoder` | Candidate enhanced-full-rate decoder |
 
 There are no named addresses in `0x8d00..0x93ff`. Querying both ordinary
@@ -555,10 +555,24 @@ through native unpacking. Each call must return with a balanced stack.
 The fixture's 1 ms observation interval is a bounded execution allowance,
 not a peripheral-latency or cycle-accuracy claim.
 
-The next software-only boundary is the codec's PCM/parameter ABI and state
-initialization at the candidate `0x8458` / `0x860c` entries. Parameter packing
-and CRC tests do not prove those codec routines, handset audio delivery or
-native speech.
+`make check-c54x-rom4-fr-decoder` validates acquired decoder `0x8458`,
+initialized by native `0x8449`. Its 76 serial-order parameters occupy
+`0x1390..0x13db`; AR2 supplies the caller's 160-word PCM destination.
+Four eight-frame sequences (zero, impulse, alternating and deterministic
+noise) retain native history between frames. All 5,120 output samples match
+the independent GSM FR codec exactly. The 5 ms observation interval is an
+execution allowance, not measured hardware timing.
+
+The decoder requires `%` address updates to remain linear when BK is zero:
+its RPE inverse quantizer uses `*AR2+0%` with AR0=3 and BK=0. Suppressing
+that update overwrites pulses. This rule is independently documented in
+[TI SPRU429A section 3.3.6](https://www.ti.com/lit/ug/spru429a/spru429a.pdf)
+and protected by 320 core cases covering signed strides, wraparound and
+single/dual-memory forms.
+
+The next software-only boundary is encoder `0x860c`, preprocessing `0x85e0`
+and their persistent state. Isolated decoder PCM validation does not prove
+handset audio delivery, native speech during a call or end-to-end calls.
 
 The practical software-only route is therefore:
 

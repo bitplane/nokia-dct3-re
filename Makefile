@@ -1221,6 +1221,10 @@ check-c54x-rom4-crc-packed: build prepare-c54x-rom4-fixture
 check-c54x-rom4-fr-packing: build prepare-c54x-rom4-fixture
 	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-packing
 
+.PHONY: check-c54x-rom4-fr-decoder
+check-c54x-rom4-fr-decoder: build prepare-c54x-rom4-fixture
+	$(PYTHON) tools/run_c54x_rom4_crc.py --mame $(MAME_DIR)/mame --rompath $(MAME_DIR)/roms --fr-decoder
+
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.
 .PHONY: probe-c54x-timer-boundary
