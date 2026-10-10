@@ -1714,9 +1714,9 @@ The current native cold-idle inventory is 626 words in 110 high-byte groups,
 SHA-256 `05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59`.
 Two isolated controls (`tmp/c54x-frontend-idle-a` and `-b`) reproduce the full
 ranked report exactly. The existing 594-word gate expectation is now stale
-and remains intentionally unrebanked: current fixture coverage is 601 asserted,
-one execution-only (`9a5f`) and 24 absent words. High-use absent forms begin
-with `6f95`, `1087`, `1182`, `6c8d`, `6db7`, `80b4`, `838a` and `f67b`.
+and remains intentionally unrebanked: current fixture coverage is 604 asserted,
+one execution-only (`9a5f`) and 21 absent words. High-use absent forms begin
+with `6c8d`, `6db7`, `80b4`, `838a` and `f67b`.
 Earlier 594-word closure statements below apply to that earlier trace, not
 the current native execution set.
 
@@ -1732,6 +1732,14 @@ and `0881`; their execution frequency is in the isolated report.
 `check-c54x-observed-coverage` requests this report but still stops at its
 stale primary fingerprint. Restore execution assertions and deliberately
 review the changed trace before rebanking it; do not bypass either check.
+
+Exact acquired `6f95/0e20` (`SUB *AR5+,0,B,A`) and indirect loads `1087`
+(`LD *AR7,A`) and `1182` (`LD *AR2,B`) have six independent execution cases,
+each with SXM clear/set and memory `8001`. They assert signed/unsigned results,
+preserved source accumulator and memory, and the single AR5 postincrement
+versus unchanged load pointers. The required marker is
+`TMS320C54x native gap arithmetic/load: PASS`; this is selected operand/status
+coverage, not all inputs or physical pipeline timing.
 
 ### Debugger control-flow decoding
 

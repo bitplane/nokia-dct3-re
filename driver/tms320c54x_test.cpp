@@ -73,6 +73,27 @@ private:
 		m_phase = 83000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_native_gap_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		unsigned const family = index / 2;
+		program.write_word(0x0800, family == 0 ? 0x6f95 : family == 1 ? 0x1087 : 0x1182);
+		program.write_word(0x0801, family == 0 ? 0x0e20 : 0xf4e1);
+		program.write_word(0x0802, 0xf4e1);
+		data.write_word(0x0600, 0x8001);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 5);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR5, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR7, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (index & 1) ? 0x0100 : 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_phase = 88000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_cala_rtn_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -19787,6 +19808,27 @@ private:
 				data.read_word(0x03ff) == 0xdead, "CALA publishes RTN independently of its stack word");
 			if (!index) { start_cala_rtn_case(1); return; }
 			osd_printf_info("TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B\n");
+			start_native_gap_case(0); return;
+		}
+		if (m_phase >= 88000 && m_phase < 88006)
+		{
+			unsigned const index = m_phase - 88000, family = index / 2;
+			bool const signed_operand = index & 1;
+			u64 const loaded = signed_operand ? 0xffffff8001ULL : 0x8001;
+			u64 const a = family == 0 ? (signed_operand ? 0x8004 : 0xffffff8004ULL) : family == 1 ? loaded : 3;
+			u64 const b = family == 2 ? loaded : 5;
+			expect_opcode(family == 0 ? 0x6f95 : family == 1 ? 0x1087 : 0x1182,
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == a &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == b &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR5) == (family == 0 ? 0x0601 : 0x0600) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR7) == 0x0600 &&
+				m_cpu->space(AS_DATA).read_word(0x0600) == 0x8001,
+				"Native 6f95/0e20 and 1087/1182 preserve source, addressing and SXM results");
+			if (index < 5) { start_native_gap_case(index + 1); return; }
+			osd_printf_info("TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
