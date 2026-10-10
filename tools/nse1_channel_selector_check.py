@@ -249,6 +249,29 @@ def check_channel_parameters(cpu):
     return 65536
 
 
+def check_rr_receive_route(cpu):
+    for message_id in (0x05ea, 0x05eb):
+        cpu.mem_write(0x10b000, message_id.to_bytes(2, "big"))
+        cpu.reg_write(UC_ARM_REG_R4, 0x10b000)
+        cpu.emu_start(0x26caed, 0x26c98c, count=128)
+        if cpu.reg_read(UC_ARM_REG_PC) != 0x26c98c:
+            raise ValueError(f"RR receive route differs for {message_id:#x}")
+        for protocol in range(256):
+            cpu.mem_write(0x10b008, (0x10b100).to_bytes(4, "big"))
+            cpu.mem_write(0x10b003, bytes([0x5a]))
+            cpu.mem_write(0x10b104, bytes([protocol]))
+            cpu.reg_write(UC_ARM_REG_R4, 0x10b000)
+            target = 0x26c9c0 if protocol & 15 == 6 else 0x26c998
+            cpu.emu_start(0x26c98d, target, count=16)
+            if cpu.reg_read(UC_ARM_REG_PC) != target:
+                raise ValueError(f"RR protocol selection differs for {protocol:#x}")
+            if protocol & 15 == 6 and (
+                    cpu.reg_read(UC_ARM_REG_R0), cpu.reg_read(UC_ARM_REG_R1)
+                    ) != (0x10b100, 0x5a):
+                raise ValueError("RR receive route changed parser arguments")
+    return 512
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -286,6 +309,7 @@ def check_image(raw):
             "optional_mode_parser_cases": check_optional_mode_parser(cpu),
             "channel_description_cases": check_channel_description(cpu, raw),
             "channel_parameter_cases": check_channel_parameters(cpu),
+            "rr_receive_route_cases": check_rr_receive_route(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

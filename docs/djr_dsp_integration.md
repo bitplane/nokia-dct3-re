@@ -924,6 +924,17 @@ Both branches retain the second byte's high three bits as the training
 sequence. This is exhaustive for those two input bytes at one accepted
 type, not proof of a live assignment or physical RF behavior.
 
+The receive-loop dispatch at `0x26caec` routes message IDs `0x05ea`
+and `0x05eb` to `0x26c98c`. Isolated execution checks both IDs and
+every protocol-byte value (512 cases): the payload pointer is read from
+message offset 8, and payload byte 4's low nibble must equal 6 to reach
+the `0x23d980` parser call at `0x26c9c0`. Its arguments are the unchanged
+payload pointer and message byte 3. Other protocol values take the
+non-RR branch. This verifies the internal receive boundary; the producer
+of these messages, complete message parsing, and native physical ingress
+remain unproved. Subtract-cascade arithmetic is checked by execution,
+not inferred from neighboring message numbers.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
