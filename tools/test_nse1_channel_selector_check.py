@@ -38,6 +38,7 @@ class ChannelSelectorTests(unittest.TestCase):
         self.assertEqual(result["channel_parameter_cases"], 65536)
         self.assertEqual(result["rr_receive_route_cases"], 512)
         self.assertEqual(result["rr_payload_allocation_cases"], 1536)
+        self.assertEqual(result["rr_fixed_block_cases"], 1024)
         self.assertEqual(result["c3_first_arguments"], [0x21, 0xe4])
 
 

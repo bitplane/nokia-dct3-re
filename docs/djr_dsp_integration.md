@@ -964,6 +964,17 @@ indirect-call coverage. At `0x23843e`, the literal ID is `0x05eb`, reached
 after receive-record processing at `0x237fcc`. The record's transport
 ownership and live publication remain the next boundary to establish.
 
+Receive processor `0x237fcc` supplies the constructor's record in its
+fixed-block branch for input kinds `40/50/60/a0`. Full isolated routine
+execution covers all 256 header bytes for each kind (1,024 cases): input
+byte 13 becomes record byte `0x157`, kind byte 11 becomes `0x164`, and
+header byte 14 shifted right two becomes length byte `0x12b`. The routine
+clears 23 bytes at record `0x114` before validation. Only header low bits
+`01` with declared length 1..22 copy 22 bytes from input offset 15; rejected
+headers leave the cleared region, although the length metadata is still
+stored. This verifies one record-population branch without claiming the
+segmented branch, incoming-kind meanings, or native RF delivery.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

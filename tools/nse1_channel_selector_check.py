@@ -319,6 +319,33 @@ def check_rr_payload_allocation(cpu):
     return 1536
 
 
+def check_rr_fixed_block(cpu):
+    for kind in (0x40, 0x50, 0x60, 0xa0):
+        for header in range(256):
+            cpu.mem_write(0x10b100, bytes([0xee]) * 0x180)
+            source = bytearray(40)
+            source[11], source[13], source[14] = kind, header ^ 255, header
+            source[15:37] = bytes(range(22))
+            cpu.mem_write(0x10b500, bytes(source))
+            cpu.reg_write(UC_ARM_REG_R0, 0x10b500)
+            cpu.reg_write(UC_ARM_REG_R1, 0x10b100)
+            cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+            cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
+            cpu.emu_start(0x237fcd, RETURN, count=4096)
+            if cpu.reg_read(UC_ARM_REG_PC) != RETURN:
+                raise ValueError("fixed receive block did not return within bound")
+            length = header >> 2
+            valid = header & 3 == 1 and 1 <= length <= 22
+            expected = bytes(range(22)) + bytes([0]) if valid else bytes(23)
+            if bytes(cpu.mem_read(0x10b214, 23)) != expected:
+                raise ValueError(f"fixed receive block copy differs for {header:#x}")
+            for offset, expected_byte in ((0x157, header ^ 255), (0x164, kind),
+                                          (0x12b, length)):
+                if bytes(cpu.mem_read(0x10b100 + offset, 1)) != bytes([expected_byte]):
+                    raise ValueError("fixed receive block metadata differs")
+    return 1024
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -358,6 +385,7 @@ def check_image(raw):
             "channel_parameter_cases": check_channel_parameters(cpu),
             "rr_receive_route_cases": check_rr_receive_route(cpu),
             "rr_payload_allocation_cases": check_rr_payload_allocation(cpu),
+            "rr_fixed_block_cases": check_rr_fixed_block(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,
