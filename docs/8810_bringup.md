@@ -335,16 +335,24 @@ bounded comparison (30 s, acquired ROM4 resident code in both):
 | Search-list packet | `441a`, consumed 2.091369 s; handlers `3d5e/3d70` execute | No type-`1a` consumption observed |
 | Mode-initializer callers | `4de3` at 2.104560 s, `4e00` at 2.109178 s, `0ab8` at 2.138677 s | All three dormant |
 | Mode `00ac` | `0 -> 1 -> 2 -> 9 -> 1` | Zero |
+| Scheduler branch `30bf` / call `30d6 -> 4dce` | Once each | Zero, despite 6,449 tests at `30a1` |
 | First four memory-upload destinations | `2286`, `22ad`, `22d4`, `22fb` | Same |
 | Compared 156 uploaded words | All match except word `22c9 = 0202` | `22c9 = 0000` |
 
-The type-`1a` handler precedes mode activation but does not directly call
-the initializer; temporal order is not a causal closure. Identity/control
-payloads also differ, with NSE-6's records erased. No NSE-1 data may be copied
-into NSE-6 to conceal these genuine input differences. Next recover the
-own-MCU search-list publication condition and the native `4de3/4e00` control
-entrance. The NSE-1 processing
-checker passes on this capture; NSE-6's overlay/upload checks also pass.
+The resident control entrance is now traced rather than inferred from timing.
+Type-`1a` writes `06e3 = 1` at PC `3db6`, 2.091369 s, after setting bit 3
+of `06bc`. Scheduler `309d..30a2` tests bit 0 of `06e3` and enters `30bf`
+at 2.091377 s, clears the word at `30cb`, then calls `4dce` from `30d6`
+at 2.100506 s. That routine reaches the observed mode-initializer callers.
+NSE-6 runs the scheduler test but never publishes the enabling word or
+enters that branch. Both fixtures hold `06be = 0010`, so that word is not
+the observed cross-product distinction. No firmware state is forced.
+
+The next boundary is the own-MCU search-list publication condition, not a
+missing native initializer implementation. Identity/control payloads also
+differ, with NSE-6's records erased; no NSE-1 data may be copied into NSE-6
+to conceal these genuine input differences. The NSE-1 processing checker
+passes on this capture; NSE-6's overlay/upload checks also pass.
 
 The differing upload word is not an evidenced activation prerequisite:
 native NSE-1 enters mode 1 at 2.104560 s, before publishing `22c9 = 0202`

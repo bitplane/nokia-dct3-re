@@ -2,11 +2,16 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[":dsp_c54x:cpu"])
 local memory = cpu.spaces["data"]
-local addresses = {0x121f, 0x1835, 0x07fb, 0x1974, 0x00ac, 0x1973}
+local addresses = {0x121f, 0x1835, 0x07fb, 0x1974, 0x00ac, 0x1973, 0x06bc, 0x06be, 0x06e3}
 local taps = {}
+local write_counts = {}
 for _, address in ipairs(addresses) do
     taps[#taps + 1] = memory:install_write_tap(address, address,
         string.format("mode_%04x", address), function(offset, data, mask)
+            local pc = cpu.state["PC"].value
+            local key = string.format("%04x:%04x", offset, pc)
+            write_counts[key] = (write_counts[key] or 0) + 1
+            if offset >= 0x06bc and offset <= 0x06e3 and write_counts[key] > 4 then return end
             machine:logerror(string.format(
                 "rom4_mode_write: t=%.9f pc=%06x address=%04x data=%04x mask=%04x\n",
                 machine.time:as_double(), cpu.state["PC"].value, offset, data, mask))
@@ -17,7 +22,7 @@ end
 local program = cpu.spaces["program"]
 local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x09a4, 0x0ab8, 0x4de3, 0x4e00, 0x9b62, 0x9b9f, 0x9bb0,
-    0x3660, 0x3d5e, 0x3d70, 0x3db8,
+    0x3660, 0x3d5e, 0x3d70, 0x3db8, 0x4dce, 0x30a1, 0x30bf, 0x30d6,
     0x3204, 0x3268, 0x3274, 0x32c3, 0x33f3,
     0x4414, 0x4428, 0x4433, 0x4460, 0x32f4, 0x33b4, 0x3249,
     0x330a, 0x3326, 0x332b, 0x3347, 0x3360, 0x337c, 0x33ac, 0x33b0, 0x42f6}
@@ -26,6 +31,8 @@ local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,
     [0x9b62] = true, [0x9b9f] = true, [0x9bb0] = true,
     [0x3660] = true, [0x3d5e] = true, [0x3d70] = true, [0x3db8] = true,
+    [0x4dce] = true,
+    [0x30bf] = true, [0x30d6] = true,
 }
 local packet_count = 0
 local upload_reads = {}
