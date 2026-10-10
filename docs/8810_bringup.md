@@ -15,6 +15,19 @@ latency are not established. Recover the surrounding port-0/port-36
 transaction and its callers before modeling a ready bit; do not assign
 the port to COBBA or a PLL from the polling shape alone.
 
+The trigger is an organic type-`0x4c` packet (`0x044c`, payload
+`0080,0104`) consumed at 3.649007 seconds. Resident dispatch `0x3bcd`
+calls `0x9232` (saved return `0x3bcf`); that routine clears control-word
+`0x06f3` bit 0 at `0x9253` and calls `0x9129` (saved return `0x9258`).
+The passive entry trace confirms both call edges. Thus this is a control
+reconfiguration after memory uploads, before search-command consumption,
+not a wait entered by the search handler itself. A word-pattern scan finds
+21 immediate PORTR/PORTW references to port `0x36`, concentrated in
+`0x8d96..0x92a4`. This is a candidate-site inventory, not an exhaustive
+instruction-boundary or computed-port census. The other entry at `0x9116`
+is not observed in this run; do not infer its callers from the blocked
+`0x9129` path.
+
 Native TX completion now wakes the MCU pending queue through MAD2 FIQ1.
 IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
 shared-service counters and block uploads, not TX-queue wakeup. FIQ dispatch

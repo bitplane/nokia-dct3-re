@@ -12,6 +12,30 @@ local handles = {}
 local pending_memory_uploads = {}
 local observing_native = false
 if dsp then
+    local port_control_writers = {}
+    handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x06f3, 0x06f3,
+        'nse6_native_port_control', function(offset, value, mask)
+            local pc = dsp.state['PC'].value
+            port_control_writers[pc] = (port_control_writers[pc] or 0) + 1
+            if port_control_writers[pc] > 4 then return end
+            machine:logerror(string.format(
+                'nse6_native_port_control: pc=%04x value=%04x t=%.9f\n',
+                pc, value, machine.time:as_double()))
+        end)
+    for _, site in ipairs({0x3bcd, 0x9232, 0x9129, 0x9116, 0x90e7, 0x92c4}) do
+        local hits = 0
+        handles[#handles + 1] = dsp.spaces['program']:install_read_tap(site, site,
+            'nse6_native_port_transaction_' .. site, function()
+                if dsp.state['PC'].value ~= site + 1 or hits >= 4 then return end
+                hits = hits + 1
+                local sp = dsp.state['SP'].value
+                machine:logerror(string.format(
+                    'nse6_native_port_transaction: site=%04x sp=%04x stack=%04x control=%04x a=%010x t=%.9f\n',
+                    site, sp, dsp.spaces['data']:read_u16(sp),
+                    dsp.spaces['data']:read_u16(0x06f3),
+                    dsp.state['A'].value, machine.time:as_double()))
+            end)
+    end
     for _, direction in ipairs({'read', 'write'}) do
         local sites = {}
         local install = direction == 'read' and 'install_read_tap' or 'install_write_tap'
