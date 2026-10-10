@@ -21,12 +21,25 @@ calls `0x9232` (saved return `0x3bcf`); that routine clears control-word
 `0x06f3` bit 0 at `0x9253` and calls `0x9129` (saved return `0x9258`).
 The passive entry trace confirms both call edges. Thus this is a control
 reconfiguration after memory uploads, before search-command consumption,
-not a wait entered by the search handler itself. A word-pattern scan finds
-21 immediate PORTR/PORTW references to port `0x36`, concentrated in
-`0x8d96..0x92a4`. This is a candidate-site inventory, not an exhaustive
+not a wait entered by the search handler itself. The existing
+`tools/c54x_rom4_port_census.py --port 0x36` finds 18 read and 13 write
+candidates, including absolute Smem forms omitted by a two-word scan.
+Most accesses are in `0x8d96..0x92a4`; additional reads occur at
+`0x34da` and `0xb8b7`. This is a candidate-site inventory, not an exhaustive
 instruction-boundary or computed-port census. The other entry at `0x9116`
 is not observed in this run; do not infer its callers from the blocked
 `0x9129` path.
+
+The acquired archive's `full.s54` agrees with the independently decoded
+`BITF 0x4000` / `BC NTC` loop but does not name the physical block. A fresh
+12-second NSE-1 cold run with its own EEPROM profile and the same native
+backend retains port `0x36=0x0080`. Its counts for `0x3bcd`, `0x9232`,
+`0x9129` and `0x9140` are all zero. The working handset therefore bypasses
+this restart transaction in the measured boot; its success is not evidence
+for a port-36 ready-bit value. `tools/c54x_rom4_port36_observe.lua` is the
+portable passive comparison instrument. Complete ownership of the port's
+fields remains a software-research target; this negative control alone does
+not establish a hardware-only blocker.
 
 Native TX completion now wakes the MCU pending queue through MAD2 FIQ1.
 IRQ dispatch `0x2deb9a` sends IRQ4 to `0x2b66fc`, which handles
