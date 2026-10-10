@@ -1825,6 +1825,15 @@ The preceding exploratory queue log used debugger expression `+12`
 (hexadecimal 0x12, not decimal 12) and is excluded; the corrected observer
 uses explicit `+0xc`.
 
+The constructor also completes its `03ea`-specific initialization before
+returning: queued `1135f4` has byte `+2=20`, `+3=00`, `+8=00`, and
+`+10=00` (hex offsets). These match the pinned `2a1f72..2a1f82` stores;
+the dispatch base literal is `03ea` at `2a2274`. This is not an incomplete
+request rewrite. The bytes' broader protocol meanings are not established
+by these stores. Fresh completion evidence:
+`tmp/noki8210_manual_queue_fields/error.log`, SHA-256
+`262cff505f7b459bdc28e718751965f41585136fa94bacc230b2f7b5c6795755`.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:

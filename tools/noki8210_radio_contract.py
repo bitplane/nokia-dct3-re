@@ -223,6 +223,15 @@ def verify(image):
             ('bne', '#0x2a1ebe'), ('movs', 'r0, #0x14'),
             ('bl', '#0x28922c'), ('str', 'r0, [r4, #0xc]')]:
         raise ValueError('queued request reuse/allocation branch differs')
+    if int.from_bytes(read(0x2a2274, 4), 'big') != 0x03ea:
+        raise ValueError('queued request dispatch base differs')
+    if instructions(0x2a1f72, 18) != [
+            ('movs', 'r0, #0x20'), ('strb', 'r0, [r2, #2]'),
+            ('movs', 'r0, #0'), ('ldr', 'r1, [r4, #0xc]'),
+            ('strb', 'r0, [r1, #3]'), ('ldr', 'r1, [r4, #0xc]'),
+            ('strb', 'r0, [r1, #8]'), ('ldr', 'r1, [r4, #0xc]'),
+            ('strb', 'r0, [r1, #0x10]')]:
+        raise ValueError('manual-selection queued object initialization differs')
     if instructions(0x21f5d6, 8) != [
             ('cmp', 'r0, #3'), ('beq', '#0x21f5de'), ('bl', '#0x21b8ea')]:
         raise ValueError('late readiness result continuation differs')
