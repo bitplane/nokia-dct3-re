@@ -183,10 +183,23 @@ Resident code `0x4951..0x4963` extracts the command byte, bounds it against
 `0x18`, then branches through data-ROM table `0xb0a6`. Static entries for
 the captured command bytes are `0x0a -> 0x49fc`, `0x0d -> 0x4a16`,
 `0x13 -> 0x4ac7`, `0x14 -> 0x4b1f`, `0x15 -> 0x4b3e`,
-`0x16 -> 0x4b73`. These are concrete candidate consumers for the next
-native control audit; their per-command execution and effects are not yet
-validated. The acquired table is compatible-reference evidence, not proof
+`0x16 -> 0x4b73`. The runtime validation below establishes the exercised
+consumers. The acquired table is compatible-reference evidence, not proof
 of the fitted NSE-6 mask identity.
+
+Native entry/return taps now validate all six candidate consumers in a fresh
+40-second run. Each executes its expected entry and RET, without a logged
+unsupported instruction. Command `0x13` changes identity scratch words
+`0x1f0c/0x1f0d` from zero to `0x0016/0x0010`. Commands `0x14`, `0x15`,
+`0x16` consume the erased records and leave flag word `0x1f11` zero at
+their returns (`0x4b3d/0x4b72/0x4bac`); the scratch first words then read
+`0xd1cc`, `0x1bef`, `0x3532`. Command `0x0d` reads result word `0x06f9`
+(zero in this run) and reaches RET `0x4a25`; command `0x0a` reaches RET
+`0x4a15` after the `0a09` input. The same handler sequence repeats after
+reset. This excludes a stalled special-control dispatcher for these inputs.
+Zero flags are an observation, not yet a proven error or permission to
+invent valid identity/security records. Their downstream control meaning
+and relationship to operational RX remain open.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

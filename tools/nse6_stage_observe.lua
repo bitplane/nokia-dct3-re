@@ -9,6 +9,22 @@ local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
 local pending_memory_uploads = {}
 if dsp then
+    for _, site in ipairs({0x49fc, 0x4a15, 0x4a16, 0x4a25,
+            0x4ac7, 0x4b1e, 0x4b1f, 0x4b3d, 0x4b3e, 0x4b72, 0x4b73, 0x4bac}) do
+        local hits = 0
+        handles[#handles + 1] = dsp.spaces['program']:install_read_tap(site, site,
+            'nse6_native_control_handler_' .. site, function()
+                if dsp.state['PC'].value ~= site + 1 or hits >= 4 then return end
+                hits = hits + 1
+                machine:logerror(string.format(
+                    'nse6_native_control_handler: site=%04x flags=%04x result=%04x scratch=%04x identity0=%04x identity1=%04x t=%.9f\n',
+                    site, dsp.spaces['data']:read_u16(0x1f11),
+                    dsp.spaces['data']:read_u16(0x06f9),
+                    dsp.spaces['data']:read_u16(0x1200),
+                    dsp.spaces['data']:read_u16(0x1f0c),
+                    dsp.spaces['data']:read_u16(0x1f0d), machine.time:as_double()))
+            end)
+    end
     for _, site in ipairs({0x3982, 0x3987}) do
         local hits = 0
         handles[#handles + 1] = dsp.spaces['program']:install_read_tap(site, site,
