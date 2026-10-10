@@ -767,7 +767,7 @@ private:
 			{0xf040, 2 | dasm::SUPPORTED, "OR      #$2345, 0, A, A"},
 			{0xf34f, 2 | dasm::SUPPORTED, "OR      #$2345, 15, B, B"},
 			{0xf164, 2 | dasm::SUPPORTED, "OR      #$2345, 16, A, B"},
-			{0xf020, 1, ".word   $F020"},
+			{0xf220, 1, ".word   $F220"},
 		};
 		for (auto const &test : immediate_alu)
 		{
@@ -1124,6 +1124,22 @@ private:
 							buffer.seen() == 1 && text.str() == expected.str(), "Accumulator ALU decoder preserves signed shift and ASM source/destination selectors");
 					}
 		osd_printf_info("TMS320C54x accumulator ALU disassembler: PASS shifts=256 asm=12 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned destination = 0; destination < 2; ++destination)
+				for (unsigned shift = 0; shift <= 16; ++shift)
+				{
+					u16 const opcode = (shift == 16 ? 0xf062 : 0xf020 + shift) | (destination << 8);
+					words const buffer(pc, opcode, 0x2345);
+					std::ostringstream text, expected;
+					util::stream_format(expected, "LD      #$2345, %u, %c", shift, destination ? 'B' : 'A');
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (2 | dasm::SUPPORTED) &&
+						buffer.seen() == 3 && text.str() == expected.str(), "Immediate LD decoder preserves shift and destination with one literal extension");
+					words const alias(pc, opcode | 0x0200, 0x2345);
+					std::ostringstream alias_text;
+					expect(decoder.disassemble(alias_text, pc, alias, alias) == 1 && alias.seen() == 1,
+						"Immediate LD decoder does not promote undocumented source-bit aliases");
+				}
+		osd_printf_info("TMS320C54x immediate load disassembler: PASS forms=34 rejected=34 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

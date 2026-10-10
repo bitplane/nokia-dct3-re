@@ -313,6 +313,12 @@ public:
 		}
 		u16 const immediate_form = op & 0xfcf0;
 		u16 const immediate_high = op & 0xfcff;
+		if ((op & 0xfef0) == 0xf020 || (op & 0xfeff) == 0xf062)
+		{
+			util::stream_format(stream, "LD      #$%04X, %u, %c", next_word(), (op & 255) == 0x62 ? 16 : op & 15,
+				BIT(op, 8) ? 'B' : 'A');
+			return 2 | SUPPORTED;
+		}
 		if (immediate_form == 0xf000 || immediate_form == 0xf010 || immediate_form == 0xf030 ||
 			immediate_form == 0xf040 || immediate_form == 0xf050 ||
 			(immediate_high >= 0xf060 && immediate_high <= 0xf065 && immediate_high != 0xf062))
