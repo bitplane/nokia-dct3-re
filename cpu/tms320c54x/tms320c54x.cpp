@@ -1911,16 +1911,20 @@ void tms320c54x_device::execute_one(u16 op)
 	}
 	case 0x6100: // BITF Smem, #lk
 	{
-		const u16 value = indirect_read(low);
+		const u16 address = prepare_smem_address(low);
 		const u16 mask = fetch();
+		const u16 value = data_read(address);
+		finish_smem_access(low);
 		m_st0 = (m_st0 & ~0x1000) | ((value & mask) ? 0x1000 : 0);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;
 	}
 	case 0x6000: // CMPM Smem, #lk
 	{
-		const u16 value = indirect_read(low);
+		const u16 address = prepare_smem_address(low);
 		const u16 immediate = fetch();
+		const u16 value = data_read(address);
+		finish_smem_access(low);
 		m_st0 = (m_st0 & ~0x1000) | (value == immediate ? 0x1000 : 0);
 		m_icount -= low >= 0xe0 ? 2 : 1;
 		return;

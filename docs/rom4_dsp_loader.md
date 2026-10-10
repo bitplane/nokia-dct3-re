@@ -877,12 +877,15 @@ interrupt pipeline.
 5110 save-state round trip and original MU4 storage/native entry. The separate
 timer observation still exposes short-period starvation.
 Operand-fetch conformance separates Smem address preparation from its read/write
-so MVDK, MVDP, PORTW, PORTR, READA and MVKD fetch their instruction extensions
+so MVDK, MVDP, PORTW, PORTR, READA, MVKD, CMPM and BITF fetch their instruction extensions
 before reading data, I/O or program operands. FIRS likewise fetches its coefficient
-address before reading X/Y. Twenty-five passive bus-tap cases cover direct,
+address before reading X/Y. Thirty-three passive bus-tap cases cover direct,
 postincrement, long-offset and absolute forms plus FIRS; the runner requires
 `TMS320C54x operand fetch order: PASS`. The original MVDK direct case reads
-data before its destination extension and fails this check. Instruction-family
+data before its destination extension and fails this check. The original CMPM
+direct case independently fails before its immediate fetch. Comparison/test
+cases also check TC and retain displacement-before-immediate encoding.
+Instruction-family
 extension layouts, address updates and aggregate cycle charges remain unchanged.
 This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
 Access-stage address-update timing, overlapping execution or interrupt drain.

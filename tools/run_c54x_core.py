@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 REQUIRED = [
-    "TMS320C54x operand fetch order: PASS cases=25 families=7 forms=direct,indirect,long,absolute",
+    "TMS320C54x operand fetch order: PASS cases=33 families=9 forms=direct,indirect,long,absolute",
     "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
     "TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi",
     "TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long",
