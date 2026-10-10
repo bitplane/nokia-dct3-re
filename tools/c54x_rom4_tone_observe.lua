@@ -30,6 +30,11 @@ watch(dsp, 'data', 0x0856, 'dsp')
 watch(dsp, 'data', 0x00fe, 'dsp')
 watch(dsp, 'data', 0x06be, 'dsp')
 watch(mcu, 'program', 0x100bc, 'mcu', 0x100bf)
+-- The selector-0x28 source is the lower halfword of this ARM bus word.
+-- Preserve wide writes and masks to distinguish record initialization from
+-- writes to the adjacent field; observing it must not read or modify RAM.
+watch(mcu, 'program', 0x10b2b8, 'speech_record', 0x10b2bb)
+watch(mcu, 'program', 0x10a6c4, 'speech_configuration', 0x10a6c7)
 watch(dsp, 'data', 0x085e, 'speech_shared')
 watch(dsp, 'data', 0x1f2b, 'speech_flags')
 -- Program-overlay stores can bypass data-space taps; retain both owners.
@@ -48,6 +53,22 @@ taps[#taps + 1] = mcu.spaces['program']:install_write_tap(
         end
     end)
 local speech_entries = 0
+local configuration_entries = 0
+taps[#taps + 1] = mcu.spaces['program']:install_read_tap(
+    0x28c494, 0x28c49b, 'speech_configuration_entry', function()
+        local pc = mcu.state['PC'].value
+        local destination = mcu.state['R1'].value
+        local length = mcu.state['R2'].value
+        if pc ~= 0x28c496 and pc ~= 0x28c498 then return end
+        if destination > 0x10a6c6 or destination + length <= 0x10a6c6 then return end
+        configuration_entries = configuration_entries + 1
+        if configuration_entries <= 16 then
+            machine:logerror(string.format(
+                'rom4_speech_configuration_entry: selector=%04x destination=%08x length=%04x caller=%08x t=%.9f\n',
+                mcu.state['R0'].value, destination, length,
+                mcu.state['R14'].value, machine.time:as_double()))
+        end
+    end)
 taps[#taps + 1] = mcu.spaces['program']:install_read_tap(
     0x271d70, 0x271d73, 'speech_field_entry', function()
         local pc = mcu.state['PC'].value

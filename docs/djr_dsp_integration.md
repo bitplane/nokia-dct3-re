@@ -641,9 +641,26 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   `28` from byte table `2a5df8`. Live LR `271d83` at the final store is
   an internal lock-call return, not the original caller. The gate requires
   the entry observation before the shared publication and rejects that
-  misattribution. The next predecessor is initialization and updates of
-  RAM record `10b2ba`, not an encoding inside the shared writer or a
-  missing DSP-originated response.
+  misattribution. A passive cold-boot RAM watch identifies the preceding
+  record write: reported PC `274cb8` stores `df29` into the lower bus
+  halfword (`mask=0000ffff`) at `10b2b8`, i.e. field `10b2ba`, at
+  0.158787846 s before shared publication. Instruction `274cb8` loads
+  `[R4+16]` and `274cba` stores it into `[R5+12]`; the reported tap PC
+  therefore must not be interpreted as the store instruction address.
+  The same record refresh occurs after the physical keypress. Adjacent
+  upper-halfword writes and later low-byte updates are distinct fields
+  or partial updates, not full-word replacements. The next predecessor
+  is the upstream structure field `[R4+16]`, rather than a missing
+  DSP-originated response. Pool `27500c` sets R4 to `10a6b0`, identifying
+  that field as `10a6c6`. Its observed initialization is a four-byte serial
+  read through `28c496`, selector `0210`, destination `10a6c4`, caller
+  `2894fd`. The byte reader `28e10e` accesses GPIO `20020`; stores at
+  `28c4c0`/`28c4d0` assemble bytes `00 e0 df 29` at 0.157115692 through
+  0.157406923 s. Thus the low halfword reaches the record refresh before
+  publication. The selector-to-storage mapping and the configuration
+  field's semantics remain to be decoded; a matching ROM literal alone
+  is not provenance. This observation does not establish
+  call-time speech activation or the semantics of every flag bit.
 - The decoder supplies destination `0x1496` before postprocessing at `0x94c9`
   and `0xab7c`; further gain/filter/mute stages precede output copying.
 - `0xaa39` copies from the ring cursor in `0x6de` into the selected input
