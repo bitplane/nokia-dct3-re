@@ -589,6 +589,127 @@ The remaining boundary is activation and delivery through the handset's
 native speech wrappers and audio transports. Isolated bit-exact codec tests
 do not establish native handset audio, speech during a call or end-to-end calls.
 
+### Native speech activation and PCM buffers
+
+The codec contract checker protects seven additional resident-ROM sequences:
+encoder/decoder mode gates, encoder PCM input, decoder PCM destination,
+mode publication, and the ingress/egress ring-copy pointers. These are bounded
+byte-checked paths, not an exhaustive closure of indirect writers/callers.
+
+- Encoder wrapper `0x9c4f` and decoder wrapper `0x9cb9` require data
+  `0x1836 == 0x00c1`. The encoder also branches on `0x6bb & 3`.
+- The encoder's normal path clears/mutes input through `0xa0b8`, preprocesses
+  160 PCM words at `0x1536`, then invokes the validated encoder.
+- The decoder supplies destination `0x1496` before postprocessing at `0x94c9`
+  and `0xab7c`; further gain/filter/mute stages precede output copying.
+- `0xaa39` copies from the ring cursor in `0x6de` into the selected input
+  buffer. `0xaa4f` copies 160 output words into the cursor in `0x6df`.
+  Both use BK=`0x278` and save their advanced cursor. These are RAM buffers,
+  not direct DSP I/O `0x21` samples.
+- The checked publication at `0x579e` selects handler `0xa436` and writes
+  `0x1836=0xc1` when `0x1869=0xc3` on that branch. The producer of that
+  operating-mode state still needs tracing through normal MCU/DSP traffic.
+
+Passive write taps in `c54x_rom4_codec_observe.lua` cover the mode cells and
+ring cursors. A fresh four-second native NSE-1 boot initializes `0x6de=0x400`,
+`0x6df=0x560` and `0x6bb=0x24`, while `0x1836`, `0x1869` and selected
+input pointers remain zero. This is evidence that boot alone does not activate
+the speech wrappers, not proof that the runtime activation path is absent.
+
+The four-second fresh-profile RF observation contains four ordered pairs: `2a04/0006`
+twice, `0041/0040`, then `2813/0030`. The added pair comes from request words
+copied by resident `0xa1ba` from `0x216d` into queue `0x1920`; runtime taps
+observe `0x1922=0x41` and `0x1923=0x40` at reported PC `0xa1bc`.
+The slot handler reads them through cursor `0x197d` at `0x370c/0x3710`, then
+advances the cursor. Both producer and consumer sequences are byte-checked.
+
+An isolated A/B test establishes causality: suppressing native TX-completion
+FIQ1 reproduces the old three-pair oracle and terminal TX pointers `0038/0038`;
+restoring it yields four pairs and `0041/0041`. Reverting MAX equality or BK=0
+behavior individually, or removing all memory taps, does not remove the pair.
+The short-run checker includes the newly delivered firmware request and its
+queue producer; the obsolete three-pair sequence is rejected. This does not
+assign physical tuning semantics to `0041/0040`.
+
+The 30-second acceptance profile captures a scan in progress: a fresh run
+receives another queue request at 6.431 seconds, repeats `2a04/0006` twice,
+then writes `2727/0030`, `2728/0030` and subsequent values. Its terminal
+summary records 1,580 port-32 writes, 20,288 frame expiries, 648,288 RF reads,
+PC `09ac` and mode-AC `0004`. The four-write short-run check rejects this
+run by design. The explicit `--scan-30s` profile instead requires these
+exact counts, all sixteen logged initial writes, the uploaded shorter-reload
+write and the later search-list selector. A fresh isolated rerun reproduces
+it. This deliberate re-bank follows the producer, loop-completion and
+post-scan consumption evidence below; neither profile claims acquisition
+or whole-boot completion.
+
+Passive timer-port taps identify the changed cadence: uploaded code writes
+I/O `0x0e=0x0546` at reported PC `0x0959`, time 6.454126 seconds. The current
+controller interprets this as a 1,351-quarter-symbol period instead of 5,000.
+The same write occurs at 1.583580 seconds but is then restored to `0x1387`
+by resident PC `0x30fc`; the later cycle retains the shorter period.
+Mode-AC writes at resident `0x442a` repeatedly select `0x0c`, and `0x32b3`
+clears bit 3 to produce `0x04`. This explains the observed counter increase
+within the current model, not the physical validity of the shortened period.
+Decode the uploaded helper around `0x0948..0x0959` and its caller before
+changing timer semantics or accepting this as normal RF operation.
+
+A passive program snapshot confirms that the shorter reload is literal
+uploaded code, not a corrupted computed operand: `0x0942` selects AR2 `0x0060`,
+`0x0944` stores `0x1387`, and `0x0946` outputs it to port `0x0e`; `0x0952`
+again selects AR2 `0x0060`, `0x0954` stores `0x0546`, and `0x0957` outputs
+it to the same port. Calls to resident `0x407c` separate the stages, with
+`0xa15f` between them. The helper then changes queue flags at `0x195c`,
+updates I/O ports `0x02` and `0x04`, and branches on data `0x0284` at
+`0x0975..0x0978`. Its complete exit/restore paths and the meaning of that
+selector were initially unclassified. The literal write alone does not validate
+the controller's reload semantics or the helper's intended duration.
+
+The passive selector trace distinguishes the invocations: the first request
+writes `0x0284=0x7c` at reported PC `0x3d8f`, then overwrites it with `1` at
+`0x3dae`; the later request writes `0x7c` without that overwrite. Resident
+type-`0x1a` processing sets this default at `0x3d8d` and, when its TC branch
+is clear, calls `0x48f7` and replaces it at `0x3dac`. Uploaded `0x0975`
+compares `0x0284` with `1`: equality branches to `0x0a1a`, whereas inequality
+enters the repeated measurement body at `0x098a..0x09cc`. In the later run,
+`0x0934` stores `0x7b` to `0x0285` and `0x097a` initializes `0x0e13=1`.
+The repeated mode `0x0c/0x04` activity therefore corresponds to a different
+search-list lifecycle, not merely a duplicate of the first single-entry
+invocation. This does not yet prove the loop termination or RF acquisition.
+
+One-second passive snapshots through 30 seconds show the helper's channel
+cursor AR7 advancing through the `0x0e14`-based list and restarting, while
+data `0x0e13` alternates between zero and one. Samples at idle PC `0x408d`
+also expose outer-counter AR6 values `7`, `4`, and `3`; AR6 samples inside
+`0x09ac` are not that counter because the nested routine has repurposed it.
+The trace establishes ongoing loop progress, not a frozen wait, but a
+terminal return was absent from that 30-second window. A 60-second passive
+boundary run resolves it: AR6 decreases from `6` to `0` at `0x0981` in
+3.712548-second steps, exits to `0x09ce` at 36.154511 seconds, and reaches
+`0x0a18` at 36.156061 seconds. Resident `0x30fc` restores port `0x0e=0x1387`
+at 36.156065 seconds. Thus this helper completes its eight-pass list scan
+and restores the original frame period without a timer or firmware shim.
+The ensuing sampled execution remains around `0x479e..0x47a1` through 60 seconds,
+with mode-AC `1`, 1,991 RF writes, 30,380 frame expiries and 971,232 RF reads.
+This sampling is not evidence of a stalled queue; scan completion is not RF
+acquisition, native speech activation or whole-boot completion.
+Resident `0x479c..0x47a2` compares data `0x06b7` with the pointer at `0x06b8`
+and loops while equal; after inequality it loads AR4 from `0x06b8` and
+copies ring entries with BK `0x48`. This is a queue-empty consumer boundary,
+not an unfinished channel-list loop.
+The annotated resident image identifies two producer tails: `0x3334..0x3345`
+and `0x3359..0x335e` advance `0x06b7` after storing filtered RF results.
+Both sit downstream of the `0x32f4` receive/FIR branch, whose input reads
+port `0x27`. The `0x3357` producer and `0x4798` empty-wait sequences are
+checked against acquired ROM words. Passive post-scan execution taps show
+mode-AA reaching zero, mode-AC remaining one, and the ISR taking `0x3230`
+to `0x32f4` and publishing at `0x3345`. Across consecutive frames, both
+queue cursors advance together from `0x1a00` through `0x1a3c` in four-word
+steps at the restored 4.615-ms cadence. The consumer therefore drains
+organically produced samples; the observed polling PC is normal inter-frame
+waiting, not a missing producer. Zero-valued modeled RF input does not
+establish acquisition or justify synthetic queue completions.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

@@ -21,7 +21,7 @@ RF_WRITE_RE = re.compile(
     r"port32=([0-9a-fA-F]{4}) pc=([0-9a-fA-F]{4})")
 
 
-def check(text: str, minimum_frames: int = 6000) -> dict[str, int]:
+def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> dict[str, int]:
     matches = list(SUMMARY_RE.finditer(text))
     if not matches:
         raise ValueError("missing rom4_interface_summary")
@@ -59,9 +59,26 @@ def check(text: str, minimum_frames: int = 6000) -> dict[str, int]:
     writes = [tuple(int(value, 16 if index else 10) for index, value in enumerate(row))
               for row in RF_WRITE_RE.findall(text)]
     expected_writes = [(1, 0x2A04, 6, 0xA240), (2, 0x2A04, 6, 0xA240),
-                       (3, 0x2813, 0x30, 0x4028)]
-    if result["rf_port32_writes"] != 3 or writes != expected_writes:
+                       (3, 0x41, 0x40, 0x3712), (4, 0x2813, 0x30, 0x4028)]
+    expected_count = 4
+    if scan_30s:
+        expected_count = 1580
+        expected_writes += [(5, 0x2A04, 6, 0xA240), (6, 0x2A04, 6, 0xA240)]
+        expected_writes += [(sequence, 0x2727 + sequence - 7, 0x30, 0x4028)
+                            for sequence in range(7, 17)]
+        if (result["frame_expiries"], result["rf_reads"]) != (20288, 648288):
+            raise ValueError("30-second scan frame/read snapshot changed")
+        if not re.search(r"space=io direction=write address=000e value=0546 mask=ffff pc=0959\b", text):
+            raise ValueError("missing uploaded scan reload")
+        if not re.search(r"rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f\b.*t=6\.", text):
+            raise ValueError("missing later search-list selector")
+    if result["rf_port32_writes"] != expected_count or writes != expected_writes:
         raise ValueError("fresh-profile RF port sequence changed")
+    # FIQ1 TX completion exposes this additional firmware-owned queue item.
+    # Require its producer, rather than accepting a bare synthetic port pair.
+    for address, value in (("1922", "0041"), ("1923", "0040")):
+        if not re.search(rf"rom4_speech_state: address={address} value={value} mask=ffff pc=a1bc\b", text):
+            raise ValueError("missing firmware RF queue producer")
     if result["rf_port38_reads"] or result["rf_port39_reads"]:
         raise ValueError("ROM4 parallel burst path unexpectedly became active")
     if result["imr"] != 0x035F:
@@ -75,9 +92,11 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("log", type=pathlib.Path)
     parser.add_argument("--minimum-frames", type=int, default=6000)
+    parser.add_argument("--scan-30s", action="store_true",
+                        help="check the fixed 30-second multi-entry scan snapshot, not acquisition")
     args = parser.parse_args()
     try:
-        result = check(args.log.read_text(errors="replace"), args.minimum_frames)
+        result = check(args.log.read_text(errors="replace"), args.minimum_frames, scan_30s=args.scan_30s)
     except (OSError, ValueError) as error:
         print(f"ROM4 RF activation boundary rejected: {error}", file=sys.stderr)
         return 1
@@ -85,7 +104,7 @@ def main() -> int:
         "ROM4 RF activation boundary: PASS "
         f"frames={result['frame_expiries']} ifr={result['ifr']:04x} "
         f"imr={result['imr']:04x} rf_reads={result['rf_reads']} "
-        "rf_port32_writes=3 rf_port38_reads=0 rf_port39_reads=0"
+        f"rf_port32_writes={result['rf_port32_writes']} rf_port38_reads=0 rf_port39_reads=0"
     )
     return 0
 

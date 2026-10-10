@@ -1388,8 +1388,9 @@ check-c54x-rom4-rf-boundary: build
 		cd "$$tmp"; \
 		$(abspath $(MAME_DIR))/mame noki5110 -rompath $(abspath $(MAME_DIR))/roms \
 			-nvram_directory "$$tmp/nvram" -video none -sound none -log \
-			-skip_gameinfo -nothrottle -seconds_to_run 30 >/dev/null; \
-		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log
+			-skip_gameinfo -nothrottle -seconds_to_run 30 \
+			-autoboot_script $(abspath tools/c54x_rom4_codec_observe.lua) >/dev/null; \
+		$(PYTHON) $(abspath tools/c54x_rom4_rf_boundary_check.py) error.log --scan-30s
 
 verify-5110-menu: build
 	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-menu.XXXXXX)"; \
