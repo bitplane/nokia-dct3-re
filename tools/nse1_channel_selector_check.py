@@ -436,6 +436,32 @@ def check_rr_record_selection(cpu):
     return cases
 
 
+def check_incoming_block_constructors(cpu):
+    cases = 0
+    for variant in (0, 1):
+        for kind in range(256):
+            for flag in ((0,) if variant == 0 else (0, 1)):
+                message = bytearray(range(40))
+                message[4], message[6] = kind, flag
+                cpu.mem_write(0x10b500, bytes(message))
+                cpu.reg_write(UC_ARM_REG_R6 if variant == 0 else UC_ARM_REG_R8, 0x10b500)
+                start, stop = (0x26b8b9, 0x26b8c8) if variant == 0 else (0x26bb1d, 0x26bb32)
+                cpu.emu_start(start, stop, count=32)
+                expected = bytearray(message)
+                expected[:2] = (0x040b).to_bytes(2, "big")
+                expected[11], expected[12] = kind, flag if variant else 0
+                if cpu.reg_read(UC_ARM_REG_PC) != stop or bytes(
+                        cpu.mem_read(0x10b500, 40)) != bytes(expected):
+                    raise ValueError("incoming block constructor changed its contract")
+                start, stop = (0x26b8cd, 0x26b8ac) if variant == 0 else (0x26bb37, 0x26bda0)
+                cpu.emu_start(start, stop, count=8)
+                if (cpu.reg_read(UC_ARM_REG_PC), cpu.reg_read(UC_ARM_REG_R0),
+                        cpu.reg_read(UC_ARM_REG_R1)) != (stop, 0x0d, 0x10b500):
+                    raise ValueError("incoming block publication arguments differ")
+                cases += 1
+    return cases
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -479,6 +505,7 @@ def check_image(raw):
             "rr_unsegmented_block_cases": check_rr_unsegmented_block(cpu),
             "rr_segment_append_cases": check_rr_segment_append(cpu),
             "rr_record_selection_cases": check_rr_record_selection(cpu),
+            "incoming_block_constructor_cases": check_incoming_block_constructors(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

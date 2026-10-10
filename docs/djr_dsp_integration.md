@@ -1007,6 +1007,18 @@ and other values return `0xff`. The caller uses 0 for the first record,
 is now the concrete lower-producer query; these checks do not establish
 its native DSP origin.
 
+The aligned Thumb literal-load scan for `0x040b` finds four candidates:
+consumer `0x2382ac` and constructors `0x26b8b8/0x26bb1c/0x26bc6e`.
+The first two constructor fragments are executed in 768 cases: they
+rewrite the original message ID to `0x040b`, copy original byte 4 to
+byte 11, and set byte 12 to zero (`26b8b8`) or original byte 6
+(`26bb1c`, tested with flag 0/1). All other 40-byte message contents
+are preserved. Their publication argument fragments target task `0x0d`
+with the same message pointer. The intervening `0x26923c` trace call and
+the post primitive are not executed by this check. The third constructor,
+computed/indirect producers, and these handlers' incoming DSP dispatch
+remain open; literal-scan coverage is not an absence proof.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

@@ -42,6 +42,7 @@ class ChannelSelectorTests(unittest.TestCase):
         self.assertEqual(result["rr_unsegmented_block_cases"], 256)
         self.assertEqual(result["rr_segment_append_cases"], 11264)
         self.assertEqual(result["rr_record_selection_cases"], 4096)
+        self.assertEqual(result["incoming_block_constructor_cases"], 768)
         self.assertEqual(result["c3_first_arguments"], [0x21, 0xe4])
 
 
