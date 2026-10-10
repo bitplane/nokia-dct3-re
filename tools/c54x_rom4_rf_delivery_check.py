@@ -63,6 +63,43 @@ def check_tuning(text):
     raise ValueError("missing selected-entry programming pair")
 
 
+def pack_tuning_nonnegative(value):
+    """403a..4048 reference for the captured nonnegative, non-doubled path."""
+    if not 0 <= value <= 0xffff:
+        raise ValueError("packing reference requires a nonnegative 16-bit input")
+    quotient, remainder = divmod(value, 64)
+    return (quotient << 7) | remainder | (0x30 << 16)
+
+
+def check_tuning_stages(text):
+    stages = [dict(FIELDS.findall(match[1])) for match in
+              re.finditer(r"rom4_rf_tuning_stage: (.*)", text)]
+    selected = [stage for stage in stages if stage.get("selected1867") == "006d"]
+    expected = ("3ffb", "400f", "402e", "403a", "4048")
+    if tuple(stage.get("address") for stage in selected) != expected:
+        raise ValueError("missing or reordered selected-entry packing stages")
+    times = [float(stage["t"]) for stage in selected]
+    if times != sorted(times):
+        raise ValueError("packing stage timestamps regress")
+    if any(int(stage["flags6be"], 16) & 0x80 or stage["flags216a"] != "0004"
+           or stage["ar2"] != "0031" for stage in selected):
+        raise ValueError("capture does not use the bounded packing branch")
+    entry, addition, transformed, packing, returned = selected
+    argument = int(entry["a"], 16)
+    addend = int(addition["addend216b"], 16)
+    value = argument + addend
+    if argument != 0x6d or int(addition["a"], 16) != argument or int(addition["b"], 16) != addend:
+        raise ValueError("selected-entry addition operands differ")
+    if int(transformed["a"], 16) != value or int(packing["a"], 16) != value:
+        raise ValueError("packing input differs from selected entry plus addend")
+    result = pack_tuning_nonnegative(value)
+    if (int(returned["a"], 16) != result or int(returned["b"], 16) != result
+            or int(returned["field60"], 16) != value // 64
+            or check_tuning(text) != result):
+        raise ValueError("packing result differs from observed quotient or port pair")
+    return result
+
+
 def check(text):
     events = []
     for line in text.splitlines():

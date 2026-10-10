@@ -60,6 +60,28 @@ observer records the first 32 writes without changing their values.
 it does not establish PLUSSA's 23-bit layout, clock/latch timing or RF
 frequency. Those require tracing the helper's inputs and programming owner.
 
+For the captured selected entry, the byte-pinned scan caller at `0x0a84`
+loads `*AR4` into A and delayed-calls `0x3ffb`, setting AR2=`0031`.
+The bounded native stage capture observes entry A=`006d`,
+`0x06be=0010` (bit 7 clear), `0x216a=0004` and both addend fields
+`0x216b/0x216c=13a6`. The `0x3ffb` path selects `0x216b`; at
+`0x400f` its B operand is `13a6`, and at `0x402e/0x403a` A is
+`1413`. Flag bit 1 is clear, so the `0x4049` transform is skipped;
+bit 2 selects `0x402e`, whose bit-7-clear path does not double A.
+For this nonnegative branch, `0x403a..0x4048` takes quotient and
+remainder at 64, packs `(quotient << 7) | remainder | (0x30 << 16)`
+and leaves the quotient in `0x0060`. Here quotient `0050`, remainder
+`0013` produce `00302813`, matching the returned A/B and port pair
+in both fresh controls. `check_tuning_stages` checks the ordered
+operands, branch flags, quotient and result; its arithmetic reference
+is not a native basis test or proof of alternate signed/doubled paths.
+The resident hook defaults `0x244a/0x244c` are return/NOP sequences
+in the checked image. Candidate direct-call scanning finds callers
+`0x099d` and `0x0a85` for `0x3ffb`, none for `0x4006`; this is
+raw direct-call coverage, not closure over computed calls or patches.
+The addend's producer and its physical units remain unresolved. Do not
+equate `13a6` with a frequency or prescaler setting without that contract.
+
 ### Software RF reference boundary
 
 An independent baseband waveform source is available in

@@ -113,6 +113,24 @@ taps[#taps + 1] = memory:install_write_tap(0x1266, 0x1266,
         end
     end)
 local tuning_writes = 0
+local tuning_stages = {}
+taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(0x3ffb, 0x4048,
+    "rf_programming_stages", function(offset)
+        local pc = cpu.state["PC"].value
+        if observing or (pc ~= offset and pc ~= offset + 1) then return end
+        if offset ~= 0x3ffb and offset ~= 0x4006 and offset ~= 0x400f
+            and offset ~= 0x402e and offset ~= 0x403a and offset ~= 0x4048 then return end
+        tuning_stages[offset] = (tuning_stages[offset] or 0) + 1
+        if tuning_stages[offset] <= 4 then
+            machine:logerror(string.format(
+                "rom4_rf_tuning_stage: t=%.9f address=%04x pc=%04x a=%010x b=%010x ar2=%04x flags6be=%04x flags216a=%04x addend216b=%04x addend216c=%04x field60=%04x selected1867=%04x\n",
+                machine.time:as_double(), offset, pc, cpu.state["A"].value,
+                cpu.state["B"].value, cpu.state["AR2"].value,
+                memory:read_u16(0x06be), memory:read_u16(0x216a),
+                memory:read_u16(0x216b), memory:read_u16(0x216c),
+                memory:read_u16(0x60), memory:read_u16(0x1867)))
+        end
+    end)
 taps[#taps + 1] = cpu.spaces["io"]:install_write_tap(0x31, 0x32,
     "rf_programming_observation", function(offset, value)
         if observing then return end

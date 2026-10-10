@@ -1,6 +1,7 @@
 import unittest
 
-from tools.c54x_rom4_rf_delivery_check import check, check_request, check_tuning, decode_search_bitmap
+from tools.c54x_rom4_rf_delivery_check import (check, check_request, check_tuning,
+    check_tuning_stages, pack_tuning_nonnegative, decode_search_bitmap)
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -14,6 +15,37 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_packing_reference(self):
+        self.assertEqual(pack_tuning_nonnegative(0x1413), 0x302813)
+        for quotient in (0, 1, 0x50, 0x3ff):
+            for remainder in range(64):
+                self.assertEqual(pack_tuning_nonnegative(quotient * 64 + remainder),
+                                 (0x30 << 16) | (quotient << 7) | remainder)
+        for value in (-1, 0x10000):
+            with self.assertRaises(ValueError):
+                pack_tuning_nonnegative(value)
+
+    def test_packing_stages(self):
+        fields = "ar2=0031 flags6be=0010 flags216a=0004 addend216b=13a6 selected1867=006d"
+        stages = [("3ffb", "6d", "4", "32"), ("400f", "6d", "13a6", "32"),
+                  ("402e", "1413", "13a6", "32"), ("403a", "1413", "13a6", "32"),
+                  ("4048", "302813", "302813", "50")]
+        lines = [f"rom4_rf_tuning_stage: t={i} address={address} a={a} b={b} field60={field} {fields}\n"
+                 for i, (address, a, b, field) in enumerate(stages)]
+        ports = """rom4_rf_tuning_write: t=5 pc=4023 port=0031 value=2813 a=00302813 ar2=0031 selected1867=006d
+rom4_rf_tuning_write: t=6 pc=4028 port=0032 value=0030 a=00302813 ar2=0031 selected1867=006d
+"""
+        trace = "".join(lines) + ports
+        self.assertEqual(check_tuning_stages(trace), 0x302813)
+        for index in range(len(lines)):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                check_tuning_stages("".join(lines[:index] + lines[index + 1:]) + ports)
+        for old, new in (("a=1413", "a=1414"), ("flags6be=0010", "flags6be=0090"),
+                         ("flags216a=0004", "flags216a=0006"), ("field60=50", "field60=51"),
+                         ("b=13a6", "b=13a7")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_tuning_stages(trace.replace(old, new))
+
     def test_tuning_accumulator_pair(self):
         trace = """rom4_rf_tuning_write: t=1.0 pc=4023 port=0031 value=2813 a=0000302813 ar2=0031 selected1867=006d
 rom4_rf_tuning_write: t=1.1 pc=4028 port=0032 value=0030 a=0000302813 ar2=0031 selected1867=006d
