@@ -1845,6 +1845,22 @@ both dispatch and zero gate. This context word is not the request queue's
 continuation remain unresolved. Observe those before treating this as
 an available drain entrance or changing peer timing.
 
+The paired runtime control resolves that immediate question. With the
+acceptance runner's GSM ARFCN4/5 PIN topology, context `138038` enters
+`21c41c`, `21bf86` and `21bffa` with phase zero, receive state 17, and
+message ID `1802`. It later enters the first two sites in state 7 with
+phase `0a`, taking the nonzero alternative. The DCS PIN-eight-second
+control enters none of these three sites through 46 seconds. Thus a wrong
+phase at this gate is not observed in DCS: the divergence precedes entry.
+Receive-table entry 17 at `21bc28` selects `21f6fc`; its handling of `1802`
+and subsequent completion routing are the next ownership boundary.
+GSM evidence is `tmp/noki8210_completion_phase_gsm_pin/error.log`, SHA-256
+`c12c67b714d81a49e810a698c1f66c3ea3aa56b638bd99a1b2497e780ea6a05b`;
+DCS evidence is `tmp/noki8210_completion_phase_dcs/error.log`, SHA-256
+`06c3002ba3130a39f8544aab57a9c2030c37f1e3b4ab10311a000c1d2e8833c5`.
+The exploratory GSM run without `configure_pin_topology` is not the
+passing-topology control. No phase, selector or packet was injected.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
