@@ -396,6 +396,35 @@ private:
 				"Literal disassembly preserves asymmetric immediate/offset ordering and indirect modifiers");
 		}
 		osd_printf_info("TMS320C54x literal disassembler: PASS decoded_modes=992 pages=2 invalid_mmr=32 bounded_extensions=1 operand_order=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x6000, 0x6100, 0x7000, 0x7100, 0x7400, 0x7500, 0x7d00, 0x7e00})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = (family == 0x7e00 ? 1 : 2) + (mode >= 0xe0);
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) &&
+						buffer.seen() == (1U << length) - 1, "Move/test decoding bounds instruction extensions within XPC");
+				}
+		vector const moves[] = {
+			{0x6000, 2 | dasm::SUPPORTED, "CMPM    $00, #$2345"},
+			{0x61e2, 3 | dasm::SUPPORTED, "BITF    *AR2($2345), #$6789"},
+			{0x70f8, 3 | dasm::SUPPORTED, "MVKD    $6789, *($2345)"},
+			{0x7192, 2 | dasm::SUPPORTED, "MVDK    *AR2+, $2345"},
+			{0x74e2, 3 | dasm::SUPPORTED, "PORTR   $2345, *AR2($6789)"},
+			{0x75f8, 3 | dasm::SUPPORTED, "PORTW   *($2345), $6789"},
+			{0x7de2, 3 | dasm::SUPPORTED, "MVDP    *AR2($6789), $2345"},
+			{0x7e92, 1 | dasm::SUPPORTED, "READA   *AR2+"},
+			{0x7ef8, 2 | dasm::SUPPORTED, "READA   *($2345)"},
+		};
+		for (auto const &test : moves)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Move/test decoding retains family-specific operand ordering and modifiers");
+		}
+		osd_printf_info("TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

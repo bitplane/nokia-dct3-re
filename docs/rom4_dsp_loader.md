@@ -1733,6 +1733,15 @@ an independent silicon oracle for extension ordering. Evidence is
 `TMS320C54x literal disassembler: PASS`. This checks debugger decoding, not
 the runtime legality of every addressing mode or the physical pipeline.
 
+MVDK, MVKD, MVDP, PORTR, PORTW, READA, CMPM and BITF now expose complete
+instruction lengths and operand layouts. The gate checks 2,048 mode encodings
+on two pages, exact extension-read bounds and nine asymmetric operand examples.
+READA has no extra immediate; long-offset PORTR/PORTW/MVDP put their port or
+destination before the displacement, unlike the displacement-first move/test
+forms. These are debugger/frontend boundary checks against the reviewed
+execution layouts, not proof of every mode's silicon legality or stage timing.
+The required marker is `TMS320C54x move/test disassembler: PASS`.
+
 Unknown forms still return a raw one-word display entry without `SUPPORTED`.
 That fallback is not a verified instruction boundary and must not be used to
 populate a future decoded-instruction pipeline. Coverage beyond these families

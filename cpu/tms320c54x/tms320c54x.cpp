@@ -39,14 +39,7 @@ public:
 		auto const target = [&]() { return (pc & 0x7f0000) | next_word(); };
 		u8 const mode = op;
 		u16 const family = op & 0xff00;
-		if (family == 0x6800 || family == 0x6900 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
-		{
-			bool const extended = family != 0x7700 && mode >= 0xe0;
-			bool const immediate_first = (family == 0x6800 || family == 0x6900) && mode >= 0xe0 && mode < 0xf8;
-			u16 const immediate = next_word(extended && !immediate_first ? 2 : 1);
-			u16 const offset = extended ? next_word(immediate_first ? 2 : 1) : 0;
-			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x7600 ? "ST" : "STM";
-			util::stream_format(stream, "%-8s#$%04X, ", name, immediate);
+		auto const smem = [&](u16 offset) {
 			if (mode < 0x80)
 				util::stream_format(stream, "$%02X", mode);
 			else if (mode >= 0xf8)
@@ -61,6 +54,44 @@ public:
 				};
 				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
 			}
+		};
+		if (family == 0x6000 || family == 0x6100 || family == 0x7000 || family == 0x7100 ||
+			family == 0x7400 || family == 0x7500 || family == 0x7d00 || family == 0x7e00)
+		{
+			bool const extended = mode >= 0xe0;
+			bool const address_first = !(mode >= 0xe0 && mode < 0xf8 &&
+				(family == 0x7400 || family == 0x7500 || family == 0x7d00));
+			u16 const offset = extended ? next_word(address_first ? 1 : 2) : 0;
+			if (family == 0x7e00)
+			{
+				stream << "READA   "; smem(offset);
+				return (1 + extended) | SUPPORTED;
+			}
+			u16 const operand = next_word(extended && address_first ? 2 : 1);
+			char const *name = family == 0x6000 ? "CMPM" : family == 0x6100 ? "BITF" :
+				family == 0x7000 ? "MVKD" : family == 0x7100 ? "MVDK" : family == 0x7400 ? "PORTR" :
+				family == 0x7500 ? "PORTW" : "MVDP";
+			util::stream_format(stream, "%-8s", name);
+			if (family == 0x7000 || family == 0x7400)
+			{
+				util::stream_format(stream, "$%04X, ", operand); smem(offset);
+			}
+			else
+			{
+				smem(offset);
+				util::stream_format(stream, ", %s$%04X", family == 0x6000 || family == 0x6100 ? "#" : "", operand);
+			}
+			return (2 + extended) | SUPPORTED;
+		}
+		if (family == 0x6800 || family == 0x6900 || family == 0x7600 || (family == 0x7700 && mode < 0xe0))
+		{
+			bool const extended = family != 0x7700 && mode >= 0xe0;
+			bool const immediate_first = (family == 0x6800 || family == 0x6900) && mode >= 0xe0 && mode < 0xf8;
+			u16 const immediate = next_word(extended && !immediate_first ? 2 : 1);
+			u16 const offset = extended ? next_word(immediate_first ? 2 : 1) : 0;
+			char const *const name = family == 0x6800 ? "ANDM" : family == 0x6900 ? "ORM" : family == 0x7600 ? "ST" : "STM";
+			util::stream_format(stream, "%-8s#$%04X, ", name, immediate);
+			smem(offset);
 			return (2 + extended) | SUPPORTED;
 		}
 		if ((op & 0xffe0) == 0xf7c0 || (op & 0xffe0) == 0xf4c0)

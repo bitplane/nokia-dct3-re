@@ -9,6 +9,7 @@ import tempfile
 REQUIRED = [
     "TMS320C54x operand fetch order: PASS cases=33 families=9 forms=direct,indirect,long,absolute",
     "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
+    "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0",
     "TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi",
     "TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long",
     "TMS320C54x repeat endpoints: PASS cases=12 endpoints=ordinary,ffff,0000 counts=short,long sources=irq,nmi",
