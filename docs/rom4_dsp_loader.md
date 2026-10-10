@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 295 decoded and 331
+promoted to a boundary. Current cold-idle coverage is 304 decoded and 322
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1817,10 +1817,10 @@ Its marker is `TMS320C54x dual multiply disassembler: PASS`. This describes
 the TI operand layout; it does not expand arithmetic or memory-hazard
 execution coverage.
 
-Immediate ADD, SUB and XOR decode the literal, independent accumulator
+Immediate ADD, SUB, AND, OR and XOR decode the literal, independent accumulator
 selectors and shifts 0 through 16, including the separate shift-16 opcode
-forms. The gate checks 204 forms on two pages with bounded literal reads,
-seven exact syntax examples and a negative unsupported-family example.
+forms. The gate checks 340 forms on two pages with bounded literal reads,
+thirteen exact syntax examples and a negative unsupported-family example.
 Its marker is `TMS320C54x immediate ALU disassembler: PASS`. Other immediate
 families remain raw until reviewed; execution and timing are unchanged.
 

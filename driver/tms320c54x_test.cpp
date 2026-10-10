@@ -669,11 +669,11 @@ private:
 			}
 		osd_printf_info("TMS320C54x accumulator disassembler: PASS shift_forms=384 rotate_forms=6 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
-			for (u16 family : {0xf000, 0xf010, 0xf050})
+			for (u16 family : {0xf000, 0xf010, 0xf030, 0xf040, 0xf050})
 				for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
 					for (unsigned shift = 0; shift <= 16; ++shift)
 					{
-						u16 const high = family == 0xf000 ? 0xf060 : family == 0xf010 ? 0xf061 : 0xf065;
+						u16 const high = 0xf060 | ((family >> 4) & 15);
 						u16 const op = (shift == 16 ? high : family | shift) | (accumulators << 8);
 						words const buffer(pc, op, 0x2345);
 						std::ostringstream text;
@@ -688,6 +688,12 @@ private:
 			{0xf360, 2 | dasm::SUPPORTED, "ADD     #$2345, 16, B, B"},
 			{0xf161, 2 | dasm::SUPPORTED, "SUB     #$2345, 16, A, B"},
 			{0xf065, 2 | dasm::SUPPORTED, "XOR     #$2345, 16, A, A"},
+			{0xf030, 2 | dasm::SUPPORTED, "AND     #$2345, 0, A, A"},
+			{0xf13f, 2 | dasm::SUPPORTED, "AND     #$2345, 15, A, B"},
+			{0xf263, 2 | dasm::SUPPORTED, "AND     #$2345, 16, B, A"},
+			{0xf040, 2 | dasm::SUPPORTED, "OR      #$2345, 0, A, A"},
+			{0xf34f, 2 | dasm::SUPPORTED, "OR      #$2345, 15, B, B"},
+			{0xf164, 2 | dasm::SUPPORTED, "OR      #$2345, 16, A, B"},
 			{0xf020, 1, ".word   $F020"},
 		};
 		for (auto const &test : immediate_alu)
@@ -697,7 +703,7 @@ private:
 			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
 				"Immediate decoder retains shift and independent accumulators without claiming other families");
 		}
-		osd_printf_info("TMS320C54x immediate ALU disassembler: PASS forms=204 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		osd_printf_info("TMS320C54x immediate ALU disassembler: PASS forms=340 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
 			for (unsigned word = 0; word < 4608; ++word)
 			{

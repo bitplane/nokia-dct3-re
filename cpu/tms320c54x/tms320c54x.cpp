@@ -231,12 +231,13 @@ public:
 		}
 		u16 const immediate_form = op & 0xfcf0;
 		u16 const immediate_high = op & 0xfcff;
-		if (immediate_form == 0xf000 || immediate_form == 0xf010 || immediate_form == 0xf050 ||
-			immediate_high == 0xf060 || immediate_high == 0xf061 || immediate_high == 0xf065)
+		if (immediate_form == 0xf000 || immediate_form == 0xf010 || immediate_form == 0xf030 ||
+			immediate_form == 0xf040 || immediate_form == 0xf050 ||
+			(immediate_high >= 0xf060 && immediate_high <= 0xf065 && immediate_high != 0xf062))
 		{
-			bool const high = immediate_high == 0xf060 || immediate_high == 0xf061 || immediate_high == 0xf065;
-			char const *name = high ? (immediate_high == 0xf060 ? "ADD" : immediate_high == 0xf061 ? "SUB" : "XOR") :
-				(immediate_form == 0xf000 ? "ADD" : immediate_form == 0xf010 ? "SUB" : "XOR");
+			static constexpr char const *names[] = {"ADD", "SUB", "LD", "AND", "OR", "XOR"};
+			bool const high = immediate_high >= 0xf060;
+			char const *name = names[high ? op & 15 : (op >> 4) & 15];
 			util::stream_format(stream, "%-8s#$%04X, %u, %c, %c", name, next_word(), high ? 16 : op & 15,
 				BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
 			return 2 | SUPPORTED;
