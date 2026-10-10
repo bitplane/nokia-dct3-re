@@ -73,6 +73,23 @@ private:
 		m_phase = 83000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_indirect_popm_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		static constexpr u16 opcodes[] = {0x8a93, 0x8a9b, 0x8a90, 0x8a9b};
+		program.write_word(0x0800, opcodes[index]);
+		program.write_word(0x0801, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, index == 1 ? 0x800f : index == 3 ? 0x8017 : 0x8010);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, index == 2 ? 0x6000 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, index == 2 ? 0x20 : 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_phase = 160000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_native_final_gap_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -20383,6 +20400,23 @@ private:
 				"Final native gaps preserve shift/add/subtract results, saturation, carry and compact store addressing");
 			if (index < 11) { start_native_final_gap_case(index + 1); return; }
 			osd_printf_info("TMS320C54x native final gaps: PASS words=6 cases=12 signed_shift=1 saturation=1 compact_store=1\n");
+			start_indirect_popm_case(0); return;
+		}
+		if (m_phase >= 160000 && m_phase < 160004)
+		{
+			unsigned const index = m_phase - 160000;
+			static constexpr u16 opcodes[] = {0x8a93, 0x8a9b, 0x8a90, 0x8a9b};
+			expect_opcode(opcodes[index], m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0802 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (index == 3 ? 0x1234 : 0x1001) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == (index == 3 ? 0xdead : 0x1234) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (index == 1 ? 0x10 : index == 3 ? 0x18 : 0x11) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (index == 2 ? 0x6000 : 0) &&
+				m_cpu->space(AS_DATA).read_word(0x1000) == 0x1234,
+				"Indirect POPM preserves stack contents, page-zero MMR addressing, pointer update and ARP selection");
+			if (index < 3) { start_indirect_popm_case(index + 1); return; }
+			osd_printf_info("TMS320C54x indirect POPM: PASS cases=4 pre_post=1 compatibility=1 sp_destination=1 pipeline_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

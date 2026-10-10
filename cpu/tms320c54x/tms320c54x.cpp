@@ -3246,9 +3246,10 @@ void tms320c54x_device::execute_one(u16 op)
 			push(data_read(mmr_address(low)));
 			return;
 		}
-		if ((op & 0xff80) == 0x8a00) // POPM MMR (seven-bit address)
+		if ((op & 0xff00) == 0x8a00 && low < 0xe0) // POPM MMR, direct or short-indirect page-zero address.
 		{
-			data_write(low & 0x7f, pop());
+			const u16 destination = mmr_address(low);
+			data_write(destination, pop());
 			return;
 		}
 		if ((op & 0xff00) == 0xec00) // RPT #k

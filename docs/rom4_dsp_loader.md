@@ -1784,11 +1784,13 @@ captured 626-word trace, not complete ISA, stage timing or native speech.
 LDM, STLM, PSHM and POPM decode their single-word direct/short-indirect
 MMR forms. The gate checks 1,344 forms and 192 rejected extended encodings
 on two pages, no extension reads and ten exact syntax/rejection examples.
-Its marker is `TMS320C54x MMR disassembler: PASS`. This primary-reference
-grammar coverage exposed a separate execution gap: the current POPM handler
-accepts only direct operands although TI specifies indirect operands too.
-Indirect POPM needs executable addressing/stack fixtures before promotion;
-decoder support alone does not close that gap.
+Its marker is `TMS320C54x MMR disassembler: PASS`. Indirect POPM separately
+has four executable cases for pre/postincrement, compatibility-mode ARP
+selection and an SP destination. It uses the shared page-zero MMR helper;
+forbidden extended encodings remain unimplemented. The fixtures failed on
+the former direct-only handler and pass with the corrected handler, requiring
+`TMS320C54x indirect POPM: PASS`. This is selected stack/addressing coverage,
+not physical stack-write or subsequent compiler-mode DAGEN timing evidence.
 
 BANZ/BANZD decode short-indirect and long-offset Sind operands. The gate
 checks 240 supported forms and 272 unclaimed direct/absolute forms on two
