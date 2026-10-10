@@ -11,7 +11,7 @@ class CodecContractTests(unittest.TestCase):
             for offset, word in enumerate(words):
                 start = 2 * (address + offset)
                 image[start:start + 2] = word.to_bytes(2, "big")
-        self.assertEqual(check_schedule_data(image), 5)
+        self.assertEqual(check_schedule_data(image), len(SCHEDULE_LISTS))
         for address, words in SCHEDULE_LISTS.items():
             for offset in range(len(words)):
                 with self.subTest(address=address, offset=offset):

@@ -1275,6 +1275,15 @@ a raw RF sample. This source contract does not apply automatically
 to every possible indirect caller of `0x996b/0x9988`; call ordering
 and hook contents must be checked at each candidate boundary.
 
+The data-image contract also covers the six lists selected by the
+annotated `0xa27d` dispatcher: `0xedf4`, `0xee00`, `0xee0c`,
+`0xee18`, `0xee26` and `0xee31`. The first five contain primary
+wrapper `0x9b15`; the last contains secondary wrapper `0x9a7a`.
+This supplies data-driven scheduling provenance for the additional
+primary caller, without claiming that the alternative callback is
+selected at runtime. All eleven known lists are checked word by word;
+this is not an exhaustive census of every DSP scheduling table.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
