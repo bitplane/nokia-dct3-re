@@ -32,12 +32,25 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         reads = reads + 1
         return value
     end)
-for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef}) do
+for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
+    0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe}) do
     taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(address, address,
         string.format("rf_score_%04x", address), function(offset)
             if observing then return end
             local pc = cpu.state["PC"].value
             if pc ~= offset and pc ~= offset + 1 then return end
+            if address == 0x0b6a or address == 0x0b6c or address == 0x0b78
+                or address == 0x2523 or address == 0x25fe then
+                publication_counts[address] = (publication_counts[address] or 0) + 1
+                if publication_counts[address] <= 4 then
+                    machine:logerror(string.format(
+                        "rom4_rf_continuation: address=%04x t=%.9f a=%010x b=%010x sp=%04x flags=%04x\n",
+                        address, machine.time:as_double(), cpu.state["A"].value & 0xffffffffff,
+                        cpu.state["B"].value & 0xffffffffff, cpu.state["SP"].value,
+                        memory:read_u16(0x1266)))
+                end
+                return
+            end
             if address == 0x0ca3 or address == 0x0cef then
                 publication_counts[address] = (publication_counts[address] or 0) + 1
                 if publication_counts[address] <= 4 then
@@ -75,7 +88,7 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef}) do
 end
 local stop = emu.add_machine_stop_notifier(function()
     observing = true
-    for _, start in ipairs({0x0ae4, 0x0b24, 0x0b64, 0x0ba4, 0x0be4, 0x0ca3, 0x0cef}) do
+    for _, start in ipairs({0x0ae4, 0x0b24, 0x0b64, 0x0ba4, 0x0be4, 0x0ca3, 0x0cef, 0x2523, 0x25fe}) do
         local words = {}
         for index = 0, 63 do
             words[#words + 1] = string.format("%04x", cpu.spaces["program"]:read_u16(start + index))
@@ -83,7 +96,7 @@ local stop = emu.add_machine_stop_notifier(function()
         machine:logerror(string.format("rom4_rf_selection_code: address=%04x words=%s\n",
             start, table.concat(words, ",")))
     end
-    for _, address in ipairs({0x0ca3, 0x0cef}) do
+    for _, address in ipairs({0x0ca3, 0x0cef, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe}) do
         machine:logerror(string.format("rom4_rf_selection_tail_count: address=%04x count=%d\n",
             address, publication_counts[address] or 0))
     end

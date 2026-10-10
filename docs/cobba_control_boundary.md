@@ -207,6 +207,16 @@ the first 24 writes do not contain bit 1. This bounded prefix is not
 an exhaustive absence proof for all later flag writes. Trace the
 continuation entry and its return-value source before attributing it
 to RF acquisition, an external peer or a missing DSP instruction.
+The fresh 60-second continuation census observes zero entries at
+`0x0b6a`, the post-pop `0x0b6c`, and the setter branch `0x0b78`.
+The unrelated/shared helper entry `0x2523` executes five times and
+branches to `0x25fe`, also observed five times. Its first four captured
+(A,B) pairs are `(13,1),(11,1),(12,2),(11,1)`; these are not recovered
+arguments of the unexecuted continuation. The live helper bytes match
+the raw ROM and are byte-pinned in the contract checker. Therefore the
+current missing link is the continuation's entry/selection contract,
+not an observed pop returning the wrong value. Search its code/data
+references and active dispatch source before modeling an external event.
 
 ### Product-specific physical buses
 
