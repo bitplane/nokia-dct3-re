@@ -1081,8 +1081,11 @@ source edge has reached IFR, before CPU dispatch, and restores the sleeping
 CPU and complete pending-source set. Replaying verifies the same vector,
 mask, INTM wake and priority result. This does not test saving an input edge
 that has not yet been delivered by MAME's scheduler.
-This tests CPU dispatch using explicit source
-edges; it does not exercise backend frame-to-source wiring, resident codec
+The fixture derives source edges from the standard-mode BSP state's completed
+duplex-frame result with receive-only, transmit-only or both directions
+released. It checks ready transitions and transmitted payload before routing
+them to the CPU. This tests completed-word state plus CPU dispatch; it does
+not exercise the production backend frame-to-source wiring, resident codec
 ISRs, physical frame timing or handset audio. Those remain distinct gates.
 The suite also checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone

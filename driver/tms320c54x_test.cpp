@@ -12,6 +12,7 @@
 #include "util/gsmfr.h"
 #include "tms320c54x_mcbsp.h"
 #include "tms320c54x_dma.h"
+#include "tms320c54x_bsp_state.h"
 #include <sstream>
 
 namespace {
@@ -19064,8 +19065,17 @@ private:
 				// Input-line changes synchronize asynchronously. Hold execution,
 				// then snapshot only after the delivered edge is visible in IFR.
 				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
-				m_cpu->set_input_line(source, HOLD_LINE);
-				if (index == 8) m_cpu->set_input_line(4, HOLD_LINE);
+				tms320c54x_bsp_state port;
+				port.control_w(index == 8 ? 0x00c0 : source == 4 ? 0x0080 : 0x0040);
+				if (source == 5) port.transmit_w(0x1234);
+				u16 output = 0;
+				const auto frame = port.duplex_frame(0x5678, output);
+				expect(frame.transmit_ready_edge == (source == 5) &&
+					frame.receive_ready_edge == (source == 4 || index == 8) &&
+					(!frame.transmitted || output == 0x1234),
+					"completed BSP frame supplies only the enabled ready transitions");
+				if (frame.transmit_ready_edge) m_cpu->set_input_line(5, HOLD_LINE);
+				if (frame.receive_ready_edge) m_cpu->set_input_line(4, HOLD_LINE);
 				++m_phase;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
