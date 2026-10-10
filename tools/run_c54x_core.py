@@ -10,6 +10,7 @@ REQUIRED = [
     "TMS320C54x zero BK addressing: PASS variants=320",
     "TMS320C54x SACCD conformance: PASS variants=576",
     "TMS320C54x RCD accumulator conditions: PASS variants=36",
+    "TMS320C54x MIN/MAX conformance: PASS variants=256",
     "TMS320C54x ROLTC conformance: PASS variants=256",
     "TMS320C54x core conformance: PASS",
     "TMS320C54x ASM accumulator add conformance: PASS left_shift=1 overflow_variants=4",

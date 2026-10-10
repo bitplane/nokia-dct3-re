@@ -15,9 +15,12 @@ FR_COMPLETE = "Fatal error: TMS320C54x ROM4 FR packing complete"
 DECODER_PASS = "TMS320C54x ROM4 FR decoder: PASS frames=32 samples=5120 handset_audio_claim=0"
 DECODER_COMPLETE = "Fatal error: TMS320C54x ROM4 FR decoder complete"
 DECODER_COMPARISON = "TMS320C54x ROM4 FR decoder comparison: frames=32 samples=5120 mismatches=0"
+ENCODER_PASS = "TMS320C54x ROM4 FR encoder: PASS frames=32 parameters=2432 handset_audio_claim=0"
+ENCODER_COMPLETE = "Fatal error: TMS320C54x ROM4 FR encoder complete"
+ENCODER_COMPARISON = "ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=0"
 
 
-def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False):
+def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False):
     lines = text.splitlines()
     marker, complete = (PACKED_PASS, PACKED_COMPLETE) if packed else (PASS, COMPLETE)
     if fr_packing:
@@ -26,6 +29,10 @@ def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=Fa
         marker, complete = DECODER_PASS, DECODER_COMPLETE
         if lines.count(DECODER_COMPARISON) != 1:
             raise ValueError("missing unique bit-exact PCM comparison")
+    if fr_encoder:
+        marker, complete = ENCODER_PASS, ENCODER_COMPLETE
+        if lines.count(ENCODER_COMPARISON) != 1:
+            raise ValueError("missing unique bit-exact parameter comparison")
     if returncode != 3:
         raise ValueError(f"unexpected MAME exit {returncode}; expected fixture completion 3")
     if lines.count(marker) != 1 or not lines or lines[-1] != complete:
@@ -44,9 +51,10 @@ def main():
     mode.add_argument("--packed", action="store_true", help="validate the outer packed-input CRC routine")
     mode.add_argument("--fr-packing", action="store_true", help="validate FR parameter packing, CRC and unpacking")
     mode.add_argument("--fr-decoder", action="store_true", help="compare native FR decoding against independent PCM")
+    mode.add_argument("--fr-encoder", action="store_true", help="compare native FR encoding against independent parameters")
     args = parser.parse_args()
     run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=Path.cwd()))
-    bios = "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
+    bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
@@ -57,7 +65,7 @@ def main():
     text = (run / "console.log").read_text()
     print(text, end="")
     try:
-        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder)
+        check_result(text, result.returncode, args.packed, args.fr_packing, args.fr_decoder, args.fr_encoder)
     except ValueError as error:
         print(f"ROM4 helper: FAIL: {error}", file=sys.stderr)
         return 1

@@ -1713,6 +1713,22 @@ private:
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
+	static constexpr u64 MINMAX_SEEDS[] = {0, 1, 0xffffffffffULL, 0x7fffffff, 0xff80000000ULL, 0x7fffffffffULL, 0x8000000000ULL, 0x123456789aULL};
+	void start_minmax_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0700, 0xf486 | ((index & 2) << 7) | (index & 1));
+		program.write_word(0x0701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, MINMAX_SEEDS[index / 32]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, MINMAX_SEEDS[(index / 4) % 8]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1c00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 77000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
 	void start_rcd_acc_case(unsigned index)
 	{
 		unsigned const condition = index % 12;
@@ -18959,6 +18975,25 @@ private:
 				"conditional delayed return preserves delay instruction and conditionally pops stack");
 			if (index < 35) { start_rcd_acc_case(index + 1); return; }
 			osd_printf_info("TMS320C54x RCD accumulator conditions: PASS variants=36\n");
+			start_minmax_case(0);
+			return;
+		}
+		if (m_phase >= 77000 && m_phase < 77256)
+		{
+			unsigned const index = m_phase - 77000;
+			u64 const a = MINMAX_SEEDS[index / 32];
+			u64 const b = MINMAX_SEEDS[(index / 4) % 8];
+			s64 const signed_a = s64(a << 24) >> 24;
+			s64 const signed_b = s64(b << 24) >> 24;
+			bool const choose_a = index & 1 ? signed_a < signed_b : signed_a > signed_b;
+			u64 const selected = choose_a ? a : b;
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				u64(m_cpu->state_int(tms320c54x_device::STATE_A)) == (index & 2 ? a : selected) &&
+				u64(m_cpu->state_int(tms320c54x_device::STATE_B)) == (index & 2 ? selected : b) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == (choose_a ? 0x1400 : 0x1c00),
+				"signed 40-bit MIN/MAX selects B and sets carry on equality");
+			if (index < 255) { start_minmax_case(index + 1); return; }
+			osd_printf_info("TMS320C54x MIN/MAX conformance: PASS variants=256\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -19006,6 +19041,13 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
 				"native FR encoder stage returns with balanced stack");
 			if (stage < 2) { start_rom4_fr_encoder(frame, stage + 1); return; }
+			auto const reference_state = m_rom4_codec.snapshot().channels[0];
+			// Native L_z2 is split low/high at 0x1001/2, unlike the reference scalar.
+			expect(s16(data.read_word(0x1000)) == reference_state.z1 &&
+				data.read_word(0x1001) == (reference_state.l_z2 & 0x7fff) &&
+				s16(data.read_word(0x1002)) == (reference_state.l_z2 >> 15) &&
+				s16(data.read_word(0x1003)) == reference_state.mp,
+				"native FR encoder preprocessing and preemphasis histories match reference");
 			unsigned differences = 0;
 			for (unsigned p = 0; p < 76; ++p)
 			{

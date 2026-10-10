@@ -474,7 +474,7 @@ Relevant original annotations and their current validation scope:
 | Data `0x1390` | `FR_prm` | Candidate full-rate parameter buffer |
 | Program `0x80e7` / `0x80ff` | `FR_prm2bits` / `FR_bits2prm` | Native FR parameter round trip validated; see packing contract below |
 | Program `0x812f` | `EFR_FR_crc3_AR4` | Candidate CRC helper used by the type-`0x50` buffer consumer |
-| Program `0x8458` / `0x860c` | `FR_decoder` / `FR_coder` | Decoder validated in isolation; encoder remains a candidate |
+| Program `0x8458` / `0x860c` | `FR_decoder` / `FR_coder` | Decoder and encoder validated in isolated algorithm fixtures |
 | Program `0xc8dc` | `EFR_decoder` | Candidate enhanced-full-rate decoder |
 
 There are no named addresses in `0x8d00..0x93ff`. Querying both ordinary
@@ -570,18 +570,24 @@ that update overwrites pulses. This rule is independently documented in
 and protected by 320 core cases covering signed strides, wraparound and
 single/dual-memory forms.
 
-The next software-only boundary is encoder `0x860c`, preprocessing `0x85e0`
-and their persistent state. Isolated decoder PCM validation does not prove
-handset audio delivery, native speech during a call or end-to-end calls.
-
-The development-only `fr-encoder` BIOS invokes native reset wrapper `0x8045`,
+`make check-c54x-rom4-fr-encoder` invokes native reset wrapper `0x8045`,
 preprocessing `0x85e0` with AR4 pointing to 160 PCM words, then `0x860c`.
 Preprocessing writes `0x127d..0x131c`; encoding writes the 76 parameters
-at `0x1390`. This fixture is not an acceptance gate yet: parameters differ
-from the independent codec (465 of 2,432 parameters); all 32 frames return without illegal instructions,
-and the final seven noise frames match every parameter. The reset must include the wrapper's additional
-state initializers, not just preprocessing reset `0x85d7`. No encoder correctness
-or handset audio claim follows from these partial runs.
+at `0x1390`. All 2,432 parameters across the same four eight-frame sequences
+match the independent codec exactly. Filter histories are also compared:
+`0x1000` is z1, `0x1001/2` hold the low/high split of L_z2, and `0x1003`
+is preemphasis history mp. The reset includes the wrapper's additional state
+initializers, not just preprocessing reset `0x85d7`.
+
+`MAX` must select B and set carry on equality (SPRU172C pages 4-99/100).
+The encoder's predictor and RPE grid searches depend on retaining the earlier
+candidate when correlation/energy ties. Selecting A on equality changes
+parameters even for silence. The strict comparison is protected by 256
+signed 40-bit MIN/MAX cases, including equal operands and both destinations.
+
+The remaining boundary is activation and delivery through the handset's
+native speech wrappers and audio transports. Isolated bit-exact codec tests
+do not establish native handset audio, speech during a call or end-to-end calls.
 
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)

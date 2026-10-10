@@ -1228,7 +1228,7 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const s64 a = s64(m_a << 24) >> 24;
 		const s64 b = s64(m_b << 24) >> 24;
-		const bool choose_a = BIT(op, 0) ? a < b : a >= b;
+		const bool choose_a = BIT(op, 0) ? a < b : a > b; // Equality selects B and sets C (SPRU172C 4-99/100).
 		accumulator(BIT(op, 8)) = choose_a ? m_a : m_b;
 		m_st0 = (m_st0 & ~u16(0x0800)) | (choose_a ? 0 : 0x0800);
 		return;
