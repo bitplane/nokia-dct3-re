@@ -84,6 +84,14 @@ class CodecContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "writer census"):
             check(image)
 
+    def test_unreviewed_programming_port_rejected(self):
+        for port in (0x30, 0x31, 0x32):
+            for opcode in (0x74f8, 0x75f8):
+                image = self.image()
+                image[0x200:0x206] = b"".join(word.to_bytes(2, "big") for word in (opcode, 8, port))
+                with self.subTest(port=port, opcode=opcode), self.assertRaisesRegex(ValueError, "programming census"):
+                    check(image)
+
 
 class CodecTraceTests(unittest.TestCase):
     def trace(self):

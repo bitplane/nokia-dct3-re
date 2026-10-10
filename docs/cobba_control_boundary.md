@@ -144,6 +144,37 @@ validate sample cadence/encoding. Keep it out of the operational hardware
 decoder until the port-to-wire path is evidenced. No DCS/PCS/extended-band
 mapping or native acquisition follows from this bounded P-GSM result.
 
+#### Transfer boundary audit
+
+The NSE-1 manual (pp. 3-42 and 3-51) identifies MAD2's SynthEna,
+SynthClk and SynthData outputs connected to PLUSSA. It does not give
+the DSP I/O register mapping or the serializer's latch/queue semantics.
+The checked program-image candidate census is now regression-protected:
+
+| DSP I/O port | Candidate reads | Candidate writes |
+| --- | --- | --- |
+| `30` | 0 | `0a94,30b5,4565,6976,a17c` |
+| `31` | 0 | `36f7,370c,4020,a23a` |
+| `32` | 0 | `36fb,3710,4025,a23e` |
+
+All thirteen candidate writer instructions are covered by byte-pinned
+sequences, including the existing `rf_slot_queue_consumption` contract.
+This is coverage of the checked image, not every future upload, other
+port status register or computed entry. There is no busy poll at these
+three ports in that image. Do not infer that hardware has zero latency,
+no queue, or no readiness signal elsewhere.
+
+The fresh controls capture initialization write `port30=1` at advanced
+PC `4567`, followed by repeated `port30=1` at `30b8`. Static sequences
+also write zero at `a17c` and use an indirect data operand at `0a94`.
+Port 30's meaning is still opaque: it is not established as a transfer
+trigger, reset or enable. Trace caps are per port because these repeated
+early writes otherwise hide the later selected-entry pair. The native
+backend currently retains all three as saved latches; no physical serial
+transfer or settling timer exists. The next evidence needed is the SCU
+register/serializer contract or an independently captured pin transfer,
+not a guessed busy bit or a replayed firmware result.
+
 ### Software RF reference boundary
 
 An independent baseband waveform source is available in

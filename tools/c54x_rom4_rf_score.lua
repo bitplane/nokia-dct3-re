@@ -127,7 +127,7 @@ taps[#taps + 1] = memory:install_write_tap(0x1266, 0x1266,
                 machine.time:as_double(), cpu.state["PC"].value, value))
         end
     end)
-local tuning_writes = 0
+local tuning_writes = {}
 local tuning_field_writes = {}
 for _, space_name in ipairs({"data", "program"}) do
     -- Program overlay writes update data storage without traversing data-space taps.
@@ -163,11 +163,11 @@ taps[#taps + 1] = cpu.spaces["program"]:install_read_tap(0x3ffb, 0x4048,
                 memory:read_u16(0x60), memory:read_u16(0x1867)))
         end
     end)
-taps[#taps + 1] = cpu.spaces["io"]:install_write_tap(0x31, 0x32,
+taps[#taps + 1] = cpu.spaces["io"]:install_write_tap(0x30, 0x32,
     "rf_programming_observation", function(offset, value)
         if observing then return end
-        tuning_writes = tuning_writes + 1
-        if tuning_writes <= 32 then
+        tuning_writes[offset] = (tuning_writes[offset] or 0) + 1
+        if tuning_writes[offset] <= 16 then
             machine:logerror(string.format(
                 "rom4_rf_tuning_write: t=%.9f pc=%04x port=%04x value=%04x a=%010x ar2=%04x flags216a=%04x field60=%04x selected1867=%04x\n",
                 machine.time:as_double(), cpu.state["PC"].value, offset, value,

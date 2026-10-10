@@ -12,6 +12,20 @@ from tools.c54x_rom4_port_census import census
 
 
 SEQUENCES = {
+    "rf_programming_table_pair": (0x36f7, (
+        0x7593, 0x0031, 0xf495, 0xf495, 0x7593, 0x0032)),
+    "rf_programming_uploaded_pair": (0xa23a, (
+        0x7595, 0x0031, 0xf495, 0xf495, 0x7595, 0x0032)),
+    "rf_port30_scan_control": (0x0a90, (
+        0xec0d, 0xf495, 0xe800, 0xf495, 0x7583, 0x0030)),
+    "rf_port30_resident_control": (0x30b3, (
+        0xe801, 0xf495, 0x75f8, 0x0008, 0x0030)),
+    "rf_port30_initialization": (0x4562, (
+        0x7682, 0x0001, 0xf495, 0x7582, 0x0030)),
+    "rf_port30_transition_control": (0x6974, (
+        0xe901, 0xf495, 0x75f8, 0x000b, 0x0030)),
+    "rf_port30_mode_control": (0xa17a, (
+        0xe900, 0xf495, 0x75f8, 0x000b, 0x0030)),
     "rf_programming_overlay_upload_loop": (0x31d4, (
         0x47f8, 0x0013, 0x7f92, 0x6d93, 0x00f8, 0x0013)),
     "rf_programming_addend_and_transform_selection": (0x3ffb, (
@@ -350,6 +364,11 @@ def check(image: bytes) -> list[str]:
         raise ValueError("port21 reader census differs from reviewed nine sites")
     if sites.get(("W", 0x21), []) != WRITE_SITES:
         raise ValueError("port21 writer census differs from reviewed twelve sites")
+    for port, expected in {0x30: [0x0a94, 0x30b5, 0x4565, 0x6976, 0xa17c],
+                           0x31: [0x36f7, 0x370c, 0x4020, 0xa23a],
+                           0x32: [0x36fb, 0x3710, 0x4025, 0xa23e]}.items():
+        if sites.get(("R", port), []) or sites.get(("W", port), []) != expected:
+            raise ValueError(f"port{port:02x} programming census differs from reviewed sites")
     return results
 
 
