@@ -31,6 +31,17 @@ def verify(image):
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     def instructions(address, size):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
+    if instructions(0x2875e4, 12) != [
+            ('movs', 'r1, #0xf0'), ('ldrb', 'r0, [r4, #0xd]'),
+            ('ands', 'r1, r0'), ('movs', 'r0, #2'),
+            ('orrs', 'r0, r1'), ('strb', 'r0, [r4, #0xd]')]:
+        raise ValueError('candidate acquisition nibble-2 initialization differs')
+    if instructions(0x28678c, 14) != [
+            ('lsls', 'r0, r4, #0x15'), ('asrs', 'r1, r0, #0x10'),
+            ('ldrb', 'r0, [r6, #0xd]'), ('lsls', 'r0, r0, #0x1b'),
+            ('lsrs', 'r0, r0, #0x1b'), ('orrs', 'r1, r0'),
+            ('strb', 'r1, [r6, #0xd]')]:
+        raise ValueError('candidate row update does not preserve low five control bits')
     if int.from_bytes(read(0x2a1378, 4), 'big') != 0x137248:
         raise ValueError('initial record scan table root differs')
     if instructions(0x2a1126, 18) != [

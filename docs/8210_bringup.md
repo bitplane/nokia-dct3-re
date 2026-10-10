@@ -1922,6 +1922,22 @@ contract before loosening eligibility or synthesizing a completion.
 Evidence: `tmp/noki8210_row6_candidates_dcs/error.log`, SHA-256
 `2bd81fa95fcfec2be631271b4fbf09108fd26c6d5efbd61b0fd742dd16524a1c`.
 
+A passive control-word watch separates acquisition state from the later
+count-row update. Both candidates receive nibble 2 through the own-ROM
+initializer `2875e4..2875ee` at 5.54056s. Only ARFCN 823 changes to nibble 4
+through the `285f26..285f4c` branch at 7.89752s; 824 retains nibble 2.
+At 9.90525s, `28678c..286798` updates the high row bits while retaining
+the low five bits: 823 becomes `ffc4c60c`, 824 `ffc22664`. The contract
+checker pins the initializer and row-preserving update. The mode-4 request
+therefore follows retained acquisition state, not a nibble manufactured
+by the count update. This does not establish the peer reply contract.
+These addresses were reused for unrelated arithmetic before candidate
+initialization; those earlier writes are not candidate-lifecycle evidence.
+The next predecessor is why the secondary candidate does not take the
+acquisition-update branch, and what its mode-4 instruction expects.
+Evidence: `tmp/noki8210_candidate_control_dcs/error.log`, SHA-256
+`f69b9c7e5bd15c3cc98b249028f223c65e7fae9c1cb4a85a5e4827477a43deda`.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
