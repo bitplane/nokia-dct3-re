@@ -183,6 +183,19 @@ public:
 			util::stream_format(stream, "RPT     #%u", op & 255);
 			return 1 | SUPPORTED;
 		}
+		if ((op & 0xfce0) == 0xf460 || (op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf0c0)
+		{
+			int const shift = (op & 0x10) ? int(op & 31) - 32 : int(op & 31);
+			char const *name = (op & 0xfce0) == 0xf460 ? "SFTA" : (op & 0xfce0) == 0xf440 ? "LD" : "XOR";
+			util::stream_format(stream, "%-8s%c, %d, %c", name, BIT(op, 9) ? 'B' : 'A', shift, BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
+		if ((op & 0xfeff) == 0xf490 || (op & 0xfeff) == 0xf491 || (op & 0xfeff) == 0xf492)
+		{
+			char const *name = (op & 255) == 0x90 ? "ROR" : (op & 255) == 0x91 ? "ROL" : "ROLTC";
+			util::stream_format(stream, "%-8s%c", name, BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
 		switch (op)
 		{
 		case 0xf495: stream << "NOP"; return 1 | SUPPORTED;

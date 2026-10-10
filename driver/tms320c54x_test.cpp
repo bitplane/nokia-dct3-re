@@ -636,6 +636,38 @@ private:
 				"Memory ALU decoding distinguishes unsigned, TS and carry/borrow families");
 		}
 		osd_printf_info("TMS320C54x memory ALU disassembler: PASS modes=4096 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xf460, 0xf440, 0xf0c0})
+				for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
+					for (unsigned shift = 0; shift < 32; ++shift)
+					{
+						words const buffer(pc, family | (accumulators << 8) | shift, 0x2345);
+						std::ostringstream text;
+						expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+							"Accumulator shift decoder has no extension reads");
+					}
+		vector const accumulator_forms[] = {
+			{0xf460, 1 | dasm::SUPPORTED, "SFTA    A, 0, A"},
+			{0xf57d, 1 | dasm::SUPPORTED, "SFTA    A, -3, B"},
+			{0xf74f, 1 | dasm::SUPPORTED, "LD      B, 15, B"},
+			{0xf650, 1 | dasm::SUPPORTED, "LD      B, -16, A"},
+			{0xf1df, 1 | dasm::SUPPORTED, "XOR     A, -1, B"},
+			{0xf491, 1 | dasm::SUPPORTED, "ROL     A"},
+			{0xf591, 1 | dasm::SUPPORTED, "ROL     B"},
+			{0xf490, 1 | dasm::SUPPORTED, "ROR     A"},
+			{0xf590, 1 | dasm::SUPPORTED, "ROR     B"},
+			{0xf492, 1 | dasm::SUPPORTED, "ROLTC   A"},
+			{0xf592, 1 | dasm::SUPPORTED, "ROLTC   B"},
+		};
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (auto const &test : accumulator_forms)
+			{
+				words const buffer(pc, test.op, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == 1,
+					"Accumulator decoding retains signed shift and rotate source");
+			}
+		osd_printf_info("TMS320C54x accumulator disassembler: PASS shift_forms=384 rotate_forms=6 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
