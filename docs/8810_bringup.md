@@ -348,8 +348,23 @@ NSE-6 runs the scheduler test but never publishes the enabling word or
 enters that branch. Both fixtures hold `06be = 0010`, so that word is not
 the observed cross-product distinction. No firmware state is forced.
 
-The next boundary is the own-MCU search-list publication condition, not a
-missing native initializer implementation. Identity/control payloads also
+The own-MCU publication chain is `0837 -> 0445 -> type-1a`. Dispatcher
+`262056..26205c` selects `262bf4` for input `0837`; that branch loads `0445`
+and enters the status constructor at `2a94f4` through shared tail `26225a`.
+Receive loop `218540` routes `0445` to `218a42`, then calls `2184b6` at
+`218a6a`. The latter allocates/clears 72 bytes, sets payload length `44`
+and type `1a`, supplies control bytes, and queues the packet to task 3.
+A halfword-aligned direct-BL scan over the own `170000`-byte MCU extent
+finds that one builder caller; this does not exclude indirect callers.
+
+In the fresh 30-second fixture the upstream dispatcher instead observes
+`083b` at 3.614168 s; constructor `2a94f4` publishes `0448`, and the search
+receive loop consumes it at 3.614318 s. The constructor later publishes
+`03e9` at 6.528498 s. No `0445` construction or search-builder entry is
+observed; constructor and receive taps have positive controls and remain
+below their 64-event caps. The next own-MCU boundary is the producer and
+lifecycle selection of `0837` versus the observed `083b`, not a missing
+native initializer implementation. Identity/control payloads also
 differ, with NSE-6's records erased; no NSE-1 data may be copied into NSE-6
 to conceal these genuine input differences. The NSE-1 processing checker
 passes on this capture; NSE-6's overlay/upload checks also pass.
