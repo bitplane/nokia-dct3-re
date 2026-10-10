@@ -912,8 +912,17 @@ type bits 1 map to channel `0x2f`, 2/3 to `0x20/0x21`, 4..7 to
 `0x40..0x43`, and 8..15 to `0x80..0x87`; type 0 and 16..31 preserve
 the record. The low three bits become the timeslot. The mapping uses the
 ROM tables at `0x2aab90/0x2aab94`. Thus parsed types 1/2/3 supply exactly
-the three channel values that enable request `0x03ed`. This test does not
-cover hopping, the full channel-number domain, or a live assignment.
+the three channel values that enable request `0x03ed`.
+
+A further 65,536 cases cover every second/third-byte combination for type
+1, timeslot 0. In the non-hopping branch, only channel numbers 1..124
+write the record; 0 and 125..1023 preserve it. Bit 4 of the second byte
+selects hopping, which writes the six-bit sequence number from the third
+byte and the six-bit index from the second byte's low nibble plus the
+third byte's high two bits, while clearing the channel-number field.
+Both branches retain the second byte's high three bits as the training
+sequence. This is exhaustive for those two input bytes at one accepted
+type, not proof of a live assignment or physical RF behavior.
 
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)

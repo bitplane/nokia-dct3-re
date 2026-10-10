@@ -219,6 +219,36 @@ def check_channel_description(cpu, raw):
     return 256
 
 
+def check_channel_parameters(cpu):
+    for packed in range(65536):
+        second, third = packed >> 8, packed & 255
+        cpu.mem_write(0x109650, bytes([0xee]) * 12)
+        cpu.mem_write(0x10b100, bytes((8, second, third)))
+        cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+        cpu.reg_write(UC_ARM_REG_R0, 0x64)
+        cpu.reg_write(UC_ARM_REG_R1, 0x10b100)
+        cpu.reg_write(UC_ARM_REG_R2, 3)
+        cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
+        cpu.emu_start(0x23ca45, RETURN, count=512)
+        if cpu.reg_read(UC_ARM_REG_PC) != RETURN:
+            raise ValueError("channel parameters did not return within bound")
+        hopping = bool(second & 0x10)
+        channel_number = ((second & 3) << 8) | third
+        actual = bytes(cpu.mem_read(0x109650, 12))
+        if hopping:
+            expected = bytes((0x2f, 0, second >> 5, 1, 0,
+                              ((second & 15) << 2) | (third >> 6),
+                              0, 0, third & 63))
+        elif 1 <= channel_number <= 124:
+            expected = bytes((0x2f, 0, second >> 5, 0, 0, 0,
+                              channel_number >> 8, channel_number & 255, 0))
+        else:
+            expected = bytes([0xee]) * 9
+        if actual[:9] != expected:
+            raise ValueError(f"channel parameters differ for {packed:#06x}")
+    return 65536
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -255,6 +285,7 @@ def check_image(raw):
             "mode_parser_cases": check_mode_parser(cpu, raw),
             "optional_mode_parser_cases": check_optional_mode_parser(cpu),
             "channel_description_cases": check_channel_description(cpu, raw),
+            "channel_parameter_cases": check_channel_parameters(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,
