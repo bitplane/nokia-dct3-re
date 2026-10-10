@@ -1,7 +1,7 @@
 import unittest
 
 from tools.c54x_rom4_rf_delivery_check import (check, check_request, check_tuning,
-    check_tuning_stages, pack_tuning_nonnegative, decode_search_bitmap)
+    check_tuning_stages, check_tuning_upload, pack_tuning_nonnegative, decode_search_bitmap)
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -30,13 +30,20 @@ class DeliveryTests(unittest.TestCase):
         stages = [("3ffb", "6d", "4", "32"), ("400f", "6d", "13a6", "32"),
                   ("402e", "1413", "13a6", "32"), ("403a", "1413", "13a6", "32"),
                   ("4048", "302813", "302813", "50")]
-        lines = [f"rom4_rf_tuning_stage: t={i} address={address} a={a} b={b} field60={field} {fields}\n"
+        lines = [f"rom4_rf_tuning_stage: t={i + 1} address={address} a={a} b={b} field60={field} {fields}\n"
                  for i, (address, a, b, field) in enumerate(stages)]
         ports = """rom4_rf_tuning_write: t=5 pc=4023 port=0031 value=2813 a=00302813 ar2=0031 selected1867=006d
 rom4_rf_tuning_write: t=6 pc=4028 port=0032 value=0030 a=00302813 ar2=0031 selected1867=006d
 """
         trace = "".join(lines) + ports
         self.assertEqual(check_tuning_stages(trace), 0x302813)
+        upload = "".join(f"rom4_rf_tuning_field_write: space=program t=0.{i + 1} pc=31d7 address={address} value={value}\n"
+                         for i, (address, value) in enumerate((("216a", "0004"), ("216b", "13a6"), ("216c", "13a6"))))
+        self.assertEqual(check_tuning_upload(upload + trace), 0x302813)
+        for old, new in (("space=program", "space=data"), ("pc=31d7", "pc=31d8"),
+                         ("value=13a6", "value=13a7"), ("t=0.3", "t=9.3")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_tuning_upload(upload.replace(old, new) + trace)
         for index in range(len(lines)):
             with self.subTest(index=index), self.assertRaises(ValueError):
                 check_tuning_stages("".join(lines[:index] + lines[index + 1:]) + ports)

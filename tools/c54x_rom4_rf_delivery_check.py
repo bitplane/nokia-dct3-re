@@ -100,6 +100,23 @@ def check_tuning_stages(text):
     return result
 
 
+def check_tuning_upload(text):
+    writes = [dict(FIELDS.findall(match[1])) for match in
+              re.finditer(r"rom4_rf_tuning_field_write: (.*)", text)]
+    expected = (("216a", "0004"), ("216b", "13a6"), ("216c", "13a6"))
+    uploaded = [write for write in writes if write.get("space") == "program"]
+    if len(uploaded) != 3 or tuple((write.get("address"), write.get("value"))
+                                  for write in uploaded) != expected:
+        raise ValueError("missing or changed native tuning overlay upload")
+    if any(write.get("pc") != "31d7" for write in uploaded):
+        raise ValueError("tuning upload did not use the observed native copy loop")
+    times = [float(write["t"]) for write in uploaded]
+    stage = re.search(r"rom4_rf_tuning_stage: (.*)", text)
+    if stage is None or times != sorted(times) or times[-1] >= float(dict(FIELDS.findall(stage[1]))["t"]):
+        raise ValueError("tuning fields were not uploaded before programming")
+    return check_tuning_stages(text)
+
+
 def check(text):
     events = []
     for line in text.splitlines():

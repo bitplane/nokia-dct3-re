@@ -79,8 +79,22 @@ The resident hook defaults `0x244a/0x244c` are return/NOP sequences
 in the checked image. Candidate direct-call scanning finds callers
 `0x099d` and `0x0a85` for `0x3ffb`, none for `0x4006`; this is
 raw direct-call coverage, not closure over computed calls or patches.
-The addend's producer and its physical units remain unresolved. Do not
-equate `13a6` with a frequency or prescaler setting without that contract.
+The checked initial DSP data image holds zero in `0x216a..0x216c`.
+Fresh zero/rotating controls observe data-space clearing writes at advanced
+PC `0x0f15`, then program-overlay writes at advanced PC `0x31d7` around
+0.134044 seconds: `0x216a=0004`, `0x216b=13a6`, `0x216c=13a6`.
+The byte-pinned loop at `0x31d4..0x31d9` copies data through AR2 into
+program space; the backend's active overlay maps those destinations to
+the same data storage. Observed AR2 advances `0931,0932,0933`. A
+data-space-only watch therefore misses the load-bearing upload writes.
+`check_tuning_upload` requires the native copy-loop tuple before the
+already-validated programming stages. The original NSE-1 v5.30 MCU image
+contains the tuple at file offsets `0x095450`, `0x098694`, `0x0998a0`;
+each has nearby destination word `216a`, but matching bytes alone do not
+identify the selected blob or establish its layout. The values are
+firmware-uploaded configuration, not a backend-invented addend. MCU blob
+selection and physical units remain unresolved; do not equate `13a6`
+with a frequency or prescaler setting without that contract.
 
 ### Software RF reference boundary
 
