@@ -576,19 +576,20 @@ of fitted silicon. Fresh acceptance passes DSP coherence, long RF cadence,
 the exact 5110 menu, normal 7110 fail-closed bootstrap, 3210 baseline and
 frontier, and the 3310/3330/3410 frontiers. All 1211 tool tests pass.
 
-A fresh, isolated 30-second NSE-1 run starts receiver reads on frame 30,
-finishes with 6499 frame expiries and 207040 reads, exactly
-`32 * (6499 - 30 + 1)`. It emits these three port-`0x31/0x32` pairs:
-`2a04/0006` at DSP `0xa240` twice, then `2813/0030` at `0x4028`.
-It remains idle at `0x408d`, IFR zero, IMR `0x035f`, with no port-`0x38/0x39`
-burst reads. A shorter instrumented run additionally emits `0041/0040`
-at `0x3712`; exact command counts are not established as invariant.
-The old assertion (zero port-`0x32` writes, first read on frame 29) is
-superseded deliberately: the fresh-profile RF gate now requires frame 30
-and exactly these three ordered pairs at their observed instruction tails.
-It still rejects parallel burst activity, pending INT0, changed interrupt
-mask and receiver cadence. This is an emulated-boundary oracle, not RF
-electrical validation or network registration evidence.
+The current NSE-1 short boot starts receiver reads on frame 30 and emits
+four port-`0x31/0x32` pairs: `2a04/0006` twice at `0xa240`, `0041/0040`
+at `0x3712`, then `2813/0030` at `0x4028`. The additional pair is caused
+by native TX-completion FIQ1 releasing queued MCU traffic, not passive
+instrumentation. The older three-write result predates that correction.
+The fixed 30-second RF gate now checks the later multi-entry scan in
+progress: 20,288 frame expiries, 648,288 reads and 1,580 control writes,
+with exact initial sequence and firmware-producer evidence. A passive
+60-second run proves return and frame-period restoration at 36.156 seconds,
+followed by ordinary FIR queue production and consumption. The gate still
+rejects parallel burst activity, pending INT0 and changed interrupt masks.
+See [the native lifecycle contract](djr_dsp_integration.md#native-speech-activation-and-pcm-buffers).
+These are emulated-boundary observations, not RF electrical validation,
+network registration or handset speech evidence.
 
 The bounded, read-only `tools/c54x_rom4_rf_operand_observe.lua` now maps
 these writes to resident firmware operands. Both calls enter `0xa22f`

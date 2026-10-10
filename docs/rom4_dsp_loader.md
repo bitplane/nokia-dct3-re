@@ -2,6 +2,17 @@
 
 ## Current result
 
+The current native boundary profiles are distinct: the four-second coherent
+boot observes four ordered RF control writes, including the firmware-owned
+`0041/0040` queue item released by TX-completion FIQ1. The 30-second RF
+gate observes the later multi-entry scan in progress (1,580 writes); a
+60-second passive run proves its return at 36.156 seconds, frame-period
+restoration and ordinary receive/FIR queue consumption. Neither establishes
+RF acquisition or handset speech. See
+[the current native boundary contract](djr_dsp_integration.md#native-speech-activation-and-pcm-buffers).
+Three-write and 6,499-frame measurements retained below describe the older
+pre-TX-FIQ1 baseline, not the current acceptance profile.
+
 The NSE-1 v5.30 MCU drives a real staged DSP boot. A cold transfer runs through
 loader1 at DSP address `0x0f00`, the MCU asserts DSP reset, and a second release
 preserves DARAM. Loader1 then requests block `0x12`; the matching descriptor
