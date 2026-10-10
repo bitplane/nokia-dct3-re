@@ -1065,6 +1065,19 @@ payload construction at `0x125b`, capacity/commit gates and physical
 input still need tracing. Native type-`0x80` publication is therefore
 present in the image, but not yet demonstrated in a handset run.
 
+The publisher's containing receive-decode engine starts at `0x4ef7`:
+it stores incoming A/B in data `0x121f/0x121e`, and operation selector
+`0x40` enters the short-block branch. That branch calls `0x5441` at
+`0x4f18` and skips publication when B is nonzero. Byte-pinned entry
+chains supply A from nonzero data `0x194f` (`0x9b40`, B=0), `0x1950`
+(`0x9be2`, B=1), or `0x11fd` (`0x9dfd`, B=0 with an additional
+active-mode/deferred-state guard). A fourth direct call at `0x9bd4`
+also consumes `0x194f`, with an operation-`0xa0` timing guard.
+These cells are operation selectors at these calls, not identified GSM
+channel modes. Their producers, decoder input vectors, and successful
+result predicates remain open; the existence of publication code does
+not supply the physical input needed to execute it successfully.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
