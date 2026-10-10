@@ -32,7 +32,8 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x4414, 0x4428, 0x4433, 0x4460, 0x32f4, 0x33b4, 0x3249,
     0x330a, 0x3326, 0x332b, 0x3347, 0x3360, 0x337c, 0x33ac, 0x33b0, 0x42f6,
     0x33e9, 0x4424, 0x4c6f, 0x4ef7, 0x4f20, 0x50db,
-    0x9a7a, 0x9aa8, 0x9b15, 0x9a99, 0x9acc, 0x9b20}
+    0x9a7a, 0x9aa8, 0x9b15, 0x9a99, 0x9acc, 0x9b20,
+    0x98b7, 0x9903}
 local counts = {}
 local control_sites = {
     [0x09a4] = true, [0x0ab8] = true, [0x4de3] = true, [0x4e00] = true,
@@ -101,6 +102,18 @@ for _, address in ipairs(sites) do
         end)
 end
 local stop = emu.add_machine_stop_notifier(function()
+    for _, start in ipairs({0xee38, 0xee3e, 0xee45, 0xee4e, 0xee57}) do
+        local words = {}
+        local terminated = false
+        for index = 0, 31 do
+            local word = memory:read_u16(start + index)
+            words[#words + 1] = string.format("%04x", word)
+            if word == 0x00ff then terminated = true; break end
+        end
+        machine:logerror(string.format(
+            "rom4_schedule_list: address=%04x terminated=%d words=%s\n",
+            start, terminated and 1 or 0, table.concat(words, ",")))
+    end
     for pc, count in pairs(upload_reads) do
         machine:logerror(string.format(
             "rom4_upload_reader_count: pc=%04x count=%d\n", pc, count))

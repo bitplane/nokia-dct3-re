@@ -1154,6 +1154,23 @@ addresses: ROM-image indexing alone cannot recover them. Capture the
 DSP data-space lists or establish their initialization before claiming
 that the receive-operation callers have no scheduling producer.
 
+Passive data-space capture after an eight-second native boot recovers
+all five sentinel-terminated lists (sentinel omitted below):
+
+| Data address | Function addresses |
+| --- | --- |
+| `ee38` | `990d,99d5,9aa8,9bbb,9d20` |
+| `ee3e` | `990d,99d5,9aa8,9bbb,9d20,9d3d` |
+| `ee45` | `990d,99d5,9a56,9a71,9aa8,9bbb,9d20,9d3d` |
+| `ee4e` | `9aa8,9b4a,9b59,9bbb,9be0,9d20,9d3d,9d49` |
+| `ee57` | `99aa,99d5,99b3,9a56,9a71,9a7a,9aa8,9b4a,9a34,9b59,9bbb,9be0,9d20,9d3d` |
+
+Every list includes primary-operation wrapper `0x9aa8`; the last also
+includes secondary wrapper `0x9a7a`. Thus a scheduling producer exists
+in data, although dispatcher `0x98b7` and interpreter `0x9903` both
+execute zero times in that bounded run. The next predecessor question
+is selection of this scheduler, not construction of missing call lists.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
