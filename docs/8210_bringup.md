@@ -1908,6 +1908,20 @@ Logs: `tmp/noki8210_row6_writer_{gsm,dcs}/error.log`, SHA-256 respectively
 `637b58dad757b644844238e93c69e87ce352996c8c80b15dfc00468edcb742ce`
 and `08506a0b848730f13e67d1d003c9eaa21eb16647a76d60659da2b66ab6cc7c04`.
 
+Object-qualified writes identify those count contributions. At 9.905357s,
+candidate `119690` (ARFCN 823) has control `ffc4c60c`; at 9.905370s,
+`1196a0` (ARFCN 824) has `ffc22664`. Both classify into row 6, column 0.
+The 9.905417s decrement applies to `119690`, leaving the 824 contribution.
+Its nibble 2 agrees with the independently observed post-acquisition mode-4
+target. Thus the count split and rejected type-11 instruction converge on
+the same secondary candidate, not a corrupt serving-record alias. The
+peer still rejects that instruction because it has no accepted neighbour
+list entry for 824; this does not establish whether mode 4 should require
+that list or what response it owes. Resolve the mode/candidate lifecycle
+contract before loosening eligibility or synthesizing a completion.
+Evidence: `tmp/noki8210_row6_candidates_dcs/error.log`, SHA-256
+`2bd81fa95fcfec2be631271b4fbf09108fd26c6d5efbd61b0fd742dd16524a1c`.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
