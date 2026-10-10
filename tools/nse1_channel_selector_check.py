@@ -507,6 +507,41 @@ def check_receive_ring_copy(raw):
     return 1300
 
 
+def check_receive_ring_header(raw):
+    cpu = Uc(UC_ARCH_ARM, UC_MODE_THUMB | UC_MODE_BIG_ENDIAN)
+    cpu.mem_map(BASE, len(raw))
+    cpu.mem_write(BASE, raw)
+    cpu.mem_map(0x100000, 0x10000)
+    cpu.mem_map(0x10000, 0x1000)
+    cases = 0
+    inputs = ((header, 0) for header in range(65536))
+    for batch in (inputs, ((0x0180, cursor) for cursor in range(100))):
+        for header, cursor in batch:
+            cpu.mem_write(0x101ca, (0x80 + cursor).to_bytes(2, "big"))
+            cpu.mem_write(0x101c8, (0x80 + (cursor + 1) % 100).to_bytes(2, "big"))
+            cpu.mem_write(0x10100 + cursor * 2, header.to_bytes(2, "big"))
+            cpu.mem_write(0x10b500, bytes([0xee]) * 8)
+            cpu.reg_write(UC_ARM_REG_SP, 0x10f000)
+            cpu.reg_write(UC_ARM_REG_R0, 0x10b000)
+            cpu.emu_start(0x2718a9, 0x2718ea, count=64)
+            if (cpu.reg_read(UC_ARM_REG_PC), cpu.reg_read(UC_ARM_REG_R0)) != (
+                    0x2718ea, (header >> 8) + 4):
+                raise ValueError("receive-header allocation request differs")
+            cpu.reg_write(UC_ARM_REG_R0, 0x10b500)
+            cpu.emu_start(0x2718ef, 0x271918, count=64)
+            if cpu.reg_read(UC_ARM_REG_PC) != 0x271918:
+                raise ValueError("receive-header construction did not finish")
+            expected = bytes((0x18, 2, header >> 8, header & 255)) + bytes([0xee]) * 4
+            if bytes(cpu.mem_read(0x10b500, 8)) != expected:
+                raise ValueError("receive-header object bytes differ")
+            if cpu.reg_read(UC_ARM_REG_R0) != ((header >> 8) + 1) // 2:
+                raise ValueError("receive-header payload word count differs")
+            if int.from_bytes(cpu.mem_read(0x101ca, 2), "big") != 0x80 + (cursor + 1) % 100:
+                raise ValueError("receive-header consumer cursor differs")
+            cases += 1
+    return cases
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -553,6 +588,7 @@ def check_image(raw):
             "incoming_block_constructor_cases": check_incoming_block_constructors(cpu),
             "type80_dispatch_cases": check_type80_dispatch(cpu),
             "receive_ring_copy_cases": check_receive_ring_copy(raw),
+            "receive_ring_header_cases": check_receive_ring_header(raw),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

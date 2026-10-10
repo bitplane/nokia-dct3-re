@@ -1041,6 +1041,17 @@ and commits the resulting consumer cursor. Header decoding/allocation,
 the receive loop's scheduler path, and native DSP publication have not
 been executed as one chain by this check.
 
+Receive-header decoder `0x2718a8` is executed for all 65,536 header
+words at cursor zero and header `0x0180` at all 100 cursors (65,636
+cases). It requests high-byte length plus 4 from `0x255aa0`; after an
+isolated buffer is supplied as that return, it writes object bytes
+`18 02 <length> <type>`, preserves the following guard bytes, advances
+the consumer by one ring word with wrap, and returns `(length + 1) / 2`
+rounded down as the payload word count. This verifies that a ring header
+with low byte `0x80` constructs the type byte consumed by `0x291c34`.
+Allocator semantics and native publication of such a ring entry remain
+outside this isolated execution proof.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
