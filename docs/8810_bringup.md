@@ -336,15 +336,25 @@ bounded comparison (30 s, acquired ROM4 resident code in both):
 | Mode-initializer callers | `4de3` at 2.104560 s, `4e00` at 2.109178 s, `0ab8` at 2.138677 s | All three dormant |
 | Mode `00ac` | `0 -> 1 -> 2 -> 9 -> 1` | Zero |
 | First four memory-upload destinations | `2286`, `22ad`, `22d4`, `22fb` | Same |
-| Compared 156 uploaded words | All match except word `22c8 = 0202` | `22c8 = 0000` |
+| Compared 156 uploaded words | All match except word `22c9 = 0202` | `22c9 = 0000` |
 
 The type-`1a` handler precedes mode activation but does not directly call
 the initializer; temporal order is not a causal closure. Identity/control
 payloads also differ, with NSE-6's records erased. No NSE-1 data may be copied
 into NSE-6 to conceal these genuine input differences. Next recover the
 own-MCU search-list publication condition and the native `4de3/4e00` control
-entrance, including any reader of uploaded word `22c8`. The NSE-1 processing
+entrance. The NSE-1 processing
 checker passes on this capture; NSE-6's overlay/upload checks also pass.
+
+The differing upload word is not an evidenced activation prerequisite:
+native NSE-1 enters mode 1 at 2.104560 s, before publishing `22c9 = 0202`
+at 2.180221 s (writer PC `3f4a`). NSE-6 publishes zero at the same address
+at 6.482853 s. Passive data-read taps observe no reader of `22c9` in either
+30-second run, excluding NSE-6's explicit upload-readback observer. This
+excludes the differing word as the cause of NSE-1's first mode activation;
+its later or dormant purpose is unassigned. Initial zero writes and upload
+writes confirm the target mapping. The corrected 39-word comparison retains
+the destination separately from payload indexing; `22c8` is `0800` in both.
 
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;

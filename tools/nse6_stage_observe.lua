@@ -574,11 +574,13 @@ emu.register_frame_done(function()
             (ccont_registers:read(6) & 2) ~= 0 and 1 or 0, now))
         for _, upload in ipairs(pending_memory_uploads) do
             local matched = 0
+            _G.rom4_observation_read = true
             for index, word in ipairs(upload.words) do
                 if dsp.spaces['data']:read_u16(upload.address + index - 1) == word then
                     matched = matched + 1
                 end
             end
+            _G.rom4_observation_read = false
             machine:logerror(string.format(
                 'nse6_native_memory_readback: address=%04x matched=%u words=%u consumed=%.9f t=%.9f\n',
                 upload.address, matched, #upload.words, upload.consumed, now))

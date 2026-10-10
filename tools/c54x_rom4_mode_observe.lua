@@ -28,6 +28,24 @@ local control_sites = {
     [0x3660] = true, [0x3d5e] = true, [0x3d70] = true, [0x3db8] = true,
 }
 local packet_count = 0
+local upload_reads = {}
+taps[#taps + 1] = memory:install_write_tap(0x22c9, 0x22c9,
+    "rom4_upload_word_publication", function(offset, value, mask)
+        machine:logerror(string.format(
+            "rom4_upload_word_write: t=%.9f pc=%04x address=%04x data=%04x mask=%04x\n",
+            machine.time:as_double(), cpu.state["PC"].value, offset, value, mask))
+    end)
+taps[#taps + 1] = memory:install_read_tap(0x22c9, 0x22c9,
+    "rom4_upload_word_reader", function(offset, value)
+        if _G.rom4_observation_read then return end
+        local pc = cpu.state["PC"].value
+        upload_reads[pc] = (upload_reads[pc] or 0) + 1
+        if upload_reads[pc] <= 2 then
+            machine:logerror(string.format(
+                "rom4_upload_word_read: t=%.9f pc=%04x address=%04x data=%04x\n",
+                machine.time:as_double(), pc, offset, value))
+        end
+    end)
 taps[#taps + 1] = memory:install_write_tap(0x0853, 0x0853,
     "rom4_host_consumption", function(offset, value, mask)
         local previous = memory:read_u16(offset)
@@ -69,6 +87,10 @@ for _, address in ipairs(sites) do
         end)
 end
 local stop = emu.add_machine_stop_notifier(function()
+    for pc, count in pairs(upload_reads) do
+        machine:logerror(string.format(
+            "rom4_upload_reader_count: pc=%04x count=%d\n", pc, count))
+    end
     for _, address in ipairs(addresses) do
         machine:logerror(string.format("rom4_mode_final: address=%04x data=%04x\n",
             address, memory:read_u16(address)))
@@ -78,5 +100,5 @@ local stop = emu.add_machine_stop_notifier(function()
             address, counts[address]))
     end
 end)
-assert(#taps == #addresses + #sites + 1 and stop)
+assert(#taps == #addresses + #sites + 3 and stop)
 _G.rom4_mode_observer = {taps = taps, stop = stop}
