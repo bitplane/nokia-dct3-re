@@ -7,6 +7,7 @@ import sys
 import tempfile
 
 REQUIRED = [
+    "TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1",
     "TMS320C54x zero BK addressing: PASS variants=320",
     "TMS320C54x SACCD conformance: PASS variants=576",
     "TMS320C54x RCD accumulator conditions: PASS variants=36",

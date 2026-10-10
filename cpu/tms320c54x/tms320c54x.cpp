@@ -159,6 +159,8 @@ void tms320c54x_device::device_start()
 	m_imr = m_power_on_imr;
 	m_opcode_first_pc.fill(0xffff);
 	m_timer = timer_alloc(FUNC(tms320c54x_device::timer_expired), this);
+	// CPU-owned MMRs take precedence over broad board RAM windows.
+	space(AS_DATA).install_device(0, 0x58, *this, &tms320c54x_device::internal_data_map);
 	space(AS_PROGRAM).cache(m_cache);
 	space(AS_PROGRAM).specific(m_program);
 	space(AS_DATA).specific(m_data);
@@ -446,6 +448,32 @@ void tms320c54x_device::far_transfer(u32 address, bool delayed)
 
 u16 tms320c54x_device::data_read(u16 address)
 {
+	return m_data.read_word(address);
+}
+
+void tms320c54x_device::data_write(u16 address, u16 value)
+{
+	m_data.write_word(address, value);
+}
+
+void tms320c54x_device::internal_data_map(address_map &map)
+{
+	// Only owned registers shadow the board map; reserved gaps stay external.
+	for (u16 address = 0; address <= 0x58; ++address)
+		if (address <= 1 || (address >= 6 && address <= 0x1d) ||
+			(address == 0x1e && m_extended_program) || (address >= 0x24 && address <= 0x26) || address == 0x58)
+			// Device submaps use byte addresses; the C54x data space is word-addressed.
+			map(u32(address) << 1, (u32(address) << 1) | 1).lrw16(
+				NAME(([this, address]() { return register_read(address); })),
+				NAME(([this, address](offs_t, u16 value, u16 mem_mask) {
+					if (address == 1) value &= mem_mask; // IFR writes clear only selected bits.
+					else if (mem_mask != 0xffff) value = (register_read(address) & ~mem_mask) | (value & mem_mask);
+					register_write(address, value);
+				})));
+}
+
+u16 tms320c54x_device::register_read(u16 address)
+{
 	if (address == 0x00)
 		return m_imr;
 	if (address == 0x01)
@@ -500,10 +528,10 @@ u16 tms320c54x_device::data_read(u16 address)
 	}
 	if (address == 0x58)
 		return m_clkmd;
-	return m_data.read_word(address);
+	fatalerror("Unmapped C54x register read %04x", address);
 }
 
-void tms320c54x_device::data_write(u16 address, u16 value)
+void tms320c54x_device::register_write(u16 address, u16 value)
 {
 	if (address == 0x00)
 		m_imr = value;
@@ -577,7 +605,7 @@ void tms320c54x_device::data_write(u16 address, u16 value)
 		m_clkmd = (value & ~u16(1)) | BIT(value, 1);
 	}
 	else
-		m_data.write_word(address, value);
+		fatalerror("Unmapped C54x register write %04x", address);
 }
 
 void tms320c54x_device::push(u16 value)

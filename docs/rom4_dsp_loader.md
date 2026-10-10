@@ -878,22 +878,37 @@ It reports four cases, with both long-period controls asserted and neither
 short-period outcome treated as physical acceptance. This rules out the
 extra pointer-setup instruction as the sole cause; it does not resolve
 Decode-stage acceptance versus write visibility.
-The passive probe also reports reload-opcode fetch and first-vector fetch
-in CPU-accounting cycles, vector-entry count and the first stacked return
-PC. With retained vector prefetch, both short-period forms have a
-two-accounting-cycle fetch gap and stack `0608`; each enters the vector
-108 times in its 100-us observation window. Neither long-period control
-enters the vector after masking. Evidence is
-`tmp/c54x-vector-timer/output.log`; the full native core suite passes in
-`tmp/c54x-vector-prefetch-redirect.log`. The earlier post-stack fetch tap had
-reported a seven-cycle gap: the changed timestamp records relocation of the
-bus read, not improved physical interrupt latency. Both short-period masks
-remain unreachable. The continuation is captured from a passive stack-write
-tap, since the vector prefetch now precedes that write. In particular, an
-address-space TCR write tap cannot timestamp the reload because internal
-MMR writes bypass that path; the reported timestamp is explicitly the
-reload opcode's fetch, not its Execute/write phase. This accounting trace
-is for comparing a future stage-aware correction, not choosing a delay.
+The passive probe distinguishes reload-opcode fetch, TCR bus write, IMR
+mask bus write, first vector fetch and the first stacked return PC. CPU-owned
+MMRs now take precedence over broad board RAM windows through a sparse
+MAME data-space device map. CPU instructions, passive taps and debugger data
+reads therefore use the same register state. Reserved gaps remain board-owned;
+partial writes preserve unselected bits, with IFR's write-one-clear rule
+handled separately. Snapshot fixture loading initializes writable RAM only,
+not live CPU or peripheral registers. The core gate requires an executable
+`TMS320C54x MMR bus: PASS` test of this boundary. No per-instruction diagnostic
+callback is added to the core.
+
+The timer observer requires one actual TCR reload write per case and one
+IMR mask write in each long-period control. It reports short-period outcomes
+without asserting them as physical acceptance. These are emulator-accounting
+timestamps at observable bus accesses, not Fetch/Decode/Execute pipeline
+phases or silicon latency. Retained vector prefetch precedes the stack write;
+the continuation is captured from the latter's passive tap. Do not choose a
+foreground delay from this trace or interpret bus observability as a pipeline
+correction.
+In `tmp/c54x-mmr-map-final.log`, opcode fetch and TCR bus write have the
+same accounting timestamp; the first short-period vector fetch follows two
+accounting cycles later. Both short cases enter 108 times and stack `0608`,
+with no mask write. Long-period indirect/direct cases mask four/two cycles
+after the reload respectively and never enter the vector. This makes the
+collapsed fetch/write boundary directly observable without changing PRD,
+interrupt admission or firmware state; it does not settle physical acceptance.
+The core and original MU4 storage/native-entry gates pass in that log.
+`tmp/c54x-mmr-map-rf.log` independently retains the ROM4 no-cell boundary:
+648,288 RF reads, 1,580 port-32 writes and no port-38/39 reads. The tool suite
+passes 2,452 tests with one skip. None of these gates proves recorder save
+completion, RF acquisition or handset speech.
 SPRU131G section 7.2, example 7-18, constrains that correction more tightly:
 recognition at the end of cycle 3 inserts INTR at Decode in cycle 4,
 replacing `i2`; already-decoded `i1` completes at Execute in cycle 6.

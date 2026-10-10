@@ -472,6 +472,33 @@ private:
 		if (index) { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); }
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void check_mmr_bus()
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		u16 const ar = m_cpu->state_int(tms320c54x_device::STATE_AR3);
+		u16 const flags = m_cpu->state_int(tms320c54x_device::STATE_IFR);
+		u16 const gap = data.read_word(3);
+		unsigned observed = 0;
+		auto tap = data.install_write_tap(0x13, 0x13, "mmr_bus_check",
+			[&observed](offs_t, u16 &, u16) { ++observed; });
+		data.write_word(0x13, 0x1234);
+		expect(m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x1234 && data.read_word(0x13) == 0x1234,
+			"Mapped AR3 and CPU state share one register");
+		data.write_word(0x13, 0xab00, 0xff00); data.write_word(0x13, 0x00cd, 0x00ff);
+		expect(data.read_word(0x13) == 0xabcd && observed == 3, "MMR partial writes preserve unselected bits and reach passive taps");
+		tap.remove();
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0xbeef);
+		data.write_word(1, 0x00ef, 0x00ff);
+		expect(data.read_word(1) == 0xbe00, "IFR byte write clears only selected low flags");
+		data.write_word(1, 0x0e00, 0xff00);
+		expect(data.read_word(1) == 0xb000, "IFR byte write clears only selected high flags");
+		data.write_word(3, 0x5a5a);
+		expect(data.read_word(3) == 0x5a5a, "Reserved CPU register gap stays in the board map");
+		data.write_word(3, gap);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, ar);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, flags);
+		osd_printf_info("TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1\n");
+	}
 	void start_timer_boundary_probe(unsigned index)
 	{
 		bool const short_period = !(index & 1);
@@ -508,18 +535,34 @@ private:
 		m_timer_probe_fetch.remove();
 		m_timer_probe_reload.remove();
 		m_timer_probe_stack.remove();
+		m_timer_probe_write.remove(); m_timer_probe_mask.remove();
 		m_timer_probe_entries = 0;
 		m_timer_probe_reload_cycle = 0;
 		m_timer_probe_first_entry_cycle = 0;
 		m_timer_probe_return_pc = 0;
+		m_timer_probe_write_cycle = m_timer_probe_mask_cycle = 0;
+		m_timer_probe_writes = m_timer_probe_masks = 0;
+		m_timer_probe_write = data.install_write_tap(0x26, 0x26, "timer_probe_reload_write",
+			[this](offs_t, u16 &value, u16) {
+				if (!machine().side_effects_disabled() && value == 0x20)
+				{
+					++m_timer_probe_writes; m_timer_probe_write_cycle = m_cpu->total_cycles();
+				}
+			});
+		m_timer_probe_mask = data.install_write_tap(0, 0, "timer_probe_mask_write",
+			[this](offs_t, u16 &value, u16) {
+				if (!machine().side_effects_disabled() && !(value & 8))
+				{
+					++m_timer_probe_masks; m_timer_probe_mask_cycle = m_cpu->total_cycles();
+				}
+			});
 		m_timer_probe_stack = data.install_write_tap(0x0fff, 0x0fff, "timer_probe_stack",
 			[this](offs_t, u16 &value, u16) {
 				if (!machine().side_effects_disabled() && m_timer_probe_entries == 1 && !m_timer_probe_return_pc)
 					m_timer_probe_return_pc = value;
 			});
 		// Observe scheduler-cycle accounting, not physical pipeline latency.
-		// Internal MMR writes bypass address-space taps; capture opcode fetch,
-		// explicitly not the execute/write phase of the TCR reload.
+		// Keep opcode fetch distinct from the observable internal-register bus write.
 		m_timer_probe_reload = program.install_read_tap(0x010606, 0x010606, "timer_probe_reload",
 			[this](offs_t address, u16 &, u16)
 			{
@@ -1168,7 +1211,8 @@ private:
 			auto &data = m_cpu->space(AS_DATA);
 			u16 const *const initial = &memregion("dspdata")->as_u16();
 			for (unsigned address = 0; address != 0x10000; ++address)
-				data.write_word(address, initial[address]);
+				// A memory snapshot seeds RAM, not live CPU/peripheral registers.
+				if (data.get_write_ptr(address)) data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "fr-encoder"))
@@ -1247,6 +1291,7 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		// CALL/RET, then a three-word RPT copy.
+		check_mmr_bus();
 		program.write_word(0x0100, 0xf074);
 		program.write_word(0x0101, 0x0200);
 		program.write_word(0x0102, 0xec02);
@@ -2410,6 +2455,11 @@ private:
 				static_cast<unsigned long long>(m_timer_probe_first_entry_cycle),
 				m_timer_probe_entries, m_timer_probe_return_pc);
 			expect(m_timer_probe_reload_cycle != 0, "Timer observation captures the reload opcode fetch, not an internal MMR tap");
+			osd_printf_info("TMS320C54x timer boundary bus: case=%u reload_write_cycle=%llu mask_write_cycle=%llu reload_writes=%u mask_writes=%u physical_latency_claim=0\n",
+				index, static_cast<unsigned long long>(m_timer_probe_write_cycle), static_cast<unsigned long long>(m_timer_probe_mask_cycle),
+				m_timer_probe_writes, m_timer_probe_masks);
+			expect(m_timer_probe_writes == 1 && (short_period || m_timer_probe_masks == 1),
+				"Passive data-space taps observe the real TCR reload and completing IMR mask");
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Timer probe executes supported synthetic instructions");
 			if (!short_period)
 				expect(marker == 1 && !(m_cpu->state_int(tms320c54x_device::STATE_IMR) & 8),
@@ -19721,6 +19771,9 @@ private:
 	unsigned m_rom4_pcm_mismatches = 0;
 	emu_timer *m_check_timer = nullptr;
 	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload, m_timer_probe_stack, m_vector_prefetch_tap;
+	memory_passthrough_handler m_timer_probe_write, m_timer_probe_mask;
+	u64 m_timer_probe_write_cycle = 0, m_timer_probe_mask_cycle = 0;
+	unsigned m_timer_probe_writes = 0, m_timer_probe_masks = 0;
 	unsigned m_vector_reads = 0, m_vector_acks = 0, m_vector_case = 0;
 	std::stringstream m_saved_vector;
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
