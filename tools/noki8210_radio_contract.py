@@ -218,6 +218,11 @@ def verify(image):
     if instructions(0x2a1ec0, 4) != [
             ('ldrsh', 'r1, [r5, r1]'), ('strh', 'r1, [r0]')]:
         raise ValueError('queued request input copy differs')
+    if instructions(0x2a1eb0, 14) != [
+            ('ldr', 'r0, [r4, #0xc]'), ('cmp', 'r0, #0'),
+            ('bne', '#0x2a1ebe'), ('movs', 'r0, #0x14'),
+            ('bl', '#0x28922c'), ('str', 'r0, [r4, #0xc]')]:
+        raise ValueError('queued request reuse/allocation branch differs')
     if instructions(0x21f5d6, 8) != [
             ('cmp', 'r0, #3'), ('beq', '#0x21f5de'), ('bl', '#0x21b8ea')]:
         raise ValueError('late readiness result continuation differs')

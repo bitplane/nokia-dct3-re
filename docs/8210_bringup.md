@@ -1808,9 +1808,22 @@ Only `03ec` reaches the argument-3 selector; `03ea` instead calls
 `21b8ea`, which branches directly to the receive loop. The own-ROM checker
 now verifies this complete comparison and branch sequence. Consequently
 the Manual request does not independently exercise the selector's readiness
-gate. Queue acceptance, replacement ownership and the later drain trigger
-remain to be observed; the static helper call alone does not prove that
-`03ea` replaces the existing queued `03ec`.
+gate. The static helper call alone does not establish queue acceptance;
+the separate runtime control below resolves that boundary. The later
+drain trigger remains unresolved.
+
+A queue-store breakpoint resolves acceptance in the same fresh composition.
+Immediately after `2a1ec2`, context `137f58` retains current pointer `1135c4`
+and queued pointer `1135f4`, whose ID is now `03ea`; the incoming object is
+`1154c0`, caller `21f5b1`. The helper's pinned `2a1eb0..2a1ebc` sequence
+reuses a nonzero queue pointer and allocates only for an empty slot. Thus
+Manual Selection changes the pending request rather than completing the
+current one; it still does not establish a drain trigger. Evidence:
+`tmp/noki8210_manual_queue_corrected/error.log`, SHA-256
+`e881d8de031014695b321457a6bbf907c97611287150c06013304bc6e09d9277`.
+The preceding exploratory queue log used debugger expression `+12`
+(hexadecimal 0x12, not decimal 12) and is excluded; the corrected observer
+uses explicit `+0xc`.
 
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
