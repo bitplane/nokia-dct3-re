@@ -68,9 +68,18 @@ The longer 40-second menu run returns to reset entry `0x200040` at
 watchdog register is `0xff`; neither expires. Firmware writes `0x31` to
 `0x20003` at 31.001033692 seconds and reset-control `0x05` to `0x20001` at
 31.967763000 seconds, from `0x2e51e0`, caller return `0x243c27`.
-Own dispatcher `0x243a24` routes input `0x00d4` to `0x243ba4`; that branch
-increments a context counter, and at count >=15 takes `0x243bfe..0x243c22`
-to request reset. The counter's reset/health contract is not yet decoded.
+Own dispatcher `0x243a24` routes input `0x00d4` to `0x243ba4`. That branch
+increments counter `0x13fde6` if activity byte `0x13fdeb` is zero, otherwise
+clears it; at count >=15 it can request reset. This is not the observed
+late-reset cause. A fresh native run receives D4 at 31.001021 s, increments
+the counter to one, then clears it through `0x2c91c8` at 31.015760 s.
+At 31.966920 s it receives **D6**, enters `0x243af6`, and follows the shared
+reset-call tail `0x243c22` with reason `0x68` and counter zero. The shared
+caller return `0x243c27` alone cannot distinguish D4's timeout from D6.
+The current target is D6's actual delivery/trigger contract, not counter
+timing. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
+several are timer-control or unrelated payload uses, not proven publishers.
+Runtime taps and literal scans do not exclude table/indirect delivery.
 Do not disable a hardware watchdog to conceal this software-requested reset.
 The native compatibility run exposes these independently documented CPU gaps.
 Instruction semantics come from [TI SPRU172C](https://e2e.ti.com/cfs-file/__key/communityserver-discussions-components-files/81/6136.spru172c.pdf);

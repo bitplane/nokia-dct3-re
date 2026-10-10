@@ -75,6 +75,7 @@ local counts = {}
 local result_readers = {}
 local report_events = {}
 local report_raw_messages = {}
+local d6_publications = 0
 local mask_writes = 0
 local cache_writes = 0
 local eeprom_blocks = 0
@@ -144,14 +145,21 @@ handles[#handles + 1] = memory:install_write_tap(0x20030, 0x20033,
             value & 0xff, cpu.state['PC'].value, cpu.state['R14'].value,
             machine.time:as_double()))
     end)
-for _, address in ipairs({0x13ff74, 0x13fde1, 0x1216bc, 0x11eb59}) do
+for _, address in ipairs({0x13ff74, 0x13fde1, 0x1216bc, 0x11eb59,
+        0x13fde6, 0x13fdeb}) do
     local writes = 0
     local late_writes = 0
+    local last_liveness_value = nil
     handles[#handles + 1] = memory:install_write_tap(address & ~3,
         (address & ~3) + 3, 'nse6_failure_' .. address,
         function(offset, value, mask)
             local lane = 0xff << ((3 - (address & 3)) * 8)
             if (mask & lane) == 0 then return end
+            if address == 0x13fde6 or address == 0x13fdeb then
+                local byte = (value >> ((3 - (address & 3)) * 8)) & 0xff
+                if byte == last_liveness_value then return end
+                last_liveness_value = byte
+            end
             writes = writes + 1
             if machine.time:as_double() >= 7 then
                 late_writes = late_writes + 1
@@ -161,6 +169,7 @@ for _, address in ipairs({0x13ff74, 0x13fde1, 0x1216bc, 0x11eb59}) do
                 '%s: address=%08x pc=%08x lr=%08x byte=%02x t=%.9f\n',
                 address == 0x1216bc and 'nse6_wake_flag_write'
                     or address == 0x11eb59 and 'nse6_report_event_write'
+                    or (address == 0x13fde6 or address == 0x13fdeb) and 'nse6_liveness_write'
                     or 'nse6_failure_write',
                 address, cpu.state['PC'].value, cpu.state['R14'].value,
                 (value >> ((3 - (address & 3)) * 8)) & 0xff,
@@ -188,7 +197,8 @@ handles[#handles + 1] = memory:install_read_tap(0x1205c8, 0x1205cf,
 for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         0x2b6026, 0x2b5fda,
         0x2b6196, 0x2b61bc, 0x2b6200, 0x2d333c, 0x2dcef0,
-        0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x240c1e,
+        0x2e1194, 0x2de164, 0x2e049a, 0x2ca910, 0x243a24, 0x243ba4, 0x243c22,
+        0x27a76e, 0x2b0adc, 0x240c1e,
         0x240992, 0x240b94, 0x2dfe9e, 0x28d5ca,
         0x2d3398, 0x2d33a0, 0x2d33a8, 0x2d33b0, 0x2d33b8,
         0x2d33c0, 0x2d33c8, 0x2d33cc, 0x288a7a,
@@ -199,6 +209,20 @@ for _, address in ipairs({0x200040, 0x2000ec, 0x2dd100, 0x2b6118,
         (address & ~3) + 3, 'nse6_stage_' .. address, function(offset, value, mask)
             if cpu.state['PC'].value ~= address then return end
             counts[address] = (counts[address] or 0) + 1
+            if (address == 0x243a24 or address == 0x243c22) and counts[address] <= 64 then
+                machine:logerror(string.format(
+                    'nse6_reset_status: pc=%08x argument=%04x counter=%02x activity=%02x lr=%08x t=%.9f\n',
+                    address, cpu.state['R0'].value, memory:read_u8(0x13fde6),
+                    memory:read_u8(0x13fdeb), cpu.state['R14'].value, machine.time:as_double()))
+            end
+            if address == 0x27a76e and cpu.state['R0'].value == 0xd6 then
+                d6_publications = d6_publications + 1
+                if d6_publications <= 32 then
+                    machine:logerror(string.format(
+                        'nse6_d6_publication: argument=%08x lr=%08x t=%.9f\n',
+                        cpu.state['R1'].value, cpu.state['R14'].value, machine.time:as_double()))
+                end
+            end
             if address == 0x2b5fda and counts[address] <= 16 then
                 local packet = cpu.state['R4'].value
                 machine:logerror(string.format(
