@@ -64,6 +64,19 @@ against the resident filter's reads and arithmetic, then test acquisition
 with physical-interface input only. A passed energy threshold alone is
 not decoded FCCH/SCH, native registration or native speech.
 
+The NSE-1 resident scan filter is now byte-pinned in the ROM4 contract
+checker. Setup `0x32f4` selects a 16-word circular history, input cursor
+`0x0080`, history cursor `0x0084`, coefficient pointer `0x21a9`,
+AR0 stride 2, ASM zero, and eight loop iterations. Loop
+`0x330a..0x3325` performs four port-`0x27` reads per iteration and
+stores two high-accumulator output words through AR3 into the
+`0x1a48` intermediate area. Thus this consumer reads 32 input words
+and emits 16 intermediate words per invocation. This is a software
+word-consumption contract, not proof of four samples per GSM symbol,
+which lane is I/Q, ADC sign extension, or continuous physical cadence.
+Recover coefficient values, arithmetic modes and lane impulse responses
+before converting an independently generated complex waveform to words.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
