@@ -166,9 +166,10 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
                 publication_counts[address] = (publication_counts[address] or 0) + 1
                 if publication_counts[address] <= 4 then
                     machine:logerror(string.format(
-                        "rom4_rf_post_scan: address=%04x t=%.9f a=%010x control6e3=%04x flags1949=%04x request1983=%04x active1836=%04x pending1869=%04x\n",
+                        "rom4_rf_post_scan: address=%04x t=%.9f a=%010x control6e3=%04x flags1949=%04x cursor1983=%04x selected1867=%04x cursor_word=%04x active1836=%04x pending1869=%04x\n",
                         address, machine.time:as_double(), cpu.state["A"].value & 0xffffffffff,
                         memory:read_u16(0x06e3), memory:read_u16(0x1949), memory:read_u16(0x1983),
+                        memory:read_u16(0x1867), memory:read_u16(memory:read_u16(0x1983)),
                         memory:read_u16(0x1836), memory:read_u16(0x1869)))
                 end
                 return
@@ -178,11 +179,12 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef,
                 publication_counts[address] = (publication_counts[address] or 0) + 1
                 if publication_counts[address] <= 4 then
                     machine:logerror(string.format(
-                        "rom4_rf_scan_entry: address=%04x t=%.9f a=%010x b=%010x ar1=%04x ar4=%04x active1836=%04x pending1869=%04x flags6bc=%04x mode6fd=%04x\n",
+                        "rom4_rf_scan_entry: address=%04x t=%.9f a=%010x b=%010x ar1=%04x ar4=%04x active1836=%04x pending1869=%04x flags6bc=%04x mode6fd=%04x cursor1983=%04x selected1867=%04x cursor_word=%04x\n",
                         address, machine.time:as_double(), cpu.state["A"].value & 0xffffffffff,
                         cpu.state["B"].value & 0xffffffffff, cpu.state["AR1"].value,
                         cpu.state["AR4"].value, memory:read_u16(0x1836), memory:read_u16(0x1869),
-                        memory:read_u16(0x06bc), memory:read_u16(0x06fd)))
+                        memory:read_u16(0x06bc), memory:read_u16(0x06fd), memory:read_u16(0x1983),
+                        memory:read_u16(0x1867), memory:read_u16(memory:read_u16(0x1983))))
                 end
                 return
             end

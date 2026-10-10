@@ -299,7 +299,18 @@ two-byte type-`0x8a` body from data `0x1867` at buffer `0x1200`.
 The observer at native publisher entry `0x37ce` captures type `008a`,
 length 2, and bodies `006d` at 1.644835731 seconds and `0001` at
 38.523456633 seconds. These are not the contemporaneous `0x1983`
-request values (`03fe` and `047a`). Do not conflate those fields.
+cursor values (`03fe` and `047a`). Do not conflate those fields.
+The byte-pinned `0x311a..0x311f` sequence loads AR4 from data
+`0x1983`, then copies `*AR4` to `0x1867`. The fallback at
+`0x3144..0x3152` copies `0x1867` into its two-byte publisher buffer.
+A retained-storage eight-second capture confirms the selected-list
+relationship: at scan entry `0x3129`, cursor `03ff` points to `006d`
+and `0x1867=006d`. At fallback call `0x314d`, cursor `03fe` points
+to sentinel `7fff`, while the selected word remains `006d` and is
+published. The cursor changed position; this does not show the selected
+entry being overwritten. These words are software search-list entries;
+physical ARFCN interpretation and RF tuning must be tied to the request
+producer rather than inferred from their plausible numeric values.
 
 Publisher entry alone proves call arguments, not delivery. A separate
 fresh eight-second capture reaches the publisher's port-1 doorbell
