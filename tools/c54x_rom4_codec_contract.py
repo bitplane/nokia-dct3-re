@@ -535,6 +535,9 @@ def check_tone(text: str) -> None:
 
 
 MCU_SPEECH_FIELD_BYTES = {
+    0x28367c: bytes.fromhex("b5304877497d2200f005ff20"),
+    0x28385c: bytes.fromhex("0010a6c4"),
+    0x283878: bytes.fromhex("00000301"),
     0x274cb8: bytes.fromhex("8ae08268"),
     0x27500c: bytes.fromhex("0010a6b0"),
     0x275044: bytes.fromhex("0010b2a8"),

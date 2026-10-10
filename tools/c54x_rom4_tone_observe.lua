@@ -54,6 +54,19 @@ taps[#taps + 1] = mcu.spaces['program']:install_write_tap(
     end)
 local speech_entries = 0
 local configuration_entries = 0
+local descriptor_entries = 0
+taps[#taps + 1] = mcu.spaces['program']:install_read_tap(
+    0x2894c8, 0x2894cb, 'speech_descriptor_entry', function()
+        if mcu.state['PC'].value ~= 0x2894c8 or mcu.state['R0'].value ~= 0x10a6c4 then return end
+        descriptor_entries = descriptor_entries + 1
+        if descriptor_entries <= 16 then
+            machine:logerror(string.format(
+                'rom4_speech_descriptor_entry: destination=%08x r1=%08x r2=%08x r3=%08x caller=%08x t=%.9f\n',
+                mcu.state['R0'].value, mcu.state['R1'].value,
+                mcu.state['R2'].value, mcu.state['R3'].value,
+                mcu.state['R14'].value, machine.time:as_double()))
+        end
+    end)
 taps[#taps + 1] = mcu.spaces['program']:install_read_tap(
     0x28c494, 0x28c49b, 'speech_configuration_entry', function()
         local pc = mcu.state['PC'].value

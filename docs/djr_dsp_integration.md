@@ -638,7 +638,7 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   store at `272034`. The fresh capture reports selector `0028`, input
   and output `df29`, destination `000100bc` and merge mask zero. Thus
   this publication forwards the supplied word rather than constructing
-  its mute bit. Eighteen original-MCU byte spans protect entry, dispatch,
+  its mute bit. Twenty-one original-MCU byte spans protect entry, dispatch,
   selected table entry, branches, stores, pools and storage addressing;
   every byte has a negative
   mutation test. Other selectors are not semantically decoded by that
@@ -675,6 +675,14 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
   semantics remain unresolved; a matching ROM literal alone is not
   provenance. This observation does not establish
   call-time speech activation or the semantics of every flag bit.
+  Descriptor-reader entry `2894c8` receives destination `10a6c4`, logical
+  identifier `0301`, R2/R3 zero and caller `283689`, before the physical
+  read. Caller `28367c` loads destination and identifier from pools
+  `28385c`/`283878`. Adjacent conditional ROM copies at
+  `28369c..2836de` target other structures at `10a6f8`/`10a72c`, not this
+  four-byte field. These tables do not establish a fallback for record
+  `0301` or justify replacing the seed's mute bit. Descriptor lookup
+  `289138` remains the static predecessor for storage metadata.
   MCU lifecycle branches `27503c..275042` and `275054..27505a` respectively
   set and clear bit 3 in record byte `[R5+13]` (the low byte of field
   `[R5+12]`). Both preserve bit 0; they cannot by themselves release the
