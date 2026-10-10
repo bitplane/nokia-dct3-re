@@ -8,7 +8,16 @@ local reads, results, nonzero, second, accepted = 0, 0, 0, 0, 0
 local maximum = 0
 local observing = false
 local publication_counts = {}
+local flag_writes = 0
 local taps = {}
+taps[#taps + 1] = memory:install_write_tap(0x1266, 0x1266,
+    "rf_candidate_flags", function(offset, value)
+        flag_writes = flag_writes + 1
+        if flag_writes <= 24 then
+            machine:logerror(string.format("rom4_rf_flag_write: t=%.9f pc=%04x value=%04x\n",
+                machine.time:as_double(), cpu.state["PC"].value, value))
+        end
+    end)
 taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
     "mathematical_rf_input", function()
         local value = 0
@@ -66,7 +75,7 @@ for _, address in ipairs({0x0ad1, 0x0add, 0x0ae4, 0x0ca3, 0x0cef}) do
 end
 local stop = emu.add_machine_stop_notifier(function()
     observing = true
-    for _, start in ipairs({0x0ae4, 0x0b24, 0x0ca3, 0x0cef}) do
+    for _, start in ipairs({0x0ae4, 0x0b24, 0x0b64, 0x0ba4, 0x0be4, 0x0ca3, 0x0cef}) do
         local words = {}
         for index = 0, 63 do
             words[#words + 1] = string.format("%04x", cpu.spaces["program"]:read_u16(start + index))

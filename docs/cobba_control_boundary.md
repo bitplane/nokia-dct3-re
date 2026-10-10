@@ -186,10 +186,27 @@ score=`0x7fff`, flags at `0x1266`=`1`, and count at `0x1344`=`500`.
 Its live instructions are `CALL 0x44b6; RET`. Follow-on routine
 `0x0cef` executes zero times. The captured decision stream tests
 `0x1266` bit 1 before branching toward the follow-on path; accepting
-ever-better scores sets bit 0 but does not establish that second flag.
+ever-better scores does not establish that second flag. Bit 0 is set
+in the delayed-branch slot of the second comparison, including cases
+that do not reach the accepted-value store; it is not an acceptance
+predicate by itself.
 Consequently these inputs prove candidate selection, not publication
 of acquired radio data. Recover the flag's producer and the follow-on
 branch contract before expecting an MCU acquisition indication.
+
+The expanded live-code capture identifies an explicit bit-1 setter:
+`0x0b78` performs a delayed branch to `0x0b42` with
+`OR #2,*AR5` in its delay slot (`0x0b7a`, AR5 selected as `0x1266`).
+The preceding continuation at `0x0b6a` clears A, pops AL, subtracts 8,
+and branches to that setter if A is nonzero. A popped value of 8
+takes the other path. This is a software continuation-value gate,
+not evidence that a hardware interrupt must directly set the flag.
+Its caller/return contract remains unresolved. The bounded write watch
+captures setup clears and repeated bit-0 writes at advanced PC `0x0ae4`;
+the first 24 writes do not contain bit 1. This bounded prefix is not
+an exhaustive absence proof for all later flag writes. Trace the
+continuation entry and its return-value source before attributing it
+to RF acquisition, an external peer or a missing DSP instruction.
 
 ### Product-specific physical buses
 
