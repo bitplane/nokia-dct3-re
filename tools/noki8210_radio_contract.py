@@ -50,6 +50,21 @@ def verify(image):
             ('pop', '{r4, r5, r6, r7, pc}'), ('movs', 'r0, #1'),
             ('pop', '{r4, r5, r6, r7, pc}')]:
         raise ValueError('initial record scan result/kind normalization differs')
+    if int.from_bytes(read(0x285f54, 4), 'big') != 0x13721c:
+        raise ValueError('candidate record-count context root differs')
+    if instructions(0x285dcc, 22) != [
+            ('ldrb', 'r1, [r4, #0xd]'), ('lsrs', 'r1, r1, #5'),
+            ('lsls', 'r1, r1, #0x18'), ('lsrs', 'r1, r1, #0x18'),
+            ('lsls', 'r2, r1, #3'), ('adds', 'r1, r1, r2'),
+            ('adds', 'r0, r0, r1'), ('adds', 'r1, r5, r0'),
+            ('ldrb', 'r0, [r1]'), ('adds', 'r0, #1'), ('strb', 'r0, [r1]')]:
+        raise ValueError('candidate record-count row index/increment differs')
+    if instructions(0x285d94, 4) != [
+            ('movs', 'r4, #0'), ('adds', 'r0, r4, #0')]:
+        raise ValueError('candidate classifier column-zero return differs')
+    if instructions(0x285e68, 6) != [
+            ('ldrb', 'r2, [r1]'), ('adds', 'r0, r0, r2'), ('strb', 'r0, [r1]')]:
+        raise ValueError('incremental candidate record-count update differs')
     if instructions(0x2b303a, 26) != [
             ('movs', 'r0, #0xc'), ('strb', 'r0, [r4, #2]'),
             ('movs', 'r0, #2'), ('strh', 'r0, [r4]'),

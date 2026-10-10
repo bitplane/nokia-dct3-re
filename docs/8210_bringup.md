@@ -1892,6 +1892,22 @@ Evidence: `tmp/noki8210_initial_scan_{gsm,dcs}/error.log`, respective SHA-256
 `cc0c3295aef7fbdeb84254d3f78a0c2a9d3b64ad1bda52824531ad176e3d24f1`
 and `c68dc4f95465d761ae7adab6b6ec27252861f9bb98f340105d0593909ac84cf2`.
 
+The seven-row storage contains candidate counts, not merely boolean flags.
+Writer `285d9e` clears 63 bytes at `13721c+2c`, classifies each candidate
+through `285ca0`, derives its row from candidate byte `+0d >> 5`, and
+increments `row*9 + column`. Incremental updater `285e30` adjusts the same
+count by +1 or -1. Consumers may booleanize counts, but raw writes need
+not be 0/1. Paired watches of `13727e` observe DCS increments 0 -> 1 -> 2
+at `285de0` (9.905357..9.905370s), then decrement 2 -> 1 at `285e6c`
+(9.905417s). GSM only clears this byte. Column zero is a classifier result
+for control-nibble values 2, 3 or 4; these are not assigned GSM meanings by
+the count arithmetic. The next useful evidence is the contributing
+candidate objects and their classifier/control transitions, rather than
+clearing this count or treating it as an independently missing latch.
+Logs: `tmp/noki8210_row6_writer_{gsm,dcs}/error.log`, SHA-256 respectively
+`637b58dad757b644844238e93c69e87ce352996c8c80b15dfc00468edcb742ce`
+and `08506a0b848730f13e67d1d003c9eaa21eb16647a76d60659da2b66ab6cc7c04`.
+
 The software-accessible stock upload, operand decoding, existing COBBA model
 and explicit memory-input comparisons do not establish the final silicon
 publication. A useful physical or independently captured reference must include:
