@@ -952,6 +952,18 @@ guard remain untouched, and source length byte `0x12b` is cleared after
 copying. This tests copying, not allocator behavior or mailbox delivery;
 the receive-record's lower transport producer remains open.
 
+The constructor's publication tail reports its ID through `0x268e48`
+at `0x237f6a`, then prepares task `0x10` and the unchanged message
+pointer for `0x254c84` at `0x237f72`. Those argument-preparation fragments
+are executed in every constructor case; neither external primitive is
+substituted or counted as executed. A whole-image aligned Thumb BL scan
+finds 14 direct-call candidates for `0x237df8`: `238312/23843e/238580/`
+`23858c/2385a4/238f86/238fc2/23903e/239220/23934e/23962a/2396b0/`
+`239a22/239c50`. This is a direct-call candidate inventory, not exhaustive
+indirect-call coverage. At `0x23843e`, the literal ID is `0x05eb`, reached
+after receive-record processing at `0x237fcc`. The record's transport
+ownership and live publication remain the next boundary to establish.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

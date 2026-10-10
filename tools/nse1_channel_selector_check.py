@@ -307,6 +307,15 @@ def check_rr_payload_allocation(cpu):
                 raise ValueError("RR payload header, copy or trailing guard differs")
             if bytes(cpu.mem_read(0x10b22b, 1)) != bytes([0]):
                 raise ValueError("RR constructor did not consume source length")
+            cpu.reg_write(UC_ARM_REG_R6, 0x05eb)
+            cpu.emu_start(0x237f09, 0x237f6a, count=8)
+            if (cpu.reg_read(UC_ARM_REG_PC), cpu.reg_read(UC_ARM_REG_R0)) != (
+                    0x237f6a, 0x05eb):
+                raise ValueError("RR publication changed report ID")
+            cpu.emu_start(0x237f6f, 0x237f72, count=8)
+            if (cpu.reg_read(UC_ARM_REG_PC), cpu.reg_read(UC_ARM_REG_R0),
+                    cpu.reg_read(UC_ARM_REG_R1)) != (0x237f72, 0x10, 0x10b000):
+                raise ValueError("RR publication changed target or message pointer")
     return 1536
 
 
