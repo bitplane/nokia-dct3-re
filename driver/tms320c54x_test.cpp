@@ -804,6 +804,35 @@ private:
 				"Double load/store syntax preserves operand order and address modifiers");
 		}
 		osd_printf_info("TMS320C54x double memory disassembler: PASS modes=1024 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x6c00, 0x6e00})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					bool const supported = mode >= 0x80 && mode < 0xf8;
+					bool const extended = supported && mode >= 0xe0;
+					u32 const result = supported ? (2 + extended) | dasm::SUPPORTED | dasm::STEP_COND : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == result && buffer.seen() ==
+						(supported ? (extended ? 7 : 3) : 1), "BANZ decoder bounds target and displacement without claiming direct/absolute forms");
+				}
+		vector const banz_forms[] = {
+			{0x6c8a, 2 | dasm::SUPPORTED | dasm::STEP_COND, "BANZ    $012345, *AR2-"},
+			{0x6e93, 2 | dasm::SUPPORTED | dasm::STEP_COND, "BANZD   $012345, *AR3+"},
+			{0x6ce3, 3 | dasm::SUPPORTED | dasm::STEP_COND, "BANZ    $016789, *AR3($2345)"},
+			{0x6eeb, 3 | dasm::SUPPORTED | dasm::STEP_COND, "BANZD   $016789, *+AR3($2345)"},
+			{0x6cf3, 3 | dasm::SUPPORTED | dasm::STEP_COND, "BANZ    $016789, *+AR3($2345)%"},
+			{0x6c00, 1, ".word   $6C00"},
+			{0x6ef8, 1, ".word   $6EF8"},
+		};
+		for (auto const &test : banz_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"BANZ syntax retains program page and displacement-before-target ordering");
+		}
+		osd_printf_info("TMS320C54x BANZ disassembler: PASS indirect=240 unclaimed=272 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

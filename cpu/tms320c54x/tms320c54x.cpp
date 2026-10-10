@@ -87,6 +87,14 @@ public:
 				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
 			}
 		};
+		if ((family == 0x6c00 || family == 0x6e00) && mode >= 0x80 && mode < 0xf8)
+		{
+			bool const extended = mode >= 0xe0;
+			util::stream_format(stream, "%-8s$%06X, ", family == 0x6e00 ? "BANZD" : "BANZ",
+				(pc & 0x7f0000) | next_word(extended ? 2 : 1));
+			smem(extended ? next_word() : 0);
+			return (2 + extended) | SUPPORTED | STEP_COND;
+		}
 		if (family == 0x4e00 || family == 0x4f00 || family == 0x5600 || family == 0x5700)
 		{
 			bool const extended = mode >= 0xe0;
