@@ -7,6 +7,7 @@ local mad2_registers = emu.item(assert(machine.devices[':mad2'].items['0/m_regs'
 local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_regs']))
 local dsp = machine.devices[':dsp_c54x:cpu']
 local handles = {}
+local pending_memory_uploads = {}
 if dsp then
     local upload_writes = 0
     handles[#handles + 1] = dsp.spaces['program']:install_write_tap(0x2946, 0x295d,
@@ -65,9 +66,25 @@ if dsp then
             local previous = dsp.spaces['data']:read_u16(0x0853)
             if previous == value or previous >= 0x52 or tx_consumptions >= 128 then return end
             tx_consumptions = tx_consumptions + 1
+            local header = dsp.spaces['data']:read_u16(0x0800 + previous)
+            local payload = {}
+            if (header & 0xff) == 0x51 and (header >> 8) <= 0x80 then
+                local upload = {words = {}, consumed = machine.time:as_double()}
+                for index = 1, (header >> 8) // 2 do
+                    local word = dsp.spaces['data']:read_u16(0x0800 + ((previous + index) % 0x52))
+                    if index == 1 then upload.address = word
+                    else upload.words[#upload.words + 1] = word end
+                    payload[#payload + 1] = string.format('%04x',
+                        word)
+                end
+                pending_memory_uploads[#pending_memory_uploads + 1] = upload
+                machine:logerror(string.format(
+                    'nse6_native_memory_upload: words=%s t=%.9f\n',
+                    table.concat(payload, ','), machine.time:as_double()))
+            end
             machine:logerror(string.format(
                 'nse6_native_tx_consumption: previous=%04x next=%04x header=%04x pc=%04x t=%.9f\n',
-                previous, value, dsp.spaces['data']:read_u16(0x0800 + previous),
+                previous, value, header,
                 dsp.state['PC'].value, machine.time:as_double()))
         end)
     handles[#handles + 1] = dsp.spaces['data']:install_write_tap(0x08e4, 0x08e5,
@@ -448,6 +465,18 @@ emu.register_frame_done(function()
         'nse6_watchdog_snapshot: ccont=%02x mad2=%02x t=%.9f\n',
         ccont_watchdog:read(0), mad2_registers:read(3), now))
     if dsp then
+        for _, upload in ipairs(pending_memory_uploads) do
+            local matched = 0
+            for index, word in ipairs(upload.words) do
+                if dsp.spaces['data']:read_u16(upload.address + index - 1) == word then
+                    matched = matched + 1
+                end
+            end
+            machine:logerror(string.format(
+                'nse6_native_memory_readback: address=%04x matched=%u words=%u consumed=%.9f t=%.9f\n',
+                upload.address, matched, #upload.words, upload.consumed, now))
+        end
+        pending_memory_uploads = {}
         machine:logerror(string.format(
             'nse6_native_snapshot: pc=%04x sp=%04x imr=%04x ifr=%04x ccont_clock=%02x t=%.9f\n',
             dsp.state['PC'].value, dsp.state['SP'].value, dsp.state['IMR'].value, dsp.state['IFR'].value,

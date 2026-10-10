@@ -150,6 +150,16 @@ The tap covers the declared `0x52`-word TX ring and remains below its
 128-event cap. Consumption alone does not prove semantic handling of that
 command family. The next native boundary is decoding these own-MCU commands
 against the acquired resident DSP dispatcher, not repairing a proven backlog.
+
+The four `0x5051` bodies are memory uploads, not evidenced reply requests:
+each contains a destination word address followed by 39 data words.
+Destinations are `0x2286`, `0x22ad`, `0x22d4`, `0x22fb`, forming a contiguous
+156-word interval through `0x2321`. Passive readback on the following
+one-second samples matches all 39 words in each fragment; all four fragments
+also match after the software reset. This confirms native semantic handling
+of these uploads beyond consumer-index advancement. It does not identify
+the data's use or establish an expected packet response. The operational
+silence must be investigated outside these successfully stored fragments.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
