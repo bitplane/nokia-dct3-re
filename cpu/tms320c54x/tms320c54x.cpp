@@ -142,11 +142,22 @@ public:
 			util::stream_format(stream, ", %s%s", (family & 0x0600) == 0x0400 ? "TS, " : "", BIT(op, 8) ? "B" : "A");
 			return (1 + extended) | SUPPORTED;
 		}
-		if (family == 0x1000 || family == 0x1100)
+		if (family == 0x1000 || family == 0x1100 || family == 0x1400 || family == 0x1500 ||
+			family == 0x4400 || family == 0x4500)
 		{
 			bool const extended = mode >= 0xe0;
 			stream << "LD      "; smem(extended ? next_word() : 0);
-			util::stream_format(stream, ", %s", BIT(op, 8) ? "B" : "A");
+			util::stream_format(stream, ", %s%c", family >= 0x4400 ? "16, " : family >= 0x1400 ? "TS, " : "",
+				BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
+		if (family >= 0x1800 && family <= 0x1d00)
+		{
+			static constexpr char const *names[] = {"AND", "OR", "XOR"};
+			bool const extended = mode >= 0xe0;
+			util::stream_format(stream, "%-8s", names[(family - 0x1800) >> 9]);
+			smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return (1 + extended) | SUPPORTED;
 		}
 		if (family == 0x6000 || family == 0x6100 || family == 0x7000 || family == 0x7100 ||

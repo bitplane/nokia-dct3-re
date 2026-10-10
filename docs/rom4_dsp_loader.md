@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 304 decoded and 322
+promoted to a boundary. Current cold-idle coverage is 336 decoded and 290
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1839,12 +1839,17 @@ and eight exact syntax examples. Its marker is
 `TMS320C54x memory ALU disassembler: PASS`. These frontend assertions do
 not establish execution for every operand or alter arithmetic/timing.
 
-Unshifted `LD Smem,A/B` exposes its one-word direct/short-indirect and
-two-word long-offset/absolute layouts. The gate checks 512 mode encodings
-on two pages, bounded extension reads and six exact address/destination
+Unshifted, TS-shifted and shift-16 `LD Smem,A/B` expose their one-word
+direct/short-indirect and two-word long-offset/absolute layouts. The gate
+checks 1,536 mode encodings on two pages, bounded extension reads and ten exact address/destination
 examples. Its required marker is `TMS320C54x load disassembler: PASS`.
 This is a frontend contract; it neither changes execution nor supplies
 pipeline-stage timing.
+
+Memory AND/OR/XOR decode their Smem address and accumulator. The gate checks
+1,536 encodings on two pages with bounded extension reads and six exact
+examples; its marker is `TMS320C54x memory logical disassembler: PASS`.
+This does not establish additional arithmetic/status semantics.
 
 BC/BCD, CC/CCD and XC decode 22 explicit named predicates. The core gate
 checks 132 forms on two pages, bounded extension reads, stepping flags and

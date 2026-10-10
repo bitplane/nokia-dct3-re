@@ -585,7 +585,7 @@ private:
 		}
 		osd_printf_info("TMS320C54x conditional disassembler: PASS forms=132 pages=2 named_predicates=22 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
-			for (u16 family : {0x1000, 0x1100})
+			for (u16 family : {0x1000, 0x1100, 0x1400, 0x1500, 0x4400, 0x4500})
 				for (unsigned mode = 0; mode < 256; ++mode)
 				{
 					words const buffer(pc, family | mode, 0x2345);
@@ -600,6 +600,10 @@ private:
 			{0x11ed, 2 | dasm::SUPPORTED, "LD      *+AR5($2345), B"},
 			{0x10f5, 2 | dasm::SUPPORTED, "LD      *+AR5($2345)%, A"},
 			{0x10f8, 2 | dasm::SUPPORTED, "LD      *($2345), A"},
+			{0x1482, 1 | dasm::SUPPORTED, "LD      *AR2, TS, A"},
+			{0x15f8, 2 | dasm::SUPPORTED, "LD      *($2345), TS, B"},
+			{0x44ed, 2 | dasm::SUPPORTED, "LD      *+AR5($2345), 16, A"},
+			{0x4593, 1 | dasm::SUPPORTED, "LD      *AR3+, 16, B"},
 		};
 		for (auto const &test : loads)
 		{
@@ -608,7 +612,32 @@ private:
 			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
 				"Load decoder retains address modifiers and accumulator destination");
 		}
-		osd_printf_info("TMS320C54x load disassembler: PASS modes=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		osd_printf_info("TMS320C54x load disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned family = 0x18; family <= 0x1d; ++family)
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, (family << 8) | mode, 0x2345);
+					std::ostringstream text;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == ((mode >= 0xe0 ? 2 : 1) | dasm::SUPPORTED) &&
+						buffer.seen() == (mode >= 0xe0 ? 3 : 1), "Memory logical decoder bounds address extensions");
+				}
+		vector const memory_logical[] = {
+			{0x1882, 1 | dasm::SUPPORTED, "AND     *AR2, A"},
+			{0x19f8, 2 | dasm::SUPPORTED, "AND     *($2345), B"},
+			{0x1aed, 2 | dasm::SUPPORTED, "OR      *+AR5($2345), A"},
+			{0x1b3a, 1 | dasm::SUPPORTED, "OR      $3A, B"},
+			{0x1c95, 1 | dasm::SUPPORTED, "XOR     *AR5+, A"},
+			{0x1df5, 2 | dasm::SUPPORTED, "XOR     *+AR5($2345)%, B"},
+		};
+		for (auto const &test : memory_logical)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Memory logical syntax preserves family and accumulator destination");
+		}
+		osd_printf_info("TMS320C54x memory logical disassembler: PASS modes=1536 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 		for (u32 pc : {0x010100, 0x01ffff})
 			for (unsigned family = 0; family < 16; ++family)
 				for (unsigned mode = 0; mode < 256; ++mode)
