@@ -598,8 +598,15 @@ byte-checked paths, not an exhaustive closure of indirect writers/callers.
 
 - Encoder wrapper `0x9c4f` and decoder wrapper `0x9cb9` require data
   `0x1836 == 0x00c1`. The encoder also branches on `0x6bb & 3`.
-- The encoder's normal path clears/mutes input through `0xa0b8`, preprocesses
-  160 PCM words at `0x1536`, then invokes the validated encoder.
+- The encoder's normal path passes `0x1536` to conditional input-mute
+  helper `0xa0b8`, then preprocesses 160 PCM words and invokes the validated
+  encoder. After its `0x24c1` hook, the helper tests bit 0 of data `0x1f2b`:
+  clear returns without changing the PCM buffer; set repeats the zero store
+  160 times through AR2. The acquired resident hook is a return, but future
+  uploaded replacement behavior is outside this bounded contract. Both
+  sequences are byte-pinned and word-mutation tested. The flag's producer
+  and organic call-time value remain unclassified; silence alone must not
+  be attributed to a broken encoder or used to force the flag clear.
 - The decoder supplies destination `0x1496` before postprocessing at `0x94c9`
   and `0xab7c`; further gain/filter/mute stages precede output copying.
 - `0xaa39` copies from the ring cursor in `0x6de` into the selected input
