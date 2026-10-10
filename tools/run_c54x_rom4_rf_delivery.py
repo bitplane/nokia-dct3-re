@@ -9,10 +9,10 @@ import sys
 import tempfile
 
 try:
-    from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request
+    from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning
     from tools.c54x_rom4_rf_score_check import check as check_score
 except ModuleNotFoundError:
-    from c54x_rom4_rf_delivery_check import check as check_delivery, check_request
+    from c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning
     from c54x_rom4_rf_score_check import check as check_score
 
 
@@ -58,6 +58,7 @@ def main():
             text = (case / "error.log").read_text()
             actual_mode, results, accepted = check_score(text)
             object_address, body = check_delivery(text)
+            check_tuning(text)
             if check_request(text) != int(body, 16):
                 raise ValueError("response body differs from selected request entry")
             if actual_mode != mode:

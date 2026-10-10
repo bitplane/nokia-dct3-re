@@ -1,6 +1,6 @@
 import unittest
 
-from tools.c54x_rom4_rf_delivery_check import check, check_request, decode_search_bitmap
+from tools.c54x_rom4_rf_delivery_check import check, check_request, check_tuning, decode_search_bitmap
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -14,6 +14,18 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_tuning_accumulator_pair(self):
+        trace = """rom4_rf_tuning_write: t=1.0 pc=4023 port=0031 value=2813 a=0000302813 ar2=0031 selected1867=006d
+rom4_rf_tuning_write: t=1.1 pc=4028 port=0032 value=0030 a=0000302813 ar2=0031 selected1867=006d
+"""
+        self.assertEqual(check_tuning(trace), 0x302813)
+        for old, new in (("value=2813", "value=2814"),
+                         ("value=0030", "value=0031"),
+                         ("pc=4028", "pc=4023"), ("t=1.1", "t=0.9"),
+                         ("selected1867=006d", "selected1867=0000")):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                check_tuning(trace.replace(old, new))
+
     def test_request_selection_contract(self):
         words = [0x10, 0x9800] + [0] * 31
         words[26] = 0x1000

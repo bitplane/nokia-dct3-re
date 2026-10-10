@@ -43,6 +43,23 @@ an evidenced software write path to this bus rather than infer an ARFCN
 from arbitrary COBBA control values. RF sample encoding remains a separate
 unresolved MFI contract.
 
+The resident destination branch `0x401a..0x402d` is byte-pinned:
+`*AR2 == 0x31` sends AL to port 31 and AH to port 32, then advances
+AR2 by two; the other branch stores accumulator halves in memory.
+The packing helper `0x403a..0x4048` is separately byte-pinned, but its
+input's physical units are not established. Fresh native zero-input
+and rotating-input controls capture the selected `006d` entry alongside
+AR2=`0031`, flags `0x216a=0004`, field `0x0060=0050` and
+accumulator `00302813`. Port 31 receives `2813` (advanced PC `4023`),
+then port 32 receives `0030` (advanced PC `4028`). Thus these two writes
+are one accumulator's halves, not two independent register addresses.
+Other writers use different PCs (`a23c/a240`, `370e/3712`); the port
+pair is not exclusively owned by this resident helper. The bounded
+observer records the first 32 writes without changing their values.
+`check_tuning` validates the selected-entry pair and accumulator halves;
+it does not establish PLUSSA's 23-bit layout, clock/latch timing or RF
+frequency. Those require tracing the helper's inputs and programming owner.
+
 ### Software RF reference boundary
 
 An independent baseband waveform source is available in

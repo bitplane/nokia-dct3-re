@@ -42,6 +42,27 @@ def check_request(text):
     return entries[0]
 
 
+def check_tuning(text):
+    """Validate the captured selected-entry port pair, not synthesizer layout."""
+    writes = [dict(FIELDS.findall(match[1])) for match in
+              re.finditer(r"rom4_rf_tuning_write: (.*)", text)]
+    for index, low in enumerate(writes[:-1]):
+        if low.get("pc") != "4023" or low.get("selected1867") != "006d":
+            continue
+        high = writes[index + 1]
+        if (low.get("port") != "0031" or high.get("port") != "0032"
+                or high.get("pc") != "4028" or low.get("ar2") != "0031"
+                or high.get("selected1867") != low.get("selected1867")
+                or high.get("ar2") != "0031" or high.get("a") != low.get("a")
+                or float(high["t"]) < float(low["t"])):
+            raise ValueError("selected-entry programming pair is inconsistent")
+        accumulator = int(low["a"], 16)
+        if int(low["value"], 16) != accumulator & 0xffff or int(high["value"], 16) != (accumulator >> 16) & 0xffff:
+            raise ValueError("programming ports differ from accumulator halves")
+        return accumulator
+    raise ValueError("missing selected-entry programming pair")
+
+
 def check(text):
     events = []
     for line in text.splitlines():

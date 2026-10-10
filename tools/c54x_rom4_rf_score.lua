@@ -112,6 +112,19 @@ taps[#taps + 1] = memory:install_write_tap(0x1266, 0x1266,
                 machine.time:as_double(), cpu.state["PC"].value, value))
         end
     end)
+local tuning_writes = 0
+taps[#taps + 1] = cpu.spaces["io"]:install_write_tap(0x31, 0x32,
+    "rf_programming_observation", function(offset, value)
+        if observing then return end
+        tuning_writes = tuning_writes + 1
+        if tuning_writes <= 32 then
+            machine:logerror(string.format(
+                "rom4_rf_tuning_write: t=%.9f pc=%04x port=%04x value=%04x a=%010x ar2=%04x flags216a=%04x field60=%04x selected1867=%04x\n",
+                machine.time:as_double(), cpu.state["PC"].value, offset, value,
+                cpu.state["A"].value, cpu.state["AR2"].value,
+                memory:read_u16(0x216a), memory:read_u16(0x60), memory:read_u16(0x1867)))
+        end
+    end)
 taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
     "mathematical_rf_input", function()
         local value = 0
