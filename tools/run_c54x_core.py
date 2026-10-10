@@ -10,6 +10,7 @@ REQUIRED = [
     "TMS320C54x operand fetch order: PASS cases=33 families=9 forms=direct,indirect,long,absolute",
     "TMS320C54x accumulator call fast return: PASS cases=2 sources=A,B",
     "TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1",
+    "TMS320C54x native gap branch/address: PASS words=6 cases=12 zero_nonzero=1 ar0_signed=1 stores=low,high",
     "TMS320C54x move/test disassembler: PASS decoded_modes=2048 pages=2 bounded_extensions=1 operand_order=1 pipeline_claim=0",
     "TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi",
     "TMS320C54x nested repeats: PASS cases=4 counts=zero,two forms=short,long",
@@ -74,7 +75,7 @@ def main():
     run = Path(tempfile.mkdtemp(prefix="run_c54x_core_", dir=args.output_root.resolve()))
     command = [str(args.mame.resolve()), "tms54test", "-rompath", str(args.rompath.resolve()),
                "-video", "none", "-sound", "none", "-nothrottle", "-noreadconfig",
-               "-log", "-seconds_to_run", "1"]
+               "-log", "-seconds_to_run", "2"]
     print(f"C54x evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)

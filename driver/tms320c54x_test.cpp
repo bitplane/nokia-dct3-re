@@ -73,6 +73,38 @@ private:
 		m_phase = 83000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_native_address_gap_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		static constexpr u16 opcodes[] = {0x6c8d, 0x6c8e, 0x6db7, 0x80b4, 0x838a, 0x8383};
+		unsigned const family = index / 2;
+		bool const variant = index & 1;
+		program.write_word(0x0800, opcodes[family]);
+		if (family < 2)
+		{
+			program.write_word(0x0801, 0x0900);
+			program.write_word(0x0802, 0xe801); // Fall-through result.
+			program.write_word(0x0803, 0xf4e1);
+			program.write_word(0x0900, 0xe802); // Taken-branch result.
+			program.write_word(0x0901, 0xf4e1);
+		}
+		else program.write_word(0x0801, 0xf4e1);
+		data.write_word(0x0600, 0xdead);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, variant ? 0xabcdef01 : 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, variant ? 0x89abcdef : 0x23456789);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, variant ? 0xffff : 3);
+		for (unsigned ar = 2; ar < 8; ++ar)
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR0 + ar, 0x0600);
+		if (family < 2)
+			m_cpu->set_state_int(tms320c54x_device::STATE_AR5 + family, variant ? 2 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_phase = 89000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_native_gap_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -19829,6 +19861,32 @@ private:
 				"Native 6f95/0e20 and 1087/1182 preserve source, addressing and SXM results");
 			if (index < 5) { start_native_gap_case(index + 1); return; }
 			osd_printf_info("TMS320C54x native gap arithmetic/load: PASS words=3 cases=6 sxm=0,1\n");
+			start_native_address_gap_case(0); return;
+		}
+		if (m_phase >= 89000 && m_phase < 89012)
+		{
+			unsigned const index = m_phase - 89000, family = index / 2;
+			bool const variant = index & 1;
+			static constexpr u16 opcodes[] = {0x6c8d, 0x6c8e, 0x6db7, 0x80b4, 0x838a, 0x8383};
+			u64 const a = family < 2 ? (variant ? 2 : 1) : variant ? 0xabcdef01 : 0x12345678;
+			u64 const b = variant ? 0x89abcdef : 0x23456789;
+			bool correct = m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == a &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == b;
+			for (unsigned ar = 2; ar < 8; ++ar)
+			{
+				u16 expected = 0x0600;
+				if (family < 2 && ar == 5 + family) expected = variant ? 1 : 0xffff;
+				if ((family == 2 && ar == 7) || (family == 3 && ar == 4)) expected = variant ? 0x05ff : 0x0603;
+				if (family == 4 && ar == 2) expected = 0x05ff;
+				correct &= m_cpu->state_int(tms320c54x_device::STATE_AR0 + ar) == expected;
+			}
+			u16 const stored = family < 3 ? 0xdead : family == 3 ? u16(a) : u16(b >> 16);
+			correct &= m_cpu->space(AS_DATA).read_word(0x0600) == stored;
+			expect_opcode(opcodes[family], correct, "Native BANZ/MAR/store preserves branch selection, word lane and AR updates");
+			if (index < 11) { start_native_address_gap_case(index + 1); return; }
+			osd_printf_info("TMS320C54x native gap branch/address: PASS words=6 cases=12 zero_nonzero=1 ar0_signed=1 stores=low,high\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

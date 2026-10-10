@@ -1525,7 +1525,7 @@ check-c54x-observed-coverage: build
 		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110" "$$tmp/menu/nvram/noki5110" "$$tmp/power/nvram/noki5110"; \
 		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test \
 			-rompath $(abspath $(MAME_DIR))/roms -video none -sound none \
-			-log -verbose -nothrottle -seconds_to_run 1 >output.log 2>&1 \
+			-log -verbose -nothrottle -seconds_to_run 2 >output.log 2>&1 \
 			|| { status=$$?; test "$$status" -eq 3; }; \
 			grep -q 'TMS320C54x core conformance: PASS' output.log \
 				|| { cat output.log >&2; exit 1; }); \

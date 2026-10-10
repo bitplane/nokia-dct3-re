@@ -1714,9 +1714,9 @@ The current native cold-idle inventory is 626 words in 110 high-byte groups,
 SHA-256 `05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59`.
 Two isolated controls (`tmp/c54x-frontend-idle-a` and `-b`) reproduce the full
 ranked report exactly. The existing 594-word gate expectation is now stale
-and remains intentionally unrebanked: current fixture coverage is 604 asserted,
-one execution-only (`9a5f`) and 21 absent words. High-use absent forms begin
-with `6c8d`, `6db7`, `80b4`, `838a` and `f67b`.
+and remains intentionally unrebanked: current fixture coverage is 610 asserted,
+one execution-only (`9a5f`) and 15 absent words. High-use absent forms begin
+with `f67b`, `3185`, `f301` and `f648`.
 Earlier 594-word closure statements below apply to that earlier trace, not
 the current native execution set.
 
@@ -1740,6 +1740,16 @@ preserved source accumulator and memory, and the single AR5 postincrement
 versus unchanged load pointers. The required marker is
 `TMS320C54x native gap arithmetic/load: PASS`; this is selected operand/status
 coverage, not all inputs or physical pipeline timing.
+
+Twelve additional cases assert `BANZ` forms `6c8d/6c8e` with zero and nonzero
+AR5/AR6, including comparison before postdecrement; `MAR 6db7` with positive
+and negative AR0 increments; and stores `80b4/838a/8383` with independent low/
+high-word patterns, addressed writes and post-updates. Unselected ARs and
+accumulators are also checked. The core runner requires
+`TMS320C54x native gap branch/address: PASS`. Its simulation ceiling is two
+seconds because the expanded fixture chain exceeds the former one-second
+limit; completion still requires every marker and the intentional terminal
+exit, never a timeout. No instruction timing is changed by this deadline.
 
 ### Debugger control-flow decoding
 
