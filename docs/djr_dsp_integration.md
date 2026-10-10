@@ -1284,6 +1284,16 @@ primary caller, without claiming that the alternative callback is
 selected at runtime. All eleven known lists are checked word by word;
 this is not an exhaustive census of every DSP scheduling table.
 
+Fresh-storage 60-second flag observation finds only initialization
+clears of `0x1932`, `0x194a` and `0x194b`, all finishing zero.
+Entries `0x990d`, `0x996b`, `0x9988`, flag-builder candidates
+`0x6318/0x659b`, and alternative callback `0xa27d` execute zero
+times, against 30351 positive-control frame executions. This does
+not support a local acquisition-bit rejection or a failed transfer
+between the neighbouring flag words: their mapped lifecycle is
+unentered. The open boundary remains selection of that lifecycle
+from the active scan/request path, not a fabricated control flag.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
