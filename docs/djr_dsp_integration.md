@@ -1214,6 +1214,18 @@ therefore already upstream of this enclosing routine in that run.
 These counts are from a reused generated-profile NVRAM directory,
 not a deterministic fresh-storage comparison with earlier runs.
 
+The verified direct caller is main-loop site `0x318a`, returning to
+`0x316b` after `0x5e62`. Byte-pinned gate `0x313f` selects this
+lifecycle when `0x1949 & 0x0080` is set. Initialization at `0x315c`
+then assigns `0x1949=0x0008`, `0x17a8=4`, `0x1868=0x30`,
+`0x1869=0x40` and schedule index `0x07fc=0`. The loop calls host
+processing `0x390a`; `0x06e3` bit 0 returns to `0x3000`, and bit 1
+selects a separate branch rather than the configuration call. This
+shows that initial configuration need not wait for a type-`0x02`
+channel request: the transition through bit `0x0080` has its own
+default initialization. The next predecessor is that flag's producer
+and its main-loop consumption, not a forced pending-channel value.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
