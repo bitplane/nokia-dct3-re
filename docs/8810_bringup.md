@@ -280,6 +280,20 @@ state, the MCU status decoder takes its value-5 branch. This is not a
 SIM failure, a DSP verdict, or evidence that CHV must be enabled to boot.
 Changing the card security policy merely to escape the reset selector would
 conceal the empty DSP window rather than resolve its traffic contract.
+
+### Native Clock Observation Scope
+
+The 40-second interface summary is reset-relative: `device_reset` clears its
+frame/slot counters. Its roughly 1,737 frame expiries describe the final
+eight seconds after the software reset, not a slow 40-second clock.
+Fresh per-second snapshots observe 6,274/6,227 frame/slot expiries at 29 s,
+6,491/6,444 at 30 s, and 6,708/6,661 at 31 s. CCONT frame-clock enable is
+one at all three samples. The 216--217 expiries/s match the declared
+13 MHz / 12 / 5000 timing; counters restart at the known software reset.
+This excludes the apparent fivefold timer slowdown and a persistently
+disabled frame-clock gate over those samples. Timer expiries alone do not
+prove correct DSP ISR processing, physical clock validation, operational
+packet production, or a valid RF sample stream. No clock setting is changed.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.

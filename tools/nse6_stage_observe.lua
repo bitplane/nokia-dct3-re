@@ -6,6 +6,8 @@ local ccont_watchdog = emu.item(assert(machine.devices[':ccont'].items['0/m_watc
 local mad2_registers = emu.item(assert(machine.devices[':mad2'].items['0/m_regs']))
 local ccont_registers = emu.item(assert(machine.devices[':ccont'].items['0/m_regs']))
 local dsp = machine.devices[':dsp_c54x:cpu']
+local native_frames = dsp and emu.item(assert(machine.devices[':dsp_c54x'].items['0/m_frame_timer_expiries']))
+local native_slots = dsp and emu.item(assert(machine.devices[':dsp_c54x'].items['0/m_slot_timer_expiries']))
 local handles = {}
 local pending_memory_uploads = {}
 local observing_native = false
@@ -566,6 +568,10 @@ emu.register_frame_done(function()
         'nse6_watchdog_snapshot: ccont=%02x mad2=%02x t=%.9f\n',
         ccont_watchdog:read(0), mad2_registers:read(3), now))
     if dsp then
+        machine:logerror(string.format(
+            'nse6_native_clock_snapshot: frames=%u slots=%u frame_enabled=%u t=%.9f\n',
+            native_frames:read(0), native_slots:read(0),
+            (ccont_registers:read(6) & 2) ~= 0 and 1 or 0, now))
         for _, upload in ipairs(pending_memory_uploads) do
             local matched = 0
             for index, word in ipairs(upload.words) do
