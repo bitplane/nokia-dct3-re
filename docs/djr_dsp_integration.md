@@ -984,6 +984,17 @@ field (the earlier metadata-byte write is separate). This verifies 256
 cases of the non-fixed block path, not its sequence-number/reassembly
 branches or the semantics of incoming kind 0.
 
+The sequence-aware append branch is also executed with kind 0,
+address/control `03/00`, and length-header low bits `01`: 11,264 cases
+cover every prior accumulated-length byte, incoming lengths 0..21, and
+matching/mismatching expected sequence values 0/1. Lengths 1..20 append
+from input offset 17 to record offset `0x18 + prior_length` only when
+the expected sequence is 0 and the new total is strictly below 252.
+Successful appends update record length byte `0x113`; all other cases
+preserve that byte and the 251-byte accumulation region. This exercises
+one sequence value and the append bound, not acknowledgement, completion,
+all sequence numbers, or the caller-owned record lifecycle.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,

@@ -371,6 +371,38 @@ def check_rr_unsegmented_block(cpu):
     return 256
 
 
+def check_rr_segment_append(cpu):
+    cases = 0
+    for previous in range(256):
+        for length in range(22):
+            for sequence in (0, 1):
+                record = bytearray([0xdd] * 0x180)
+                record[11], record[0x113] = sequence, previous
+                cpu.mem_write(0x10b100, bytes(record))
+                source = bytearray(80)
+                source[13:17] = bytes((0x5a, 3, 0, (length << 2) | 1))
+                source[17:] = bytes(range(63))
+                cpu.mem_write(0x10b500, bytes(source))
+                cpu.reg_write(UC_ARM_REG_R0, 0x10b500)
+                cpu.reg_write(UC_ARM_REG_R1, 0x10b100)
+                cpu.reg_write(UC_ARM_REG_SP, 0x100f00)
+                cpu.reg_write(UC_ARM_REG_LR, RETURN | 1)
+                cpu.emu_start(0x237fcd, RETURN, count=4096)
+                if cpu.reg_read(UC_ARM_REG_PC) != RETURN:
+                    raise ValueError("segment append did not return within bound")
+                accepted = 1 <= length <= 20 and previous + length < 252 and sequence == 0
+                expected = bytearray([0xdd] * 251)
+                if accepted:
+                    expected[previous:previous + length] = bytes(range(length))
+                if bytes(cpu.mem_read(0x10b118, 251)) != bytes(expected):
+                    raise ValueError("segment append changed payload outside its contract")
+                if bytes(cpu.mem_read(0x10b213, 1)) != bytes([
+                        previous + length if accepted else previous]):
+                    raise ValueError("segment append length differs")
+                cases += 1
+    return cases
+
+
 def check_image(raw):
     if len(raw) != 0x100000 or hashlib.sha1(raw).hexdigest() != ROM_SHA1:
         raise ValueError("requires the identified unswapped NSE-1 v5.30 image")
@@ -412,6 +444,7 @@ def check_image(raw):
             "rr_payload_allocation_cases": check_rr_payload_allocation(cpu),
             "rr_fixed_block_cases": check_rr_fixed_block(cpu),
             "rr_unsegmented_block_cases": check_rr_unsegmented_block(cpu),
+            "rr_segment_append_cases": check_rr_segment_append(cpu),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,
