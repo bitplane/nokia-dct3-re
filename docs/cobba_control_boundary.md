@@ -149,6 +149,32 @@ threshold comparison is a processed correlation-score boundary, not
 an established raw ADC-energy or dBm threshold. Exact score units and
 the active TC-mode interpretation remain to be validated numerically.
 
+`c54x_rom4_rf_score.lua` supplies three explicit mathematical controls
+at port `0x27`: zero; DC word pairs `(2048,0)`; and rotating word pairs
+of amplitude 2048 with one turn per sixteen pairs. Pair order and
+normalized frequency are diagnostic assumptions, not GSM sample-rate
+or physical ADC claims. It observes the uploaded score at `0x0ad1`,
+the second comparison at `0x0add`, and accepted-value store `0x0ae4`.
+Fresh generated-profile 60-second runs produce:
+
+| Input | Completed scores | Nonzero | Maximum | Second comparison | Accepted store |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Zero | 5158 | 0 | 0 | 0 | 0 |
+| Rotating pairs | 5146 | 5146 | `0x7fff` | 500 | 9 |
+
+A separate 60-second DC run using storage from its preceding eight-second
+run has 5568 completed scores, all zero, with no second comparison or
+accepted store. Its counts are not a fresh-boot oracle. Validate captures
+with `tools/c54x_rom4_rf_score_check.py /path/to/error.log`; the checker
+requires sustained observation, not the single completion in eight seconds.
+The rotating input therefore advances the actual native score/selection
+path without firmware-state or message injection. Saturation at `0x7fff`
+is an observed score ceiling, not proof of correct physical RF modeling.
+No control contains a GSM burst, FCCH/SCH timing or broadcast information;
+these results establish neither acquisition nor registration. Next recover
+what the accepted selection publishes and attach an independently generated
+waveform only with explicit lane, scaling and cadence assumptions.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
