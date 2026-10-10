@@ -2497,6 +2497,36 @@ void tms320c54x_device::execute_one(u16 op)
 			dual_modify(y);
 		return;
 	}
+	if ((op & 0xfe00) == 0x9e00 && (op & 7) >= 2) // SACCD (SPRU172C 4-152)
+	{
+		const u8 x = op >> 4;
+		const unsigned xar = 2 + (x & 3);
+		const u64 tested = accumulator(BIT(op, 3)) & ACC_MASK;
+		const s64 signed_tested = s64(tested << 24) >> 24;
+		bool take = false;
+		switch (op & 7)
+		{
+		case 2: take = signed_tested >= 0; break;
+		case 3: take = signed_tested < 0; break;
+		case 4: take = tested != 0; break;
+		case 5: take = tested == 0; break;
+		case 6: take = signed_tested > 0; break;
+		case 7: take = signed_tested <= 0; break;
+		}
+		const u16 address = m_ar[xar];
+		u16 value = data_read(address);
+		if (take)
+		{
+			const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
+			const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
+			const u64 shifted = shift < 0 ? arithmetic_shift_right(source, -shift) : (source << shift) & ACC_MASK;
+			value = u16(saturated_store(shifted) >> 16);
+		}
+		// A false condition still performs a read/write-back bus transaction.
+		data_write(address, value);
+		dual_modify(x);
+		return;
+	}
 	if ((op & 0xfc00) == 0x9800) // STL/STH src, SHFT, Xmem (SPRU172C 4-169/172)
 	{
 		const u8 x = op >> 4;
@@ -2633,6 +2663,28 @@ void tms320c54x_device::execute_one(u16 op)
 			}
 			m_icount -= 2;
 		}
+		return;
+	}
+	if ((op & 0xfff0) == 0xfe40 && (op & 7) >= 2) // RCD accumulator conditions (SPRU172C 4-133)
+	{
+		const u64 raw = accumulator(BIT(op, 3)) & ACC_MASK;
+		const s64 value = s64(raw << 24) >> 24;
+		bool take = false;
+		switch (op & 7)
+		{
+		case 2: take = value >= 0; break;
+		case 3: take = value < 0; break;
+		case 4: take = raw != 0; break;
+		case 5: take = raw == 0; break;
+		case 6: take = value > 0; break;
+		case 7: take = value <= 0; break;
+		}
+		if (take)
+		{
+			m_delayed_target = pop();
+			m_delayed_words = 2;
+		}
+		m_icount -= 2;
 		return;
 	}
 	switch (op)
@@ -2807,15 +2859,6 @@ void tms320c54x_device::execute_one(u16 op)
 	case 0xfe00: // RETD
 		m_delayed_target = pop();
 		m_delayed_words = 2;
-		m_icount -= 2;
-		return;
-	case 0xfe44: // RCD ANEQ (SPRU172C, RC[D])
-	case 0xfe4c: // RCD BNEQ
-		if (((BIT(op, 3) ? m_b : m_a) & ACC_MASK) != 0)
-		{
-			m_delayed_target = pop();
-			m_delayed_words = 2;
-		}
 		m_icount -= 2;
 		return;
 	case 0xf495: // NOP

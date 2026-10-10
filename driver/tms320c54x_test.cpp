@@ -1077,6 +1077,12 @@ private:
 				data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "fr-encoder"))
+		{
+			start_rom4_fr_encoder(0, 0);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "fr-decoder"))
 		{
 			start_rom4_fr_decoder(0, true);
@@ -1635,6 +1641,57 @@ private:
 		m_check_timer->adjust(attotime::from_msec(5));
 	}
 
+	void start_rom4_fr_encoder(unsigned frame, unsigned stage)
+	{
+		auto &data = m_cpu->space(AS_DATA);
+		if (!stage)
+		{
+			m_rom4_codec.reset();
+			if (!frame) m_rom4_pcm_mismatches = 0;
+		}
+		if (stage == 1)
+		{
+			util::gsm_fr_codec::pcm_block input{};
+			u32 random = 0x12345678U ^ frame;
+			for (unsigned i = 0; i < input.size(); ++i)
+			{
+				random = random * 1664525U + 1013904223U;
+				switch (frame / 8)
+				{
+				case 0: input[i] = 0; break;
+				case 1: input[i] = i == frame % 160 ? 32767 : 0; break;
+				case 2: input[i] = i & 1 ? 12000 : -12000; break;
+				case 3: input[i] = s16(random >> 16); break;
+				}
+				data.write_word(0x1500 + i, u16(input[i]));
+			}
+			util::gsm_fr_codec::speech_frame encoded{};
+			expect(m_rom4_codec.encode(input, encoded), "FR encoder reference available");
+			gsm::tch_f::speech_bits serial{};
+			expect(gsm::tch_f::unpack_speech(encoded, serial), "FR encoder reference serial frame");
+			unsigned position = 0;
+			for (unsigned p = 0; p < 76; ++p)
+			{
+				u16 value = 0;
+				for (unsigned bit = 0; bit < ROM4_FR_WIDTHS[p]; ++bit) value = (value << 1) | serial[position++];
+				m_rom4_parameters[p] = value;
+			}
+		}
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		data.write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, stage == 0 ? 0x8045 : stage == 1 ? 0x85e0 : 0x860c);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 74000 + frame * 3 + stage;
+		m_check_timer->adjust(attotime::from_msec(5));
+	}
+
 	void start_zero_bk_case(unsigned index)
 	{
 		static constexpr u16 addresses[] = { 0, 1, 0x007f, 0x0100, 0x7fff, 0x8000, 0xfffe, 0xffff };
@@ -1653,6 +1710,56 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 		m_phase = 73000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
+	void start_rcd_acc_case(unsigned index)
+	{
+		unsigned const condition = index % 12;
+		unsigned const sign = index / 12;
+		u64 const tested = sign == 0 ? 0 : sign == 1 ? 0x12340000ULL : 0xffedcc0000ULL;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0700, 0xfe40 | (condition < 6 ? 2 + condition : 10 + condition - 6));
+		program.write_word(0x0701, 0x7710);
+		program.write_word(0x0702, 0x4321);
+		program.write_word(0x0703, 0xf4e1);
+		program.write_word(0x0720, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 0);
+		m_cpu->space(AS_DATA).write_word(0x1ec3, 0x0720);
+		m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, condition < 6 ? tested : 0x23450000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, condition < 6 ? 0x23450000 : tested);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 76000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
+	void start_saccd_case(unsigned index)
+	{
+		unsigned const condition = index % 12;
+		unsigned const sign = (index / 12) % 3;
+		unsigned const source = (index / 36) % 2;
+		unsigned const mode = (index / 72) % 4;
+		unsigned const shift = index / 288;
+		u64 const tested = sign == 0 ? 0 : sign == 1 ? 0x12340000ULL : 0xffedcc0000ULL;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0700, 0x9e00 | (source << 8) | (mode << 6) | (condition < 6 ? 2 + condition : 10 + condition - 6));
+		program.write_word(0x0701, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0500, 0xa55a);
+		m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, condition < 6 ? tested : 0x23450000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, condition < 6 ? 0x23450000 : tested);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR0, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0500);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0900 | shift);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 75000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 
@@ -18815,6 +18922,43 @@ private:
 				"BK zero preserves linear modulo-16-bit address updates for Smem and dual operands");
 			if (index < 319) { start_zero_bk_case(index + 1); return; }
 			osd_printf_info("TMS320C54x zero BK addressing: PASS variants=320\n");
+			start_saccd_case(0);
+			return;
+		}
+		if (m_phase >= 75000 && m_phase < 75576)
+		{
+			unsigned const index = m_phase - 75000;
+			unsigned const condition = index % 12;
+			unsigned const sign = (index / 12) % 3;
+			unsigned const source = (index / 36) % 2;
+			unsigned const mode = (index / 72) % 4;
+			unsigned const shift = index / 288;
+			bool const predicates[] = {sign != 2, sign == 2, sign != 0, sign == 0, sign == 1, sign != 1};
+			u16 const tested = sign == 0 ? 0 : sign == 1 ? 0x1234 : 0xedcc;
+			u16 const expected = predicates[condition % 6] ? u16(((source == unsigned(condition >= 6)) ? tested : 0x2345) << shift) : 0xa55a;
+			unsigned const delta[] = {0, 0xffff, 1, 3};
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->space(AS_DATA).read_word(0x0500) == expected &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == u16(0x0500 + delta[mode]),
+				"SACCD conditions, accumulator selection, ASM and unconditional pointer update");
+			if (index < 575) { start_saccd_case(index + 1); return; }
+			osd_printf_info("TMS320C54x SACCD conformance: PASS variants=576\n");
+			start_rcd_acc_case(0);
+			return;
+		}
+		if (m_phase >= 76000 && m_phase < 76036)
+		{
+			unsigned const index = m_phase - 76000;
+			unsigned const sign = index / 12;
+			bool const predicates[] = {sign != 2, sign == 2, sign != 0, sign == 0, sign == 1, sign != 1};
+			bool const take = predicates[index % 6];
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR0) == 0x4321 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (take ? 0x1ec4 : 0x1ec3) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == (take ? 0x0721 : 0x0704),
+				"conditional delayed return preserves delay instruction and conditionally pops stack");
+			if (index < 35) { start_rcd_acc_case(index + 1); return; }
+			osd_printf_info("TMS320C54x RCD accumulator conditions: PASS variants=36\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -18850,6 +18994,35 @@ private:
 			expect(!m_rom4_pcm_mismatches, "native FR decoder PCM matches independent codec");
 			osd_printf_info("TMS320C54x ROM4 FR decoder: PASS frames=32 samples=5120 handset_audio_claim=0\n");
 			throw emu_fatalerror(0, "TMS320C54x ROM4 FR decoder complete");
+		}
+		if (m_phase >= 74000 && m_phase < 74096)
+		{
+			unsigned const frame = (m_phase - 74000) / 3;
+			unsigned const stage = (m_phase - 74000) % 3;
+			if (!m_cpu->state_int(tms320c54x_device::STATE_IDLE) || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL))
+				osd_printf_info("ROM4 FR encoder stop: frame=%u stage=%u pc=%04x sp=%04x illegal=%u\n", frame, stage,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4,
+				"native FR encoder stage returns with balanced stack");
+			if (stage < 2) { start_rom4_fr_encoder(frame, stage + 1); return; }
+			unsigned differences = 0;
+			for (unsigned p = 0; p < 76; ++p)
+			{
+				u16 const actual = m_cpu->space(AS_DATA).read_word(0x1390 + p);
+				if (actual != m_rom4_parameters[p])
+				{
+					if (!differences) osd_printf_info("ROM4 FR encoder mismatch: frame=%u parameter=%u actual=%u expected=%u\n", frame, p, actual, m_rom4_parameters[p]);
+					++differences;
+				}
+			}
+			m_rom4_pcm_mismatches += differences;
+			osd_printf_info("ROM4 FR encoder comparison: frame=%u mismatches=%u\n", frame, differences);
+			if (frame < 31) { start_rom4_fr_encoder(frame + 1, (frame + 1) % 8 == 0 ? 0 : 1); return; }
+			osd_printf_info("ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=%u\n", m_rom4_pcm_mismatches);
+			expect(!m_rom4_pcm_mismatches, "native FR encoder parameters match independent codec");
+			osd_printf_info("TMS320C54x ROM4 FR encoder: PASS frames=32 parameters=2432 handset_audio_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 FR encoder complete");
 		}
 		if (m_phase >= 71000 && m_phase < 71879)
 		{
@@ -19184,6 +19357,7 @@ private:
 	optional_device<nokia_dspif_device> m_transport;
 	util::gsm_fr_codec m_rom4_codec;
 	util::gsm_fr_codec::pcm_block m_rom4_pcm{};
+	std::array<u16, 76> m_rom4_parameters{};
 	unsigned m_rom4_pcm_mismatches = 0;
 	emu_timer *m_check_timer = nullptr;
 	unsigned m_phase = 0;
@@ -19495,6 +19669,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(3, "crc-packed", "Isolated acquired ROM packed CRC")
 	ROM_SYSTEM_BIOS(4, "fr-packing", "Isolated acquired ROM FR parameter round trip")
 	ROM_SYSTEM_BIOS(5, "fr-decoder", "Isolated acquired ROM FR decoder")
+	ROM_SYSTEM_BIOS(6, "fr-encoder", "Isolated acquired ROM FR encoder")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -19514,6 +19689,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(5))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(6))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -19533,6 +19711,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(5))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(6))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))

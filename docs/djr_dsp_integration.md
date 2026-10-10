@@ -574,6 +574,26 @@ The next software-only boundary is encoder `0x860c`, preprocessing `0x85e0`
 and their persistent state. Isolated decoder PCM validation does not prove
 handset audio delivery, native speech during a call or end-to-end calls.
 
+The development-only `fr-encoder` BIOS invokes native reset wrapper `0x8045`,
+preprocessing `0x85e0` with AR4 pointing to 160 PCM words, then `0x860c`.
+Preprocessing writes `0x127d..0x131c`; encoding writes the 76 parameters
+at `0x1390`. This fixture is not an acceptance gate yet: parameters differ
+from the independent codec (465 of 2,432 parameters); all 32 frames return without illegal instructions,
+and the final seven noise frames match every parameter. The reset must include the wrapper's additional
+state initializers, not just preprocessing reset `0x85d7`. No encoder correctness
+or handset audio claim follows from these partial runs.
+
+Encoder execution also requires conditional accumulator store `SACCD`.
+[TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+specifies that even a false condition reads and writes back the destination,
+with address modification independent of the condition. The core implements
+that contract; 576 cases cover both sources, twelve conditions, three signed
+test values, four address forms and two ASM settings.
+Conditional delayed returns with accumulator predicates are covered by 36
+additional cases: all twelve predicates against negative, zero and positive
+values, preserving a two-word delay instruction and popping the stack only
+when taken (SPRU172C page 4-133).
+
 The practical software-only route is therefore:
 
 1. preserve the recovered historical volumes and extracted inputs outside Git;
