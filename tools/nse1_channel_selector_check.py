@@ -276,6 +276,7 @@ def check_rr_payload_allocation(cpu):
     for kind in (0, 0x40, 0x50, 0x60, 0xa0, 0xff):
         for length in range(256):
             cpu.mem_write(0x10b000, bytes(12))
+            cpu.mem_write(0x10b214, bytes(range(256)))
             cpu.mem_write(0x10b257, bytes([length ^ 0xff]))
             cpu.mem_write(0x10b264, bytes([kind]))
             cpu.mem_write(0x10b22b, bytes([length]))
@@ -290,6 +291,22 @@ def check_rr_payload_allocation(cpu):
                 raise ValueError("RR payload allocation size differs")
             if bytes(cpu.mem_read(0x10b003, 2)) != bytes((length ^ 0xff, 1)):
                 raise ValueError("RR payload metadata differs")
+            copied = 22 if fixed else length
+            expected = bytes(cpu.mem_read(0x10b214, copied))
+            cpu.mem_write(0x10b500, bytes([0xee]) * 260)
+            cpu.reg_write(UC_ARM_REG_R0, 0x10b500)
+            cpu.emu_start(0x237ee5 if fixed else 0x237ecb,
+                          0x237f08, count=4096)
+            if cpu.reg_read(UC_ARM_REG_PC) != 0x237f08:
+                raise ValueError("RR payload copy did not reach its boundary")
+            if bytes(cpu.mem_read(0x10b008, 4)) != (0x10b500).to_bytes(4, "big"):
+                raise ValueError("RR constructor changed allocated payload pointer")
+            if bytes(cpu.mem_read(0x10b500, copied + 5)) != (
+                    length.to_bytes(2, "big") + bytes([0xee]) * 2
+                    + expected + bytes([0xee])):
+                raise ValueError("RR payload header, copy or trailing guard differs")
+            if bytes(cpu.mem_read(0x10b22b, 1)) != bytes([0]):
+                raise ValueError("RR constructor did not consume source length")
     return 1536
 
 
