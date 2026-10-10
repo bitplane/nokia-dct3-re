@@ -103,7 +103,24 @@ Validate a captured log with
 requires both bounded state captures and the exact 32-read prefix,
 including coefficient values; it deliberately allows nonzero history
 values so it does not encode silence as an RF-format requirement.
-Recover lane impulse responses and output scaling before converting an
+The diagnostic `c54x_rom4_rf_impulse.lua` supplies a single `0x4000`
+word through the I/O read boundary at port `0x27`, followed by zeros.
+It never writes firmware RAM, registers or messages. Its external event
+starts at emulated time 1.6402 seconds (a fixture alignment, not physical
+timing); the first supplied word is consumed at PC `0x330c`. Output
+observation excludes earlier initialization and filter writes.
+With `ROM4_RF_IMPULSE_INDEX=0`, the first 16 output words have nonzero
+values only at indices 1,3,5,7: `0469 1000 0ab6 00e2`.
+With index 1, the same values appear at indices 0,2,4,6 instead.
+Both eight-second runs execute the native firmware with unchanged
+instructions. Thus these two adjacent input words feed separate,
+oppositely ordered output lanes. The observed values equal the high
+halfword of `0x4000` multiplied by coefficients `11a3 4000 2ad6 0387`.
+This is a positive-word impulse observation, not a proof of negative
+sample handling, all 32 input positions, continuous sample cadence,
+physical ADC scaling, or which lane is I versus Q. The Lua override is
+a diagnostic port-input fixture, not a shipped RF model. Recover the
+remaining impulse phases and signed scaling before converting an
 independently generated complex waveform to words.
 
 ### Product-specific physical buses
