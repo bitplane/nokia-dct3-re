@@ -57,6 +57,13 @@ board-level battery routing. Other ADC channels remain research defaults.
 
 ### Menu Execution and Restart Boundary
 
+**Open contract:** identify the legitimate operational-mode entrance after
+the MCU clears the DSP receive count at 6.533113 s. Startup packets, native
+memory uploads, control handlers, and frame interrupts execute; the processing
+tail remains dormant. Neither a fabricated heartbeat nor altered NV reset
+policy is an evidenced correction. The acquired NSE-1 mask remains a
+compatibility instrument, not an identified fitted NSE-6 mask.
+
 `tools/nse6_menu_fixture.lua` accepts the default code then applies physical
 Menu, Down and Select contacts. Snapshots show Messages, Call register, and
 Missed calls respectively. `tools/nse6_names_fixture.lua` opens Names, selects
@@ -123,15 +130,15 @@ The receive primitive's timer-queue branch at `0x27b604` dequeues timer ID
 `0x16` from record `0x10b2ac` for task record `0x10c884` at 31.966903 s.
 Its ROM mapping at `0x2fa344 + 8 * 0x16` supplies status D6; the dispatcher
 receives it 17 microseconds later. Thus the observed D6 is a timer expiration,
-not a demonstrated DSP response. The unresolved contract is who arms/cancels
-timer `0x16` and which status check selects its reset action. A second
-fresh run identifies the arm call: `0x27a76e` receives ID `0x16` and delay
+not a demonstrated DSP response. The verified arm call at `0x27a76e`
+receives ID `0x16` and delay
 `0x7d` at 31.000918 s, with caller return `0x2d3473`. The arm routine starts
 at `0x2d3460`, queues control value `0x1b` to task 1, then arms the timer.
 A further fresh run enters that routine with caller return `0x2c6973` at
 31.000869 s. Own code at `0x2c696e` calls it after selecting and storing
-reason `0x68` through `0x2d3408`. The selector uses local status bytes,
-several global guards, and helper returns; their semantics remain unresolved.
+reason `0x68` through `0x2d3408`. The selector uses the NV policy and SIM
+status decoded below, plus global guards; their broader lifecycle semantics
+remain unresolved.
 This is not evidence of an idle-loop timeout or a missing DSP heartbeat.
 The selector entry is `0x2c68c8`. A fresh run enters with input `1`, caller
 return `0x2e25f5`, at 31.000193 s. Its NV read uses descriptor `0x0607`;
@@ -141,8 +148,9 @@ NV byte; input 2 separately tests bit 1 and can select `0x69`. Erased NV is
 therefore an observed input to the live reset decision, not proof of a missing
 DSP response. The remaining guards also pass in this run. No valid default
 or authentic replacement value for descriptor `0x0607` is established.
-The next boundary is that descriptor's storage/default contract and the
-status reader `0x2a1e3c`, not altering timer delay or suppressing expiration.
+The status reader's SIM provenance is established below. The descriptor's
+authentic default remains unknown; altering timer delay or suppressing
+expiration would not resolve the empty receive window.
 
 The own descriptor resolver `0x2d6b98` uses eight-byte records selected by
 the descriptor's high byte. Group 6's directory entry at `0x2fcb40` points
@@ -306,6 +314,16 @@ execute, not merely the external timer. This measured lifecycle never enters
 the candidate processing tail. The next native contract is entry into an
 operational mode, not repair of missing frame interrupts. These counts do
 not prove a valid RF input or the fitted NSE-6 DSP identity.
+
+The corresponding 30-second caller census records zero at the seven known
+initializer call sites (`09a4`, `0ab8`, `4de3`, `4e00`, `9b62`, `9b9f`,
+`9bb0`), control dispatcher `3660`, type-`1a` entries `3d5e/3d70`, and
+type-`1b` entry `3db8`, with 6,428 frame entries as a positive control.
+The 24-word executable overlay and all four 39-word memory uploads still
+pass readback checks. Unlike the current native NSE-1 fixture, this lifecycle
+never reaches the known mode-initialization entrances. This is a measured
+cross-product control-sequence difference, not an exhaustive indirect-call
+closure or evidence that a particular missing host command must be injected.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
