@@ -914,6 +914,36 @@ private:
 				"MMR syntax retains register/accumulator ordering and rejects extended forms");
 		}
 		osd_printf_info("TMS320C54x MMR disassembler: PASS modes=1344 rejected=192 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned word = 0; word < 4352; ++word)
+			{
+				u16 const op = word < 4096 ? 0xd000 + word : 0xe200 + word - 4096;
+				words const buffer(pc, op, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+					"Parallel multiply and SQDST decoders read no extension words");
+			}
+		vector const parallel_forms[] = {
+			{0xd6e1, 1 | dasm::SUPPORTED, "ST      B, *AR3 || MACR *AR4+0%, A"},
+			{0xd03a, 1 | dasm::SUPPORTED, "ST      A, *AR4+ || MAC *AR5, A"},
+			{0xdbae, 1 | dasm::SUPPORTED, "ST      B, *AR4+0% || MAS *AR4+, B"},
+			{0xdd00, 1 | dasm::SUPPORTED, "ST      A, *AR2 || MASR *AR2, B"},
+			{0xe210, 1 | dasm::SUPPORTED, "SQDST   *AR3, *AR2"},
+			{0xe2e4, 1 | dasm::SUPPORTED, "SQDST   *AR4+0%, *AR2-"},
+			{0xf493, 1 | dasm::SUPPORTED, "CMPL    A, A"},
+			{0xf593, 1 | dasm::SUPPORTED, "CMPL    A, B"},
+			{0xf693, 1 | dasm::SUPPORTED, "CMPL    B, A"},
+			{0xf793, 1 | dasm::SUPPORTED, "CMPL    B, B"},
+		};
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (auto const &test : parallel_forms)
+			{
+				words const buffer(pc, test.op, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == test.result && text.str() == test.text && buffer.seen() == 1,
+					"Parallel instruction syntax separates store and arithmetic selectors");
+			}
+		osd_printf_info("TMS320C54x parallel disassembler: PASS forms=4352 complement=4 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

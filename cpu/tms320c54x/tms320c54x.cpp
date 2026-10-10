@@ -119,12 +119,27 @@ public:
 			stream << "MAR     "; smem(extended ? next_word() : 0);
 			return (1 + extended) | SUPPORTED;
 		}
+		auto const dual = [&](u8 operand) {
+			static constexpr char const *forms[] = {"*AR%u", "*AR%u-", "*AR%u+", "*AR%u+0%%"};
+			util::stream_format(stream, forms[(operand >> 2) & 3], 2 + (operand & 3));
+		};
+		if (family == 0xe200 || (op & 0xf000) == 0xd000)
+		{
+			if (family == 0xe200)
+			{
+				stream << "SQDST   "; dual(op >> 4); stream << ", "; dual(op);
+			}
+			else
+			{
+				util::stream_format(stream, "ST      %c, ", BIT(op, 9) ? 'B' : 'A'); dual(op);
+				char const *name = BIT(op, 11) ? (BIT(op, 10) ? "MASR" : "MAS") : (BIT(op, 10) ? "MACR" : "MAC");
+				util::stream_format(stream, " || %s ", name); dual(op >> 4);
+				util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			}
+			return 1 | SUPPORTED;
+		}
 		if ((op & 0xfe00) == 0xa400 || (op & 0xf000) == 0xb000)
 		{
-			auto const dual = [&](u8 operand) {
-				static constexpr char const *forms[] = {"*AR%u", "*AR%u-", "*AR%u+", "*AR%u+0%%"};
-				util::stream_format(stream, forms[(operand >> 2) & 3], 2 + (operand & 3));
-			};
 			bool const multiply = (op & 0xfe00) == 0xa400;
 			char const *name = multiply ? "MPY" : BIT(op, 11) ? (BIT(op, 10) ? "MASR" : "MAS") : (BIT(op, 10) ? "MACR" : "MAC");
 			util::stream_format(stream, "%-8s", name);
@@ -264,6 +279,11 @@ public:
 			util::stream_format(stream, "%-8s#$%04X, %u, %c, %c", name, next_word(), high ? 16 : op & 15,
 				BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
 			return 2 | SUPPORTED;
+		}
+		if ((op & 0xfcff) == 0xf493)
+		{
+			util::stream_format(stream, "CMPL    %c, %c", BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
 		}
 		if ((op & 0xfce0) == 0xf460 || (op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf0c0)
 		{

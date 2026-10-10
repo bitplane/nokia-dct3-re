@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 415 decoded and 211
+promoted to a boundary. Current cold-idle coverage is 423 decoded and 203
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1780,6 +1780,12 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger instruction boundaries
+
+Parallel ST||MAC/MACR/MAS/MASR and SQDST decode both dual-memory operands
+without extension reads. The gate checks 4,352 forms on two pages and ten
+exact examples, including all four CMPL accumulator pairings. Its marker is
+`TMS320C54x parallel disassembler: PASS`. Parallel syntax does not establish
+physical concurrency: the core's existing effects remain instruction-atomic.
 
 LDM, STLM, PSHM and POPM decode their single-word direct/short-indirect
 MMR forms. The gate checks 1,344 forms and 192 rejected extended encodings
