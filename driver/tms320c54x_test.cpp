@@ -1043,6 +1043,18 @@ private:
 				"ADDM syntax retains displacement-before-immediate layout");
 		}
 		osd_printf_info("TMS320C54x ADDM disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0xf484, 0xf485, 0xf48f})
+				for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
+				{
+					words const buffer(pc, family | (accumulators << 8), 0x2345);
+					std::ostringstream text, expected;
+					char const *name = family == 0xf484 ? "NEG" : family == 0xf485 ? "ABS" : "NORM";
+					util::stream_format(expected, "%-8s%c, %c", name, accumulators & 2 ? 'B' : 'A', accumulators & 1 ? 'B' : 'A');
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) &&
+						buffer.seen() == 1 && text.str() == expected.str(), "Unary accumulator syntax preserves both selectors without extension reads");
+				}
+		osd_printf_info("TMS320C54x unary disassembler: PASS forms=12 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

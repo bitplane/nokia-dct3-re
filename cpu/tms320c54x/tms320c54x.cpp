@@ -318,6 +318,12 @@ public:
 				BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
 			return 2 | SUPPORTED;
 		}
+		if ((op & 0xfcff) == 0xf484 || (op & 0xfcff) == 0xf485 || (op & 0xfcff) == 0xf48f)
+		{
+			char const *name = (op & 255) == 0x84 ? "NEG" : (op & 255) == 0x85 ? "ABS" : "NORM";
+			util::stream_format(stream, "%-8s%c, %c", name, BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
 		if ((op & 0xfcff) == 0xf493)
 		{
 			util::stream_format(stream, "CMPL    %c, %c", BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
