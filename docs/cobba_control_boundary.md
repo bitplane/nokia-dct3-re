@@ -290,13 +290,25 @@ the dormant follow-on route. Zero mode inside the scan is the selected
 pre-return lifecycle, not an absent mode-setting hardware event.
 Exact-word scans do not cover computed entries or overwritten tables.
 
-The next unresolved question is which post-return branch selects the
-subsequent scan/restart instead of the operational configuration path.
-Trace the host-command call at `0x3138`, its `0x06e3` decisions, and
-the `0x1949` selection before attributing the dormant operational
-callbacks to a missing physical producer. The 1523-versus-500 counter
-constraint is an observed property of this pre-return scan, not proof
-that the resident lifecycle is blocked there.
+The fresh 60-second rotating-input post-return capture observes both
+returns through `0x3138/3a/3d/3f/42`, with `0x06e3=0` and
+`0x1949=0`. Neither the host restart selection nor the operational-ready
+bit is set. Both execute the fallback call at `0x314d` and continue at
+`0x3151`; `0x3153/5c/6b` remain unexecuted. The fallback prepares a
+two-byte type-`0x8a` body from data `0x1867` at buffer `0x1200`.
+The observer at native publisher entry `0x37ce` captures type `008a`,
+length 2, and bodies `006d` at 1.644835731 seconds and `0001` at
+38.523456633 seconds. These are not the contemporaneous `0x1983`
+request values (`03fe` and `047a`). Do not conflate those fields.
+
+Publisher entry proves the native call arguments, not successful ring
+commit or MCU delivery. The next boundary is to verify the publisher's
+commit and classify the MCU consumer of this naturally constructed
+type-`0x8a` response before choosing an operational RF contract. The
+score checker still passes (5146 nonzero results, 500 second comparisons,
+nine accepted stores); it does not validate packet delivery or acquisition.
+The 1523-versus-500 constraint remains a property of the pre-return scan,
+not proof that the resident lifecycle is blocked there.
 
 ### Product-specific physical buses
 
