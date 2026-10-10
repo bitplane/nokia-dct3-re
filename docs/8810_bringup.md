@@ -363,8 +363,18 @@ receive loop consumes it at 3.614318 s. The constructor later publishes
 `03e9` at 6.528498 s. No `0445` construction or search-builder entry is
 observed; constructor and receive taps have positive controls and remain
 below their 64-event caps. The next own-MCU boundary is the producer and
-lifecycle selection of `0837` versus the observed `083b`, not a missing
-native initializer implementation. Identity/control payloads also
+lifecycle selection upstream of search, not a missing native initializer
+implementation. Dispatcher `202cb0..202cd0` maps incoming `0a33` through
+`206598` to `0837`, and `0a35` through `206584` to `083b`; both publish
+through `2007f8`. The live `0a35` is constructed by `218c66`, caller return
+`218c45`, at 3.613780 s, then selected by the dispatcher at 3.613971 s.
+Own routine `218c24` frees a linked list, clears its stored pointer, and
+unconditionally constructs that status. Thus this observed path is explicit
+MCU cleanup, not a failed attempt to send the search packet. The literal
+`0a33` constructor at `21a8e2` calls the same helper and then sets a context
+byte to 2; its entry condition remains the next software boundary. The
+literal-seeded scan identifies candidates, not every computed publisher.
+Identity/control payloads also
 differ, with NSE-6's records erased; no NSE-1 data may be copied into NSE-6
 to conceal these genuine input differences. The NSE-1 processing checker
 passes on this capture; NSE-6's overlay/upload checks also pass.
