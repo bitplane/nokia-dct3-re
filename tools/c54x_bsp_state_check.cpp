@@ -6,6 +6,24 @@
 int main()
 {
 	tms320c54x_bsp_state port;
+	std::uint16_t duplex_output = 0xaaaa;
+	port.control_w(0x00c2);
+	// Released DLB without loaded TX/frame cannot manufacture RX readiness.
+	auto frame = port.duplex_frame(0x5555, duplex_output);
+	assert(!frame.transmitted && !frame.transmit_ready_edge && !frame.receive_ready_edge);
+	assert(!port.receive_ready);
+	port.transmit_w(0x1234);
+	assert(!port.receive_ready); // Writing DXR does not advance either clock.
+	frame = port.duplex_frame(0x5555, duplex_output);
+	assert(frame.transmitted && frame.transmit_ready_edge && frame.receive_ready_edge);
+	assert(port.receive == 0x1234 && duplex_output == 0x1234);
+	frame = port.duplex_frame(0x5555, duplex_output);
+	assert(frame.transmitted && !frame.transmit_ready_edge && !frame.receive_ready_edge);
+	assert(port.receive_overrun && port.receive_r() == 0x1234);
+	port.control_w(0x00c0);
+	frame = port.duplex_frame(0x5555, duplex_output);
+	assert(frame.receive_ready_edge && port.receive_r() == 0x5555);
+	port.reset();
 	assert(port.control_r() == 0x0800);
 	for (unsigned value = 0; value <= 0xffff; ++value)
 	{
@@ -76,6 +94,11 @@ int main()
 			const auto expected = std::uint16_t(payload & (1U << (width - 1))
 					? payload | ~mask : payload);
 			assert(port.receive_r() == expected);
+			port.control_w(port.control | 2);
+			port.transmit_w(value);
+			const auto looped = port.duplex_frame(~value, output, extension);
+			assert(looped.transmitted && looped.transmit_ready_edge && looped.receive_ready_edge);
+			assert(output == (value & mask) && port.receive_r() == expected);
 		}
 		port.reset();
 		port.control_w(0x00c4); // 8-bit BSP format.

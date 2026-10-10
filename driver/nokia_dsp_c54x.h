@@ -22,6 +22,8 @@ public:
 	// Completed external serial frames; these methods do not supply clocks.
 	bool codec_transmit_frame(u16 &word);
 	bool codec_receive_frame(u16 word);
+	// Explicit completion of a frame whose TX/RX clock relationship is known.
+	bool codec_duplex_frame(u16 input, u16 &output);
 
 	virtual void tx_commit_w(int state) override;
 	virtual void service_pending_w(int state) override { }

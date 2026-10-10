@@ -92,6 +92,22 @@ struct tms320c54x_bsp_state
 		receive_overrun = false;
 		return receive;
 	}
+	struct duplex_result
+	{
+		bool transmitted, transmit_ready_edge, receive_ready_edge;
+	};
+	// The caller supplies a completed frame with both clock domains advanced.
+	// DLB alone must not create clocks (SPRU131G 9.2.3, MCM=0).
+	duplex_result duplex_frame(std::uint16_t input, std::uint16_t &output,
+			std::uint16_t extension = 0)
+	{
+		bool tx_edge;
+		const bool sent = frame_transmit(output, &tx_edge, extension);
+		const bool loopback = control & 0x0002;
+		const bool received = (!loopback || sent) &&
+				frame_receive(loopback ? output : input, extension);
+		return {sent, tx_edge, received};
+	}
 };
 
 #endif // MAME_NOKIA_TMS320C54X_BSP_STATE_H

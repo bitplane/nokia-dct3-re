@@ -1047,10 +1047,18 @@ each of the four formats, including retransmit/ready-edge behavior. Native
 frames consult the saved data-`0023` latch, without changing its reset value
 or claiming that firmware uses FE in the observed boot. The generic TI
 BSPCE reset value is `0003`, whereas the current MAD2 latch is `0000`;
-the product-specific reset/decode remains unresolved. DLB also remains
-unimplemented: TI connects DX/FSX internally to DR/FSR but still requires
-external CLKR when MCM is zero, so DLB cannot justify an untimed receive
-completion or bypass the missing receive-clock attachment (section 9.2.3).
+the product-specific reset/decode remains unresolved. An explicit completed
+duplex-frame interface now supports DLB: TI connects DX/FSX internally to
+DR/FSR but still requires external CLKR when MCM is zero (section 9.2.3).
+Only a caller establishing both clock domains may invoke this interface.
+Setting DLB or writing DXR alone produces no receive event. At a supplied
+frame, DLB selects the transmitted word instead of external receive data;
+ordinary reset, sign extension, readiness and unread-word overrun rules
+still apply. Executable helper tests cover all 65,536 values in all four
+formats, absent TX, retained-word underrun and overrun. No production
+clock attachment calls the duplex interface yet; the existing independent
+boot-echo TX/RX methods are unchanged. This does not bypass the missing
+receive-clock attachment or establish handset playback.
 The suite also checks all 65,536 control-write values and the state transitions. Native coherent
 boot, 30-second processing (6,033 mode-1 frames), organic physical-key tone
 command delivery and exact idle save/load pass with this state model. The

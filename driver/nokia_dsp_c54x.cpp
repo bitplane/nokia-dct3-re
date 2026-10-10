@@ -281,6 +281,16 @@ bool nokia_dsp_c54x_device::codec_receive_frame(u16 word)
 	return accepted;
 }
 
+bool nokia_dsp_c54x_device::codec_duplex_frame(u16 input, u16 &output)
+{
+	const auto result = m_bsp.duplex_frame(input, output, m_data[0x0023]);
+	if (result.transmit_ready_edge)
+		m_cpu->set_input_line(5, HOLD_LINE);
+	if (result.receive_ready_edge)
+		m_cpu->set_input_line(4, HOLD_LINE);
+	return result.transmitted;
+}
+
 void nokia_dsp_c54x_device::data_w(offs_t offset, u16 data)
 {
 	const u16 address = offset;
