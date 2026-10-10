@@ -243,6 +243,20 @@ Do not infer a firmware bug or remove either guard: initialization,
 other writers and product/request context of `0x1256` remain open.
 The next concrete query is that counter's initialization/write contract,
 not a missing MDI reply or an injected continuation return value.
+The complete 60-second write census observes five writer PCs for
+`0x1256`: loader `0x0f15` (1), reset `0x3074` (2), filtered-buffer
+store at advanced PC `0x33e5` (2), uploaded reset `0x0ac7` (3), and
+candidate-loop store at advanced PC `0x0b09` (499). Uploaded code
+explicitly clears B and stores it to `0x198d`, `0x1256` and `0x1344`
+before calling the queue helper. The scan-entry reset supersedes the
+earlier filtered-buffer value `0xfc38`; it is not an input offset that
+survives into this scan. The captured loop writes begin `1,2,3,4`,
+and the uncapped comparison range remains 1..499. No other writer
+executes during that candidate interval. This establishes the observed
+lifecycle's counter constraint, not an exhaustive static writer census
+or proof that all valid request/product contexts share it. Independently
+audit the guard's decoding and uploaded request context before treating
+the apparent 1523-versus-500 incompatibility as a firmware defect.
 
 ### Product-specific physical buses
 

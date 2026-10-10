@@ -10,7 +10,17 @@ local observing = false
 local publication_counts = {}
 local flag_writes = 0
 local counter_min, counter_max = 0xffff, 0
+local counter_writers = {}
 local taps = {}
+taps[#taps + 1] = memory:install_write_tap(0x1256, 0x1256,
+    "rf_candidate_counter_writers", function(offset, value)
+        local pc = cpu.state["PC"].value
+        counter_writers[pc] = (counter_writers[pc] or 0) + 1
+        if counter_writers[pc] <= 4 then
+            machine:logerror(string.format("rom4_rf_counter_write: t=%.9f pc=%04x value=%04x\n",
+                machine.time:as_double(), pc, value))
+        end
+    end)
 taps[#taps + 1] = memory:install_write_tap(0x1266, 0x1266,
     "rf_candidate_flags", function(offset, value)
         flag_writes = flag_writes + 1
@@ -126,13 +136,16 @@ local stop = emu.add_machine_stop_notifier(function()
             "rom4_rf_continuation_reference_summary: space=%s words=65536 matches=%d exhaustive_dispatch_claim=0\n",
             space_name, matches))
     end
-    for _, start in ipairs({0x0ae4, 0x0b24, 0x0b64, 0x0ba4, 0x0be4, 0x0ca3, 0x0cef, 0x2523, 0x25fe}) do
+    for _, start in ipairs({0x0a5c, 0x0a9c, 0x0ae4, 0x0b24, 0x0b64, 0x0ba4, 0x0be4, 0x0ca3, 0x0cef, 0x2523, 0x25fe}) do
         local words = {}
         for index = 0, 63 do
             words[#words + 1] = string.format("%04x", cpu.spaces["program"]:read_u16(start + index))
         end
         machine:logerror(string.format("rom4_rf_selection_code: address=%04x words=%s\n",
             start, table.concat(words, ",")))
+    end
+    for pc, count in pairs(counter_writers) do
+        machine:logerror(string.format("rom4_rf_counter_writer_count: pc=%04x count=%d\n", pc, count))
     end
     for _, address in ipairs({0x0ca3, 0x0cef, 0x0b6a, 0x0b6c, 0x0b78, 0x2523, 0x25fe,
         0x0b00, 0x0b0b, 0x0b0d, 0x0b1e, 0x0b24, 0x0b2e, 0x0b3a, 0x0b42, 0x0b4a}) do
