@@ -126,6 +126,18 @@ it is not established that changing NV would repair the underlying behavior.
 Native ring-index writes alone do not prove packets reach this dispatcher.
 The next transport check is producer publication versus MCU draining and
 task notification over this window, retaining the fitted-mask uncertainty.
+
+The counter/dispatch trace confirms all four startup packets reach the MCU
+dispatcher: counts 1, 2, 3 at 0.473940, 0.483414, 0.483657 s, then count 4
+at 2.278505 s. At 6.533113 s, own MCU code `0x211318..0x211322` rearms
+timer `0x1d` and explicitly clears `0x12166e`. No further dispatcher entry
+appears before status DD at 31.000192 s. Thus the zero count describes the
+new operational window, not failure to count or deliver the startup packets.
+The fresh reset repeats the same startup publications and counter-clear path.
+The next unresolved contract is what native DSP traffic the operational
+window expects after that MCU transition; the observed startup transport
+works. Do not substitute synthetic heartbeat packets or alter policy storage
+without recovering that contract.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
