@@ -47,6 +47,20 @@ taps[#taps + 1] = mcu.spaces['program']:install_write_tap(
                 mcu.state['R12'].value, mcu.state['R14'].value, machine.time:as_double()))
         end
     end)
+local speech_entries = 0
+taps[#taps + 1] = mcu.spaces['program']:install_read_tap(
+    0x271d70, 0x271d73, 'speech_field_entry', function()
+        local pc = mcu.state['PC'].value
+        if (pc ~= 0x271d70 and pc ~= 0x271d72) or mcu.state['R0'].value ~= 0x28 then return end
+        speech_entries = speech_entries + 1
+        if speech_entries <= 16 then
+            machine:logerror(string.format(
+                'rom4_speech_field_entry: input=%04x parameter=%04x caller=%08x pc=%08x source=%08x index=%02x t=%.9f\n',
+                mcu.state['R1'].value, mcu.state['R2'].value,
+                mcu.state['R14'].value, pc, mcu.state['R5'].value,
+                mcu.state['R7'].value, machine.time:as_double()))
+        end
+    end)
 watch(dsp, 'io', 0x002c, 'cobba_select')
 watch(dsp, 'io', 0x002d, 'cobba_data')
 -- Fetch increments PC before the program tap. Restrict this to actual helper

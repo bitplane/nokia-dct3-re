@@ -503,7 +503,14 @@ def check_tone(text: str) -> None:
         r"rom4_tone_access: owner=(mcu|speech_shared|speech_flags) direction=(read|write) "
         r"address=([0-9a-f]{6}) value=([0-9a-f]+) mask=([0-9a-f]+) "
         r"pc=([0-9a-f]{6}) t=([0-9.]+)", text)
-    cursor = 0.0
+    entries = re.findall(
+        r"rom4_speech_field_entry: input=df29 parameter=0000 caller=00275445 "
+        r"pc=00271d70 source=([0-9a-f]{8}) index=09 t=([0-9.]+)", text)
+    entries = [(int(source, 16), float(t)) for source, t in entries
+               if 0x100000 <= int(source, 16) < 0x180000]
+    if not entries:
+        raise ValueError("missing original MCU speech-field caller")
+    cursor = entries[0][1]
     for expected, earliest in (
             (("mcu", "write", "0100bc", "df290000", "ffff0000", "272034"), 0.0),
             (("speech_shared", "read", "00085e", "df29", "ffff", "0027ad"), 0.0),
@@ -518,6 +525,9 @@ def check_tone(text: str) -> None:
 
 
 MCU_SPEECH_FIELD_BYTES = {
+    0x275426: bytes.fromhex("46442701886188684281d00c4649465072c848875dc088692200f7fcfc96"),
+    0x275658: bytes.fromhex("002a5df8"),
+    0x2a5df8: bytes.fromhex("08091b252021222324282d"),
     0x271d70: bytes.fromhex("b5f04643b4081c151c0e1c04"),
     0x271d94: bytes.fromhex("1c20282ed862a102008058084687"),
     0x271e44: bytes.fromhex("00271e9a"),
