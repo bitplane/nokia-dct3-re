@@ -1265,6 +1265,16 @@ bit `0x0800` in the delayed call's slot. These fragments establish
 the argument/branch contract only; the provenance of incoming B
 and the runtime contents of hook `0x2472` remain separate questions.
 
+For the mapped wrappers that first call `0x990d`, its byte-pinned
+return tail `0x995a` supplies B from control word `0x194a`. It tests
+bit 0 through A and either returns immediately or updates `0x195b`,
+clears selectors `0x194f/0x1951`, and returns without changing B.
+Thus their acquisition bit tests consume control-word flags, subject
+to any modification by hook `0x2472`, rather than directly consuming
+a raw RF sample. This source contract does not apply automatically
+to every possible indirect caller of `0x996b/0x9988`; call ordering
+and hook contents must be checked at each candidate boundary.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
