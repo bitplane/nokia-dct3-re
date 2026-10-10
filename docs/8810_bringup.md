@@ -57,9 +57,9 @@ board-level battery routing. Other ADC channels remain research defaults.
 
 ### Menu Execution and Restart Boundary
 
-**Open contract:** trace the own-MCU type-`1a` packet posted at 6.532938 s
-from mailbox 3 into the native DSP TX ring. It is constructed organically,
-but absent from native consumption. Startup packets, native
+**Open contract:** recover the MCU TX queue's ring-space wakeup contract.
+The organic type-`1a` object reaches mailbox 3 but remains behind partially
+drained memory uploads; native consumption never reaches it. Startup packets, native
 memory uploads, control handlers, and frame interrupts execute; the processing
 tail remains dormant. Neither a fabricated heartbeat nor altered NV reset
 policy is an evidenced correction. The acquired NSE-1 mask remains a
@@ -409,6 +409,23 @@ packet selection, and ring publication for this specific object, not forcing
 `0a33/0837/0445` or modifying the DSP mode word. The monitoring timer is
 armed just after this organic post. The separately mapped `0434` constructor
 at `210f90` remains dormant and is not established as the source of `043c`.
+
+The exact search object `10d758` reaches the TX mailbox handler at `2d354c`
+at 6.532581 s, before the sender resumes from its post at 6.532938 s.
+It retains prefix `0002` and type `1a`; this excludes loss before mailbox
+delivery. TX task `2d36de..2d36fc` processes the oldest queued object,
+requires free space >= payload length + 2, then calls writer `2b5f62`.
+At search delivery the head is still upload `10e034`, length `50`, with
+162 bytes free. It publishes that upload, then tests the next upload
+`10e238` with only 80 bytes free, below its 82-byte requirement. The later
+`e0` mailbox event at 10.390270 s publishes `10e238` and again leaves the
+next upload (`10e2e4`) waiting with 80 bytes free. Earlier queue arrivals
+show the same head-retention behavior. No search-object ring-space test or
+writer call occurs during the 30-second fixture; all three TX taps stay
+below their 128-event caps. Native consumption subsequently frees the ring,
+but the remaining queued work is not reconsidered before reset. Next trace
+the legitimate task wakeup/flow-control publication for freed ring space;
+do not increase ring capacity, drop uploads, or manually drain this queue.
 Identity/control payloads also
 differ, with NSE-6's records erased; no NSE-1 data may be copied into NSE-6
 to conceal these genuine input differences. The NSE-1 processing checker
