@@ -9,8 +9,8 @@ registration before the save boundary, independently of post-load events.
 Whole-run hardware/provisioning checks remain separate from that ordering
 requirement.
 
-Native NSE-1 opcode coverage is currently 614 asserted forms out of 626
-observed in cold idle, with 12 execution-assertion gaps. The older 594-word
+Native NSE-1 opcode coverage is currently 620 asserted forms out of 626
+observed in cold idle, with six execution-assertion gaps. The older 594-word
 idle/Menu/power closure cited below is historical; its coverage oracle remains
 unrebanked pending those assertions. See the current audit boundary in
 `rom4_dsp_loader.md`. No native RF acquisition or speech is promoted.

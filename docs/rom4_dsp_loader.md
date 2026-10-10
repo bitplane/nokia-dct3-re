@@ -1714,9 +1714,9 @@ The current native cold-idle inventory is 626 words in 110 high-byte groups,
 SHA-256 `05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59`.
 Two isolated controls (`tmp/c54x-frontend-idle-a` and `-b`) reproduce the full
 ranked report exactly. The existing 594-word gate expectation is now stale
-and remains intentionally unrebanked: current fixture coverage is 614 asserted,
-one execution-only (`9a5f`) and 11 absent words. High-use absent forms begin
-with `6b82` and `4583`; the other remaining words occur once in this trace.
+and remains intentionally unrebanked: current fixture coverage is 620 asserted,
+one execution-only (`9a5f`) and five absent words (`f20f`, `f47d`, `f50f`,
+`f736`, `f761`). Each remaining word occurs once in this trace.
 Earlier 594-word closure statements below apply to that earlier trace, not
 the current native execution set.
 
@@ -1758,6 +1758,15 @@ settings, `3185` accumulator-high/memory multiply under both FRCT settings,
 results, carry, T publication, unchanged source/memory and AR5. The required
 marker is `TMS320C54x native gap math: PASS`. Overflow/saturation boundaries
 and physical stage timing are not established by these selected operands.
+
+Twelve memory cases assert `6b82` ADDM carry/overflow and 16-bit writeback,
+`4583` signed/unsigned high-halfword loads, `21f8` absolute MPY under both
+FRCT settings, `3ed3` partial-carry add with circular BK zero/eight, `5793`
+double load with guard extension and two-word postincrement, and `818b`
+low-word store with postdecrement. They check selected result/status values,
+unchanged T/source/memory where applicable and exact AR2/AR3 changes. The
+required marker is `TMS320C54x native gap memory: PASS`; other operand/flag
+combinations and physical timing remain outside this coverage.
 
 ### Debugger control-flow decoding
 
