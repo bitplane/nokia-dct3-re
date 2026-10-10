@@ -1171,6 +1171,18 @@ in data, although dispatcher `0x98b7` and interpreter `0x9903` both
 execute zero times in that bounded run. The next predecessor question
 is selection of this scheduler, not construction of missing call lists.
 
+Byte-pinned scheduler selections write callback cell `0x07fb`:
+`0x55bb` assigns `0x98b7` unless active-mode high nibble
+`0x1836 & 0xf0` equals `0xc0`; `0x5783` also assigns `0x98b7`.
+The latter path can subsequently override it: channel `0x1835 == 0x2f`
+selects `0xa27d`, `(0x1835 & 0xfe) == 0x20` selects `0xa2cf`, and
+pending mode `0x1869 == 0xc3` selects `0xa436` while setting active
+mode `0x1836` to `0xc1`. These are verified local store/branch fragments,
+not an exhaustive callback-writer census or proof their enclosing
+configuration routine runs during the observed scan. They connect
+scheduler choice to the pending/active channel configuration already
+mapped on the MCU side; do not set `0x07fb` directly to activate it.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
