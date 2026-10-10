@@ -16,6 +16,7 @@ from unicorn import Uc, UC_ARCH_ARM, UC_MODE_BIG_ENDIAN, UC_MODE_THUMB
 from unicorn.arm_const import (
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1,
     UC_ARM_REG_SP,
+    UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_R6,
 )
 
 
@@ -63,7 +64,7 @@ def check_ring_copy(raw):
 
 def check_request_routes(cpu):
     """Stop at selected handler entry, before timer/allocator side effects."""
-    cpu.mem_map(0x100000, 0x1000)
+    cpu.mem_map(0x100000, 0x10000)
     routes = {0x03ed: 0x20f102, 0x03ef: 0x20f0f2,
               0x03f1: 0x20f0ec, 0x03f2: 0x20f0e8}
     for request, target in routes.items():
@@ -74,6 +75,32 @@ def check_request_routes(cpu):
         if cpu.reg_read(UC_ARM_REG_PC) != target:
             raise ValueError(f"request {request:#x} did not select {target:#x}")
     return len(routes)
+
+
+def check_request_fields(cpu, raw):
+    base = int.from_bytes(raw[0x6c6d8:0x6c6dc], "big")
+    entry = 0x6c3dc + 4 * (0x03ed - base)
+    if int.from_bytes(raw[entry:entry + 4], "big") != 0x26c5b0:
+        raise ValueError("03ed constructor table entry differs")
+    cases = 0
+    for channel in range(256):
+        for mode in (0, 1, 0x21, 0xe4):
+            cpu.mem_write(0x10b000, bytes([0xee]) * 16)
+            cpu.mem_write(0x109650, bytes([channel]))
+            cpu.mem_write(0x109739, bytes([mode]))
+            cpu.reg_write(UC_ARM_REG_R4, 0x10b000)
+            cpu.reg_write(UC_ARM_REG_R5, 0x109736)
+            cpu.reg_write(UC_ARM_REG_R6, 0x109650)
+            cpu.emu_start(0x26c5f9, 0x26c614, count=32)
+            if cpu.reg_read(UC_ARM_REG_PC) != 0x26c614:
+                raise ValueError("request field constructor did not finish")
+            enabled = channel in (0x20, 0x21, 0x2f)
+            actual = bytes(cpu.mem_read(0x10b006, 2))
+            expected = bytes((int(enabled), mode if enabled else 0xee))
+            if actual != expected:
+                raise ValueError(f"request fields differ for channel {channel:#x}")
+            cases += 1
+    return cases
 
 
 def expected_selector(first, second):
@@ -119,8 +146,10 @@ def check_image(raw):
                 speech_inputs.add(first)
     if speech_inputs != {0x21, 0xe4}:
         raise ValueError(f"unexpected c3 input set: {speech_inputs}")
+    routes = check_request_routes(cpu)
     return {"cases": count, "c3_first_arguments": sorted(speech_inputs),
-            "request_routes": check_request_routes(cpu),
+            "request_routes": routes,
+            "request_field_cases": check_request_fields(cpu, raw),
             "ring_copy_start_positions": check_ring_copy(raw),
             "explicit_c3_branch_input": 0x21,
             "unmatched_residual_c3_input": 0xe4,

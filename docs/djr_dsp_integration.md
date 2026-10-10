@@ -834,6 +834,27 @@ scan finds one candidate caller of the dispatcher, `0x211ca0`, passing
 therefore the incoming `0x03ed` object's fields `6/7/0x48`, not a guessed
 global controller write. No protocol name is assigned to `0x03ed` yet.
 
+The incoming object's constructor is `0x26c394`. Its table base is
+`0x03e9` (literal `0x26c6d8`); entry 4 at `0x26c3ec` selects
+`0x26c5b0` for request `0x03ed`. That branch copies `0x58` bytes from
+channel record `0x109650` into object + `0x48`, explaining the selector's
+second argument. At `0x26c5f8..0x26c612`, channel-record byte 0 values
+`0x20/0x21/0x2f` set object byte 6 to 1 and copy mode-record
+`[0x109736+3]` into object byte 7; other channel values clear byte 6 and
+leave byte 7 untouched. The checker executes this fragment for every
+channel byte and four representative mode bytes (1,024 cases), including
+the disabled field's untouched behavior. The common tail at `0x26c6ca`
+posts the object to task 10 through `0x254c84` at `0x26c6ce`.
+
+A literal-load scan of 524,287 halfword positions finds five candidates
+loading exact value `0x03ed`: two consumers (`0x20e904/0x20f09c`) and
+three calls into this constructor (`0x24ff44/0x24ff88/0x250600`). This is
+not a closure over computed IDs or indirect calls. The live writers of
+channel record `0x109650` and mode byte `0x109739`, and the lifecycle
+conditions around those constructor calls, are the remaining producer
+questions. No acquired native boot trace has shown this request completing
+traffic assignment.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
