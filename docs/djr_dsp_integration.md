@@ -1129,6 +1129,19 @@ and stores the result directly into `0x194f` at `0x9b27`. This additional
 caller is not an exhaustive ownership census. Its control-word
 provenance and runtime scheduling remain unresolved.
 
+A 60-second native run using the generated EEPROM profile extends this
+observation through the scan window: entries `0x9a7a`, `0x9aa8` and
+`0x9b15`, their three mapped `0x4c6f` callsites, and decoder entry
+`0x4ef7` all have zero observed executions. Frame-loop positive control
+`0x33f3` executes 30351 times; filtered pointer commits remain eleven.
+Control words `0x194c`, `0x1951` and `0x195b` are only observed being
+cleared and finish zero, as do the three decode selectors. Consequently
+these particular local early-return tests are not the first executed
+blocker in this run: their containing entrypoints are never reached.
+Investigate the scheduling/configuration that selects those routines
+before adjusting a local gate or supplying a synthetic completion.
+This is bounded runtime coverage, not proof of exhaustive caller absence.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
