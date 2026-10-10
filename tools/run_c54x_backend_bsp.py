@@ -5,7 +5,7 @@ import subprocess
 import sys
 import tempfile
 
-MARKER = 'C54x native backend BSP: PASS cases=3 save_replay=3 handset_audio_claim=0'
+MARKER = 'C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0'
 COMPLETION = 'Fatal error: C54x backend BSP tests complete'
 
 

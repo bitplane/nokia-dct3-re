@@ -1095,8 +1095,13 @@ transmit-only and duplex completions through `codec_duplex_frame`, including
 the transmitted/received words, CPU IFR bits, vector entry and simultaneous
 receive priority. Each case saves the backend and CPU after source delivery
 but before dispatch, restores, and repeats the vector and payload checks.
-The mandatory marker is `C54x native backend BSP: PASS cases=3 save_replay=3
-handset_audio_claim=0`. This establishes completed-frame wiring and backend
+After replay, each case holds DSP reset, checks BSP reset state and rejects
+further receive, transmit and duplex completions without output/readiness
+changes or new CPU source bits. The source-bit check allows asynchronous
+input delivery before inspecting IFR. It does not claim IFR clears on reset
+assertion rather than release.
+The mandatory marker is `C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0`.
+This establishes completed-frame wiring, reset suppression and backend
 state restoration, not a production frame-clock caller, handset ISR,
 COBBA control interpretation or native audio. No physical clock is supplied
 by the fixture's explicit completions.

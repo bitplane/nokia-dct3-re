@@ -19699,7 +19699,7 @@ private:
 			expect(machine().save().write_stream(m_saved) == STATERR_NONE, "save backend and pending CPU");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 		}
-		else
+		else if (m_stage == 4 || m_stage == 5)
 		{
 			expect(m_cpu->state_int(STATE_GENPC) == (m_case == 1 ? 0x00d5 : 0x00d1) &&
 				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_case == 2 ? 0x20 : 0),
@@ -19715,16 +19715,35 @@ private:
 			}
 			else
 			{
-				if (++m_case == 3)
-				{
-					osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 handset_audio_claim=0\n");
-					throw emu_fatalerror(0, "C54x backend BSP tests complete");
-				}
 				m_backend->reset_line_w(0);
-				m_stage = 0;
-				m_timer->adjust(attotime::from_usec(100));
-				return;
 			}
+		}
+		else if (m_stage == 6)
+		{
+			m_reset_ifr = m_cpu->state_int(tms320c54x_device::STATE_IFR);
+			u16 output = 0xaaaa;
+			expect(m_cpu->space(AS_DATA).read_word(0x0022) == 0x0800,
+				"reset clears backend BSP ready and loaded-word state");
+			expect(!m_backend->codec_duplex_frame(0x5678, output) && output == 0xaaaa &&
+				!m_backend->codec_transmit_frame(output) &&
+				!m_backend->codec_receive_frame(0x5678), "reset BSP rejects completed frames");
+			expect(m_cpu->space(AS_DATA).read_word(0x0022) == 0x0800 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == m_reset_ifr,
+				"reset frame calls cannot publish readiness or source edges");
+		}
+		else
+		{
+			// Allow asynchronous CPU input delivery before rejecting extra edges.
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == m_reset_ifr,
+				"reset frame calls leave no asynchronously delivered source edges");
+			if (++m_case == 3)
+			{
+				osd_printf_info("C54x native backend BSP: PASS cases=3 save_replay=3 reset_cases=3 handset_audio_claim=0\n");
+				throw emu_fatalerror(0, "C54x backend BSP tests complete");
+			}
+			m_stage = 0;
+			m_timer->adjust(attotime::from_usec(100));
+			return;
 		}
 		++m_stage;
 		m_timer->adjust(attotime::from_usec(100));
@@ -19733,6 +19752,7 @@ private:
 	required_device<tms320c54x_device> m_cpu;
 	emu_timer *m_timer = nullptr;
 	unsigned m_stage = 0, m_case = 0;
+	u16 m_reset_ifr = 0;
 	std::stringstream m_saved;
 };
 
