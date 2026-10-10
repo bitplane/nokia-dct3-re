@@ -2206,17 +2206,16 @@ multiword-store and return fixtures, but the metadata diagnostic still has
 cursor 27, RX/TX 36/47 and no metadata delivery. It does not close this
 general timer/write/pipeline boundary.
 
-The current `bootrecsave` reproduction again reaches original resident
+The `bootrecsave` reproduction reaches original resident
 startup and control return, but stops with cursor 27, RX-ready set, zero
 tracks and PRD `1`; the metadata packet has not been delivered. This remains
 a CPU interrupt-recognition/pipeline-drain question, not evidence of metadata
 rejection. The independently verified stopped-PSC/read-only-TCR corrections
-do not change this endpoint: the retained original-bootstrap reproduction
-still records RX/TX 36/47, three responses, two ACKs, completion `8009`,
-PC `02:3d76`, and PRD/TCR `0001/0000`. Correcting remaining-clock rounding
-changes the sampled TIM read from `0000` to `0001`, without changing the
-cursor, control returns or metadata delivery. The recorder acceptance
-checker still fails; passing timer-register conformance must not promote it.
+did not change serial progress: RX/TX remained 36/47, with three responses,
+two ACKs and completion `8009`. Sampled handler PC and TIM depend on the
+observation phase; the replay below is the authoritative snapshot. The
+recorder acceptance checker still fails; passing timer-register conformance
+must not promote it.
 A blanket return-instruction guard is not established by
 [SPRU131G](https://www.ti.com/lit/ug/spru131g/spru131g.pdf): section 6.10.7
 explicitly protects SSBX/RSBX INTM and their following instruction, while
@@ -2288,19 +2287,19 @@ MU4_BOOTSTRAP_BIOS=bootreccontrol`.
 Its receive PASS label proves native packet receipt and acknowledgement,
 not successful control-handler execution or recording.
 
-Fresh isolated diagnostics distinguish this duplicate filter from the save
-fixture's CPU boundary. `tmp/mu4-recorder-control-current/error.log` receives
+Isolated replays after the MMR bus, INTR SP ordering and XC protection
+corrections distinguish this duplicate filter from the save fixture's CPU
+boundary. `tmp/mu4-recorder-control-xc/error.log` receives
 selector `36`/parameter `4` at 11.406 seconds with previous class/selector
 `1/36`; native receipt/acknowledgement passes, recording completion remains
-unclaimed (SHA-256
-`c20eb914ea08fed69e605021d5975381e6a54de0b98e9fddd0ac474eeb47f3ec`).
-`tmp/mu4-recorder-save-current/error.log` receives the selector-`49` poll at
+unclaimed.
+`tmp/mu4-recorder-save-xc/error.log` receives the selector-`49` poll at
 11.389 seconds and control at 11.449 seconds with previous selector `49`.
 Completion reaches `8009` and the resident image returns, but the endpoint
-is `02:3d7b`, IMR `0ac9`, IFR `0c78`, cursor 27 and RX-ready set: 50
+is `02:3d7b`, ST1 `2900`, IMR `0ac9`, IFR `0c78`, cursor 27 and RX-ready set: 50
 application calls, two dequeued messages and one processing-wait entry.
-It exits 3 because metadata has not been delivered (SHA-256
-`3e19b509647a8fda88db463e38bebb77f5f2950cf87fbbf955615763fa504c59`).
+RX/TX remain 36/47, with three responses and two ACKs; TIM/PRD/TCR are
+`0000/0001/0000`. It exits 3 because metadata has not been delivered.
 Both use the retained product's own NAND with NVRAM saving disabled and no
 firmware-state forcing. The control fixture's working warm dispatch does
 not close the save fixture's timer/interrupt recognition and drain boundary.
