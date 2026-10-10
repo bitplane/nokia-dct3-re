@@ -880,13 +880,16 @@ extra pointer-setup instruction as the sole cause; it does not resolve
 Decode-stage acceptance versus write visibility.
 The passive probe also reports reload-opcode fetch and first-vector fetch
 in CPU-accounting cycles, vector-entry count and the first stacked return
-PC. On the current build both short-period forms have a seven-accounting-
-cycle gap and stack `0608`; the indirect/direct cases enter the vector
-108/107 times in their 100-us observation windows. Neither long-period
-control enters the vector after masking. Evidence is
-`tmp/c54x-timer-accounting.log`; the full native core suite also passes in
-`tmp/c54x-core-timer-accounting.log`. These observations preserve the four
-existing outcomes and do not assert physical latency. In particular, an
+PC. With retained vector prefetch, both short-period forms have a
+two-accounting-cycle fetch gap and stack `0608`; each enters the vector
+108 times in its 100-us observation window. Neither long-period control
+enters the vector after masking. Evidence is
+`tmp/c54x-vector-timer/output.log`; the full native core suite passes in
+`tmp/c54x-vector-prefetch-redirect.log`. The earlier post-stack fetch tap had
+reported a seven-cycle gap: the changed timestamp records relocation of the
+bus read, not improved physical interrupt latency. Both short-period masks
+remain unreachable. The continuation is captured from a passive stack-write
+tap, since the vector prefetch now precedes that write. In particular, an
 address-space TCR write tap cannot timestamp the reload because internal
 MMR writes bypass that path; the reported timestamp is explicitly the
 reload opcode's fetch, not its Execute/write phase. This accounting trace
@@ -894,8 +897,9 @@ is for comparing a future stage-aware correction, not choosing a delay.
 SPRU131G section 7.2, example 7-18, constrains that correction more tightly:
 recognition at the end of cycle 3 inserts INTR at Decode in cycle 4,
 replacing `i2`; already-decoded `i1` completes at Execute in cycle 6.
-INTR then occupies cycles 7--9, and the first vector instruction executes
-in cycle 10. The saved continuation is `i2`, not a fixed number of later
+Interrupt overhead covers cycles 7--9 before the first vector instruction
+executes in cycle 10; the inserted INTR's actual stage placement is detailed
+below. The saved continuation is `i2`, not a fixed number of later
 foreground instructions. A blanket three-instruction deferral would therefore
 implement the wrong contract. The core's current `service_interrupt()` joins
 recognition, IFR clearing, return-PC capture, stack update and vector transfer
@@ -910,16 +914,38 @@ SPRU131G section 6.10.4 ties IACK and IFR clearance to the first vector-word
 fetch. The rendered example 7-18 must be read alongside that prose: its
 vector fetch occurs in cycle 6, overlapping `i1` Execute, before the inserted
 INTR's stack write in cycle 7. Therefore moving IFR clearance to the core's
-present post-stack `fetch()` would implement the wrong bus order. The missing
-mechanism includes early vector prefetch and a retained fetched opcode, not
-merely a deferred flag clear or acknowledgement callback. The figure places
+former post-stack `fetch()` would implement the wrong bus order. The core
+now prefetches and retains the first hardware-vector opcode before the
+stack write, calling MAME's IRQ acknowledgement callback once for the accepted
+IRQ/NMI source. Extension words are fetched normally. This is a bus-order
+correction, not a Decode-stage recognition/drain model. The figure places
 INTR Access/Read/Execute in cycles 5/6/7; the prose's cycles 7--9 describe the
 interrupt overhead before first ISR execution in cycle 10, and must not be
 treated as three later foreground executions. A stage-aware fixture must
 observe acceptance, foreground mask write, vector prefetch, acknowledgement,
 stack write and ISR execution separately. Preserve the accepted source and
 continuation across later IMR changes. Neither the atomic core's fetch tap
-nor its aggregate five-cycle charge measures these physical boundaries.
+nor its unchanged aggregate five-cycle charge measures these physical
+boundaries.
+An executable IRQ/NMI fixture observes the untouched stack at vector fetch,
+selective IFR clearance and one source acknowledgement. It changes the
+vector opcode after that read and checks execution of the retained word,
+normal extension fetch, two save/replays, survival of later IMR masking,
+reset discard and explicit debugger-PC redirect discard. The unchanged core
+fails at the before-stack assertion in
+`tmp/c54x-vector-prefetch-red.log`; the complete core gate requires
+`TMS320C54x vector prefetch: PASS` and passes in
+`tmp/c54x-vector-prefetch-redirect.log`. Native NSE-1 RF acceptance also passes
+in `tmp/c54x-vector-prefetch-rf.log`; this does not establish native speech
+or recorder completion. The complete original MU4 storage/loader/serial gate
+passes in `tmp/c54x-vector-mu4-final.log`. An isolated recorder-control replay in
+`tmp/c54x-vector-reccontrol` reproduces the existing `error.log` SHA-256
+`c20eb914ea08fed69e605021d5975381e6a54de0b98e9fddd0ac474eeb47f3ec`:
+native packet receipt is unchanged and remains distinct from recording.
+The separate save diagnostic in `tmp/c54x-vector-recsave` also reproduces
+its documented checksum from `5510_bringup.md` and exits 3 at the same
+undelivered metadata boundary. Vector bus order is corrected; the recorder's
+recognition/drain timing question is not closed.
 An independent return-bus assertion covers `RETF` (`f49b`): SPRU172C
 section 4-141 and SPRU131G example 7-11 specify PC from RTN and an SP
 increment, without reading the stacked PC. A passive tap in the existing

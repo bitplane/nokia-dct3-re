@@ -435,6 +435,43 @@ private:
 		m_phase = 79000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_vector_prefetch_case(unsigned index)
+	{
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		m_vector_prefetch_tap.remove();
+		m_vector_reads = m_vector_acks = 0;
+		m_vector_case = index;
+		u32 const address = index ? 4 : 0x40;
+		program.write_word(address, 0xf020); // LD #1234,A: retain opcode, fetch extension normally.
+		program.write_word(address + 1, 0x1234);
+		program.write_word(address + 2, 0xf4e1);
+		program.write_word(0x0800, 0xf4e1);
+		data.write_word(0x0fff, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, index ? 0x0800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 80000;
+		m_vector_prefetch_tap = program.install_read_tap(address, address, "vector_prefetch",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+					m_cpu->space(AS_DATA).read_word(0x0fff) == 0xbeef,
+					"SPRU131G vector fetch precedes interrupt stack write");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_vector_case ? 3 : 2),
+					"Vector acknowledgement clears only the accepted maskable source");
+				++m_vector_reads;
+				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+			});
+		if (index) { m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE); m_cpu->set_input_line(INPUT_LINE_NMI, CLEAR_LINE); }
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_timer_boundary_probe(unsigned index)
 	{
 		bool const short_period = !(index & 1);
@@ -470,10 +507,16 @@ private:
 		m_phase = 7000 + index;
 		m_timer_probe_fetch.remove();
 		m_timer_probe_reload.remove();
+		m_timer_probe_stack.remove();
 		m_timer_probe_entries = 0;
 		m_timer_probe_reload_cycle = 0;
 		m_timer_probe_first_entry_cycle = 0;
 		m_timer_probe_return_pc = 0;
+		m_timer_probe_stack = data.install_write_tap(0x0fff, 0x0fff, "timer_probe_stack",
+			[this](offs_t, u16 &value, u16) {
+				if (!machine().side_effects_disabled() && m_timer_probe_entries == 1 && !m_timer_probe_return_pc)
+					m_timer_probe_return_pc = value;
+			});
 		// Observe scheduler-cycle accounting, not physical pipeline latency.
 		// Internal MMR writes bypass address-space taps; capture opcode fetch,
 		// explicitly not the execute/write phase of the TCR reload.
@@ -490,9 +533,6 @@ private:
 				if (!m_timer_probe_entries++)
 				{
 					m_timer_probe_first_entry_cycle = m_cpu->total_cycles();
-					auto const disable = machine().disable_side_effects();
-					m_timer_probe_return_pc = m_cpu->space(AS_DATA).read_word(
-						m_cpu->state_int(tms320c54x_device::STATE_SP));
 				}
 			});
 		m_check_timer->adjust(attotime::from_usec(100));
@@ -19196,8 +19236,62 @@ private:
 				"SPRU131G CLKMD protected fields require DIV mode; PLLNDIV remains writable and PLLSTATUS read-only");
 			if (index < 15) { start_clkmd_write_case(index + 1); return; }
 			osd_printf_info("TMS320C54x CLKMD write protection: PASS cases=16 physical_clock_claim=0\n");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			start_vector_prefetch_case(0); return;
+		}
+		if (m_phase >= 80000 && m_phase <= 80003)
+		{
+			u32 const address = m_vector_case ? 4 : 0x40;
+			if (m_phase == 80003)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0 && m_cpu->state_int(STATE_GENPC) == 0x0801,
+					"Reset discards the retained hardware vector opcode");
+				m_vector_prefetch_tap.remove();
+				if (m_vector_case == 2) { start_vector_prefetch_case(3); return; }
+				osd_printf_info("TMS320C54x vector prefetch: PASS sources=irq,nmi before_stack=1 retained_opcode=1 extension_fetch=1 save_replay=2 single_ack=1 later_mask=1 reset=1 debugger_redirect=1 physical_latency_claim=0\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			if (m_phase == 80000)
+			{
+				expect(m_vector_reads == 1 && m_vector_acks == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff && data.read_word(0x0fff) == 0x0800,
+					"Vector prefetch is acknowledged once and followed by the continuation stack write");
+				expect(machine().scheduler().can_save(), "Vector prefetch checkpoint has no synchronized inputs");
+				if (m_vector_case >= 2)
+				{
+					if (m_vector_case == 2) { m_cpu->reset(); m_cpu->set_state_int(STATE_GENPC, 0x0800); }
+					else m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0800);
+					m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 80003;
+					m_check_timer->adjust(attotime::from_usec(100)); return;
+				}
+				m_saved_vector.str(std::string()); m_saved_vector.clear();
+				expect(machine().save().write_stream(m_saved_vector) == STATERR_NONE, "Save retained vector opcode");
+				program.write_word(address, 0xf4e1); // Must not replace the already fetched LD.
+				m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0); // A later mask cannot revoke accepted entry.
+				m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 80001;
+			}
+			else
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_vector_reads == 1 && m_vector_acks == 1,
+					"Retained vector opcode executes once with its normally fetched extension");
+				if (m_phase == 80001)
+				{
+					m_saved_vector.clear(); m_saved_vector.seekg(0);
+					expect(machine().save().read_stream(m_saved_vector) == STATERR_NONE, "Restore retained vector opcode");
+					program.write_word(address, 0xf4e1);
+					m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+					m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 80002;
+				}
+				else
+				{
+					m_vector_prefetch_tap.remove();
+					start_vector_prefetch_case(m_vector_case + 1); return;
+				}
+			}
+			m_check_timer->adjust(attotime::from_usec(100)); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
@@ -19626,7 +19720,9 @@ private:
 	std::array<u16, 76> m_rom4_parameters{};
 	unsigned m_rom4_pcm_mismatches = 0;
 	emu_timer *m_check_timer = nullptr;
-	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload;
+	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload, m_timer_probe_stack, m_vector_prefetch_tap;
+	unsigned m_vector_reads = 0, m_vector_acks = 0, m_vector_case = 0;
+	std::stringstream m_saved_vector;
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
 	unsigned m_timer_probe_entries = 0;
 	u16 m_timer_probe_return_pc = 0;
@@ -19669,6 +19765,14 @@ void tms320c54x_test_state::test(machine_config &config)
 {
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
+	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase >= 80000 && m_phase <= 80003)
+		{
+			expect(line == (m_vector_case ? INPUT_LINE_NMI : 0), "Vector acknowledgement retains accepted source identity");
+			++m_vector_acks;
+		}
+		return 0;
+	}, "vector_acknowledge");
 	m_cpu->bio_in_cb().set(FUNC(tms320c54x_test_state::bio_r));
 	m_cpu->xf_out_cb().set(FUNC(tms320c54x_test_state::xf_w));
 	NOKIA_DSPIF(config, m_transport, 0);

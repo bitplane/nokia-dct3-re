@@ -166,8 +166,8 @@ void tms320c54x_device::device_start()
 
 	set_icountptr(m_icount);
 
-	state_add(STATE_PC, "PC", m_pc).formatstr("%04X");
-	state_add(STATE_XPC, "XPC", m_xpc).mask(0x7f).formatstr("%02X");
+	state_add(STATE_PC, "PC", m_pc).callimport().formatstr("%04X");
+	state_add(STATE_XPC, "XPC", m_xpc).mask(0x7f).callimport().formatstr("%02X");
 	state_add(STATE_A, "A", m_a).mask(ACC_MASK).formatstr("%010X");
 	state_add(STATE_B, "B", m_b).mask(ACC_MASK).formatstr("%010X");
 	state_add(STATE_T, "T", m_t).formatstr("%04X");
@@ -224,6 +224,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_imr));
 	save_item(NAME(m_nmi_pending));
 	save_item(NAME(m_nmi_asserted));
+	save_item(NAME(m_vector_prefetch_word));
+	save_item(NAME(m_vector_prefetch_valid));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_tim));
 	save_item(NAME(m_prd));
@@ -253,6 +255,8 @@ void tms320c54x_device::device_reset()
 	m_pc = 0xff80;
 	m_xpc = 0;
 	m_op = 0;
+	m_vector_prefetch_word = 0;
+	m_vector_prefetch_valid = false;
 	m_a = 0;
 	m_b = 0;
 	m_t = 0;
@@ -373,13 +377,22 @@ TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
 
 u16 tms320c54x_device::fetch()
 {
+	if (m_vector_prefetch_valid)
+	{
+		m_vector_prefetch_valid = false;
+		++m_pc;
+		return m_vector_prefetch_word;
+	}
 	return m_cache.read_word(program_address(m_pc++));
 }
 
 void tms320c54x_device::state_import(const device_state_entry &entry)
 {
+	if (entry.index() == STATE_PC || entry.index() == STATE_XPC)
+		m_vector_prefetch_valid = false;
 	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
 	{
+		m_vector_prefetch_valid = false; // A debugger redirect discards the retained fetch.
 		m_pc = u16(m_debug_pc);
 		m_xpc = m_extended_program ? (m_debug_pc >> 16) & 0x7f : 0;
 	}
@@ -908,6 +921,7 @@ void tms320c54x_device::finish_repeats()
 
 bool tms320c54x_device::service_interrupt()
 {
+	if (m_vector_prefetch_valid) return false; // Finish the accepted entry before recognizing another source.
 	// Maskable hardware sources occupy vectors 16..31 and map directly to
 	// IMR/IFR bits 0..15. PMST.IPTR selects their 128-word vector page.
 	const u16 pending = m_ifr & m_imr;
@@ -922,6 +936,7 @@ bool tms320c54x_device::service_interrupt()
 		return false;
 
 	unsigned vector = 1; // SPRU131G table 6-20: NMI, independent of IFR/IMR.
+	int acknowledged_source = INPUT_LINE_NMI;
 	if (m_nmi_pending)
 		m_nmi_pending = false;
 	else
@@ -931,11 +946,19 @@ bool tms320c54x_device::service_interrupt()
 			++source;
 		m_ifr &= ~(u16(1) << source);
 		vector = source + 16;
+		acknowledged_source = source;
 	}
 	m_rtn = m_pc;
-	push(m_pc);
 	m_st1 |= 0x0800;
-	m_pc = (m_pmst & 0xff80) | (vector << 2);
+	u16 const vector_pc = (m_pmst & 0xff80) | (vector << 2);
+	// SPRU131G example 7-18: first vector fetch precedes the INTR stack
+	// write. Retain that opcode; execute/fetch its extension in the normal path.
+	standard_irq_callback(acknowledged_source, logical_program_address(m_pc));
+	m_pc = vector_pc;
+	m_vector_prefetch_word = fetch();
+	m_vector_prefetch_valid = true;
+	push(m_rtn);
+	m_pc = vector_pc;
 	leave_idle();
 	m_icount -= 5;
 	return true;
