@@ -1,11 +1,18 @@
 import unittest
 
-from tools.run_c54x_rom4_crc import COMPLETE, PASS, check_result
+from tools.run_c54x_rom4_crc import COMPLETE, PASS, PACKED_COMPLETE, PACKED_PASS, check_result
 
 
 class Rom4HelperResultTest(unittest.TestCase):
     def test_completion(self):
         check_result(PASS + "\n" + COMPLETE + "\n", 3)
+
+    def test_packed_completion(self):
+        check_result(PACKED_PASS + "\n" + PACKED_COMPLETE + "\n", 3, packed=True)
+        with self.assertRaises(ValueError):
+            check_result(PASS + "\n" + COMPLETE + "\n", 3, packed=True)
+        with self.assertRaises(ValueError):
+            check_result(PACKED_PASS + "\n" + PACKED_COMPLETE + "\n", 3)
 
     def test_reject_incomplete_or_ambiguous_results(self):
         for text, status in [(PASS, 3), (COMPLETE, 3),

@@ -1075,6 +1075,12 @@ private:
 				data.write_word(address, initial[address]);
 		}
 		if (!strcmp(machine().system().name, "tms54rom4") &&
+				!strcmp(machine().options().bios(), "crc-packed"))
+		{
+			start_rom4_crc_packed(0);
+			return;
+		}
+		if (!strcmp(machine().system().name, "tms54rom4") &&
 				!strcmp(machine().options().bios(), "crc-helper"))
 		{
 			start_rom4_crc_helper(0);
@@ -1445,6 +1451,89 @@ private:
 		m_stack_mmr[offset] = value;
 	}
 
+	static void rom4_crc_input(unsigned vector, u16 (&words)[12])
+	{
+		std::fill(std::begin(words), std::end(words), 0);
+		if (vector < 192)
+			words[vector / 16] = u16(1U << (vector % 16));
+		else if (vector == 193)
+			std::fill(std::begin(words), std::end(words), 0xffff);
+		else if (vector > 193)
+		{
+			u32 value = 0x9e3779b9U ^ vector;
+			for (u16 &word : words)
+			{
+				value ^= value << 13;
+				value ^= value >> 17;
+				value ^= value << 5;
+				word = u16(value);
+			}
+		}
+	}
+
+	static u16 rom4_crc_expected(u16 const (&words)[12])
+	{
+		// GSM 05.03 3.1.1: divide message*D^3 by D^3+D+1, then
+		// complement parity. Keep this independent of C54x rotate instructions.
+		u64 polynomial = 0;
+		const auto append = [&polynomial](unsigned bit) { polynomial = (polynomial << 1) | bit; };
+		u16 const combined = u16((words[10] >> 9) | (words[11] << 7));
+		for (unsigned bit = 0; bit < 16; ++bit)
+		{
+			append(BIT(words[0], bit));
+			append(BIT(combined, 15 - bit));
+		}
+		for (unsigned bit = 0; bit < 9; ++bit)
+		{
+			append(BIT(words[1], bit));
+			append(BIT(words[10], 8 - bit));
+		}
+		polynomial <<= 3;
+		for (int degree = 52; degree >= 3; --degree)
+			if (BIT(polynomial, degree)) polynomial ^= u64(0xb) << (degree - 3);
+		unsigned const parity = unsigned(polynomial) ^ 7;
+		unsigned const reversed = (BIT(parity, 0) << 2) | (BIT(parity, 1) << 1) | BIT(parity, 2);
+		return u16(reversed << 11);
+	}
+
+	void start_rom4_crc_packed(unsigned index)
+	{
+		u16 words[12];
+		rom4_crc_input(index / 2, words);
+		for (unsigned i = 0; i < 12; ++i) m_cpu->space(AS_DATA).write_word(0x1400 + i, words[i]);
+		memregion("dspprg")->as_u16(0x0f00) = 0xf4e1;
+		m_cpu->space(AS_DATA).write_word(0x1ec3, 0x0f00);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x812f);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1ec3);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR4, 0x1400);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x12345678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0xdeadbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, index & 1 ? 0x0800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x4101);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0xffac);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 64000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
+	void start_roltc_case(unsigned index)
+	{
+		static constexpr u64 seeds[] = { 0, 1, 0x80000000, 0xffffffff,
+			0x81c0005555ULL, 0xff12345678ULL, 0xaaaaaaaa, 0x55555555 };
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0700, index & 1 ? 0xf592 : 0xf492);
+		program.write_word(0x0701, 0xf4e1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_XPC, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x0700);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, index & 1 ? 0x12345 : seeds[index / 32]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, index & 1 ? seeds[index / 32] : 0x12345);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x25a5 | ((index & 2) ? 0x1000 : 0) | ((index & 4) ? 0x0800 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800 | ((index & 8) ? 0x0100 : 0) | ((index & 16) ? 0x0200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 70000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
+
 	void start_rom4_crc_helper(unsigned index)
 	{
 		// Only the return sentinel is fixture code; 8179..8180 stays acquired ROM.
@@ -1597,8 +1686,8 @@ private:
 				"SPRU172C shifted STH Xmem preserves accumulators/status and applies address modification and SST");
 			if (index < 127) { start_shifted_high_store_case(index + 1); return; }
 			osd_printf_info("TMS320C54x shifted high store conformance: PASS variants=128\n");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			start_roltc_case(0);
+			return;
 		}
 		if (m_phase >= 6200 && m_phase < 6212)
 		{
@@ -18572,6 +18661,47 @@ private:
 			start_idle_wake_case(0);
 			return;
 		}
+		if (m_phase >= 70000 && m_phase < 70256)
+		{
+			unsigned const index = m_phase - 70000;
+			static constexpr u64 seeds[] = { 0, 1, 0x80000000, 0xffffffff,
+				0x81c0005555ULL, 0xff12345678ULL, 0xaaaaaaaa, 0x55555555 };
+			u64 const source = seeds[index / 32];
+			u32 const expected = (u32(source) << 1) | ((index & 2) ? 1 : 0);
+			u16 const status = 0x25a5 | ((index & 2) ? 0x1000 : 0) | (BIT(source, 31) ? 0x0800 : 0);
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (index & 1 ? 0x12345 : expected) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (index & 1 ? expected : 0x12345) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == status &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x0800 | ((index & 8) ? 0x0100 : 0) | ((index & 16) ? 0x0200 : 0)),
+				"ROLTC inserts TC, exports bit31 to C, clears guard bits and preserves other status");
+			if (index < 255) { start_roltc_case(index + 1); return; }
+			osd_printf_info("TMS320C54x ROLTC conformance: PASS variants=256\n");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+		}
+		if (m_phase >= 64000 && m_phase < 64516)
+		{
+			unsigned const index = m_phase - 64000;
+			u16 words[12];
+			rom4_crc_input(index / 2, words);
+			u16 const expected = rom4_crc_expected(words);
+			if (m_cpu->state_int(tms320c54x_device::STATE_A) != expected)
+				osd_printf_info("ROM4 packed CRC mismatch: case=%u actual=%010llx expected=%04x pc=%04x sp=%04x\n",
+					index, (unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A), expected,
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_PC)),
+					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PC) == 0x0f01 &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1ec4 &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == expected,
+				"acquired ROM4 packed CRC agrees with independent GSM polynomial division");
+			if (index < 515) { start_rom4_crc_packed(index + 1); return; }
+			osd_printf_info("TMS320C54x ROM4 packed CRC: PASS cases=516 basis_bits=192 gsm_crc_claim=1 speech_claim=0\n");
+			throw emu_fatalerror(0, "TMS320C54x ROM4 packed CRC complete");
+		}
 		if (m_phase >= 63000 && m_phase < 63512)
 		{
 			unsigned const index = m_phase - 63000;
@@ -19116,6 +19246,7 @@ ROM_START(tms54rom4)
 	ROM_SYSTEM_BIOS(0, "entry", "Transform-entry snapshot")
 	ROM_SYSTEM_BIOS(1, "cold", "Cold reset from mask ROM and DROM")
 	ROM_SYSTEM_BIOS(2, "crc-helper", "Isolated acquired ROM carry/XOR helper")
+	ROM_SYSTEM_BIOS(3, "crc-packed", "Isolated acquired ROM packed CRC")
 	ROM_REGION16_LE(0x80000, "dspprg", 0)
 	ROMX_LOAD("transform_entry_prog.bin", 0, 0x80000,
 			CRC(99757118) SHA1(0a1da67d21f4c333acd331271c3d9f08e896008f),
@@ -19126,6 +19257,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
 			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(2))
+	ROMX_LOAD("dsp_full.bin", 0, 0x1fffe,
+			CRC(886f35e4) SHA1(a05a1e96a8c36ec5a47e1ea059d15afa54ca5739),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(3))
 	ROM_REGION16_LE(0x20000, "dspdata", 0)
 	ROMX_LOAD("transform_entry_data.bin", 0, 0x20000,
 			CRC(bef92101) SHA1(1c547eb7fd457d95cdf7956462e80a40dbadb46e),
@@ -19136,6 +19270,9 @@ ROM_START(tms54rom4)
 	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
 			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(2))
+	ROMX_LOAD("dsp_cold_data.bin", 0, 0x20000,
+			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d),
+			ROM_GROUPWORD | ROM_REVERSE | ROM_BIOS(3))
 	ROM_REGION16_LE(0x20000, "dspdrom", 0)
 	ROM_LOAD16_WORD_SWAP("dsp_cold_data.bin", 0, 0x20000,
 			CRC(c8111608) SHA1(024c7f970f4ef754d3e90471de48a167515f930d))

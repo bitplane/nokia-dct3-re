@@ -2892,10 +2892,12 @@ void tms320c54x_device::execute_one(u16 op)
 		return;
 	case 0xf491: // ROL A through carry
 	case 0xf591: // ROL B through carry
+	case 0xf492: // ROLTC A (SPRU172C 4-144)
+	case 0xf592: // ROLTC B
 	{
 		u64 &acc = accumulator(BIT(op, 8));
 		const u32 value = u32(acc);
-		const u32 carry = BIT(m_st0, 11);
+		const u32 carry = BIT(m_st0, BIT(op, 1) ? 12 : 11);
 		m_st0 = (m_st0 & ~0x0800) | (BIT(value, 31) ? 0x0800 : 0);
 		acc = u32((value << 1) | carry);
 		return;

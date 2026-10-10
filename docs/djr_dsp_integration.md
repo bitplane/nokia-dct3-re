@@ -496,11 +496,42 @@ the accumulator, carry, scratch accumulator, return PC and stack pointer.
 Only a return-to-IDLE sentinel is fixture code; no handset state or peer
 response is injected. The gate also requires the acquired ROM checksums.
 
-This validates the helper's arithmetic, not the historical label's GSM
-meaning. `0x812f` packs several input words before three helper calls and
-complements a three-bit result. Its packed-input ABI and bit ordering remain
-the next software-only question; neither GSM frame CRC correctness nor
-native speech is established by the inner-loop gate.
+The inner-loop gate alone does not validate GSM frame CRC correctness.
+The outer routine has a separate gate, described below; native speech remains
+unvalidated by either gate.
+
+#### Packed CRC contract
+
+`make check-c54x-rom4-crc-packed` executes acquired ROM at `0x812f` and
+compares its result with independent polynomial division using
+[GSM 05.03 v5.0.0, section 3.1.1](https://www.etsi.org/deliver/etsi_gts/05/0503/05.00.00_60/gsmts_0503v050000p.pdf).
+The reference protects 50 bits with polynomial `D^3 + D + 1` and produces
+the complemented three-bit parity. It does not reproduce DSP instructions.
+
+With `AR4` pointing at twelve 16-bit words `w`, define
+`c = (w[10] >> 9) | ((w[11] & 0x1ff) << 7)`.
+The recovered input stream is:
+
+- for `j = 0..15`, append `w[0].bit(j)`, then `c.bit(15-j)`;
+- for `j = 0..8`, append `w[1].bit(j)`, then `w[10].bit(8-j)`.
+
+The normal polynomial parity's bit order is reversed and placed in
+accumulator A bits 13..11. All 192 input-bit basis vectors, zero/all-one
+vectors and 64 deterministic mixed vectors agree, each with both initial
+carry values: 516 native cases. This also checks the return PC and balanced
+stack. Words 2..9, word 1 bits 9..15 and word 11 bits 9..15 do not contribute.
+The isolated mask-ROM call at `0x23c6` returns directly; the fixture does not
+substitute the handset's uploaded resident helper or prove that upload's ABI.
+
+The first execution exposed missing `ROLTC A/B` support in the CPU. Its
+[TI SPRU172C, page 4-144](https://e2e.ti.com/cfs-file/__key/communityserver-discussions-components-files/81/6136.spru172c.pdf)
+contract is now implemented and checked with 256 core vectors: insert TC,
+export source bit 31 to carry, clear guard bits, preserve TC and other status.
+
+This establishes the packed routine's CRC arithmetic, not that a complete
+speech frame reaches it with the correct GSM importance ordering. Connecting
+the packed buffer to `0x80e7` / `0x80ff` and the speech codec remains the next
+software-only boundary. No native speech or end-to-end call claim follows.
 
 The practical software-only route is therefore:
 
