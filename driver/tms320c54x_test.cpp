@@ -724,6 +724,32 @@ private:
 				"Dual-memory multiply decoding retains modifiers, rounding and accumulator selectors");
 		}
 		osd_printf_info("TMS320C54x dual multiply disassembler: PASS forms=4608 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned mode = 0; mode < 256; ++mode)
+			{
+				words const buffer(pc, 0x6d00 | mode, 0x2345);
+				std::ostringstream text;
+				u32 const result = mode < 0x80 ? 1 : (mode >= 0xe0 ? 2 : 1) | dasm::SUPPORTED;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == result && buffer.seen() == (mode >= 0xe0 ? 3 : 1),
+					"MAR decoder claims only indirect layouts and bounds their extensions");
+			}
+		vector const mar_forms[] = {
+			{0x6d90, 1 | dasm::SUPPORTED, "MAR     *AR0+"},
+			{0x6ddc, 1 | dasm::SUPPORTED, "MAR     *AR4+0%"},
+			{0x6ded, 2 | dasm::SUPPORTED, "MAR     *+AR5($2345)"},
+			{0x6df5, 2 | dasm::SUPPORTED, "MAR     *+AR5($2345)%"},
+			{0x6df8, 2 | dasm::SUPPORTED, "MAR     *($2345)"},
+			{0x6d10, 1, ".word   $6D10"},
+			{0x6d60, 1, ".word   $6D60"},
+		};
+		for (auto const &test : mar_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"MAR syntax preserves circular and long-offset modes without treating direct forms as indirect");
+		}
+		osd_printf_info("TMS320C54x MAR disassembler: PASS indirect=128 direct_unclaimed=128 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
@@ -3524,7 +3550,7 @@ private:
 			program.write_word(0x0423, 0x0428);
 			program.write_word(0x0424, 0xe801); // delay slot 1
 			program.write_word(0x0425, 0xe902); // delay slot 2
-			program.write_word(0x0426, 0x6d10); // MAR *AR0+
+			program.write_word(0x0426, 0x6d90); // MAR *AR0+ (I=1).
 			program.write_word(0x0427, 0xf495);
 			program.write_word(0x0428, 0xf495);
 			program.write_word(0x0429, 0xf5e1);

@@ -1725,7 +1725,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 251 decoded and 375
+promoted to a boundary. Current cold-idle coverage is 265 decoded and 361
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1780,6 +1780,14 @@ the compact store's address update. The runner requires
 captured 626-word trace, not complete ISA, stage timing or native speech.
 
 ### Debugger control-flow decoding
+
+MAR decodes the 128 explicit indirect forms, including long-offset and
+absolute extensions; 128 direct forms stay unsupported. The gate checks both
+sets on two pages and seven exact examples. Its marker is
+`TMS320C54x MAR disassembler: PASS`. The older RPTBD fixture's mislabeled
+`6d10` was corrected to `6d90` (`MAR *AR0+`, I=1). This retires an accidental
+fixture assumption, not a runtime direct-MAR legality claim: the execution
+handler's treatment of direct encodings remains unaudited.
 
 Dual-memory MPY and MAC/MACR/MAS/MASR decode their X/Y pointer modifiers
 and accumulator fields as single-word forms. The gate checks 4,608 encodings

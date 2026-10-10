@@ -87,6 +87,12 @@ public:
 				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
 			}
 		};
+		if (family == 0x6d00 && mode >= 0x80)
+		{
+			bool const extended = mode >= 0xe0;
+			stream << "MAR     "; smem(extended ? next_word() : 0);
+			return (1 + extended) | SUPPORTED;
+		}
 		if ((op & 0xfe00) == 0xa400 || (op & 0xf000) == 0xb000)
 		{
 			auto const dual = [&](u8 operand) {
