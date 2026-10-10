@@ -7,7 +7,8 @@ CPU-big-endian flash image. Research machine `nse6stage` now executes its own
 reset/initialization and reaches the verifier's first DSP acknowledgement wait.
 The ROM4 compatibility fixture now has graphical security-editor and physical
 digit-entry acceptance. An initialized synthetic retry count permits default
-code acceptance and a Menu / Names frame; card/service parity remains unproved. Other products'
+code acceptance, Menu / Names navigation, and persistent SIM phonebook
+save/recall; broader card/service parity remains unproved. Other products'
 provisioning and DSP publications are not evidence for this handset.
 
 The reset stack base `0x125f30` fits the documented 256 KiB SRAM window starting
@@ -16,8 +17,8 @@ The silent baseline waits for its first DSP acknowledgement. The separate
 `nse6r4t` compatibility fixture executes acquired NSE-1 ROM4 code and reaches
 CONTACT SERVICE, without proving that mask belongs to the 8810.
 An explicitly diagnostic six-byte integrity correction removes the two decoded
-erased-storage failures and reaches SIMI initialization. No usable idle handset
-or authentic provisioning is established.
+erased-storage failures and reaches SIMI initialization. Authentic provisioning
+and stable long-running handset operation are not established.
 The nominal VBAT profile now completes ten acquisitions and publishes report
 `0x14` organically at about 1.763 seconds. The input controller leaves state
 `0x10`, reaches state `4`, and changes the column mask from `0x3f` to `0x20`.
@@ -60,8 +61,27 @@ board-level battery routing. Other ADC channels remain research defaults.
 Menu, Down and Select contacts. Snapshots show Messages, Call register, and
 Missed calls respectively. `tools/nse6_names_fixture.lua` opens Names, selects
 Add entry, and reaches name and number editors with entered characters.
-This validates the exercised softkeys/navigation and editor inputs, not a
-saved phonebook record, call signaling, or SMS transport.
+This validates the exercised softkeys/navigation and editor inputs. Call
+signaling and SMS transport remain unproved.
+
+### Persistent SIM Phonebook
+
+The Names fixture now presses Save at 31 s, before the known reset; its
+31.5-second frame reads **Saved to SIM card**. The generated card NVRAM's
+first 32-byte ADN record contains name `A`, BCD number `123` (`03 81 21 f3`
+at bytes 18..21), and erased padding. The other 49 records remain erased,
+verified by `sim_phonebook_check.validate_phonebook_storage(data, b"A")`.
+No record is preseeded: physical contacts enter the name/number and firmware
+owns the card write.
+
+`tools/nse6_phonebook_recall_fixture.lua` starts a new MAME process using
+that same NVRAM directory, accepts the default phone code, and applies
+Names / Search / blank search / Detail contacts. The 23-second frame shows
+`A`; the 25-second frame displays **Number: 123**. This establishes the
+exercised SIM save and cold-start UI recall, not phone-memory storage,
+edit/delete coverage, native calls, SMS, or long-running stability. The
+six-byte integrity and initialized-retry diagnostic remain explicit inputs;
+identity is still erased and the fitted DSP mask is still unknown.
 
 The longer 40-second menu run returns to reset entry `0x200040` at
 31.967763462 seconds. At 31 seconds the CCONT countdown is `0x13` and MAD2
