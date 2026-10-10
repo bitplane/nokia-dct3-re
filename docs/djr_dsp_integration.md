@@ -801,6 +801,16 @@ domains of controller bytes `6/7/0x48`, and the packet-body-to-native-word
 correspondence, remain necessary before constructing any native traffic
 assignment fixture.
 
+The native side of that correspondence is byte-checked: `0x387b` consumes
+the ring header with `*AR2+%`; `0x387f` extracts its low-byte type while
+`0x3881` extracts its high-byte length. Thus the type-2 handler starts at
+the first payload word, not at the header. Its reads at `0x3a0c/15/1b/1d/26`
+consume payload words 1 through 5; `0x3a27` writes word 5's high byte to
+`0x1869`. The existing transport's `tx_payload_byte` independently uses
+header cursor + 1 and high-byte-first packing. The MCU task-3 copy from
+object byte 4 into that ring remains a separate boundary to verify; only
+with that copy established does object byte `0x0c` map to `0x1869`.
+
 Encoder execution also requires conditional accumulator store `SACCD`.
 [TI SPRU172C pages 4-152/153](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 specifies that even a false condition reads and writes back the destination,
