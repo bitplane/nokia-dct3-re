@@ -30,7 +30,7 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x3660, 0x3d5e, 0x3d70, 0x3db8, 0x4dce, 0x30a1, 0x30bf, 0x30d6,
     0x3204, 0x3268, 0x3274, 0x32c3, 0x33f3,
     0x4414, 0x4428, 0x4433, 0x4460, 0x32f4, 0x33b4, 0x3249,
-    0x330a, 0x3326, 0x332b, 0x3347, 0x3360, 0x337c, 0x33ac, 0x33b0, 0x42f6,
+    0x330a, 0x3322, 0x3326, 0x332b, 0x3347, 0x3360, 0x337c, 0x33ac, 0x33b0, 0x42f6,
     0x33e9, 0x4424, 0x4c6f, 0x4ef7, 0x4f20, 0x50db,
     0x9a7a, 0x9aa8, 0x9b15, 0x9a99, 0x9acc, 0x9b20,
     0x98b7, 0x9903, 0x55bb, 0x5783, 0x578f, 0x579b, 0x57a3,
@@ -41,7 +41,7 @@ local sites = {0x23d0, 0x2626, 0x4ef9, 0x5006, 0x3da2,
     0x4701, 0x4798, 0x0acf, 0x0c16, 0x0ad1, 0x0add, 0x0ae4}
 local counts = {}
 local filter_operand_count = 0
-for _, range in ipairs({{0x0080, 0x008f}, {0x21a9, 0x21b0}}) do
+for _, range in ipairs({{0x0080, 0x008f}, {0x21a0, 0x21b8}}) do
     taps[#taps + 1] = memory:install_read_tap(range[1], range[2],
         string.format("scan_filter_operands_%04x", range[1]), function(offset, value)
             if _G.rom4_observation_read then return end
@@ -107,6 +107,11 @@ for _, address in ipairs(sites) do
             local pc = cpu.state["PC"].value
             if pc == offset or pc == offset + 1 then
                 counts[address] = counts[address] + 1
+                if address == 0x3322 and counts[address] <= 2 then
+                    machine:logerror(string.format(
+                        "rom4_scan_pointer_probe: address=3322 word=%04x ar4=%04x ar5=%04x\n",
+                        data, cpu.state["AR4"].value, cpu.state["AR5"].value))
+                end
                 if address == 0x330a and counts[address] <= 2 then
                     local coefficients = {}
                     _G.rom4_observation_read = true
@@ -155,7 +160,7 @@ local stop = emu.add_machine_stop_notifier(function()
     _G.rom4_observation_read = true
     machine:logerror(string.format("rom4_uploaded_result_summary: total=%d zero=%d\n",
         result_counts.total, result_counts.zero))
-    for _, start in ipairs({0x0ac7, 0x0c0e}) do
+    for _, start in ipairs({0x0ac7, 0x0c0e, 0x330a}) do
         local words = {}
         for index = 0, 31 do
             words[#words + 1] = string.format("%04x", program:read_u16(start + index))

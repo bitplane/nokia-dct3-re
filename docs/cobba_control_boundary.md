@@ -86,6 +86,14 @@ Its bounded operand census observes history reads in order
 `84,85,87,86,88,89,8b,8a,8c,8d,8f,8e,80,81,83,82`
 at DSP PCs `0x330d..0x3322`, followed by a read of `0x0084` at
 `0x3323`. The coefficient reads advance through `0x21a9..0x21b0`;
+these data-tap PCs are the core's advanced execution PC, not a claim
+that the operand's instruction starts at that address. An expanded
+coefficient probe covering `0x21a0..0x21b8` observes the same prefix,
+with no ninth coefficient read. A live 32-word program capture at
+`0x330a` matches the byte-pinned resident sequence; the program probe at
+`0x3322` reads opcode `0xe4e9`, AR4=`0x0084` and AR5=`0x21b0` on its
+first invocation (AR4=`0x0088` on the second). Do not interpret the
+operand trace PC as the start of a supposed extra MAC instruction.
 the census excludes the observer's own memory reads. This demonstrates
 interleaved circular-history consumption in the executed core, but does
 not assign physical I/Q names to either lane. The capture uses zero RF
