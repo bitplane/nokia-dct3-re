@@ -635,3 +635,7 @@ emu.register_frame_done(function()
     end
 end, 'frame')
 _G.nse6_stage_observer_handles = handles
+if dsp then
+    local directory = assert(debug.getinfo(1, 'S').source:match('^@(.*/)'))
+    dofile(directory .. 'c54x_rom4_mode_observe.lua')
+end

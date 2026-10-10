@@ -294,6 +294,18 @@ This excludes the apparent fivefold timer slowdown and a persistently
 disabled frame-clock gate over those samples. Timer expiries alone do not
 prove correct DSP ISR processing, physical clock validation, operational
 packet production, or a valid RF sample stream. No clock setting is changed.
+
+The shared passive `c54x_rom4_mode_observe.lua` now also records frame
+entry/exit sites and is used by the NSE-6 observer. An isolated 30-second
+pre-reset run observes 6,428 entries at `0x3204`, 6,428 bypasses at `0x32c3`,
+and 6,428 common exits at `0x33f3`. Sites `0x3249` and `0x3268` each execute
+51,424 times, exactly eight per serviced frame. Processing entry `0x3274`
+and mode initializer `0x4414` (including its observed sub-sites) record zero;
+final mode word `0x00ac` is zero. Thus INT0 and its idle receive-read loop
+execute, not merely the external timer. This measured lifecycle never enters
+the candidate processing tail. The next native contract is entry into an
+operational mode, not repair of missing frame interrupts. These counts do
+not prove a valid RF input or the fitted NSE-6 DSP identity.
 `0x27a76e` takes a timer ID, not the delivered status: tracing only R0=D6 there
 does not enumerate this timer's arm sites. A syntactic immediate scan finds ten D6 candidates in the MCU extent;
 several are timer-control or unrelated payload uses, not proven publishers.
