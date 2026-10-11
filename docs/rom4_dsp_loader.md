@@ -3682,6 +3682,15 @@ fixtures fail on the previous implementation and pass on the corrected core,
 following [TI SPRU172C, FIRS, 4-59](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
 and the ST0/ST1 rules above. This selected coverage fixes FRCT=0, SMUL=0
 and C16=0; it establishes neither physical pipeline timing nor RF acquisition.
+ABDST has sixteen additional executable `e301` cases for old A-high=-65536,
+B=`0x7fffffff`/-1, FRCT and OVM clear/set, and pre-existing OVB clear/set.
+They verify the absolute signed-17 distance, its documented FRCT doubling,
+B overflow/saturation and sticky OVB, while the parallel zero difference
+preserves OVA, T and operand addresses and sets subtraction carry. All pass
+without changing the implementation. The reference is
+[TI SPRU172C, ABDST, 4-2](https://www.ti.com/lit/ug/spru172c/spru172c.pdf);
+these cases fix SXM=1 and C16=0 and do not establish other addressing modes
+or physical pipeline timing.
 The core, bounded mixed RF filter, 5110
 Menu/save-state and short/long physical power gates pass on the corrected
 build. Remaining FRCT/OVM and source/destination combinations are not

@@ -63,6 +63,28 @@ private:
 		m_phase = 230000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_abdst_overflow_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0800, 0xe301); // ABDST *AR2,*AR3.
+		program.write_word(0x0801, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0600, 0);
+		m_cpu->space(AS_DATA).write_word(0x0601, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0601);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0xff00000000ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, index & 4 ? 0xffffffffffULL : 0x7fffffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1400 | (index & 8 ? 0x0200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
+			0x0100 | (index & 1 ? 0x0040 : 0) | (index & 2 ? 0x0200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 240000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_sqdst_difference_case(unsigned index)
 	{
 		static constexpr u16 x[] = {0xffff, 0, 0x8000, 0x7fff};
@@ -21489,6 +21511,27 @@ private:
 				"FIRS computes operand carry, SXM sum, sticky OVA and OVM saturation while accumulating old A");
 			if (index < 31) { start_firs_sum_case(index + 1); return; }
 			osd_printf_info("TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0\n");
+			start_abdst_overflow_case(0); return;
+		}
+		if (m_phase >= 240000 && m_phase < 240016)
+		{
+			unsigned const index = m_phase - 240000;
+			u64 const distance = index & 1 ? 0x20000 : 0x10000;
+			bool const overflow = !(index & 4);
+			u64 const result = overflow ? (index & 2 ? 0x7fffffff : 0x7fffffff + distance) : distance - 1;
+			u16 const flags = 0x1c00 | (overflow || (index & 8) ? 0x0200 : 0);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == result &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == flags &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0601 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(STATE_GENPC) == 0x0802,
+				"ABDST accumulates absolute signed-17 old A with FRCT, sticky OVB and OVM saturation");
+			if (index < 15) { start_abdst_overflow_case(index + 1); return; }
+			osd_printf_info("TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
