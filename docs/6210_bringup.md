@@ -299,8 +299,15 @@ is unchanged. The control clears only FPLMN before boot: the same cell now
 registers, releases and persists LAI `00f1200001`/status 0. Thus the negative
 result is tied to retained FPLMN rather than merely an unresponsive peer.
 
-International visited PLMN 310-260 remains a separate unresolved selection
-case. Paired fresh 90-second research-HLE controls use the acquired NPE-3 PMM,
+International roaming is verified on the two-digit-MNC laboratory cell
+234-15 by `verify-6210-foreign-registration`, including retained EF_LOCI
+after a cold restart. The three-digit-MNC cell 310-260 is a negative
+compatibility case: selection now completes, but the own mandatory LAI
+parser rejects its non-`F` MNC filler. The contracts and checks below
+distinguish selection completion from Layer-3 registration.
+
+The pre-follow-up-model comparison establishes the original selection
+failure boundary. Paired fresh 90-second research-HLE controls used the acquired NPE-3 PMM,
 the same unchanged home IMSI, no PIN, coherent ARFCNs 35/36 and acceptance
 policy. Only the external preferred PLMN and serving PLMN differ:
 
@@ -314,11 +321,10 @@ is not an untested selector or absent broadcast. Evidence is retained under
 `tmp/6210-plmn-current-national/` and
 `tmp/6210-plmn-current-international/` (raw `error.log.gz`, console and input
 invocation). This is a bounded no-random-access observation, not proof that
-the phone cannot roam or that a particular peer packet is missing. The next
-boundary is firmware selection/admission of the foreign three-digit-MNC
-PLMN; country/band policy and identity parsing must be distinguished before
-changing the radio peer. The same-country proof does not establish why
-international selection differs or imply roaming coverage for every PLMN.
+the phone cannot roam. The exact follow-up measurement contract below
+resolves this pre-model stall; the subsequent mandatory LAI check separately
+establishes the three-digit-MNC restriction. Neither observation implies
+roaming coverage for every PLMN.
 
 Own BCCH consumer boundary: type `80` decoder `4f611e -> 457f80`
 routes channel `50` through `457f28`. Its admitted path changes the original
@@ -830,7 +836,7 @@ this fixture. Firmware organically publishes `07f4` to task 18 at
 at 10.619167462 s. Random access follows, then a Location Updating Request
 and acknowledgement of Location Updating Accept at 11.243672 s.
 
-Current unresolved boundary is downstream of that acknowledgement:
+Three-digit-MNC negative case, downstream of that acknowledgement:
 the 25-second international fixture retains invalid EF_LOCI
 (`ffffffffffffffffffff01`), with no location-update SIM writes and no
 observed Channel Release acknowledgement. Reaching the network acceptance
@@ -881,12 +887,29 @@ length >= 5 is accepted. This isolated test does not modify a live phone.
 Runtime evidence: `tmp/6210-mm-lai-mnc-gate/error.log.gz`.
 
 Do not patch this validator or relabel `310-260` as a two-digit-MNC cell.
-The next supported roaming fixture should use a separately configured,
-standards-valid foreign two-digit-MNC laboratory cell and require both
+The supported roaming fixture uses a separately configured,
+standards-valid foreign two-digit-MNC laboratory cell and requires both
 Layer-3 acceptance and persistent EF_LOCI. Retain `310-260` as a negative
 compatibility case. Three-digit-MNC support on this ROM remains unavailable
 through this decoded acceptance path; broader product support is a separate
 cross-ROM question.
+
+`verify-6210-foreign-registration` selects a laboratory cell with identity
+234-15 (`AUTHCFG` serving-PLMN value `08`) on ARFCNs 35/36. This is a
+synthetic network, not a connection to that commercial operator. The SIM
+keeps its original laboratory IMSI/home identity and prefers the visited
+PLMN; the acquired product PMM is unchanged. The initial run requires
+random access, Location Updating Accept delivery acknowledgement, Channel
+Release acknowledgement and firmware SIM writes yielding EF_LOCI
+`32f4510001` with valid status. A second independent process copies only
+the same handset's retained NVRAM/configuration, requires EF_LOCI to be read
+before the retained-LAI Location Updating Request, and verifies acceptance,
+release and continued valid foreign location without a redundant status
+rewrite. Both processes pass. Home registration remains independently
+gate-green. This proves research-HLE foreign registration and storage,
+not native RF, speech or reviewed foreign-operator display pixels.
+Evidence: `tmp/6210-foreign-two-digit-cold-persistence/acceptance.json`, its
+`error.log.gz`, and `cold-registration/error.log.gz`.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures

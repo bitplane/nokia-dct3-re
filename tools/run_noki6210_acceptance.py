@@ -22,6 +22,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'calculator': ('npe3hle', 'application_input', 38),
              'phonebook': ('npe3hle', 'phonebook_input', 33),
              'registration': ('npe3hle', 'menu_input', 25),
+             'foreign-registration': ('npe3hle', 'staged_observe', 25),
              'plmn-reject': ('npe3hle', 'staged_observe', 90),
              'home-plmn-reject': ('npe3hle', 'staged_observe', 30),
              'outgoing-call': ('npe3hle', 'outgoing_call_input', 48),
@@ -83,14 +84,16 @@ def check_divert(text, frames):
 
 
 def check_registration(text, storage, *, preserved_location=False,
-                       channel_header='0000'):
+                       channel_header='0000', expected_lai=bytes.fromhex('00f1100001')):
     import re
+    if len(expected_lai) != 5:
+        raise ValueError('registration LAI must contain five octets')
     patterns = (
         r'TX packet type=56 payload=160 .*data=0023',
         rf'TX packet type=02 .*radio_phase=candidate_channel_change data=04{channel_header}000000005050000023',
         r'TX packet type=0c .*radio_phase=random_access',
         r'RX enqueue type=89 payload=8 .*data=0100000000000000',
-        (r'TX packet type=1b .*data=0080013f4905087200f110000133080910101032547698'
+        (rf'TX packet type=1b .*data=0080013f49050872{expected_lai.hex()}33080910101032547698'
          if preserved_location else
          r'TX packet type=1b .*data=0080013f4905087000f000fffe33080910101032547698'),
         r'LAPDm Location Updating Accept acknowledged nr=1',
@@ -111,7 +114,7 @@ def check_registration(text, storage, *, preserved_location=False,
         updates.append('update-binary fid=6f7e offset=10 length=1')
     else:
         read = text.find('read-binary fid=6f7e offset=0 length=11')
-        request = text.find('data=0080013f4905087200f110000133080910101032547698')
+        request = text.find(f'data=0080013f49050872{expected_lai.hex()}33080910101032547698')
         if read < 0 or request < 0 or read > request:
             raise ValueError('warm NPE-3 registration did not read retained EF_LOCI before requesting')
         if 'update-binary fid=6f7e offset=10 length=1' in text:
@@ -121,7 +124,7 @@ def check_registration(text, storage, *, preserved_location=False,
         if position < 0:
             raise ValueError('missing ordered NPE-3 SIM location persistence: ' + record)
         cursor = position + len(record)
-    if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
+    if len(storage) < 1611 or storage[1604:1609] != expected_lai or storage[1610] != 0:
         raise ValueError('persisted EF_LOCI is not laboratory location-updated')
 
 
@@ -293,17 +296,18 @@ def main():
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
-        if args.scenario == 'plmn-reject':
+        if args.scenario in ('plmn-reject', 'foreign-registration'):
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             # A visited preferred PLMN is external subscriber data, not an
             # injected selection event. Keep IMSI/home identity unchanged.
-            card.write_bytes(make_profile(pin_enabled=False) + bytes.fromhex('00f120') +
+            plmn = '32f451' if args.scenario == 'foreign-registration' else '00f120'
+            card.write_bytes(make_profile(pin_enabled=False) + bytes.fromhex(plmn) +
                              b'\xff' * 21 + b'\xff' * 12)
         host = args.scenario.startswith('host-')
         configured = args.scenario in ('incoming-call', 'incoming-pcm-missing', 'incoming-sms', 'state-sms') or args.scenario in TOOLKIT_PROFILES or host
-        if configured or args.coherent_cell or args.scenario in ('plmn-reject', 'home-plmn-reject'):
+        if configured or args.coherent_cell or args.scenario in ('plmn-reject', 'home-plmn-reject', 'foreign-registration'):
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
@@ -320,7 +324,7 @@ def main():
             if args.scenario == 'incoming-pcm-missing':
                 ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
                               mask='32', defvalue='0', value='32')
-            if args.coherent_cell:
+            if args.coherent_cell or args.scenario == 'foreign-registration':
                 ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
                               mask='1024', defvalue='0', value='1024')
             if args.scenario in ('plmn-reject', 'home-plmn-reject'):
@@ -329,6 +333,9 @@ def main():
                 if args.scenario == 'plmn-reject':
                     ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
                                   mask='12', defvalue='0', value='4')
+            if args.scenario == 'foreign-registration':
+                ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
+                              mask='12', defvalue='0', value='8')
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -369,6 +376,22 @@ def main():
             check_frames(run / 'snap')
         else:
             verify(text, runtime=runtime, selftest=runtime)
+        if args.scenario == 'foreign-registration':
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
+                               channel_header='1202', expected_lai=bytes.fromhex('32f4510001'))
+            cold = run / 'cold-registration'
+            cold.mkdir()
+            shutil.copytree(run / 'nvram', cold / 'nvram')
+            shutil.copytree(run / 'cfg', cold / 'cfg')
+            with (cold / 'console.log').open('w') as output:
+                subprocess.run(command, cwd=cold, stdout=output, stderr=subprocess.STDOUT,
+                               check=True, timeout=180, env=environment)
+            check_output((cold / 'console.log').read_text(errors='replace'))
+            cold_text = events(cold / 'error.log')
+            verify(cold_text, runtime=True, selftest=True)
+            check_registration(cold_text, (cold / 'nvram/npe3hle/sim_card').read_bytes(),
+                               preserved_location=True, channel_header='1202',
+                               expected_lai=bytes.fromhex('32f4510001'))
         if args.pin_enabled:
             from tools.radio_call_lifecycle_common import require_ordered
             from tools.sim_security_trace_check import validate as check_security
@@ -691,7 +714,8 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
-            'sim_profile': ('visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
+            'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration'
+                            else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
                             else 'PIN-enabled laboratory card' if args.scenario == 'security' or args.pin_enabled
                             else 'default laboratory card'),
             'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',
@@ -706,6 +730,9 @@ def main():
                                         'independent_processes': 2}
                                        if args.scenario == 'host-sms-status' else None),
             'native_dsp_complete': False, 'speech_tested': False, 'command': command,
+            'foreign_registration': ({'plmn': '234-15', 'lai': '32f4510001',
+                                      'firmware_sim_update': True, 'independent_processes': 2}
+                                     if args.scenario == 'foreign-registration' else None),
             'host_command': host_command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

@@ -69,6 +69,14 @@ class ApplicationAcceptanceTest(unittest.TestCase):
         storage = bytearray(3524)
         storage[1604:1609] = bytes.fromhex('00f1100001')
         runner.check_registration(text, storage, preserved_location=True)
+        foreign = bytes.fromhex('32f4510001')
+        foreign_text = text.replace('00f1100001', foreign.hex())
+        foreign_storage = bytearray(storage)
+        foreign_storage[1604:1609] = foreign
+        runner.check_registration(foreign_text, foreign_storage, preserved_location=True,
+                                  expected_lai=foreign)
+        with self.assertRaises(ValueError):
+            runner.check_registration(foreign_text, foreign_storage, preserved_location=True)
         pin_text = text.replace('data=040000', 'data=041202')
         runner.check_registration(pin_text, storage, preserved_location=True,
                                   channel_header='1202')
@@ -116,6 +124,14 @@ class ApplicationAcceptanceTest(unittest.TestCase):
         storage[1604:1609] = bytes.fromhex('00f1100001')
         for index in (6, 7, 8):
             runner.check_registration('\n'.join(records[:index] + updates + records[index:]), storage)
+        foreign = bytes.fromhex('32f4510001')
+        storage[1604:1609] = foreign
+        text = '\n'.join(records + updates)
+        runner.check_registration(text, storage, expected_lai=foreign)
+        with self.assertRaisesRegex(ValueError, 'EF_LOCI'):
+            runner.check_registration(text, storage)
+        with self.assertRaisesRegex(ValueError, 'five octets'):
+            runner.check_registration(text, storage, expected_lai=foreign[:3])
         with self.assertRaises(ValueError):
             runner.check_registration('\n'.join(updates + records), storage)
 
