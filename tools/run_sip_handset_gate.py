@@ -9,6 +9,9 @@ from pathlib import Path
 import re
 import sys
 
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 try:
     from tools.run_sip_stack_probe import write_tone
 except ModuleNotFoundError:
@@ -40,7 +43,9 @@ async def run(args):
             remote_command = [str(args.pjsua.resolve()),
                 '--null-audio', '--no-tcp', '--no-vad', '--clock-rate=8000',
                 '--bound-addr=127.0.0.1', '--ip-addr=127.0.0.1', f'--local-port={args.sip_port}',
-                f'--auto-answer={args.sip_response}', '--duration=8', f'--play-file={root / "sip-source.wav"}',
+                f'--auto-answer={args.sip_response}',
+                '--duration=30' if getattr(args, 'signaling_only', False) else '--duration=8',
+                f'--play-file={root / "sip-source.wav"}',
                 '--auto-play']
             if args.record_media:
                 remote_command += [f'--rec-file={root / "sip-microphone.wav"}', '--auto-rec']
@@ -76,7 +81,7 @@ async def run(args):
                 '--destination', f'sip:probe@127.0.0.1:{args.sip_port}',
                 '--sip-port', str(args.sip_port + 1),
                 *(['--once'] if args.calls == 1 else ['--calls', str(args.calls)]), '--require-frames',
-                '100' if args.sip_response == 200 and not args.cancel_incoming and
+                '100' if not getattr(args, 'signaling_only', False) and args.sip_response == 200 and not args.cancel_incoming and
                 not (args.restore_call and args.restore_phase == 'alerting') else '0',
                 *(['--record-pcm', str(root)] if args.record_media else []),
                 stdout=bridge_log, stderr=asyncio.subprocess.STDOUT)
@@ -212,6 +217,19 @@ def verify_success(root, remote_text, args):
     if not match:
         raise RuntimeError('missing bridge media/release summary')
     counts = json.loads(match[1])
+    if getattr(args, 'signaling_only', False):
+        from tools.noki6210_outgoing_call_check import verify as verify_call
+        log = (root / 'error.log').read_text(errors='replace')
+        verify_call(log, number=number)
+        if 'uplink' not in counts or counts['uplink'] != 0 or 'dsp_hle: speech tick' in log:
+            raise RuntimeError('unclocked signaling fixture unexpectedly produced handset media')
+        (root / 'sip-result.json').write_text(json.dumps({
+            'scope': '6210 physical outgoing SIP dialog and CC/RR release only',
+            'dialed_digits': number, 'passed': True, 'speech_tested': False,
+            'native_dsp_complete': False, 'bridge_counts': counts,
+        }, indent=2) + '\n')
+        print('OK - physical 6210 SIP dialog connected and released; speech unproved')
+        return
     if min(counts.get(name, 0) for name in (
             'uplink', 'downlink', 'pcm_transmitted', 'pcm_received')) < 100:
         raise RuntimeError('insufficient executed bidirectional media')
@@ -571,9 +589,17 @@ def main():
     parser.add_argument('--restore-phase', choices=('connected', 'alerting'), default='connected')
     parser.add_argument('--restore-idle', action='store_true')
     parser.add_argument('--restore-outgoing', action='store_true')
+    parser.add_argument('--signaling-only', action='store_true',
+                        help='bounded 6210 outgoing SIP-200 dialog fixture without media acceptance')
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 403, 404, 408, 480, 486, 503, 600), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    signaling_connected = (args.signaling_only and args.product == '6210' and
+                           not args.incoming and args.sip_response == 200 and args.calls == 1 and
+                           not args.record_media and not args.restore_call and not args.restore_idle and
+                           not args.restore_outgoing and not args.cancel_incoming)
+    if args.signaling_only and not signaling_connected:
+        parser.error('--signaling-only requires the single 6210 outgoing SIP-200 fixture without recording/restoration')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():
@@ -608,7 +634,7 @@ def main():
     nsm3_incoming_restore = (args.product in ('8210', '8850') and args.incoming and
                             args.restore_call and not args.cancel_incoming and
                             not args.record_media and not args.restore_outgoing and not args.restore_idle)
-    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not npe3_pending_restore and not unanswered_alerting_restore and not unanswered_pending_restore and not nsm3_incoming_restore and
+    if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_connected and not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not npe3_pending_restore and not unanswered_alerting_restore and not unanswered_pending_restore and not nsm3_incoming_restore and
             (not args.incoming or not args.cancel_incoming)) or
             (args.record_media and not nsm3_media and not nsm2_media) or (args.restore_call and not nsm3_incoming_restore and not unanswered_alerting_restore) or args.restore_idle or (args.restore_outgoing and not nsm3_restore and not npe3_pending_restore and not unanswered_pending_restore)):
         parser.error(f'unsupported SIP scenario for {args.product}; use a verified product-specific signaling/media fixture')

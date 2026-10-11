@@ -902,6 +902,14 @@ is required, not the accidental interleaving of a prior trace.
 
 ## Unclocked research-HLE speech boundary
 
+`verify-6210-sip-connected-signaling` independently connects a physically
+dialed `1234567` call to a real loopback PJSIP endpoint, then physically ends
+it and requires complete CC/RR release and registered-idle recovery. It
+preserves own PMM and product configuration. Bridge uplink must remain zero
+and no HLE speech tick may execute. This is connected signaling acceptance,
+not a speech/media promotion; the product-owned PCM prerequisites below
+remain unchanged.
+
 `verify-6210-pcm-missing` independently answers and ends an incoming call
 using physical keys, unchanged own PMM and the existing NPE-3 upload,
 registration and call-signaling checks. Only external network configuration

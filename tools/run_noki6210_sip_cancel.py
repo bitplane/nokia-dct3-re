@@ -45,6 +45,8 @@ def main():
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore idle CPU/RAM/time before admitting the fresh SIP call')
     outgoing = parser.add_mutually_exclusive_group()
+    outgoing.add_argument('--outgoing-connected-signaling', action='store_true',
+                          help='physically connect and end a SIP dialog without claiming media')
     outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='physically dial into SIP 486 instead of receiving CANCEL')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
@@ -56,7 +58,7 @@ def main():
     parser.add_argument('--http-port', type=int, default=18621)
     parser.add_argument('--sip-port', type=int, default=25621)
     args = parser.parse_args()
-    outgoing_status = 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
+    outgoing_status = 200 if args.outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
     if (outgoing_status or args.restore_outgoing_pending or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
@@ -86,7 +88,8 @@ def main():
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6210',
                    *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
-                     ['--sip-response', str(outgoing_status)] if outgoing_status else
+                     ['--sip-response', str(outgoing_status)] +
+                     (['--signaling-only'] if args.outgoing_connected_signaling else []) if outgoing_status else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
                       str(run / 'snap/6210_sip_registered_idle.png')] if args.restore_incoming_alerting else
                      ['--incoming', '--cancel-incoming', '--ready-file',

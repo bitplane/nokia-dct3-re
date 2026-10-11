@@ -454,8 +454,11 @@ registered-idle artifact before INVITE, verifies the same unanswered
 CANCEL/487 and clean CC/RR release, pins `1 missed call`, and physically
 dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
-The generic SIP runner rejects answered/media fixtures for signaling-only
-products `6210`, `6250` and `8890`. The 8210 and 8850 have narrowly scoped
+The generic SIP runner rejects media-acceptance fixtures for signaling-only
+products `6210`, `6250` and `8890`. The 6210 additionally admits only the
+single outgoing SIP-200 `--signaling-only` fixture described below; recording,
+incoming Answer, multiple calls and connected restoration remain excluded.
+The 8210 and 8850 have narrowly scoped
 single-call outgoing and incoming SIP-200 HLE media-transport fixtures and
 a separate connected-outgoing restore fixture. Explicit recording is
 available for media fixtures without asserting waveform success.
@@ -468,7 +471,19 @@ research-HLE runner retains unchanged acquired PMM and own bootstrap,
 self-test, registration and persisted SIM-location checks. Only this
 outgoing busy failure, the unavailable fixture below, pending-outgoing
 restoration and alerting-incoming restoration are enabled for the 6210;
-answered calls and speech remain unproved.
+speech remains unproved.
+
+`verify-6210-sip-connected-signaling` physically dials `1234567`, confirms a
+real loopback PJSIP-200 dialog and ends it with the handset End key. The own
+product checker requires exact SETUP digits, CC connection/acknowledgement,
+traffic assignment and full CC/RR release; the product runner additionally
+checks own uploads/self-test, registration/EF_LOCI and registered-idle pixels.
+The bridge reports zero uplink and the trace must contain no HLE speech tick.
+Remote RTP reception and downlink queue activity are recorded as observations,
+not handset playback. `sip-result.json` explicitly records
+`speech_tested=false` and `native_dsp_complete=false`. This gate establishes
+an answered signaling dialog, not an audible or end-to-end voice call, and
+does not authorize a guessed NPE-3 PCM clock.
 
 `verify-6210-sip-pending-outgoing-restore` physically dials `1234567`, saves
 during SIP 180, and restores handset PC, SP, RAM checksum and emulated time
