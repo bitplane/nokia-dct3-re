@@ -2,10 +2,9 @@
 
 This catalogue records architectural knowledge reviewed from
 [`djr-747/nokia-dct3-emulator`](https://github.com/djr-747/nokia-dct3-emulator)
-without importing its GPL implementation. The initial reviewed checkout was
-commit `c50f7e272bf10c37a40c57174dbde84d9717b7e3` dated 25 July 2026. A second
-review on 4 September 2026 covered public commit `b93a7f7` and its native ROM4
-C54x/COBBA analysis path.
+without importing its GPL implementation. Reviewed references include
+`c50f7e272bf10c37a40c57174dbde84d9717b7e3`, `b93a7f7` and
+`2b4c10f`; their admitted contracts and rejected interpretations are below.
 
 The upstream native analysis backend combines a modified C54x core with a
 bring-your-own Nokia 5110 DSP ROM4 dump. That dump is git-ignored and was not
@@ -106,24 +105,23 @@ come from a license-compatible source or remain an optional analysis tool; its
 traces should be converted into independent protocol tests rather than copied
 implementation.
 
-## Current execution target
+## Current native boundary
 
-ROM acquisition is closed for the 5110 experiment. The next bounded milestone
-is to reproduce the independent native backend with the untouched 65,535-word
-program export and complete DROM map, recording the exact backend commit and
-runtime options. Success requires more than reaching a screen:
+NSE-1 ROM4 acquisition, external reproduction and local native loader/menu
+execution are established, not future milestones. The local backend executes
+the recovered resident program/DROM and firmware uploads without synthesized
+DSP completion. `make check-c54x-observed-coverage` validates the exact 626-word
+cold-idle opcode set and its Menu/power controls. Isolated native FR encoder
+and decoder gates validate algorithm results, not handset speech.
 
-1. record resident-program, DROM and uploaded-overlay execution coverage;
-2. distinguish genuine DSP output from any host-staged self-test or bootstrap
-   response;
-3. capture ordered DSPIF, serial COBBA, parallel MFI and PCM activity through
-   boot, idle and one call lifecycle; and
-4. convert corroborated bus transactions into independent local fixtures before
-   assigning semantics to COBBA registers or DSP mailbox words.
-
-The recovered archive does not close the product-correct DSP-ROM problem. It is
-an NSE-1/5110 ROM4 input. The Nokia 3210 still needs its own internal DSP images
-or physical traces before the HLE backend can be replaced faithfully for NSE-8.
+The remaining NSE-1 boundaries are RF sample ownership/encoding and SCU
+tuning, and an organic DSP-to-PCM speech lifecycle. Matching internal images
+or independent traces are still required for other DSP products; the recovered
+5110 mask is not product-correct evidence for a 3210. Keep generated replies,
+host-assisted DSP output, opaque register labels and measured peripheral
+transactions separate. The authoritative local execution contract and current
+RF frontier are in [ROM4 DSP loader](rom4_dsp_loader.md); the catalogue below
+retains corroboration and costly-to-repeat negative knowledge.
 
 ### First reproduced run
 
