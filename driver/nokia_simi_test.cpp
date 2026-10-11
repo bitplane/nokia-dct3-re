@@ -275,6 +275,21 @@ private:
 		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
 		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
 		{0xb0, 0, 0, 5, 0, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x6f43, 0x94, 4}, // SMSS belongs to TELECOM, not GSM.
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f43, 0x9f, 15, true, false, true},
+		{0xc0, 0, 0, 15, 0x6f43, 0x90, 0},
+		{0xb0, 0, 0, 2, 0, 0x98, 4},
+		{0xd6, 0, 0, 2, 0x42fe, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb0, 0, 0, 2, 0xff, 0x90, 0},
+		{0xd6, 0, 0, 2, 0x42fe, 0x90, 0},
+		{0xb0, 0, 0, 2, 0x42fe, 0x90, 0},
+		{0xd6, 0, 2, 1, 0x55, 0x94, 2},
+		{0xb0, 0, 0, 2, 0x42fe, 0x90, 0, false, true},
+		{0xb0, 0, 0, 2, 0, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb0, 0, 0, 2, 0xff, 0x90, 0, false, true},
 		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
 		{0xa4, 0, 0, 2, 0x6f30, 0x9f, 15, true, false, true},
 		{0xc0, 0, 0, 15, 0x6f30, 0x90, 0},
@@ -294,7 +309,11 @@ private:
 		{0xd6, 0, 0, 12, 0x3344, 0x90, 0},
 		{0xa4, 0, 0, 2, 0x6f30, 0x9f, 15},
 		{0xd6, 0, 0, 24, 0x1122, 0x90, 0},
-		{0xb0, 0, 0, 1, 0x11, 0x90, 0}
+		{0xb0, 0, 0, 1, 0x11, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f43, 0x9f, 15},
+		{0xd6, 0, 0, 2, 0x42fe, 0x90, 0},
+		{0xb0, 0, 0, 2, 0x42fe, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -677,6 +696,8 @@ private:
 					expect(m_bytes[9] == 0x10, "IMSI advertises CHV1 READ");
 				if (item.body == 0x6f30 || item.body == 0x6f7b)
 					expect(m_bytes[9] == 0x11, "PLMN lists advertise CHV1 READ and UPDATE");
+				if (item.body == 0x6f43)
+					expect(m_bytes[9] == 0x11, "SMSS advertises CHV1 READ and UPDATE");
 				if (m_write_case >= 147)
 					expect((m_bytes[9] & 0xf0) == 0x10, "GSM file advertises CHV1 READ");
 			}
@@ -750,6 +771,7 @@ private:
 			osd_printf_info("SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0\n");
 			osd_printf_info("SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
+			osd_printf_info("SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

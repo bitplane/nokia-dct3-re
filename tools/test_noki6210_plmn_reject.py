@@ -5,9 +5,9 @@ from tools.run_noki6210_acceptance import check_plmn_reject, check_forbidden_sel
 
 class PlmnRejectTest(unittest.TestCase):
     def fixture(self, home=False):
-        storage = bytearray(3560)
+        storage = bytearray(3562)
         storage[1610] = 3
-        storage[3548:] = b'\xff' * 12
+        storage[3548:3560] = b'\xff' * 12
         text = ('RX enqueue type=80 data=05040b\n'
                 'LAPDm Location Updating Reject acknowledged nr=1\n'
                 'LAPDm Channel Release acknowledged nr=2\n')
@@ -38,7 +38,7 @@ class PlmnRejectTest(unittest.TestCase):
 
     def test_wrong_or_partial_storage(self):
         text, storage = self.fixture()
-        for changed in (storage[:-1], storage + b'\x00', bytes(3560)):
+        for changed in (storage[:-1], storage + b'\x00', bytes(3562)):
             with self.subTest(size=len(changed)), self.assertRaises(ValueError):
                 check_plmn_reject(text, changed)
 
@@ -58,7 +58,7 @@ class PlmnRejectTest(unittest.TestCase):
         text = ('read-binary fid=6f7b offset=0 length=12\n'
                 'RX enqueue type=80 data=061b00f120\n')
         if not forbidden:
-            storage[3548:] = b'\xff' * 12
+            storage[3548:3560] = b'\xff' * 12
             storage[1604:1609] = bytes.fromhex('00f1200001')
             storage[1610] = 0
             text += ('TX packet type=0c payload=8\n'

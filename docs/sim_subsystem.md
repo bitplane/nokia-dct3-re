@@ -138,15 +138,16 @@ implements:
 
 SIM NVRAM loading validates the complete serialized record before installing
 card fields. The supported append-only layouts retain base files, then SMS/SMSP,
-then security state, then EF_ACM, then preferred/forbidden PLMN lists; missing later fields receive their declared
+then security state, then EF_ACM, then preferred/forbidden PLMN lists, then
+EF_SMSS; missing later fields receive their declared
 defaults. Truncated records, trailing bytes and non-boolean CHV1-enable flags
 are rejected atomically. Device startup initializes defaults because MAME
 reports load failure without resetting NVRAM. `verify-sim-nvram-atomic` exercises
-thirteen cases through actual isolated MAME processes, including all four legacy
+fifteen cases through actual isolated MAME processes, including all five legacy
 layouts and an unchanged full record. Its short-ADN negative detects the former
 partial-load defect. This is storage conformance, not a handset-service claim;
 physical phonebook and security gates remain separate.
-The current record is 3560 bytes; its original 3524-byte prefix and all existing
+The current record is 3562 bytes; its original 3560-byte prefix and all existing
 file/security offsets are unchanged. `run_sim_nvram_atomic.py --card-seed`
 additionally cold-loads an independently produced current record and requires
 byte-exact preservation, rejecting silent reinitialization.
@@ -228,12 +229,15 @@ successful five-byte readback, and denial after unverified-state restoration.
 PUCT update policy remains unmapped: the standard permits an administratively
 selected CHV1/CHV2 condition, not an unconditional assumption of either one.
 
-EF_SMSS (`6F43`, SMS status) remains a concrete file-completeness gap. GSM
-11.11 10.3.7 places it under DF_TELECOM with CHV1 READ/UPDATE; the current
-descriptor incorrectly places an immutable erased body under DF_GSM. Its
-last-used TP-MR and capacity-notification flag need card-owned mutable storage,
-save/load and backward-compatible persistence before handset SMS lifecycle
-claims can cover this file. Do not repair its parent alone and call it complete.
+EF_SMSS (`6F43`, SMS status) belongs to DF_TELECOM and enforces CHV1
+READ/UPDATE, with matching FCP (GSM 11.11 10.3.7). Its two card-owned bytes
+hold last-used TP-MR and the capacity-exceeded notification flag; the initial
+profile is `FF FF` (flag unset/capacity available). The serial fixture checks
+wrong-parent selection, pre-PIN denial, mutation, failed bounds preservation
+and exact restoration. Both bytes are saved and appended to NVRAM; complete
+legacy PLMN records receive defaults, while partial extensions are rejected
+before any retained state is installed. A serial-written record is independently
+cold-loaded byte-for-byte by the atomic-storage gate.
 The standard GSM transparent set Kc (`6F20`), PLMNsel (`6F30`), HPLMN
 (`6F31`), ACMmax (`6F37`), BCCH (`6F74`), ACC (`6F78`), FPLMN (`6F7B`)
 and LOCI (`6F7E`) also enforces CHV1 READ. Serial tests independently check

@@ -22,11 +22,12 @@ AUTH_ACCESS_PASS = "SIM authentication access: PASS before_pin=1 after_pin=1 gsm
 BLOCKED_DISABLED_PASS = "SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0"
 PLMN_PASS = "SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
 PUCT_PASS = "SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
+SMSS_PASS = "SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
 
 
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -49,16 +50,18 @@ def main():
                                     stderr=subprocess.STDOUT, timeout=90)
         check((run / "console.log").read_text(), result.returncode)
         storage = (run / "nvram/simitest/card").read_bytes()
-        if (len(storage) != 3560 or storage[3524:3548] != b"\x11" + b"\x22" * 23
-                or storage[3548:] != b"\x33" + b"\x44" * 11):
+        if (len(storage) != 3562 or storage[3524:3548] != b"\x11" + b"\x22" * 23
+                or storage[3548:3560] != b"\x33" + b"\x44" * 11
+                or storage[3560:] != b"\x42\xfe"):
             raise ValueError("serial PLMN updates were not serialized exactly")
         (run / "acceptance.json").write_text(json.dumps({
-            "result": "pass", "command": command, "checkpoints": 8,
+            "result": "pass", "command": command, "checkpoints": 9,
             "plmn_update_files": 2, "plmn_update_restore": True,
             "plmn_serialized_exactly": True,
             "protected_record_files": 4, "read_access_restore": True,
             "imsi_read_access": True,
             "puct_read_access": True, "puct_unverified_restore": True,
+            "smss_access_restore": True, "smss_serialized_exactly": True,
             "additional_protected_binary_files": 8,
             "authentication_access": True, "authentication_directory": True,
             "disabled_chv_blocking": True, "unblock_recovery": True,
@@ -97,6 +100,7 @@ def main():
     print(BLOCKED_DISABLED_PASS)
     print(PLMN_PASS)
     print(PUCT_PASS)
+    print(SMSS_PASS)
 
 
 if __name__ == "__main__":

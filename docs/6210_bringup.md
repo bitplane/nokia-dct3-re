@@ -271,6 +271,15 @@ and speech are not accepted; unrecovered handover fields remain unset.
 
 ### Phone-service acceptance
 
+`verify-6210-sms-status-persistence` sends a physical `A`/5551234 SMS through
+the host backend with PIN enabled, then starts a separate process using the
+retained card and sends another. Each process requires PIN verification, own
+registration, CP/RP/RR closure, and the sent-message frame. Firmware reads
+EF_SMSS before submission and writes it afterward; its saved TP-MR must equal
+the transmitted reference, its capacity flag must remain unset, and the second
+reference must advance modulo 256. This proves handset-managed SMS reference
+persistence, not native DSP or speech.
+
 `verify-6210-home-plmn-reject` supplies GSM 04.08 cause 11 through the
 ordinary downlink and requires rejection/channel-release acknowledgements,
 EF_LOCI status 3, no acceptance, and unchanged erased EF_FPLMN. This is a

@@ -182,6 +182,7 @@ private:
 	u8 m_acm[3] = { 0 };
 	u8 m_preferred_plmn[24] = { 0 };
 	u8 m_forbidden_plmn[12] = { 0 };
+	u8 m_smss[2] = { 0xff, 0xff };
 	u8 m_chv[2][8] = { { 0 }, { 0 } };
 	u8 m_unblock_chv[2][8] = { { 0 }, { 0 } };
 	u8 m_chv_attempts[2] = { 3, 3 };

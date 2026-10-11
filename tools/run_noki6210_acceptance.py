@@ -47,6 +47,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'host-incoming-call': ('npe3hle', 'host_incoming_input', 60),
              'host-incoming-sms': ('npe3hle', 'incoming_sms_input', 30),
              'host-outgoing-sms': ('npe3hle', 'outgoing_sms_input', 43),
+             'host-sms-status': ('npe3hle', 'outgoing_sms_input', 43),
              'host-rejected-sms': ('npe3hle', 'sms_reject_input', 50),
              'host-silent-sms': ('npe3hle', 'sms_silence_input', 135),
              'host-outgoing-call': ('npe3hle', 'outgoing_call_input', 48)}
@@ -134,12 +135,12 @@ def check_plmn_reject(text, storage, *, home=False):
     ), '6210 PLMN rejection')
     if 'LAPDm Location Updating Accept acknowledged' in text:
         raise ValueError('rejected PLMN was also accepted')
-    if len(storage) != 3560:
+    if len(storage) != 3562:
         raise ValueError('incomplete SIM storage after rejection')
     if storage[1610] != 3:
         raise ValueError('rejected location update did not persist roaming-not-allowed status')
     if home:
-        if 'update-binary fid=6f7b' in text or storage[3548:] != b'\xff' * 12:
+        if 'update-binary fid=6f7b' in text or storage[3548:3560] != b'\xff' * 12:
             raise ValueError('home PLMN incorrectly added to EF_FPLMN')
         return
     if text.find('update-binary fid=6f7b') < text.find('05040b'):
@@ -151,7 +152,7 @@ def check_plmn_reject(text, storage, *, home=False):
 
 def check_forbidden_selection(text, storage, *, forbidden, previous):
     import re
-    if len(storage) != 3560:
+    if len(storage) != 3562:
         raise ValueError('incomplete cold SIM storage')
     if 'read-binary fid=6f7b offset=0 length=12' not in text:
         raise ValueError('cold selection did not read EF_FPLMN')
@@ -171,7 +172,7 @@ def check_forbidden_selection(text, storage, *, forbidden, previous):
         ), '6210 cleared forbidden-list control')
         if storage[1604:1609] != bytes.fromhex('00f1200001') or storage[1610] != 0:
             raise ValueError('cleared forbidden-list control did not persist visited location')
-        if storage[3548:] != b'\xff' * 12:
+        if storage[3548:3560] != b'\xff' * 12:
             raise ValueError('accepted cleared-list control unexpectedly forbade a PLMN')
 
 
@@ -272,7 +273,7 @@ def main():
     args = parser.parse_args()
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
                              ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call',
-                              'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms', 'phonebook', 'state-call',
+                              'host-outgoing-sms', 'host-sms-status', 'host-rejected-sms', 'host-silent-sms', 'phonebook', 'state-call',
                               'state-idle', 'state-sms')):
         parser.error('--pin-enabled requires --coherent-cell and a supported service fixture')
     root = Path(__file__).resolve().parents[1]
@@ -344,6 +345,7 @@ def main():
                     '--caller', '5551234', '--ready-file', str(run / 'snap/6210_host_registered_idle.png')]),
                 'host-incoming-sms': ('run_host_incoming_sms_gate', []),
                 'host-outgoing-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1']),
+                'host-sms-status': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1']),
                 'host-rejected-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
                 'host-silent-sms': ('run_host_sms_gate', ['--user-data', '41', '--user-data-length', '1', '--decision', 'rp_silence']),
                 'host-outgoing-call': ('run_host_call_adapter_gate', ['--number', '1234567', '--decision', 'connect']),
@@ -554,7 +556,7 @@ def main():
                             frame.convert('L').crop((0, 8, 96, 40)).tobytes()).hexdigest() != (
                             'edde96356123c9684d846f94418f1d2e6eedc7fd331a3dab41d92cd38f5006ca'):
                         raise ValueError('missing reviewed host caller 5551234')
-        elif args.scenario in ('outgoing-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms'):
+        elif args.scenario in ('outgoing-sms', 'host-outgoing-sms', 'host-sms-status', 'host-rejected-sms', 'host-silent-sms'):
             from tools.noki6210_outgoing_sms_check import verify as check_submission
             if args.scenario != 'host-silent-sms':
                 check_submission(text, rejected=args.scenario == 'host-rejected-sms')
@@ -594,7 +596,7 @@ def main():
                     card = cold / f'nvram/{machine}/sim_card'
                     if not forbidden:
                         cleared = bytearray(retained)
-                        cleared[3548:] = b'\xff' * 12
+                        cleared[3548:3560] = b'\xff' * 12
                         card.write_bytes(cleared)
                     cold_command = command.copy()
                     cold_command[cold_command.index('-seconds_to_run') + 1] = '30'
@@ -647,13 +649,45 @@ def main():
                 from PIL import Image
                 with Image.open(run / 'snap/6210_state_sms_read_1.png') as frame:
                     check_frame(frame, SMS_READ_SHA256, 'restored received hello SMS')
-        if args.scenario in ('host-incoming-sms', 'host-outgoing-sms'):
+        if args.scenario in ('host-incoming-sms', 'host-outgoing-sms', 'host-sms-status'):
             name = 'radio_incoming_host_sms_trace_check' if args.scenario == 'host-incoming-sms' else 'radio_outgoing_host_sms_trace_check'
             options = [] if args.scenario == 'host-incoming-sms' else ['--octets', '1']
             if args.scenario == 'host-incoming-sms' and args.coherent_cell:
                 options.extend(['--arfcn', '35'])
             subprocess.run([sys.executable, str(root / f'tools/{name}.py'),
                             str(run / 'error.log')] + options, check=True)
+        if args.scenario == 'host-sms-status':
+            from tools.noki6210_outgoing_sms_check import verify as check_submit, verify_status
+            from tools.radio_outgoing_host_sms_trace_check import verify as check_host_sms
+            card_path = Path(f'nvram/{machine}/sim_card')
+            first_reference = verify_status(text, (run / card_path).read_bytes())
+            cold = run / 'cold-sms-status'
+            cold.mkdir()
+            shutil.copytree(run / 'nvram', cold / 'nvram')
+            shutil.copytree(run / 'cfg', cold / 'cfg')
+            cold_host_command = host_command.copy()
+            cold_host_command[cold_host_command.index('--cwd') + 1] = str(cold)
+            with (cold / 'console.log').open('w') as output:
+                subprocess.run(cold_host_command, cwd=cold, stdout=output,
+                               stderr=subprocess.STDOUT, check=True, timeout=180,
+                               env=environment)
+            check_output((cold / 'console.log').read_text(errors='replace'))
+            cold_text = events(cold / 'error.log')
+            verify(cold_text, runtime=True, selftest=True)
+            check_submit(cold_text)
+            check_host_sms((cold / 'error.log').read_text(errors='replace'), octets=1)
+            cold_storage = (cold / card_path).read_bytes()
+            second_reference = verify_status(cold_text, cold_storage)
+            if second_reference != (first_reference + 1) % 256:
+                raise ValueError('cold SMS did not advance the retained TP-MR')
+            if args.pin_enabled:
+                from tools.sim_security_trace_check import validate as check_security
+                check_security(cold_text, cold_storage, 'verify', '1234')
+                check_registration(cold_text, cold_storage, preserved_location=True,
+                                   channel_header='1202')
+            from PIL import Image
+            with Image.open(cold / 'snap/6210_sms_sent.png') as frame:
+                check_host_sms_sent(frame)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
@@ -666,6 +700,11 @@ def main():
                                if args.scenario == 'plmn-reject' else
                                {'cause': 11, 'home_plmn_forbidden': False}
                                if args.scenario == 'home-plmn-reject' else None),
+            'sms_status_persistence': ({'first_reference': first_reference,
+                                        'cold_reference': second_reference,
+                                        'firmware_read_and_write': True,
+                                        'independent_processes': 2}
+                                       if args.scenario == 'host-sms-status' else None),
             'native_dsp_complete': False, 'speech_tested': False, 'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')

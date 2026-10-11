@@ -18,9 +18,14 @@ class SimSecurityTraceCheckTest(unittest.TestCase):
         trace = "SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n"
         validate(trace, nvram, "verify", "1234")
 
+    def test_smss_extension_preserves_security_offsets(self):
+        nvram = profile.make_profile(True) + b"\xff" * 36 + b"\x42\xfe"
+        trace = "SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n"
+        validate(trace, nvram, "verify", "1234")
+
     def test_partial_or_overlong_plmn_extension_is_rejected(self):
         trace = "SIM status ins=20 sw=9000 chv=3/3 puk=10/10 enabled=1\n"
-        for length in (1, 24, 35, 37):
+        for length in (1, 24, 35, 37, 39):
             with self.subTest(length=length), self.assertRaisesRegex(ValueError, "SIM NVRAM"):
                 validate(trace, profile.make_profile(True) + b"\xff" * length, "verify", "1234")
 
