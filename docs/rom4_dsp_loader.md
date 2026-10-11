@@ -2277,10 +2277,11 @@ RF acquisition or handset speech.
 The optional `set_pipeline_frontend` path owns Prefetch, Fetch, Decode,
 Access, Read and Execute slots inside the existing CPU, reusing its semantic
 backend and interrupt-source/entry operations. No handset or MU4 configuration
-enables it. Initial executable coverage is NOP, one-word immediate loads,
-two-word shifted immediate loads and direct DP-relative loads to A/B.
-Indirect, SP-relative and other multiword forms stop at Decode without
-atomic fallback.
+enables it. Executable coverage is NOP, one-word immediate loads, two-word
+shifted immediate loads, direct DP-relative loads and STL/STH stores, and
+short indirect loads using plain, post-decrement, post-increment or
+pre-increment addressing. SP-relative, other indirect and other multiword
+forms stop at Decode without atomic fallback.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
@@ -2300,8 +2301,24 @@ DP-relative loads capture their operand address in Access, read the data bus
 once in Read at cycle 5 and retire the captured value at Execute at cycle 6.
 The fixtures change backing memory after Read and checkpoint that boundary:
 both normal and restored retirement use the captured value, not a second bus
-read. This covers both accumulators; it does not establish modifying address
-modes, address/data hazards, multiple data accesses or memory writes.
+read. This covers both accumulators, not address/data hazards or multiple
+data accesses.
+
+Direct DP-relative STL/STH stores capture EAB in Read and commit EB in
+Execute, as described in SPRU131G 7.1. Twelve fixtures cover A/B low/high
+halves and existing unsigned/signed saturation semantics. Changing DP after
+Read cannot redirect the pending write. All twelve restore a post-Read
+checkpoint and require exactly one Execute-stage write per leg while the
+older store drains alongside interrupt entry. These fixtures use ordinary
+RAM; they do not establish MMR-write hazards or memory arbitration.
+
+Short indirect loads perform DAGEN and the AR modification in Access, read
+the retained address in Read and retire the captured value in Execute.
+Eight AR1 fixtures cover both accumulators and plain/post-decrement/
+post-increment/pre-increment addressing. They change AR1 after Access,
+checkpoint there and require one read of the original address per leg,
+without repeating the AR modification on restoration. Extended, indexed,
+circular and compatibility-mode hazard contracts remain outside this scope.
 
 Two-word immediate loads retain the opcode while the following fetched word
 completes Decode as its literal. They consume distinct program fetches
@@ -2323,8 +2340,8 @@ Decode reproduces every subsequent observed stage and architectural result,
 with one vector fetch/acknowledgement per leg. The bench suspends execution
 for scheduler settlement after loading inside a live callback; that pause is
 not emulated interrupt latency or a physical wall-time replay claim.
-`check-c54x-core` requires staged-frontend, direct-load, multiword/replay/stream,
-empty IRQ/NMI and unsupported-form markers.
+`check-c54x-core` requires staged-frontend, direct-load, store, indirect-load,
+multiword/replay/stream, empty IRQ/NMI and unsupported-form markers.
 Existing native execution remains protected by its full conformance suite.
 `verify-5110-save-state` passes with the added partial-Decode fields; this
 revalidates native CPU/register/I/O restoration, not the still-failing exact

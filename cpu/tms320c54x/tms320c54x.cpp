@@ -1751,12 +1751,14 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_valid[2] = false;
 		}
 		u16 const word = m_pipeline_word[2];
-		// Register loads, two-word immediate loads and direct DP loads are covered.
+		// Register/immediate loads, short loads and direct DP stores are covered.
 		// Other memory/control forms need Access/Read/redirect ownership first.
-		bool const direct_load = (word & 0xfe80) == 0x1000 && !BIT(m_st1, 14);
+		bool const short_load = (word & 0xfe00) == 0x1000 && u8(word) < 0xa0 &&
+			(BIT(word, 7) || !BIT(m_st1, 14));
+		bool const direct_store = (word & 0xfc80) == 0x8000 && !BIT(m_st1, 14);
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
 		if (m_pipeline_valid[2] && word != 0xf495 && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !direct_load && !long_load)
+			(word & 0xff00) != 0xe900 && !short_load && !direct_store && !long_load)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -1764,12 +1766,21 @@ void tms320c54x_device::pipeline_step()
 			return;
 		}
 	}
-	// Direct DP-relative loads own their address in Access and bus value in
-	// Read. SP-relative and modifying indirect modes need separate contracts.
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe80) == 0x1000)
-		m_pipeline_operand_address[3] = short_smem_address(u8(m_pipeline_word[3]));
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe80) == 0x1000)
+	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
+	// not retirement. Retain that address even if the AR changes before Read.
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe00) == 0x1000)
+	{
+		u8 const mode = m_pipeline_word[3];
+		bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
+		if (preincrement) indirect_modify(mode);
+		m_pipeline_operand_address[3] = short_smem_address(mode);
+		if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
+	}
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe00) == 0x1000)
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
+	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfc80) == 0x8000)
+		m_pipeline_operand_address[4] = short_smem_address(u8(m_pipeline_word[4]));
 	if (m_pipeline_valid[5])
 	{
 		u32 const address = m_pipeline_address[5];
@@ -1780,8 +1791,11 @@ void tms320c54x_device::pipeline_step()
 		++m_pc;
 		if (m_opcode_first_pc[m_op] == 0xffff) m_opcode_first_pc[m_op] = u16(address);
 		++m_opcode_count[m_op];
-		if ((m_op & 0xfe80) == 0x1000)
+		if ((m_op & 0xfe00) == 0x1000)
 			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
+		else if ((m_op & 0xfc80) == 0x8000)
+			data_write(m_pipeline_operand_address[5],
+				u16(saturated_store(accumulator(BIT(m_op, 8))) >> (BIT(m_op, 9) ? 16 : 0)));
 		else if ((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062)
 		{
 			++m_pc;

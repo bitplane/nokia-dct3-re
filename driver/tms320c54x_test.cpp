@@ -2492,6 +2492,86 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_store_case(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_store_case = variant;
+		m_pipeline_store_writes = m_vector_acks = 0;
+		m_pipeline_replay = false;
+		m_pipeline_expected_cycle = 1;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i)
+		{
+			program.write_word(0x600 + i, 0xf495);
+			program.write_word(0x40 + i, 0xf495);
+		}
+		program.write_word(0x600, 0x8020 + (variant % 4) * 0x100);
+		program.write_word(0x40, 0xe955);
+		data.write_word(0x420, 0xbeef); data.write_word(0x4a0, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant >= 8 ? 0x0100 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, variant >= 4 ? 1 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, variant >= 8 ? 0xff00000000ULL : 0x0123456789ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, variant >= 8 ? 0xff00000001ULL : 0x0156789abcULL);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_operand_tap = data.install_write_tap(0x420, 0x420, "pipeline_store",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				constexpr u16 results[] = {0x6789, 0x9abc, 0x2345, 0x5678,
+					0xffff, 0xffff, 0xffff, 0xffff, 0, 0, 0x8000, 0x8000};
+				expect(m_cpu->pipeline_cycles() == 6 && value == results[m_pipeline_store_case],
+					"Direct STL/STH writes once in Execute with existing saturation semantics");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251070;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_indirect_case(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_indirect_case = variant;
+		m_pipeline_operand_reads = m_vector_acks = 0;
+		m_pipeline_replay = false;
+		m_pipeline_expected_cycle = 1;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i)
+		{
+			program.write_word(0x600 + i, 0xf495);
+			program.write_word(0x40 + i, 0xf495);
+		}
+		constexpr u16 modes[] = { 0x81, 0x89, 0x91, 0x99 };
+		program.write_word(0x600, (variant >= 4 ? 0x1100 : 0x1000) | modes[variant % 4]);
+		program.write_word(0x40, 0xe955);
+		m_cpu->space(AS_DATA).write_word(0x420, 0x1234);
+		m_cpu->space(AS_DATA).write_word(0x4a0, 0x5678);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, variant % 4 == 3 ? 0x41f : 0x420);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x420, 0x420, "pipeline_indirect",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 5, "Indirect data read uses the retained Access address in Read");
+				++m_pipeline_operand_reads;
+			});
+		m_phase = 251090;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -22553,10 +22633,121 @@ private:
 				m_pipeline_operand_tap.remove();
 				m_cpu->set_pipeline_frontend(false);
 				osd_printf_info("TMS320C54x staged multiword stream: PASS long_execute=7,9 short_execute=10 literal_reads=2\n");
+				start_pipeline_store_case();
+				return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251070)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"Direct store follows the staged frontend without atomic fallback");
+			expect(m_pipeline_store_writes == (cycle >= 6 ? 1 : 0) &&
+				m_cpu->space(AS_DATA).read_word(0x4a0) == 0xbeef,
+				"Store waits for Execute and keeps its Read-stage address despite later DP changes");
+			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
+			if (cycle == 5 && !m_pipeline_replay)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 9);
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+					"Save pending store after EAB preparation but before EB commit");
+			}
+			if (cycle == 10)
+			{
+				expect(m_vector_acks == 1 && m_pipeline_store_writes == 1,
+					"Interrupt drain retires one pending store before its first ISR instruction");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_vector_acks = m_pipeline_store_writes = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == 5,
+						"Restore the pending store with its retained write address");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = 6;
+					m_phase = 251080;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_operand_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_store_case < 11) { start_pipeline_store_case(m_pipeline_store_case + 1); return; }
+				osd_printf_info("TMS320C54x staged stores: PASS cases=12 address=Read write=Execute writes_per_leg=1 pending_store_restore=12\n");
+				start_pipeline_indirect_case();
+				return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251080)
+		{
+			expect(m_cpu->pipeline_cycles() == 5, "Scheduler settlement does not commit a pending store");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_phase = 251070;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251090)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const modifier = m_pipeline_indirect_case % 4;
+			bool const destination_b = m_pipeline_indirect_case >= 4;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"Short indirect load advances through owned stages");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 6 && !destination_b ? 0x1234 : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 10 ? 0x55 : cycle >= 6 && destination_b ? 0x1234 : 0),
+				"Indirect load retires the Read value, not a new AR-relative read");
+			constexpr u16 initial[] = {0x420, 0x420, 0x420, 0x41f};
+			constexpr u16 modified[] = {0x420, 0x41f, 0x421, 0x420};
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) ==
+				(cycle < 4 ? initial[modifier] : cycle == 4 ? modified[modifier] : 0x4a0),
+				"AR modification occurs in Access and is not repeated at Read or Execute");
+			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
+			if (cycle == 4 && !m_pipeline_replay)
+			{
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x4a0);
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+					"Save completed DAGEN before the indirect bus read");
+			}
+			if (cycle == 10)
+			{
+				expect(m_vector_acks == 1 && m_pipeline_operand_reads == 1,
+					"Each indirect leg reads once and acknowledges one interrupt");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_vector_acks = m_pipeline_operand_reads = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == 4,
+						"Restore captured DAGEN without repeating AR modification");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = 5;
+					m_phase = 251100;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_operand_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_indirect_case < 7) { start_pipeline_indirect_case(m_pipeline_indirect_case + 1); return; }
+				osd_printf_info("TMS320C54x staged indirect loads: PASS cases=8 ar_update=Access read=Read execute=Execute captured_address_restore=8\n");
 				osd_printf_info("TMS320C54x core conformance: PASS\n");
 				throw emu_fatalerror(0, "TMS320C54x core tests complete");
 			}
 			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251100)
+		{
+			expect(m_cpu->pipeline_cycles() == 4, "Scheduler settlement preserves the completed indirect Access");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_phase = 251090;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 			return;
 		}
@@ -23008,6 +23199,9 @@ private:
 	bool m_pipeline_memory_b = false;
 	unsigned m_pipeline_operand_reads = 0;
 	unsigned m_pipeline_long_case = 0;
+	unsigned m_pipeline_store_case = 0;
+	unsigned m_pipeline_store_writes = 0;
+	unsigned m_pipeline_indirect_case = 0;
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
 	unsigned m_pipeline_drained_fetches = 0;
@@ -23065,6 +23259,17 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 251090)
+		{
+			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Indirect load drains while vector IACK occurs");
+			++m_vector_acks;
+		}
+		if (m_phase == 251070)
+		{
+			expect(line == 0 && m_cpu->pipeline_cycles() == 6,
+				"Direct store retires during vector Fetch/IACK");
+			++m_vector_acks;
+		}
 		if (m_phase == 251040)
 		{
 			expect(line == 0 && m_cpu->pipeline_cycles() == 7,
