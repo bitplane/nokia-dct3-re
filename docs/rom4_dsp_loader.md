@@ -989,14 +989,15 @@ phases or silicon latency. Retained vector prefetch precedes the stack write;
 the continuation is captured from the latter's passive tap. Do not choose a
 foreground delay from this trace or interpret bus observability as a pipeline
 correction.
-In `tmp/c54x-mmr-map-final.log`, opcode fetch and TCR bus write have the
-same accounting timestamp; the first short-period vector fetch follows two
-accounting cycles later. Both short cases enter 108 times and stack `0608`,
+In `tmp/c54x-entry-timer-observation.log`, opcode fetch and TCR bus write have
+the same accounting timestamp; the first short-period vector fetch follows
+four accounting cycles later after the entry micro-operation split. Both
+short cases still enter 108 times and stack `0608`,
 with no mask write. Long-period indirect/direct cases mask four/two cycles
 after the reload respectively and never enter the vector. This makes the
 collapsed fetch/write boundary directly observable without changing PRD,
 interrupt admission or firmware state; it does not settle physical acceptance.
-The core and original MU4 storage/native-entry gates pass in that log.
+The changed vector-fetch timestamp does not resolve the short-period stall.
 `tmp/c54x-mmr-map-rf.log` independently retains the ROM4 no-cell boundary:
 648,288 RF reads, 1,580 port-32 writes and no port-38/39 reads. The tool suite
 passes 2,452 tests with one skip. None of these gates proves recorder save

@@ -2293,17 +2293,18 @@ boundary. `tmp/mu4-recorder-control-xc/error.log` receives
 selector `36`/parameter `4` at 11.406 seconds with previous class/selector
 `1/36`; native receipt/acknowledgement passes, recording completion remains
 unclaimed.
-The current replay after BRAF, operand-fetch ordering and CALA RTN corrections
-is `tmp/mu4-recorder-save-fetch/error.log`. It receives control at 12.236
-seconds with previous selector `49` (the earlier BRAF-only run received it
-at 11.449 seconds). The changed latency is an observation, not a calibrated
-peer delay or proof of correct pipeline timing.
+The current replay after staged interrupt entry and vector-fetch IFR clearance
+is `tmp/c54x-entry-recorder-save/error.log`. It receives control at 12.236
+seconds with previous selector `49`. This is unchanged from the earlier
+operand-fetch/CALA replay; entry micro-operation ordering did not resolve
+the metadata transaction. This latency is an observation, not a calibrated
+peer delay or proof of correct foreground pipeline timing.
 Completion reaches `8009` and the resident image returns, but the endpoint
 is `02:3da4`, ST1 `6900`, IMR `0ac9`, IFR `0c78`, cursor 28 and RX-ready set: 50
 application calls, two dequeued messages and one processing-wait entry.
 RX/TX are 37/47, with three responses and two ACKs; TIM/PRD/TCR are
 `0001/0001/0000`. It exits 3 because metadata has not been delivered.
-The terminal snapshot remains identical to the BRAF-only replay, so the newer
+The terminal snapshot remains identical to the earlier replay, so the newer
 CPU corrections do not resolve this transaction. The source and isolated NAND
 copy compare byte-for-byte after the run with NVRAM saving disabled and no
 firmware-state forcing. The control fixture's working warm dispatch does
