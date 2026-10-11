@@ -98,7 +98,8 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   this does not establish arbitrary user-delay recovery. A separately observed
   12-s start with slower keys accepts PIN at 20.018 s and remains interactive,
   but never requests Location Updating during the 45-s window. Late SIM
-  readiness remains an open firmware/peer lifecycle boundary, not a PIN failure.
+  readiness fails with the default ARFCN 1/2 topology; the coherent 86/87
+  topology independently completes delayed-PIN registration as described below.
 - `verify-5210-radio-measurement-static` pins the own MCU hash and RX table:
   `3de7a0[8] -> 3de7f4 -> 37019c`; the selected forwarding branch posts to
   task 12. Completion `2e336c -> 2bd782` consumes forty four-byte records,
@@ -115,6 +116,26 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   channel acknowledgements solely to make registration pass.
 
 ## Delayed-PIN request ownership
+
+### Validated coherent-network result
+
+`make verify-5210-late-pin-registration` starts physical PIN entry at 12 s
+with 1.85-s inter-key spacing, using the acquired PMM's ARFCN 86 and a matching
+86/87 laboratory topology. The background response reports serving carrier
+`0056` at -60 dBm. Firmware accepts PIN, completes Location Updating, persists
+EF_LOCI, releases the dedicated channel and returns to steady camp. Both
+request roots clear. Reviewed entered-code, registered idle, Messages menu and
+physical End recovery frames are checked independently. The PIN-enabled
+coherent run emits release header `041202`; the original no-PIN/early-PIN gate
+retains its separate `040000` expectation. Neither checker accepts both.
+
+The former delayed-PIN failure is a mismatched external network fixture, not
+proof of an unavailable firmware continuation or missing DSP acknowledgement.
+The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a
+negative control; all observations below describe that mismatched topology.
+No firmware state, message or callback is forced, and no DSP reply is replayed.
+
+### Mismatched-topology control
 
 Paired passive RAM observations distinguish successful PIN verification from
 radio-request promotion. The own v5.40E root is `0x13e78c`: selector state is
@@ -145,8 +166,8 @@ with the new request already queued. The delayed control has six entries:
 argument-zero calls from that same site occur at 10.208 and 10.209 s, before
 PIN acceptance, and its only post-PIN entry is argument 3. Thus neither a
 missing eligibility flag nor absence of the argument-zero caller explains
-this boundary; the unresolved difference is the ordinary event lifecycle
-that brings that caller and queued request together. The negative gate checks
+this negative control. The coherent-network run supplies the missing physical
+carrier consistency without changing selector behavior. The negative gate checks
 retained distinct request pointers, the eligible state-6 post-PIN entry, and
 complete selector coverage below the observation cap.
 
@@ -168,10 +189,8 @@ instead enters the previous-request comparison and configuration path. The
 static gate checks this entire discriminator cascade, not an inferred name
 for these requests. Their complete lifecycle semantics remain open.
 
-The outstanding lifecycle question is why late `0x03ec` readiness retains
-the initial request after both ordinary completion inputs have occurred, and
-which firmware-owned continuation should retire or promote it. A second
-channel-change or measurement reply is not justified merely by this ordering.
+The retained request in this control does not establish a missing DSP reply.
+A second channel-change or measurement reply is not justified by its ordering.
 The initial continuation `0x2e1f5e` is observed once in the delayed run at
 10.209223 s, after background-result parsing and before PIN acceptance; the
 successful early control never enters it. It passes value 5 to `0x2bd3d8`,
@@ -180,15 +199,14 @@ preserving its lower five bits, then calls `0x2bd424` and marks context byte 4.
 This is a configuration/record update, not proof of request retirement or a
 new completion message. The late boundary gate requires those ordered entry
 observations; the static contract checks the setter and continuation tail.
-The remaining own-ROM target is the lifetime of that retained initial scan
-after this update. The post-measurement type-`0x11` mode-4 instruction is
+The post-measurement type-`0x11` mode-4 instruction in the negative control is
 currently logged as unaccepted by the neighbour decoder; this is a separate
 candidate contract mismatch, not evidence that fabricating its response would
 promote the queued request.
 
-The next unresolved contract is which ordinary event invokes the eligible
-promotion entrance after late SIM readiness. Do not force selector arguments,
-promote pointers externally, or replay measurement completions to bypass it.
+Mode-4 DSP semantics remain independently unresolved, but are not required to
+claim the coherent-topology registration result. Do not force selector
+arguments, promote pointers externally, or replay measurement completions.
 `run_noki5210_acceptance.py --scenario pin-registration --observe-readiness`
 provides the successful physical-input control; `--scenario late-pin-boundary`
 provides the delayed negative control. Both use passive root observations.

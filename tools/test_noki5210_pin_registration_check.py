@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
-from tools.noki5210_pin_registration_check import verify, verify_late_boundary
+from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late
 
 
 def complete():
@@ -14,6 +14,19 @@ def complete():
 
 
 class PinRegistrationTest(unittest.TestCase):
+    def test_coherent_late_requires_own_measured_carrier(self):
+        text = '\n'.join((
+            'TX packet type=57 payload=4 words=3 radio_phase=serving_bcch data=03050000',
+            'RX enqueue type=8b payload=166 producer=0a4 data=0010005600c4',
+            complete(),
+            '5210_readiness_root: final current=00000000 queued=00000000 previous=00000000 context=00000000',
+        ))
+        with patch('tools.noki5210_pin_registration_check.registration') as registration:
+            verify_coherent_late(text, make_profile(pin_enabled=True))
+        registration.assert_called_once_with(text, 'nsm5', nsm5_pin=True)
+        with self.assertRaisesRegex(ValueError, 'serving-carrier'):
+            verify_coherent_late(text.replace('0010005600c4', '0010000100c4'), make_profile(pin_enabled=True))
+
     def late_trace(self):
         prefix = '\n'.join((
             'TX packet type=57 payload=4 words=3 radio_phase=serving_bcch data=03050000',

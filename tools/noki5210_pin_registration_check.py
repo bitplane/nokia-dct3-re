@@ -17,6 +17,7 @@ FRAMES = {
     'menu': '36956cb40f917975e07505c1889210989c2915d153f4578dc29350e175b70f47',
     'recovered': '08737c08772c99df2b41fc8560587820c2c209f5f74c12893a657bd6f623e555',
 }
+LATE_FRAMES = dict(FRAMES, menu='c74ae44fbfc72442195e3c981e9632508bde61da87a70b7c567a2a70d9a7aa53')
 
 
 def verify_authentication(text, card):
@@ -38,6 +39,20 @@ def verify(text, card):
         'LAPDm Location Updating Accept acknowledged nr=1',
     ))
     registration(text, 'nsm5')
+
+
+def verify_coherent_late(text, card):
+    verify_authentication(text, card)
+    require_in_order(text, (
+        'TX packet type=57 payload=4 words=3 radio_phase=serving_bcch data=03050000',
+        'RX enqueue type=8b payload=166',
+        'SIM status ins=20 sw=9000',
+        'LAPDm Location Updating Accept acknowledged nr=1',
+        '5210_readiness_root: final current=00000000 queued=00000000 previous=00000000 context=00000000',
+    ))
+    if not re.search(r'RX enqueue type=8b payload=166 [^\n]*data=0010005600c4', text):
+        raise ValueError('missing own coherent serving-carrier measurement')
+    registration(text, 'nsm5', nsm5_pin=True)
 
 
 def verify_late_boundary(text, card):
@@ -94,13 +109,15 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--late-boundary', action='store_true',
                         help='verify the unresolved delayed-readiness boundary, not registration')
+    parser.add_argument('--coherent-late', action='store_true',
+                        help='verify delayed PIN with the own ARFCN 86 laboratory topology')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify)(text, card)
-        for phase, digest in ({} if args.late_boundary else FRAMES).items():
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late else verify)(text, card)
+        for phase, digest in ({} if args.late_boundary else LATE_FRAMES if args.coherent_late else FRAMES).items():
             with Image.open(run / f'snap/5210_pin_{phase}.png') as frame:
                 if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)

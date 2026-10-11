@@ -77,6 +77,21 @@ NSM5_GOOD = NHM5_GOOD.replace(
     "data=040000000000001a600000560000000f00000000",
 )
 
+
+class Nsm5PinReleaseTest(unittest.TestCase):
+    def test_pin_release_is_explicit_and_strict(self):
+        text = NSM5_GOOD.replace('data=040000000000001a60000056',
+                                 'data=041202000000001a60000056')
+        verify(text, 'nsm5', nsm5_pin=True)
+        with self.assertRaises(ValueError):
+            verify(text, 'nsm5')
+        with self.assertRaises(ValueError):
+            verify(NSM5_GOOD, 'nsm5', nsm5_pin=True)
+
+    def test_pin_contract_rejects_other_product(self):
+        with self.assertRaisesRegex(ValueError, 'only validated'):
+            verify(GOOD, 'nse8', nsm5_pin=True)
+
 NHM6_PRESERVED_GOOD = NHM6_GOOD.replace(
     "4905087000f000fffe",
     "4905087200f1100001",

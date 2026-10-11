@@ -45,14 +45,17 @@ old set. See the current audit boundary in
 
 `verify-5210-sim-pin-registration` independently proves early physical
 `1234`/OK, successful CHV1 verification before laboratory registration,
-reviewed masked-code/menu/idle frames and physical recovery. A delayed
-entry accepts the PIN but does not register in the observed 45-s window;
-late-readiness recovery and authenticated call/SMS parity remain unproved.
+reviewed masked-code/menu/idle frames and physical recovery.
+`verify-5210-late-pin-registration` additionally proves delayed physical
+entry, own-carrier background measurements and full Location Updating on a
+coherent ARFCN 86/87 laboratory topology, with registered idle/menu/recovery
+frames. PIN-enabled call/SMS parity remains separately unproved.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record
 consumer before accepted delayed PIN; no random access follows within 45 s.
-The missing reply was not the recovery trigger. The negative gate distinguishes
-this unresolved lifecycle from authenticated registration coverage.
+This negative control deliberately uses mismatched ARFCN 1/2; it does not
+establish a missing firmware continuation or DSP acknowledgement. Correcting
+the external topology resolves the delayed-PIN registration boundary.
 
 `verify-sim-toolkit-interactive-5210` independently extends NSM-5's Phase-2+
 DISPLAY TEXT coverage with physical GET INKEY `5`/GET INPUT `42`, successful

@@ -103,12 +103,15 @@ COMMON_POST_ACCEPT_CHECKPOINTS = (
         r"RX enqueue type=80 payload=34 .*data=60[0-9a-f]{18}1506210001f0")),
 )
 
-def verify(text: str, profile: str = "nse8", preserved: bool = False, *, configured_carrier=False) -> None:
+def verify(text: str, profile: str = "nse8", preserved: bool = False, *, configured_carrier=False,
+           nsm5_pin=False) -> None:
     if profile not in PROFILE_CHECKPOINTS:
         raise ValueError(f"unknown registration profile: {profile}")
     if configured_carrier and profile != 'nhm3':
         raise ValueError('configured carrier contract is only validated for NHM-3')
-    deconfig_prefix = '041202' if configured_carrier else PROFILE_DECONFIG_PREFIX[profile]
+    if nsm5_pin and profile != 'nsm5':
+        raise ValueError('PIN release contract is only validated for NSM-5')
+    deconfig_prefix = '041202' if configured_carrier or nsm5_pin else PROFILE_DECONFIG_PREFIX[profile]
     acquisition = (
         ('configured SCH carrier 19', re.compile(
             r'RX enqueue type=80 payload=14 .*data=4012[0-9a-f]{8}0013000048')),

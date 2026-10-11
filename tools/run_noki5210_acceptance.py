@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -14,7 +15,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
-    parser.add_argument('--scenario', choices=('toolkit-interactive', 'pin-registration', 'late-pin-boundary'),
+    parser.add_argument('--scenario', choices=('toolkit-interactive', 'pin-registration',
+                                             'late-pin-boundary', 'late-pin-registration'),
                         default='toolkit-interactive')
     parser.add_argument('--observe-readiness', action='store_true',
                         help='passively observe own context roots during the early-PIN control')
@@ -28,7 +30,15 @@ def main():
         for name in ('cfg', 'nvram', 'snap'):
             (run / name).mkdir()
         pin = args.scenario != 'toolkit-interactive'
-        late = args.scenario == 'late-pin-boundary'
+        late = args.scenario in ('late-pin-boundary', 'late-pin-registration')
+        if args.scenario == 'late-pin-registration':
+            config = ET.Element('mameconfig', version='10')
+            system = ET.SubElement(config, 'system', name='noki5210')
+            ports = ET.SubElement(system, 'input')
+            ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
+                          mask='32', defvalue='0', value='32')
+            ET.ElementTree(config).write(run / 'cfg/noki5210.cfg',
+                                        encoding='utf-8', xml_declaration=True)
         if pin:
             card = run / 'nvram/noki5210_3/sim_card'
             card.parent.mkdir()
@@ -51,7 +61,8 @@ def main():
         with (run / 'console.log').open('w') as console:
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         subprocess.run([sys.executable, str(root / 'tools' / checker),
-                        str(run)] + (['--late-boundary'] if late else []), check=True)
+                        str(run)] + (['--late-boundary'] if args.scenario == 'late-pin-boundary' else
+                                     ['--coherent-late'] if args.scenario == 'late-pin-registration' else []), check=True)
     except (OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 
