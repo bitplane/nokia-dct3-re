@@ -3074,22 +3074,23 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		bool const set = BIT(variant, 0), store = BIT(variant, 3);
+		bool const dp = BIT(variant, 4);
 		unsigned const gap = (variant / 2) % 4;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, set ? 0xf7be : 0xf6be);
+		program.write_word(0x600, dp ? (set ? 0xf5b0 : 0xf4b0) : (set ? 0xf7be : 0xf6be));
 		program.write_word(0x601 + gap, store ? 0x8027 : 0x1027);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0e);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, set ? 0x800 : 0x4800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, dp && !set ? 0x0f : 0x0e);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, dp || set ? 0x800 : 0x4800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x7777);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
 		m_cpu->space(AS_DATA).write_word(0x727, 0x1111);
-		m_cpu->space(AS_DATA).write_word(0x1027, 0x2222);
+		m_cpu->space(AS_DATA).write_word(dp ? 0x7a7 : 0x1027, 0x2222);
 		m_cpu->set_state_int(STATE_GENPC, 0x600);
 		m_cpu->set_pipeline_frontend(true);
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
@@ -23951,8 +23952,9 @@ private:
 			u64 const cycle = m_cpu->pipeline_cycles();
 			unsigned const gap = (m_pipeline_peripheral_case / 2) % 4;
 			bool const set = BIT(m_pipeline_peripheral_case, 0), store = BIT(m_pipeline_peripheral_case, 3);
-			bool const compiler = gap == 3 ? set : !set;
-			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "CPL consumer executes without unsupported direct mode");
+			bool const dp = BIT(m_pipeline_peripheral_case, 4);
+			bool const alternate = gap == 3 ? set : !set;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "CPL/DP consumer executes without unsupported direct mode");
 			if (cycle == 4 + gap && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -23960,11 +23962,13 @@ private:
 			}
 			if (cycle == 11)
 			{
-				expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (set ? 0x4800 : 0x800), "CPL producer retires independently of retained consumer status");
-				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : compiler ? 0x2222 : 0x1111) &&
-					m_cpu->space(AS_DATA).read_word(0x727) == (store && !compiler ? 0x7777 : 0x1111) &&
-					m_cpu->space(AS_DATA).read_word(0x1027) == (store && compiler ? 0x7777 : 0x2222),
-					"Basic direct LD/ST uses old CPL with zero to two NOPs, new CPL with three NOPs");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) == (dp || !set ? 0x800 : 0x4800) &&
+					m_cpu->state_int(tms320c54x_device::STATE_ST0) == (dp && set ? 0x0f : 0x0e),
+					"CPL/DP producer retires independently of retained consumer status");
+				expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (store ? 0x7777 : alternate ? 0x2222 : 0x1111) &&
+					m_cpu->space(AS_DATA).read_word(0x727) == (store && !alternate ? 0x7777 : 0x1111) &&
+					m_cpu->space(AS_DATA).read_word(dp ? 0x7a7 : 0x1027) == (store && alternate ? 0x7777 : 0x2222),
+					"Basic direct LD/ST uses old CPL/DP with zero to two NOPs, new state with three NOPs");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
@@ -23974,8 +23978,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 15) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged CPL latency: PASS cases=16 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=16\n");
+				if (m_pipeline_peripheral_case < 31) { start_pipeline_cpl(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged CPL/DP latency: PASS cases=32 fields=2 directions=2 consumers=LD,ST gaps=0,1,2,3 restore=32\n");
 				start_timer_boundary_probe(0, true); return;
 			}
 			++m_pipeline_expected_cycle;
