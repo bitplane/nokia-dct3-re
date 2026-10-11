@@ -3375,7 +3375,15 @@ both sources, false-condition write-back, preserved accumulators/status and
 unconditional pointer update. They failed before the correction and pass
 after it; the full core suite and isolated ROM4 FR encoder/decoder comparisons
 also pass. These are instruction results, not physical pipeline timing,
-native RF acquisition or handset speech evidence. The
+native RF acquisition or handset speech evidence.
+ASM `STL/STH`, long-immediate `STL/STH`, and parallel stores also obey SXM
+when shifting right, before applying SST. Their previous handlers always
+sign-extended. A separate 120-case literal-result fixture covers shifts
+-16/-1, negative guard-bit inputs, both SXM/SST settings and both sources
+across these five forms (parallel `ST||LD` is the fifth). It checks stored
+lanes, preserved accumulators/status and address updates. The fixtures fail
+against the old handlers and pass with SXM-aware right shifts. This is not
+exhaustive parallel-store or pipeline coverage. The
 implemented parallel `ST||MAC[R]` form also saturates the pre-MAC store
 source after its ASM shift. Exact `d6e1` fixtures check both zero and nonzero
 ASM shifts, the old B value, unchanged B, A's MACR result, and the one-cycle

@@ -1205,7 +1205,7 @@ void tms320c54x_device::parallel_store(u16 op, u16 address)
 	const u64 source = accumulator(BIT(op, 9)) & ACC_MASK;
 	const int asm_shift = s8((m_st1 & 0x001f) << 3) >> 3;
 	const u64 shifted_source = asm_shift < 0 ?
-			arithmetic_shift_right(source, -asm_shift) :
+			(BIT(m_st1, 8) ? arithmetic_shift_right(source, -asm_shift) : source >> -asm_shift) :
 			(source << asm_shift) & ACC_MASK;
 	data_write(address, u16(saturated_store(shifted_source) >> 16));
 }
@@ -1873,7 +1873,7 @@ void tms320c54x_device::execute_one(u16 op)
 		const int shift = s8((extension & 0x1f) << 3) >> 3;
 		auto shifted = [this, shift](u64 value)
 		{
-			return shift < 0 ? arithmetic_shift_right(value, -shift) :
+			return shift < 0 ? (BIT(m_st1, 8) ? arithmetic_shift_right(value, -shift) : value >> -shift) :
 					(value << shift) & ACC_MASK;
 		};
 		auto read_operand = [this, extended, address, low]()
@@ -2639,7 +2639,9 @@ void tms320c54x_device::execute_one(u16 op)
 	{
 		const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
 		const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
-		const u64 shifted = shift < 0 ? arithmetic_shift_right(source, -shift) : (source << shift) & ACC_MASK;
+		const u64 shifted = shift < 0
+			? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift)
+			: (source << shift) & ACC_MASK;
 		indirect_write(low, u16(saturated_store(shifted) >> (BIT(op, 9) ? 16 : 0)));
 		m_icount -= low >= 0xe0;
 		return;

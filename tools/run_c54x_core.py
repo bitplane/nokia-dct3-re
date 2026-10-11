@@ -34,6 +34,7 @@ REQUIRED = [
     "TMS320C54x delayed accumulator predicates conformance: PASS variants=60",
     "TMS320C54x delayed conditional call conformance: PASS variants=9",
     "TMS320C54x ASM store conformance: PASS variants=128",
+    "TMS320C54x store shift boundaries: PASS cases=120 asm=-16,-1 sxm=0,1 sst=0,1 forms=5 sources=A,B pipeline_claim=0",
     "TMS320C54x reverse carry conformance: PASS variants=2688",
     "TMS320C54x reverse carry sequences: PASS forward=16 inverse=16",
     "TMS320C54x timer debugger registers: PASS independent=1 reload=1",
