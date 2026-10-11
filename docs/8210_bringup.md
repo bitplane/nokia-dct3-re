@@ -24,6 +24,13 @@ advances from 0 to 1 across cold restart. Both processes independently pass
 registration, host CP/RP/RR closure and the sent-screen oracle. The shared
 status checker preserves the product's relative TP-VP (`A7`); neither its
 initial reference nor its validity period is borrowed from the 6210.
+`verify-8210-dcs-early-pin-sms-status-persistence` independently verifies
+the same two-process contract on coherent DCS ARFCN 823 with physical PIN
+entry starting at seven seconds. The cold firmware reads retained SMSS
+byte `00`, submits reference 1 and updates the file after host acknowledgement.
+Both processes independently verify PIN, own DCS registration and sent
+pixels. This preserves the early-PIN boundary; late-PIN DCS recovery remains
+unproved.
 
 ### Documented PCM bus
 

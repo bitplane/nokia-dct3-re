@@ -9,6 +9,18 @@ from tools import run_noki8210_acceptance as runner
 
 
 class IsolatedAcceptanceTest(unittest.TestCase):
+    def test_cold_sms_status_admits_own_dcs_pin_profile(self):
+        self.assertIn('host-sms-status', runner.PIN_SCENARIOS)
+        self.assertIn('host-sms-status', runner.DCS_SCENARIOS)
+        self.assertEqual(runner.SCENARIOS['host-sms-status'],
+                         runner.SCENARIOS['host-outgoing-sms'])
+        with patch('sys.argv', ['runner', 'unused', '--scenario', 'host-sms-status',
+                               '--dcs1800', '--pin-enabled', '--pin-start', '7']), \
+                patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                patch.object(runner, 'prepare_run', side_effect=RuntimeError('admitted')), \
+                self.assertRaisesRegex(RuntimeError, 'admitted'):
+            runner.main()
+
     def test_dcs_topology_preserves_sms_service(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / 'nsm3hle.cfg'
