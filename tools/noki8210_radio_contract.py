@@ -216,6 +216,22 @@ def verify(image):
             ('movs', 'r3, #1'), ('lsls', 'r3, r3, #0x11'),
             ('cmp', 'r1, r3'), ('beq', '#0x286d7e')]:
         raise ValueError('own cell-context selector for mode 4 differs')
+    if instructions(0x286d62, 28) != [
+            ('movs', 'r2, #3'), ('lsls', 'r2, r2, #0x10'),
+            ('cmp', 'r1, r2'), ('beq', '#0x286d78'),
+            ('movs', 'r0, #1'), ('lsls', 'r0, r0, #0x12'),
+            ('cmp', 'r1, r0'), ('bne', '#0x286d8c'),
+            ('bl', '#0x286cd2'), ('b', '#0x286d8c'),
+            ('bl', '#0x286d0c'), ('b', '#0x286d8c')]:
+        raise ValueError('own context selectors do not dispatch mode-2/mode-3 builders')
+    if instructions(0x286cd8, 8) != [
+            ('ldr', 'r0, [r1, #0xc]'), ('mov', 'r3, sp'),
+            ('movs', 'r2, #3'), ('strb', 'r2, [r3]')]:
+        raise ValueError('alternate stack builder does not select mode 3')
+    if instructions(0x286d12, 8) != [
+            ('ldr', 'r3, [r1]'), ('mov', 'r2, sp'),
+            ('movs', 'r1, #2'), ('strb', 'r1, [r2]')]:
+        raise ValueError('alternate stack builder does not select mode 2')
     if int.from_bytes(read(0x2870b0, 4), 'big') != 0x137228:
         raise ValueError('own mode-selection context root differs')
     if int.from_bytes(read(0x287198, 4), 'big') != 0x137224:

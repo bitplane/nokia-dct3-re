@@ -1738,6 +1738,10 @@ literal-argument sites (`21c320`, `21c96e`, `21cc1e`, `21d236`, `21d41a`,
 This is direct-call candidate coverage, not closure of indirect/data-driven
 entrances. Helper `286d4a` selects modes 4/2/3 from context bits 16..19
 equal to 2/3/4 respectively; mode 4 takes carrier halfword `+6` only.
+The verifier also pins the complete selector dispatch: selector 3 calls
+`286d0c` (stack mode 2), selector 4 calls `286cd2` (stack mode 3), and
+other selectors return without constructing this instruction. These are
+MCU construction facts, not DSP acknowledgement or cancellation semantics.
 Passive runtime capture observes caller `21ef07`, argument zero, context
 `1196a0`, carrier `0338`, control `ffc22664` at 12.262144s, then constructor
 caller `286d8d` at 12.262148s. This precedes the late `03ec` queue arrival.
