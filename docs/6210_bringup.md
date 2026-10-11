@@ -601,6 +601,16 @@ instead include `03f4`, `03ed` and `03fe`, with no observed `03f5`
 publication. Thus the reset is attached to a specific firmware-message
 branch, not an unexplained peer-state loss. Evidence:
 `tmp/6210-plmn-controller-entry-status-{national,international}/error.log.gz`.
+Publisher caller attribution remains provisional: the recorded LR
+`315565` is adjacent to BL `315560`, but the preceding own-ROM load at
+`31555e` reads literal `3158fc = 03fa`, not `03f5`. A fresh runtime
+observation confirms `3158fc = 000003fa` and code word at `31555c =
+f81548e7` while the publisher-entry tap reports R0 `03f5` and that LR.
+Thus changed flash bytes do not explain the discrepancy. Do not claim
+that BL `315560` directly publishes `03f5` until control flow and tap
+register timing are reconciled; the received `03f5` and reset-selector
+observations remain separate evidence. Evidence:
+`tmp/6210-plmn-publisher-code-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

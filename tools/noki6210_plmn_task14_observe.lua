@@ -85,6 +85,15 @@ local publisher_tap = space:install_read_tap(0x3cc660, 0x3cc663,
         local status = cpu.state['R0'].value
         if status ~= 0x3ea and status ~= 0x3ec and status ~= 0x3f5 then return end
         publishers = publishers + 1
+        if status == 0x3f5 and not busy then
+            busy = true
+            local literal = space:read_u32(0x3158fc)
+            local code = space:read_u32(0x31555c)
+            busy = false
+            machine:logerror(string.format(
+                'plmn_publisher_code: literal=%08x code=%08x t=%.9f\n',
+                literal, code, machine.time:as_double()))
+        end
         machine:logerror(string.format(
             'plmn_status_publisher: status=%04x caller=%08x t=%.9f\n',
             status, cpu.state['R14'].value, machine.time:as_double()))
