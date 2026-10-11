@@ -1749,9 +1749,15 @@ new words; long power executes 625, also adding none. Decoder support remains
 a separate gap: passing execution assertions must not promote unsupported
 raw-word lengths into a pipeline frontend.
 The synthetic-extension report cannot characterize `6Fxx` forms whose
-operation is selected by a second opcode word. Those need captured instruction
-extensions and an extension-sensitive census before reporting native frontend
-coverage; a zero extension must not be treated as the executed operation.
+operation is selected by a second opcode word. Verbose `[opwords]` records now
+capture these actual execution fetches without extra target-memory reads.
+The isolated coverage gate requires `--extension-report`: every observed `6f`
+word must have complete two/three-word tuples whose counts sum to its execution
+count. Idle/Menu/power currently capture 18 distinct tuples across nine first
+words. `6f83` selects both `0c1e` and `0c5f`; `6ff8` has nine distinct
+address/operation pairs. Invalid lengths, absent opcodes, malformed records and
+count drift fail validation. This is operand evidence, not decoder support or
+physical Fetch-stage timing; a zero extension is still not the executed operation.
 
 ADDM immediate-memory decoding covers all 256 addressing forms on ordinary
 and wrapping program pages, with bounded two/three-word extension reads and

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <map>
+
 class tms320c54x_device : public cpu_device
 {
 public:
@@ -189,6 +191,12 @@ private:
 	bool m_illegal = false;
 	std::array<u16, 0x10000> m_opcode_first_pc;
 	std::array<u32, 0x10000> m_opcode_count = {};
+	// Verbose-only observations, not architectural state or prefetched operands.
+	struct extension_observation { u32 first_pc; u32 count = 0; };
+	std::map<std::array<u16, 4>, extension_observation> m_extension_observations;
+	std::array<u16, 3> m_instruction_words = {};
+	u16 m_instruction_word_count = 0;
+	bool m_capture_extensions = false;
 	int m_icount = 0;
 };
 

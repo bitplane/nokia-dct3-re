@@ -1566,6 +1566,7 @@ check-c54x-observed-coverage: build
 			--decoder-source $(abspath cpu/tms320c54x/tms320c54x.cpp) \
 			--variant-report \
 			--frontend-report \
+			--extension-report \
 			--observed-group f4 \
 			--observed-group f0 \
 			--require-all-asserted

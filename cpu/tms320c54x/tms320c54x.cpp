@@ -689,6 +689,9 @@ void tms320c54x_device::device_stop()
 			machine().logerror("[opdecode] op=%04x supported=%u words=%u\n", opcode,
 				supported, supported ? result & util::disasm_interface::LENGTHMASK : 0);
 		}
+	for (auto const &[words, observation] : m_extension_observations)
+		machine().logerror("[opwords] op=%04x words=%u ext1=%04x ext2=%04x first_pc=%06x count=%u\n",
+			words[1], words[0], words[2], words[3], observation.first_pc, observation.count);
 }
 
 void tms320c54x_device::device_reset()
@@ -817,13 +820,22 @@ TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
 
 u16 tms320c54x_device::fetch()
 {
+	u16 value;
 	if (m_vector_prefetch_valid)
 	{
 		m_vector_prefetch_valid = false;
 		++m_pc;
-		return m_vector_prefetch_word;
+		value = m_vector_prefetch_word;
 	}
-	return m_cache.read_word(program_address(m_pc++));
+	else
+		value = m_cache.read_word(program_address(m_pc++));
+	if (m_capture_extensions)
+	{
+		if (m_instruction_word_count < m_instruction_words.size())
+			m_instruction_words[m_instruction_word_count] = value;
+		++m_instruction_word_count;
+	}
+	return value;
 }
 
 void tms320c54x_device::state_import(const device_state_entry &entry)
@@ -3548,14 +3560,30 @@ void tms320c54x_device::execute_run()
 		const bool delayed = m_delayed_words != 0;
 		const bool xc_guarded = m_xc_guard != 0;
 		const u16 instruction_pc = m_pc;
+		const u32 instruction_address = logical_program_address(instruction_pc);
 		const u16 previous_sp = m_sp;
 		const bool repeat_was_armed = m_rpt_armed;
 		m_op = fetch();
+		m_capture_extensions = (m_op & 0xff00) == 0x6f00 && machine().options().verbose();
+		if (m_capture_extensions)
+		{
+			m_instruction_words = {m_op, 0, 0};
+			m_instruction_word_count = 1;
+		}
 		m_sp_address_late = (m_op & 0xff00) == 0x6f00;
 		if (m_opcode_first_pc[m_op] == 0xffff)
 			m_opcode_first_pc[m_op] = instruction_pc;
 		++m_opcode_count[m_op];
 		execute_one(m_op);
+		if (m_capture_extensions)
+		{
+			std::array<u16, 4> const words = {m_instruction_word_count,
+				m_instruction_words[0], m_instruction_words[1], m_instruction_words[2]};
+			auto entry = m_extension_observations.try_emplace(words,
+				extension_observation{instruction_address}).first;
+			++entry->second.count;
+			m_capture_extensions = false;
+		}
 		update_xf();
 		// One-cycle stack-operation group from SPRU131G table 7-9.
 		// Calls/returns use the architectural SP, not this DAGEN snapshot.

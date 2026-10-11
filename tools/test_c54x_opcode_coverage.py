@@ -7,10 +7,58 @@ from unittest.mock import patch
 
 from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main,
                                         ranked_gaps, ranked_variant_candidates, summarize,
-                                        require_rom4_idle)
+                                        require_rom4_idle, require_extension_capture)
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
+    def test_extension_tuples_preserve_variants_and_count_repeated_runs(self):
+        text = ("[opcov] op=6f82 first_pc=0800 count=3\n"
+                "[opwords] op=6f82 words=2 ext1=0c48 ext2=0000 first_pc=010800 count=2\n"
+                "[opwords] op=6f82 words=2 ext1=0e20 ext2=0000 first_pc=010810 count=1\n")
+        result = summarize(text + text)
+        require_extension_capture(result)
+        self.assertEqual(result["extensions"], {
+            (0x6f82, 2, 0x0c48, 0): (0x010800, 4),
+            (0x6f82, 2, 0x0e20, 0): (0x010810, 2),
+        })
+
+    def test_extension_records_reject_malformed_or_impossible_data(self):
+        records = (
+            "[opwords] op=6f82 words=2 ext1=0c48 ext2=0001 first_pc=010800 count=1",
+            "[opwords] op=6fe2 words=2 ext1=0c48 ext2=0000 first_pc=010800 count=1",
+            "[opwords] op=6f82 words=3 ext1=0c48 ext2=0000 first_pc=010800 count=1",
+            "[opwords] op=6f82 words=2 ext1=0c48 ext2=0000 first_pc=800000 count=1",
+            "[opwords] op=6f82 words=2 ext1=0c48 ext2=0000 first_pc=010800 count=0",
+            "[opwords] op=7c82 words=2 ext1=0c48 ext2=0000 first_pc=010800 count=1",
+            "[opwords] op=6f82 words=2 ext1=0c48",
+        )
+        for record in records:
+            with self.subTest(record=record), self.assertRaises(ValueError):
+                summarize("[opcov] op=6f82 first_pc=0800 count=1\n" + record)
+
+    def test_extension_capture_rejects_orphans_missing_variants_and_count_drift(self):
+        record = "[opwords] op=6f82 words=2 ext1=0c48 ext2=0000 first_pc=010800 count=1\n"
+        with self.assertRaisesRegex(ValueError, "absent"):
+            summarize("[opcov] op=7712 first_pc=0800\n" + record)
+        for text in ("[opcov] op=6f82 first_pc=0800 count=1\n",
+                     "[opcov] op=6f82 first_pc=0800 count=2\n" + record,
+                     "[opcov] op=6f82 first_pc=0800 count=1\n" + record +
+                     "[opcov] op=6f83 first_pc=0802 count=1\n"):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                require_extension_capture(summarize(text))
+
+    def test_extension_report_uses_real_words_not_synthetic_decoder_support(self):
+        with TemporaryDirectory() as root:
+            log = Path(root) / "trace.log"
+            log.write_text("[opcov] op=6ff8 first_pc=ffff count=1\n"
+                           "[opdecode] op=6ff8 supported=0 words=0\n"
+                           "[opwords] op=6ff8 words=3 ext1=1234 ext2=0c48 first_pc=01ffff count=1\n")
+            output = StringIO()
+            with patch("sys.argv", ["coverage", str(log), "--extension-report"]), redirect_stdout(output):
+                self.assertEqual(main(), 0)
+            self.assertIn("Fetched 6f instruction tuples: 1", output.getvalue())
+            self.assertIn("ext1=1234 ext2=0c48 first_pc=01ffff executions=1", output.getvalue())
+
     def test_current_fingerprint_rejects_previous_native_trace(self):
         current = {"opcodes": 626, "high_byte_groups": 110,
                    "set_sha256": "05356c59d7b0843b8023b7a68822b1b258a2a18cd161db6dd33955580bf33a59"}
