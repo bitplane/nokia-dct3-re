@@ -82,6 +82,17 @@ configuration, but does not identify the exact AccIF wiring or status-bit
 implementation. The completion bit remains unmapped, so no reset timer or
 UART-ready constant is yet justified.
 
+The adjacent `djr-747` emulator at revision
+`b93a7f7143ea8d6d636ae920ac29258d3f6666f6` does not close this boundary.
+Its native `mad2_dsp_c54x.c` port-36 read is an explicit
+`DSP54_PORT36` diagnostic override, not a stateful restart/completion model.
+Its separately modeled COBBA serial register path uses ports `2c/2d` and
+bit `1000`; those semantics do not establish this interface's bit `4000`.
+The inspected native adapter and inherited core supply no matching restart
+trigger or latency evidence. This is a bounded reference check, not proof
+that no software-accessible specification exists. Do not transplant the
+diagnostic override or COBBA ready behavior into the NSE-6 backend.
+
 The passive serial observer now includes ports `0`, `2`, and `34..36`,
 retains uncapped totals/last values and logs at most four events per site.
 It makes no target reads or writes of its own. A fresh twelve-second run in

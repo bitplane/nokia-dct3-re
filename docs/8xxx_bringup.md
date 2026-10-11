@@ -2097,6 +2097,16 @@ NSM-2 laboratory registration and persisted EF_LOCI. This establishes
 DISPLAY TEXT only, not other proactive commands, native DSP execution,
 or inherited 8890 Toolkit support. Acquired MCU/PMM bytes are unchanged.
 
+`verify-8850-sim-toolkit-interactive` independently selects card profile 3
+and composes DISPLAY TEXT with GET INKEY and GET INPUT. Status words
+`91 15` and `91 1a` announce the next FETCH. Physical digit 5 and OK
+produce response `8103022200020282810301000d020435`; physical digits 4/2
+and OK produce `8103032300020282810301000d03043432` and `90 00`.
+The gate checks reviewed `Press 5`, `Enter 42` and `DCT3 LAB` idle pixels,
+own registration and persisted EF_LOCI. The interactive idle oracle is
+distinct from the DISPLAY TEXT-only numeric-PLMN frame. Arbitrary text,
+UCS2, cancellation, menu selection and native DSP are outside this gate.
+
 `verify-8890-sim-toolkit-busy` independently covers the NSB-6 cold-start
 response, not successful DISPLAY TEXT. Its own nine-byte TERMINAL PROFILE
 arms the card; STATUS returns `91 16` and FETCH reaches the firmware while
