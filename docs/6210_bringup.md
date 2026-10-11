@@ -807,6 +807,19 @@ field units without supplying an authoritative mode-two response sequence.
 The current peer requires membership in its independently received
 neighbour list; the type-`09` PSW-search list is not yet modeled as
 that list. Preserve this distinction when adding selection support.
+The phase dispatcher is executable, not merely inferred from nearby code.
+`38ae9a` reads the selected-record pointer at `1711d8` (distinct from
+the last lookup pointer `1711d4`) and dispatches on the record's low
+flag nibble. Exhaustive isolated execution of all sixteen values proves:
+nibble 2 takes the direct type-`11` mode-4 constructor, nibble 3 takes
+`38ae5c` (mode 2), and nibble 4 takes `38ae22` (mode 3); other values
+select none of those constructors. Mode 3 also copies record+10 into
+the outgoing BSIC byte. Thus the evidence supports phase-specific
+handling rather than one generic neighbour request: measured record,
+timing-result record, and decoded-result record are distinct prerequisites.
+These are descriptive aliases, not recovered Nokia names for the modes.
+No live mode-two request/response or foreign registration is established
+by the isolated dispatch checks.
 Primary references:
 [TX vocabulary](https://web.archive.org/web/20160119223852/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typestxd.htm),
 [RX vocabulary](https://web.archive.org/web/20160119223857/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typesrxd.htm).

@@ -399,6 +399,15 @@ def verify(image):
         0x3f2528: ('strb', 'r0, [r4, #0xa]'),
         0x3f253a: ('strb', 'r0, [r4, #6]'),
         0x3f2544: ('strb', 'r0, [r4, #8]'),
+        0x38aeae: ('cmp', 'r1, r3'),
+        0x38aeb0: ('beq', '#0x38aece'),
+        0x38aeb8: ('beq', '#0x38aec8'),
+        0x38aec2: ('bl', '#0x38ae22'),
+        0x38aec8: ('bl', '#0x38ae5c'),
+        0x38aed0: ('movs', 'r1, #4'),
+        0x38aed8: ('bl', '#0x3f2500'),
+        0x38ae2c: ('movs', 'r2, #3'),
+        0x38ae30: ('ldrb', 'r2, [r0, #0xa]'),
         0x3f2238: ('beq', '#0x3f225e'),
         0x3f225e: ('movs', 'r0, #3'),
         0x3f2266: ('ldr', 'r0, [pc, #0x344]'),
@@ -506,7 +515,8 @@ def verify(image):
                            0x426ddc: 0x16ffe4,
                            0x426e7c: 0x100a4, 0x43ea98: 975,
                            0x43ea8c: 886, 0x38b898: 0x1711cc,
-                           0x38b2e4: 5000, 0x38b2e8: 0x1711d4}.items():
+                           0x38b2e4: 5000, 0x38b2e8: 0x1711d4,
+                           0x38b200: 0x1711d8}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
     if read(0x3f25ac, 4) != bytes.fromhex('002819a9') or read(0x2819a9, 3) != bytes([5, 3, 3]):

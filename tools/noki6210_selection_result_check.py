@@ -1,6 +1,6 @@
 """Execute NPE-3's type-88 field decoder; not a live RF response fixture."""
 
-from unicorn import Uc, UC_ARCH_ARM, UC_MODE_BIG_ENDIAN, UC_MODE_THUMB
+from unicorn import Uc, UC_ARCH_ARM, UC_HOOK_CODE, UC_MODE_BIG_ENDIAN, UC_MODE_THUMB
 from unicorn.arm_const import (
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1,
     UC_ARM_REG_R2, UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_SP,
@@ -102,8 +102,41 @@ def check_fields(image):
                     f'retries={retries} actual={actual.hex()} '
                     f'expected={expected.hex()}')
             transitions += 1
+    selected = []
+    targets = {0x38ae5c, 0x38ae22, 0x3f2500}
+    cpu.mem_write(0x1711d8, record.to_bytes(4, 'big'))
+
+    def stop_at_mode(_cpu, address, _size, _data):
+        if address in targets:
+            selected.append(address)
+            _cpu.emu_stop()
+
+    hook = cpu.hook_add(UC_HOOK_CODE, stop_at_mode)
+    try:
+        for nibble in range(16):
+            selected.clear()
+            initial = bytearray(16)
+            initial[6:8] = (35).to_bytes(2, 'big')
+            initial[13] = 0xa0 | nibble
+            cpu.mem_write(record, bytes(initial))
+            cpu.reg_write(UC_ARM_REG_SP, 0x10f000)
+            cpu.reg_write(UC_ARM_REG_R0, 1)
+            cpu.reg_write(UC_ARM_REG_LR, stop | 1)
+            cpu.emu_start(0x38ae9b, stop, count=200)
+            expected_target = {2: 0x3f2500, 3: 0x38ae5c, 4: 0x38ae22}.get(nibble)
+            if selected != ([] if expected_target is None else [expected_target]):
+                raise ValueError(f'record nibble {nibble} selected {selected}')
+            if expected_target is None and cpu.reg_read(UC_ARM_REG_PC) != stop:
+                raise ValueError('unselected record did not return')
+            if nibble == 2:
+                args = cpu.reg_read(UC_ARM_REG_R0)
+                if bytes(cpu.mem_read(args, 1)) != bytes([4]):
+                    raise ValueError('nibble-2 direct constructor did not select mode 4')
+    finally:
+        cpu.hook_del(hook)
     return {'executed_cases': cases, 'record_transition_cases': transitions,
             'request_copy_cases': requests,
+            'record_mode_cases': 16,
             'entry': '38af66',
             'phase_modulus': 5000, 'frame_modulus': 51,
             'decoded_prefix_octets': 8,
