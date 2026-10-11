@@ -1435,6 +1435,12 @@ void nokia_sim_card_device::update_record()
 		queue_status(0x67, 0x00);
 		return;
 	}
+	// GSM 11.11 8.6 permits only PREVIOUS for cyclic updates.
+	if (file->structure == file_structure::cyclic && m_p2 != 0x03)
+	{
+		queue_status(0x6b, 0x00);
+		return;
+	}
 	unsigned record;
 	if (!resolve_record(*file, record))
 		return;

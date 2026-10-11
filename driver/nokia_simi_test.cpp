@@ -32,6 +32,40 @@ private:
 	unsigned m_phase = 0; // Observer control is intentionally outside the saved device state.
 	unsigned m_parameter_case = 0;
 	unsigned m_record_case = 0;
+	unsigned m_write_case = 0;
+	struct write_case { u8 ins, p1, p2, length; u16 body; u8 sw1, sw2; };
+	static constexpr write_case WRITE_CASES[] = {
+		{0xdc, 0, 4, 32, 0x11, 0x90, 0},
+		{0xb2, 50, 4, 32, 0x11, 0x90, 0},
+		{0xdc, 1, 4, 32, 0x22, 0x90, 0},
+		{0xb2, 0, 4, 32, 0x11, 0x90, 0},
+		{0xdc, 0, 2, 32, 0x33, 0x94, 2}, // Last linear record cannot wrap on write.
+		{0xb2, 1, 4, 32, 0x22, 0x90, 0},
+		{0xb2, 0, 4, 32, 0x11, 0x90, 0},
+		{0xdc, 0, 3, 32, 0x44, 0x90, 0},
+		{0xb2, 0, 4, 32, 0x44, 0x90, 0}, // Save record 49 and its pointer here.
+		{0xdc, 0, 4, 32, 0x99, 0x90, 0}, // Restore after this deliberate overwrite.
+		{0xb2, 0, 4, 32, 0x44, 0x90, 0},
+		{0xdc, 0, 4, 31, 0x55, 0x67, 0},
+		{0xb2, 0, 4, 32, 0x44, 0x90, 0},
+		{0xb2, 50, 4, 32, 0x11, 0x90, 0},
+		{0xb2, 0, 2, 32, 0x11, 0x90, 0},
+		{0xdc, 0, 0, 32, 0x66, 0x6b, 0},
+		{0xb2, 0, 4, 32, 0x11, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f39, 0x9f, 15},
+		{0xb2, 0, 4, 3, 0x00, 0x90, 0},
+		{0xdc, 0, 4, 3, 0x77, 0x6b, 0}, // Cyclic writes permit PREVIOUS only.
+		{0xb2, 0, 4, 3, 0x00, 0x90, 0},
+		{0xdc, 0, 2, 3, 0x88, 0x6b, 0},
+		{0xb2, 0, 4, 3, 0x00, 0x90, 0},
+		{0xdc, 1, 4, 3, 0x99, 0x6b, 0},
+		{0xb2, 0, 4, 3, 0x00, 0x90, 0},
+		{0xdc, 0, 3, 3, 0x12, 0x90, 0},
+		{0xb2, 0, 4, 3, 0x12, 0x90, 0},
+		{0xb2, 0, 2, 3, 0x12, 0x90, 0},
+		{0xb2, 0, 3, 3, 0x12, 0x90, 0}
+	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
 		{0xa0, 0xb2, 0, 4, 32, 0x94}, // Undefined current pointer.
@@ -97,6 +131,25 @@ private:
 	{
 		auto const &header = RECORD_HEADERS[m_record_case];
 		transmit({header[0], header[1], header[2], header[3], header[4]});
+	}
+	void begin_write_case()
+	{
+		auto const &item = WRITE_CASES[m_write_case];
+		transmit({0xa0, item.ins, item.p1, item.p2, item.length});
+		m_phase = item.ins == 0xb2 ? 30 : 29;
+		m_timer->adjust(attotime::from_msec(item.ins == 0xb2 ? 40 : 5));
+	}
+	void transmit_write_body()
+	{
+		auto const &item = WRITE_CASES[m_write_case];
+		if (item.ins == 0xa4) { transmit({u8(item.body >> 8), u8(item.body)}); return; }
+		for (unsigned offset = 0; offset < item.length; offset += 16)
+		{
+			m_simi->tx_fifo_control_w(4);
+			for (unsigned i = offset; i < std::min<unsigned>(offset + 16, item.length); ++i)
+				m_simi->txd_w(u8(item.body));
+			m_simi->tx_fifo_control_w(0);
+		}
 	}
 	void save_checkpoint()
 	{
@@ -317,6 +370,35 @@ private:
 				m_timer->adjust(attotime::from_msec(40)); return;
 			}
 			osd_printf_info("SIM record addressing: PASS cases=11 linear_no_wrap=1 absolute_preserves_pointer=1 current_record=1 mode_validation=1 handset_claim=0\n");
+			begin_write_case(); return;
+		}
+		case 29:
+			expect(m_count == 1 && m_bytes[0] == WRITE_CASES[m_write_case].ins, "record-write procedure byte");
+			clear_capture(); transmit_write_body();
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 30:
+		{
+			auto const &item = WRITE_CASES[m_write_case];
+			if (item.ins == 0xb2 && item.sw1 == 0x90)
+			{
+				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == 0xb2 &&
+					m_bytes[m_count - 2] == 0x90 && m_bytes[m_count - 1] == 0, "record-write readback response");
+				for (unsigned i = 1; i <= item.length; ++i)
+					expect(m_bytes[i] == u8(item.body), "record-write readback contents");
+			}
+			else
+			{
+				if (m_count != 2 || m_bytes[0] != item.sw1 || m_bytes[1] != item.sw2)
+					osd_printf_info("SIM record update mismatch: case=%u ins=%02x count=%u sw=%02x%02x expected=%02x%02x\n",
+						m_write_case, item.ins, m_count, m_bytes[0], m_bytes[1], item.sw1, item.sw2);
+				expect(m_count == 2 && m_bytes[0] == item.sw1 && m_bytes[1] == item.sw2,
+					"record-write completion status");
+			}
+			if (m_write_case == 8) save_checkpoint();
+			if (m_write_case == 9) restore_checkpoint();
+			clear_capture();
+			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
+			osd_printf_info("SIM record updates: PASS cases=30 linear_mutation=1 failure_preservation=1 state_restore=1 cyclic_previous_only=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}
