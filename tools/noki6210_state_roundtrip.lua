@@ -2,14 +2,14 @@
 local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local scenario = assert(_G.noki6210_state_scenario)
-local inputs = {idle='staged_observe', incoming_alerting='staged_observe', call='outgoing_call_input', sms='incoming_sms_input',
+local inputs = {idle='staged_observe', incoming_alerting='staged_observe', incoming_connected='host_incoming_input', call='outgoing_call_input', sms='incoming_sms_input',
                 divert='divert_lifecycle_input'}
 dofile(directory .. 'noki6210_' .. assert(inputs[scenario]) .. '.lua')
 if scenario == 'idle' and os.getenv('NOKIA_DCT3_6210_PIN_ENTRY') == '1' then
     dofile(directory .. 'noki6210_security_input.lua')
 end
 local machine = manager.machine
-local save_time = ({idle=19, incoming_alerting=40, call=31, sms=15.02, divert=36})[scenario]
+local save_time = ({idle=19, incoming_alerting=40, incoming_connected=41, call=31, sms=15.02, divert=36})[scenario]
 local saved, completed
 local capture = dofile(directory .. 'arm_architecture_snapshot.lua')
 local function snapshot() return capture(machine) end
@@ -48,6 +48,9 @@ local post_load = emu.add_machine_post_load_notifier(function()
             key:set_value(0)
             assert(emu.wait(1.85))
             machine.screens[':screen']:snapshot('6210_sip_after_cancel.png')
+        elseif scenario == 'incoming_connected' then
+            assert(emu.wait(10))
+            machine.screens[':screen']:snapshot('6210_sip_connected_after_restore.png')
         elseif scenario == 'divert' then
             assert(_G.noki6210_resume_divert)()
         elseif scenario == 'call' then

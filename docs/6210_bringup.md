@@ -922,8 +922,15 @@ connected SIP call and checks an exact handset architectural round trip.
 The external dialog is cleared with BYE under the new epoch, not restored
 or redialed. One cause-41 termination, full CC/RR release and exact idle
 recovery are required. Pre-reset bridge uplink must be zero and no HLE codec
-tick may run. Connected-incoming restoration remains unproved; this gate
-does not change the PCM or native-speech boundary.
+tick may run. This gate does not change the PCM or native-speech boundary.
+
+`verify-6210-sip-connected-incoming-restore` separately covers a fresh
+incoming dialog answered by physical Send. It saves at 41 seconds after
+connection, checks exact CPU/RAM/time restoration, and requires correlated
+SIP BYE, one cause-41 clear, full CC/RR release and exact registered idle.
+The original identity's Answer and confirmation must precede epoch change.
+Zero pre-reset uplink and absence of codec ticks remain mandatory: external
+dialog restoration and speech are not established.
 
 `verify-6210-pcm-missing` independently answers and ends an incoming call
 using physical keys, unchanged own PMM and the existing NPE-3 upload,

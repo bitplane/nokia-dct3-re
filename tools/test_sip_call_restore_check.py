@@ -53,15 +53,38 @@ class SipRestoreCheckTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.check(log=wrong, product='8210')
 
-    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, phase='connected', product='3210'):
+    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, phase='connected', product='3210', signaling_only=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(log)
             (root / 'sip-bridge.log').write_text(bridge)
-            verify_restore(root, remote, phase, product)
+            verify_restore(root, remote, phase, product, signaling_only=signaling_only)
             result = json.loads((root / 'sip-result.json').read_text())
             self.assertTrue(result['passed'])
             self.assertTrue(result['scope'].startswith(product + ' '))
+            return result
+
+    def test_6210_connected_restore_requires_physical_answer_and_media_absence(self):
+        prefix = ('6210_incoming_physical: action=Send\n'
+                  '6210_keypad_decoded: key=0e\n'
+                  'GSM service uplink sapi=0 pd=03 message=07 length=2\n')
+        bridge = BRIDGE.replace('SIP epoch changed',
+            'SIP physical answer identity=(1, 1)\n'
+            'SIP confirmed status=200 identity=(1, 1)\n'
+            'SIP epoch media discarded {"uplink": 0}\nSIP epoch changed')
+        result = self.check(log=prefix + LOG, bridge=bridge, product='6210', signaling_only=True)
+        self.assertFalse(result['speech_tested'])
+        self.assertFalse(result['native_dsp_complete'])
+        for bad_log, bad_bridge in (
+                (LOG, bridge), (prefix.replace('key=0e', 'key=0f') + LOG, bridge),
+                (prefix + LOG, bridge.replace('"uplink": 0', '"uplink": 1')),
+                (prefix + LOG + 'dsp_hle: speech tick\n', bridge),
+                (prefix + LOG, bridge.replace('SIP epoch media discarded {"uplink": 0}\n', '')),
+                (prefix + LOG, bridge.replace('SIP physical answer identity=(1, 1)',
+                                              'SIP physical answer identity=(2, 1)')),
+                (prefix + LOG, bridge + 'SIP physical answer identity=(1, 1)\n')):
+            with self.subTest(log=bad_log, bridge=bad_bridge), self.assertRaises(RuntimeError):
+                self.check(log=bad_log, bridge=bad_bridge, product='6210', signaling_only=True)
 
     def test_connected_restore_clears_both_sides(self):
         self.check()

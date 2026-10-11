@@ -146,7 +146,8 @@ async def run(args):
                                 signaling_only=getattr(args, 'signaling_only', False))
         return
     if args.restore_call:
-        verify_restore(root, remote_text, args.restore_phase, args.product)
+        verify_restore(root, remote_text, args.restore_phase, args.product,
+                       signaling_only=getattr(args, 'signaling_only', False))
         return
     if args.cancel_incoming:
         verify_cancel(root, remote_text, args.product)
@@ -496,7 +497,7 @@ def verify_outgoing_restore(root, remote_text, connected=False, product='3210', 
     print('OK - outgoing restoration cleared SIP and GSM without redial')
 
 
-def verify_restore(root, remote_text, phase='connected', product='3210'):
+def verify_restore(root, remote_text, phase='connected', product='3210', *, signaling_only=False):
     bridge = (root / 'sip-bridge.log').read_text(errors='replace')
     log = (root / 'error.log').read_text(errors='replace')
     if phase == 'connected':
@@ -522,11 +523,13 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
         raise RuntimeError('restoration did not clear the handset call exactly once')
     cursor = 0
     physical_answer = (
-        rf'{product}_incoming_physical: action=Call / Send',
-        (r'8850_keypad_decoded key=0e\b' if product == '8850' else
+        (r'6210_incoming_physical: action=Send' if product == '6210' else
+         rf'{product}_incoming_physical: action=Call / Send'),
+        (r'6210_keypad_decoded: key=0e\b' if product == '6210' else
+         r'8850_keypad_decoded key=0e\b' if product == '8850' else
          r'8210_keypad_decoded: key=0e\b'),
         r'GSM service uplink sapi=0 pd=03 message=07 length=2',
-    ) if product in ('8210', '8850') and phase == 'connected' else ()
+    ) if product in ('6210', '8210', '8850') and phase == 'connected' else ()
     for pattern in physical_answer + (
             rf'incoming state id=1 epoch=1 phase={phase}',
             r'sip_state: saved', r'sip_state: restored',
@@ -539,9 +542,23 @@ def verify_restore(root, remote_text, phase='connected', product='3210'):
         if not match:
             raise RuntimeError(f'missing handset restoration checkpoint: {pattern}')
         cursor += match.end()
+    if signaling_only:
+        summaries = re.findall(r'SIP epoch media discarded (\{[^\n]+\})', bridge)
+        if len(summaries) != 1 or json.loads(summaries[0]).get('uplink') != 0 or 'dsp_hle: speech tick' in log:
+            raise RuntimeError('signaling-only incoming restoration lacks zero-uplink/no-codec evidence')
+        cursor = 0
+        for marker in ('SIP incoming identity=(1, 1) caller=5551234',
+                       'SIP physical answer identity=(1, 1)',
+                       'SIP confirmed status=200 identity=(1, 1)',
+                       'SIP epoch changed old=1 new=2',
+                       'SIP restored call cleared identity=(2, 1)'):
+            if bridge.count(marker) != 1 or (index := bridge.find(marker, cursor)) < 0:
+                raise RuntimeError(f'missing or reordered incoming restoration identity: {marker}')
+            cursor = index + len(marker)
     (root / 'sip-result.json').write_text(json.dumps({
         'scope': f'{product} {phase} HLE SIP call save/load; external dialog cleared, not restored',
-        'passed': True}, indent=2) + '\n')
+        'passed': True, **({'speech_tested': False, 'native_dsp_complete': False}
+                          if signaling_only else {})}, indent=2) + '\n')
     print('OK - save/load cleared real SIP dialog and restored GSM call under new epoch')
 
 
@@ -616,10 +633,11 @@ def main():
     signaling_connected = (args.signaling_only and args.product == '6210' and
                            args.sip_response == 200 and args.calls == 1 and
                            (not args.incoming or args.ready_file is not None) and
-                           not args.record_media and not args.restore_call and not args.restore_idle and
+                           not args.record_media and not args.restore_idle and
+                           (not args.restore_call or (args.incoming and args.restore_phase == 'connected')) and
                            (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
-        parser.error('--signaling-only requires a single 6210 SIP-200 fixture; only outgoing connected restoration is supported')
+        parser.error('--signaling-only requires a single 6210 SIP-200 fixture, with connected restoration only')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():
@@ -656,7 +674,7 @@ def main():
                             not args.record_media and not args.restore_outgoing and not args.restore_idle)
     if args.product in ('6210', '6250', '8210', '8850', '8890') and ((not signaling_connected and not signaling_failure and not nsm3_media and not nsm2_media and not nsm3_restore and not npe3_pending_restore and not unanswered_alerting_restore and not unanswered_pending_restore and not nsm3_incoming_restore and
             (not args.incoming or not args.cancel_incoming)) or
-            (args.record_media and not nsm3_media and not nsm2_media) or (args.restore_call and not nsm3_incoming_restore and not unanswered_alerting_restore) or args.restore_idle or (args.restore_outgoing and not signaling_connected and not nsm3_restore and not npe3_pending_restore and not unanswered_pending_restore)):
+            (args.record_media and not nsm3_media and not nsm2_media) or (args.restore_call and not signaling_connected and not nsm3_incoming_restore and not unanswered_alerting_restore) or args.restore_idle or (args.restore_outgoing and not signaling_connected and not nsm3_restore and not npe3_pending_restore and not unanswered_pending_restore)):
         parser.error(f'unsupported SIP scenario for {args.product}; use a verified product-specific signaling/media fixture')
     if args.calls != 1 and (args.product != '3310' or args.incoming or args.sip_response not in (480, 486)):
         parser.error('two-call fixture requires 3310 outgoing SIP failure/redial')

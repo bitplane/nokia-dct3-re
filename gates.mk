@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 717 gates: 519 generated from typed steps, 198 copied verbatim (shell).
+# 718 gates: 520 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -433,7 +433,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-calendar-cold verify-6210-calendar-midnight \
 	verify-6210-calendar-leap-day verify-6210-calendar-nonleap \
 	verify-6210-calendar-year-end verify-6210-sip-connected-outgoing-restore \
-	verify-radio-outgoing-call-sip-unavailable
+	verify-radio-outgoing-call-sip-unavailable \
+	verify-6210-sip-connected-incoming-restore
 
 verify-8210-host-incoming-call: build
 	$(VENV)/bin/python tools/run_noki8210_acceptance.py $(RUN_DIR) --scenario host-incoming-call --mame $(MAME_DIR)/mame
@@ -5140,3 +5141,6 @@ verify-6210-sip-connected-outgoing-restore: build
 
 verify-radio-outgoing-call-sip-unavailable:
 	@$(MAKE) --no-print-directory verify-radio-outgoing-call-sip RUN_DIR=$(RUN_DIR) JOBS=$(JOBS) SIP_HANDSET_RUNNER_ARGS='--sip-response 480'
+
+verify-6210-sip-connected-incoming-restore: build
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki6210_sip_cancel.py $(RUN_DIR) --restore-incoming-connected-signaling --pjsua $(SIP_PJSUA_BIN) --mame $(MAME_DIR)/mame

@@ -457,7 +457,8 @@ It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects media-acceptance fixtures for signaling-only
 products `6210`, `6250` and `8890`. The 6210 additionally admits only the
 single incoming/outgoing SIP-200 `--signaling-only` fixtures described below;
-recording, multiple calls and connected-incoming restoration remain excluded.
+recording and multiple calls remain excluded. Connected restoration is
+limited to the independently verified signaling-only fixtures below.
 The 8210 and 8850 have narrowly scoped
 single-call outgoing and incoming SIP-200 HLE media-transport fixtures and
 a separate connected-outgoing restore fixture. Explicit recording is
@@ -506,7 +507,7 @@ PC, SP, RAM checksum and time exactly. The host rejects the outstanding
 INVITE and clears the handset once under the new epoch. Complete CC/RR
 release, one missed-call notification, physical Exit and exact registered
 idle are required; Answer, CONNECT, accepted media and dialog replay are
-rejected. Connected-incoming restoration remains unproved for this product.
+rejected.
 
 `verify-6210-sip-connected-outgoing-restore` physically dials `1234567` and
 saves after a real SIP-200 connection. Restoring the handset clears, rather
@@ -516,6 +517,16 @@ The architectural round trip checks PC, SP, RAM and emulated time. The bridge
 reports its uplink count before discarding old-epoch counters; zero uplink
 and absence of HLE codec ticks are mandatory. No redial, native speech or
 audible playback is established by this signaling-only gate.
+
+`verify-6210-sip-connected-incoming-restore` admits one fresh caller
+`5551234` after registered idle, physically answers it, then saves and
+restores exact handset CPU/RAM/time after connection. The bridge requires
+the ordered original call identity through Answer and SIP confirmation,
+clears that dialog with BYE on epoch change, and terminates the restored
+handset call exactly once with cause 41. Full CC/RR release and exact idle
+pixels are checked. Old-epoch uplink is zero and no HLE codec tick may run;
+external dialog resurrection, speech and native DSP completion are not
+claimed.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:
