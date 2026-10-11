@@ -320,6 +320,21 @@ PLMN; country/band policy and identity parsing must be distinguished before
 changing the radio peer. The same-country proof does not establish why
 international selection differs or imply roaming coverage for every PLMN.
 
+Own BCCH consumer boundary: type `80` decoder `4f611e -> 457f80`
+routes channel `50` through `457f28`. Its admitted path changes the original
+object's status to `0800` and posts it to task 18 at `457f70`. Both fresh
+controls observe object `105cec`, caller `457f75`, at 6.773790308 seconds;
+the same object's `0800` header is read by `3b9302` at trace PC `3b9308`.
+That helper caches the object at context offset `1c`. Its caller `3ba706`
+has a state-2/channel-50 path into BCCH decoder `3b9e34`; SI3 chooses
+`3ba0c0`, then operation `19` in `3b9598` reaches parser `43f074`.
+These static branches are pinned by `noki6210_radio_contract.py`, not all
+asserted as executed by the header-read probe. Object reuse after reception
+must not be interpreted as continued ownership by the original message.
+Evidence: `tmp/6210-plmn-consumer-{national,international}/error.log.gz`.
+The next discriminator is the SI3 parser result and downstream selection
+state, not another synthesized transport message.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require
