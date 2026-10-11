@@ -526,6 +526,15 @@ record no hits in either control. This is bounded non-observation, not a
 proof that the code never executes (instruction-fetch tap granularity
 still applies). Evidence:
 `tmp/6210-plmn-completion-entry-{national,international}/error.log.gz`.
+Additional fresh paired controls show that the controller itself is active:
+foreign boot reaches receive entry `2d2952` at 10.616510385 s with R4
+`174550`, then repeatedly reaches `2d2528`; subsequent receive entries
+are approximately 305 ms apart. The observer records its twelve-hit cap
+at both sites in the foreign run and no hits at either in the national
+run. Thus absent publisher-entry hits must not be generalized to a dormant
+controller. R0 is `03fe` at the observed `2d2528` entries, but that is not
+the saved status in R1 and must not be labeled as its incoming message.
+Evidence: `tmp/6210-plmn-completion-controller-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

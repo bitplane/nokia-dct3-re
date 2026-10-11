@@ -16,7 +16,7 @@ local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
         local status = space:read_u16(object)
         busy = false
         if (status == 0x7d2 or status == 0x7d4 or status == 0x9c6 or status == 0x9c8
-            or status == 0x1589 or status == 0x9fd)
+            or status == 0x1589 or status == 0x9fd or status == 0x419 or status == 0x7f4)
             and inputs < 24 then
             inputs = inputs + 1
             machine:logerror(string.format(
@@ -88,7 +88,7 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
                     0x2e4f7c, 0x2e50c4, 0x2e6046, 0x2e60a2, 0x2e5c74,
                     0x2e4e62, 0x2e4e70, 0x2e6e68, 0x2a31ca, 0x2a3948,
                     0x2d1118, 0x2d111a, 0x4cfdd4, 0x313218,
-                    0x2d0d50, 0x2d1048}) do
+                    0x2d0d50, 0x2d1048, 0x2d2952, 0x2d2528, 0x2d0ee4}) do
     local hits = 0
     decision_taps[#decision_taps + 1] = space:install_read_tap(pc & ~3, (pc & ~3) + 3,
         'plmn_decision_' .. pc, function(address)
