@@ -2217,8 +2217,8 @@ ISA coverage or a physical pipeline implementation.
 
 ### Native timing continuation
 
-`execute_run()` still recognizes interrupts before an instruction-atomic
-`execute_one()`. Hardware interrupt entry now retains the accepted vector,
+Native configurations still recognize interrupts before an instruction-atomic
+`execute_one()`. Hardware interrupt entry retains the accepted vector,
 source, then captures the continuation at INTR Decode before stepping SP
 decrement, vector fetch/IACK and stack write on separate CPU cycles. All
 entry continuation state is saved.
@@ -2256,23 +2256,70 @@ Fetch by one cycle for both IRQ and NMI. The first ISR execution retains its
 previous aggregate placement. The short-period timer still enters 108 times
 without reaching the foreground mask write, so this ordering correction does
 not resolve that pipeline-drain boundary or promote recorder completion.
-`check-c54x-rom4-rf-boundary` retains 20,282 frame expiries, 648,096 RF reads
-and 1,519 port-`32` writes, with no port-`38/39` reads;
-`verify-5110-save-state` also passes. These protect the established native
-scan and restoration boundary, not RF acquisition or handset speech.
+The previously banked `check-c54x-rom4-rf-boundary` snapshot is 20,282 frame
+expiries, 648,096 RF reads and 1,519 port-`32` writes. Current fresh-storage
+runs instead reproduce 20,285 / 648,192 / 1,520, with no port-`38/39` reads.
+A generated-overlay control using the original instruction-boundary interrupt
+routine reproduces the same changed totals: the staged-frontend refactor is
+not their cause. A second generated-overlay control restores the CPU's
+`device_start`, `device_reset` and timer-clock reader from `146b9ff8` (the last
+documented passing interrupt-entry milestone); it reproduces those same totals
+too. These clock/reset additions therefore do not explain the mismatch either.
+Both controls use newly generated own EEPROM and no retained flash/SIM state;
+reusing the first run's NVRAM is not a valid cold control. The exact snapshot
+gate remains failing and unchanged pending a wider provenance audit; this is
+not a new accepted oracle.
+The earlier save-state pass protects its tested restoration boundary, not
+RF acquisition or handset speech.
 
-The next implementation milestone is stage-owned request recognition and
-in-flight foreground instruction retirement, not another opcode-count increase. It
-must reproduce SPRU131G example 7-18's ordering: acceptance at cycle 3,
-INTR Decode at 4, SP decrement at 5, vector fetch/IACK and the preceding
-instruction's execution at 6, continuation stack write at 7, and first ISR
-execution at 10. It must preserve already-tested repeat, delayed-control,
-NMI, held-line and save/load behavior. A constant interrupt delay or adjusted
-timer period cannot establish those orderings. The legacy vendor activation
-failure is a limitation of the optional differential oracle, not evidence
-that this core already implements the stages or that all software work is
-blocked. Native acquisition, recorder finalization and handset speech remain
-unpromoted until their own end-to-end gates pass.
+#### Staged frontend prototype
+
+The optional `set_pipeline_frontend` path owns Prefetch, Fetch, Decode,
+Access, Read and Execute slots inside the existing CPU, reusing its semantic
+backend and interrupt-source/entry operations. No handset or MU4 configuration
+enables it. Initial executable coverage is NOP, one-word immediate loads
+to A/B and direct DP-relative loads to A/B. Indirect, SP-relative and multiword
+forms stop at Decode without atomic fallback.
+
+Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
+example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
+decrement at 5, vector Fetch/IACK and the older decoded foreground instruction's
+Execute at 6, continuation stack write at 7, and first ISR Execute at 10.
+The already-prefetched flush word reaches Fetch at cycle 4 but never Decode
+or Execute. The continuation is the first not-decoded instruction, not the
+prefetch cursor. The test uses a one-word immediate load as the first ISR
+instruction; it does not claim the example's RETFD/return/delay-slot behavior.
+
+Separate empty-frontend IRQ and NMI fixtures accept at cycle 1, fetch the
+vector at 4, write the continuation at 5 and retire the first ISR load at 8.
+They stack the first unexecuted instruction at `0600`, not the advanced
+prefetch cursor, and NMI preserves an unrelated latched IRQ flag.
+
+DP-relative loads capture their operand address in Access, read the data bus
+once in Read at cycle 5 and retire the captured value at Execute at cycle 6.
+The fixtures change backing memory after Read and checkpoint that boundary:
+both normal and restored retirement use the captured value, not a second bus
+read. This covers both accumulators; it does not establish modifying address
+modes, address/data hazards, multiple data accesses or memory writes.
+
+Slot addresses, fetched words, operand addresses/values, validity, pending frontend redirection,
+continuation and active-clock counter are saved. A checkpoint after cycle-4
+Decode reproduces every subsequent observed stage and architectural result,
+with one vector fetch/acknowledgement per leg. The bench suspends execution
+for scheduler settlement after loading inside a live callback; that pause is
+not emulated interrupt latency or a physical wall-time replay claim.
+`check-c54x-core` requires staged-frontend, direct-load, empty IRQ/NMI and unsupported-form markers.
+Existing native execution remains protected by its full conformance suite.
+
+The next implementation work is multiword instruction fetch/decode and
+stage-owned operand address/read/write handling, then branches, returns,
+repeat/delayed-control and idle rules. Those contracts must precede enabling
+the frontend for native firmware or claiming the timer/recorder stall fixed.
+A constant interrupt delay or adjusted timer period cannot replace in-flight
+instruction ownership. The legacy vendor activation failure limits the
+optional differential oracle; it does not block this software implementation.
+Native acquisition, recorder finalization and handset speech remain unpromoted
+until their own end-to-end gates pass.
 
 The passive foreground-fetch tap in `probe-c54x-timer-boundary` narrows that
 implementation boundary: both period-one cases accept 108 entries with

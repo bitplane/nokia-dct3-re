@@ -19,6 +19,10 @@ public:
 	void set_pll_reference_clock(u32 hz) { m_pll_reference_clock = hz; }
 	void set_follow_clkmd(bool enabled) { m_follow_clkmd = enabled; }
 	void set_reset_clkmd(u16 value, bool enabled = true) { m_reset_clkmd = value; m_reset_clkmd_enabled = enabled; }
+	// Experimental stage-owned frontend; unsupported instruction forms stop,
+	// rather than falling back to instruction-boundary interrupt recognition.
+	void set_pipeline_frontend(bool enabled);
+	u64 pipeline_cycles() const { return m_pipeline_cycles; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
@@ -122,6 +126,10 @@ private:
 	void circular_modify(unsigned ar, s16 step);
 	void execute_one(u16 op);
 	bool service_interrupt();
+	bool accept_interrupt();
+	void interrupt_entry_step();
+	void reset_pipeline();
+	void pipeline_step();
 	void finish_repeats();
 	void push(u16 value);
 	u16 pop();
@@ -216,6 +224,19 @@ private:
 	u8 m_idle_mode = 0;
 	u64 m_idle_timer_ticks = 0;
 	bool m_illegal = false;
+	bool m_pipeline_frontend = false;
+	// Prefetch, Fetch, Decode, Access, Read, Execute. Addresses and words are
+	// owned by their slots; no speculative instruction executes at acceptance.
+	std::array<u32, 6> m_pipeline_address = {};
+	std::array<u16, 6> m_pipeline_word = {};
+	std::array<u16, 6> m_pipeline_operand_address = {};
+	std::array<u16, 6> m_pipeline_operand = {};
+	std::array<bool, 6> m_pipeline_valid = {};
+	u32 m_pipeline_fetch_address = 0;
+	u16 m_pipeline_return_pc = 0;
+	bool m_pipeline_flush_front = false;
+	bool m_pipeline_vector_pending = false;
+	u64 m_pipeline_cycles = 0;
 	std::array<u16, 0x10000> m_opcode_first_pc;
 	std::array<u32, 0x10000> m_opcode_count = {};
 	// Verbose-only observations, not architectural state or prefetched operands.

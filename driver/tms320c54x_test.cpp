@@ -2316,6 +2316,108 @@ private:
 		m_phase = 79000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_pipeline_frontend_case(bool memory = false, bool memory_b = false)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_memory_case = memory;
+		m_pipeline_memory_b = memory_b;
+		m_pipeline_operand_reads = 0;
+		m_vector_prefetch_tap.remove(); m_vector_stack_tap.remove();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 32; ++i)
+		{
+			program.write_word(0x600 + i, 0xf495);
+			program.write_word(0x40 + i, 0xf495);
+		}
+		program.write_word(0x600, 0xe811); // Decoded before INTR, retires at cycle 6.
+		if (memory) program.write_word(0x600, memory_b ? 0x1120 : 0x1020);
+		program.write_word(0x601, 0xe822); // Fetched, not decoded; must not execute.
+		program.write_word(0x602, 0xe833); // Prefetch already in flight; Fetch must drain.
+		program.write_word(0x40, 0xe955); // One-word first ISR instruction, Execute at 10.
+		data.write_word(0xfff, 0xbeef);
+		data.write_word(0x420, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_expected_cycle = 1;
+		m_pipeline_replay = false;
+		m_vector_reads = m_vector_acks = 0;
+		m_pipeline_drained_fetches = 0;
+		if (memory)
+			m_pipeline_operand_tap = data.install_read_tap(0x420, 0x420, "pipeline_operand",
+				[this](offs_t, u16 &, u16) {
+					if (machine().side_effects_disabled()) return;
+					expect(m_cpu->pipeline_cycles() == 5, "DP-relative operand is read in Read, not Execute");
+					++m_pipeline_operand_reads;
+				});
+		m_pipeline_fetch_tap = program.install_read_tap(0x602, 0x602, "pipeline_flush_fetch",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 4, "Already-prefetched flush word reaches Fetch at cycle 4");
+				++m_pipeline_drained_fetches;
+			});
+		m_vector_prefetch_tap = program.install_read_tap(0x40, 0x40, "pipeline_vector",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 6 && m_vector_acks == 1,
+					"Vector Fetch occurs at cycle 6 once, after IACK");
+				++m_vector_reads;
+			});
+		m_vector_stack_tap = data.install_write_tap(0xfff, 0xfff, "pipeline_return_pc",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 7 && value == 0x601,
+					"INTR Execute writes the first not-decoded continuation at cycle 7");
+			});
+		m_phase = 251000;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_empty_pipeline_case(bool nmi)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_empty_nmi = nmi;
+		m_pipeline_expected_cycle = 1;
+		m_vector_reads = m_vector_acks = 0;
+		u16 const vector = nmi ? 4 : 0x40;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(vector + i, 0xf495);
+		program.write_word(vector, 0xe955);
+		program.write_word(0x600, 0xe811);
+		m_cpu->space(AS_DATA).write_word(0xfff, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, nmi ? 0x0800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, nmi ? 0 : 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, nmi ? 2 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_vector_prefetch_tap = program.install_read_tap(vector, vector, "empty_pipeline_vector",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 4 && m_vector_acks == 1,
+					"Empty frontend vector Fetch follows IACK at cycle 4");
+				++m_vector_reads;
+			});
+		m_phase = 251030;
+		m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, ASSERT_LINE);
+		m_cpu->set_input_line(nmi ? INPUT_LINE_NMI : 0, CLEAR_LINE);
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -22179,6 +22281,129 @@ private:
 				"POLY rounds old-B product sum, applies OVM/sticky OVA and independently loads SXM-extended memory into B");
 			if (index < 63) { start_poly_boundary_case(index + 1); return; }
 			osd_printf_info("TMS320C54x POLY boundaries: PASS cases=64 frct=0,1 ovm=0,1 sxm=0,1 sticky_ova=1 pipeline_claim=0\n");
+			start_pipeline_frontend_case(); return;
+		}
+		if (m_phase == 251000)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			osd_printf_info("TMS320C54x staged tick: cycle=%llu expected=%llu replay=%u pc=%06x a=%llx b=%llx sp=%04x ifr=%04x illegal=%u\n",
+				static_cast<unsigned long long>(cycle), static_cast<unsigned long long>(m_pipeline_expected_cycle), m_pipeline_replay,
+				unsigned(m_cpu->state_int(STATE_GENPC)), static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_A)),
+				static_cast<unsigned long long>(m_cpu->state_int(tms320c54x_device::STATE_B)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"Staged frontend advances exactly one clock per observation without unsupported forms");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle < 6 || m_pipeline_memory_b ? 0 : m_pipeline_memory_case ? 0x1234 : 0x11) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 10 ? 0x55 : cycle >= 6 && m_pipeline_memory_b ? 0x1234 : 0),
+				"Decoded foreground retires at 6; first ISR retires at 10; flushed immediate loads never execute");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle < 5 ? 0x1000 : 0xfff) &&
+				m_cpu->space(AS_DATA).read_word(0xfff) == (cycle < 7 ? 0xbeef : 0x601),
+				"INTR Access and Execute own separate cycles 5 and 7");
+			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
+			u64 const checkpoint = m_pipeline_memory_case ? 5 : 4;
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				if (m_pipeline_memory_case)
+				{
+					expect(m_pipeline_operand_reads == 1, "Operand bus read completed once before checkpoint");
+					m_cpu->space(AS_DATA).write_word(0x420, 0x5678);
+				}
+				expect(machine().scheduler().can_save(), "Decoded foreground and INTR checkpoint is saveable");
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+					"Save decoded foreground and pending INTR before Access");
+			}
+			if (cycle == 10)
+			{
+				expect(m_vector_reads == 1 && m_vector_acks == 1 && m_pipeline_drained_fetches == 1,
+					"Each leg drains its prefetched word and fetches/acknowledges one vector");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_vector_reads = m_vector_acks = 0;
+					// The flush word was already fetched at the saved cycle-4 boundary.
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint,
+						"Restore pending INTR and the decoded foreground slot");
+					// Loading inside a live callback rewinds device local times while
+					// the callback timestamp is still the old one. Let the scheduler
+					// settle with this bench CPU suspended before single-clock replay.
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_phase = 251010;
+					m_pipeline_expected_cycle = checkpoint + 1;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				if (m_pipeline_memory_case)
+				{
+					expect(m_pipeline_operand_reads == 1, "Retirement and restored retirement reuse the captured operand without another bus read");
+					if (m_pipeline_memory_b)
+						osd_printf_info("TMS320C54x staged direct load: PASS cases=2 read=5 execute=6 retained_operand=1 restore_after_read=1 bus_reads_per_case=1\n");
+				}
+				else
+					osd_printf_info("TMS320C54x staged frontend: PASS foreground_execute=6 vector_fetch=6 stack_write=7 isr_execute=10 pending_restore=1 coverage=register_one_word native_enabled=0\n");
+				m_pipeline_fetch_tap.remove(); m_vector_prefetch_tap.remove(); m_vector_stack_tap.remove();
+				m_pipeline_operand_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (!m_pipeline_memory_case) { start_pipeline_frontend_case(true); return; }
+				if (!m_pipeline_memory_b) { start_pipeline_frontend_case(true, true); return; }
+				m_cpu->space(AS_PROGRAM).write_word(0x600, 0x7711);
+				m_cpu->set_state_int(STATE_GENPC, 0x600);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0);
+				m_cpu->set_pipeline_frontend(true);
+				m_phase = 251020;
+				m_check_timer->adjust(attotime::from_ticks(3, m_cpu->clock()));
+				return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251010)
+		{
+			expect(m_cpu->pipeline_cycles() == (m_pipeline_memory_case ? 5 : 4), "Scheduler settlement does not retire restored instructions");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_phase = 251000;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251020)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0,
+				"Unsupported staged multiword form stops at Decode without atomic fallback");
+			m_cpu->set_pipeline_frontend(false);
+			osd_printf_info("TMS320C54x staged frontend exclusions: PASS unsupported_stops=1 atomic_fallback=0\n");
+			start_empty_pipeline_case(false);
+			return;
+		}
+		if (m_phase == 251030)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"Empty frontend advances one clock without fallback");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle < 8 ? 0 : 0x55),
+				"Undecoded foreground is flushed; ISR retires at cycle 8");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle < 3 ? 0x1000 : 0xfff) &&
+				m_cpu->space(AS_DATA).read_word(0xfff) == (cycle < 5 ? 0xbeef : 0x600),
+				"Empty frontend stacks the unexecuted first instruction at cycle 5");
+			if (cycle < 8)
+			{
+				++m_pipeline_expected_cycle;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+				return;
+			}
+			expect(m_vector_reads == 1 && m_vector_acks == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == (m_pipeline_empty_nmi ? 2 : 0),
+				"Empty IRQ/NMI acknowledges once and preserves unrelated pending sources");
+			m_vector_prefetch_tap.remove();
+			m_cpu->set_pipeline_frontend(false);
+			if (!m_pipeline_empty_nmi) { start_empty_pipeline_case(true); return; }
+			osd_printf_info("TMS320C54x staged empty frontend: PASS irq=1 nmi=1 return_pc=0600 vector_fetch=4 stack_write=5 isr_execute=8\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -22623,6 +22848,16 @@ private:
 	int m_entry_ack_source = -1;
 	u64 m_entry_fetch_cycle = 0, m_entry_stack_cycle = 0;
 	std::stringstream m_saved_vector;
+	std::stringstream m_saved_pipeline;
+	u64 m_pipeline_expected_cycle = 0;
+	bool m_pipeline_empty_nmi = false;
+	bool m_pipeline_memory_case = false;
+	bool m_pipeline_memory_b = false;
+	unsigned m_pipeline_operand_reads = 0;
+	memory_passthrough_handler m_pipeline_operand_tap;
+	bool m_pipeline_replay = false;
+	unsigned m_pipeline_drained_fetches = 0;
+	memory_passthrough_handler m_pipeline_fetch_tap;
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
 	unsigned m_timer_probe_entries = 0;
 	u16 m_timer_probe_return_pc = 0;
@@ -22676,6 +22911,20 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 251030)
+		{
+			expect(line == (m_pipeline_empty_nmi ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() == 4,
+				"Empty frontend acknowledges the selected IRQ/NMI at vector Fetch");
+			++m_vector_acks;
+		}
+		if (m_phase == 251000)
+		{
+			expect(line == 0 && m_cpu->pipeline_cycles() == 6 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 0 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800),
+				"Staged vector IACK at cycle 6 clears its source and sets INTM");
+			++m_vector_acks;
+		}
 		if (m_phase >= 450000 && m_phase <= 450002)
 		{
 			expect(line == (m_stage_restore_case >= 5 ? INPUT_LINE_NMI : 0),

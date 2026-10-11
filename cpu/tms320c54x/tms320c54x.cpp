@@ -683,6 +683,16 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_interrupt_vector_pc));
 	save_item(NAME(m_interrupt_stack_address));
 	save_item(NAME(m_interrupt_ack_source));
+	save_item(NAME(m_pipeline_address));
+	save_item(NAME(m_pipeline_word));
+	save_item(NAME(m_pipeline_operand_address));
+	save_item(NAME(m_pipeline_operand));
+	save_item(NAME(m_pipeline_valid));
+	save_item(NAME(m_pipeline_fetch_address));
+	save_item(NAME(m_pipeline_return_pc));
+	save_item(NAME(m_pipeline_flush_front));
+	save_item(NAME(m_pipeline_vector_pending));
+	save_item(NAME(m_pipeline_cycles));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_pll_locked));
 	save_item(NAME(m_timer_clock));
@@ -767,6 +777,7 @@ void tms320c54x_device::device_reset()
 	m_interrupt_entry_stage = 0;
 	m_interrupt_vector_pc = m_interrupt_stack_address = 0;
 	m_interrupt_ack_source = 0;
+	reset_pipeline();
 	m_a = 0;
 	m_b = 0;
 	m_t = 0;
@@ -1037,6 +1048,7 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 	{
 		m_vector_prefetch_valid = false;
 		m_interrupt_entry_stage = 0;
+		reset_pipeline();
 	}
 	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
 	{
@@ -1044,6 +1056,7 @@ void tms320c54x_device::state_import(const device_state_entry &entry)
 		m_interrupt_entry_stage = 0;
 		m_pc = u16(m_debug_pc);
 		m_xpc = m_extended_program ? (m_debug_pc >> 16) & 0x7f : 0;
+		reset_pipeline();
 	}
 	else if (entry.index() == STATE_ST1)
 		update_xf();
@@ -1579,39 +1592,50 @@ void tms320c54x_device::finish_repeats()
 	}
 }
 
+void tms320c54x_device::interrupt_entry_step()
+{
+	// SPRU131G example 7-18: these entry operations are shared by both
+	// execution frontends; only the staged frontend also drains older slots.
+	switch (m_interrupt_entry_stage++)
+	{
+	case 1: m_rtn = m_pc; break; // INTR Decode, before stack Access.
+	case 2: m_interrupt_stack_address = --m_sp; break;
+	case 3:
+		// SPRU131G 6.10.4/6.10.8 tie IFR clearance and maskable INTM
+		// setting to vector Fetch/IACK, not the earlier source selection.
+		if (m_interrupt_ack_source != INPUT_LINE_NMI)
+		{
+			m_st1 |= 0x0800;
+			m_ifr &= ~(u16(1) << m_interrupt_ack_source);
+		}
+		standard_irq_callback(m_interrupt_ack_source, logical_program_address(m_rtn));
+		m_pc = m_interrupt_vector_pc;
+		m_vector_prefetch_word = fetch();
+		m_vector_prefetch_valid = true;
+		m_pc = m_interrupt_vector_pc;
+		break;
+	case 4:
+		m_data.write_word(m_interrupt_stack_address, m_rtn);
+		m_interrupt_entry_stage = 0;
+		break;
+	}
+}
+
 bool tms320c54x_device::service_interrupt()
 {
 	if (m_interrupt_entry_stage)
 	{
-		// Entry micro-operations follow SPRU131G example 7-18. Foreground
-		// pipeline drain is still absent; recognition remains instruction-boundary.
-		switch (m_interrupt_entry_stage++)
-		{
-		case 1: m_rtn = m_pc; break; // INTR Decode, before stack Access.
-		case 2: m_interrupt_stack_address = --m_sp; break;
-		case 3:
-			// SPRU131G 6.10.4 ties IFR clearance to vector Fetch/IACK,
-			// not to the earlier source selection at Decode.
-			if (m_interrupt_ack_source != INPUT_LINE_NMI)
-			{
-				// SPRU131G 6.10.8 couples maskable INTM setting to IACK.
-				m_st1 |= 0x0800;
-				m_ifr &= ~(u16(1) << m_interrupt_ack_source);
-			}
-			standard_irq_callback(m_interrupt_ack_source, logical_program_address(m_rtn));
-			m_pc = m_interrupt_vector_pc;
-			m_vector_prefetch_word = fetch();
-			m_vector_prefetch_valid = true;
-			m_pc = m_interrupt_vector_pc;
-			break;
-		case 4:
-			m_data.write_word(m_interrupt_stack_address, m_rtn);
-			m_interrupt_entry_stage = 0;
-			break;
-		}
+		interrupt_entry_step();
 		--m_icount;
 		return true;
 	}
+	if (!accept_interrupt()) return false;
+	--m_icount;
+	return true;
+}
+
+bool tms320c54x_device::accept_interrupt()
+{
 	if (m_vector_prefetch_valid) return false; // Finish the accepted entry before recognizing another source.
 	// Maskable hardware sources occupy vectors 16..31 and map directly to
 	// IMR/IFR bits 0..15. PMST.IPTR selects their 128-word vector page.
@@ -1644,8 +1668,120 @@ bool tms320c54x_device::service_interrupt()
 	m_interrupt_ack_source = acknowledged_source;
 	m_interrupt_entry_stage = 1;
 	leave_idle();
-	--m_icount;
 	return true;
+}
+
+void tms320c54x_device::reset_pipeline()
+{
+	m_pipeline_valid.fill(false);
+	m_pipeline_fetch_address = logical_program_address(m_pc);
+	m_pipeline_return_pc = 0;
+	m_pipeline_flush_front = m_pipeline_vector_pending = false;
+	m_pipeline_cycles = 0;
+}
+
+void tms320c54x_device::set_pipeline_frontend(bool enabled)
+{
+	m_pipeline_frontend = enabled;
+	m_vector_prefetch_valid = false;
+	m_interrupt_entry_stage = 0;
+	reset_pipeline();
+}
+
+void tms320c54x_device::pipeline_step()
+{
+	++m_pipeline_cycles;
+	u8 const entry_stage = m_interrupt_entry_stage;
+	for (unsigned stage = 5; stage; --stage)
+	{
+		m_pipeline_valid[stage] = m_pipeline_valid[stage - 1];
+		m_pipeline_address[stage] = m_pipeline_address[stage - 1];
+		m_pipeline_word[stage] = m_pipeline_word[stage - 1];
+		m_pipeline_operand_address[stage] = m_pipeline_operand_address[stage - 1];
+		m_pipeline_operand[stage] = m_pipeline_operand[stage - 1];
+	}
+	m_pipeline_valid[0] = false;
+	if (m_pipeline_flush_front) m_pipeline_valid[2] = false;
+
+	// SPRU131G example 7-18: INTR occupies Decode/Access/Read/Execute
+	// while older decoded foreground instructions continue to Execute.
+	if (entry_stage)
+	{
+		if (entry_stage == 1) m_pc = m_pipeline_return_pc;
+		interrupt_entry_step();
+	}
+	if (m_pipeline_valid[1])
+	{
+		u32 const address = m_pipeline_address[1];
+		if (entry_stage == 3 && u16(address) == m_interrupt_vector_pc)
+		{
+			m_pipeline_word[1] = m_vector_prefetch_word;
+			m_vector_prefetch_valid = false;
+		}
+		else
+		{
+			m_pc = u16(address + 1);
+			m_xpc = (address >> 16) & 0x7f;
+			m_pipeline_word[1] = m_cache.read_word(physical_program_address(address));
+		}
+	}
+	if (m_pipeline_valid[2])
+	{
+		u16 const word = m_pipeline_word[2];
+		// Only one-word register forms and direct DP loads have stage contracts.
+		// Other memory/control forms need Access/Read/redirect ownership first.
+		bool const direct_load = (word & 0xfe80) == 0x1000 && !BIT(m_st1, 14);
+		if (word != 0xf495 && (word & 0xff00) != 0xe800 && (word & 0xff00) != 0xe900 && !direct_load)
+		{
+			logerror("%s: unsupported staged C54x form %04x at %06x\n",
+				machine().describe_context(), word, m_pipeline_address[2]);
+			m_illegal = true;
+			return;
+		}
+	}
+	// Direct DP-relative loads own their address in Access and bus value in
+	// Read. SP-relative and modifying indirect modes need separate contracts.
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe80) == 0x1000)
+		m_pipeline_operand_address[3] = short_smem_address(u8(m_pipeline_word[3]));
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe80) == 0x1000)
+		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
+	if (m_pipeline_valid[5])
+	{
+		u32 const address = m_pipeline_address[5];
+		m_pc = u16(address);
+		m_xpc = (address >> 16) & 0x7f;
+		m_op = m_pipeline_word[5];
+		debugger_instruction_hook(address);
+		++m_pc;
+		if (m_opcode_first_pc[m_op] == 0xffff) m_opcode_first_pc[m_op] = u16(address);
+		++m_opcode_count[m_op];
+		if ((m_op & 0xfe80) == 0x1000)
+			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
+		else
+			execute_one(m_op);
+		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
+			m_pipeline_vector_pending = false;
+	}
+
+	if (entry_stage == 2)
+	{
+		m_pipeline_fetch_address = logical_program_address(m_interrupt_vector_pc);
+		m_pipeline_flush_front = false;
+	}
+	if (!m_pipeline_flush_front)
+	{
+		m_pipeline_address[0] = m_pipeline_fetch_address;
+		m_pipeline_valid[0] = true;
+		m_pipeline_fetch_address = (m_pipeline_fetch_address & 0x7f0000) | u16(m_pipeline_fetch_address + 1);
+	}
+	// Acceptance occurs after this cycle's Decode. Retain decoded slots,
+	// replace the next Decode with INTR, and drain the prefetched bus word.
+	if (!m_interrupt_entry_stage && !m_pipeline_vector_pending && accept_interrupt())
+	{
+		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
+			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);
+		m_pipeline_flush_front = m_pipeline_vector_pending = true;
+	}
 }
 
 void tms320c54x_device::execute_one(u16 op)
@@ -3768,6 +3904,13 @@ void tms320c54x_device::execute_run()
 {
 	while (m_icount > 0)
 	{
+		if (m_pipeline_frontend)
+		{
+			if (m_illegal || m_idle) { m_icount = 0; break; }
+			pipeline_step();
+			--m_icount;
+			continue;
+		}
 		if (service_interrupt())
 			continue;
 		if (m_idle)
