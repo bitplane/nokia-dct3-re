@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run fresh native RF controls and task-delivery checks; no acquisition claim."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,20 @@ def check_repeats(observations):
             raise ValueError(f"fresh {case['mode']} controls differ: {baseline} versus {fingerprint}")
 
 
+def input_provenance(paths):
+    """Hash actual inputs without claiming source HEAD identifies a built binary."""
+    result = {}
+    for name, path in paths.items():
+        path = Path(path).resolve()
+        entry = dict(path=str(path), present=path.is_file())
+        if entry['present']:
+            with path.open('rb') as stream:
+                entry['sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
+            entry['bytes'] = path.stat().st_size
+        result[name] = entry
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mame", type=Path, required=True)
@@ -43,6 +58,17 @@ def main():
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_rom4_rf_delivery_", dir=args.output_root))
     print(f"Native RF delivery evidence: {run}", flush=True)
+    paths = dict(binary=args.mame, observer=root / 'tools/c54x_rom4_rf_score.lua',
+                 generator=root / 'tools/make_5110_eeprom_profile.py')
+    for name in ('nse1_rom4_dsp_program.bin', 'nse1_rom4_dsp_data.bin',
+                 '5110f530.fls', 'nse-1.bin', 'nse1_rom4_boot.bin'):
+        paths['rom:' + name] = args.rompath / 'noki5110' / name
+    # The generator uses repo-local provisioning sources even with another ROM path.
+    paths['provisioning_flash'] = root / 'roms/noki5110/5110f530.fls'
+    paths['provisioning_eeprom'] = root / 'roms/noki5110/nse-1.bin'
+    (run / 'inputs.json').write_text(json.dumps(dict(schema=1,
+        inputs=input_provenance(paths), physical_iq_claim=False,
+        acquisition_claim=False), indent=2) + '\n')
     observations = []
     for mode in ("zero", "tone"):
         for repeat in range(args.repeats):
@@ -58,6 +84,10 @@ def main():
                        "-nvram_directory", str(case / "nvram"), "-video", "none", "-sound", "none",
                        "-log", "-skip_gameinfo", "-nothrottle", "-seconds_to_run", "60",
                        "-autoboot_script", str(root / "tools/c54x_rom4_rf_score.lua")]
+            (case / 'invocation.json').write_text(json.dumps(dict(
+                command=command, cwd=str(case.resolve()), mode=mode,
+                generated_storage=input_provenance({'eeprom': nvram / 'eeprom'})),
+                indent=2) + '\n')
             with (case / "console.log").open("w") as console:
                 subprocess.run(command, cwd=case, env=dict(os.environ, ROM4_RF_SCORE_MODE=mode),
                                stdout=console, stderr=subprocess.STDOUT, check=True)

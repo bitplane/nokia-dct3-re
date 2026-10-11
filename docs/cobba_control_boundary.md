@@ -316,6 +316,10 @@ The retained comparison data below therefore describes earlier captures,
 not verified acceptance on this executable. First reconcile the score-path
 instruction/peripheral changes and capture provenance; do not increase input
 amplitude or lower the acceptance threshold to make this diagnostic pass.
+The RF delivery runner writes `inputs.json` before launching any case and
+per-case `invocation.json` before emulation: binary/observer/generator/loose-ROM
+hashes, explicit missing inputs, command and generated EEPROM hash survive a
+failed gate. Source revision alone is not treated as executable provenance.
 
 A fresh cold run with the minimal observer from `ee56297f` (the same
 rotating port input and only the three score-path taps, without the later
