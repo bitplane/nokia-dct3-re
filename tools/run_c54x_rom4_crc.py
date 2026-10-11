@@ -50,13 +50,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mame", type=Path, required=True)
     parser.add_argument("--rompath", type=Path, required=True)
+    parser.add_argument("--output-root", type=Path,
+                        default=Path(__file__).resolve().parents[1] / 'tmp')
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--packed", action="store_true", help="validate the outer packed-input CRC routine")
     mode.add_argument("--fr-packing", action="store_true", help="validate FR parameter packing, CRC and unpacking")
     mode.add_argument("--fr-decoder", action="store_true", help="compare native FR decoding against independent PCM")
     mode.add_argument("--fr-encoder", action="store_true", help="compare native FR encoding against independent parameters")
     args = parser.parse_args()
-    run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_"))
+    args.output_root.mkdir(parents=True, exist_ok=True)
+    run = Path(tempfile.mkdtemp(prefix="run_c54x_rom4_crc_", dir=args.output_root))
     bios = "fr-encoder" if args.fr_encoder else "fr-decoder" if args.fr_decoder else "fr-packing" if args.fr_packing else "crc-packed" if args.packed else "crc-helper"
     command = [str(args.mame.resolve()), "tms54rom4", "-bios", bios,
                "-rompath", str(args.rompath.resolve()), "-video", "none",

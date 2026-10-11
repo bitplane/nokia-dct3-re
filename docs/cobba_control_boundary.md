@@ -304,6 +304,26 @@ threshold comparison is a processed correlation-score boundary, not
 an established raw ADC-energy or dBm threshold. Exact score units and
 the active TC-mode interpretation remain to be validated numerically.
 
+### Current RF-control reproducibility boundary
+
+A fresh `run_c54x_rom4_rf_delivery.py --repeats 1` check against binary
+SHA-256 `67575b98a9ba96d7aa61ef3875fe5e677b9ab455ef990d6cf2bf3595896d8765`
+does not reproduce the accepted-store result below. Zero produces 4889
+completed zero scores; rotating input produces 4889 nonzero scores, maximum
+`0x0538`, and zero second-comparison/accepted-store entries. Threshold remains
+`0x0574`. The strict rotating-input gate fails and is not rebanked.
+The retained comparison data below therefore describes earlier captures,
+not verified acceptance on this executable. First reconcile the score-path
+instruction/peripheral changes and capture provenance; do not increase input
+amplitude or lower the acceptance threshold to make this diagnostic pass.
+
+The same executable independently passes the ROM4 native FR decoder fixture:
+32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
+does not establish handset RF acquisition, a fitted codec clock or speech.
+Its required fixture ROM directory is `mame/roms`, not the handset `roms`
+directory. Native RF/CRC evidence runners now default to ignored repo `tmp/`
+on disk and accept `--output-root`; they no longer default to tmpfs.
+
 `c54x_rom4_rf_score.lua` supplies three explicit mathematical controls
 at port `0x27`: zero; DC word pairs `(2048,0)`; and rotating word pairs
 of amplitude 2048 with one turn per sixteen pairs. Pair order and

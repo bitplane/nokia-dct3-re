@@ -33,12 +33,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mame", type=Path, required=True)
     parser.add_argument("--rompath", type=Path, required=True)
-    parser.add_argument("--output-root", type=Path, default=Path("/tmp"))
+    parser.add_argument("--output-root", type=Path,
+                        default=Path(__file__).resolve().parents[1] / 'tmp')
     parser.add_argument("--repeats", type=int, default=2)
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("--repeats must be positive")
     root = Path(__file__).resolve().parent.parent
+    args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_rom4_rf_delivery_", dir=args.output_root))
     print(f"Native RF delivery evidence: {run}", flush=True)
     observations = []
