@@ -604,6 +604,8 @@ void tms320c54x_device::device_start()
 	m_timer_clock = clock();
 	if (m_follow_clkmd && !m_pll_reference_clock)
 		fatalerror("C54x CLKMD rate selection requires an input clock");
+	if (m_reset_clkmd_enabled && BIT(m_reset_clkmd, 0) != BIT(m_reset_clkmd, 1))
+		fatalerror("C54x reset CLKMD requires matching requested and actual source selection");
 	m_opcode_first_pc.fill(0xffff);
 	m_timer = timer_alloc(FUNC(tms320c54x_device::timer_expired), this);
 	m_pll_timer = timer_alloc(FUNC(tms320c54x_device::pll_transition_complete), this);
@@ -800,13 +802,18 @@ void tms320c54x_device::device_reset()
 	m_nmi_asserted = false;
 	// Hardware reset sets INTM and clears IFR, but does not initialise IMR.
 	// Preserve the mask written by the ROM loader across MAD2 DSP reset pulses.
-	m_clkmd = 0;
-	m_pll_locked = false;
+	m_clkmd = m_reset_clkmd_enabled ? m_reset_clkmd : 0;
+	m_pll_locked = m_reset_clkmd_enabled && BIT(m_clkmd, 0);
 	m_pll_timer->adjust(attotime::never);
 	m_clock_timer->adjust(attotime::never);
 	m_pending_clock = 0;
 	if (m_follow_clkmd)
-		set_unscaled_clock(m_reset_clock);
+	{
+		if (m_reset_clkmd_enabled)
+			publish_selected_clock();
+		else
+			set_unscaled_clock(m_reset_clock);
+	}
 	m_tim = 0xffff;
 	m_prd = 0xffff;
 	m_tcr = 0;
@@ -1766,6 +1773,10 @@ void tms320c54x_device::execute_one(u16 op)
 			m_timer->adjust(attotime::never);
 		}
 		m_idle_mode = mode;
+		// SPRU131G 6.11.3 and 8.5.2: IDLE3 halts the PLL. A later
+		// software-managed DIV -> PLL entry must acquire lock again.
+		if (mode == 3)
+			m_pll_locked = false;
 		m_peripheral_clock_stop_cb(mode >= 2);
 		m_pll_clock_stop_cb(mode == 3);
 		m_idle = true;

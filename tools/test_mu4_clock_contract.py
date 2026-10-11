@@ -17,10 +17,14 @@ class ClockContractTest(unittest.TestCase):
             text += (f'\nmu4_system_clock_selected: cpu={rate} dma={rate} mcbsp0={rate} '
                      f'mcbsp1={rate} mcbsp2={rate} codec=11995200 t={float(index + 1 + delay):.9f}')
         self.assertTrue(check_clock_rates(text)['execution_clock_propagated'])
+        reset = text.replace('codec=11995200 t=1.000000000', 'codec=11995200 t=0.000000000')
+        marker = '\nmu4_clock_reset_profile: pins=111 clkmd=0000 divider=2 family=C5416_compatible exact_da150_identity=0'
+        self.assertTrue(check_clock_rates(reset + marker)['execution_clock_propagated'])
         for wrong in (text.replace('codec=11995200', 'codec=119952000'),
                       text.replace('dma=95961600', 'dma=13000000'),
                       text.replace('t=2.000340673', 't=2.000000000'),
-                      text + '\n' + text.splitlines()[-1], self.trace()):
+                      text + '\n' + text.splitlines()[-1], self.trace(), reset,
+                      reset + marker.replace('pins=111', 'pins=000')):
             with self.assertRaises(ValueError):
                 check_clock_rates(wrong)
 

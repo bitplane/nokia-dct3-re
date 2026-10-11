@@ -73,6 +73,10 @@ def contract(source):
                        'unlocked_div_to_pll_seconds': [duration.numerator, duration.denominator],
                        'unlocked_div_to_pll_us': float(duration * 1_000_000)})
     return {'source_sha256': SOURCE_SHA256, 'schematic_input_hz': INPUT_HZ,
+            'reset_contract': {'clock_pins': [1, 1, 1], 'pullup_ohms': 100_000,
+                               'u101_pins': [77, 78, 79], 'r101_pairs': [[7, 2], [6, 3], [8, 1]],
+                               'compatible_family': 'C5416', 'clkmd': '0000',
+                               'requested_hz': INPUT_HZ // 2, 'exact_da150_identity': False},
             'writers': rows,
             'ti_family_transition_predictions': delays,
             'scope': 'four pinned original writers and TI-family clock selection; no complete writer census or physical DA150 reset/PLL clock measurements'}
@@ -125,7 +129,12 @@ def check_clock_rates(text):
     delays = [Fraction(0), transition_seconds(0x77fb, entering_pll=True),
               transition_seconds(0x77fb, entering_pll=False),
               transition_seconds(0x97fb, entering_pll=True)]
-    for (_, time), write, delay in zip(rows, writes, delays):
+    reset_marker = 'mu4_clock_reset_profile: pins=111 clkmd=0000 divider=2 family=C5416_compatible exact_da150_identity=0'
+    for index, ((_, time), write, delay) in enumerate(zip(rows, writes, delays)):
+        if index == 0 and time == 0:
+            if text.count(reset_marker) != 1:
+                raise ValueError('reset-derived divider rate requires the explicit compatibility profile')
+            continue
         if abs(time - Fraction(write) - delay) > Fraction(3, 1_000_000_000):
             raise ValueError('source switch differs from input-derived transition deadline')
     return {'selected_hz': expected, 'external_codec_hz': INPUT_HZ,

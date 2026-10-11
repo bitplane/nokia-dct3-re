@@ -18,6 +18,7 @@ public:
 	// Input clock for TI-family PLLSTATUS timing and optional rate selection.
 	void set_pll_reference_clock(u32 hz) { m_pll_reference_clock = hz; }
 	void set_follow_clkmd(bool enabled) { m_follow_clkmd = enabled; }
+	void set_reset_clkmd(u16 value, bool enabled = true) { m_reset_clkmd = value; m_reset_clkmd_enabled = enabled; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
@@ -197,6 +198,8 @@ private:
 	u16 m_clkmd = 0;
 	u32 m_pll_reference_clock = 0;
 	bool m_follow_clkmd = false;
+	u16 m_reset_clkmd = 0;
+	bool m_reset_clkmd_enabled = false;
 	u32 m_reset_clock = 0;
 	u32 m_timer_clock = 0;
 	u32 m_pending_clock = 0;

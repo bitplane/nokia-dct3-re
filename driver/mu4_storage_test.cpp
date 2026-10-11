@@ -24,11 +24,14 @@ public:
 		  m_disk_vectors(*this, "disk_vectors"), m_segment(*this, "segment") { }
 	void test(machine_config &config)
 	{
-		// Test clock only; DA150 PLL/physical memory mapping is not claimed here.
+		// Initial configured rate is replaced by the evidenced compatibility reset.
 		TMS320C54X(config, m_cpu, 13'000'000);
-		// Y101 clocks original CLKMD selection; reset straps remain unvalidated.
+		// Sheet 4: R101 pulls CLKMD1/2/3 high. SPRS095P table 3-8,
+		// matching C5416 PGE pin/MMIO layout: 111 -> 0000, Y101 / 2.
+		// This is a compatible reset contract, not DA150 die identification.
 		m_cpu->set_pll_reference_clock(11'995'200);
 		m_cpu->set_follow_clkmd(true);
+		m_cpu->set_reset_clkmd(0);
 		m_cpu->system_clock_cb().set([this](u32 hz) {
 			m_dma->set_unscaled_clock(hz);
 			m_mcbsp->set_unscaled_clock(hz);
@@ -1153,6 +1156,8 @@ private:
 	}
 	u16 nand_r()
 	{
+		if (!m_ready && !machine().side_effects_disabled())
+			fatalerror("MU4 storage fixture read data while NAND busy");
 		if (!m_data_reads) m_first_data = machine().time();
 		++m_data_reads;
 		return m_nand->data_r();
@@ -1307,6 +1312,7 @@ private:
 	}
 	virtual void machine_start() override
 	{
+		logerror("mu4_clock_reset_profile: pins=111 clkmd=0000 divider=2 family=C5416_compatible exact_da150_identity=0\n");
 		if (original_bootstrap_profile())
 		{
 			m_phase = 74;
@@ -1901,7 +1907,12 @@ private:
 		// Disable the unrelated core timer so it cannot wake the completion IDLE.
 		program.write_word(0x17fe, 0x7726); program.write_word(0x17ff, 0x0010);
 		program.write_word(0xff80, 0xf073); program.write_word(0xff81, 0x17fe);
-		m_check->adjust(m_phase >= 25 ? attotime::from_usec(1) : attotime::from_msec(m_phase == 24 ? 8000 : m_phase == 18 ? 60000 : m_phase == 13 ? 8000 : (m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1));
+		// These isolated routine fixtures bypass the original clock initializer.
+		// Their instruction-budget deadlines were established at 13 MHz; retain
+		// that budget at the selected reset clock without changing NAND latency.
+		unsigned const budget_ms = m_phase == 24 ? 8000 : m_phase == 18 ? 60000 : m_phase == 13 ? 8000 :
+			(m_phase == 7 || m_phase == 14) ? 500 : m_phase == 4 ? 250 : m_phase >= 6 ? 50 : 1;
+		m_check->adjust(attotime::from_ticks(m_phase >= 25 ? 13 : u64(budget_ms) * 13'000, m_cpu->clock()));
 		if (m_phase == 74)
 		{
 			// Original serial-boot entry handoff, not mask-ROM or DA150 reset wiring.
@@ -2203,7 +2214,9 @@ private:
 			{
 				if (!m_serial_tx_words.empty() || (mcbsp_status() & 6)) fatalerror("MU4 McBSP advanced without clock");
 				mcbsp_reg_w(14, 0x0200);
-				m_phase = 32; m_check->adjust(attotime::from_usec(3)); return;
+				// Preserve the conformance observation windows in serial system-clock
+				// ticks, independent of the board's selected reset/PLL rate.
+				m_phase = 32; m_check->adjust(attotime::from_ticks(39, m_mcbsp->clock())); return;
 			}
 			if (m_phase == 32)
 			{
@@ -2214,7 +2227,7 @@ private:
 				m_serial_saved_bits = m_serial_tx_bits.size();
 				m_saved_dma.str(std::string()); m_saved_dma.clear();
 				if (machine().save().write_stream(m_saved_dma) != STATERR_NONE) fatalerror("MU4 McBSP pending save failed");
-				m_phase = 33; m_check->adjust(attotime::from_usec(70)); return;
+				m_phase = 33; m_check->adjust(attotime::from_ticks(910, m_mcbsp->clock())); return;
 			}
 			if (m_phase == 33 || m_phase == 34)
 			{
@@ -2231,17 +2244,17 @@ private:
 					if (machine().save().read_stream(m_saved_dma) != STATERR_NONE || (mcbsp_status() & 7) != 5)
 						fatalerror("MU4 McBSP pending restore mismatch");
 					m_serial_tx_words.clear(); m_serial_tx_bits.clear();
-					m_phase = 34; m_check->adjust(attotime::from_usec(70)); return;
+					m_phase = 34; m_check->adjust(attotime::from_ticks(910, m_mcbsp->clock())); return;
 				}
 				m_mcbsp->data_w(3, 0x1234); mcbsp_reg_w(1, 0);
-				m_phase = 35; m_check->adjust(attotime::from_usec(40)); return;
+				m_phase = 35; m_check->adjust(attotime::from_ticks(520, m_mcbsp->clock())); return;
 			}
 			if (m_phase == 35)
 			{
 				if (mcbsp_status() & 7 || m_serial_tx_words.size() != 2 || m_serial_tx_irqs != 4) fatalerror("MU4 McBSP reset/interrupt count mismatch");
 				m_serial_tx_words.clear(); m_serial_tx_bits.clear();
 				mcbsp_reg_w(4, 0); mcbsp_reg_w(1, 0x0041); m_mcbsp->data_w(3, 0xa55a);
-				m_phase = 36; m_check->adjust(attotime::from_usec(40)); return;
+				m_phase = 36; m_check->adjust(attotime::from_ticks(520, m_mcbsp->clock())); return;
 			}
 			unsigned const width = m_phase == 36 ? 8 : 12;
 			u16 const expected = m_phase == 36 ? 0x005a : 0x055a;
@@ -2253,7 +2266,7 @@ private:
 			{
 				m_serial_tx_words.clear(); m_serial_tx_bits.clear();
 				mcbsp_reg_w(1, 0); mcbsp_reg_w(4, 0x0020); mcbsp_reg_w(1, 0x0041); m_mcbsp->data_w(3, 0xa55a);
-				m_phase = 37; m_check->adjust(attotime::from_usec(40)); return;
+				m_phase = 37; m_check->adjust(attotime::from_ticks(520, m_mcbsp->clock())); return;
 			}
 			if (m_serial_tx_irqs != 8) fatalerror("MU4 McBSP short-word interrupt mismatch");
 			m_saved_dma.str(std::string());
@@ -3378,7 +3391,7 @@ private:
 			unsigned spare_reads = 0, status_reads = 0;
 			for (u16 value : m_writes) { spare_reads += value == 0x0150; status_reads += value == 0x0170; }
 			if (m_cpu->state_int(tms320c54x_device::STATE_A) != (m_phase == 10 ? 0xff : 0) ||
-				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_busy_reads ||
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 ||
 				spare_reads != (m_phase == 10 ? 2 : 1) || status_reads != spare_reads)
 				fatalerror("MU4 InitDisk marker contract mismatch a=%llx sp=%04x spare=%u status=%u reads=%u busy=%u",
 					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
@@ -3427,7 +3440,7 @@ private:
 		if (m_phase == 6)
 		{
 			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 1 ||
-				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_busy_reads || !m_data_reads)
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_data_reads)
 				fatalerror("MU4 erased mount contract mismatch a=%llx sp=%04x reads=%u busy=%u",
 					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)), m_data_reads, m_busy_reads);
@@ -3439,7 +3452,7 @@ private:
 		if (m_phase == 19)
 		{
 			if (m_cpu->state_int(tms320c54x_device::STATE_A) != 0 ||
-				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_data_reads || !m_busy_reads)
+				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 || !m_data_reads)
 				fatalerror("MU4 InitData mount of original InitDisk medium failed a=%llx sp=%04x",
 					(unsigned long long)m_cpu->state_int(tms320c54x_device::STATE_A),
 					unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)));
@@ -3582,7 +3595,10 @@ private:
 		std::vector<u16> const expected = m_phase ?
 			std::vector<u16>{0x0100, 0x0200, 0x0200, 0x0200, 0x0201} :
 			std::vector<u16>{0x0100, 0x0200, 0x0201, 0x0200, 0x0200};
-		if (m_writes != expected || m_data_reads != 2 || !m_busy_reads ||
+		// A slower reset clock may reach the BIO poll after NAND is ready.
+		// Require the device's minimum data latency, not a CPU-speed-dependent
+		// count of polls while it was busy.
+		if (m_writes != expected || m_data_reads != 2 ||
 				m_cpu->state_int(tms320c54x_device::STATE_A) != (m_phase ? 0x3412 : 0xffff) ||
 				m_cpu->state_int(tms320c54x_device::STATE_SP) != 0x1200 ||
 				m_first_data - m_read_started < attotime::from_usec(10))

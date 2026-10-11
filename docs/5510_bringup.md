@@ -32,8 +32,10 @@ conformance fixtures verify the IDLE3 source switch, absent-clock pending
 transfers, enabled/masked completion wake and save-state replay. MU4 now wires
 that switch to the schematic's 11.9952 MHz Y101 input. The original startup
 divider/PLL sequence now controls CPU execution, core timer, DMA and internal
-McBSP rates after input-derived transition delays. Reset straps, PLL wake
-timing and sub-cycle switching remain unvalidated. See
+McBSP rates after input-derived transition delays. The schematic's reset
+straps now select a documented C5416-compatible DIV/2 profile. Exact DA150
+reset-table identity, automatic PLL-selected IDLE3 wake timing and sub-cycle
+switching remain unvalidated. See
 [the CLKMD contract](#original-clkmd-contract).
 The `startup` profile passes its 20-second window with zero illegal
 instructions and an active original streaming consumer. With selected CLKMD
@@ -980,8 +982,58 @@ lock times or a complete writer census. The MU4 bench configures the core's
 PLLSTATUS and selected execution rates. CPU clock publication fans out to
 DMA and all three McBSPs, not to the externally clocked codec. Unconfigured
 users retain their declared fixed execution rate and legacy immediate status
-behavior. The MU4 reset rate remains a provisional 13 MHz until the first
-CLKMD write; reset straps and IDLE3 relock behavior remain unvalidated.
+behavior. MU4 explicitly configures reset CLKMD `0000` and DIV/2 from the
+compatible pin/MMIO contract below, rather than retaining a 13 MHz reset
+calibration. Exact DA150 die equivalence is not established.
+
+#### Reset profile
+
+The NPM-5 MU4 schematic, sheet 4, connects U101 CLKMD1/2/3 (pins 77/78/79)
+through R101's independent 100-kilohm resistors to DVCC (2.8 V): pairs 7-2,
+6-3 and 8-1 respectively. Thus the board strap is `111`, not a guessed default.
+The separate R101 pair 5-4 pulls MP/MC down; it must not be confused with a
+CLKMD pulldown.
+
+[TI SPRS095P](https://www.ti.com/lit/ds/symlink/tms320vc5416.pdf), figure 2-2,
+matches all five clock pins: CLKMD1/2/3 at 77/78/79 and X1/X2 at 96/97.
+Its three McBSP subbanks, DMA registers `54..57` and CLKMD `58` also match
+the firmware-mapped MU4 layout. Table 3-8 maps `111` to reset CLKMD `0000`,
+PLL disabled, input divided by two: 5,997,600 Hz with Y101. This establishes
+the explicitly named **C5416-compatible model profile**, not an identification
+of DA150's complete silicon or mask ROM. Older family tables differ; applying
+SPRU131G's C5410 reset table without a variant match would be unjustified.
+
+The ignored local reference is
+`roms/reference-docs/npm5/ti_tms320vc5416_sprs095p.pdf`, SHA-256
+`3511b32bf9d3ba338ad5043376a30115c046979f6a3a094d3c30c5cd674261e2`.
+The core's optional `set_reset_clkmd` publishes the configured source/rate
+at reset and cancels any pending transition. Unconfigured machines keep their
+existing reset behavior. The controller fixture checks reset CLKMD and the
+CPU/DMA/McBSP DIV/2 rates; the passive original-run checker requires an explicit
+compatibility-profile marker before accepting a divider publication at time zero.
+
+Isolated routine fixtures bypass that original clock initializer. Their
+conformance windows therefore use peripheral ticks and instruction budgets,
+not fixed deadlines assuming 13 MHz. NAND read/program/erase timing remains
+unchanged. A busy-poll count is observational: slower execution may first poll
+after readiness. The fixture instead rejects data reads while NAND is busy
+and retains the minimum ten-microsecond read-latency check.
+
+#### Software-managed IDLE3 relock
+
+SPRU131G sections 6.11.3/8.5.2 establish that IDLE3 halts the PLL and software
+re-entry must account for lock acquisition. The core invalidates retained
+lock on the actual IDLE3 instruction. A coupled fixture first locks PLL x8,
+switches to DIV with PLLON/OFF held high, executes IDLE3, wakes through an
+enabled interrupt with INTM set, and requests PLL again. The request remains
+in DIV after one microsecond and switches only after the new lock-count delay.
+Without the IDLE3 invalidation it would wrongly reuse retained lock.
+
+This validates software-managed DIV wake and subsequent PLL entry. It does
+not assign an automatic wake latency when IDLE3 is entered with PLL selected,
+nor establish oscillator startup availability or asynchronous pin pulse timing.
+
+#### Transition timing
 
 The tool also calculates exact TI-family transition predictions (SPRU131G
 pp. 8-32/33). An unlocked DIV-to-PLL request adds six input cycles and
@@ -991,8 +1043,8 @@ lock-up; PLLSTATUS changes only after the source switch. PLL-to-DIV has no
 lock-count delay and uses the old PLL configuration for its 3.5-cycle term;
 the input-cycle term becomes twelve for PLLMUL=15. A still-locked PLL skips
 the lock-count delay on re-entry. Exact rational tests cover these distinctions
-and fractional PLL ratios. These predictions do not establish DA150 reset
-straps or IDLE3 wake/relock behavior, and are not runtime timing measurements.
+and fractional PLL ratios. These predictions are not physical timing
+measurements or a complete automatic IDLE3 wake contract.
 
 `check-c54x-core` tests the delayed status one input tick before the predicted
 deadline and one nanosecond after it. It saves a pending request, cancels it,
@@ -1170,8 +1222,8 @@ queued words, reset cancellation, XRDY interrupts and pending save/restore.
 Receiver and wider/multiphase formats remain unsupported; active unsupported
 transmit formats fail explicitly. External framed clocks and DMA-ready lines
 have separate conformance coverage below.
-The fixture's provisional 13 MHz reset rate is not a validated DA150 reset
-configuration; subsequent CLKMD selection follows the contract above.
+The fixture uses the C5416-compatible DIV/2 reset profile above; complete
+DA150 equivalence is not claimed.
 
 Original MCUSI16 transmits `0c10 0818 0a01 0e53 1023 1201` without illegal
 instructions. The gate ends when the sixth word completes, not after a full

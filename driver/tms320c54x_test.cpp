@@ -2368,6 +2368,13 @@ private:
 		m_phase = 79600;
 		m_check_timer->adjust(attotime::from_ticks(81'727, 239'904'000) - attotime::from_ticks(1, 11'995'200));
 	}
+	void start_idle3_pll_relock_case()
+	{
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->space(AS_DATA).write_word(0x58, 0x77ff);
+		m_phase = 79700;
+		m_check_timer->adjust(attotime::from_usec(341));
+	}
 	void start_vector_prefetch_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -21501,10 +21508,67 @@ private:
 				expect(m_idle_dma_completions == 1 && data.read_word(0x0533) == 0x4444,
 					"input-clock DMA completes on CLKIN despite both system-rate changes");
 				m_idle_dma->reset();
-				m_cpu->resume(SUSPEND_REASON_DISABLE);
-				osd_printf_info("TMS320C54x CLKMD rates: PASS div_hz=5997600 pll_hz=119952000 timer=1 dma=1 input_clock_dma=1 internal_mcbsp=1 save_restore=1 physical_rate_claim=0\n");
-				start_vector_prefetch_case(0); return;
+				m_cpu->set_pll_reference_clock(11'995'200); m_cpu->set_follow_clkmd(true);
+				m_cpu->set_reset_clkmd(0);
+				m_cpu->reset();
+				expect(data.read_word(0x58) == 0 && m_cpu->clock() == 5'997'600 &&
+					m_idle_dma->clock() == 5'997'600 && m_idle_mcbsp->clock() == 5'997'600,
+					"explicit compatibility reset restores CLKMD and divider-derived CPU/peripheral rates");
+				m_cpu->set_reset_clkmd(0, false);
+				osd_printf_info("TMS320C54x CLKMD rates: PASS div_hz=5997600 pll_hz=119952000 timer=1 dma=1 input_clock_dma=1 internal_mcbsp=1 save_restore=1 reset_profile=1 physical_rate_claim=0\n");
+				start_idle3_pll_relock_case(); return;
 			}
+		}
+		if (m_phase >= 79700 && m_phase <= 79705)
+		{
+			if (m_phase == 79700)
+			{
+				expect(data.read_word(0x58) == 0x77ff, "PLL locks before software-managed idle transition");
+				data.write_word(0x58, 0x77fc);
+				m_phase = 79701; m_check_timer->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 79701)
+			{
+				expect(data.read_word(0x58) == 0x77fc, "DIV source with PLL power held before IDLE3");
+				auto &program = m_cpu->space(AS_PROGRAM);
+				program.write_word(0x0b80, 0xf5e1); program.write_word(0x0b81, 0xf4e1);
+				m_cpu->set_state_int(STATE_GENPC, 0x0b80);
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+				m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+				m_cpu->resume(SUSPEND_REASON_DISABLE);
+				m_phase = 79702; m_check_timer->adjust(attotime::from_usec(10)); return;
+			}
+			if (m_phase == 79702)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == 0x0b81,
+					"original IDLE3 instruction stops before continuation");
+				m_cpu->set_input_line(0, ASSERT_LINE);
+				m_phase = 79703; m_check_timer->adjust(attotime::from_usec(10)); return;
+			}
+			if (m_phase == 79703)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) && m_cpu->state_int(STATE_GENPC) == 0x0b82,
+					"enabled IRQ wakes IDLE3 to masked-interrupt continuation in DIV mode");
+				m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+				m_cpu->set_input_line(0, CLEAR_LINE);
+				data.write_word(0x58, 0x77ff);
+				m_phase = 79704; m_check_timer->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 79704)
+			{
+				expect(data.read_word(0x58) == 0x77fe && m_cpu->clock() == 5'997'600,
+					"IDLE3 invalidates retained PLL lock: software re-entry cannot skip the lock count");
+				m_phase = 79705; m_check_timer->adjust(attotime::from_usec(340)); return;
+			}
+			expect(data.read_word(0x58) == 0x77ff && m_cpu->clock() == 95'961'600,
+				"software-managed PLL re-entry completes its new lock delay after IDLE3");
+			m_cpu->set_follow_clkmd(false); m_cpu->set_pll_reference_clock(0);
+			m_cpu->set_unscaled_clock(13'000'000);
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			osd_printf_info("TMS320C54x IDLE3 PLL relock: PASS div_wake=1 power_held=1 lock_invalidated=1 software_reentry=1 automatic_pll_wake_claim=0\n");
+			start_vector_prefetch_case(0); return;
 		}
 		if (m_phase >= 80000 && m_phase <= 80003)
 		{

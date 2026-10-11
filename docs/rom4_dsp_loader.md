@@ -2919,8 +2919,11 @@ Pending clock switches round up to the next whole transfer clock; sub-cycle
 switching and PLL startup latency remain unvalidated. MU4 now supplies the
 11.9952 MHz Y101 rate evidenced by its own schematic sheet 4 to this connection.
 The original MU4 system-clock requests now drive delayed PLLSTATUS, CPU
-execution and system-clocked peripheral rates. Reset straps, IDLE3 relock
-and sub-cycle switching remain unvalidated; see the
+execution and system-clocked peripheral rates. The MU4 schematic's `111`
+straps select an explicitly C5416-compatible DIV/2 reset, and IDLE3
+invalidates retained lock for software-managed PLL re-entry. Exact DA150
+reset-table identity, automatic PLL-selected wake and sub-cycle switching
+remain unvalidated; see the
 [MU4 CLKMD contract](5510_bringup.md#original-clkmd-contract).
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
