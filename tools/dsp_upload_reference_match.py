@@ -10,7 +10,7 @@ import re
 from dsp_upload_extract import encode_words
 
 
-def read_payload(path: Path) -> list[int]:
+def read_reference(path: Path) -> tuple[list[int], list[int]]:
     text = path.read_text()
     declaration = re.search(
         r"static\s+struct\s+dsp_codeblock\s+\w+\s*=\s*\{"
@@ -28,7 +28,21 @@ def read_payload(path: Path) -> list[int]:
     header, words = arrays
     if len(header) != 5 or len(words) != header[2]:
         raise ValueError(f"{path}: descriptor/payload size mismatch")
-    return words
+    return header, words
+
+
+def read_payload(path: Path) -> list[int]:
+    return read_reference(path)[1]
+
+
+def descriptor_match(header: list[int], image: bytes, hit: dict) -> dict | None:
+    offset = hit["file_offset"] - 12
+    if offset < 0:
+        return None
+    observed = [int.from_bytes(image[index:index + 2], hit["byteorder"])
+                for index in range(offset, offset + 12, 2)]
+    return {"file_offset": offset, "words": observed,
+            "archival_header_equal": observed[:5] == header}
 
 
 def matches(words: list[int], image: bytes) -> list[dict]:
@@ -53,16 +67,19 @@ def main() -> None:
         sources = sorted(args.reference_dir.glob("block*.h"))
         if not sources:
             raise ValueError("no block headers found")
-        payloads = [(path, read_payload(path)) for path in sources]
-        report = {"headers": len(payloads), "nonempty": sum(bool(w) for _, w in payloads),
+        payloads = [(path, *read_reference(path)) for path in sources]
+        report = {"headers": len(payloads), "nonempty": sum(bool(w) for _, _, w in payloads),
                   "offset_namespace": "file bytes, not MCU/DSP addresses", "images": []}
         for path in args.images:
             image = path.read_bytes()
             entries = []
-            for source, words in payloads:
+            for source, header, words in payloads:
                 hits = matches(words, image)
                 if hits:
+                    for hit in hits:
+                        hit["preceding_descriptor_candidate"] = descriptor_match(header, image, hit)
                     entries.append({"block": source.stem, "words": len(words),
+                                    "archival_header": header,
                                     "payload_sha256_be": hashlib.sha256(encode_words(words, "big")).hexdigest(),
                                     "matches": hits})
             report["images"].append({"path": str(path), "sha256": hashlib.sha256(image).hexdigest(),

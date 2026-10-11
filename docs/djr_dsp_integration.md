@@ -1495,6 +1495,13 @@ exposed blocks match at these **file offsets**, not MCU program addresses:
 | `01` | 2986 | `0x1025cc` |
 | `14` | 629 | `0x108128` |
 
+All 20 matches also have the archival five-word header immediately before
+the payload, within the firmware's six-word descriptor layout (12 bytes).
+The sixth word is zero in every case. For blocks `00`, `01` and `14`, the
+descriptor file offsets are respectively `0x1020b4`, `0x1025c0` and
+`0x10811c`. This checks both payload identity and descriptor metadata; it
+does not establish which blocks a particular runtime boot requests.
+
 This establishes byte identity, not unique archival provenance or a compatible
 resident DSP ROM. Other products share complete individual payloads: for
 example, 3210 v6.00 matches blocks `05`, `06`, `0f` and `16`. Raw images were
@@ -1509,6 +1516,10 @@ Reproduce complete-payload matches with
 The JSON includes image and payload hashes, all occurrences in both byte
 orders, and explicit file-offset labeling; malformed or size-inconsistent
 source arrays fail rather than silently contributing partial signatures.
+Each occurrence includes its preceding six-word descriptor candidate and
+an explicit comparison with the archival five-word header. A payload match
+without a matching descriptor is retained as such, not promoted to a
+matching upload contract.
 
 Inspection of `hw/dsp.c`, `hw/m_dsp.c`, `hw/dspblocks.c` and their DSP headers
 does not identify the 8810 port-`0x36` completion-bit owner or its timing.

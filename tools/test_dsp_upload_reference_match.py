@@ -2,7 +2,7 @@ import pathlib
 import tempfile
 import unittest
 
-from dsp_upload_reference_match import matches, read_payload
+from dsp_upload_reference_match import descriptor_match, matches, read_payload
 
 
 class ReferenceMatchTest(unittest.TestCase):
@@ -29,6 +29,17 @@ class ReferenceMatchTest(unittest.TestCase):
         self.assertEqual(matches([0x1234], bytes.fromhex("12341234")),
                          [{"byteorder": "big", "file_offset": 0}, {"byteorder": "big", "file_offset": 2},
                           {"byteorder": "little", "file_offset": 1}])
+
+    def test_descriptor_candidate(self):
+        header = [1, 2, 3, 4, 5]
+        for order in ("big", "little"):
+            image = b"".join(v.to_bytes(2, order) for v in header + [0]) + b"payload"
+            result = descriptor_match(header, image, {"byteorder": order, "file_offset": 12})
+            self.assertTrue(result["archival_header_equal"])
+            self.assertEqual(result["words"], header + [0])
+            self.assertFalse(descriptor_match([9] * 5, image,
+                                             {"byteorder": order, "file_offset": 12})["archival_header_equal"])
+        self.assertIsNone(descriptor_match(header, b"short", {"byteorder": "big", "file_offset": 0}))
 
 
 if __name__ == "__main__":
