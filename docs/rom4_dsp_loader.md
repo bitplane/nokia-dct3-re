@@ -4222,16 +4222,20 @@ marker and whole-core conformance pass in
 for this cross-accumulator test. Nonzero subtraction shifts, all other
 operand/status combinations and native RF/speech remain outside this claim.
 Systematic `f580/f581` (`ADD/SUB A,ASM,B`) fixtures cover all 32 signed
-ASM values with SXM clear/set, for 128 selected vectors. Source A is fixed
+ASM values with SXM and OVM clear/set and initial OVA/OVB clear/set,
+for 512 selected vectors. Source A is fixed
 at -65537 and destination B at 17, so negative right shifts distinguish
 sign fill from zero fill and positive shifts include 32-bit overflow.
 Expected signed right-shift values use explicit division/rounding rather
-than the host's negative shift behavior. Each vector checks unchanged A,
-the 40-bit B result, B-owned overflow, low-word carry/borrow and one-cycle
-cost with OVM clear. The dedicated family marker and whole-core conformance
-pass in `run_c54x_asm_all_shifts_core_20261009.log`. This closes shift/fill
-coverage for these operands/encodings, not all operands, OVM combinations,
-sticky-status initial states, RF acquisition or speech.
+than the host's negative shift behavior. Each vector checks unchanged A
+and ST1, the guard-preserving or saturated B result, sticky overflow,
+low-word carry/borrow and one-cycle cost. The reference is SPRU172C's
+`ADD/SUB src,ASM[,dst]` contract and SPRU131G's ST0/ST1 arithmetic rules.
+The dedicated family marker and whole-core conformance pass in
+`tmp/c54x-asm-saturation-matrix.log`; no core implementation change is needed.
+This closes selected shift/fill/saturation coverage for these operands and
+encodings, not other accumulator selections, all operands, RF acquisition
+or speech. Initial OVA and OVB are varied together, not independently.
 Re-run
 `make check-c54x-opcode-coverage LOG=<rom4-log> ROM4_IDLE=1` to check the
 opcode-set fingerprint; add `FIXTURE_LOG=<core-log> GROUPS=1` to rank
