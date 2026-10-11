@@ -61,7 +61,8 @@ public:
 		physical_information,
 		multiparty_facility_result,
 		supplementary_facility,
-		supplementary_register
+		supplementary_register,
+		location_update_reject
 	};
 	enum class host_ussd_outcome : u8
 	{
@@ -332,10 +333,12 @@ private:
 		awaiting_mobile_ussd_host_response,
 		awaiting_network_ussd_register_acknowledgement,
 		awaiting_network_ussd_response,
-		awaiting_network_ussd_release_acknowledgement
+		awaiting_network_ussd_release_acknowledgement,
+		awaiting_location_update_reject_acknowledgement
 	};
 
 	void clear_pending_downlink();
+	downlink_kind location_update_reply();
 	// Close the dedicated channel: every transaction that finishes on a
 	// dedicated channel ends this way, so the ordering of the state change
 	// against the queued release lives in one place.

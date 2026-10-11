@@ -19,6 +19,20 @@
 class nokia_gsm_network_device : public device_t, public device_nvram_interface
 {
 public:
+	enum class location_update_outcome : u8
+	{
+		accept,
+		plmn_not_allowed
+	};
+	void set_location_update_outcome(location_update_outcome outcome)
+	{
+		m_location_update_outcome = outcome;
+	}
+	location_update_outcome location_update_result() const
+	{
+		return m_location_update_outcome;
+	}
+	std::array<u8, 3> location_update_reject() const;
 	enum class cell_profile : u8
 	{
 		suitable,
@@ -346,6 +360,7 @@ private:
 
 	cell_profile m_cell_profile = cell_profile::suitable;
 	paging_profile m_paging_profile = paging_profile::matched;
+	location_update_outcome m_location_update_outcome = location_update_outcome::accept;
 	assignment_profile m_assignment_profile =
 			assignment_profile::matched_request;
 	outgoing_call_outcome m_outgoing_call_outcome =

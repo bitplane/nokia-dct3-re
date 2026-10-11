@@ -2034,6 +2034,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 						m_lapdm_link->pending_receive_sequence(),
 						machine().time().as_double());
 			const auto action = m_gsm_session->downlink_acknowledged();
+			if (m_trace_enabled && acknowledged ==
+					nokia_gsm_session_device::downlink_kind::location_update_reject)
+				LOGMASKED(LOG_RADIO,
+						"dsp_hle: LAPDm Location Updating Reject acknowledged nr=%u t=%.6f\n",
+						m_lapdm_link->pending_receive_sequence(),
+						machine().time().as_double());
 			if (action ==
 					nokia_gsm_session_device::downlink_kind::channel_release)
 			{
@@ -2993,6 +2999,7 @@ void nokia_radio_peer_device::advance_after_report(u8 report_type)
 		const auto action = m_gsm_session->contention_resolution_delivered();
 		if (action ==
 				nokia_gsm_session_device::downlink_kind::location_update_accept ||
+				action == nokia_gsm_session_device::downlink_kind::location_update_reject ||
 				action ==
 				nokia_gsm_session_device::downlink_kind::authentication_request)
 		{

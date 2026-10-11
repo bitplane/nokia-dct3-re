@@ -22,6 +22,8 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'calculator': ('npe3hle', 'application_input', 38),
              'phonebook': ('npe3hle', 'phonebook_input', 33),
              'registration': ('npe3hle', 'menu_input', 25),
+             'plmn-reject': ('npe3hle', 'staged_observe', 90),
+             'home-plmn-reject': ('npe3hle', 'staged_observe', 30),
              'outgoing-call': ('npe3hle', 'outgoing_call_input', 48),
              'incoming-call': ('npe3hle', 'incoming_call_input', 42),
              'incoming-pcm-missing': ('npe3hle', 'incoming_call_input', 42),
@@ -120,6 +122,31 @@ def check_registration(text, storage, *, preserved_location=False,
         cursor = position + len(record)
     if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
         raise ValueError('persisted EF_LOCI is not laboratory location-updated')
+
+
+def check_plmn_reject(text, storage, *, home=False):
+    from tools.radio_call_lifecycle_common import require_ordered
+    import re
+    require_ordered(text, (
+        ('LU reject', re.compile(r'RX enqueue type=80 .*data=.*05040b')),
+        ('LU reject acknowledgement', re.compile(r'LAPDm Location Updating Reject acknowledged nr=1')),
+        ('channel release', re.compile(r'LAPDm Channel Release acknowledged nr=2')),
+    ), '6210 PLMN rejection')
+    if 'LAPDm Location Updating Accept acknowledged' in text:
+        raise ValueError('rejected PLMN was also accepted')
+    if len(storage) != 3560:
+        raise ValueError('incomplete SIM storage after rejection')
+    if storage[1610] != 3:
+        raise ValueError('rejected location update did not persist roaming-not-allowed status')
+    if home:
+        if 'update-binary fid=6f7b' in text or storage[3548:] != b'\xff' * 12:
+            raise ValueError('home PLMN incorrectly added to EF_FPLMN')
+        return
+    if text.find('update-binary fid=6f7b') < text.find('05040b'):
+        raise ValueError('handset did not update EF_FPLMN after cause 11')
+    if bytes.fromhex('130062') not in (
+            storage[offset:offset + 3] for offset in range(3548, 3560, 3)):
+        raise ValueError('laboratory PLMN was not retained in EF_FPLMN')
 
 
 def events(path):
@@ -239,9 +266,17 @@ def main():
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
+        if args.scenario == 'plmn-reject':
+            from tools.make_sim_card_profile import make_profile
+            card = run / f'nvram/{machine}/sim_card'
+            card.parent.mkdir(parents=True)
+            # A visited preferred PLMN is external subscriber data, not an
+            # injected selection event. Keep IMSI/home identity unchanged.
+            card.write_bytes(make_profile(pin_enabled=False) + bytes.fromhex('130062') +
+                             b'\xff' * 21 + b'\xff' * 12)
         host = args.scenario.startswith('host-')
         configured = args.scenario in ('incoming-call', 'incoming-pcm-missing', 'incoming-sms', 'state-sms') or args.scenario in TOOLKIT_PROFILES or host
-        if configured or args.coherent_cell:
+        if configured or args.coherent_cell or args.scenario in ('plmn-reject', 'home-plmn-reject'):
             (run / 'cfg').mkdir()
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name=machine)
@@ -261,6 +296,12 @@ def main():
             if args.coherent_cell:
                 ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
                               mask='1024', defvalue='0', value='1024')
+            if args.scenario in ('plmn-reject', 'home-plmn-reject'):
+                ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
+                              mask='2', defvalue='0', value='2')
+                if args.scenario == 'plmn-reject':
+                    ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
+                                  mask='4', defvalue='0', value='4')
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -508,6 +549,9 @@ def main():
             from PIL import Image
             with Image.open(run / 'snap/6210_sms_read_1.png') as frame:
                 check_frame(frame, SMS_READ_SHA256, 'received hello SMS')
+        elif args.scenario in ('plmn-reject', 'home-plmn-reject'):
+            check_plmn_reject(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
+                              home=args.scenario == 'home-plmn-reject')
         elif args.scenario == 'security':
             import re
             from tools.radio_call_lifecycle_common import require_ordered

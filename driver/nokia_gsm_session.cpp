@@ -468,6 +468,20 @@ nokia_gsm_session_device::contention_resolution_delivered()
 				request.data(), request.size());
 	}
 
+	return location_update_reply();
+}
+
+nokia_gsm_session_device::downlink_kind nokia_gsm_session_device::location_update_reply()
+{
+	if (m_network->location_update_result() ==
+			nokia_gsm_network_device::location_update_outcome::plmn_not_allowed)
+	{
+		const auto reject = m_network->location_update_reject();
+		m_release_completes_registration = false;
+		m_state = u8(state::awaiting_location_update_reject_acknowledgement);
+		return queue_downlink(downlink_kind::location_update_reject,
+				reject.data(), reject.size());
+	}
 	const auto accept = m_network->location_update_accept(
 			m_established_layer3.data(), m_established_layer3_length,
 			m_serving_arfcn);
@@ -602,6 +616,10 @@ nokia_gsm_session_device::downlink_acknowledged()
 		return queue_downlink(downlink_kind::channel_release,
 				release.data(), release.size());
 	}
+
+	if (m_state == u8(state::awaiting_location_update_reject_acknowledgement) &&
+			m_pending_downlink.kind == u8(downlink_kind::location_update_reject))
+		return begin_channel_release();
 
 	if (m_state == u8(state::awaiting_location_update_accept_acknowledgement) &&
 			m_pending_downlink.kind == u8(downlink_kind::location_update_accept))
@@ -1425,12 +1443,7 @@ nokia_gsm_session_device::receive_layer3(
 				return queue_downlink(downlink_kind::cipher_mode_command,
 						command.data(), command.size());
 			}
-			const auto accept = m_network->location_update_accept(
-					m_established_layer3.data(),
-					m_established_layer3_length, m_serving_arfcn);
-			m_state = u8(state::awaiting_location_update_accept_acknowledgement);
-			return queue_downlink(downlink_kind::location_update_accept,
-					accept.data(), accept.size());
+			return location_update_reply();
 		}
 
 		const auto reject = m_network->authentication_reject();

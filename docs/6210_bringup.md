@@ -271,6 +271,22 @@ and speech are not accepted; unrecovered handover fields remain unset.
 
 ### Phone-service acceptance
 
+`verify-6210-home-plmn-reject` supplies GSM 04.08 cause 11 through the
+ordinary downlink and requires rejection/channel-release acknowledgements,
+EF_LOCI status 3, no acceptance, and unchanged erased EF_FPLMN. This is a
+negative control: GSM 03.22 forbids adding the subscriber's home PLMN to
+the forbidden list ([specification](https://www.etsi.org/deliver/etsi_ts/100900_100999/100930/07.04.00_60/ts_100930v070400p.pdf)).
+The network outcome and visited-PLMN inputs are external laboratory policy;
+they do not alter firmware state or subscriber identity.
+
+The manual `run_noki6210_acceptance.py --scenario plmn-reject --coherent-cell`
+probe instead broadcasts visited PLMN 310-260 and puts it in the external
+card's preferred list. Its 90-second observation receives 57 SI3 blocks and
+reads PLMNsel but emits no random access, Location Updating or FPLMN write.
+It therefore fails the rejection acceptance deliberately; handset-originated
+visited-FPLMN persistence and cold selection remain unproven. Resolve the
+selection boundary before attempting further rejection payloads.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require

@@ -1906,6 +1906,19 @@ void nokia_dct3_state::reset_board_state(bool clear_sram)
 	m_gsm_session->set_authentication_required(
 			BIT(m_authentication_config.read_safe(0x00), 0) ||
 			m_gsm_network->cipher_algorithm() != gsm::a5::algorithm::a5_0);
+	m_gsm_network->set_location_update_outcome(
+			BIT(m_authentication_config.read_safe(0x00), 1)
+			? nokia_gsm_network_device::location_update_outcome::plmn_not_allowed
+			: nokia_gsm_network_device::location_update_outcome::accept);
+	if (BIT(m_authentication_config.read_safe(0x00), 2))
+	{
+		for (unsigned index = 0; index < m_gsm_network->cell_count(); ++index)
+		{
+			auto cell = *m_gsm_network->cell_at(index);
+			cell.location.plmn = { 0x13, 0x00, 0x62 };
+			m_gsm_network->set_cell(index, cell);
+		}
+	}
 	m_radio_peer->set_page_after_registration(
 			BIT(network, 0) || BIT(network, 1) || BIT(network, 2) ||
 			BIT(network, 3) || ((network >> 8) & 0x03) != 0);
@@ -2905,6 +2918,12 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x01, 0x00, "Require GSM MM authentication during registration")
 	PORT_CONFSETTING(0x00, DEF_STR(Off))
 	PORT_CONFSETTING(0x01, DEF_STR(On))
+	PORT_CONFNAME(0x02, 0x00, "Laboratory Location Updating outcome")
+	PORT_CONFSETTING(0x00, "Accept")
+	PORT_CONFSETTING(0x02, "Reject: PLMN not allowed")
+	PORT_CONFNAME(0x04, 0x00, "Laboratory serving PLMN")
+	PORT_CONFSETTING(0x00, "Subscriber home PLMN")
+	PORT_CONFSETTING(0x04, "Visited PLMN 310-260")
 
 	PORT_START("CIPHERCFG")
 	PORT_CONFNAME(0x01, 0x00, "Laboratory GSM cipher policy")

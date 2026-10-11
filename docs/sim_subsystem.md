@@ -236,7 +236,11 @@ arrays with exact FCP READ/UPDATE conditions, bounds checking, save/load and
 append-only NVRAM persistence. The serial fixture verifies both updates and
 restoration, then checks the exact serialized bodies; the storage gate cold-loads
 that same record. This does not yet prove a handset-originated rejection updates
-FPLMN or alters subsequent network selection; that lifecycle remains open.
+visited FPLMN or alters subsequent network selection; that lifecycle remains
+open. The 6210 home-PLMN rejection control does prove the complementary rule:
+cause 11 updates EF_LOCI to roaming-not-allowed but leaves EF_FPLMN erased.
+The HPLMN must not be forbidden (GSM 03.22); a visited-network probe has not
+yet reached Location Updating. See `6210_bringup.md` for the exact boundary.
 These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
 ([ETSI specification](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf)).
 No retained handset trace uses SEEK;

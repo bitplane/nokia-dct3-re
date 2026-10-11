@@ -845,6 +845,12 @@ std::array<u8, 17> nokia_gsm_network_device::location_update_accept(
 	return message;
 }
 
+std::array<u8, 3> nokia_gsm_network_device::location_update_reject() const
+{
+	// GSM 04.08 9.2.14: MM header and mandatory cause 11 (PLMN not allowed).
+	return { 0x05, 0x04, 0x0b };
+}
+
 std::array<u8, 19> nokia_gsm_network_device::authentication_request() const
 {
 	// GSM 04.08 9.2.2: MM header, key sequence 0, and a 128-bit RAND.
