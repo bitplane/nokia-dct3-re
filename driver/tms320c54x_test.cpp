@@ -2687,7 +2687,7 @@ private:
 		}
 		program.write_word(base + 0x600, 0xe811);
 		program.write_word(base + 0x601, 0xe844);
-		bool const multiword = variant >= 8;
+		bool const multiword = variant >= 8 && variant < 12;
 		program.write_word(base + 0x40, !multiword && (variant & 1) ? 0xf49b : 0xf69b);
 		program.write_word(base + 0x41, multiword ? 0xf020 : 0xe822);
 		program.write_word(base + 0x42, multiword ? 0x1234 : 0xe933);
@@ -23049,27 +23049,48 @@ private:
 		if (m_phase == 251150)
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
-			bool const multiword = m_pipeline_return_case >= 8;
+			bool const pending_irq = m_pipeline_return_case >= 12;
+			bool const multiword = m_pipeline_return_case >= 8 && !pending_irq;
 			bool const delayed = multiword || !(m_pipeline_return_case & 1);
-			u64 const checkpoint = multiword ? (m_pipeline_return_case & 1 ? 9 : 8) : (m_pipeline_return_case & 4 ? 8 : 7);
+			u64 const acceptance = delayed ? 12 : 10;
+			u64 const checkpoint = pending_irq ? 11 : multiword ? (m_pipeline_return_case & 1 ? 9 : 8) : (m_pipeline_return_case & 4 ? 8 : 7);
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Fast return advances one frontend cycle");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 && cycle < 8 ? 0xfff : 0x1000), "Fast return increments SP in Access only");
-			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == (cycle >= 6 && cycle < 10), "Fast return clears INTM in Execute");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == ((cycle >= 5 && cycle < 8) || (pending_irq && cycle >= acceptance + 2) ? 0xfff : 0x1000), "Fast return and pending entry modify SP in their Access stages only");
+			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == ((cycle >= 6 && cycle < 10) || (pending_irq && cycle >= acceptance + 3)), "Fast return clears INTM before the next accepted interrupt sets it");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle < 6 ? 0 : cycle >= 13 ? 0x44 : multiword ? (cycle >= 12 ? 0x1234 : 0x11) : delayed && cycle >= 11 ? 0x22 : 0x11), "Fast return preserves or discards the two delay words");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == (!multiword && delayed && cycle >= 12 ? 0x33 : 0), "Return delay words belong to complete instructions, not independent literal opcodes");
 			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
+			if (pending_irq && cycle == 9)
+			{
+				m_cpu->set_input_line(0, CLEAR_LINE);
+				m_cpu->set_input_line(0, ASSERT_LINE);
+			}
+			// Input-line writes are scheduler-synchronized after this callback.
+			if (pending_irq && cycle > 9)
+			{
+				if (m_cpu->state_int(tms320c54x_device::STATE_IFR) != (cycle < acceptance + 3 ? 1 : 0))
+					osd_printf_info("Pending return IRQ mismatch: case=%u cycle=%llu ifr=%04x ack=%u\n", m_pipeline_return_case, (unsigned long long)cycle, unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), m_vector_acks);
+				expect(m_cpu->state_int(tms320c54x_device::STATE_IFR) == (cycle < acceptance + 3 ? 1 : 0), "Pending return IRQ remains latched until its vector Fetch");
+				expect(m_vector_acks == (cycle < acceptance + 3 ? 1 : 2), "Return delay words finish before the second vector acknowledgment");
+			}
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save fast return around Access");
 			}
-			if (cycle == 13)
+			if (cycle == (pending_irq ? acceptance + 4 : 13))
 			{
-				expect(m_vector_acks == 1 && !m_pipeline_operand_reads && m_pipeline_drained_fetches == 2, "Fast return uses RTN without reading stack memory and fetches its continuation once");
+				expect(m_vector_acks == (pending_irq ? 2 : 1) && !m_pipeline_operand_reads && m_pipeline_drained_fetches == 2, "Fast return uses RTN without reading stack memory and fetches its continuation once");
+				if (pending_irq)
+				{
+					auto const suppress = machine().disable_side_effects();
+					expect(m_cpu->space(AS_DATA).read_word(0xfff) == (delayed ? 0x604 : 0x602), "Second IRQ stacks the first not-decoded continuation after return delay retirement");
+				}
 				expect(!multiword || m_pipeline_extensions_reads == 1, "Restored delay instruction does not reread its retained literal");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true;
+					m_vector_acks = 1;
 					m_pipeline_drained_fetches = checkpoint >= 9 ? 2 : 1;
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore fast-return redirect and delay ownership");
@@ -23083,9 +23104,10 @@ private:
 				m_pipeline_fetch_tap.remove();
 				if (multiword) m_pipeline_write_tap.remove();
 				m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_return_case < 11) { start_pipeline_return_case(m_pipeline_return_case + 1); return; }
+				if (m_pipeline_return_case < 15) { start_pipeline_return_case(m_pipeline_return_case + 1); return; }
 				osd_printf_info("TMS320C54x staged fast returns: PASS cases=8 target_fetch=9 return_execute=10 delay_execute=11,12 resumed_execute=13 stack_reads=0 restore=8\n");
 				osd_printf_info("TMS320C54x staged return multiword delay: PASS cases=4 partial_decode_restore=2 completed_decode_restore=2 delay_execute=12 resumed_execute=13\n");
+				osd_printf_info("TMS320C54x staged pending return IRQ: PASS cases=4 request=9 vector_fetch=13,15 stack_write=14,16 continuation=0602,0604 pending_restore=4\n");
 				osd_printf_info("TMS320C54x core conformance: PASS\n");
 				throw emu_fatalerror(0, "TMS320C54x core tests complete");
 			}
@@ -23095,7 +23117,7 @@ private:
 		}
 		if (m_phase == 251160)
 		{
-			u64 const checkpoint = m_pipeline_return_case >= 8 ? (m_pipeline_return_case & 1 ? 9 : 8) : (m_pipeline_return_case & 4 ? 8 : 7);
+			u64 const checkpoint = m_pipeline_return_case >= 12 ? 11 : m_pipeline_return_case >= 8 ? (m_pipeline_return_case & 1 ? 9 : 8) : (m_pipeline_return_case & 4 ? 8 : 7);
 			expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement retains the fast-return checkpoint");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 			m_phase = 251150;
@@ -23616,7 +23638,8 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
 		if (m_phase == 251150)
 		{
-			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Fast-return fixture vector Fetch acknowledges once");
+			u64 const cycle = m_vector_acks ? (m_pipeline_return_case & 1 ? 13 : 15) : 6;
+			expect(line == 0 && m_cpu->pipeline_cycles() == cycle, "Fast-return fixture acknowledges each IRQ in its vector Fetch");
 			++m_vector_acks;
 		}
 		if (m_phase == 251130)

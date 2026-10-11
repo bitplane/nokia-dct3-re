@@ -2308,8 +2308,17 @@ RETFD cases fill both delay words with one two-word immediate load, on
 base/extended pages. They restore partial Decode at cycle 8 or completed
 Decode at 9, require one literal Fetch at 8, retire the load at 12 and
 resume the target at 13 without treating the literal as an opcode.
-Pending interrupts during return remain unverified; these tests do not
-establish general control-flow or hazard completeness.
+Four pending-IRQ cases pulse INT0 after cycle 9 on base/extended pages and
+checkpoint cycle 11. RETF accepts after Execute at 10, fetches the second
+vector at 13 and writes continuation `0602` at 14. RETFD retains the pending
+flag through both delay words, accepts at 12, fetches at 15 and stacks
+`0604` at 16. Already-decoded target instructions drain while this entry
+progresses. Both restored forms acknowledge exactly once per entry and
+perform no return-side stack read. The input pulse is scheduler-synchronized
+after the fixture callback, so IFR is checked from cycle 10, not inside the
+callback issuing the pulse. These are executable conformance checks of the
+staged acceptance/drain contract, not independent silicon latency measurements
+or general control-flow/hazard completeness.
 
 Separate empty-frontend IRQ and NMI fixtures accept at cycle 1, fetch the
 vector at 4, write the continuation at 5 and retire the first ISR load at 8.
