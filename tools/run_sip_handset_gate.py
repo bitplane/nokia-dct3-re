@@ -233,17 +233,21 @@ def verify_success(root, remote_text, args):
             from tools.noki6210_incoming_call_check import verify as verify_call
             verify_call(log)
         else:
-            from tools.noki6210_outgoing_call_check import verify as verify_call
-            verify_call(log, number=number)
+            if args.product == '6250':
+                from tools.noki6250_call_check import verify_outgoing as verify_call
+                verify_call(log, number=number, configured_carrier=True)
+            else:
+                from tools.noki6210_outgoing_call_check import verify as verify_call
+                verify_call(log, number=number)
         if 'uplink' not in counts or counts['uplink'] != 0 or 'dsp_hle: speech tick' in log:
             raise RuntimeError('unclocked signaling fixture unexpectedly produced handset media')
         (root / 'sip-result.json').write_text(json.dumps({
-            'scope': f'6210 physical {"incoming" if args.incoming else "outgoing"} SIP dialog and CC/RR release only',
+            'scope': f'{args.product} physical {"incoming" if args.incoming else "outgoing"} SIP dialog and CC/RR release only',
             ('caller' if args.incoming else 'dialed_digits'): '5551234' if args.incoming else number,
             'passed': True, 'speech_tested': False,
             'native_dsp_complete': False, 'bridge_counts': counts,
         }, indent=2) + '\n')
-        print('OK - physical 6210 SIP dialog connected and released; speech unproved')
+        print(f'OK - physical {args.product} SIP dialog connected and released; speech unproved')
         return
     if min(counts.get(name, 0) for name in (
             'uplink', 'downlink', 'pcm_transmitted', 'pcm_received')) < 100:
@@ -626,7 +630,7 @@ def main():
     parser.add_argument('--restore-idle', action='store_true')
     parser.add_argument('--restore-outgoing', action='store_true')
     parser.add_argument('--signaling-only', action='store_true',
-                        help='bounded 6210 SIP-200 dialog fixture without media acceptance')
+                        help='bounded own-product SIP-200 dialog fixture without media acceptance')
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 403, 404, 408, 480, 486, 503, 600), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -636,8 +640,13 @@ def main():
                            not args.record_media and not args.restore_idle and
                            (not args.restore_call or (args.incoming and args.restore_phase == 'connected')) and
                            (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
+    signaling_connected = signaling_connected or (
+        args.signaling_only and args.product == '6250' and not args.incoming and
+        args.sip_response == 200 and args.calls == 1 and not args.record_media and
+        not args.restore_call and not args.restore_outgoing and not args.restore_idle and
+        not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
-        parser.error('--signaling-only requires a single 6210 SIP-200 fixture, with connected restoration only')
+        parser.error('--signaling-only requires a single verified product SIP-200 fixture; restoration is 6210-only')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():

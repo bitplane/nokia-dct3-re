@@ -102,12 +102,14 @@ def main():
     parser.add_argument('--sip-port', type=int, default=25625)
     parser.add_argument('--restore-idle', action='store_true')
     outgoing = parser.add_mutually_exclusive_group()
+    outgoing.add_argument('--outgoing-connected-signaling', action='store_true',
+                          help='physically connect and end a SIP dialog without claiming speech')
     outgoing.add_argument('--outgoing-busy', action='store_true')
     outgoing.add_argument('--outgoing-unavailable', action='store_true')
     outgoing.add_argument('--restore-incoming-alerting', action='store_true')
     outgoing.add_argument('--restore-outgoing-pending', action='store_true')
     args = parser.parse_args()
-    outgoing_status = 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
+    outgoing_status = 200 if args.outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
     outgoing_run = outgoing_status or args.restore_outgoing_pending
     if (outgoing_run or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
@@ -132,7 +134,8 @@ def main():
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6250',
                    *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
-                     ['--sip-response', str(outgoing_status)] if outgoing_status else
+                     ['--sip-response', str(outgoing_status)] +
+                     (['--signaling-only'] if args.outgoing_connected_signaling else []) if outgoing_status else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
                       str(run / 'snap/6250_sip_registered_idle.png')] if args.restore_incoming_alerting else
                      ['--incoming', '--cancel-incoming', '--ready-file',
@@ -151,6 +154,9 @@ def main():
             check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
             if args.restore_outgoing_pending:
                 check_alerting_restoration(text, outgoing=True)
+            if args.outgoing_connected_signaling:
+                from tools.noki6250_call_check import verify_outgoing
+                verify_outgoing(text, number='123', configured_carrier=True)
             require_ordered(text, (
                 ('physical Send', re.compile(r'6250_call_input: step=7 pressed=1')),
                 *((('own traffic carrier 19', re.compile(
@@ -161,11 +167,11 @@ def main():
                   if outgoing_status == 480 else ()),
                 ('own release carrier 19', re.compile(
                     r'TX packet type=02 payload=20 .*radio_phase=release_channel_change '
-                    + (r'data=041202001117001a600000130000001400000001' if outgoing_status == 480 or args.restore_outgoing_pending else
+                    + (r'data=041202001117001a600000130000001400000001' if outgoing_status in (200, 480) or args.restore_outgoing_pending else
                        r'data=041202000000001a600000130000000f00000000'))),
                 ('own release confirmation', re.compile(
                     r'6250_channel_confirmation: body=00 input=0409 expected='
-                    + ('00' if outgoing_status == 480 or args.restore_outgoing_pending else '01') + r' pending=00')),
+                    + ('00' if outgoing_status in (200, 480) or args.restore_outgoing_pending else '01') + r' pending=00')),
                 ('resumed idle paging', IDLE_PCH),
             ), 'NHM-3 outgoing SIP failure')
             with Image.open(run / 'snap/6250_call_4.png') as frame:
@@ -179,6 +185,7 @@ def main():
             'machine': 'nhm3hle',
             'scenario': ('outgoing-sip-pending-restore' if args.restore_outgoing_pending else
                          'incoming-sip-alerting-restore' if args.restore_incoming_alerting else
+                         'outgoing-sip-connected-signaling' if outgoing_status == 200 else
                          'outgoing-sip-busy' if outgoing_status == 486 else
                          'outgoing-sip-unavailable' if outgoing_status else 'incoming-sip-cancel'),
             'provisioning': 'derived acquired initial-record PMM comparison',

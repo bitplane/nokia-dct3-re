@@ -471,8 +471,9 @@ are checked independently before resumed paging.
 
 The reviewed 96x60 `1 missed call` screen must appear, followed by physical
 Names/C Exit decoded as own raw matrix value `15` and the reviewed operator
-idle frame. The generic SIP runner rejects answered/media and connected-dialog
-restoration fixtures for this profile; the own idle-restore runner admits a
+idle frame. The generic SIP runner rejects media and connected-dialog
+restoration fixtures for this profile; only the independently verified
+outgoing SIP-200 signaling fixture below is admitted. The own idle-restore runner admits a
 fresh dialog only after handset restoration. This proves an unanswered external SIP
 lifecycle, not speech, native DSP, live RF or authentic factory PMM repair.
 The normal `noki6250` machine remains fail-closed.
@@ -495,7 +496,7 @@ or CONNECT/media. Own carrier-19 release uses
 `body=00 input=0409 expected=00 pending=00`, followed by resumed paging and
 the reviewed registered-idle frame. The fixture's hold control omits its
 scheduled physical End; it never writes firmware state or supplies a
-handset completion event. Connected SIP and native speech remain unproved.
+handset completion event. Connected restoration and native speech remain unproved.
 
 `verify-6250-sip-outgoing-busy` independently verifies physical `123`/Send
 against real local PJSIP 486 on the same declared initial-record composition.
@@ -506,7 +507,18 @@ with firmware confirmation `body=00 input=0409 expected=01 pending=00`;
 the answered-call deconfiguration is not applicable. Repeated confirmation
 tuples are retained in outgoing fixtures to distinguish this release from
 registration. Resumed paging and reviewed registered-idle pixels are required.
-Answered SIP and speech remain unproved.
+Incoming answered SIP and speech remain unproved.
+
+`verify-6250-sip-connected-signaling` physically dials `123`/Send against a
+real local SIP-200 endpoint, then physically ends the dialog. The unchanged
+initial-record comparison must still register and persist SIM location.
+The own-product checker requires SETUP digits, CONNECT/acknowledgement,
+carrier-19 traffic assignment, physical End, complete CC/RR release with
+the own deconfiguration body and confirmation, and resumed paging. Reviewed
+registered-idle pixels must return. Bridge uplink must be zero and no HLE
+codec tick may run; the result explicitly excludes speech and native DSP
+completion. Remote PCM reception is not handset playback. Incoming
+connected signaling, recording and connected restoration remain excluded.
 
 `verify-6250-sip-outgoing-unavailable` independently verifies the same physical
 `123`/Send against real local PJSIP 480. Unlike busy, the no-answer decision
