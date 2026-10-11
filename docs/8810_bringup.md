@@ -11,8 +11,8 @@ write followed by unchanged reads; AR2 is `0x0060` and control word
 `0x06f3` is zero. The backend currently provides only opaque saved storage
 for this port. Completion would leave the loop, clear bit 15, and write
 the port again. The physical block, status-bit ownership, trigger and
-latency are not established. Recover the surrounding port-0/port-36
-transaction and its callers before modeling a ready bit; do not assign
+latency are not established. The surrounding port-0/port-36 sequence is
+observed below, but its physical completion contract remains open; do not assign
 the port to COBBA or a PLL from the polling shape alone.
 
 The trigger is an organic type-`0x4c` packet (`0x044c`, payload
@@ -81,6 +81,38 @@ ports `0x34..0x36`. The MCU producer contract below corroborates serial
 configuration, but does not identify the exact AccIF wiring or status-bit
 implementation. The completion bit remains unmapped, so no reset timer or
 UART-ready constant is yet justified.
+
+The passive serial observer now includes ports `0`, `2`, and `34..36`,
+retains uncapped totals/last values and logs at most four events per site.
+It makes no target reads or writes of its own. A fresh twelve-second run in
+`tmp/8810-serial-neighbors` uses own flash and the declared ROM4 compatibility
+mask with a newly generated checksum/retry diagnostic EEPROM, not donor
+storage. It observes this ordered restart at 3.649 seconds:
+
+- Port `0`: read `001d`, write `000d` (clear bit `0010`).
+- Port `36`: read `0080`, write `809c`.
+- Port `0`: read `000d`, write `001d` (restore bit `0010`).
+- Port `36`: repeated `809c` reads at the completion loop.
+
+The original archive's `full.s54` independently agrees on the literal
+clear/restore at `924c/924f` and `9135/9138`. Firmware again clears the same
+port-0 bit at `914c/914f` after successful completion, before restoring
+the port-36 format bits. This establishes a firmware-owned gating sequence,
+not the bit's electrical or interrupt/clock identity. An earlier native
+port-34 write publishes `1eff` at 0.385935 seconds; no port-35 receive read
+is observed in this run. Neither event identifies the external endpoint or
+justifies fabricating receive data or completion status.
+The separate fresh five-second run `tmp/8810-serial-neighbors-final`
+validates the uncapped observer: 7,902,023 port-36 reads end at `809c`,
+three writes end at `809c`, one port-34 write carries `1eff`, and port-35
+has no accesses. All four restart-site counters are nonzero. The summary
+records observed accesses, not extra debugger reads or physical hardware
+acceptance; the compatibility mask and diagnostic EEPROM limitations remain.
+The fresh same-observer NSE-1 control `tmp/5110-serial-neighbors` also writes
+`1eff` once to port-34 and has no port-35 traffic, but ends with port-36
+`0080` after four reads/two writes and all four restart-site counters zero.
+Thus that transmit word is shared startup behavior, not evidence for the
+8810 restart's missing completion or for its physical endpoint.
 
 The MCU producer is constructor `0x29b9ea`, called organically by initializer
 `0x29c022` at `0x29c094` (observed LR `0x29c099`, 3.648453 seconds).
