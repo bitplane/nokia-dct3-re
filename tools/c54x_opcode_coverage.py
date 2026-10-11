@@ -20,6 +20,11 @@ EXTENSIONS = re.compile(
     r"ext1=([0-9a-fA-F]{4}) ext2=([0-9a-fA-F]{4}) "
     r"first_pc=([0-9a-fA-F]{6}) count=(\d+)$"
 )
+TUPLE_DECODE = re.compile(
+    r"^\[optupledecode\] op=([0-9a-fA-F]{4}) words=(\d+) "
+    r"ext1=([0-9a-fA-F]{4}) ext2=([0-9a-fA-F]{4}) "
+    r"supported=([01]) decoded_words=(\d+)$"
+)
 # Current core corrections; two isolated cold controls and full assertions are
 # documented in rom4_dsp_loader.md. This is an exact trace, not ISA completeness.
 ROM4_IDLE_OPCODE_COUNT = 626
@@ -56,6 +61,7 @@ def summarize(text: str) -> dict[str, object]:
     asserted = set()
     decoded = {}
     extensions = {}
+    tuple_decoded = {}
     for line in text.splitlines():
         match = OPCODE.match(line)
         if match:
@@ -88,6 +94,18 @@ def summarize(text: str) -> dict[str, object]:
             key = (opcode, words, ext1, ext2)
             previous = extensions.get(key, (pc, 0))
             extensions[key] = (previous[0], previous[1] + count)
+        match = TUPLE_DECODE.match(line)
+        if line.startswith("[optupledecode]") and not match:
+            raise ValueError("malformed tuple decoder record")
+        if match:
+            opcode, words, ext1, ext2, supported, decoded_words = match.groups()
+            key = (int(opcode, 16), int(words), int(ext1, 16), int(ext2, 16))
+            value = (bool(int(supported)), int(decoded_words))
+            if (value[0] and value[1] != key[1]) or (not value[0] and value[1]):
+                raise ValueError("invalid tuple decoder length")
+            if key in tuple_decoded and tuple_decoded[key] != value:
+                raise ValueError("conflicting tuple decoder records")
+            tuple_decoded[key] = value
     if not first_pc:
         raise ValueError("no [opcov] records")
     if asserted - first_pc.keys():
@@ -96,6 +114,8 @@ def summarize(text: str) -> dict[str, object]:
         raise ValueError("decoder record names an opcode absent from the execution trace")
     if {key[0] for key in extensions} - first_pc.keys():
         raise ValueError("fetched-extension record names an opcode absent from the execution trace")
+    if tuple_decoded.keys() - extensions.keys():
+        raise ValueError("tuple decoder record names an absent fetched tuple")
     opcodes = sorted(first_pc)
     encoded = b"".join(opcode.to_bytes(2, "big") for opcode in opcodes)
     return {
@@ -107,6 +127,7 @@ def summarize(text: str) -> dict[str, object]:
         "asserted": asserted,
         "decoded": decoded,
         "extensions": extensions,
+        "tuple_decoded": tuple_decoded,
     }
 
 
@@ -119,6 +140,29 @@ def require_extension_capture(result: dict[str, object]) -> None:
         raise ValueError("extension report requires captured tuples for every observed 6f opcode")
     if any(count != result["counts"][opcode] for opcode, count in counts.items()):
         raise ValueError("fetched-extension counts do not match opcode executions")
+
+
+def require_extension_decoding(result: dict[str, object]) -> None:
+    require_extension_capture(result)
+    if result["tuple_decoded"].keys() != result["extensions"].keys():
+        raise ValueError("tuple decoding requires decoder records for every fetched variant")
+    if any(not valid for valid, _ in result["tuple_decoded"].values()):
+        raise ValueError("captured instruction tuple remains undecoded")
+
+
+def decoded_boundaries(result: dict[str, object]) -> set[int]:
+    """Require real, complete variants for extension-controlled first words."""
+    supported = {opcode for opcode, (valid, _) in result["decoded"].items()
+                 if valid and opcode >> 8 != 0x6f}
+    for opcode in result["first_pc"]:
+        if opcode >> 8 != 0x6f:
+            continue
+        variants = {key: count for key, (_, count) in result["extensions"].items()
+                    if key[0] == opcode}
+        if (variants and sum(variants.values()) == result["counts"][opcode]
+                and all(result["tuple_decoded"].get(key, (False, 0))[0] for key in variants)):
+            supported.add(opcode)
+    return supported
 
 
 def require_rom4_idle(result: dict[str, object]) -> None:
@@ -196,6 +240,8 @@ def main() -> int:
                         help="require actual decoder records and rank unsupported instruction boundaries")
     parser.add_argument("--extension-report", action="store_true",
                         help="require and list actual fetched 6f instruction tuples, not synthetic extensions")
+    parser.add_argument("--require-extension-decoded", action="store_true",
+                        help="require supported, exact-length decoding of every fetched 6f variant")
     parser.add_argument("--require-all-asserted", action="store_true",
                         help="fail unless every observed ROM4 word has a fixture assertion")
     args = parser.parse_args()
@@ -221,6 +267,8 @@ def main() -> int:
             raise ValueError("frontend report requires decoder records for every observed opcode")
         if args.extension_report:
             require_extension_capture(result)
+        if args.require_extension_decoded:
+            require_extension_decoding(result)
         fixture = summarize(args.fixture_log.read_text(errors="replace")) if args.fixture_log else None
         declared = decoder_declared_words(args.decoder_source.read_text()) if args.decoder_source else None
         if args.require_rom4_idle:
@@ -242,14 +290,22 @@ def main() -> int:
         for (opcode, words, ext1, ext2), (pc, count) in sorted(result["extensions"].items()):
             print(f"  op={opcode:04x} words={words} ext1={ext1:04x} ext2={ext2:04x} "
                   f"first_pc={pc:06x} executions={count}")
+        supported = {key for key, (valid, _) in result["tuple_decoded"].items() if valid}
+        print(f"Fetched frontend tuples: decoded={len(supported)} "
+              f"observed={len(result['extensions'])} (not physical pipeline timing)")
     if args.frontend_report:
         supported = {opcode for opcode, (valid, _) in result["decoded"].items() if valid}
         missing = set(result["first_pc"]) - supported
         print(f"Frontend boundaries: decoded={len(supported)} unsupported={len(missing)} "
-              f"observed={result['opcodes']} (decoder support, not stage timing)")
+              f"observed={result['opcodes']} (synthetic extensions, not actual 6f lengths or stage timing)")
         for opcode in sorted(missing, key=lambda word: (-result["counts"][word], word)):
             print(f"  undecoded op={opcode:04x} first_pc={result['first_pc'][opcode]:04x} "
                   f"executions={result['counts'][opcode]} length=unknown")
+        if args.extension_report:
+            boundaries = decoded_boundaries(result)
+            print(f"Observed instruction boundaries: decoded={len(boundaries)} "
+                  f"observed={result['opcodes']} fetched_variants={len(result['extensions'])} "
+                  "(not ISA completeness or physical pipeline timing)")
     for group in sorted(set(args.observed_group)):
         print(f"Observed ROM4 words in group {group:02x} (exact execution counts):")
         words = sorted(((opcode, count) for opcode, count in result["counts"].items()

@@ -93,6 +93,28 @@ public:
 				util::stream_format(stream, forms[(mode >> 3) & 15], mode & 7);
 			}
 		};
+		if (family == 0x6f00)
+		{
+			bool const extended = mode >= 0xe0;
+			u16 const offset = extended ? next_word() : 0;
+			u16 const extension = next_word(extended ? 2 : 1);
+			bool const arithmetic = (extension & 0xfce0) == 0x0c00 || (extension & 0xfce0) == 0x0c20;
+			bool const load = (extension & 0xfee0) == 0x0c40;
+			bool const high = (extension & 0xfee0) == 0x0c60;
+			bool const low = (extension & 0xfee0) == 0x0c80;
+			if (arithmetic || load || high || low)
+			{
+				int const shift = int(extension & 31) - (BIT(extension, 4) ? 32 : 0);
+				char const *name = arithmetic ? (BIT(extension, 5) ? "SUB" : "ADD") : load ? "LD" : high ? "STH" : "STL";
+				util::stream_format(stream, "%-8s", name);
+				if (high || low) util::stream_format(stream, "%c, %d, ", BIT(extension, 8) ? 'B' : 'A', shift);
+				smem(offset);
+				if (arithmetic) util::stream_format(stream, ", %d, %c, %c", shift,
+					BIT(extension, 9) ? 'B' : 'A', BIT(extension, 8) ? 'B' : 'A');
+				if (load) util::stream_format(stream, ", %d, %c", shift, BIT(extension, 8) ? 'B' : 'A');
+				return (2 + extended) | SUPPORTED;
+			}
+		}
 		if ((family == 0x6c00 || family == 0x6e00) && mode >= 0x80 && mode < 0xf8)
 		{
 			bool const extended = mode >= 0xe0;
@@ -689,9 +711,33 @@ void tms320c54x_device::device_stop()
 			machine().logerror("[opdecode] op=%04x supported=%u words=%u\n", opcode,
 				supported, supported ? result & util::disasm_interface::LENGTHMASK : 0);
 		}
+	class fetched_buffer : public util::disasm_interface::data_buffer
+	{
+	public:
+		explicit fetched_buffer(std::array<u16, 4> const &words) : m_words(words) { }
+		virtual u16 r16(u32 address) const override
+		{
+			if (address >= m_words[0]) throw emu_fatalerror("C54x decoder exceeded captured instruction words");
+			return m_words[address + 1];
+		}
+		virtual u8 r8(u32) const override { throw emu_fatalerror("C54x tuple decoder requires word reads"); }
+		virtual u32 r32(u32) const override { throw emu_fatalerror("C54x tuple decoder requires word reads"); }
+		virtual u64 r64(u32) const override { throw emu_fatalerror("C54x tuple decoder requires word reads"); }
+	private:
+		std::array<u16, 4> const &m_words;
+	};
 	for (auto const &[words, observation] : m_extension_observations)
+	{
 		machine().logerror("[opwords] op=%04x words=%u ext1=%04x ext2=%04x first_pc=%06x count=%u\n",
 			words[1], words[0], words[2], words[3], observation.first_pc, observation.count);
+		fetched_buffer const buffer(words);
+		std::ostringstream text;
+		u32 const result = get_disassembler().disassemble(text, 0, buffer, buffer);
+		bool const supported = result & util::disasm_interface::SUPPORTED;
+		machine().logerror("[optupledecode] op=%04x words=%u ext1=%04x ext2=%04x supported=%u decoded_words=%u\n",
+			words[1], words[0], words[2], words[3], supported,
+			supported ? result & util::disasm_interface::LENGTHMASK : 0);
+	}
 }
 
 void tms320c54x_device::device_reset()

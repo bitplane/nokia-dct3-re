@@ -1580,6 +1580,66 @@ private:
 				"MVPD syntax distinguishes long-offset and absolute extension order");
 		}
 		osd_printf_info("TMS320C54x MVPD disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned mode = 0; mode < 256; ++mode)
+				for (unsigned kind = 0; kind < 5; ++kind)
+					for (unsigned selection = 0; selection < (kind < 2 ? 4 : 2); ++selection)
+						for (unsigned shift = 0; shift < 32; ++shift)
+						{
+							u16 const extension = 0x0c00 | (kind << 5) | (selection << 8) | shift;
+							bool const extended = mode >= 0xe0;
+							words const buffer(pc, 0x6f00 | mode, extended ? 0x2345 : extension, extension);
+							std::ostringstream text;
+							expect(decoder.disassemble(text, pc, buffer, buffer) == ((2 + extended) | dasm::SUPPORTED) &&
+								buffer.seen() == (extended ? 7 : 3), "Shifted memory decoder bounds legal extension tuples across page wrap");
+						}
+		for (unsigned extension = 0; extension < 65536; ++extension)
+		{
+			unsigned const kind = (extension >> 5) & 7;
+			bool const legal = (extension >> 10) == 3 && kind <= 4 && (kind < 2 || !(extension & 0x0200));
+			if (legal) continue;
+			for (u16 op : {0x6f82, 0x6ff8})
+			{
+				bool const extended = op == 0x6ff8;
+				words const buffer(0x01ffff, op, extended ? 0x2345 : extension, extension);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == 1 && buffer.seen() == (extended ? 7 : 3),
+					"Reserved shifted memory extension remains raw rather than claiming an instruction boundary");
+			}
+		}
+		struct fetched_vector { u16 op, first, second; char const *text; };
+		fetched_vector const fetched_forms[] = {
+			{0x6f82, 0x0c58, 0, "LD      *AR2, -8, A"},
+			{0x6f83, 0x0c1e, 0, "ADD     *AR3, -2, A, A"},
+			{0x6f83, 0x0c5f, 0, "LD      *AR3, -1, A"},
+			{0x6f8a, 0x0c96, 0, "STL     A, -10, *AR2-"},
+			{0x6f8b, 0x0d91, 0, "STL     B, -15, *AR3-"},
+			{0x6f92, 0x0d96, 0, "STL     B, -10, *AR2+"},
+			{0x6f93, 0x0c91, 0, "STL     A, -15, *AR3+"},
+			{0x6f95, 0x0e20, 0, "SUB     *AR5+, 0, B, A"},
+			{0x6fd2, 0x0c45, 0, "LD      *AR2+%, 5, A"},
+			{0x6ff8, 0x0020, 0x0c44, "LD      *($0020), 4, A"},
+			{0x6ff8, 0x00ee, 0x0d20, "SUB     *($00EE), 0, A, B"},
+			{0x6ff8, 0x0308, 0x0d20, "SUB     *($0308), 0, A, B"},
+			{0x6ff8, 0x06c3, 0x0c48, "LD      *($06C3), 8, A"},
+			{0x6ff8, 0x0852, 0x0e20, "SUB     *($0852), 0, B, A"},
+			{0x6ff8, 0x08e4, 0x0e20, "SUB     *($08E4), 0, B, A"},
+			{0x6ff8, 0x1f0c, 0x0c9c, "STL     A, -4, *($1F0C)"},
+			{0x6ff8, 0x1f0d, 0x0c8c, "STL     A, 12, *($1F0D)"},
+			{0x6ff8, 0x219b, 0x0d20, "SUB     *($219B), 0, A, B"},
+			{0x6f82, 0x0c6f, 0, "STH     A, 15, *AR2"},
+			{0x6fea, 0x2345, 0x0d70, "STH     B, -16, *+AR2($2345)"},
+		};
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (auto const &test : fetched_forms)
+			{
+				words const buffer(pc, test.op, test.first, test.second);
+				std::ostringstream text;
+				unsigned const length = (test.op & 255) >= 0xe0 ? 3 : 2;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && text.str() == test.text,
+					"Captured shifted memory syntax retains operation, signed shift, address and independent accumulators");
+			}
+		osd_printf_info("TMS320C54x shifted memory disassembler: PASS forms=114688 rejected=130176 captured=18 syntax=20 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

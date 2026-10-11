@@ -1567,6 +1567,7 @@ check-c54x-observed-coverage: build
 			--variant-report \
 			--frontend-report \
 			--extension-report \
+			--require-extension-decoded \
 			--observed-group f4 \
 			--observed-group f0 \
 			--require-all-asserted

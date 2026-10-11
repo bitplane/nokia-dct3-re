@@ -1738,16 +1738,16 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 617 decoded and 9
-unsupported forms. This measures frontend coverage, not silicon legality or
-pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
-reviewed boundaries; the isolated report ranks the remaining unsupported
-forms by execution frequency rather than preserving a stale leading-gap list.
+promoted to a boundary. The synthetic-extension census reports 617 decoded
+and nine unsupported first words. Those nine are extension-controlled `6f`
+forms, resolved separately from actual fetched tuples below. Conditional
+BC/CC/XC and unshifted Smem loads have reviewed boundaries. These reports
+measure observed frontend coverage, not ISA completeness or pipeline timing.
 `check-c54x-observed-coverage` passes the reviewed cold-idle fingerprint,
 physical Menu and long-power runs, and all 626 union assertions. Menu adds no
-new words; long power executes 625, also adding none. Decoder support remains
-a separate gap: passing execution assertions must not promote unsupported
-raw-word lengths into a pipeline frontend.
+new words; long power executes 625, also adding none. Execution assertions
+and debugger boundaries remain independent evidence; neither establishes
+physical operand visibility or interrupt drain.
 The synthetic-extension report cannot characterize `6Fxx` forms whose
 operation is selected by a second opcode word. Verbose `[opwords]` records now
 capture these actual execution fetches without extra target-memory reads.
@@ -1755,9 +1755,24 @@ The isolated coverage gate requires `--extension-report`: every observed `6f`
 word must have complete two/three-word tuples whose counts sum to its execution
 count. Idle/Menu/power currently capture 18 distinct tuples across nine first
 words. `6f83` selects both `0c1e` and `0c5f`; `6ff8` has nine distinct
-address/operation pairs. Invalid lengths, absent opcodes, malformed records and
-count drift fail validation. This is operand evidence, not decoder support or
-physical Fetch-stage timing; a zero extension is still not the executed operation.
+address/operation pairs. `[optupledecode]` applies the real decoder to those
+captured words using a bounded buffer, never rereading target memory. The gate
+also requires `--require-extension-decoded`: every variant must decode at its
+actual fetched length. All 18 tuples pass; together with first-word-independent
+decoding this covers all 626 observed words. Missing variants, invalid lengths,
+absent opcodes, malformed records and count drift fail validation. A zero
+extension still cannot stand in for the executed operation.
+
+Shifted memory ADD/SUB/LD/STL/STH boundaries follow SPRU172C syntax 4.
+The required marker is `TMS320C54x shifted memory disassembler: PASS`:
+114,688 legal address/shift/accumulator combinations on two program pages,
+130,176 reserved-extension rejection cases, all 18 captured tuples and two
+additional STH syntax cases. Signed shifts are -16 through 15; LD/STL/STH
+reserve the source-selection bit that ADD/SUB use independently of destination.
+Long/absolute Smem's address word precedes the opcode-extension word.
+This decoder closure changes no execution semantics. A physical frontend still
+needs operand effects, hazards, overlapping stages and interrupt-drain timing;
+the observed boundaries alone do not provide those contracts.
 
 ADDM immediate-memory decoding covers all 256 addressing forms on ordinary
 and wrapping program pages, with bounded two/three-word extension reads and

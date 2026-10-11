@@ -7,10 +7,51 @@ from unittest.mock import patch
 
 from tools.c54x_opcode_coverage import (decoder_declared_words, group_gaps, main,
                                         ranked_gaps, ranked_variant_candidates, summarize,
-                                        require_rom4_idle, require_extension_capture)
+                                        require_rom4_idle, require_extension_capture,
+                                        require_extension_decoding, decoded_boundaries)
 
 
 class C54xOpcodeCoverageTest(unittest.TestCase):
+    def test_tuple_decoding_requires_every_captured_variant(self):
+        capture = ("[opcov] op=6f83 first_pc=0800 count=2\n"
+                   "[opwords] op=6f83 words=2 ext1=0c1e ext2=0000 first_pc=010800 count=1\n"
+                   "[opwords] op=6f83 words=2 ext1=0c5f ext2=0000 first_pc=010810 count=1\n")
+        first = "[optupledecode] op=6f83 words=2 ext1=0c1e ext2=0000 supported=1 decoded_words=2\n"
+        second = "[optupledecode] op=6f83 words=2 ext1=0c5f ext2=0000 supported=1 decoded_words=2\n"
+        with self.assertRaisesRegex(ValueError, "every fetched variant"):
+            require_extension_decoding(summarize(capture + first))
+        self.assertEqual(decoded_boundaries(summarize(capture + first)), set())
+        require_extension_decoding(summarize(capture + first + second))
+        self.assertEqual(decoded_boundaries(summarize(capture + first + second)), {0x6f83})
+        with self.assertRaisesRegex(ValueError, "undecoded"):
+            require_extension_decoding(summarize(capture + first + second.replace("supported=1 decoded_words=2", "supported=0 decoded_words=0")))
+
+    def test_tuple_decoder_rejects_invalid_lengths_conflicts_or_orphans(self):
+        capture = ("[opcov] op=6f83 first_pc=0800 count=1\n"
+                   "[opwords] op=6f83 words=2 ext1=0c1e ext2=0000 first_pc=010800 count=1\n")
+        decoded = "[optupledecode] op=6f83 words=2 ext1=0c1e ext2=0000 supported=1 decoded_words=2\n"
+        records = (
+            decoded.replace("decoded_words=2", "decoded_words=3"),
+            decoded.replace("supported=1", "supported=0"),
+            decoded.replace("ext1=0c1e", "ext1=0c5f"),
+            "[optupledecode] op=6f83 words=2\n",
+            decoded + decoded.replace("supported=1 decoded_words=2", "supported=0 decoded_words=0"),
+        )
+        for record in records:
+            with self.subTest(record=record), self.assertRaises(ValueError):
+                summarize(capture + record)
+
+    def test_cli_fails_when_real_tuple_is_undecoded_despite_first_word_support(self):
+        with TemporaryDirectory() as root:
+            log = Path(root) / "trace.log"
+            log.write_text("[opcov] op=6f83 first_pc=0800 count=1\n"
+                           "[opdecode] op=6f83 supported=1 words=2\n"
+                           "[opwords] op=6f83 words=2 ext1=0c1e ext2=0000 first_pc=010800 count=1\n"
+                           "[optupledecode] op=6f83 words=2 ext1=0c1e ext2=0000 supported=0 decoded_words=0\n")
+            with patch("sys.argv", ["coverage", str(log), "--require-extension-decoded"]), redirect_stderr(StringIO()):
+                self.assertEqual(main(), 1)
+            self.assertEqual(decoded_boundaries(summarize(log.read_text())), set())
+
     def test_extension_tuples_preserve_variants_and_count_repeated_runs(self):
         text = ("[opcov] op=6f82 first_pc=0800 count=3\n"
                 "[opwords] op=6f82 words=2 ext1=0c48 ext2=0000 first_pc=010800 count=2\n"
