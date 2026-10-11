@@ -564,6 +564,9 @@ SMS delivery. `verify-8850-sim-toolkit-call` separately proves card-owned
 SET UP CALL, physical consent before SETUP, traffic assignment and CONNECT,
 successful TERMINAL RESPONSE, then physical End and complete CC/RR release
 to idle. Reviewed consent and active-call pixels do not establish speech.
+`verify-8850-sim-toolkit-call-decline` independently requires physical Cancel,
+user-rejected TERMINAL RESPONSE (`22`), no outgoing request, SETUP,
+assignment or connection, then physical End to registered idle.
 Other proactive
 commands and native DSP execution are not established by these gates.
 `verify-8890-sim-toolkit-busy` independently verifies nine-byte profile

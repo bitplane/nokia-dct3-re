@@ -4,6 +4,22 @@ from tools.dct3_toolkit_check import interactive_events, menu_events
 
 
 class ToolkitProtocolTest(unittest.TestCase):
+    def test_call_decline_requires_refusal_and_no_outgoing_request(self):
+        events = (*menu_events('8850', selection_status='911c')[:-1],
+                  'proactive SET UP CALL ready', 'SIM status ins=c2 sw=911c',
+                  'header cla=a0 ins=12 p1=00 p2=00 p3=1c',
+                  '8850_toolkit_interactive: action=call_decline',
+                  'terminal-response data=810306100002028281030122',
+                  'SIM status ins=14 sw=9000',
+                  '8850_toolkit_interactive: action=menu_exit')
+        text = '\n'.join(events)
+        verify_protocol(text, call_decline=True)
+        for changed in (text.replace('030122', '030100'),
+                        text.replace('action=call_decline', 'action=call_accept'),
+                        text + '\nGSM outgoing request id=1 digits=5551234'):
+            with self.assertRaises(ValueError):
+                verify_protocol(changed, call_decline=True)
+
     def test_menu_requires_complete_ordered_exchange(self):
         events = menu_events('8850')
         verify_protocol('\n'.join(events), menu=True)
