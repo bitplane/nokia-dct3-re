@@ -431,6 +431,26 @@ input, not an RF-format claim. The next numerical boundary is the energy
 producer around `0x3374` and how it derives its term from filter outputs;
 do not replace the separate energy stream with pair magnitude by assumption.
 
+The captured energy producer is also numerically accounted for. In the
+TC-clear filter path, `0x3369` primes A with the difference at `0x1a57`
+against reference `0x06d2`; the `SQDST` block at `0x336a/0x336b`, with
+`BRC=3`, executes eight squares. Its sampled differences in square order
+are `-340,-1708,-1448,-968,-1708,340,-968,1448`, from filtered words
+`0x1a57..0x1a50`, with both reference words `0x06d2/0x06d3` zero.
+Their squared sum is exactly `0x00b92340`. A ninth read at `0x1a4f`
+supplies difference 340, leaving A=`0x01540000`; it is not included in
+that B sum. This follows the previous-A operation specified by TI
+SPRU172C, SQDST (4-160), not a missing final square inferred from read
+count. `test_c54x_rom4_rf_division.py` independently pins all eight
+partial sums and the remaining A value. FRCT and OVM are clear in this
+capture; this does not validate their general status/overflow behavior.
+No mismatch has been established from these filter outputs through energy,
+correlation accumulation and normalization for the captured first window.
+The historical accepted-tone result remains unreproduced; it is not an
+oracle for modifying this numerically consistent path or for declaring
+physical RF acquisition. Further comparison needs matched executable/input
+provenance or independently supported RF sample-format evidence.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.

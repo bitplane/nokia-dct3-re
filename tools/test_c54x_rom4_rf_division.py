@@ -13,6 +13,17 @@ def division_tail(numerator, denominator):
 
 
 class RFDivisionTest(unittest.TestCase):
+    def test_captured_energy_producer_pipeline(self):
+        # SUB primes A, then SQDST squares the previous A before loading
+        # the next difference. The ninth read is not a ninth square.
+        differences = [-340, -1708, -1448, -968, -1708, 340, -968, 1448, 340]
+        partials = [sum(value * value for value in differences[:count])
+                    for count in range(1, 9)]
+        self.assertEqual(partials, [0x1c390, 0x2e4720, 0x4e4560, 0x5c91a0,
+                                    0x891530, 0x8ad8c0, 0x992500, 0xb92340])
+        self.assertEqual(differences[-1] << 16, 0x01540000)
+        self.assertNotEqual(sum(value * value for value in differences), partials[-1])
+
     def test_captured_window_accounting(self):
         # Energy is seeded from a separate queue before 17 adjacent-pair
         # comparisons. It is not the squared magnitude of the stored pair.
