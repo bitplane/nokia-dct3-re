@@ -2501,8 +2501,8 @@ completion list:
 
 | Probe encoding | Meaning | Staged ownership still missing |
 | --- | --- | --- |
-| `7681 literal` | Immediate ST through AR1 to PRD/TCR | Retained literal/address and peripheral write wait; this is not STM |
-| `76f8 0501 0001` | Absolute immediate ST of the completion marker | Three-word Decode and retained memory write |
+| `7681 literal` | Immediate ST through AR1 to PRD/TCR | Implemented bounded short-indirect ST with retained literal/address and peripheral write wait; this is not STM |
+| `76f8 0501 0001` | Absolute immediate ST of the completion marker | Implemented three-word Decode and retained memory write |
 | `4a1e` | PSHM XPC at the interrupt vector | Source sample, stack decrement/address and stack write |
 | `f4e5` | FRETE | Two stack samples/pops, restored XPC/PC, interrupt enable and redirection |
 
@@ -2517,8 +2517,21 @@ operations and costs do not independently establish each prototype bus phase.
 SPRU131G Table 7-4's early Read write rule for immediate ST applies to DAGEN
 destinations, not automatically to PRD/TCR.
 
-Implement retained immediate-ST operands and writes first, then stack-source
-ownership and far interrupt return; repeat/delayed-control and idle rules
+Immediate ST now retains its two/three-word literal through Decode, owns its
+short destination in Read and writes the retained value in Execute. Absolute
+destinations come from the saved extension word. The existing peripheral
+wait applies once before a PRD/TCR-class write. Eight executable cases cover
+DP, post-increment, absolute and peripheral destinations, restoring before
+or after the write. An opcode-shaped literal remains data, and post-increment
+and bus writes occur once across replay. This is the same declared partial
+bus-placement model as other staged stores, not independently measured
+silicon timing. DAGEN destinations stop before their write because their
+early-write contract is not implemented; indirect address modification may
+already have occurred. Long-offset, compiler-mode direct and other indirect
+encodings remain outside this subset.
+
+Next implement stack-source ownership and far interrupt return;
+repeat/delayed-control and idle rules
 remain separate completeness work. Those contracts must precede enabling
 the frontend for native firmware or claiming the timer/recorder stall fixed.
 A constant interrupt delay or adjusted timer period cannot replace in-flight

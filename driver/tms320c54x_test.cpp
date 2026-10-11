@@ -2899,6 +2899,37 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_immediate_store(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		unsigned const form = variant % 4;
+		u16 const target = form == 3 ? 0x25 : 0x700;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, std::array<u16, 4>{0x7600, 0x7691, 0x76f8, 0x7681}[form]);
+		program.write_word(0x601, form == 2 ? target : 0xf495);
+		if (form == 2) program.write_word(0x602, 0xf495);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x0e);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, target);
+		m_cpu->space(AS_DATA).write_word(target, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1; m_pipeline_store_writes = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(target, target, "staged_immediate_store",
+			[this, form](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0xf495 && m_cpu->pipeline_cycles() == (form >= 2 ? 8 : 7), "Immediate ST retains opcode-shaped literal and writes at its owned stage");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251250;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -23488,8 +23519,50 @@ private:
 				"Rejected arbitration performs no bus access or atomic fallback");
 			m_cpu->set_pipeline_frontend(false);
 			osd_printf_info("TMS320C54x staged peripheral arbitration exclusion: PASS stopped_cycle=6 bus_accesses=0 atomic_fallback=0\n");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			start_pipeline_immediate_store();
+			return;
+		}
+		if (m_phase == 251250)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const form = m_pipeline_peripheral_case % 4;
+			u64 const write_cycle = form >= 2 ? 8 : 7;
+			u64 const checkpoint = m_pipeline_peripheral_case & 4 ? write_cycle : write_cycle - 1;
+			if (cycle != m_pipeline_expected_cycle || m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) || m_pipeline_store_writes != unsigned(cycle >= write_cycle))
+				osd_printf_info("Immediate ST mismatch: form=%u cycle=%llu expected=%llu illegal=%u writes=%u\n", form, (unsigned long long)cycle, (unsigned long long)m_pipeline_expected_cycle, unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), m_pipeline_store_writes);
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_store_writes == unsigned(cycle >= write_cycle), "Immediate ST advances without duplicated writes or atomic fallback");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == (form == 3 ? 0x25 : 0x700 + unsigned(form == 1 && cycle >= 6)),
+				"Immediate ST updates its indirect register once at address ownership, including replay");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save pending or committed immediate store");
+			}
+			if (cycle == 12)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_store_writes = unsigned(checkpoint >= write_cycle);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore immediate operand/address/wait ownership");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251260;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 7) { start_pipeline_immediate_store(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged immediate stores: PASS cases=8 forms=DP,postincrement,absolute,peripheral retained_literal=1 duplicate_writes=0 restore=8\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251260)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251250;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
