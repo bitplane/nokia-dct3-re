@@ -938,6 +938,35 @@ changes. Both temporary source controls are removed. DSP transport source
 is unchanged since `cd3dbd10`, and the driver diff has no 5110 product/clock
 configuration change. Preserve the corrected repeat/XC contracts and their
 executable regressions rather than reverting them to chase an oracle.
+
+Retained-state provenance is not interchangeable with this cold fixture.
+The retained `c54x-frontend-idle-a` run has the old exact totals, but copying
+its own saved NVRAM into an isolated current-binary run does not reproduce
+them: 3,358 completion strobes, 3,323 slot expiries, 21,389 frame expiries,
+683,520 RF reads and 1,646 port-32 writes, with terminal modes `0000/000c`.
+Evidence: `tmp/rf-retained-provenance-control/error.log`. Its saved EEPROM,
+flash, CCONT and network files match the retained current cold-run outputs;
+the SIM file shares every byte of the shorter legacy record and differs
+only by appended storage. These are post-run files, not captured initial
+conditions. This control therefore neither reconstructs the banked cold
+fixture nor explains its +3/+96/+1 drift; do not use its counts to re-bank.
+
+An isolated current cold boot with verbose transport observation narrows
+the late-scan difference to MCU request scheduling. The first 23 TX-ring
+commits match the retained old-total trace within 2 microseconds. Commit 24
+publishes the same type-`1a`, 68-byte body (`001198` followed by zeroes),
+from MCU PC `27183e`, at `6.418223` instead of `6.425337` seconds.
+The DSP's work flag changes at `6.418225` and `6.425339` respectively:
+both dispatch latencies are 2 microseconds at the logged precision.
+The subsequent RF sequence-6 command moves from `6.431055` to `6.426440`,
+one 4.615-millisecond frame earlier. Evidence:
+`tmp/rf-cold-commit-audit/error.log` against
+`tmp/c54x-frontend-idle-a/error.log`. This is a current cold run compared
+with retained historical evidence, not a reconstructed historical cold
+fixture. It localizes the observed difference before the type-`1a` DSP
+dispatch; audit the MCU request's timer/lifecycle scheduling next rather
+than assuming the RF totals identify a DSP instruction defect.
+
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free
 instruction cases write PRD `1234`, reload with TSS set and each TDDR value,
