@@ -96,6 +96,7 @@ private:
 	// site. Reset additionally clears the command header, which activation
 	// deliberately leaves alone.
 	void reset_session_state();
+	bool nvram_read_record(util::read_stream &file);
 
 	void emit_response(const u8 *data, unsigned length);
 	void finish_header();

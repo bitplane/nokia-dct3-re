@@ -26,6 +26,8 @@ void nokia_sim_card_device::device_start()
 	m_trace = machine().options().verbose();
 	m_toolkit_timer = timer_alloc(
 			FUNC(nokia_sim_card_device::toolkit_command_ready), this);
+	// MAME reports a failed load without resetting the device's NVRAM.
+	nvram_default();
 	save_item(NAME(m_cphs_aoc));
 	save_item(NAME(m_cached_location));
 	save_item(NAME(m_atr));
@@ -120,6 +122,25 @@ void nokia_sim_card_device::nvram_default()
 }
 
 bool nokia_sim_card_device::nvram_read(util::read_stream &file)
+{
+	constexpr size_t files = sizeof(m_adn) + sizeof(m_loci) + sizeof(m_kc) + sizeof(m_bcch);
+	constexpr size_t sms = files + sizeof(m_sms) + sizeof(m_smsp);
+	constexpr size_t security = sms + sizeof(m_chv) + sizeof(m_unblock_chv) +
+			sizeof(m_chv_attempts) + sizeof(m_unblock_attempts) + 1;
+	constexpr size_t current = security + sizeof(m_acm);
+	std::array<u8, current + 1> staged;
+	auto const [err, actual] = util::read(file, staged.data(), staged.size());
+	if (err || (actual != files && actual != sms && actual != security && actual != current))
+		return false;
+	if (actual >= security && staged[security - 1] > 1)
+		return false;
+	// Complete supported records make the RAM-backed parser infallible; no
+	// device fields are touched while validating lengths or retained flags.
+	auto const input = util::ram_read(staged.data(), actual);
+	return input && nvram_read_record(*input);
+}
+
+bool nokia_sim_card_device::nvram_read_record(util::read_stream &file)
 {
 	auto const [err, actual] = util::read(file, m_adn, sizeof(m_adn));
 	if (err || actual != sizeof(m_adn))

@@ -117,6 +117,17 @@ implements:
 - persistent mutable `EF_ADN`, `EF_SMS`, `EF_SMSP` and cyclic `EF_ACM`
   contents through MAME device NVRAM.
 
+SIM NVRAM loading validates the complete serialized record before installing
+card fields. The supported append-only layouts retain base files, then SMS/SMSP,
+then security state, then EF_ACM; missing later fields receive their declared
+defaults. Truncated records, trailing bytes and non-boolean CHV1-enable flags
+are rejected atomically. Device startup initializes defaults because MAME
+reports load failure without resetting NVRAM. `verify-sim-nvram-atomic` exercises
+ten cases through actual isolated MAME processes, including all three legacy
+layouts and an unchanged full record. Its short-ADN negative detects the former
+partial-load defect. This is storage conformance, not a handset-service claim;
+physical phonebook and security gates remain separate.
+
 It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
 device is disabled, SIMI reads and writes retain the legacy behavior used by the
 missing-hardware failure baseline.
