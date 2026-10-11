@@ -1,9 +1,17 @@
 import unittest
 from tools.noki8850_toolkit_check import EVENTS, verify_protocol
-from tools.dct3_toolkit_check import interactive_events
+from tools.dct3_toolkit_check import interactive_events, menu_events
 
 
 class ToolkitProtocolTest(unittest.TestCase):
+    def test_menu_requires_complete_ordered_exchange(self):
+        events = menu_events('8850')
+        verify_protocol('\n'.join(events), menu=True)
+        for index in range(len(events)):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                verify_protocol('\n'.join(events[:index] + events[index + 1:]), menu=True)
+        with self.assertRaises(ValueError):
+            verify_protocol('\n'.join(events).replace('d30702020181100101', 'd30702020181100102'), menu=True)
     def test_interactive_exchange_requires_every_link(self):
         events = interactive_events('8850')
         verify_protocol('\n'.join(events), interactive=True)

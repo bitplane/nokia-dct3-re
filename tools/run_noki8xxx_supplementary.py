@@ -36,7 +36,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('product', choices=PROFILES)
     parser.add_argument('run_directory', type=Path)
-    parser.add_argument('--service', choices=('ussd', 'divert', 'toolkit', 'toolkit-interactive', 'toolkit-busy'), required=True)
+    parser.add_argument('--service', choices=('ussd', 'divert', 'toolkit', 'toolkit-interactive', 'toolkit-menu', 'toolkit-busy'), required=True)
     parser.add_argument('--mame', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -44,7 +44,7 @@ def main():
     profile = PROFILES[args.product]
     machine = profile[0]
     try:
-        if args.service in ('toolkit', 'toolkit-interactive') and args.product != '8850':
+        if args.service in ('toolkit', 'toolkit-interactive', 'toolkit-menu') and args.product != '8850':
             raise ValueError('Toolkit acceptance is not yet established for this product')
         if args.service == 'toolkit-busy' and args.product != '8890':
             raise ValueError('Toolkit screen-busy acceptance is only established for 8890')
@@ -54,14 +54,14 @@ def main():
         run.mkdir(parents=True, exist_ok=False)
         for directory in ('cfg', 'nvram', 'snap'):
             (run / directory).mkdir()
-        if args.service in ('toolkit', 'toolkit-interactive', 'toolkit-busy'):
+        if args.service in ('toolkit', 'toolkit-interactive', 'toolkit-menu', 'toolkit-busy'):
             config = ET.Element('mameconfig', version='10')
             inputs = ET.SubElement(ET.SubElement(config, 'system', name=machine), 'input')
             ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
-                          mask='15', defvalue='0', value='3' if args.service == 'toolkit-interactive' else '1')
+                          mask='15', defvalue='0', value='4' if args.service == 'toolkit-menu' else '3' if args.service == 'toolkit-interactive' else '1')
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg')
         fixture = args.service.replace('-', '_')
-        duration = {'toolkit': 43, 'toolkit-interactive': 53, 'toolkit-busy': 45}.get(
+        duration = {'toolkit': 43, 'toolkit-interactive': 53, 'toolkit-menu': 65, 'toolkit-busy': 45}.get(
             args.service, profile[6 if args.service == 'ussd' else 7])
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -74,8 +74,9 @@ def main():
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         if args.service == 'divert':
             checker = [sys.executable, str(root / 'tools/noki8xxx_divert_check.py'), args.product, str(run)]
-        elif args.service == 'toolkit-interactive':
-            checker = [sys.executable, str(root / 'tools/noki8850_toolkit_check.py'), str(run), '--interactive']
+        elif args.service in ('toolkit-interactive', 'toolkit-menu'):
+            checker = [sys.executable, str(root / 'tools/noki8850_toolkit_check.py'), str(run),
+                       '--menu' if args.service == 'toolkit-menu' else '--interactive']
         else:
             checker = [sys.executable, str(root / f'tools/noki{args.product}_{fixture}_check.py'), str(run)]
         subprocess.run(checker, check=True)

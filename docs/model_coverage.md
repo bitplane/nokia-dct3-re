@@ -551,8 +551,12 @@ and persisted EF_LOCI. `verify-8850-sim-toolkit-interactive` additionally
 accepts card-owned GET INKEY and GET INPUT: physical digit 5 plus OK and
 digits 4/2 plus OK produce the expected terminal responses, with reviewed
 prompt and registered-idle pixels. This uses unchanged own MCU/PMM and the
-Phase 2+ laboratory card. Other proactive commands and native DSP execution
-are not established by these gates.
+Phase 2+ laboratory card. `verify-8850-sim-toolkit-menu` additionally proves
+card-owned SET UP MENU, physical menu navigation and accepted item-1 ENVELOPE,
+with reviewed entry/list/result pixels and physical End recovery to numeric
+`001 01` registered idle. Selection remains on the item list; it does not
+prove a menu-triggered application or network service. Other proactive
+commands and native DSP execution are not established by these gates.
 `verify-8890-sim-toolkit-busy` independently verifies nine-byte profile
 download, STATUS/FETCH and the explicit `20 01` screen-busy terminal response
 during physical date entry, followed by successful date-editor recovery and
