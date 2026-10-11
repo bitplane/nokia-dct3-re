@@ -1737,8 +1737,12 @@ void nokia_radio_peer_device::receive_packet(const nokia_dspif_device::packet &p
 	// the serving receiver; the request grammar is independently configured.
 	if (m_protocol.background_band_measurements && packet.type == 0x57 &&
 			packet.length == m_protocol.background_measurement_request.size() &&
-			std::equal(m_protocol.background_measurement_request.begin(),
-				m_protocol.background_measurement_request.end(), packet.payload.begin()))
+			(std::equal(m_protocol.background_measurement_request.begin(),
+				m_protocol.background_measurement_request.end(), packet.payload.begin()) ||
+				(m_protocol.background_measurement_followup_request &&
+					std::equal(m_protocol.background_measurement_followup_request->begin(),
+						m_protocol.background_measurement_followup_request->end(),
+						packet.payload.begin()))))
 	{
 		m_background_measurement_pending = true;
 		return;

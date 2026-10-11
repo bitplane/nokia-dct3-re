@@ -4218,6 +4218,10 @@ void nokia_dct3_state::npe3hle(machine_config &config)
 	// Own 8b handler 45835c and completion 3c9750/38b6ae recover the
 	// forty-record background measurement contract; late-PIN run verifies it.
 	runtime.radio.background_band_measurements = true;
+	// Own foreign-selection continuation 2d107c -> 3f2684 publishes this
+	// follow-up; state one permits the ordinary 8b measurement consumer.
+	// Keep the selector product-owned rather than accepting arbitrary modes.
+	runtime.radio.background_measurement_followup_request = {{3, 3, 0, 0}};
 	// Own compiler 426eb4 selector 11 updates field 0200 with keep-mask
 	// fdff. Physical Send/End publish command-8 870b/850a at 42727c.
 	runtime.dsp_speech_control = {

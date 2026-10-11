@@ -677,14 +677,11 @@ transport observations establish that the queued messages actually drain.
 The differing byte is preserved by transport, not interpreted by this
 writer. Next verify ring publication and the peer's type-`57` handling;
 neither its mode semantics nor its expected completion is established.
-The current peer only accepts the exact configured background request
-`03050000`. NPE-3's candidate-window search decoder accepts types `55`/`56`,
-not `57`, and its serving-SCH request type is unset. Therefore the foreign
-`57:03030000` packet reaches the transport but matches none of these
-modeled response contracts. Do not broaden the background predicate merely
-to make it respond: recover which RX family this mode consumes and how its
-completion advances the pending controller first. This is an HLE peer
-coverage gap, not evidence of a missing MCU publisher or native DSP support.
+The NPE-3 peer accepts the exact configured background request `03050000`
+and the product-owned follow-up `03030000`. Other products do not inherit
+the follow-up, and arbitrary type-`57` modes remain unsupported. Both use
+the ordinary `8b` measurement consumer described below; this is an HLE
+response contract, not native DSP execution.
 The consumer has a viable ordinary measurement entrance: `1802` kind `8b`
 branches at `2d0f56` to `2d1038`, which passes the referenced payload to
 `38b6ae`; unlike kind `8f` and status `3f9`, this dispatch does not require
@@ -824,11 +821,37 @@ Primary references:
 [TX vocabulary](https://web.archive.org/web/20160119223852/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typestxd.htm),
 [RX vocabulary](https://web.archive.org/web/20160119223857/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typesrxd.htm).
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
-Current unresolved boundary: the response contract for foreign selection's
-type-`57` mode byte `03`, ownership of the pre-existing completion object,
-and the handler's alternative `1580` route.
-No operational international-roaming contract is
-established by these observations.
+Live follow-up validation: the exact `03030000` request receives the
+topology-derived `8b` response. The referenced controller moves from state
+1 to 4 with counts `1,0,0`, then takes the no-eligible-candidate completion
+branch (stage return 5, reset to stage 1). It does not issue type `09` in
+this fixture. Firmware organically publishes `07f4` to task 18 at
+10.618152692 s, `09fd` to task 17 at 10.618819769 s and `1589` to task 19
+at 10.619167462 s. Random access follows, then a Location Updating Request
+and acknowledgement of Location Updating Accept at 11.243672 s.
+
+Current unresolved boundary is downstream of that acknowledgement:
+the 25-second international fixture retains invalid EF_LOCI
+(`ffffffffffffffffffff01`), with no location-update SIM writes and no
+observed Channel Release acknowledgement. Reaching the network acceptance
+is not proof of completed registration, persistent roaming state or operator
+presentation. Inspect the firmware's acceptance/release consumers before
+adding another peer response. The alternative candidate-search/type-`88`
+contracts above remain isolated execution evidence, not exercised live
+contracts in this run. Evidence:
+`tmp/6210-plmn-followup-measurements-international/error.log` and its saved
+`nvram/npe3hle/sim_card`. Home-network registration remains gate-green with
+the same peer correction.
+
+The release-window uplink is not the ordinary supervisory acknowledgement:
+its LAPDm information body is `057160` (MM STATUS, sequence bit masked from
+message type `71`, cause `60`). Cause 96 is invalid mandatory information
+under [GSM 04.08 section 8.5](https://www.etsi.org/deliver/etsi_gts/04/0408/05.03.00_60/gsmts_0408v050300p.pdf).
+This supplies a concrete next target: identify the rejected mandatory field
+in the received `0502` Location Updating Accept, particularly the foreign
+LAI `1300620001`, rather than treating the LAPDm acknowledgement as Layer-3
+acceptance. Home registration, physical outgoing-call signaling and incoming
+SMS acceptance all pass with this same build.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures

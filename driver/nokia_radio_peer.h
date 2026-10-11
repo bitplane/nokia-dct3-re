@@ -13,6 +13,7 @@
 #include "nokia_lapdm_link.h"
 
 #include <array>
+#include <optional>
 
 class nokia_radio_peer_device : public device_t
 {
@@ -65,6 +66,7 @@ public:
 		bool split_gsm_pcs_scans = false;
 		bool background_band_measurements = false;
 		std::array<u8, 4> background_measurement_request{3, 5, 0, 0};
+		std::optional<std::array<u8, 4>> background_measurement_followup_request = std::nullopt;
 
 		constexpr bool enabled() const
 		{
