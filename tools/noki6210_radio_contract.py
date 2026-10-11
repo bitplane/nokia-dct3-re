@@ -182,6 +182,13 @@ def verify(image):
         0x2d29ac: ('b', '#0x2d2528'),
         0x2d252e: ('bl', '#0x2d0f18'),
         0x2d2538: ('bl', '#0x2d0ee4'),
+        0x2d0f28: ('ldr', 'r0, [pc, #0x370]'),
+        0x2d0f2e: ('ldrb', 'r2, [r4]'),
+        0x2d0f30: ('cmp', 'r2, #0x8f'),
+        0x2d0f56: ('cmp', 'r2, #0x8b'),
+        0x2d0f58: ('beq', '#0x2d1038'),
+        0x2d0f5a: ('ldr', 'r0, [pc, #0x374]'),
+        0x2d0f5c: ('cmp', 'r1, r0'),
         0x29e1e0: ('ldr', 'r1, [pc, #0x3a4]'),
         0x29e1e6: ('bl', '#0x295f2c'),
         0x295f3a: ('mov', 'sl, r0'),
@@ -272,7 +279,8 @@ def verify(image):
                            0x3ccd4c: 0x172fa4,
                            0x2d1214: 0x419, 0x2d121c: 0x175458,
                            0x29e588: 0x419, 0x296a18: 0x412,
-                           0x26dd14: 0x419, 0x46a8c4: 0x26dbac}.items():
+                           0x26dd14: 0x419, 0x46a8c4: 0x26dbac,
+                           0x2d129c: 0x1802, 0x2d12d0: 0x3f9}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',

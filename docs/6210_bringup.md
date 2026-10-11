@@ -535,6 +535,21 @@ run. Thus absent publisher-entry hits must not be generalized to a dormant
 controller. R0 is `03fe` at the observed `2d2528` entries, but that is not
 the saved status in R1 and must not be labeled as its incoming message.
 Evidence: `tmp/6210-plmn-completion-controller-{national,international}/error.log.gz`.
+Direct R1/header observation resolves those foreign dispatcher inputs:
+`03f9` at 10.902136692 s, then `1802` (message byte 3 = `83`) at
+11.201837538 s, then `03f9` at 11.207263615 s. This alternation repeats
+through the twelve-hit cap at 12.726838000 s; `1802` arrivals are about
+305 ms apart. R1 agrees with context+4 in every recorded entry. There
+are no such dispatcher observations in the national control. Do not
+assign timer semantics solely from cadence or byte `83`; identify the
+actual publishers first. Evidence:
+`tmp/6210-plmn-controller-input-{national,international}/error.log.gz`.
+The local consumer at `2d0f28` recognizes `1802` but its routes toward
+`2d1048`/`2d1038` require kind `8f`/`8b`, respectively. Observed kind
+`83` satisfies neither. The following comparison at `2d0f5a` separately
+recognizes `03f9`; its continuation additionally checks the referenced
+state at `[1711dc]`. These static guards are pinned, but the runtime
+branch and referenced state's semantic ownership still need observation.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

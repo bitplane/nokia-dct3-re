@@ -101,6 +101,19 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
                 machine:logerror(string.format('plmn_state2_input: status=%08x t=%.9f\n',
                     cpu.state['R6'].value, machine.time:as_double()))
             end
+            if not busy and pc == 0x2d2528 then
+                local context = cpu.state['R4'].value
+                if context >= 0x100000 and context + 12 < 0x180000 then
+                    busy = true
+                    local header = space:read_u16(context + 4)
+                    local kind = space:read_u8(context)
+                    local object = space:read_u32(context + 8)
+                    busy = false
+                    machine:logerror(string.format(
+                        'plmn_controller_input: status=%08x header=%04x kind=%02x object=%08x t=%.9f\n',
+                        cpu.state['R1'].value, header, kind, object, machine.time:as_double()))
+                end
+            end
             if not busy and pc == 0x2a31ca then
                 local stack = cpu.state['R13'].value
                 if stack >= 0x100000 and stack + 8 < 0x180000 then
