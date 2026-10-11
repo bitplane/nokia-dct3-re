@@ -127,7 +127,7 @@ REQUIRED = [
     "TMS320C54x rounded load conformance: PASS variants=64",
     "TMS320C54x immediate repeat conformance: PASS variants=256",
     "TMS320C54x short immediate load conformance: PASS variants=512 sxm_settings=2",
-    "TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2",
+    "TMS320C54x rounded multiply boundaries: PASS vectors=26 destinations=2 addressing_modes=2 sticky_overflow_states=2",
     "TMS320C54x NMI idle wake: PASS cases=12 cycle_accuracy_claim=0",
     "TMS320C54x NMI pending restore: PASS cases=12 held_line_cases=12 timing_claim=0",
     "TMS320C54x control disassembler: PASS vectors=48 pages=2"

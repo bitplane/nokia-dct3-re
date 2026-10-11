@@ -3338,9 +3338,9 @@ OVM states, preservation of carry, and TI SPRU131G's `FRCT`/`SMUL` example
 assert saturated overflow in dual-memory and parallel-store MAC forms.
 Other rounded boundaries and encoded variants remain unaudited; fixture
 overlap does not claim those cases are complete.
-The executable rounded-multiplier boundary matrix covers twenty-two explicit
+The executable rounded-multiplier boundary matrix covers twenty-six explicit
 MPYR/MACR/MASR vectors across A/B destinations, `*AR2`/absolute operands,
-and clear/pre-existing destination overflow: 176 cases. It checks fractional
+and clear/pre-existing destination overflow: 208 cases. It checks fractional
 minimum-times-minimum multiplication, positive rounding across the 32-bit
 boundary, negative subtraction overflow, OVM saturation, sticky destination
 and opposite overflow, preserved carry/TC, T, address and opposite accumulator.
@@ -3353,8 +3353,13 @@ FRCT is clear. Eight MPYR vectors additionally check that SMUL does not alter
 its result under the four OVM/FRCT combinations, negative exact-half rounding,
 negative fractional rounding, positive below-half and positive exact-half
 rounding. Each case initializes and preserves PMST explicitly. This
-does not cover every addressing form or SMUL combination, 40-bit wrap boundary,
-cycle cost or Nokia RF sample format.
+also covers positive MACR and negative MASR crossing the signed 40-bit guard
+boundary, with OVM clear/set: unsaturated results wrap to the accumulator
+width, while OVM saturates the mathematical result before truncation. These
+four additional vectors preserve opposite accumulator/status, carry, TC, T,
+PMST and addressing state across both destinations and addressing modes.
+It does not cover every addressing form or SMUL combination, cycle cost or
+Nokia RF sample format.
 PMST.SST now saturates the shifted 40-bit accumulator value to 32 bits before
 ordinary `STH`, `STL`, `STLM`, and `DST` stores, without modifying the
 accumulator. Focused fixtures reproduce TI SPRU131G's signed `STH` and

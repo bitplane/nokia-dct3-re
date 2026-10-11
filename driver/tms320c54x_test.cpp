@@ -2013,7 +2013,13 @@ private:
 			{0x2200, 1, 0x8000, 0, 0, 0, false, 2},
 			{0x2200, 1, 0x8000, 0x0040, 0, 0xffffff0000ULL, false, 2},
 			{0x2200, 1, 0x7fff, 0, 0, 0, false, 2},
-			{0x2200, 1, 0x4000, 0x0040, 0, 0x0000010000ULL, false, 2}
+			{0x2200, 1, 0x4000, 0x0040, 0, 0x0000010000ULL, false, 2},
+			// Rounded accumulation crosses the 40-bit guard boundary; OVM
+			// saturates the mathematical result before accumulator truncation.
+			{0x2a00, 1, 1, 0, 0x7fffffffffULL, 0x8000000000ULL, true},
+			{0x2a00, 1, 1, 0x0200, 0x7fffffffffULL, 0x007fffffffULL, true},
+			{0x2e00, 0x0100, 0x0100, 0, 0x8000000000ULL, 0x7fffff0000ULL, true},
+			{0x2e00, 0x0100, 0x0100, 0x0200, 0x8000000000ULL, 0xff80000000ULL, true}
 		};
 		return cases[index];
 	}
@@ -2041,7 +2047,7 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, 0x010980);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = 6320 + index;
+		m_phase = 260000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 	void start_idle_wake_case(unsigned index)
@@ -4053,9 +4059,9 @@ private:
 			start_rounded_multiply_case(0);
 			return;
 		}
-		if (m_phase >= 6320 && m_phase < 6496)
+		if (m_phase >= 260000 && m_phase < 260208)
 		{
-			unsigned const index = m_phase - 6320;
+			unsigned const index = m_phase - 260000;
 			auto const &test = rounded_multiply_vector(index / 8);
 			bool const destination_b = BIT(index, 0);
 			u16 const opcode = test.opcode | (destination_b ? 0x0100 : 0) | (BIT(index, 1) ? 0xf8 : 0x82);
@@ -4072,8 +4078,8 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
 				"SPRU172C rounded multiplier signed boundaries preserve opposite accumulator, carry, TC, T and address");
-			if (index < 175) { start_rounded_multiply_case(index + 1); return; }
-			osd_printf_info("TMS320C54x rounded multiply boundaries: PASS vectors=22 destinations=2 addressing_modes=2 sticky_overflow_states=2\n");
+			if (index < 207) { start_rounded_multiply_case(index + 1); return; }
+			osd_printf_info("TMS320C54x rounded multiply boundaries: PASS vectors=26 destinations=2 addressing_modes=2 sticky_overflow_states=2\n");
 			start_idle_nmi_case(0);
 			return;
 		}
