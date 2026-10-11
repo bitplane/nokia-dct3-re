@@ -2388,6 +2388,9 @@ private:
 		m_timer_probe_reload.remove();
 		m_timer_probe_stack.remove();
 		m_timer_probe_write.remove(); m_timer_probe_mask.remove();
+		m_timer_probe_foreground.remove();
+		m_timer_probe_foreground_fetches = 0;
+		m_timer_probe_foreground_first_cycle = 0;
 		m_timer_probe_entries = 0;
 		m_timer_probe_reload_cycle = 0;
 		m_timer_probe_first_entry_cycle = 0;
@@ -2429,6 +2432,12 @@ private:
 				{
 					m_timer_probe_first_entry_cycle = m_cpu->total_cycles();
 				}
+			});
+		m_timer_probe_foreground = program.install_read_tap(0x010608, 0x010608,
+			"timer_probe_foreground_fetch", [this](offs_t address, u16 &, u16) {
+				if (machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+				if (!m_timer_probe_foreground_fetches++)
+					m_timer_probe_foreground_first_cycle = m_cpu->total_cycles();
 			});
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
@@ -4310,6 +4319,12 @@ private:
 			osd_printf_info("TMS320C54x timer boundary bus: case=%u reload_write_cycle=%llu mask_write_cycle=%llu reload_writes=%u mask_writes=%u physical_latency_claim=0\n",
 				index, static_cast<unsigned long long>(m_timer_probe_write_cycle), static_cast<unsigned long long>(m_timer_probe_mask_cycle),
 				m_timer_probe_writes, m_timer_probe_masks);
+			osd_printf_info("TMS320C54x timer boundary foreground: case=%u opcode_address=010608 fetches=%u first_fetch_cycle=%llu mask_writes=%u pipeline_drain_claim=0\n",
+				index, m_timer_probe_foreground_fetches,
+				static_cast<unsigned long long>(m_timer_probe_foreground_first_cycle), m_timer_probe_masks);
+			if (!short_period)
+				expect(m_timer_probe_foreground_fetches == 1 && m_timer_probe_foreground_first_cycle,
+					"Long-period control observes the post-reload foreground opcode fetch exactly once");
 			expect(m_timer_probe_writes == 1 && (short_period || m_timer_probe_masks == 1),
 				"Passive data-space taps observe the real TCR reload and completing IMR mask");
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Timer probe executes supported synthetic instructions");
@@ -22217,6 +22232,9 @@ private:
 	memory_passthrough_handler m_timer_probe_fetch, m_timer_probe_reload, m_timer_probe_stack, m_vector_prefetch_tap;
 	memory_passthrough_handler m_vector_stack_tap;
 	memory_passthrough_handler m_timer_probe_write, m_timer_probe_mask;
+	memory_passthrough_handler m_timer_probe_foreground;
+	unsigned m_timer_probe_foreground_fetches = 0;
+	u64 m_timer_probe_foreground_first_cycle = 0;
 	u64 m_timer_probe_write_cycle = 0, m_timer_probe_mask_cycle = 0;
 	unsigned m_timer_probe_writes = 0, m_timer_probe_masks = 0;
 	unsigned m_vector_reads = 0, m_vector_acks = 0, m_vector_case = 0;

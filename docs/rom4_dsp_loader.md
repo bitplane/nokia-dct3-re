@@ -2266,6 +2266,20 @@ that this core already implements the stages or that all software work is
 blocked. Native acquisition, recorder finalization and handset speech remain
 unpromoted until their own end-to-end gates pass.
 
+The passive foreground-fetch tap in `probe-c54x-timer-boundary` narrows that
+implementation boundary: both period-one cases accept 108 entries with
+return PC `0608`, but never fetch the opcode at `010608` and never write the
+IMR mask. Long-period controls fetch that opcode exactly once. Indirect
+addressing fetches it two scheduler cycles after the reload and writes IMR
+four cycles after reload; direct addressing fetches and writes IMR two cycles
+after reload. Evidence: `tmp/c54x-foreground-fetch.log`. Thus the starvation
+is upstream of operand access or instruction retirement, not a fetched mask
+instruction whose store was lost. The future frontend must retain actual
+in-flight instruction ownership across interrupt recognition; adding only a
+late write queue cannot repair this case. These are scheduler-accounting
+observations, not measured silicon latencies or permission to insert a fixed
+two-cycle interrupt delay.
+
 This is bounded debugger coverage, not a complete ISA disassembler or new
 execution/timing evidence. Other forms remain unsupported raw words.
 Non-delayed calls and returns carry debugger stepping flags. Delayed calls
