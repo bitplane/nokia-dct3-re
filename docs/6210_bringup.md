@@ -387,24 +387,15 @@ in `tmp/6210-plmn-task14-census-{national,international}/error.log.gz`.
 `tools/noki6210_plmn_task14_observe.lua` retains the read-only census;
 its 160-publication limit is a diagnostic bound, not a topology closure.
 
-Both divergent statuses enter wrapper `3cc660` from the same call at
-`31525e` (observed LR `315263`). The wrapper copies its R0 argument into
-the new object's status and posts to task 14; it does not choose between
-these two statuses. The preceding own-ROM switch compares the saved word
-at stack offset 8: `07d4` selects `315234 -> 03ec`, while `07d2` selects
-`315256 -> 03ea`. Instructions and pool literals are pinned by the radio
-contract checker. This maps the publication back to an earlier numeric
-input; the meaning and origin of `07d2/07d4` remain unresolved, and the
-saved input is confirmed by a passive switch observation: at `3151da`,
-national input is `000007d4` (10.136371231 seconds), international input
-is `000007d2` (10.085288308 seconds), with R4 context `169be8` in both.
-An earlier shared input `07d3` is also observed in both controls.
-The own-ROM path `315070..315078` reads a signed halfword at R6 and
-stores it into this saved stack slot before entering the switch's enclosing
-tail. This identifies a candidate message-header source, not a closed
-producer census or runtime proof that this store supplied these two values.
-Evidence: `tmp/6210-plmn-publisher-{national,international}/error.log.gz`.
-Switch evidence: `tmp/6210-plmn-switch-{national,international}/error.log.gz`.
+The own-ROM switch at `3151da` selects `315234 -> 03ec` for saved
+stack-offset-8 input `07d4`, and `315256 -> 03ea` for input `07d2`.
+Both publish through `31525e -> 3cc660`, which copies R0 into the message
+status and posts to task 14. Runtime confirms the national/foreign saved
+inputs with the same R4 context `169be8`; their semantic names are unknown.
+Instructions and pool literals are pinned by the radio contract checker.
+`315070..315078` is a static candidate source that reads a signed R6
+message header into the saved slot; execution for these inputs is unverified.
+Evidence: `tmp/6210-plmn-{publisher,switch}-{national,international}/error.log.gz`.
 
 The divergent inputs are themselves published to task 18: `07d4` in the
 national control at 10.136268846 seconds, `07d2` in the international
@@ -413,11 +404,15 @@ separate cold boots and return through `2a0615` (post call `2a0610`).
 This publisher stores R4 into the object's halfword header and posts with
 R0 = 18; the instruction contract is pinned. The result reproduces in two
 fresh pairs under `tmp/6210-plmn-input-source{-branch,}-{national,international}/`.
-The candidate consumption path `31506a` was not observed by either a
-mid-block or branch-entry tap. Silence is not a proof of absence, and the
-publication has not yet been correlated with the exact task-18 header read.
-The next boundary is task 18's receive/dispatch and the upstream selection
-of the status supplied to `2a0610`, not a DSP response hypothesis.
+The original headers are consumed at `3ccef0`, immediately after receive
+call `3ccee8`: national `07d4` at 10.136331077 seconds, international
+`07d2` at 10.085218154 seconds. These first reads are correlated with the
+posted object; later accesses belong to reuse and confer no message ownership.
+Evidence: `tmp/6210-plmn-input-consumer-{national,international}/error.log.gz`.
+The candidate source path `31506a` remains unobserved (not disproven).
+Current unresolved boundary: which caller/input of dispatcher `29ffb8`
+selects the task-18 status emitted at `2a0610`, and how the receive dispatch
+supplies the saved switch value. No missing DSP response is established.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures

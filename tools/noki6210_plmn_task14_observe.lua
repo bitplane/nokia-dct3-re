@@ -4,6 +4,7 @@ assert(machine.system.name == 'npe3hle', 'requires NPE-3 research-HLE compositio
 local cpu = assert(machine.devices[':maincpu'])
 local space = cpu.spaces['program']
 local busy, posts, inputs = false, 0, 0
+local input_taps, watched = {}, {}
 local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
     'plmn_task14_census', function(address)
         if busy or address ~= 0x3c22c0 or cpu.state['PC'].value ~= 0x3c22c0 then return end
@@ -19,6 +20,19 @@ local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
             machine:logerror(string.format(
                 'plmn_input_post: status=%04x task=%d object=%08x caller=%08x t=%.9f\n',
                 status, task, object, cpu.state['R14'].value, machine.time:as_double()))
+            if not watched[object] then
+                watched[object] = true
+                local reads = 0
+                input_taps[#input_taps + 1] = space:install_read_tap(object, object + 3,
+                    'plmn_input_header_' .. object, function(offset, value, mask)
+                        -- Later reads may belong to an allocator reuse, not this message.
+                        if busy or reads >= 1 then return end
+                        reads = reads + 1
+                        machine:logerror(string.format(
+                            'plmn_input_read: object=%08x pc=%08x value=%08x mask=%08x t=%.9f\n',
+                            object, cpu.state['PC'].value, value, mask, machine.time:as_double()))
+                    end)
+            end
         end
         if task ~= 14 or posts >= 160 then return end
         posts = posts + 1
@@ -54,4 +68,5 @@ local switch_tap = space:install_read_tap(0x3151d8, 0x3151db,
             input, cpu.state['R4'].value, machine.time:as_double()))
     end)
 _G.plmn_task14_census_observer = {
-    tap = tap, publisher_tap = publisher_tap, switch_tap = switch_tap}
+    tap = tap, publisher_tap = publisher_tap, switch_tap = switch_tap,
+    input_taps = input_taps}
