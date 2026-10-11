@@ -984,6 +984,21 @@ upstream timer owner. The instrument reads only CPU registers and the
 known ordinary-RAM task header, writes no firmware state, and is not a
 new handset acceptance gate.
 
+The late controller input is now traced through its live publication chain.
+Task-10 `03e9` is constructed at `26c394`, called from `24f49e`, and
+posted at `26c6ce` (`6.414274923` seconds). The controller's receive
+helper returns `05e8` at `24f47c` (`6.413684077`); the initial invocation
+instead returns `083b`. Constructor `237df8`, called from `238f86`,
+posts `05e8` to task 16 for records `108094` and `107f2c` at
+`6.412975154` and `6.413326692`. Both follow task-13 input `05df`,
+posted at `26c898` at `6.412429077` and `6.413101077`.
+The live receiver takes branch `238f28` with R0/R1=`05df`; independently,
+the branch comparison loads that ID from literal `239170` using the
+swap16 pool-literal rule. Evidence: `tmp/rf-scan-05df-origin/error.log`.
+These are repeatable current cold-input observations, not reconstructed
+old timing. Next boundary: the caller/lifecycle owning the `26c898`
+publication of `05df`, before calling this a timer-latency correction.
+
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free
 instruction cases write PRD `1234`, reload with TSS set and each TDDR value,
