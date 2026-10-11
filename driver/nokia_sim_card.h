@@ -131,6 +131,7 @@ private:
 	u8 *mutable_file_data(u16 fid);
 	const u8 *mutable_file_data(u16 fid) const;
 	bool access_allowed(const file_descriptor &file) const;
+	bool chv1_authorized() const;
 	void initialize_sms_files();
 
 	static constexpr unsigned sms_record_length = 176;

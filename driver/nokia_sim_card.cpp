@@ -323,7 +323,7 @@ nokia_sim_card_device::selected_file_for(access_shape shape)
 
 bool nokia_sim_card_device::read_permitted(const file_descriptor &file)
 {
-	if (!file.read_chv1 || !m_chv1_enabled || m_chv_verified[0])
+	if (!file.read_chv1 || chv1_authorized())
 		return true;
 	queue_status(0x98, 0x04);
 	return false;
@@ -1117,7 +1117,7 @@ void nokia_sim_card_device::run_gsm_algorithm()
 		queue_status(0x94, 0x08);
 		return;
 	}
-	if (m_chv1_enabled && !m_chv_verified[0])
+	if (!chv1_authorized())
 	{
 		queue_status(0x98, 0x04);
 		return;
@@ -1766,5 +1766,12 @@ bool nokia_sim_card_device::access_allowed(const file_descriptor &file) const
 	// Mutable laboratory files use the CHV1 update condition.  GSM 11.11
 	// treats it as ALWAYS while CHV1 is disabled, otherwise verification is
 	// scoped to the current card session.
-	return file.mutable_data && (!m_chv1_enabled || m_chv_verified[0]);
+	return file.mutable_data && chv1_authorized();
+}
+
+bool nokia_sim_card_device::chv1_authorized() const
+{
+	// GSM 11.11 8.12: failed ENABLE can block a still-disabled CHV1.
+	// Disabled authorization does not override the persistent blocked state.
+	return m_chv_attempts[0] != 0 && (!m_chv1_enabled || m_chv_verified[0]);
 }

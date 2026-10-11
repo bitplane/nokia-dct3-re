@@ -204,7 +204,7 @@ interior-only mismatch, six parameter errors, incompatible cyclic/transparent
 files, and pending-result save/replay. Directory-only selection reports `94 00`
 for SEEK and both read commands; incompatible EFs report `94 08`. Current
 ADN, SMS, SMSP and ACM require CHV1 for READ; SEEK applies the selected
-file's READ condition. Disabled CHV1 satisfies that condition; an enabled,
+file's READ condition. Disabled, unblocked CHV1 satisfies that condition; an enabled,
 unverified card returns `98 04`, including after restoration of an earlier
 unverified checkpoint. FCP advertises the same policy. The isolated serial
 fixture covers denial, wrong PIN, successful verification and restoration.
@@ -232,11 +232,17 @@ No retained handset trace uses SEEK;
 this is standards-derived card conformance, not new UI capability.
 
 RUN GSM ALGORITHM also requires current directory DFGSM and CHV1
-authorization (satisfied while CHV1 is disabled), following GSM 11.11 8.16.
+authorization (satisfied while CHV1 is disabled and unblocked), following GSM 11.11 8.16.
 The serial fixture proves `98 04` before PIN verification, `94 08` under
 DF_TELECOM, no pending authentication result after either rejection, and
 independently computed SRES/Kc after valid verification and directory selection.
 These checks are repeated following controller reset and reinsertion.
+CHV1 authorization also requires a nonzero retry count. Three wrong ENABLE
+attempts can block a still-disabled CHV1 (GSM 11.11 8.12); disabled mode must
+not bypass that state. One shared authorization predicate covers protected
+READ, UPDATE and authentication. Serial tests block this disabled card, deny
+all three operations, retain ALWAYS ICCID access, and recover through UNBLOCK
+without changing the ADN record rejected by the failed update.
 With an authentication algorithm selected, RUN GSM ALGORITHM rejects nonzero
 `P1/P2` with `6B 00` and a RAND length other than sixteen with `67 00`
 (GSM 11.11 sections 9.2.16 and 9.4.5). With no algorithm selected it remains

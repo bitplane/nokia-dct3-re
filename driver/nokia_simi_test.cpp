@@ -244,6 +244,26 @@ private:
 		{0xc0, 0, 0, 12, 0, 0x6f, 0},
 		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
 		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
+		{0xc0, 0, 0, 12, 0, 0x90, 0},
+		{0x26, 0, 1, 8, 0, 0x90, 0},
+		{0x28, 0, 1, 8, 1, 0x98, 4},
+		{0x28, 0, 1, 8, 1, 0x98, 4},
+		{0x28, 0, 1, 8, 1, 0x98, 0x40},
+		{0xa4, 0, 0, 2, 0x6f07, 0x9f, 15},
+		{0xb0, 0, 0, 1, 0, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x3f00, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x2fe2, 0x9f, 15},
+		{0xb0, 0, 0, 1, 0x98, 0x90, 0}, // ALWAYS access survives CHV blocking.
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0x88, 0, 0, 16, 0x5a, 0x98, 4},
+		{0xc0, 0, 0, 12, 0, 0x6f, 0},
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f3a, 0x9f, 15},
+		{0xdc, 2, 4, 32, 0xcc, 0x98, 4},
+		{0x2c, 0, 0, 16, 0, 0x90, 0},
+		{0xb2, 2, 4, 32, 0xaabb, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
 		{0xc0, 0, 0, 12, 0, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
@@ -324,9 +344,15 @@ private:
 	{
 		auto const &item = WRITE_CASES[m_write_case];
 		if (item.ins == 0xa4) { transmit({u8(item.body >> 8), u8(item.body)}); return; }
-		if (item.ins == 0x20 || item.ins == 0x28)
+		if (item.ins == 0x20 || item.ins == 0x28 || item.ins == 0x26)
 		{
 			transmit({u8(item.body ? '9' : '1'), '2', '3', '4', 0xff, 0xff, 0xff, 0xff});
+			return;
+		}
+		if (item.ins == 0x2c)
+		{
+			transmit({'1', '2', '3', '4', '5', '6', '7', '8',
+				'1', '2', '3', '4', 0xff, 0xff, 0xff, 0xff});
 			return;
 		}
 		for (unsigned offset = 0; offset < item.length; offset += 16)
@@ -673,6 +699,7 @@ private:
 			osd_printf_info("SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 reset_revokes=1 removal_revokes=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM GSM binary read access: PASS files=8 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM authentication access: PASS before_pin=1 after_pin=1 gsm_directory=1 rejected_result_absent=1 handset_claim=0\n");
+			osd_printf_info("SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}
