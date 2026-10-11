@@ -612,6 +612,14 @@
                  "arguments": ["$(RUN_DIR)", "--outgoing-connected-signaling", "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-sip-incoming-connected-signaling",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false,
+                 "interpreter": "env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_sip_cancel.py",
+                 "arguments": ["$(RUN_DIR)", "--incoming-connected-signaling", "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-sip-outgoing-unavailable",
       "prerequisites": ["build"], "variables": {},
       "unstructured": "optional external PJSIP stack; physical NPE-3 outgoing cause-18 clearing with no media",

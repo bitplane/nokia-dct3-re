@@ -11,7 +11,7 @@ from tools.run_sip_handset_gate import main, verify_success
 
 class ConnectedSignalingTest(unittest.TestCase):
     def test_signaling_scope_rejects_unproved_combinations(self):
-        for options in (['--incoming'], ['--record-media'], ['--restore-outgoing'],
+        for options in (['--incoming'], ['--cancel-incoming'], ['--record-media'], ['--restore-outgoing'],
                         ['--product', '8890'], ['--sip-response', '486'], ['--calls', '2']):
             with self.subTest(options=options), \
                     patch('sys.argv', ['gate', '--pjsua', 'unused', '--run-dir', 'unused',
@@ -21,18 +21,24 @@ class ConnectedSignalingTest(unittest.TestCase):
                 main()
             self.assertEqual(error.exception.code, 2)
 
-    def run_check(self, counts, log='physical call trace'):
+    def run_check(self, counts, log='physical call trace', incoming=False, bridge_transform=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / 'sip-bridge.log').write_text(
-                'digits=1234567\nSIP confirmed status=200\n'
+            bridge_text = (
+                ('SIP incoming identity=(1, 1) caller=5551234\nSIP physical answer identity=(1, 1)\n' if incoming else 'digits=1234567\n') +
+                'SIP confirmed status=200 identity=(1, 1)\n'
                 'SIP bridge ended ' + json.dumps(counts) + '\n')
+            (root / 'sip-bridge.log').write_text(bridge_transform(bridge_text) if bridge_transform else bridge_text)
             (root / 'error.log').write_text(log)
-            args = SimpleNamespace(product='6210', incoming=False, signaling_only=True)
+            args = SimpleNamespace(product='6210', incoming=incoming, signaling_only=True)
             remote = 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]'
-            with patch('tools.noki6210_outgoing_call_check.verify') as verify_call:
+            checker = 'tools.noki6210_incoming_call_check.verify' if incoming else 'tools.noki6210_outgoing_call_check.verify'
+            with patch(checker) as verify_call:
                 verify_success(root, remote, args)
-                verify_call.assert_called_once_with(log, number='1234567')
+                if incoming:
+                    verify_call.assert_called_once_with(log)
+                else:
+                    verify_call.assert_called_once_with(log, number='1234567')
             return json.loads((root / 'sip-result.json').read_text())
 
     def test_scope_does_not_promote_bridge_downlink_to_speech(self):
@@ -41,6 +47,21 @@ class ConnectedSignalingTest(unittest.TestCase):
         self.assertFalse(result['speech_tested'])
         self.assertFalse(result['native_dsp_complete'])
         self.assertNotIn('media', result)
+
+    def test_incoming_uses_own_answer_checker_and_caller_scope(self):
+        result = self.run_check({'uplink': 0}, incoming=True)
+        self.assertEqual(result['caller'], '5551234')
+        self.assertNotIn('dialed_digits', result)
+        self.assertFalse(result['speech_tested'])
+
+    def test_incoming_requires_one_ordered_correlated_answer(self):
+        for transform in (
+                lambda text: text.replace('identity=(1, 1)', 'identity=(2, 1)'),
+                lambda text: text + 'SIP physical answer identity=(1, 1)\n',
+                lambda text: text.replace('SIP physical answer identity=(1, 1)\n', '') +
+                             'SIP physical answer identity=(1, 1)\n'):
+            with self.subTest(transform=transform), self.assertRaises(RuntimeError):
+                self.run_check({'uplink': 0}, incoming=True, bridge_transform=transform)
 
     def test_rejects_unexpected_or_missing_handset_media_count(self):
         for counts in ({}, {'uplink': 1}):

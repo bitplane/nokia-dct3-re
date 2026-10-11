@@ -218,14 +218,27 @@ def verify_success(root, remote_text, args):
         raise RuntimeError('missing bridge media/release summary')
     counts = json.loads(match[1])
     if getattr(args, 'signaling_only', False):
-        from tools.noki6210_outgoing_call_check import verify as verify_call
         log = (root / 'error.log').read_text(errors='replace')
-        verify_call(log, number=number)
+        if args.incoming:
+            cursor = 0
+            for marker in ('SIP incoming identity=(1, 1) caller=5551234',
+                           'SIP physical answer identity=(1, 1)',
+                           'SIP confirmed status=200 identity=(1, 1)'):
+                position = bridge_text.find(marker, cursor)
+                if position < 0 or bridge_text.count(marker) != 1:
+                    raise RuntimeError('missing unique ordered incoming SIP identity/Answer/confirmation')
+                cursor = position + len(marker)
+            from tools.noki6210_incoming_call_check import verify as verify_call
+            verify_call(log)
+        else:
+            from tools.noki6210_outgoing_call_check import verify as verify_call
+            verify_call(log, number=number)
         if 'uplink' not in counts or counts['uplink'] != 0 or 'dsp_hle: speech tick' in log:
             raise RuntimeError('unclocked signaling fixture unexpectedly produced handset media')
         (root / 'sip-result.json').write_text(json.dumps({
-            'scope': '6210 physical outgoing SIP dialog and CC/RR release only',
-            'dialed_digits': number, 'passed': True, 'speech_tested': False,
+            'scope': f'6210 physical {"incoming" if args.incoming else "outgoing"} SIP dialog and CC/RR release only',
+            ('caller' if args.incoming else 'dialed_digits'): '5551234' if args.incoming else number,
+            'passed': True, 'speech_tested': False,
             'native_dsp_complete': False, 'bridge_counts': counts,
         }, indent=2) + '\n')
         print('OK - physical 6210 SIP dialog connected and released; speech unproved')
@@ -590,16 +603,17 @@ def main():
     parser.add_argument('--restore-idle', action='store_true')
     parser.add_argument('--restore-outgoing', action='store_true')
     parser.add_argument('--signaling-only', action='store_true',
-                        help='bounded 6210 outgoing SIP-200 dialog fixture without media acceptance')
+                        help='bounded 6210 SIP-200 dialog fixture without media acceptance')
     parser.add_argument('--sip-response', type=int, choices=(180, 200, 403, 404, 408, 480, 486, 503, 600), default=200)
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     signaling_connected = (args.signaling_only and args.product == '6210' and
-                           not args.incoming and args.sip_response == 200 and args.calls == 1 and
+                           args.sip_response == 200 and args.calls == 1 and
+                           (not args.incoming or args.ready_file is not None) and
                            not args.record_media and not args.restore_call and not args.restore_idle and
                            not args.restore_outgoing and not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
-        parser.error('--signaling-only requires the single 6210 outgoing SIP-200 fixture without recording/restoration')
+        parser.error('--signaling-only requires the single 6210 SIP-200 fixture without recording/restoration')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():

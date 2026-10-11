@@ -456,8 +456,8 @@ dismisses it with the right softkey before checking registered idle again.
 It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects media-acceptance fixtures for signaling-only
 products `6210`, `6250` and `8890`. The 6210 additionally admits only the
-single outgoing SIP-200 `--signaling-only` fixture described below; recording,
-incoming Answer, multiple calls and connected restoration remain excluded.
+single incoming/outgoing SIP-200 `--signaling-only` fixtures described below;
+recording, multiple calls and connected restoration remain excluded.
 The 8210 and 8850 have narrowly scoped
 single-call outgoing and incoming SIP-200 HLE media-transport fixtures and
 a separate connected-outgoing restore fixture. Explicit recording is
@@ -468,9 +468,9 @@ against actual local PJSIP 486. It decodes the SETUP number, requires the
 correlated busy decision and complete CC/RR release, rejects CONNECT and
 media, and checks exact registered-idle pixels afterward. The isolated
 research-HLE runner retains unchanged acquired PMM and own bootstrap,
-self-test, registration and persisted SIM-location checks. Only this
-outgoing busy failure, the unavailable fixture below, pending-outgoing
-restoration and alerting-incoming restoration are enabled for the 6210;
+self-test, registration and persisted SIM-location checks. The failure and
+connected-signaling fixtures, pending-outgoing restoration and
+alerting-incoming restoration are enabled for the 6210;
 speech remains unproved.
 
 `verify-6210-sip-connected-signaling` physically dials `1234567`, confirms a
@@ -484,6 +484,14 @@ not handset playback. `sip-result.json` explicitly records
 `speech_tested=false` and `native_dsp_complete=false`. This gate establishes
 an answered signaling dialog, not an audible or end-to-end voice call, and
 does not authorize a guessed NPE-3 PCM clock.
+
+`verify-6210-sip-incoming-connected-signaling` waits for a fresh registered-idle
+artifact before admitting caller `5551234`. Physical Send/Answer is required
+before the correlated SIP confirmation; physical End then closes CC/RR and
+returns to exact registered-idle pixels. The own incoming-call checker
+requires paging, assignment, one CONNECT and one DISCONNECT. Both the bridge's
+handset-owned Answer marker and the decoded key must be present. The same
+zero-uplink/no-codec guard and explicit non-speech result scope apply.
 
 `verify-6210-sip-pending-outgoing-restore` physically dials `1234567`, saves
 during SIP 180, and restores handset PC, SP, RAM checksum and emulated time

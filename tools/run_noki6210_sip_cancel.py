@@ -47,6 +47,8 @@ def main():
     outgoing = parser.add_mutually_exclusive_group()
     outgoing.add_argument('--outgoing-connected-signaling', action='store_true',
                           help='physically connect and end a SIP dialog without claiming media')
+    outgoing.add_argument('--incoming-connected-signaling', action='store_true',
+                          help='physically answer and end a SIP dialog without claiming media')
     outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='physically dial into SIP 486 instead of receiving CANCEL')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
@@ -59,7 +61,7 @@ def main():
     parser.add_argument('--sip-port', type=int, default=25621)
     args = parser.parse_args()
     outgoing_status = 200 if args.outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
-    if (outgoing_status or args.restore_outgoing_pending or args.restore_incoming_alerting) and args.restore_idle:
+    if (outgoing_status or args.incoming_connected_signaling or args.restore_outgoing_pending or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -75,6 +77,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki6210_host_incoming_input.lua' if args.incoming_connected_signaling else
                        'noki6210_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
                        'noki6210_sip_outgoing_restore.lua' if args.restore_outgoing_pending else
                        'noki6210_outgoing_call_input.lua' if outgoing_status else
@@ -87,7 +90,9 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6210',
-                   *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
+                   *(['--incoming', '--signaling-only', '--ready-file',
+                      str(run / 'snap/6210_host_registered_idle.png')] if args.incoming_connected_signaling else
+                     ['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', str(outgoing_status)] +
                      (['--signaling-only'] if args.outgoing_connected_signaling else []) if outgoing_status else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
@@ -117,6 +122,14 @@ def main():
                           else '6210_after_outgoing_call.png')
             with Image.open(run / 'snap' / frame_name) as frame:
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after SIP failure')
+        elif args.incoming_connected_signaling:
+            from PIL import Image
+            text = (run / 'error.log').read_text(errors='replace')
+            verify(text, runtime=True, selftest=True)
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
+            for name in ('6210_host_registered_idle.png', '6210_after_incoming_call.png'):
+                with Image.open(run / 'snap' / name) as frame:
+                    check_frame(frame, OPERATOR_SHA256, name)
         else:
             check_product_result(run, args.restore_idle)
             if args.restore_incoming_alerting:
@@ -126,7 +139,8 @@ def main():
                     raise ValueError('incoming alerting architecture did not restore exactly')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6210 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('6210 research-HLE SIP ' + ('incoming alerting restoration' if args.restore_incoming_alerting else
+    print('6210 research-HLE SIP ' + ('incoming connected signaling' if args.incoming_connected_signaling else
+          'incoming alerting restoration' if args.restore_incoming_alerting else
           'pending outgoing restoration' if args.restore_outgoing_pending else
           f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +
           ' PASS; registered idle recovered, no speech acceptance')

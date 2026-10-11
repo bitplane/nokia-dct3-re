@@ -910,6 +910,13 @@ and no HLE speech tick may execute. This is connected signaling acceptance,
 not a speech/media promotion; the product-owned PCM prerequisites below
 remain unchanged.
 
+`verify-6210-sip-incoming-connected-signaling` additionally admits a real
+INVITE only after the fresh registered-idle capture. The own paging and
+assignment lifecycle leads to physical Answer, SIP confirmation, physical
+End and complete release, with exact idle recovery. Zero bridge uplink and
+no HLE speech ticks remain required; incoming signaling does not establish
+PCM timing, audible playback or native DSP speech.
+
 `verify-6210-pcm-missing` independently answers and ends an incoming call
 using physical keys, unchanged own PMM and the existing NPE-3 upload,
 registration and call-signaling checks. Only external network configuration
