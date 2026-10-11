@@ -687,8 +687,10 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_word));
 	save_item(NAME(m_pipeline_operand_address));
 	save_item(NAME(m_pipeline_operand));
+	save_item(NAME(m_pipeline_immediate));
 	save_item(NAME(m_pipeline_valid));
-	save_item(NAME(m_pipeline_decode_pending));
+	save_item(NAME(m_pipeline_decode_remaining));
+	save_item(NAME(m_pipeline_decode_extension));
 	save_item(NAME(m_pipeline_decode_word));
 	save_item(NAME(m_pipeline_decode_address));
 	save_item(NAME(m_pipeline_fetch_address));
@@ -1677,7 +1679,8 @@ bool tms320c54x_device::accept_interrupt()
 void tms320c54x_device::reset_pipeline()
 {
 	m_pipeline_valid.fill(false);
-	m_pipeline_decode_pending = false;
+	m_pipeline_decode_remaining = 0;
+	m_pipeline_decode_extension = 0;
 	m_pipeline_decode_word = 0;
 	m_pipeline_decode_address = 0;
 	m_pipeline_fetch_address = logical_program_address(m_pc);
@@ -1705,6 +1708,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_word[stage] = m_pipeline_word[stage - 1];
 		m_pipeline_operand_address[stage] = m_pipeline_operand_address[stage - 1];
 		m_pipeline_operand[stage] = m_pipeline_operand[stage - 1];
+		m_pipeline_immediate[stage] = m_pipeline_immediate[stage - 1];
 	}
 	m_pipeline_valid[0] = false;
 	if (m_pipeline_flush_front) m_pipeline_valid[2] = false;
@@ -1733,32 +1737,46 @@ void tms320c54x_device::pipeline_step()
 	}
 	if (m_pipeline_valid[2])
 	{
-		if (m_pipeline_decode_pending)
+		if (m_pipeline_decode_remaining)
 		{
-			// The next word is the literal belonging to the retained opcode,
-			// not a separately executable instruction (SPRU131G 7.1).
-			m_pipeline_operand[2] = m_pipeline_word[2];
-			m_pipeline_word[2] = m_pipeline_decode_word;
-			m_pipeline_address[2] = m_pipeline_decode_address;
-			m_pipeline_decode_pending = false;
+			// Extension words belong to the retained opcode, not independently
+			// executable instructions. Absolute ANDM/ORM use address, then literal.
+			if (--m_pipeline_decode_remaining)
+			{
+				m_pipeline_decode_extension = m_pipeline_word[2];
+				m_pipeline_valid[2] = false;
+			}
+			else
+			{
+				m_pipeline_operand[2] = m_pipeline_immediate[2] = m_pipeline_word[2];
+				m_pipeline_operand_address[2] = m_pipeline_decode_extension;
+				m_pipeline_word[2] = m_pipeline_decode_word;
+				m_pipeline_address[2] = m_pipeline_decode_address;
+			}
 		}
 		else if ((m_pipeline_word[2] & 0xfef0) == 0xf020 ||
-			(m_pipeline_word[2] & 0xfeff) == 0xf062)
+			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
+			((m_pipeline_word[2] & 0xfe00) == 0x6800 &&
+				(u8(m_pipeline_word[2]) == 0xf8 || (u8(m_pipeline_word[2]) < 0x98 &&
+					(BIT(m_pipeline_word[2], 7) || !BIT(m_st1, 14))))))
 		{
-			m_pipeline_decode_pending = true;
+			m_pipeline_decode_remaining = (m_pipeline_word[2] & 0xfeff) == 0x68f8 ? 2 : 1;
+			m_pipeline_decode_extension = 0;
 			m_pipeline_decode_word = m_pipeline_word[2];
 			m_pipeline_decode_address = m_pipeline_address[2];
 			m_pipeline_valid[2] = false;
 		}
 		u16 const word = m_pipeline_word[2];
-		// Register/immediate loads, short loads and direct DP stores are covered.
+		// Register/immediate loads, short loads, DP stores and bounded RMW forms.
 		// Other memory/control forms need Access/Read/redirect ownership first.
 		bool const short_load = (word & 0xfe00) == 0x1000 && u8(word) < 0xa0 &&
 			(BIT(word, 7) || !BIT(m_st1, 14));
 		bool const direct_store = (word & 0xfc80) == 0x8000 && !BIT(m_st1, 14);
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
+		bool const rmw = (word & 0xfe00) == 0x6800 &&
+			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		if (m_pipeline_valid[2] && word != 0xf495 && (word & 0xff00) != 0xe800 &&
-			(word & 0xff00) != 0xe900 && !short_load && !direct_store && !long_load)
+			(word & 0xff00) != 0xe900 && !short_load && !direct_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
 				machine().describe_context(), word, m_pipeline_address[2]);
@@ -1768,7 +1786,8 @@ void tms320c54x_device::pipeline_step()
 	}
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
-	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfe00) == 0x1000)
+	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
+		((m_pipeline_word[3] & 0xfe00) == 0x6800 && u8(m_pipeline_word[3]) != 0xf8)))
 	{
 		u8 const mode = m_pipeline_word[3];
 		bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
@@ -1776,7 +1795,8 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[3] = short_smem_address(mode);
 		if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
 	}
-	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfe00) == 0x1000)
+	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1000 ||
+		(m_pipeline_word[4] & 0xfe00) == 0x6800))
 		m_pipeline_operand[4] = m_data.read_word(m_pipeline_operand_address[4]);
 	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfc80) == 0x8000)
@@ -1796,6 +1816,13 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_op & 0xfc80) == 0x8000)
 			data_write(m_pipeline_operand_address[5],
 				u16(saturated_store(accumulator(BIT(m_op, 8))) >> (BIT(m_op, 9) ? 16 : 0)));
+		else if ((m_op & 0xfe00) == 0x6800)
+		{
+			m_pc += u8(m_op) == 0xf8 ? 2 : 1;
+			data_write(m_pipeline_operand_address[5], BIT(m_op, 8)
+				? m_pipeline_operand[5] | m_pipeline_immediate[5]
+				: m_pipeline_operand[5] & m_pipeline_immediate[5]);
+		}
 		else if ((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062)
 		{
 			++m_pc;
@@ -1821,7 +1848,7 @@ void tms320c54x_device::pipeline_step()
 	}
 	// Acceptance occurs after this cycle's Decode. Retain decoded slots,
 	// replace the next Decode with INTR, and drain the prefetched bus word.
-	if (!m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_pending && accept_interrupt())
+	if (!m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :
 			m_pipeline_valid[0] ? m_pipeline_address[0] : m_pipeline_fetch_address);

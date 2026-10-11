@@ -231,8 +231,10 @@ private:
 	std::array<u16, 6> m_pipeline_word = {};
 	std::array<u16, 6> m_pipeline_operand_address = {};
 	std::array<u16, 6> m_pipeline_operand = {};
+	std::array<u16, 6> m_pipeline_immediate = {};
 	std::array<bool, 6> m_pipeline_valid = {};
-	bool m_pipeline_decode_pending = false;
+	u8 m_pipeline_decode_remaining = 0;
+	u16 m_pipeline_decode_extension = 0;
 	u16 m_pipeline_decode_word = 0;
 	u32 m_pipeline_decode_address = 0;
 	u32 m_pipeline_fetch_address = 0;

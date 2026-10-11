@@ -15,6 +15,8 @@ REQUIRED = [
     "TMS320C54x staged multiword stream: PASS long_execute=7,9 short_execute=10 literal_reads=2",
     "TMS320C54x staged stores: PASS cases=12 address=Read write=Execute writes_per_leg=1 pending_store_restore=12",
     "TMS320C54x staged indirect loads: PASS cases=8 ar_update=Access read=Read execute=Execute captured_address_restore=8",
+    "TMS320C54x staged RMW: PASS cases=12 forms=DP,postincrement,absolute extension_restore=6 sampled_read_restore=6 duplicate_reads=0",
+    "TMS320C54x staged mask RMW: PASS read=7 write=8 accepted_irq=1 subsequent_masked=1 pending_write_restore=1 duplicate_reads=0",
     "TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0",
     "TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0",
     "TMS320C54x POLY boundaries: PASS cases=64 frct=0,1 ovm=0,1 sxm=0,1 sticky_ova=1 pipeline_claim=0",

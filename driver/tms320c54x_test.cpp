@@ -2572,6 +2572,108 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_rmw_case(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_rmw_case = variant;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_vector_acks = 0;
+		m_pipeline_extensions_reads = 0;
+		m_pipeline_replay = false;
+		m_pipeline_expected_cycle = 1;
+		unsigned const kind = (variant / 2) % 3;
+		bool const absolute = kind == 1;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		for (unsigned i = 0; i < 16; ++i)
+		{
+			program.write_word(0x600 + i, 0xf495);
+			program.write_word(0x40 + i, 0xf495);
+		}
+		program.write_word(0x600, (variant & 1 ? 0x6900 : 0x6800) | (absolute ? 0xf8 : kind == 2 ? 0x91 : 0x20));
+		program.write_word(0x601, absolute ? 0x420 : 0xe833);
+		if (absolute) program.write_word(0x602, 0xe833);
+		program.write_word(0x40, 0xe955);
+		data.write_word(0x420, 0x55aa); data.write_word(0x4a0, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 8);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x420);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_fetch_tap = program.install_read_tap(0x601, 0x602, "pipeline_rmw_extensions",
+			[this](offs_t address, u16 &, u16) {
+				if (machine().side_effects_disabled() || (address == 0x602 && (m_pipeline_rmw_case / 2) % 3 != 1)) return;
+				expect(m_cpu->pipeline_cycles() == (address == 0x601 ? 3 : 4),
+					"RMW extension words use independent program-bus Fetch clocks");
+				++m_pipeline_extensions_reads;
+			});
+		m_pipeline_operand_tap = data.install_read_tap(0x420, 0x420, "pipeline_rmw_read",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == ((m_pipeline_rmw_case / 2) % 3 == 1 ? 7 : 6),
+					"RMW target is sampled in Read, before Execute");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = data.install_write_tap(0x420, 0x420, "pipeline_rmw_write",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == ((m_pipeline_rmw_case / 2) % 3 == 1 ? 8 : 7) &&
+					value == (m_pipeline_rmw_case & 1 ? 0xfdbb : 0x4022),
+					"RMW writes the captured Read value combined with its owned literal in Execute");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251110;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_mask_rmw_case()
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i)
+		{
+			program.write_word(0x600 + i, 0xf495);
+			program.write_word(0x40 + i, 0xf495);
+		}
+		program.write_word(0x600, 0x68f8); // ANDM #fffe,*(IMR).
+		program.write_word(0x601, 0); program.write_word(0x602, 0xfffe);
+		program.write_word(0x40, 0xe955);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false;
+		m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = m_vector_acks = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0, 0, "pipeline_imr_read",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 7 && value == 1, "RMW samples the real IMR register in Read");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0, 0, "pipeline_imr_write",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 8 && value == 0, "Pending RMW clears IMR through its actual Execute-stage bus write");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251130;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -22736,8 +22838,8 @@ private:
 				m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_indirect_case < 7) { start_pipeline_indirect_case(m_pipeline_indirect_case + 1); return; }
 				osd_printf_info("TMS320C54x staged indirect loads: PASS cases=8 ar_update=Access read=Read execute=Execute captured_address_restore=8\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_pipeline_rmw_case();
+				return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -22748,6 +22850,146 @@ private:
 			expect(m_cpu->pipeline_cycles() == 4, "Scheduler settlement preserves the completed indirect Access");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 			m_phase = 251090;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251110)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const kind = (m_pipeline_rmw_case / 2) % 3;
+			bool const absolute = kind == 1;
+			bool const after_read = m_pipeline_rmw_case >= 6;
+			u64 const read_cycle = absolute ? 7 : 6;
+			u64 const execute_cycle = read_cycle + 1;
+			u64 const isr_cycle = execute_cycle + 4;
+			u64 const checkpoint = after_read ? read_cycle : absolute ? 4 : 3;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"RMW frontend advances one clock without atomic fallback");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= isr_cycle ? 0x55 : 0),
+				"Opcode-shaped RMW literals are data, not accumulator loads");
+			expect(m_pipeline_store_writes == (cycle >= execute_cycle ? 1 : 0) &&
+				m_cpu->space(AS_DATA).read_word(0x4a0) == 0xbeef,
+				"RMW never commits before Execute or redirects to later DP/AR values");
+			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
+			if (cycle == read_cycle - 1)
+			{
+				if (kind == 2) expect(m_cpu->state_int(tms320c54x_device::STATE_AR1) == 0x421,
+					"RMW post-increment belongs to Access");
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 9);
+				m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0x4a0);
+			}
+			if (cycle == read_cycle)
+			{
+				// Bench mutation is not an emulated CPU bus transaction.
+				auto const suppress = machine().disable_side_effects();
+				m_cpu->space(AS_DATA).write_word(0x420, 0x3333);
+			}
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+					"Save partial RMW Decode or pending RMW write after Read");
+			}
+			if (cycle == isr_cycle)
+			{
+				expect(m_vector_acks == 1 && m_pipeline_store_writes == 1 &&
+					m_pipeline_operand_reads == (m_pipeline_replay && after_read ? 0 : 1) &&
+					m_pipeline_extensions_reads == (absolute ? 2 : 1),
+					"RMW replay preserves extensions and captured data without duplicate bus traffic");
+				expect(m_cpu->space(AS_DATA).read_word(0xfff) == (absolute ? 0x603 : 0x602),
+					"RMW continuation points after every owned extension word");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_vector_acks = m_pipeline_store_writes = m_pipeline_operand_reads = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint,
+						"Restore incomplete RMW assembly or its sampled Read operand");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1;
+					m_phase = 251120;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_fetch_tap.remove(); m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_rmw_case < 11) { start_pipeline_rmw_case(m_pipeline_rmw_case + 1); return; }
+				osd_printf_info("TMS320C54x staged RMW: PASS cases=12 forms=DP,postincrement,absolute extension_restore=6 sampled_read_restore=6 duplicate_reads=0\n");
+				start_pipeline_mask_rmw_case();
+				return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251120)
+		{
+			u64 const checkpoint = m_pipeline_rmw_case >= 6 ? ((m_pipeline_rmw_case / 2) % 3 == 1 ? 7 : 6) :
+				(m_pipeline_rmw_case / 2) % 3 == 1 ? 4 : 3;
+			expect(m_cpu->pipeline_cycles() == checkpoint, "Scheduler settlement preserves pending RMW state");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_phase = 251110;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251130)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IMR) == (cycle < 8 ? 1 : 0),
+				"Mask RMW changes IMR only when its retained operation retires");
+			expect(m_pipeline_store_writes == (cycle < 8 ? 0 : 1) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle < 12 ? 0 : 0x55),
+				"Accepted entry completes after the staged mask write without a second commit");
+			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
+			if (cycle == 7 && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+					"Save sampled IMR operand before the hardware mask write");
+			}
+			if (cycle == 12)
+			{
+				// Controller conformance: remove INTM as a confound, then pulse
+				// another physical IRQ while the firmware-owned IMR write holds.
+				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+				m_cpu->set_input_line(0, CLEAR_LINE);
+				m_cpu->set_input_line(0, ASSERT_LINE);
+			}
+			if (cycle == 18)
+			{
+				expect(m_vector_acks == 1 && m_pipeline_operand_reads == (m_pipeline_replay ? 0 : 1) &&
+				m_cpu->state_int(tms320c54x_device::STATE_IFR) == 1,
+					"New IRQ remains pending under IMR=0 despite INTM being clear");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_vector_acks = m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == 7,
+						"Restore sampled mask RMW without rereading the MMR");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = 8;
+					m_phase = 251140;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				osd_printf_info("TMS320C54x staged mask RMW: PASS read=7 write=8 accepted_irq=1 subsequent_masked=1 pending_write_restore=1 duplicate_reads=0\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251140)
+		{
+			expect(m_cpu->pipeline_cycles() == 7, "Scheduler settlement does not perform a pending mask write");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_phase = 251130;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 			return;
 		}
@@ -23202,6 +23444,9 @@ private:
 	unsigned m_pipeline_store_case = 0;
 	unsigned m_pipeline_store_writes = 0;
 	unsigned m_pipeline_indirect_case = 0;
+	unsigned m_pipeline_rmw_case = 0;
+	unsigned m_pipeline_extensions_reads = 0;
+	memory_passthrough_handler m_pipeline_write_tap;
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
 	unsigned m_pipeline_drained_fetches = 0;
@@ -23259,6 +23504,17 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 251130)
+		{
+			expect(line == 0 && m_cpu->pipeline_cycles() == 8, "Accepted IRQ acknowledges once alongside mask RMW retirement");
+			++m_vector_acks;
+		}
+		if (m_phase == 251110)
+		{
+			expect(line == 0 && m_cpu->pipeline_cycles() == ((m_pipeline_rmw_case / 2) % 3 == 1 ? 8 : 7),
+				"RMW retires alongside the accepted vector Fetch/IACK");
+			++m_vector_acks;
+		}
 		if (m_phase == 251090)
 		{
 			expect(line == 0 && m_cpu->pipeline_cycles() == 6, "Indirect load drains while vector IACK occurs");

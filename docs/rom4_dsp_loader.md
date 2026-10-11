@@ -2280,8 +2280,10 @@ backend and interrupt-source/entry operations. No handset or MU4 configuration
 enables it. Executable coverage is NOP, one-word immediate loads, two-word
 shifted immediate loads, direct DP-relative loads and STL/STH stores, and
 short indirect loads using plain, post-decrement, post-increment or
-pre-increment addressing. SP-relative, other indirect and other multiword
-forms stop at Decode without atomic fallback.
+pre-increment addressing, and ANDM/ORM with DP-relative, plain/post-decrement/
+post-increment short indirect or three-word absolute (`f8`) operands.
+SP-relative, other indirect and other multiword forms stop at Decode without
+atomic fallback.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
@@ -2320,6 +2322,24 @@ checkpoint there and require one read of the original address per leg,
 without repeating the AR modification on restoration. Extended, indexed,
 circular and compatibility-mode hazard contracts remain outside this scope.
 
+ANDM/ORM retain the immediate separately from the sampled data operand.
+The three-word absolute form consumes address then literal; its two pending
+extensions are saved independently from the completed pipeline slots.
+Access owns the target address, Read samples the value and Execute commits
+the logical result at that retained address. Twelve fixtures cover both
+operations with DP-relative, post-increment and absolute operands, restoring
+either incomplete extension assembly or a post-Read/pre-write checkpoint.
+Changing DP/AR after Access or backing RAM after Read does not alter the
+pending operation. Restoring after Read performs no second operand read.
+
+A separate absolute ANDM fixture targets the real IMR register through the
+ordinary CPU data map: Read at 7 samples mask 1, Execute at 8 writes mask 0,
+the already-accepted interrupt finishes, and a subsequent IRQ remains pending
+with INTM clear. Its restored post-Read leg writes once without rereading IMR.
+This implements the form used by the timer-boundary probe, not that complete
+program: staged returns, idle/control rules and native enablement are still
+missing, so the timer/recorder starvation boundary remains unclosed.
+
 Two-word immediate loads retain the opcode while the following fetched word
 completes Decode as its literal. They consume distinct program fetches
 (SPRU131G 7.1), never interpret opcode-shaped literals as instructions and
@@ -2341,7 +2361,7 @@ with one vector fetch/acknowledgement per leg. The bench suspends execution
 for scheduler settlement after loading inside a live callback; that pause is
 not emulated interrupt latency or a physical wall-time replay claim.
 `check-c54x-core` requires staged-frontend, direct-load, store, indirect-load,
-multiword/replay/stream, empty IRQ/NMI and unsupported-form markers.
+RAM/MMR RMW, multiword/replay/stream, empty IRQ/NMI and unsupported-form markers.
 Existing native execution remains protected by its full conformance suite.
 `verify-5110-save-state` passes with the added partial-Decode fields; this
 revalidates native CPU/register/I/O restoration, not the still-failing exact
