@@ -14321,6 +14321,12 @@
       ]
     },
     {
+      "name": "verify-sim-toolkit-interactive-5210", "prerequisites": ["normalize-5210", "build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki5210_toolkit.py",
+                 "arguments": ["$(RUN_DIR)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-sim-toolkit-5210",
       "prerequisites": ["normalize-5210"],
       "variables": {},

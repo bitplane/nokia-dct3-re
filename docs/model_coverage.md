@@ -43,6 +43,12 @@ old set. See the current audit boundary in
 
 ## Promotion rules
 
+`verify-sim-toolkit-interactive-5210` independently extends NSM-5's Phase-2+
+DISPLAY TEXT coverage with physical GET INKEY `5`/GET INPUT `42`, successful
+terminal responses and reviewed entered/registered-idle pixels. Its INKEY
+editor requires an additional physical OK after the digit. This gate does
+not promote card-menu/network Toolkit services or native DSP execution.
+
 `verify-3410-radio-a5-1-degraded` independently proves NHM-2 encrypted
 incoming-call resilience: organic authentication/cipher completion, own
 physical Answer/End lifecycle, bidirectional impaired traffic bursts,

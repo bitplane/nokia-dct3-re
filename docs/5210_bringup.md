@@ -91,6 +91,13 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   product's nine-byte TERMINAL PROFILE, then requires `91xx`, FETCH, rendered
   `DCT3 SAT`, physical OK and a successful TERMINAL RESPONSE. The profile
   length is product evidence rather than a borrowed 3210 constant.
+- `make verify-sim-toolkit-interactive-5210` independently accepts GET INKEY
+  `5` and GET INPUT `42`, with exact successful terminal responses and five
+  reviewed prompt/entered/registered-idle frames. NSM-5 requires physical OK
+  after the INKEY digit; submitting the digit alone leaves the reply pending.
+  The gate uses fresh private storage and own v5.40E MCU/PMM, not firmware
+  state injection. Card-menu and network-triggered Toolkit services are not
+  established by this text-reply gate.
 - `make verify-5210-radio-paging` proves one IMSI-addressed page, random access,
   Paging Response, contention resolution, clean release and return to the
   subscriber's paging group.

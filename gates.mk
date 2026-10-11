@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 682 gates: 484 generated from typed steps, 198 copied verbatim (shell).
+# 683 gates: 485 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -315,7 +315,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-toolkit-malformed verify-sim-toolkit-timeout verify-sim-hotplug \
 	verify-sim-hotplug-v501 verify-sim-hotplug-toolkit \
 	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
-	verify-sim-toolkit-3310 verify-sim-toolkit-3330 verify-sim-toolkit-5210 \
+	verify-sim-toolkit-3310 verify-sim-toolkit-3330 \
+	verify-sim-toolkit-interactive-5210 verify-sim-toolkit-5210 \
 	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
 	verify-sim-phonebook verify-sim-pin verify-sim-pin-unblock \
 	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
@@ -4416,6 +4417,9 @@ verify-sim-toolkit-3330:
 	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_3330/noki3330.cfg $(RUN_DIR)/cfg/; \
 	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg'; \
 	$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome screen-busy
+
+verify-sim-toolkit-interactive-5210: normalize-5210 build
+	$(PYTHON) tools/run_noki5210_toolkit.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 # shell: NSM-5 Phase-2+ DISPLAY TEXT corroboration
 verify-sim-toolkit-5210: normalize-5210
