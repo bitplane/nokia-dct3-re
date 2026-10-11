@@ -90,6 +90,14 @@ physical Answer/End, CC/RR closure and exact idle recovery.
 and pixels during a local-peer RP wait, then requires timed DISC, UA/release,
 paging and physical idle/menu recovery. Whole-interval reference/replay,
 external host transaction restoration remain separate.
+Combining the local outgoing-call save fixture with the ordinary host-connect
+mock is insufficient: that mock closes its WebSocket after its correlated
+decision, before save/load. The captured handset round trip preserves PC/SP/RAM
+and pixels and releases physically, but the restored epoch-2 call publishes
+with `clients=0`. This does not demonstrate active external transaction
+restoration or a handset defect. A restoration backend must remain attached
+through save/load and assert old-epoch invalidation, host dialog cleanup and
+the restored lifecycle before this coverage can be promoted.
 `verify-5210-pin-outgoing-call-sip` independently combines cold PIN
 authentication, physical dialing and End, real loopback SIP confirmation,
 bidirectional host media transport, ordered DISCONNECT/RELEASE/RELEASE COMPLETE
