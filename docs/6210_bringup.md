@@ -490,7 +490,14 @@ allocates a 12-byte object, writes its header and payload, and posts to
 task 18 at `4cfe1e`. An image-wide direct Thumb BL candidate scan finds
 one call to that entry, at `2d1126`. This does not cover indirect calls,
 arithmetic status construction or data-driven publication.
-Current unresolved boundary: the lifecycle selecting caller `2d1126`
+Three nearby direct branch candidates reach this publisher's caller:
+`2d0d5a` reaches `2d111a` when query `3c1ad0(75)` returns zero;
+`2d0f1e` reaches `2d1118` when R1 equals literal `0419`; and `2d1062`
+reaches `2d1118` when byte zero of the object referenced by `175458`
+equals 5. These local comparisons are pinned to the own image, but their
+enclosing entry conditions and subsystem semantics are not yet recovered.
+They do not justify treating `07f4` as an ordinary roaming completion.
+Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
 No operational international-roaming contract is
