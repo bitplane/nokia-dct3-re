@@ -510,8 +510,15 @@ and consumer `2d0f18`. The former is not a recovered message publisher:
 it passes `0419` in R1 into local dispatcher `295f2c`, which preserves
 the supplied context in R10 and selects `296bec` by subtracting literal
 `0412` and then 7. Do not count that literal use as an RTOS send site.
-Computed and table-driven producers, and other uses of the remaining
-pool, are not excluded by this scan.
+The remaining occurrence `26dd14` is a key in a 64-record, eight-byte
+lookup table at `26dbac`. Reader `46a53c` obtains that base through
+literal `46a8c4`, compares each record's word with the constructed key,
+copies record byte+4 to the supplied output pointer on a match, and
+returns 8 (4 on exhaustion). Its loop advances eight bytes and is bounded
+at `40` records. This use is not a message publication either; no semantic
+meaning is assigned to its metadata byte here. Thus all three aligned
+literal occurrences are classified, but computed, indirect and other
+table-driven message producers remain outside this scan's coverage.
 Fresh 25-second national and foreign controls reproduce the original
 `09c8/07d4` versus `09c6/07d2` split with clean observer health. Passive
 taps at `2d1118`, `2d111a`, `4cfdd4`, `313218`, `2d0d50` and `2d1048`
