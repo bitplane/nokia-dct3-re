@@ -1,7 +1,7 @@
 import unittest
-from tools.run_simi_restore import HEADER_PASS, PARAMETER_PASS, PASS, RECORD_PASS, UPDATE_PASS, check
+from tools.run_simi_restore import BINARY_PASS, HEADER_PASS, PARAMETER_PASS, PASS, RECORD_PASS, UPDATE_PASS, check
 
-COMPLETE = "\n".join((PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS)) + "\n"
+COMPLETE = "\n".join((PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS)) + "\n"
 
 
 class SimiRestoreResultTest(unittest.TestCase):
@@ -21,7 +21,9 @@ class SimiRestoreResultTest(unittest.TestCase):
                              (COMPLETE.replace(RECORD_PASS, ""), 0),
                              (COMPLETE + RECORD_PASS, 0),
                              (COMPLETE.replace(UPDATE_PASS, ""), 0),
-                             (COMPLETE + UPDATE_PASS, 0)):
+                             (COMPLETE + UPDATE_PASS, 0),
+                             (COMPLETE.replace(BINARY_PASS, ""), 0),
+                             (COMPLETE + BINARY_PASS, 0)):
             with self.subTest(text=text, status=status), self.assertRaises(ValueError):
                 check(text, status)
 

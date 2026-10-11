@@ -179,6 +179,13 @@ check cyclic EF_ACM selection, all three disallowed update modes, successful
 PREVIOUS update and wrapping reads. Only the existing single-record cyclic
 EF is covered; multi-record cyclic rotation is not implemented or validated.
 
+READ/UPDATE BINARY use the full `P1:P2` offset as specified in GSM 11.11
+sections 9.2.3/9.2.4; the high bit is not a short-file selector. Out-of-range
+access returns `94 02` without modifying file contents. Fourteen isolated
+binary transactions on EF_LOCI check high-byte offsets `80` and `FF`, the
+last valid byte, the first invalid byte and readback after rejected writes.
+These are serial-path card conformance checks, not new handset capabilities.
+
 The implemented surface is classified by ownership and evidence:
 
 | Surface | Classification | Basis and limitation |

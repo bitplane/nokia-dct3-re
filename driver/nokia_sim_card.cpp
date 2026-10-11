@@ -1347,7 +1347,7 @@ void nokia_sim_card_device::queue_read_binary(unsigned requested)
 			selected_file_for(access_shape::transparent);
 	if (!file)
 		return;
-	const unsigned start = (unsigned(m_p1 & 0x7f) << 8) | m_p2;
+	const unsigned start = (unsigned(m_p1) << 8) | m_p2;
 	if (start + requested > file->size)
 	{
 		queue_status(0x94, 0x02);
@@ -1406,7 +1406,7 @@ void nokia_sim_card_device::update_binary()
 		return;
 	if (!write_permitted(*file))
 		return;
-	const unsigned start = (unsigned(m_p1 & 0x7f) << 8) | m_p2;
+	const unsigned start = (unsigned(m_p1) << 8) | m_p2;
 	if (start + m_tx_len > file->size)
 	{
 		queue_status(0x94, 0x02);

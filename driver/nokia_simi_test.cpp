@@ -64,7 +64,22 @@ private:
 		{0xdc, 0, 3, 3, 0x12, 0x90, 0},
 		{0xb2, 0, 4, 3, 0x12, 0x90, 0},
 		{0xb2, 0, 2, 3, 0x12, 0x90, 0},
-		{0xb2, 0, 3, 3, 0x12, 0x90, 0}
+		{0xb2, 0, 3, 3, 0x12, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f7e, 0x9f, 15}, // Transparent LOCI, 11 bytes.
+		{0xd6, 0, 0, 1, 0x55, 0x90, 0},
+		{0xb0, 0, 0, 1, 0x55, 0x90, 0},
+		{0xb0, 0x80, 0, 1, 0, 0x94, 2}, // Full high offset must not alias zero.
+		{0xd6, 0x80, 0, 1, 0x77, 0x94, 2},
+		{0xb0, 0, 0, 1, 0x55, 0x90, 0},
+		{0xb0, 0xff, 0, 1, 0, 0x94, 2},
+		{0xd6, 0xff, 0, 1, 0x88, 0x94, 2},
+		{0xb0, 0, 0, 1, 0x55, 0x90, 0},
+		{0xd6, 0, 10, 1, 0x66, 0x90, 0},
+		{0xb0, 0, 10, 1, 0x66, 0x90, 0},
+		{0xd6, 0, 11, 1, 0x99, 0x94, 2},
+		{0xb0, 0, 10, 1, 0x66, 0x90, 0},
+		{0xb0, 0, 11, 1, 0, 0x94, 2},
+		{0xb0, 0, 0, 1, 0x55, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -136,8 +151,9 @@ private:
 	{
 		auto const &item = WRITE_CASES[m_write_case];
 		transmit({0xa0, item.ins, item.p1, item.p2, item.length});
-		m_phase = item.ins == 0xb2 ? 30 : 29;
-		m_timer->adjust(attotime::from_msec(item.ins == 0xb2 ? 40 : 5));
+		bool const reading = item.ins == 0xb2 || item.ins == 0xb0;
+		m_phase = reading ? 30 : 29;
+		m_timer->adjust(attotime::from_msec(reading ? 40 : 5));
 	}
 	void transmit_write_body()
 	{
@@ -379,9 +395,9 @@ private:
 		case 30:
 		{
 			auto const &item = WRITE_CASES[m_write_case];
-			if (item.ins == 0xb2 && item.sw1 == 0x90)
+			if ((item.ins == 0xb2 || item.ins == 0xb0) && item.sw1 == 0x90)
 			{
-				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == 0xb2 &&
+				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == item.ins &&
 					m_bytes[m_count - 2] == 0x90 && m_bytes[m_count - 1] == 0, "record-write readback response");
 				for (unsigned i = 1; i <= item.length; ++i)
 					expect(m_bytes[i] == u8(item.body), "record-write readback contents");
@@ -396,9 +412,11 @@ private:
 			}
 			if (m_write_case == 8) save_checkpoint();
 			if (m_write_case == 9) restore_checkpoint();
+			if (m_write_case == 29)
+				osd_printf_info("SIM record updates: PASS cases=30 linear_mutation=1 failure_preservation=1 state_restore=1 cyclic_previous_only=1 handset_claim=0\n");
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
-			osd_printf_info("SIM record updates: PASS cases=30 linear_mutation=1 failure_preservation=1 state_restore=1 cyclic_previous_only=1 handset_claim=0\n");
+			osd_printf_info("SIM binary offsets: PASS cases=14 full_high_byte=1 failed_write_preserves_data=1 boundary_readback=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}
