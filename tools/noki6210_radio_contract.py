@@ -97,6 +97,22 @@ def verify(image):
         0x2e2e62: ('adds', 'r5, r0, #0'),
         0x2e2e66: ('bl', '#0x3c2c90'),
         0x2e2e6c: ('strh', 'r5, [r4]'),
+        0x2e6da2: ('bl', '#0x2e36fc'),
+        0x2e6da6: ('cmp', 'r0, #1'),
+        0x2e6da8: ('beq', '#0x2e6e18'),
+        0x2e6e18: ('adr', 'r0, #0x3a8'),
+        0x2e6e2e: ('ldr', 'r0, [pc, #0x380]'),
+        0x2e6e30: ('bl', '#0x2e2e60'),
+        0x2e6ec0: ('adr', 'r0, #0x114'),
+        0x2e6ee2: ('ldr', 'r0, [pc, #0x3bc]'),
+        0x2e6ee4: ('bl', '#0x2e2e60'),
+        0x2e374c: ('adds', 'r0, r4, #0'),
+        0x2e374a: ('movs', 'r4, #1'),
+        0x2e371a: ('bl', '#0x414a58'),
+        0x2e3720: ('bl', '#0x4148ac'),
+        0x2e3724: ('ldr', 'r0, [pc, #0xa4]'),
+        0x2e372c: ('cmp', 'r1, r2'),
+        0x2e372e: ('bne', '#0x2e374a'),
         0x2e2f08: ('b', '#0x2e2ef8'),
         0x2e2ef8: ('adds', 'r1, r4, #0'),
         0x2e2efa: ('bl', '#0x3c22c0'),
@@ -143,7 +159,9 @@ def verify(image):
             raise ValueError(f'own acquisition contract differs at {address:x}')
     for address, value in {0x315540: 0x3ea, 0x315548: 0x7d4,
                            0x315554: 0x7d2, 0x2a0b54: 0x9c6,
-                           0x2a0944: 0x7d4, 0x2a094c: 0x7d2}.items():
+                           0x2a0944: 0x7d4, 0x2a094c: 0x7d2,
+                           0x2e71b0: 0x9c6, 0x2e72a0: 0x9c8,
+                           0x2e37cc: 0x16fe90}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',

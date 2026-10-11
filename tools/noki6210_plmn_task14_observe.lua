@@ -80,6 +80,43 @@ local dispatcher_tap = space:install_read_tap(0x29ffb8, 0x29ffbb,
             cpu.state['R0'].value, cpu.state['R1'].value,
             cpu.state['R14'].value, time))
     end)
+local decision_taps = {}
+for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c}) do
+    local hits = 0
+    decision_taps[#decision_taps + 1] = space:install_read_tap(pc & ~3, (pc & ~3) + 3,
+        'plmn_decision_' .. pc, function(address)
+            if address ~= (pc & ~3) or cpu.state['PC'].value ~= pc or hits >= 12 then return end
+            hits = hits + 1
+            machine:logerror(string.format(
+                'plmn_decision: pc=%08x r0=%08x r4=%08x t=%.9f\n',
+                pc, cpu.state['R0'].value, cpu.state['R4'].value, machine.time:as_double()))
+            if not busy and (pc == 0x2e374a or pc == 0x2e374c) then
+                local stack = cpu.state['R13'].value
+                if stack >= 0x100000 and stack + 12 < 0x180000 then
+                    busy = true
+                    local stored = space:read_u16(0x16fe90)
+                    local first = space:read_u16(stack + 4)
+                    local second = space:read_u16(stack + 8)
+                    busy = false
+                    machine:logerror(string.format(
+                        'plmn_compare_pairs: pc=%08x stored=%04x first=%04x second=%04x t=%.9f\n',
+                        pc, stored, first, second, machine.time:as_double()))
+                end
+            end
+        end)
+end
+local constructors = 0
+local constructor_tap = space:install_read_tap(0x2e2e60, 0x2e2e63,
+    'plmn_input_constructor', function(address)
+        if address ~= 0x2e2e60 or cpu.state['PC'].value ~= 0x2e2e60
+            or constructors >= 24 then return end
+        local status = cpu.state['R0'].value
+        if status ~= 0x9c6 and status ~= 0x9c8 then return end
+        constructors = constructors + 1
+        machine:logerror(string.format(
+            'plmn_input_constructor: status=%08x caller=%08x t=%.9f\n',
+            status, cpu.state['R14'].value, machine.time:as_double()))
+    end)
 local translations = 0
 local translator_tap = space:install_read_tap(0x2a086c, 0x2a086f,
     'plmn_input_translator', function(address)
@@ -103,4 +140,5 @@ local selection_tap = space:install_read_tap(0x2a0604, 0x2a0607,
 _G.plmn_task14_census_observer = {
     tap = tap, publisher_tap = publisher_tap, switch_tap = switch_tap,
     input_taps = input_taps, dispatcher_tap = dispatcher_tap,
-    selection_tap = selection_tap, translator_tap = translator_tap}
+    selection_tap = selection_tap, translator_tap = translator_tap,
+    constructor_tap = constructor_tap, decision_taps = decision_taps}

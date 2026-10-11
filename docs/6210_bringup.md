@@ -426,12 +426,27 @@ pinned, and runtime confirms the arguments, not just the resulting statuses.
 The original task-17 posts occur at 10.134729462/10.083616538 seconds.
 Evidence: `tmp/6210-plmn-{dispatcher,translator,upstream-post}-{national,international}/error.log.gz`.
 The dispatcher observer's 9–11-second window is bounded research instrumentation.
-Constructor `2e2e60` copies its R0 argument into the allocated header;
-the remaining choice is therefore upstream of this constructor, not in the
-post primitive. Current unresolved boundary: which caller supplies `09c8`
-versus `09c6` to `2e2e60` before the task-17 post through `2e2efa`.
-Numeric status semantics remain unproven;
-no missing DSP response or operational roaming contract is established.
+Constructor `2e2e60` copies its R0 argument into the allocated header.
+Its observed callers are national `2e6ee4` (`09c8`) and foreign `2e6e30`
+(`09c6`). The earlier helper `2e36fc` returns 0/1 respectively at
+`2e6da6`; the foreign result takes `2e6e18`, while national reaches
+`2e6ec0`. The helper compares stored bytes at `16fe90` against two pairs
+returned by `414a58` and `4148ac`:
+
+| Control | Stored Pair | First Pair | Second Pair | Helper Result |
+| --- | --- | --- | --- | ---: |
+| National | `00f1` | `00f1` | `00f1` | 0 |
+| Foreign | `13f0` | `00f1` | `00f1` | 1 |
+
+The foreign mismatch branch `2e374a` and national return `2e374c` are
+observed. This supports an identity/country comparison interpretation,
+but the fields' complete semantic contract is not yet recovered. The
+different status is therefore explained by an actual pair mismatch, not
+an absent parser result or guessed DSP reply.
+Evidence: `tmp/6210-plmn-{constructor,decision,compare-pairs}-{national,international}/error.log.gz`.
+Current unresolved boundary: the mismatch continuation's expected next
+selection action and completion. No operational international-roaming
+contract is established by these observations.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
