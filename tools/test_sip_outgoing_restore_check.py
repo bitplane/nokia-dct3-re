@@ -133,6 +133,24 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
                     self.check(log=log, remote='state changed to CONFIRMED\n',
                                connected=True, product=product)
 
+    def test_8890_connected_signaling_restore_has_no_media_or_redial(self):
+        log = LOG.replace('5551234', '1234567').replace(
+            '03450401a05e0581551532f4150101', '03450401a05e0581214365f7150101')
+        log = log.replace('sip_state: saved',
+            'gsm_call_adapter: state id=1 epoch=1 phase=connected\nsip_state: saved')
+        log = log.replace('termination id=1 cause=41 result=accepted\noutgoing termination consumed id=1 cause=41',
+            'outgoing termination consumed id=1 cause=41\ntermination id=1 cause=41 result=accepted')
+        bridge = BRIDGE + 'SIP epoch media discarded {"uplink": 0}\n'
+        remote = 'state changed to CONFIRMED\nRequest msg BYE/\n'
+        result = self.check(log=log, bridge=bridge, remote=remote, connected=True,
+                            product='8890', signaling_only=True)
+        self.assertIn('"speech_tested": false', result)
+        for bad_bridge in (bridge.replace('"uplink": 0', '"uplink": 1'),
+                           bridge + 'SIP dial identity=(2, 1)\n'):
+            with self.assertRaises(RuntimeError):
+                self.check(log=log, bridge=bad_bridge, remote=remote, connected=True,
+                           product='8890', signaling_only=True)
+
     def test_missing_real_cancel_is_rejected(self):
         with self.assertRaises(RuntimeError):
             self.check(remote=REMOTE.replace('Request msg CANCEL/', ''))

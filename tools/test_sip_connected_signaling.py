@@ -79,7 +79,7 @@ class ConnectedSignalingTest(unittest.TestCase):
     def test_8890_signaling_scope_rejects_restoration_and_media(self):
         with tempfile.TemporaryDirectory() as directory:
             ready = str(Path(directory) / 'not-yet-captured.png')
-            for options in (['--restore-outgoing'], ['--restore-call'], ['--record-media'],
+            for options in (['--incoming', '--restore-outgoing'], ['--restore-call'], ['--record-media'],
                             ['--calls', '2'], ['--incoming', '--restore-call', '--ready-file', ready]):
                 with self.subTest(options=options), \
                         patch('sys.argv', ['gate', '--pjsua', 'unused', '--run-dir', 'unused',

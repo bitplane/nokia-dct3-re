@@ -572,7 +572,7 @@ complete CC/RR release with product-owned configuration bodies and resumed
 paging. Reviewed pre/post idle pixels and persistent laboratory SIM location
 must hold. Zero bridge uplink and no HLE codec tick are required; remote PCM
 reception remains a host-side observation, not handset playback. Recording,
-connected restoration and native speech remain unproved for this product.
+connected-incoming restoration and native speech remain unproved for this product.
 
 `verify-8890-sip-incoming-connected-signaling` captures fresh registered
 idle at 45 seconds after physical clock/date settlement, then admits caller
@@ -583,6 +583,16 @@ reviewed pre/post idle pixels and persistent SIM location. The original
 identity's unique Answer precedes SIP confirmation. Zero bridge uplink and
 no HLE codec ticks keep this signaling-only; remote PCM reception is not
 handset playback, and no unsupported PCM clock is enabled.
+
+`verify-8890-sip-connected-outgoing-restore` separately saves a physically
+dialed `1234567` call at 32 seconds after real SIP-200 and handset connection.
+Exact R15/R13/RAM/time restoration invalidates the external dialog with BYE,
+then requires one cause-41 clear, complete CC/RR release, own carrier-60
+traffic/release configuration and confirmation, resumed paging and reviewed
+idle recovery. Persistent SIM location remains checked. The bridge publishes
+old-epoch media counters before resetting them; zero uplink and no HLE codec
+ticks are mandatory. The dialog is cleared, not saved or redialed, and
+neither native DSP completion nor speech is established.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:
