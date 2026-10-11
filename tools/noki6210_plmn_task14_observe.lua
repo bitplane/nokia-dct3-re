@@ -6,6 +6,29 @@ local space = cpu.spaces['program']
 local busy, posts, inputs = false, 0, 0
 local controller_posts = 0
 local input_taps, watched = {}, {}
+local owner_taps, owner_watched = {}, {}
+local owner_pointer_tap = space:install_write_tap(0x1711dc, 0x1711df,
+    'plmn_controller_owner', function(address, value, mask)
+        if address ~= 0x1711dc or mask ~= 0xffffffff then return end
+        local owner = value & 0xffffffff
+        if owner < 0x100000 or owner + 4 >= 0x180000 or owner_watched[owner] then return end
+        owner_watched[owner] = true
+        machine:logerror(string.format('plmn_controller_owner: owner=%08x pc=%08x t=%.9f\n',
+            owner, cpu.state['PC'].value, machine.time:as_double()))
+        local writes = 0
+        owner_taps[#owner_taps + 1] = space:install_write_tap(owner, owner + 3,
+            'plmn_controller_state_' .. owner, function(offset, data, lanes)
+                if busy or offset ~= owner or writes >= 24 then return end
+                busy = true
+                local current = space:read_u32(0x1711dc)
+                busy = false
+                if current ~= owner then return end
+                writes = writes + 1
+                machine:logerror(string.format(
+                    'plmn_controller_state_write: owner=%08x value=%08x mask=%08x pc=%08x t=%.9f\n',
+                    owner, data, lanes, cpu.state['PC'].value, machine.time:as_double()))
+            end)
+    end)
 local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
     'plmn_task14_census', function(address)
         if busy or address ~= 0x3c22c0 or cpu.state['PC'].value ~= 0x3c22c0 then return end
@@ -218,6 +241,7 @@ local selection_tap = space:install_read_tap(0x2a0604, 0x2a0607,
             cpu.state['R5'].value, cpu.state['R4'].value, machine.time:as_double()))
     end)
 _G.plmn_task14_census_observer = {
+    owner_pointer_tap = owner_pointer_tap, owner_taps = owner_taps,
     tap = tap, publisher_tap = publisher_tap, switch_tap = switch_tap,
     input_taps = input_taps, dispatcher_tap = dispatcher_tap,
     selection_tap = selection_tap, translator_tap = translator_tap,

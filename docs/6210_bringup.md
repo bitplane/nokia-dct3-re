@@ -568,6 +568,19 @@ This establishes a concrete unsatisfied MCU state predicate, not its
 meaning or a justified state replacement; observe its actual writers
 and lifecycle next. Evidence:
 `tmp/6210-plmn-controller-guard-{national,international}/error.log.gz`.
+An ownership-following write watch observes allocation/publication of
+object `102754` at 3.687860846 s in both controls, then its zero
+initialization. Both subsequently reach value 4: national at
+10.328670769 s, foreign at 10.323930000 s (reported callback PC `38b790`).
+Foreign then resets it to zero at 10.614832385 and 10.615582846 s
+(reported PC `38b514`), and writes 1 at 10.616167615 s (reported PC
+`2d1074`). These are firmware writes, not a missing initial state-4
+publication. Own-ROM stores are pinned at `38b516` (zero initialization),
+`38b792` (computed state) and `2d1074` (literal 1); callback PC is not
+assumed identical to the store's address. A later national zero write
+is reported inside `3c2aca`; its allocator/lifetime meaning is not yet
+classified and must not be treated as a controller transition by default.
+Evidence: `tmp/6210-plmn-controller-writers-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
