@@ -11,7 +11,7 @@ local input = coroutine.create(function()
         machine:logerror('5210_pin_physical: key=' .. name .. '\n')
         local field = key(name)
         field:set_value(1)
-        assert(emu.wait(0.15))
+        assert(emu.wait(_G.noki5210_pin_duration or 0.15))
         field:set_value(0)
         assert(emu.wait(_G.noki5210_pin_gap or 0.2))
     end

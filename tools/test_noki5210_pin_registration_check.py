@@ -3,7 +3,7 @@ import contextlib
 import io
 from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
-from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late, verify_pin_sms, verify_pin_idle_state
+from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late, verify_pin_sms, verify_pin_idle_state, verify_pin_outgoing_sms
 
 
 def complete():
@@ -16,6 +16,28 @@ def complete():
 
 
 class PinRegistrationTest(unittest.TestCase):
+    def test_outgoing_sms_requires_exact_submit_and_physical_composition(self):
+        menu = '5210_pin_physical: key=Left Softkey / Menu'
+        text = '\n'.join(('SIM status ins=20 sw=9000',) + (menu,) * 3 + (
+            '5210_pin_physical: key=Keypad 2',) + (menu,) * 2 + tuple(
+            '5210_pin_physical: key=Keypad ' + digit for digit in '5551234') + (
+            menu, 'GSM service establish sapi=0 pd=05 message=24 length=16',
+            'TX packet type=1b data=00800d3f01',
+            'GSM service uplink sapi=3 pd=09 message=01 length=27 data=390118000100069121436587090d11010781551532f40000a70161',
+            'gsm_sms_submit: cp=39 rp=01 smsc=1234567890 destination=5551234 alphabet=0 user_length=1 outcome=0 status_report=0',
+            'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2',
+            'GSM service downlink kind=18 sapi=3 pd=09 message=01 length=5',
+            'GSM service uplink sapi=3 pd=09 message=04 length=2 data=3904',
+            'LAPDm service Channel Release acknowledged nr=2',
+        ))
+        verify_pin_outgoing_sms(text)
+        for old, new in (('a70161', 'a70162'), ('user_length=1', 'user_length=2'),
+                         ('key=Keypad 5', 'key=Keypad 6'), ('downlink kind=18', 'downlink kind=19')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_pin_outgoing_sms(text.replace(old, new))
+        with self.assertRaisesRegex(ValueError, 'expected one'):
+            verify_pin_outgoing_sms(text + '\ngsm_sms_submit: duplicate')
+
     def test_checker_rejects_mixed_scenarios_before_reading_evidence(self):
         from tools.noki5210_pin_registration_check import main
         with patch('sys.argv', ['checker', 'missing-run', '--outgoing-call', '--idle-state']), \

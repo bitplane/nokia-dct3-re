@@ -65,8 +65,10 @@ identical notification pixels and physical post-load Read, with the existing
 message-body oracle and persistent SIM read status.
 `verify-5210-pin-outgoing-call` adds physical dialling, exact called-party
 SETUP, connection and physical End release with pinned idle recovery. It is
-laboratory HLE signaling; PIN-enabled outgoing SMS and host/SIP composition
-remain separate coverage.
+laboratory HLE signaling. `verify-5210-pin-outgoing-sms` adds physical `a`
+composition for `5551234`, exact one-character SMS-SUBMIT, CP/RP/RR closure
+and reviewed composer/`Message sent` pixels. PIN-enabled host/SIP composition
+and outgoing-transaction restoration remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record
 consumer before accepted delayed PIN; no random access follows within 45 s.

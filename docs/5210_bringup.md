@@ -181,8 +181,17 @@ handset Connect Acknowledge, physical End, CC/RR release and exact idle
 recovery. Its traffic/release headers are explicitly the coherent PIN variant;
 the original outgoing gate continues to require its own different headers.
 The default laboratory session supplies the remote party. This does not prove
-PIN-enabled host/SIP composition or native speech. PIN-enabled outgoing SMS
-remains a separate acceptance item.
+PIN-enabled host/SIP composition or native speech.
+
+`make verify-5210-pin-outgoing-sms` physically enters Messages after delayed
+PIN, composes the predictive-text character `a`, selects Send and enters
+`5551234`. It requires exactly one complete SMS-SUBMIT
+`390118000100069121436587090d11010781551532f40000a70161`, decoded GSM-7 length
+one, network CP-ACK/RP-ACK, handset final CP-ACK and service RR release.
+Reviewed composer and `Message sent` frames are exact pixel oracles. The
+transaction uses the coherent laboratory network; no editor contents or
+message bytes are injected. This does not establish PIN-enabled host SMS
+submission or outgoing-transaction save-state replay.
 
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.

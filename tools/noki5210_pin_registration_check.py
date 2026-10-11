@@ -73,6 +73,22 @@ def verify_pin_sms(text, card, state=False):
     ))
 
 
+def verify_pin_outgoing_sms(text):
+    from tools.radio_outgoing_sms_product_trace_check import CHECKPOINTS
+    from tools.radio_call_lifecycle_common import require_ordered
+    require_ordered(text, CHECKPOINTS, 'NSM-5 PIN-enabled outgoing SMS')
+    menu = '5210_pin_physical: key=Left Softkey / Menu'
+    require_in_order(text, ('SIM status ins=20 sw=9000',) + (menu,) * 3 + (
+        '5210_pin_physical: key=Keypad 2',) + (menu,) * 2 + tuple(
+        '5210_pin_physical: key=Keypad ' + digit for digit in '5551234') + (
+        menu,
+        'GSM service uplink sapi=3 pd=09 message=01 length=27 data=390118000100069121436587090d11010781551532f40000a70161',
+        'gsm_sms_submit: cp=39 rp=01 smsc=1234567890 destination=5551234 alphabet=0 user_length=1 outcome=0 status_report=0',
+    ))
+    if text.count('gsm_sms_submit:') != 1:
+        raise ValueError('expected one PIN-enabled outgoing SMS')
+
+
 def verify_pin_idle_state(text, call=False, sms=False):
     entries = re.findall(r'5210_pin_state: event=(saved|restored) pc=([0-9a-f]{8}) '
                          r'sp=([0-9a-f]{8}) ram=([0-9a-f]{8}) t=([0-9.]+)', text)
@@ -156,12 +172,16 @@ def main():
                         help='restore delivered SMS before physical Read and persistent status update')
     mode.add_argument('--outgoing-call', action='store_true',
                         help='verify physical dialling after coherent delayed PIN')
+    mode.add_argument('--outgoing-sms', action='store_true',
+                        help='verify physical SMS composition after coherent delayed PIN')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call else verify)(text, card)
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms else verify)(text, card)
+        if args.outgoing_sms:
+            verify_pin_outgoing_sms(text)
         if args.outgoing_call:
             from tools.radio_5210_outgoing_call_trace_check import verify as outgoing_call
             require_in_order(text, ('SIM status ins=20 sw=9000',) + tuple(
@@ -189,7 +209,10 @@ def main():
                                    '5210_pin_state: event=saved',
                                    '5210_pin_state_physical: key=End'))
             call_lifecycle(text, coherent_pin=True, require_state_roundtrip=True)
-        frames = ({'entered': FRAMES['entered'], 'idle': FRAMES['idle'], 'recovered': FRAMES['recovered']} if args.outgoing_call else
+        frames = ({'entered': FRAMES['entered'],
+                   'sms_composed': 'f38afdd41fe1284a3f5f1e2e4ca3876c7ad9cc63e0ab6802be72d3a1f24bb3d4',
+                   'sms_sent': '1eda22f78cde69cd4f9add1c90732b07254f3742ade7aede18cb818219712a78'} if args.outgoing_sms else
+                  {'entered': FRAMES['entered'], 'idle': FRAMES['idle'], 'recovered': FRAMES['recovered']} if args.outgoing_call else
                   {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered']} if args.call_state else
                   {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'state_menu': '19b7a982404067d7ff58d584949b7c6aa3d322cf64215f5877d604f5b6e2ef16'} if args.idle_state else
@@ -205,7 +228,8 @@ def main():
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 PIN-enabled physical outgoing-call lifecycle PASS; HLE signaling, not native speech' if args.outgoing_call else
+    print('5210 PIN-enabled physical outgoing SMS and Message sent PASS; research HLE' if args.outgoing_sms else
+          '5210 PIN-enabled physical outgoing-call lifecycle PASS; HLE signaling, not native speech' if args.outgoing_call else
           '5210 PIN-enabled delivered-SMS restoration and persistent physical Read PASS; research HLE' if args.sms_state else
           '5210 PIN-enabled active-call restoration and physical release PASS; HLE signaling, not native speech' if args.call_state else
           '5210 PIN-authenticated exact idle restoration and physical continuation PASS; research HLE' if args.idle_state else

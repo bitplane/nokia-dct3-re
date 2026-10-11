@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--scenario', choices=('toolkit-interactive', 'pin-registration',
                                              'late-pin-boundary', 'late-pin-registration',
-                                             'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state', 'pin-sms-state', 'pin-outgoing-call'),
+                                             'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state', 'pin-sms-state', 'pin-outgoing-call', 'pin-outgoing-sms'),
                         default='toolkit-interactive')
     parser.add_argument('--observe-readiness', action='store_true',
                         help='passively observe own context roots during the early-PIN control')
@@ -73,6 +73,8 @@ def main():
             script = 'noki5210_pin_sms_state.lua'
         if args.scenario == 'pin-outgoing-call':
             script = 'noki5210_pin_outgoing_call.lua'
+        if args.scenario == 'pin-outgoing-sms':
+            script = 'noki5210_pin_outgoing_sms.lua'
         checker = 'noki5210_pin_registration_check.py' if pin else 'noki5210_toolkit_interactive_check.py'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'noki5210',
                    '-bios', '540e', '-rompath', str(root / 'roms'), '-cfg_directory', 'cfg',
@@ -80,7 +82,7 @@ def main():
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / script),
-                   '-seconds_to_run', '60' if args.scenario == 'pin-outgoing-call' else '55' if args.scenario == 'pin-call-state' else '45' if pin else '65']
+                   '-seconds_to_run', '70' if args.scenario == 'pin-outgoing-sms' else '60' if args.scenario == 'pin-outgoing-call' else '55' if args.scenario == 'pin-call-state' else '45' if pin else '65']
         with (run / 'console.log').open('w') as console:
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         subprocess.run([sys.executable, str(root / 'tools' / checker),
@@ -91,7 +93,8 @@ def main():
                                      ['--idle-state'] if args.scenario == 'pin-idle-state' else
                                      ['--call-state'] if args.scenario == 'pin-call-state' else
                                      ['--sms-state'] if args.scenario == 'pin-sms-state' else
-                                     ['--outgoing-call'] if args.scenario == 'pin-outgoing-call' else []), check=True)
+                                     ['--outgoing-call'] if args.scenario == 'pin-outgoing-call' else
+                                     ['--outgoing-sms'] if args.scenario == 'pin-outgoing-sms' else []), check=True)
     except (OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 
