@@ -30,4 +30,20 @@ local publisher_tap = space:install_read_tap(0x3cc660, 0x3cc663,
             'plmn_status_publisher: status=%04x caller=%08x t=%.9f\n',
             status, cpu.state['R14'].value, machine.time:as_double()))
     end)
-_G.plmn_task14_census_observer = {tap = tap, publisher_tap = publisher_tap}
+local switches = 0
+local switch_tap = space:install_read_tap(0x3151d8, 0x3151db,
+    'plmn_status_switch', function(address)
+        if busy or address ~= 0x3151d8 or cpu.state['PC'].value ~= 0x3151da
+            or switches >= 12 then return end
+        local stack = cpu.state['R13'].value
+        if stack < 0x100000 or stack + 12 >= 0x180000 then return end
+        busy = true
+        local input = space:read_u32(stack + 8)
+        busy = false
+        switches = switches + 1
+        machine:logerror(string.format(
+            'plmn_status_switch: input=%08x context=%08x t=%.9f\n',
+            input, cpu.state['R4'].value, machine.time:as_double()))
+    end)
+_G.plmn_task14_census_observer = {
+    tap = tap, publisher_tap = publisher_tap, switch_tap = switch_tap}

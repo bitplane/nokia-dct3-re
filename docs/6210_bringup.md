@@ -395,8 +395,16 @@ at stack offset 8: `07d4` selects `315234 -> 03ec`, while `07d2` selects
 `315256 -> 03ea`. Instructions and pool literals are pinned by the radio
 contract checker. This maps the publication back to an earlier numeric
 input; the meaning and origin of `07d2/07d4` remain unresolved, and the
-saved input has not yet been runtime-observed.
+saved input is confirmed by a passive switch observation: at `3151da`,
+national input is `000007d4` (10.136371231 seconds), international input
+is `000007d2` (10.085288308 seconds), with R4 context `169be8` in both.
+An earlier shared input `07d3` is also observed in both controls.
+The own-ROM path `315070..315078` reads a signed halfword at R6 and
+stores it into this saved stack slot before entering the switch's enclosing
+tail. This identifies a candidate message-header source, not a closed
+producer census or runtime proof that this store supplied these two values.
 Evidence: `tmp/6210-plmn-publisher-{national,international}/error.log.gz`.
+Switch evidence: `tmp/6210-plmn-switch-{national,international}/error.log.gz`.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
