@@ -1211,7 +1211,7 @@ original `CCS_Scripting_Com.dll` with 32-bit `regsvr32.exe` makes its public
 Version 1.52**. Its documented `CCSOpen(0x54, 0, 0, 1, 0)` call then fails
 with a CreateInstance automation error `0x80040154` rather than returning
 a board/CPU identity. Wine also reports an unsupported interface on
-`CodeComposerSetup.SystemSetup` (`{3620D2F0-F091-11D1-8BE4-0020182ABDCA}`);
+`CodeComposerSetup.SystemSetup` (class `{3620D2F0-F091-11D1-8BE4-0020182ABDCA}`);
 the 32-bit class registration exists and points to the installed
 `cc_setup.exe`. This does not establish that this class alone causes the
 failure. No target instruction, timer fixture or pipeline mode has executed.
@@ -1235,13 +1235,33 @@ does not prove a missing board configuration. Opening the application after
 that saved configuration still fails. The setup server's own `/RegServer`
 entry point also exits zero without resolving application initialization.
 
-A reversible isolated-prefix trial exported the original class registration
-and removed only its default `InprocHandler32` entry. The application still
-reports the same unsupported interface/failure; the original registration
-was restored. Do not repeat that handler-entry trial or claim it establishes
-a working simulator. No vendor binary or generated board database was
-patched. A different compatibility environment or a working direct
-application API is required before this route can provide timing evidence.
+The failed interface request is `IOleObject`, IID
+`{00000112-0000-0000-c000-000000000046}`, not the SystemSetup class ID or
+its custom setup interface (see the
+[Microsoft SDK definition](https://raw.githubusercontent.com/microsoft/win32metadata/main/generation/WinSDK/RecompiledIdlHeaders/um/oleidl.h)).
+The COM trace records `0x80004002` at that request before the scripting
+wrapper reports `0x80040154`.
+
+Reversible controls in a disposable copy of the retained prefix explicitly
+removed `InprocHandler32` first in `/reg:32` alone, then in both registry
+views. Queries verified each removal; both controls reproduced the baseline
+failure and restored the registrations. Installed and administrative copies
+of `cc_setup.exe` and `ccreg.dll` are byte-identical. A fresh direct setup
+control still returns zero for `Clear`, `Import` and `SaveConfig` after
+restoration. The handler-view hypothesis is exhausted; do not repeat it.
+No vendor binary or generated board database was patched. A different
+compatibility environment or a working direct application API is required
+before this route can provide timing evidence.
+
+`tools/ccs33_activation_probe.vbs` is the fail-closed activation control:
+scripting version alone is insufficient; successful opening and nonempty
+board/CPU identities are required. Even its success would establish target
+identity only, not instruction execution or pipeline timing. Stage it in a
+disposable work directory and invoke it through
+`sh tools/run_ccs33_isolated.sh`, never directly against the host prefix.
+The explicit-view controls are retained in
+`tmp/ccs33-interface-{baseline,without32,withoutboth}.log`; the fresh setup
+control is `tmp/ccs33-interface-setup-control.log`.
 
 Retain `full-install-expanded-path.log`, `installed-ide.log`,
 `installed-ide-screen.png`, `run_ccs33_oracle_plugin_msxml_legacy.log`,
