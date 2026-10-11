@@ -239,6 +239,7 @@ async def bridge(args, pj):
     connected = False
     blocked_restore = False
     restored_identity = None
+    restored_direction = None
     registered = False
     completed_calls = 0
     downlink_sequence = 0
@@ -278,6 +279,7 @@ async def bridge(args, pj):
                                 endpoint.hangup()
                                 blocked_restore = event.get('calls_idle') is not True
                                 restored_identity = None
+                                restored_direction = None
                                 connected = False
                                 identity = None
                                 decision = False
@@ -305,6 +307,7 @@ async def bridge(args, pj):
                                     if restored_identity is not None:
                                         continue
                                     restored_identity = incoming_identity
+                                    restored_direction = 'outgoing'
                                     # A pending outgoing request has no call-state
                                     # event yet. Supply the ordinary non-connecting
                                     # decision before its correlated termination.
@@ -328,6 +331,7 @@ async def bridge(args, pj):
                                     if restored_identity is not None:
                                         continue
                                     restored_identity = incoming_identity
+                                    restored_direction = kind.removesuffix('_call_state')
                                     await websocket.send(json.dumps({
                                         'type': kind.replace('_state', '_terminate'), 'epoch': epoch,
                                         'request_id': event['request_id'], 'cause': 41}))
@@ -363,10 +367,12 @@ async def bridge(args, pj):
                                         codec = GsmFrCodec()
                                         endpoint.incoming_enabled = registered and not blocked_restore
                                 if (blocked_restore and event.get('phase') == 'ended' and
-                                        incoming_identity == restored_identity):
+                                        incoming_identity == restored_identity and
+                                        kind == f'{restored_direction}_call_state'):
                                     print(f'SIP restored call cleared identity={incoming_identity}', flush=True)
                                     blocked_restore = False
                                     restored_identity = None
+                                    restored_direction = None
                                     endpoint.incoming_enabled = registered and identity is None
                                     if args.once:
                                         return

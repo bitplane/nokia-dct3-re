@@ -59,6 +59,10 @@ request or resume external media, and clears the handset transaction through
 the correlated non-connecting decision/termination path. A pending request
 needs both messages; an already accepted request needs only termination.
 An explicit idle initial snapshot still permits a fresh outgoing call.
+Restoration release is correlated by direction as well as epoch and request
+ID: an opposite-direction `ended` event cannot clear the guarded transaction.
+Executable loopback tests cover both incoming and outgoing connected initial
+snapshots, repeated state publication, and a fresh call after matched release.
 
 Every host-to-MAME message carries the current `epoch` and a positive
 `request_id`. A restore increments the epoch, invalidates queued host input and

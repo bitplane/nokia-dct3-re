@@ -214,6 +214,52 @@ class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
                 await asyncio.wait_for(sip.bridge(args, None), 3)
         self.assertGreaterEqual(Endpoint.instances[-1].hangups, 1)
 
+    async def test_initial_connected_snapshots_require_direction_matched_release(self):
+        for direction in ('incoming', 'outgoing'):
+            with self.subTest(direction=direction):
+                await self.check_initial_connected_snapshot(direction)
+
+    async def check_initial_connected_snapshot(self, direction):
+        other = 'outgoing' if direction == 'incoming' else 'incoming'
+
+        async def host(socket):
+            async def send(kind, **fields):
+                await socket.send(json.dumps({'type': kind, 'epoch': 4, **fields}))
+
+            await send('call_adapter_ready', protocol_version=1, calls_idle=False)
+            await send('network_state', registered=True)
+            await send(f'{direction}_call_state', request_id=1, phase='connected',
+                       media_downlink_sequence=5)
+            self.assertEqual(json.loads(await asyncio.wait_for(socket.recv(), 2)), {
+                'type': f'{direction}_call_terminate', 'epoch': 4,
+                'request_id': 1, 'cause': 41})
+            # Republished phases and the other direction's same-number release
+            # cannot reopen incoming admission or create a new external dialog.
+            await send(f'{direction}_call_state', request_id=1, phase='connected',
+                       media_downlink_sequence=5)
+            await send(f'{other}_call_state', request_id=1, phase='ended')
+            await send('outgoing_call', request_id=2, digits='456')
+            with self.assertRaises(asyncio.TimeoutError):
+                await asyncio.wait_for(socket.recv(), 0.04)
+            endpoint = Endpoint.instances[-1]
+            self.assertFalse(endpoint.incoming_enabled)
+            self.assertEqual(endpoint.dials, [])
+            await send(f'{direction}_call_state', request_id=1, phase='ended')
+            await send('outgoing_call', request_id=2, digits='456')
+            self.assertEqual(json.loads(await asyncio.wait_for(socket.recv(), 2)), {
+                'type': 'outgoing_call_decision', 'epoch': 4,
+                'request_id': 2, 'decision': 'connect'})
+            await send('outgoing_call_state', request_id=2, phase='ended')
+            await socket.wait_closed()
+
+        with patch.object(sip, 'SipEndpoint', Endpoint), patch.object(sip, 'GsmFrCodec', Codec):
+            async with websockets.serve(host, '127.0.0.1', 0) as server:
+                port = server.sockets[0].getsockname()[1]
+                args = SimpleNamespace(url=f'ws://127.0.0.1:{port}', sip_port=0,
+                    destination='sip:probe@localhost', once=False, calls=1, require_frames=0)
+                await asyncio.wait_for(sip.bridge(args, None), 3)
+        self.assertEqual(Endpoint.instances[-1].dials, [(4, 2)])
+
 
 if __name__ == '__main__':
     unittest.main()
