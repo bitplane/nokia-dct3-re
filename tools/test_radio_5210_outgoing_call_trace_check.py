@@ -27,6 +27,15 @@ PCH no-identity fill channel=60 fn=6309
 
 
 class Radio5210OutgoingCallTraceCheckTest(unittest.TestCase):
+    def test_coherent_pin_uses_own_channel_headers(self):
+        text = GOOD.replace('040002000271012fc1000001', '041202000271012fc1000056').replace(
+            '040000001117001a60000056', '041202001117001a60000056')
+        verify(text, coherent_pin=True)
+        with self.assertRaises(ValueError):
+            verify(text)
+        with self.assertRaises(ValueError):
+            verify(GOOD, coherent_pin=True)
+
     def test_accepts_complete_lifecycle(self):
         verify(GOOD)
 

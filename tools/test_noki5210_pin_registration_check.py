@@ -1,4 +1,6 @@
 import unittest
+import contextlib
+import io
 from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
 from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late, verify_pin_sms, verify_pin_idle_state
@@ -14,6 +16,13 @@ def complete():
 
 
 class PinRegistrationTest(unittest.TestCase):
+    def test_checker_rejects_mixed_scenarios_before_reading_evidence(self):
+        from tools.noki5210_pin_registration_check import main
+        with patch('sys.argv', ['checker', 'missing-run', '--outgoing-call', '--idle-state']), \
+                contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as raised:
+            main()
+        self.assertEqual(raised.exception.code, 2)
+
     def test_pin_idle_requires_exact_restoration_and_continuation(self):
         text = '\n'.join((
             'LAPDm Location Updating Accept acknowledged nr=1',

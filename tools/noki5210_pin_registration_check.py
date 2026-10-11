@@ -139,26 +139,35 @@ def main():
     from PIL import Image
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
-    parser.add_argument('--late-boundary', action='store_true',
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--late-boundary', action='store_true',
                         help='verify the unresolved delayed-readiness boundary, not registration')
-    parser.add_argument('--coherent-late', action='store_true',
+    mode.add_argument('--coherent-late', action='store_true',
                         help='verify delayed PIN with the own ARFCN 86 laboratory topology')
-    parser.add_argument('--incoming-call', action='store_true',
+    mode.add_argument('--incoming-call', action='store_true',
                         help='verify physical Answer/End after coherent delayed-PIN registration')
-    parser.add_argument('--incoming-sms', action='store_true',
+    mode.add_argument('--incoming-sms', action='store_true',
                         help='verify SMS persistence and physical Read after coherent delayed PIN')
-    parser.add_argument('--idle-state', action='store_true',
+    mode.add_argument('--idle-state', action='store_true',
                         help='verify exact PIN-authenticated idle restoration and physical continuation')
-    parser.add_argument('--call-state', action='store_true',
+    mode.add_argument('--call-state', action='store_true',
                         help='verify answered PIN-enabled call restoration and physical End')
-    parser.add_argument('--sms-state', action='store_true',
+    mode.add_argument('--sms-state', action='store_true',
                         help='restore delivered SMS before physical Read and persistent status update')
+    mode.add_argument('--outgoing-call', action='store_true',
+                        help='verify physical dialling after coherent delayed PIN')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state else verify)(text, card)
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call else verify)(text, card)
+        if args.outgoing_call:
+            from tools.radio_5210_outgoing_call_trace_check import verify as outgoing_call
+            require_in_order(text, ('SIM status ins=20 sw=9000',) + tuple(
+                '5210_pin_physical: key=Keypad ' + digit for digit in '5551234') + (
+                '5210_pin_physical: key=Send', '5210_pin_physical: key=End'))
+            outgoing_call(text, coherent_pin=True)
         if args.idle_state or args.call_state or args.sms_state:
             verify_pin_idle_state(text, call=args.call_state, sms=args.sms_state)
             with Image.open(run / 'snap/5210_pin_state_reference.png') as reference, \
@@ -180,7 +189,8 @@ def main():
                                    '5210_pin_state: event=saved',
                                    '5210_pin_state_physical: key=End'))
             call_lifecycle(text, coherent_pin=True, require_state_roundtrip=True)
-        frames = ({'entered': FRAMES['entered'], 'recovered': FRAMES['recovered']} if args.call_state else
+        frames = ({'entered': FRAMES['entered'], 'idle': FRAMES['idle'], 'recovered': FRAMES['recovered']} if args.outgoing_call else
+                  {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered']} if args.call_state else
                   {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'state_menu': '19b7a982404067d7ff58d584949b7c6aa3d322cf64215f5877d604f5b6e2ef16'} if args.idle_state else
                   {'entered': FRAMES['entered'],
@@ -195,7 +205,8 @@ def main():
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 PIN-enabled delivered-SMS restoration and persistent physical Read PASS; research HLE' if args.sms_state else
+    print('5210 PIN-enabled physical outgoing-call lifecycle PASS; HLE signaling, not native speech' if args.outgoing_call else
+          '5210 PIN-enabled delivered-SMS restoration and persistent physical Read PASS; research HLE' if args.sms_state else
           '5210 PIN-enabled active-call restoration and physical release PASS; HLE signaling, not native speech' if args.call_state else
           '5210 PIN-authenticated exact idle restoration and physical continuation PASS; research HLE' if args.idle_state else
           '5210 PIN-enabled persistent incoming SMS and physical Read PASS; research HLE' if args.incoming_sms else

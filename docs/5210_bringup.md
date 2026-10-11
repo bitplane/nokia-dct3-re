@@ -174,6 +174,16 @@ between transport closure and the Read inputs, so saving an already-read
 message cannot substitute for this test. PIN-enabled idle, active-call and
 delivered-SMS restoration are independent gates on the same fixture core.
 
+`make verify-5210-pin-outgoing-call` physically dials `5551234` after delayed
+PIN and coherent registration, then verifies exact called-party SETUP digits,
+CM Service, Call Proceeding, traffic assignment, remote Alerting/Connect,
+handset Connect Acknowledge, physical End, CC/RR release and exact idle
+recovery. Its traffic/release headers are explicitly the coherent PIN variant;
+the original outgoing gate continues to require its own different headers.
+The default laboratory session supplies the remote party. This does not prove
+PIN-enabled host/SIP composition or native speech. PIN-enabled outgoing SMS
+remains a separate acceptance item.
+
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.
 The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a

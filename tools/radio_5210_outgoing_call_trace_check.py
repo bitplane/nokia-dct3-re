@@ -61,8 +61,18 @@ CHECKPOINTS = (
 )
 
 
-def verify(text: str, expected_number: str = "5551234") -> None:
-    require_ordered(text, CHECKPOINTS, "NSM-5 mobile-originated")
+def verify(text: str, expected_number: str = "5551234", *, coherent_pin=False) -> None:
+    checkpoints = list(CHECKPOINTS)
+    if coherent_pin:
+        replacements = {
+            'NSM-5 traffic-channel configuration':
+                r'TX packet type=02 payload=20 .*data=041202000271012fc10000560000000400000000',
+            'NSM-5 release channel transaction':
+                r'TX packet type=02 payload=20 .*data=041202001117001a600000560000001400000001',
+        }
+        checkpoints = [(label, re.compile(replacements[label]) if label in replacements else pattern)
+                       for label, pattern in checkpoints]
+    require_ordered(text, checkpoints, "NSM-5 mobile-originated")
     require_count(
         text, TRAFFIC_ASSIGNMENT, 1,
         "NSM-5 mobile-originated call must contain exactly one traffic assignment")
