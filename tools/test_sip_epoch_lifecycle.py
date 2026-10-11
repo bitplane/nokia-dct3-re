@@ -115,14 +115,21 @@ class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
     async def test_accepted_restored_request_needs_only_termination(self):
         await self.check_restored_request(False)
 
-    async def check_restored_request(self, decision_pending=None):
+    async def test_initial_active_pending_snapshot_is_not_redialed(self):
+        await self.check_restored_request(initial=True)
+
+    async def test_initial_active_accepted_snapshot_needs_only_termination(self):
+        await self.check_restored_request(False, initial=True)
+
+    async def check_restored_request(self, decision_pending=None, initial=False):
         async def host(socket):
             async def send(kind, **fields):
                 await socket.send(json.dumps({'type': kind, **fields}))
 
-            await send('call_adapter_ready', protocol_version=1, epoch=1)
-            await send('outgoing_call', epoch=1, request_id=1, digits='123')
-            await asyncio.wait_for(socket.recv(), 2)
+            if not initial:
+                await send('call_adapter_ready', protocol_version=1, epoch=1)
+                await send('outgoing_call', epoch=1, request_id=1, digits='123')
+                await asyncio.wait_for(socket.recv(), 2)
             await send('call_adapter_ready', protocol_version=1, epoch=2, calls_idle=False)
             await send('outgoing_call', epoch=2, request_id=1, digits='123',
                        decision_pending=decision_pending)
@@ -131,7 +138,7 @@ class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
                 expected = expected[1:]
             replies = [json.loads(await asyncio.wait_for(socket.recv(), 2)) for _ in expected]
             self.assertEqual(replies, expected)
-            self.assertEqual(Endpoint.instances[-1].dials, [(1, 1)])
+            self.assertEqual(Endpoint.instances[-1].dials, [] if initial else [(1, 1)])
             await send('outgoing_call_state', epoch=2, request_id=1,
                        phase='connected', media_downlink_sequence=0)
             with self.assertRaises(asyncio.TimeoutError):
@@ -147,11 +154,18 @@ class SipEpochLifecycleTest(unittest.IsolatedAsyncioTestCase):
                 await asyncio.wait_for(sip.bridge(args, None), 3)
 
     async def test_explicit_idle_snapshot_allows_fresh_call(self):
+        await self.check_idle_snapshot()
+
+    async def test_initial_idle_snapshot_allows_fresh_call(self):
+        await self.check_idle_snapshot(initial=True)
+
+    async def check_idle_snapshot(self, initial=False):
         async def host(socket):
             async def send(kind, **fields):
                 await socket.send(json.dumps({'type': kind, **fields}))
 
-            await send('call_adapter_ready', protocol_version=1, epoch=1)
+            if not initial:
+                await send('call_adapter_ready', protocol_version=1, epoch=1)
             await send('call_adapter_ready', protocol_version=1, epoch=2, calls_idle=True)
             await send('outgoing_call', epoch=2, request_id=2, digits='456')
             decision = json.loads(await asyncio.wait_for(socket.recv(), 2))

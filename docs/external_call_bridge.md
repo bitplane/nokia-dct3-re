@@ -53,6 +53,12 @@ request, pending outgoing request, connected outgoing call or alerting outgoing
 call. It does not assert network registration or availability of other services.
 Hosts lacking this field must not infer idle from a temporary absence of call
 events.
+The SIP bridge treats an explicit non-idle snapshot on its first connection
+the same as an active save-state restore: it does not redial the republished
+request or resume external media, and clears the handset transaction through
+the correlated non-connecting decision/termination path. A pending request
+needs both messages; an already accepted request needs only termination.
+An explicit idle initial snapshot still permits a fresh outgoing call.
 
 Every host-to-MAME message carries the current `epoch` and a positive
 `request_id`. A restore increments the epoch, invalidates queued host input and

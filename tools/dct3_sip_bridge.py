@@ -267,6 +267,11 @@ async def bridge(args, pj):
                         if kind == 'call_adapter_ready':
                             if event.get('protocol_version') != 1:
                                 raise RuntimeError('unsupported host protocol')
+                            if epoch is None:
+                                # A restarted bridge has no external dialog to
+                                # resume. Do not redial an already-active handset
+                                # snapshot merely because this is our first epoch.
+                                blocked_restore = event.get('calls_idle') is False
                             if epoch is not None and epoch != event.get('epoch'):
                                 if identity is not None:
                                     print(f'SIP epoch media discarded {json.dumps(counts)}', flush=True)
