@@ -764,6 +764,24 @@ and bit-25-set controls fail. Evidence is
 The next application boundary is helper `210f5c`'s status dispatch, not a
 missing native response or a forced controller flag.
 
+That dispatch's table selects `2114fc` for `1390`. It loads base `1084a4`,
+increments halfword `+8` and calls getter `27e3b4`; if count exceeds the
+returned limit, `LSRS #5; BHS` tests original bit 4 of byte `+1b` before
+the possible call to `20fbb8`. Fresh zero-input capture reaches `2114fc`
+with count 1, returns from the getter at `211508` with count 2 and limit 1,
+and reaches common return `2115a2` with count 2 and flags `00`.
+The same object/status is preserved at these observation boundaries. This
+establishes the counted, flag-clear return path, not the flag's semantic name,
+its writer closure, or successful acquisition. The neighboring `138f` object
+has a different status-table case and must not substitute for this proof.
+`--consumer-decision` checks the ordered same-object path, increment, bounded
+limit, flag-clear predicate and preserved count/flags at return. Negative
+tests cover missing entries, changed count/limit/flag, wrong object and time.
+Evidence: `tmp/rom4-task10-decision/error.log`, fresh eight-second native boot.
+The remaining MCU-side question is the flag/limit provisioning and the
+`20fbb8` continuation contract; it is independent of obtaining valid RF
+samples. Neither should be forced merely to advance the application.
+
 The isolated cold-control runner is:
 
 ```sh

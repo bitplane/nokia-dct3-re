@@ -49,6 +49,22 @@ taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x211e80, 0x211eff,
             space:read_u32(mcu.state["R4"].value + 0x7c), machine.time:as_double()))
     end)
 local consumer_counter_writes = 0
+local consumer_decision_counts = {}
+taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x2114e0, 0x2115bf,
+    "rf_task10_helper_decision", function(address)
+        local pc = mcu.state["PC"].value
+        if pc ~= 0x2114fc and pc ~= 0x211508 and pc ~= 0x21152a and pc ~= 0x2115a2 then return end
+        if address ~= (pc & ~3) then return end
+        consumer_decision_counts[pc] = (consumer_decision_counts[pc] or 0) + 1
+        if consumer_decision_counts[pc] > 16 then return end
+        local space = mcu.spaces["program"]
+        local object = mcu.state["R8"].value
+        if object < 0x100000 or object >= 0x180000 then return end
+        machine:logerror(string.format(
+            "rom4_rf_task10_decision: pc=%08x object=%08x status=%04x count=%04x flags=%02x r0=%08x t=%.9f\n",
+            pc, object, space:read_u16(object), space:read_u16(0x1084ac),
+            space:read_u8(0x1084bf), mcu.state["R0"].value, machine.time:as_double()))
+    end)
 local consumer_helper_calls = 0
 taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x210f40, 0x210f9f,
     "rf_task10_consumer_helper", function(address)

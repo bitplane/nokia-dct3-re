@@ -16,6 +16,27 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_status_handler_count_limit_and_flag_return(self):
+        effects = ('rom4_rf_task10_consumer: pc=00211eb0 object=00101438 status=1390 control=80000000 t=1.7\n'
+                   'rom4_rf_task10_counter: pc=00211ec4 address=0010fee0 value=162f0000 mask=ffff0000 t=1.8\n'
+                   'rom4_rf_task10_helper: pc=00210f5c object=00101438 status=1390 caller=00211ed3 t=1.9\n')
+        decisions = ''.join(f'rom4_rf_task10_decision: pc={pc} object=00101438 '
+            f'status=1390 count={count} flags=00 r0=00000001 t={time}\n'
+            for pc, count, time in (('002114fc', '0001', '2.0'),
+                                   ('00211508', '0002', '2.1'),
+                                   ('002115a2', '0002', '2.2')))
+        text = TRACE + effects + decisions
+        self.assertEqual(check(text, consumer_decision=True), ('00101438', '006d'))
+        for changed in (text.replace('count=0002', 'count=0003'),
+                        text.replace('flags=00', 'flags=10'),
+                        text.replace('r0=00000001 t=2.1', 'r0=00000002 t=2.1'),
+                        text.replace('r0=00000001 t=2.1', 'r0=00010000 t=2.1'),
+                        text.replace('pc=002115a2 object=00101438', 'pc=002115a2 object=00101480'),
+                        text.replace('t=2.2', 't=1.8'),
+                        text.replace('pc=00211508', 'pc=0021150a')):
+            with self.subTest(text=changed), self.assertRaises(ValueError):
+                check(changed, consumer_decision=True)
+
     def test_consumer_effects_preserve_identity_and_order(self):
         case = ('rom4_rf_task10_consumer: pc=00211eb0 object=00101438 '
                 'status=1390 control=80000000 t=1.7\n')
