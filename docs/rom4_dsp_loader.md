@@ -967,6 +967,23 @@ fixture. It localizes the observed difference before the type-`1a` DSP
 dispatch; audit the MCU request's timer/lifecycle scheduling next rather
 than assuming the RF totals identify a DSP instruction defect.
 
+The current MCU predecessor is observed, not inferred from a packet label.
+`tools/c54x_rom4_scan_schedule.lua` is a capped passive NSE-1 v5.30
+instrument (use as the isolated run's `-autoboot_script`). A fresh eight-second
+run reaches caller `211548` with R0=`2` and task-object header `03e9` at
+`1.549555769` and `6.414681692` seconds. Both enter builder `20fc94`
+with return address `21154d`. The late invocation takes branch `20fe38`
+at `6.417569308`: the ROM sets object byte 5 bit 0 and clears 63 bytes
+from object + 7, matching the late `001198` packet. Timer/control helper
+`269390` is called with R0=`4400`, R1=`108427`, return address `20ff61`
+after each builder. Its semantics are not established by that register
+snapshot. Evidence: `tmp/rf-scan-schedule-headers/error.log`.
+Resolve the second `03e9` object's publication/delivery and its scheduling
+dependency next; neither these taps nor the packet commit identifies its
+upstream timer owner. The instrument reads only CPU registers and the
+known ordinary-RAM task header, writes no firmware state, and is not a
+new handset acceptance gate.
+
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free
 instruction cases write PRD `1234`, reload with TSS set and each TDDR value,
