@@ -581,6 +581,15 @@ assumed identical to the store's address. A later national zero write
 is reported inside `3c2aca`; its allocator/lifetime meaning is not yet
 classified and must not be treated as a controller transition by default.
 Evidence: `tmp/6210-plmn-controller-writers-{national,international}/error.log.gz`.
+Reset wrapper `38b5c6` calls zero-initializer `38b502`, then `38b588`
+with its saved input. Paired entry observations show input 3 from caller
+LR `2d42d9` at 3.687833846 s in both controls. Only foreign boot calls
+it again: input 3 from LR `2d0b3b` at 10.614830077 s and LR `2d0cd7`
+at 10.615580538 s, immediately preceding the two observed zero writes.
+The corresponding own-ROM BL sites are `2d42d4`, `2d0b36` and `2d0cd2`.
+Trace the latter two entry conditions rather than treating state 1 as
+a missing DSP publication. Evidence:
+`tmp/6210-plmn-controller-reset-call-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

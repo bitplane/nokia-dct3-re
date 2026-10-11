@@ -124,7 +124,7 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
                     0x2e4e62, 0x2e4e70, 0x2e6e68, 0x2a31ca, 0x2a3948,
                     0x2d1118, 0x2d111a, 0x4cfdd4, 0x313218,
                     0x2d0d50, 0x2d1048, 0x2d2952, 0x2d2528, 0x2d0ee4,
-                    0x2d0f6e}) do
+                    0x2d0f6e, 0x38b5c6, 0x2d1068}) do
     local hits = 0
     decision_taps[#decision_taps + 1] = space:install_read_tap(pc & ~3, (pc & ~3) + 3,
         'plmn_decision_' .. pc, function(address)
@@ -136,6 +136,11 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
             if pc == 0x2e6e68 then
                 machine:logerror(string.format('plmn_state2_input: status=%08x t=%.9f\n',
                     cpu.state['R6'].value, machine.time:as_double()))
+            end
+            if pc == 0x38b5c6 then
+                machine:logerror(string.format(
+                    'plmn_controller_reset_call: input=%08x caller=%08x t=%.9f\n',
+                    cpu.state['R0'].value, cpu.state['R14'].value, machine.time:as_double()))
             end
             if not busy and pc == 0x2d0f6e then
                 busy = true
