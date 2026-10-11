@@ -247,6 +247,13 @@ public:
 			if (family != 0x3400) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return (1 + extended) | SUPPORTED;
 		}
+		if (family == 0x3100 || family == 0x3300 || family == 0x3500 || family == 0x3700)
+		{
+			bool const extended = mode >= 0xe0;
+			char const *name = family == 0x3100 ? "MPYA" : family == 0x3300 ? "MASA" : family == 0x3500 ? "MACA" : "MACAR";
+			util::stream_format(stream, "%-8s", name); smem(extended ? next_word() : 0);
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family == 0x3000 || family == 0x3200 || family == 0x4600)
 		{
 			bool const extended = mode >= 0xe0;
@@ -420,6 +427,12 @@ public:
 			util::stream_format(stream, "%-8s#$%04X, %u, %c, %c", name, next_word(), high ? 16 : op & 15,
 				BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
 			return 2 | SUPPORTED;
+		}
+		if ((op & 0xfeff) == 0xf48c || (op & 0xfeff) == 0xf48d)
+		{
+			if (BIT(op, 0)) util::stream_format(stream, "SQUR    A, %c", BIT(op, 8) ? 'B' : 'A');
+			else util::stream_format(stream, "MPYA    %c", BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
 		}
 		if ((op & 0xfcfc) == 0xf488)
 		{

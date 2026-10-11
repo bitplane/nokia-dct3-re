@@ -1731,7 +1731,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 607 decoded and 19
+promoted to a boundary. Current cold-idle coverage is 611 decoded and 15
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1869,6 +1869,13 @@ on two program pages and five exact syntax cases. The required marker is
 `TMS320C54x conditional subtract disassembler: PASS` (SPRU172C, SUBC).
 Its divide-step arithmetic, carry/overflow behavior and timing remain separately
 tested execution contracts, not conclusions of debugger decoding.
+
+Accumulator-A MPYA/MACA/MACAR/MASA memory forms cover 1,024 addressing
+encodings; short MPYA/SQUR adds four forms with selected destinations. Tests
+check two program pages and exact syntax separately from arithmetic execution.
+The required marker is `TMS320C54x accumulator-A multiply disassembler: PASS`
+(SPRU172C, MPYA, MACA/MASA syntax 1 and SQUR syntax 2). Fixed accumulator-A
+inputs are not interchangeable with the T-based ordinary multiply family.
 
 Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
 giving 44 one-word forms checked on two program pages. Non-delayed RC has

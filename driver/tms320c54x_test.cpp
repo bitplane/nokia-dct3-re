@@ -1471,6 +1471,35 @@ private:
 				"Conditional subtract syntax preserves both accumulator selections");
 		}
 		osd_printf_info("TMS320C54x conditional subtract disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x3100, 0x3300, 0x3500, 0x3700})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+						"Accumulator-A memory multiply decoder bounds its source extensions");
+				}
+		vector const accumulator_a_forms[] = {
+			{0x3185, 1 | dasm::SUPPORTED, "MPYA    *AR5"},
+			{0x33f8, 2 | dasm::SUPPORTED, "MASA    *($2345)"},
+			{0x35e2, 2 | dasm::SUPPORTED, "MACA    *AR2($2345)"},
+			{0x3794, 1 | dasm::SUPPORTED, "MACAR   *AR4+"},
+			{0xf48c, 1 | dasm::SUPPORTED, "MPYA    A"},
+			{0xf58c, 1 | dasm::SUPPORTED, "MPYA    B"},
+			{0xf48d, 1 | dasm::SUPPORTED, "SQUR    A, A"},
+			{0xf58d, 1 | dasm::SUPPORTED, "SQUR    A, B"},
+		};
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (auto const &test : accumulator_a_forms)
+			{
+				words const buffer(pc, test.op, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == test.result && text.str() == test.text,
+					"Accumulator-A multiply syntax distinguishes fixed and selected operands");
+			}
+		osd_printf_info("TMS320C54x accumulator-A multiply disassembler: PASS memory_forms=1024 short_forms=4 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
