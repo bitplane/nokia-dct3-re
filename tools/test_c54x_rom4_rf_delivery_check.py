@@ -16,6 +16,26 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_consumer_effects_preserve_identity_and_order(self):
+        case = ('rom4_rf_task10_consumer: pc=00211eb0 object=00101438 '
+                'status=1390 control=80000000 t=1.7\n')
+        counter = ('rom4_rf_task10_counter: pc=00211ec4 address=0010fee0 '
+                   'value=162f0000 mask=ffff0000 t=1.8\n')
+        helper = ('rom4_rf_task10_helper: pc=00210f5c object=00101438 '
+                  'status=1390 caller=00211ed3 t=1.9\n')
+        text = TRACE + case + counter + helper
+        self.assertEqual(check(text, consumer_effects=True), ('00101438', '006d'))
+        for changed in (text.replace(counter, ''), text.replace(helper, ''),
+                        text.replace('80000000', '82000000'),
+                        text.replace('162f0000', '162f0001'),
+                        text.replace('ffff0000', '0000ffff'),
+                        text.replace('0010fee0', '0010fee2'),
+                        text.replace(helper, helper.replace('00101438', '00101480')),
+                        text.replace('00211ed3', '00211f45'),
+                        text.replace('t=1.9', 't=1.75')):
+            with self.subTest(text=changed), self.assertRaises(ValueError):
+                check(changed, consumer_effects=True)
+
     def test_correlated_consumer_case(self):
         case = ('rom4_rf_task10_consumer: pc=00211eb0 object=00101438 '
                 'status=1390 control=80000000 t=1.7\n')

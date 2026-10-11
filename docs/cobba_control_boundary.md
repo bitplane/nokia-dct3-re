@@ -748,6 +748,22 @@ both request correlation and the same object reaching that case after receipt.
 Negative tests reject missing entry, wrong object/status, reversed time and
 malformed controller words. No firmware or DSP state is written by this tap.
 
+The case's `LSRS #26; BHS` tests original control bit 25, not the high
+bit 31. With observed control `80000000`, bit 25 is clear and execution
+reaches the counter store at `211ec4`: upper-halfword value `162f`, mask
+`ffff0000`, address `10fee0`, at 1.816221769 seconds. Helper `210f5c`
+then receives object `101438`/status `1390` from caller `211ed3` at
+1.816223385 seconds. The separate `138f` object increments the counter to
+`1630` and calls that helper later. Thus native delivery is not rejected by
+this flag gate. `LSRS #27` later tests original bit 26; its runtime outcome
+is not established by the silent fall-through fetch taps.
+`--consumer-effects` requires ordered receipt, matching case, counter lane
+and same-object helper entry; wrong objects, caller, mask, address, timestamps
+and bit-25-set controls fail. Evidence is
+`tmp/rom4-task10-flags-final/error.log`, a fresh eight-second zero-input run.
+The next application boundary is helper `210f5c`'s status dispatch, not a
+missing native response or a forced controller flag.
+
 The isolated cold-control runner is:
 
 ```sh

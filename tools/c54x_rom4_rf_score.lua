@@ -20,9 +20,25 @@ local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
 local post_fetches = 0
 local consumer_case_observations = 0
+local consumer_stage_counts = {}
 taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x211e80, 0x211eff,
     "rf_task10_consumer_case", function(address)
-        if mcu.state["PC"].value ~= 0x211eb0 or address ~= 0x211eb0 then return end
+        local pc = mcu.state["PC"].value
+        if pc ~= 0x211eb0 then
+            if pc ~= 0x211eb8 and pc ~= 0x211ecc and pc ~= 0x211ed6 then return end
+            if address ~= (pc & ~3) then return end
+            consumer_stage_counts[pc] = (consumer_stage_counts[pc] or 0) + 1
+            if consumer_stage_counts[pc] > 16 then return end
+            local space = mcu.spaces["program"]
+            local object = space:read_u32(mcu.state["R13"].value + 0x18)
+            machine:logerror(string.format(
+                "rom4_rf_task10_stage: pc=%08x object=%08x status=%04x control=%08x r1=%08x t=%.9f\n",
+                pc, object, space:read_u16(object),
+                space:read_u32(mcu.state["R4"].value + 0x7c),
+                mcu.state["R1"].value, machine.time:as_double()))
+            return
+        end
+        if address ~= 0x211eb0 then return end
         if consumer_case_observations >= 16 then return end
         consumer_case_observations = consumer_case_observations + 1
         local space = mcu.spaces["program"]
@@ -31,6 +47,29 @@ taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x211e80, 0x211eff,
             "rom4_rf_task10_consumer: pc=%08x object=%08x status=%04x control=%08x t=%.9f\n",
             mcu.state["PC"].value, object, space:read_u16(object),
             space:read_u32(mcu.state["R4"].value + 0x7c), machine.time:as_double()))
+    end)
+local consumer_counter_writes = 0
+local consumer_helper_calls = 0
+taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x210f40, 0x210f9f,
+    "rf_task10_consumer_helper", function(address)
+        if mcu.state["PC"].value ~= 0x210f5c or address ~= 0x210f5c then return end
+        if consumer_helper_calls >= 16 then return end
+        consumer_helper_calls = consumer_helper_calls + 1
+        local object = mcu.state["R0"].value
+        if object < 0x100000 or object >= 0x180000 then return end
+        machine:logerror(string.format(
+            "rom4_rf_task10_helper: pc=%08x object=%08x status=%04x caller=%08x t=%.9f\n",
+            mcu.state["PC"].value, object, mcu.spaces["program"]:read_u16(object),
+            mcu.state["R14"].value, machine.time:as_double()))
+    end)
+taps[#taps + 1] = mcu.spaces["program"]:install_write_tap(0x10fee0, 0x10fee3,
+    "rf_task10_consumer_counter", function(address, value, mask)
+        if mcu.state["PC"].value ~= 0x211ec4 then return end
+        consumer_counter_writes = consumer_counter_writes + 1
+        if consumer_counter_writes > 16 then return end
+        machine:logerror(string.format(
+            "rom4_rf_task10_counter: pc=%08x address=%08x value=%08x mask=%08x t=%.9f\n",
+            mcu.state["PC"].value, address, value, mask, machine.time:as_double()))
     end)
 for _, address in ipairs({0x295444, 0x298688, 0x299894}) do
     local reads_at_blob = 0

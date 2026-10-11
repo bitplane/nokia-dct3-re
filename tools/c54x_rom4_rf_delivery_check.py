@@ -162,7 +162,7 @@ def check_tuning_blob(text):
     return 0x299894
 
 
-def check(text, consumer_case=False):
+def check(text, consumer_case=False, consumer_effects=False):
     events = []
     for line in text.splitlines():
         match = EVENT.search(line)
@@ -206,12 +206,23 @@ def check(text, consumer_case=False):
     index, received = after(index + 1, "task10_lifecycle",
         matches(pc="00211a9a", r0=object_address, status="1390"))
     times.append(float(received["t"]))
-    if consumer_case:
-        _, consumed = after(index + 1, "task10_consumer",
+    if consumer_case or consumer_effects:
+        index, consumed = after(index + 1, "task10_consumer",
             matches(pc="00211eb0", object=object_address, status="1390"))
         if not re.fullmatch(r'[0-9a-f]{8}', consumed.get('control', '')):
             raise ValueError('missing controller observation at task-10 case')
         times.append(float(consumed['t']))
+        if consumer_effects:
+            if int(consumed['control'], 16) & (1 << 25):
+                raise ValueError('consumer bit-25 gate rejects the observed effects path')
+            index, counter = after(index + 1, 'task10_counter',
+                matches(pc='00211ec4', address='0010fee0', mask='ffff0000'))
+            if not re.fullmatch(r'[0-9a-f]{4}0000', counter.get('value', '')):
+                raise ValueError('counter store is not an isolated upper halfword')
+            times.append(float(counter['t']))
+            _, helper = after(index + 1, 'task10_helper',
+                matches(pc='00210f5c', object=object_address, status='1390', caller='00211ed3'))
+            times.append(float(helper['t']))
     if any(later < earlier for earlier, later in zip(times, times[1:])):
         raise ValueError("delivery timestamps regress")
     return object_address, publication["words"]
@@ -223,10 +234,13 @@ def main():
     parser.add_argument("--search-list", action="store_true", help="also validate the first single-entry request bitmap")
     parser.add_argument('--consumer-case', action='store_true',
                         help='require correlated downstream task-10 case entry')
+    parser.add_argument('--consumer-effects', action='store_true',
+                        help='also require ordered counter store and correlated helper entry')
     args = parser.parse_args()
     try:
         text = args.log.read_text()
-        object_address, body = check(text, consumer_case=args.consumer_case)
+        object_address, body = check(text, consumer_case=args.consumer_case,
+                                     consumer_effects=args.consumer_effects)
         if args.search_list and check_request(text) != int(body, 16):
             raise ValueError("native response body differs from requested entry")
     except (OSError, ValueError, KeyError) as error:
