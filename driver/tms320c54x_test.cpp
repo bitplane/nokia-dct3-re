@@ -23455,8 +23455,12 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 15) { start_pipeline_peripheral_case(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged peripheral waits: PASS cases=16 extra_cycles=1 rmw_double_charge=0 held_stage_restore=8 resumed_access_restore=8 duplicate_bus_accesses=0 silicon_phase_claim=0\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_pipeline_peripheral_case(9);
+				// Adjacent STL/LD contend at the prototype's two bus stages.
+				m_cpu->space(AS_PROGRAM).write_word(0x10601, 0x1025);
+				m_phase = 251240;
+				m_check_timer->adjust(attotime::from_ticks(12, m_cpu->clock()));
+				return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -23470,6 +23474,22 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251220;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 			return;
+		}
+		if (m_phase == 251240)
+		{
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_cpu->pipeline_cycles() == 6,
+				"Unsupported peripheral arbitration stops at the first contending stages");
+			expect(m_pipeline_operand_reads == 0 && m_pipeline_store_writes == 0,
+				"Rejected arbitration performs no CPU bus access");
+			// PRD debugger export reads the bus; exclude that observer access.
+			m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove();
+			expect(m_cpu->state_int(tms320c54x_device::STATE_PRD) == 0xaaaa &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == 0x5678,
+				"Rejected arbitration performs no bus access or atomic fallback");
+			m_cpu->set_pipeline_frontend(false);
+			osd_printf_info("TMS320C54x staged peripheral arbitration exclusion: PASS stopped_cycle=6 bus_accesses=0 atomic_fallback=0\n");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{

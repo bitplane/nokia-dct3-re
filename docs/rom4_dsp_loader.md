@@ -2442,7 +2442,11 @@ not every multiword operand's exact bus phase; do not extrapolate first-word
 DAGEN Read timing to all peripheral accesses. Peripheral STM remains outside
 the staged instruction subset. Simultaneous peripheral read/write stage
 occupancy stops as unsupported rather than inventing arbitration; that
-exclusion still needs a dedicated executable fixture. No handset enables
+exclusion is checked by adjacent peripheral STL/LD in the extended page.
+The fixture stops at cycle 6 with zero CPU bus accesses and unchanged PRD
+and accumulator contents. Debugger PRD export itself reads the bus, so its
+observation occurs only after the CPU-access taps have been removed.
+This proves the exclusion, not a silicon arbitration rule. No handset enables
 the staged frontend, and these fixtures do not establish native RF or speech
 completion.
 
