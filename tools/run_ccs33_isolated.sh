@@ -18,11 +18,14 @@ if [ "$limit" -lt 1 ] || [ "$limit" -gt 1800 ]; then
     exit 2
 fi
 
+# Vendor unpacking and Xvfb scratch must not consume a RAM-backed /tmp.
+mkdir -p "$work/tmp"
+
 # Hide host data, disable networking and kill all namespace children at exit.
 # The command sees only this research directory as writable persistent storage.
 exec timeout "$limit" bwrap --unshare-all --die-with-parent \
     --ro-bind / / --tmpfs /mnt --bind "$work" /mnt/work \
-    --tmpfs /data --tmpfs /home --tmpfs /root --tmpfs /tmp \
+    --tmpfs /data --tmpfs /home --tmpfs /root --bind "$work/tmp" /tmp \
     --proc /proc --dev /dev --chdir /mnt/work \
     --setenv HOME /mnt/work/home --setenv WINEPREFIX /mnt/work/prefix \
     --setenv TMPDIR /tmp \

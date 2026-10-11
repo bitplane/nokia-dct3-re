@@ -1141,6 +1141,8 @@ and process-isolated namespace around Wine/Xvfb. Persistent writes are limited
 to `WORK`; host `/data`, `/home` and `/root` are hidden. This optional vendor-
 tool runner is not a MAME acceptance gate. It requires `bwrap`, `timeout`,
 `xvfb-run` and Wine; prepare `WORK/home` and `WORK/prefix` first.
+The runner creates `WORK/tmp` and binds it as the isolated `/tmp`; choose
+a disk-backed `WORK` so vendor unpacking and Xvfb scratch do not consume tmpfs.
 The default timeout is 120 seconds; `CCS33_TIMEOUT_SECONDS` accepts an
 integer from 1 to 1800 for vendor installation steps. Normal command exit
 also stops and waits for Wine's server so registry writes can finish before
