@@ -2549,17 +2549,33 @@ can be observed. This is a declared bus-placement model of the documented
 six-clock return, not independent silicon phase evidence. Delayed FRETE,
 general stack conflicts and pending-interrupt timing remain unvalidated.
 
-The original four short/long-period, direct/indirect-mask streams now run
-through this staged subset without an unsupported-opcode stop. Each records
-one foreground fetch, one mask write and marker 1, with SP back at `1000`.
-However, all four record zero vector entries. Therefore these observations
-do not yet exercise the adjacent PSHM/FRETE ISR under timer pressure or prove
-the atomic backend's short-period starvation resolved. Timer scheduling and
-delivery must be audited before promoting this result. Staged taps observe
-program bus reads without the atomic backend's PC-at-fetch guard.
-Evidence: `tmp/c54x-staged-far-return.log`.
+The original four short/long-period, direct/indirect-mask streams run through
+this staged subset without an unsupported-opcode stop. Each records one
+foreground fetch, one mask write and marker 1, with SP back at `1000`, but
+zero vector entries. The timer is not silent: TCR reload occurs at clock 15,
+and short-period IFR is `0008` by the mask at clock 19 (indirect) or 18
+(direct). In this dense stream, incomplete younger multiword Decode defers
+acceptance until the older mask can retire. That interpretation still needs
+silicon validation; these cases alone do not test ISR execution.
 
-Next audit timer delivery in the staged stream and pending-IRQ far return;
+Four controls insert four explicit NOPs after the reload, leaving timer
+periods and hardware state unchanged. The short-period direct control enters
+the adjacent PSHM/FRETE ISR once, completes the mask/marker and restores SP
+to `1000`. The short-period indirect control instead records 143 vector
+entries, one foreground fetch and no mask/marker, with a live ISR at the
+observation deadline. Both long-period controls complete without an entry.
+The gate requires actual ISR entry for short gap controls and successful
+direct-mask stack restoration; the indirect result remains an observation,
+not a passing completion claim. It demonstrates that the staged frontend
+does not generally solve short-period starvation.
+
+Staged taps observe program bus reads without the atomic backend's
+PC-at-fetch guard. Reload/mask/final observations include PRD, TIM, TCR,
+IMR, IFR and ST1; they separate a live timer from deferred acceptance.
+Evidence: `tmp/c54x-staged-timer-audit.log`. The atomic probe still stalls
+for short PRD and completes for long PRD; its behavior is unchanged.
+
+Next audit pending-IRQ far-return re-entry and the indirect continuation;
 repeat/delayed-control and idle rules remain separate completeness work.
 Those contracts must precede enabling
 the frontend for native firmware or claiming the timer/recorder stall fixed.

@@ -3134,7 +3134,8 @@ private:
 	void start_timer_boundary_probe(unsigned index, bool staged = false)
 	{
 		bool const short_period = !(index & 1);
-		bool const direct_mask = index >= 2;
+		bool const direct_mask = (index & 3) >= 2;
+		unsigned const gap = staged && index >= 4 ? 4 : 0;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		// Synthetic timer reload followed by IMR masking. No handset image.
@@ -3142,14 +3143,15 @@ private:
 			0x7711, 0x0026, 0x7681, 0x0020, 0x7711, 0,
 			0x6881, 0xfff7, 0x76f8, 0x0501, 1, 0xf073, 0x060f};
 		for (unsigned i = 0; i < std::size(code); ++i)
-			program.write_word(0x010600 + i, code[i]);
+			program.write_word(0x010600 + i + (i >= 8 ? gap : 0), i == 16 ? code[i] + gap : code[i]);
+		for (unsigned i = 0; i < gap; ++i) program.write_word(0x010608 + i, 0xf495);
 		// Direct IMR addressing removes the post-reload pointer setup only.
 		if (direct_mask)
 		{
-			program.write_word(0x010608, 0x68f8); // ANDM #fff7,*(0000)
-			program.write_word(0x010609, 0x0000);
-			program.write_word(0x01060a, 0xfff7);
-			program.write_word(0x01060b, 0xf495); // NOP; keep the marker location unchanged.
+			program.write_word(0x010608 + gap, 0x68f8); // ANDM #fff7,*(0000)
+			program.write_word(0x010609 + gap, 0x0000);
+			program.write_word(0x01060a + gap, 0xfff7);
+			program.write_word(0x01060b + gap, 0xf495); // NOP; keep the marker location unchanged.
 		}
 		program.write_word(0x01004c, 0x4a1e); // Save XPC, as a far-return ISR requires.
 		program.write_word(0x01004d, 0xf4e5); // FRETE
@@ -3179,17 +3181,23 @@ private:
 		m_timer_probe_write_cycle = m_timer_probe_mask_cycle = 0;
 		m_timer_probe_writes = m_timer_probe_masks = 0;
 		m_timer_probe_write = data.install_write_tap(0x26, 0x26, "timer_probe_reload_write",
-			[this](offs_t, u16 &value, u16) {
+			[this, staged](offs_t, u16 &value, u16) {
 				if (!machine().side_effects_disabled() && value == 0x20)
 				{
 					++m_timer_probe_writes; m_timer_probe_write_cycle = m_cpu->total_cycles();
+					if (staged) osd_printf_info("Staged timer reload: cycle=%llu prd=%04x imr=%04x ifr=%04x st1=%04x\n",
+						(unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PRD)),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
 				}
 			});
 		m_timer_probe_mask = data.install_write_tap(0, 0, "timer_probe_mask_write",
-			[this](offs_t, u16 &value, u16) {
+			[this, staged](offs_t, u16 &value, u16) {
 				if (!machine().side_effects_disabled() && !(value & 8))
 				{
 					++m_timer_probe_masks; m_timer_probe_mask_cycle = m_cpu->total_cycles();
+					if (staged) osd_printf_info("Staged timer mask: cycle=%llu tim=%04x tcr=%04x ifr=%04x st1=%04x\n",
+						(unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)),
+						unsigned(m_cpu->state_int(tms320c54x_device::STATE_TCR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
 				}
 			});
 		m_timer_probe_stack = data.install_write_tap(0x0fff, 0x0fff, "timer_probe_stack",
@@ -3214,7 +3222,7 @@ private:
 					m_timer_probe_first_entry_cycle = m_cpu->total_cycles();
 				}
 			});
-		m_timer_probe_foreground = program.install_read_tap(0x010608, 0x010608,
+		m_timer_probe_foreground = program.install_read_tap(0x010608 + gap, 0x010608 + gap,
 			"timer_probe_foreground_fetch", [this, staged](offs_t address, u16 &, u16) {
 				if (machine().side_effects_disabled() || (!staged && m_cpu->pc() != address + 1)) return;
 				if (!m_timer_probe_foreground_fetches++)
@@ -5130,19 +5138,29 @@ private:
 			start_timer_boundary_probe(0);
 			return;
 		}
-		if (m_phase >= 7020 && m_phase <= 7023)
+		if (m_phase >= 7020 && m_phase <= 7027)
 		{
 			unsigned const index = m_phase - 7020;
 			u16 const marker = m_cpu->space(AS_DATA).read_word(0x0501);
-			osd_printf_info("TMS320C54x staged timer observation: case=%u period=%u addressing=%s marker=%u foreground_fetches=%u mask_writes=%u vector_entries=%u pc=%06x sp=%04x illegal=%u silicon_phase_claim=0\n",
-				index, index & 1 ? 256 : 1, index >= 2 ? "direct" : "indirect", marker,
+			osd_printf_info("Staged timer final: case=%u cycles=%llu tim=%04x prd=%04x tcr=%04x imr=%04x ifr=%04x st1=%04x\n",
+				index, (unsigned long long)m_cpu->pipeline_cycles(), unsigned(m_cpu->state_int(tms320c54x_device::STATE_TIM)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_PRD)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_TCR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IMR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_IFR)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_ST1)));
+			osd_printf_info("TMS320C54x staged timer observation: case=%u period=%u addressing=%s marker=%u foreground_fetches=%u mask_writes=%u vector_entries=%u pc=%06x sp=%04x illegal=%u gap_nops=%u silicon_phase_claim=0\n",
+				index, index & 1 ? 256 : 1, (index & 3) >= 2 ? "direct" : "indirect", marker,
 				m_timer_probe_foreground_fetches, m_timer_probe_masks, m_timer_probe_entries,
 				unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
-				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)), index >= 4 ? 4 : 0);
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original timer stream executes the staged subset without atomic fallback");
+			if (index >= 4 && !(index & 1))
+			{
+				expect(m_timer_probe_entries > 0, "Short-period NOP-gap control actually enters the PSHM/FRETE ISR");
+				if ((index & 3) >= 2)
+					expect(marker == 1 && m_timer_probe_masks == 1 && m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000,
+					"Direct mask drains across the accepted ISR and far return without losing stack ownership");
+			}
 			m_cpu->set_pipeline_frontend(false);
-			if (index < 3) { start_timer_boundary_probe(index + 1, true); return; }
-			osd_printf_info("TMS320C54x staged timer observation: complete cases=4 fidelity_acceptance=0\n");
+			if (index < 7) { start_timer_boundary_probe(index + 1, true); return; }
+			osd_printf_info("TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
