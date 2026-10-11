@@ -363,6 +363,16 @@ The initial SI3 parser, publication and classification therefore do not
 explain the national/international difference. The next boundary is the
 classification-1 continuation and its downstream selection state.
 
+The first classification-1 continuation also agrees in the paired controls:
+both reach `2d3ec0`, `2d3f26`, `2d3f64` and `2d3f6e`. At `2d3f26`,
+R5 points to `172518` and its byte at offset 8 is `50` in both runs.
+The decoded inclusive `10..18` test therefore takes the outside-range path
+in both, followed by calls to `48a004(1, 3)` and `38b420`.
+This excludes the first continuation's observed selection-byte fork as the
+national/international discriminator, not later selection or admission.
+Evidence: `tmp/6210-plmn-continuation-{national,international}/error.log.gz`;
+the observation addresses are pinned by `noki6210_radio_contract.py`.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require
