@@ -1265,6 +1265,29 @@ No vendor binary or generated board database was patched. A different
 compatibility environment or a working direct application API is required
 before this route can provide timing evidence.
 
+#### Direct driver loading boundary
+
+`tools/ccs33_driver_load_probe.c` loads `tisim54x.dvr` without COM and checks
+eight GTI exports, including initialization, simulator mode, pipeline
+inspection and stepping. The installed driver loads successfully under the
+isolated Wine runner; a nonexistent-driver control exits 1. Evidence is in
+`tmp/ccs33-driver-load.log` and `tmp/ccs33-driver-load-negative.log`.
+This establishes DLL loading only: no GTI function is called, no target is
+initialized and no instruction executes. The SDK header search did not find
+the direct GTI initialization ABI. Recover a documented initialization and
+configuration contract before attempting execution; exported names alone
+do not establish function signatures or pipeline behavior.
+
+Stage the source in `WORK` and compile with the installed Win32 compiler:
+
+```sh
+sh tools/run_ccs33_isolated.sh WORK wine \
+  'C:\CCS33\bin\utilities\sim\gcc\bin\gcc.exe' \
+  -Wall -Wextra -o driver_load_probe.exe driver_load_probe.c
+sh tools/run_ccs33_isolated.sh WORK wine driver_load_probe.exe \
+  'C:\CCS33\drivers\tisim54x.dvr'
+```
+
 `tools/ccs33_activation_probe.vbs` is the fail-closed activation control:
 scripting version alone is insufficient; successful opening and nonempty
 board/CPU identities are required. Even its success would establish target
