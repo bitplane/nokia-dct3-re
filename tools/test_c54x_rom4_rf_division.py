@@ -19,6 +19,14 @@ class RFDivisionTest(unittest.TestCase):
         self.assertEqual(pair_energy, 0x13c0040)
         self.assertEqual(-17 * pair_energy, -0x14fc0440)
 
+    def test_captured_adjacent_pair_products(self):
+        previous_x, previous_y = -2528, -3784
+        current_x, current_y = 2528, 3784
+        dot = previous_x * current_x + previous_y * current_y
+        cross = previous_y * current_x - previous_x * current_y
+        self.assertEqual(dot, -0x13c0040)
+        self.assertEqual(cross, 0)
+
     def test_captured_normalization_operands(self):
         # Independent signed integers, not the core's masked-accumulator helpers.
         energy = 0x0d047a80
