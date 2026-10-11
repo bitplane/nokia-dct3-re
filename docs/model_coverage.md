@@ -560,7 +560,11 @@ prove a menu-triggered application or network service.
 MESSAGE to `5551234`, one decoded SMS-SUBMIT, CP/RP acknowledgements,
 successful TERMINAL RESPONSE and RR release, followed by physical idle
 recovery. This remains laboratory HLE signaling, not native or public-network
-SMS delivery. Other proactive
+SMS delivery. `verify-8850-sim-toolkit-call` separately proves card-owned
+SET UP CALL, physical consent before SETUP, traffic assignment and CONNECT,
+successful TERMINAL RESPONSE, then physical End and complete CC/RR release
+to idle. Reviewed consent and active-call pixels do not establish speech.
+Other proactive
 commands and native DSP execution are not established by these gates.
 `verify-8890-sim-toolkit-busy` independently verifies nine-byte profile
 download, STATUS/FETCH and the explicit `20 01` screen-busy terminal response
