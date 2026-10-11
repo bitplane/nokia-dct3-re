@@ -43,6 +43,12 @@ old set. See the current audit boundary in
 
 ## Promotion rules
 
+`verify-5210-sim-pin-registration` independently proves early physical
+`1234`/OK, successful CHV1 verification before laboratory registration,
+reviewed masked-code/menu/idle frames and physical recovery. A delayed
+entry accepts the PIN but does not register in the observed 45-s window;
+late-readiness recovery and authenticated call/SMS parity remain unproved.
+
 `verify-sim-toolkit-interactive-5210` independently extends NSM-5's Phase-2+
 DISPLAY TEXT coverage with physical GET INKEY `5`/GET INPUT `42`, successful
 terminal responses and reviewed entered/registered-idle pixels. Its INKEY

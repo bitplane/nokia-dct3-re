@@ -91,6 +91,14 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   product's nine-byte TERMINAL PROFILE, then requires `91xx`, FETCH, rendered
   `DCT3 SAT`, physical OK and a successful TERMINAL RESPONSE. The profile
   length is product evidence rather than a borrowed 3210 constant.
+- `make verify-5210-sim-pin-registration` uses a PIN-enabled laboratory card
+  in BIOS-local `noki5210_3` storage, physical `1234` and OK, one successful
+  VERIFY before own laboratory registration, reviewed masked-code/idle/menu
+  frames and physical End recovery. Entry starts at 7 s after SIM startup;
+  this does not establish arbitrary user-delay recovery. A separately observed
+  12-s start with slower keys accepts PIN at 20.018 s and remains interactive,
+  but never requests Location Updating during the 45-s window. Late SIM
+  readiness remains an open firmware/peer lifecycle boundary, not a PIN failure.
 - `make verify-sim-toolkit-interactive-5210` independently accepts GET INKEY
   `5` and GET INPUT `42`, with exact successful terminal responses and five
   reviewed prompt/entered/registered-idle frames. NSM-5 requires physical OK
