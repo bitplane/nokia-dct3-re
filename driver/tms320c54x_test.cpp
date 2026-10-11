@@ -2930,6 +2930,38 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_xpc_push(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		u32 const base = variant & 1 ? 0x10000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(base + 0x600 + i, i ? 0xf495 : 0x4a1e);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->space(AS_DATA).write_word(0xfff, 0xaaaa);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1e, 0x1e, "staged_xpc_push_source",
+			[this, base](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == (base >> 16) && m_cpu->pipeline_cycles() == 5, "PSHM XPC samples its source once in Read");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0xfff, 0xfff, "staged_xpc_push_stack",
+			[this, base](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == (base >> 16) && m_cpu->pipeline_cycles() == 6, "PSHM XPC writes the retained source to its allocated stack word");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251270; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -23553,8 +23585,7 @@ private:
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 7) { start_pipeline_immediate_store(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged immediate stores: PASS cases=8 forms=DP,postincrement,absolute,peripheral retained_literal=1 duplicate_writes=0 restore=8\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_pipeline_xpc_push(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -23562,6 +23593,44 @@ private:
 		if (m_phase == 251260)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251250;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251270)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const checkpoint = 4 + m_pipeline_peripheral_case / 2;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5) && m_pipeline_store_writes == unsigned(cycle >= 6) &&
+				m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 ? 0xfff : 0x1000), "PSHM XPC retains source, stack ownership and one decrement across replay");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save PSHM before Read, after Read or after Write");
+			}
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_operand_reads = unsigned(checkpoint >= 5); m_pipeline_store_writes = unsigned(checkpoint >= 6);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore retained XPC source and allocated stack destination");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251280;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 5) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged XPC push: PASS cases=6 source_read=5 stack_write=6 restore=6 duplicate_accesses=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251280)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251270;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

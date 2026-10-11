@@ -2503,7 +2503,7 @@ completion list:
 | --- | --- | --- |
 | `7681 literal` | Immediate ST through AR1 to PRD/TCR | Implemented bounded short-indirect ST with retained literal/address and peripheral write wait; this is not STM |
 | `76f8 0501 0001` | Absolute immediate ST of the completion marker | Implemented three-word Decode and retained memory write |
-| `4a1e` | PSHM XPC at the interrupt vector | Source sample, stack decrement/address and stack write |
+| `4a1e` | PSHM XPC at the interrupt vector | Implemented retained source sample, stack decrement/address and stack write |
 | `f4e5` | FRETE | Two stack samples/pops, restored XPC/PC, interrupt enable and redirection |
 
 The probe's `7711` DAGEN initialization, `6881`/`68f8` mask ANDM and `f073`
@@ -2530,7 +2530,15 @@ early-write contract is not implemented; indirect address modification may
 already have occurred. Long-offset, compiler-mode direct and other indirect
 encodings remain outside this subset.
 
-Next implement stack-source ownership and far interrupt return;
+The exact PSHM XPC form samples XPC once in Read, retains the decremented
+stack destination, then commits the sampled value in Execute. Six cases
+cover both program pages and restore before Read, after Read or after Write,
+asserting one source access, one SP decrement and one stack write per leg.
+Read-owned stack allocation is a declared partial stage model, not a silicon
+phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
+accumulator-source latency are not covered by this implementation or gate.
+
+Next implement far interrupt return;
 repeat/delayed-control and idle rules
 remain separate completeness work. Those contracts must precede enabling
 the frontend for native firmware or claiming the timer/recorder stall fixed.
