@@ -2824,30 +2824,36 @@ private:
 	{
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_mmr_timing_case = variant;
-		u16 const target = variant & 1 ? 0x25 : 0x12;
-		u16 const opcode = (variant >= 2 ? 0x6800 : 0x7700) | target;
+		u16 const target = std::array<u16, 4>{0x12, 0x25, 0x5f, 0x60}[variant % 4];
+		unsigned const family = variant / 4;
+		bool const read = family == 4;
+		u16 const opcode = std::array<u16, 5>{0x7700, 0x6800, 0x6900, 0x7600, 0x1000}[family] | target;
+		unsigned const words = read ? 1 : 2;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
-		program.write_word(0x600, opcode); program.write_word(0x601, 0xff00);
-		program.write_word(0x602, opcode); program.write_word(0x603, 0xff00);
-		program.write_word(0x604, 0xf073); program.write_word(0x605, 0x604);
+		for (unsigned i = 0; i < 2; ++i)
+		{
+			program.write_word(0x600 + i * words, opcode);
+			if (!read) program.write_word(0x601 + i * words, 0xff00);
+		}
+		program.write_word(0x600 + 2 * words, 0xf073); program.write_word(0x601 + 2 * words, 0x600 + 2 * words);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0xffff);
-		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
+		m_cpu->space(AS_DATA).write_word(target, 0xff00);
 		m_cpu->set_state_int(STATE_GENPC, 0x600);
 		m_cpu->set_pipeline_frontend(false);
 		m_pipeline_store_writes = 0;
 		m_first_operand_cycle = m_last_operand_cycle = 0;
-		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(target, target, "peripheral_mmr_timing_audit",
-			[this](offs_t, u16 &value, u16) {
+		auto const observe = [this](offs_t, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
 				expect(value == 0xff00, "Timing audit reaches the actual register bus");
 				if (!m_pipeline_store_writes++) m_first_operand_cycle = m_cpu->total_cycles();
 				else m_last_operand_cycle = m_cpu->total_cycles();
-			});
+			};
+		m_pipeline_write_tap = read ? m_cpu->space(AS_DATA).install_read_tap(target, target, "peripheral_mmr_read_timing", observe) :
+			m_cpu->space(AS_DATA).install_write_tap(target, target, "peripheral_mmr_write_timing", observe);
 		m_phase = 251210;
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(24, m_cpu->clock()));
@@ -4075,7 +4081,7 @@ private:
 	}
 	u16 repeat_irq_r(offs_t offset)
 	{
-		if (m_phase == 6517 || m_phase == 6518)
+		if (m_phase == 6517 || m_phase == 6518 || m_phase == 251210)
 			return m_stack_mmr[offset];
 		if (m_phase == 784)
 		{
@@ -13273,8 +13279,8 @@ private:
 		if (m_phase == 382)
 		{
 			expect_opcode(0x7722, data.read_word(0x0022) == 0xa55a &&
-					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 5,
-					"ROM4 STM #lk,MMR22 writes its immediate in two cycles");
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
+					"ROM4 STM #lk,MMR22 includes the peripheral access cycle");
 			program.write_word(0x05e3, 0xf537); // SUB A >> 9,B
 			program.write_word(0x05e4, 0x75f8);
 			program.write_word(0x05e5, 0x0d00);
@@ -13717,8 +13723,8 @@ private:
 		if (m_phase == 406)
 		{
 			expect_opcode(0x7726, m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0010 &&
-					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 6,
-					"ROM4 STM #TSS,TCR survives MMR readback with two-cycle store");
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
+					"ROM4 STM #TSS,TCR and LDM readback each include the peripheral access cycle");
 			program.write_word(0x05e3, 0xf945); // CC 05f0,AEQ
 			program.write_word(0x05e4, 0x05f0);
 			program.write_word(0x05e5, 0x75f8); // Fallthrough marker.
@@ -15826,8 +15832,8 @@ private:
 			expect_opcode(0x7758,
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0003 &&
 					m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0800 &&
-					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 9,
-					"ROM4 CLKMD write reads back modeled status; three STMs cost two cycles each");
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 12,
+					"ROM4 CLKMD sequence includes peripheral waits for STM28, STM58 and LDM58");
 			program.write_word(0x05e2, 0x8812); // STLM A,AR2
 			program.write_word(0x05e3, 0x881a); // STLM A,BRC
 			program.write_word(0x05e4, 0x731a); // MVMD BRC,dmad
@@ -16359,8 +16365,8 @@ private:
 			expect_opcode(0x4920,
 					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x9abc &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
-					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 8,
-					"ROM4 LDM MMR 0x20,B zero-extends; six MMR transfers cost one cycle each");
+					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 10,
+					"ROM4 mixed MMR transfers preserve CPU-register costs and include STLM21/LDM20 peripheral waits");
 			program.write_word(0x05e0, 0x75d6);
 			program.write_word(0x05e2, 0x71da); // MVDK *AR2+0%,dmad
 			program.write_word(0x05e3, 0x0f40);
@@ -21464,7 +21470,7 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0 &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x0900 &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (mode == 1 ? 0x0f60 : 0x0f67) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (mode == 2 ? 4 : 3),
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (mode == 1 ? 3 : 4),
 				"ST TRN uses writable/readable MMR state, preserves flags and supports circular/absolute stores");
 			if (index < 11) { start_trn_store_case(index + 1); return; }
 			osd_printf_info("TMS320C54x TRN store conformance: PASS variants=12\n");
@@ -21527,7 +21533,7 @@ private:
 				m_cpu->state_int(tms320c54x_device::STATE_ST0) == 0x0e00 &&
 				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (0x0a00 | (index & 2 ? 0x0100 : 0)) &&
 				m_cpu->state_int(tms320c54x_device::STATE_AR0) == (mode == 2 ? 0x0f65 : 0x0f66) &&
-				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (mode == 3 ? 4 : 3),
+				m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == (mode == 0 || mode == 3 ? 4 : 3),
 				"LDR loads memory high plus rounding bit, honors SXM, ignores OVM and preserves flags/other accumulator");
 			if (index < 63) { start_rounded_load_case(index + 1); return; }
 			osd_printf_info("TMS320C54x rounded load conformance: PASS variants=64\n");
@@ -23362,15 +23368,14 @@ private:
 		{
 			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_pipeline_store_writes == 2, "Timing audit executes both register operations without interrupt or peripheral activity");
 			u64 const observed = m_last_operand_cycle - m_first_operand_cycle;
-			unsigned const specified = m_mmr_timing_case & 1 ? 3 : 2;
-			// An observer, not an accepted oracle for a known missing wait state.
-			osd_printf_info("TMS320C54x MMR timing audit: operation=%s destination=%s observed_cycles=%llu ti_cycles=%u matches=%u physical_latency_claim=0\n",
-				m_mmr_timing_case >= 2 ? "ANDM" : "STM", m_mmr_timing_case & 1 ? "PRD" : "AR2",
+			unsigned const specified = (m_mmr_timing_case / 4 == 4 ? 1 : 2) + unsigned((m_mmr_timing_case % 4) == 1 || (m_mmr_timing_case % 4) == 2);
+			osd_printf_info("TMS320C54x MMR timing conformance: operation=%s destination=%s observed_cycles=%llu ti_cycles=%u matches=%u physical_latency_claim=0\n",
+				std::array<char const *, 5>{"STM", "ANDM", "ORM", "ST", "LD"}[m_mmr_timing_case / 4], std::array<char const *, 4>{"AR2", "PRD", "005f", "scratch0060"}[m_mmr_timing_case % 4],
 				(unsigned long long)observed, specified, observed == specified);
-			if (!(m_mmr_timing_case & 1)) expect(observed == specified, "CPU-register timing control matches the documented two-cycle class");
+			expect(observed == specified, "CPU, peripheral and scratch memory costs match TI's instruction classes");
 			m_pipeline_write_tap.remove();
-			if (m_mmr_timing_case < 3) { start_peripheral_mmr_timing_audit(m_mmr_timing_case + 1); return; }
-			osd_printf_info("TMS320C54x peripheral MMR timing audit: complete cases=4 fidelity_acceptance=0\n");
+			if (m_mmr_timing_case < 19) { start_peripheral_mmr_timing_audit(m_mmr_timing_case + 1); return; }
+			osd_printf_info("TMS320C54x peripheral MMR timing: PASS cases=20 families=STM,ANDM,ORM,ST,LD extra_cycles=1 rmw_double_charge=0 scratch_wait=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

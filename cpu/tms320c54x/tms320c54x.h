@@ -224,6 +224,9 @@ private:
 	u8 m_idle_mode = 0;
 	u64 m_idle_timer_ticks = 0;
 	bool m_illegal = false;
+	// Synchronous semantic-call accounting, reset before each instruction.
+	// No partially completed wait is carried across a scheduler/save boundary.
+	bool m_peripheral_mmr_access = false;
 	bool m_pipeline_frontend = false;
 	// Prefetch, Fetch, Decode, Access, Read, Execute. Addresses and words are
 	// owned by their slots; no speculative instruction executes at acceptance.

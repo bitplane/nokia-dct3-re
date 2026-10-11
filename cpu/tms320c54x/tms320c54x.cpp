@@ -1120,11 +1120,13 @@ void tms320c54x_device::far_transfer(u32 address, bool delayed)
 
 u16 tms320c54x_device::data_read(u16 address)
 {
+	m_peripheral_mmr_access |= address >= 0x20 && address <= 0x5f;
 	return m_data.read_word(address);
 }
 
 void tms320c54x_device::data_write(u16 address, u16 value)
 {
+	m_peripheral_mmr_access |= address >= 0x20 && address <= 0x5f;
 	m_data.write_word(address, value);
 }
 
@@ -4099,7 +4101,12 @@ void tms320c54x_device::execute_run()
 		if (m_opcode_first_pc[m_op] == 0xffff)
 			m_opcode_first_pc[m_op] = instruction_pc;
 		++m_opcode_count[m_op];
+		m_peripheral_mmr_access = false;
 		execute_one(m_op);
+		// SPRU172C memory-operand classes add one cycle for peripheral MMR
+		// access. SPRU131G maps peripherals at 20..5f; 60..7f is scratch DARAM.
+		// Charge once for an RMW instruction, not separately for read and write.
+		if (m_peripheral_mmr_access) --m_icount;
 		if (m_capture_extensions)
 		{
 			std::array<u16, 4> const words = {m_instruction_word_count,

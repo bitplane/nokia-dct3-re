@@ -2384,7 +2384,7 @@ that store/STM conflict, not general DAGEN hazard resolution or peripheral
 register initialization timing. The negative Decode fixture now uses an
 unsupported indirect STM rather than the newly supported direct AR1 form.
 
-#### Peripheral MMR timing gap
+#### Peripheral MMR access cost
 
 [TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), March 2001,
 classes 12A and 18A (pages 3-26/3-39), specify a two-cycle base cost for
@@ -2393,26 +2393,45 @@ The downloaded reference is
 `roms/reference-docs/c54x/ti_tms320c54x_mnemonic_spru172c.pdf`, SHA-256
 `c4f89ce4a774a76de1d93a2413e882a71b82d236fc2c52af63f3159368a37e75`.
 
-`check-c54x-core` now includes a native-backend observer of back-to-back
-bus writes, with the timer stopped and INTM set. It compares CPU-register
-AR2 against peripheral-register PRD without handset ROM or provisioning:
+The native semantic backend records peripheral data accesses during each
+instruction and charges one extra clock at retirement. RMW read and write
+share that charge. SPRU131G's memory maps distinguish peripheral registers
+`0020..005f` from CPU registers `0000..001f` and scratch DARAM `0060..007f`;
+scratch accesses must not inherit the penalty. Debugger/DMA bus accesses
+do not run the semantic accounting path. Its transient flag is reset before
+every synchronous instruction, not saved as an in-flight wait.
+
+Twenty executable cases measure back-to-back operand bus intervals with
+the timer stopped and INTM set. STM, ANDM, ORM, ST and LD each test AR2,
+PRD, the last peripheral address `005f` and first scratch address `0060`.
+Read-only accesses receive the same one-clock increment; RMW receives it
+once rather than twice. Representative checked intervals are:
 
 | Operation | Destination | Observed Write Interval | TI Class Cost |
 | --- | --- | --- | --- |
 | STM | AR2 | 2 clocks | 2 clocks |
-| STM | PRD | 2 clocks | 3 clocks |
+| STM | PRD | 3 clocks | 3 clocks |
 | ANDM | AR2 | 2 clocks | 2 clocks |
-| ANDM | PRD | 2 clocks | 3 clocks |
+| ANDM | PRD | 3 clocks | 3 clocks |
+| LD | PRD | 2 clocks | 2 clocks |
+| LD | Scratch `0060` | 1 clock | 1 clock |
 
-The CPU-register controls are asserted. Peripheral results are printed with
-`fidelity_acceptance=0`, not frozen as a passing two-cycle oracle. The native
-`data_read`/`data_write` and instruction-retirement path currently have no
-peripheral MMR wait accounting. The staged frontend still excludes STM to
-PRD/TCR, and its RAM/IMR RMW fixtures do not validate this peripheral timing.
-Next is an evidenced access penalty with executable CPU/peripheral controls,
-save/load and native regression comparison. These class tables establish
-instruction costs, not every multiword operand's exact pipeline bus phase;
-do not extrapolate first-word DAGEN Read timing to all peripheral accesses.
+All twenty costs are asserted. Existing instruction fixtures for MMR22,
+TCR, CLKMD, STLM/LDM20 and direct operand `0045` now include the documented
+peripheral cycles; their former blanket CPU-register costs were wrong.
+The shared `0060` bench callback serves stored scratch data for this gate,
+not its separate IRQ-raising fixture behavior.
+
+Native 5110 save/load passes. The four timer-boundary observations still
+stall with short PRD and complete with long PRD: this cost correction does
+not replace Decode/Execute ownership. A new fresh 30-second 5110 run retains
+20,285 frame expiries, 648,192 RF reads and 1,520 port-32 writes, exactly the
+previously reproduced mismatching snapshot. The strict RF gate remains
+failing and unchanged, not re-banked as part of this correction.
+The staged frontend still lacks peripheral wait/stall ownership, and its
+RAM/IMR fixtures do not validate that timing. These class tables establish
+instruction costs, not every multiword operand's exact bus phase; do not
+extrapolate first-word DAGEN Read timing to all peripheral accesses.
 
 ANDM/ORM retain the immediate separately from the sampled data operand.
 The three-word absolute form consumes address then literal; its two pending
