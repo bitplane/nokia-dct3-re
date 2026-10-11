@@ -12,6 +12,8 @@ cpu.debug:bpset(0x3cc660, 'r0==3f5 || r0==3fa',
     'logerror "plmn_publisher_instruction: pc=003cc660 r0=%08x r14=%08x\\n",r0,r14;g')
 cpu.debug:bpset(0x3131f0, nil,
     'logerror "plmn_03f5_selector: input=%08x\\n",d@(r13+8);g')
+cpu.debug:bpset(0x2a393c, nil,
+    'logerror "plmn_07d7_selector: input=%08x\\n",d@(r13+4);g')
 local busy, posts, inputs = false, 0, 0
 local controller_posts = 0
 local input_taps, watched = {}, {}
@@ -72,7 +74,7 @@ local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
         end
         if (status == 0x7d2 or status == 0x7d4 or status == 0x9c6 or status == 0x9c8
             or status == 0x1589 or status == 0x9fd or status == 0x419 or status == 0x7f4
-            or status == 0x9cb or status == 0x7d7)
+            or status == 0x9cb or status == 0x7d7 or status == 0x9c9)
             and inputs < 24 then
             inputs = inputs + 1
             machine:logerror(string.format(
@@ -253,7 +255,7 @@ local constructor_tap = space:install_read_tap(0x2e2e60, 0x2e2e63,
         if address ~= 0x2e2e60 or cpu.state['PC'].value ~= 0x2e2e60
             or constructors >= 24 then return end
         local status = cpu.state['R0'].value
-        if status ~= 0x9c6 and status ~= 0x9c8 and status ~= 0x9cb then return end
+        if status ~= 0x9c6 and status ~= 0x9c8 and status ~= 0x9cb and status ~= 0x9c9 then return end
         constructors = constructors + 1
         machine:logerror(string.format(
             'plmn_input_constructor: status=%08x caller=%08x t=%.9f\n',

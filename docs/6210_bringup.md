@@ -629,8 +629,18 @@ from `2a3ca4` and calls `2a7f74`. Dispatcher table entry `2a015c` points
 to `2a0598`, which loads `07d7` from `2a0934` into R2 and branches to
 `2a061c`; that block writes the status into context+68's existing object
 before posting it to task 18. Adjacent `2a061a` loads a different status
-(`07d1`) and must not be mistaken for this path's predecessor. The
-condition reaching the `2a3942` preparation remains to be observed.
+(`07d1`) and must not be mistaken for this path's predecessor.
+Foreign boot constructs `09c9` at
+10.614109385 s, caller LR `2e6e69` (own call `2e6e64`), posts it to task
+17 at 10.614156000 s, and instruction observation at `2a393c` reads
+saved input `09c9`. Selector `2a31d4..2a31dc` compares stack+4 against
+literal `2a3538 = 09c9` and enters that preparation. National records no
+such constructor/post/selector in this bounded control. The connected
+organic chain is therefore `2e6e50` continuation -> `09c9` -> `07d7` ->
+`03f5` -> controller reset/state-one lifecycle. Its higher-level semantics
+and the condition for completing that lifecycle remain unresolved; no
+additional peer completion is justified solely by this mapping.
+Evidence: `tmp/6210-plmn-07d7-selector-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
