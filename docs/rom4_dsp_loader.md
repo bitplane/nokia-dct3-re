@@ -2495,9 +2495,31 @@ Existing native execution remains protected by its full conformance suite.
 revalidates native CPU/register/I/O restoration, not the still-failing exact
 RF scan snapshot described above.
 
-The next implementation work is the remaining multiword grammar and
-stage-owned operand address/read/write handling, then branches, returns,
-repeat/delayed-control and idle rules. Those contracts must precede enabling
+The short-period timer probe has the following remaining staged dependencies.
+These are exact encodings in `start_timer_boundary_probe`, not a general ISA
+completion list:
+
+| Probe encoding | Meaning | Staged ownership still missing |
+| --- | --- | --- |
+| `7681 literal` | Immediate ST through AR1 to PRD/TCR | Retained literal/address and peripheral write wait; this is not STM |
+| `76f8 0501 0001` | Absolute immediate ST of the completion marker | Three-word Decode and retained memory write |
+| `4a1e` | PSHM XPC at the interrupt vector | Source sample, stack decrement/address and stack write |
+| `f4e5` | FRETE | Two stack samples/pops, restored XPC/PC, interrupt enable and redirection |
+
+The probe's `7711` DAGEN initialization, `6881`/`68f8` mask ANDM and `f073`
+branch are already in the bounded subset. Peripheral STM coverage alone
+cannot make this probe executable. SPRU172C identifies immediate ST as
+classes 12A/12B (two/three words and base clocks), PSHM as class 16A
+(single source read and stack write), and FRETE as class 34 (six clocks,
+four when delayed). FRETE restores XPC from TOS, increments SP, restores PC
+from the next TOS, increments SP again and clears INTM. Those architectural
+operations and costs do not independently establish each prototype bus phase.
+SPRU131G Table 7-4's early Read write rule for immediate ST applies to DAGEN
+destinations, not automatically to PRD/TCR.
+
+Implement retained immediate-ST operands and writes first, then stack-source
+ownership and far interrupt return; repeat/delayed-control and idle rules
+remain separate completeness work. Those contracts must precede enabling
 the frontend for native firmware or claiming the timer/recorder stall fixed.
 A constant interrupt delay or adjusted timer period cannot replace in-flight
 instruction ownership. The legacy vendor activation failure limits the
