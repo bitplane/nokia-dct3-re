@@ -301,6 +301,11 @@ const nokia_sim_card_device::file_descriptor *
 nokia_sim_card_device::selected_file_for(access_shape shape)
 {
 	const file_descriptor *const file = find_file(m_selected_file);
+	if (!file || file->structure == file_structure::directory)
+	{
+		queue_status(0x94, 0x00);
+		return nullptr;
+	}
 	const bool matches = file && (
 			shape == access_shape::transparent ?
 				file->structure == file_structure::transparent :
@@ -451,7 +456,7 @@ void nokia_sim_card_device::finish_header()
 	if (m_ins == 0x10 || m_ins == 0x14 ||
 			m_ins == 0xc2 ||
 			m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
-			m_ins == 0x28 || m_ins == 0x2c || m_ins == 0x88 || m_ins == 0xa4 ||
+			m_ins == 0x28 || m_ins == 0x2c || m_ins == 0x88 || m_ins == 0xa4 || m_ins == 0xa2 ||
 			m_ins == 0x32 || m_ins == 0xd6 || m_ins == 0xdc)
 	{
 		const u8 procedure = m_ins;
@@ -520,6 +525,13 @@ void nokia_sim_card_device::finish_body()
 				LOGMASKED(LOG_SIM, "%02x", m_tx[index]);
 			LOGMASKED(LOG_SIM, "\n");
 		}
+	}
+	if (m_ins == 0xa2)
+	{
+		seek_record();
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		return;
 	}
 	if (m_ins == 0xdc)
 	{
@@ -1465,6 +1477,55 @@ void nokia_sim_card_device::update_record()
 		LOGMASKED(LOG_SIM, "sim_device: update fid=%04x record=%u length=%u t=%.8f\n",
 				file->fid, record, file->record_length, machine().time().as_double());
 	queue_status(0x90, 0x00);
+}
+
+void nokia_sim_card_device::seek_record()
+{
+	const file_descriptor *const file = selected_file_for(access_shape::record);
+	if (!file)
+		return;
+	if (file->structure != file_structure::linear_fixed)
+	{
+		queue_status(0x94, 0x08);
+		return;
+	}
+	if (m_p1 != 0 || (m_p2 & 0xec))
+	{
+		queue_status(0x6b, 0x00);
+		return;
+	}
+	if (m_tx_len == 0 || m_tx_len > 16 || m_tx_len > file->record_length)
+	{
+		queue_status(0x67, 0x00);
+		return;
+	}
+	// GSM 11.11 8.7: linear prefix search, no wrap, and an undefined
+	// pointer starts at the appropriate end for either relative direction.
+	const int records = file->size / file->record_length;
+	const unsigned mode = m_p2 & 3;
+	const int step = mode & 1 ? -1 : 1;
+	int record = mode == 0 ? 1 : mode == 1 ? records : mode == 2 ?
+		int(m_record_pointer) + 1 : m_record_pointer ? int(m_record_pointer) - 1 : records;
+	for (; record >= 1 && record <= records; record += step)
+	{
+		const unsigned start = (record - 1) * file->record_length;
+		unsigned offset = 0;
+		while (offset < m_tx_len && ef_byte(file->fid, start + offset) == m_tx[offset])
+			++offset;
+		if (offset != m_tx_len)
+			continue;
+		m_record_pointer = record;
+		if (BIT(m_p2, 4))
+		{
+			m_pending_response[0] = record;
+			m_pending_response_len = 1;
+			queue_status(0x9f, 1);
+		}
+		else
+			queue_status(0x90, 0x00);
+		return;
+	}
+	queue_status(0x94, 0x04);
 }
 
 void nokia_sim_card_device::increase_record()

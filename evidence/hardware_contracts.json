@@ -3,6 +3,11 @@
   "kind": "hardware_contracts",
   "entries": [
     {
+      "id": "sim_linear_record_seek", "subsystem": "sim_card", "status": "partial", "confidence": "strong",
+      "boundary": "GSM 11.11 8.7/9.2.7 defines linear-fixed prefix search, four directions, types one and two, undefined-pointer starts and pointer preservation on failure. The serial controller/card fixture checks all directions and both types, first/last boundaries without wrap, one/16-byte patterns, interior-only mismatch, six parameter rejections, cyclic/transparent rejection, and no-EF status for SEEK and both reads. Type two publishes one pending record-number byte; save/replay before GET RESPONSE reproduces that byte and subsequent current-record readback. The old card fails at the first SEEK procedure byte. All current linear-fixed EFs advertise ALWAYS read access. No handset trace issues SEEK; this is dormant standards conformance, not a newly exercised handset feature or complete SIM command coverage",
+      "evidence": ["docs/sim_subsystem.md", "driver/nokia_sim_card.cpp", "driver/nokia_simi_test.cpp", "tools/run_simi_restore.py", "tools/test_simi_restore.py"]
+    },
+    {
       "id": "sim_get_response_activation_and_adjacency", "subsystem": "sim_card", "status": "partial", "confidence": "strong",
       "boundary": "GSM 11.11 9.2.18 allows GET RESPONSE as the first command after activation because MF is implicitly selected; broken command/response adjacency returns the technical-error status 6F00 under 9.4.5. The serial SIMI fixture verifies initial MF response and save/replay before that command, followed by ten transactions checking one-time authentication/MF/DF/EF responses, STATUS interrupting SELECT adjacency and fresh SELECT recovery. The previous implementation fails the initial MF check. This is standards-derived card/controller conformance, not a newly observed handset request or complete SIM command coverage",
       "evidence": ["docs/sim_subsystem.md", "driver/nokia_sim_card.cpp", "driver/nokia_simi_test.cpp", "tools/run_simi_restore.py", "tools/test_simi_restore.py"]

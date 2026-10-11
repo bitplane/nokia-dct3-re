@@ -34,6 +34,7 @@ private:
 	unsigned m_parameter_case = 0;
 	unsigned m_record_case = 0;
 	unsigned m_write_case = 0;
+	bool m_seek_replayed = false;
 	struct write_case { u8 ins, p1, p2, length; u16 body; u8 sw1, sw2; };
 	static constexpr write_case WRITE_CASES[] = {
 		{0xdc, 0, 4, 32, 0x11, 0x90, 0},
@@ -97,7 +98,55 @@ private:
 		{0xc0, 0, 0, 22, 0, 0x6f, 0},
 		{0xa4, 0, 0, 2, 0x6f7e, 0x9f, 15},
 		{0xc0, 0, 0, 15, 0x6f7e, 0x90, 0},
-		{0xc0, 0, 0, 15, 0, 0x6f, 0}
+		{0xc0, 0, 0, 15, 0, 0x6f, 0},
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f3a, 0x9f, 15},
+		{0xa2, 0, 2, 1, 0x22, 0x90, 0}, // Undefined NEXT starts at record one.
+		{0xb2, 0, 4, 32, 0x22, 0x90, 0},
+		{0xa2, 0, 0x12, 1, 0x44, 0x9f, 1}, // Pending result is checkpointed here.
+		{0xc0, 0, 0, 1, 49, 0x90, 0},
+		{0xb2, 0, 4, 32, 0x44, 0x90, 0},
+		{0xa2, 0, 2, 1, 0x44, 0x94, 4},
+		{0xb2, 0, 4, 32, 0x44, 0x90, 0},
+		{0xa2, 0, 0x12, 1, 0x11, 0x9f, 1},
+		{0xc0, 0, 0, 1, 50, 0x90, 0},
+		{0xa2, 0, 2, 1, 0x22, 0x94, 4}, // No wrap from the last record.
+		{0xb2, 0, 4, 32, 0x11, 0x90, 0},
+		{0xa2, 0, 3, 1, 0x22, 0x90, 0},
+		{0xb2, 0, 4, 32, 0x22, 0x90, 0},
+		{0xa2, 0, 3, 1, 0x22, 0x94, 4}, // No wrap before the first record.
+		{0xb2, 0, 4, 32, 0x22, 0x90, 0},
+		{0xa2, 0, 0x11, 1, 0xff, 0x9f, 1},
+		{0xc0, 0, 0, 1, 48, 0x90, 0},
+		{0xa2, 0, 0x10, 16, 0xff, 0x9f, 1},
+		{0xc0, 0, 0, 1, 2, 0x90, 0},
+		{0xa2, 1, 0, 1, 0xff, 0x6b, 0},
+		{0xa2, 0, 0x80, 1, 0xff, 0x6b, 0},
+		{0xa2, 0, 0x20, 1, 0xff, 0x6b, 0},
+		{0xa2, 0, 4, 1, 0xff, 0x6b, 0},
+		{0xa2, 0, 0, 0, 0, 0x67, 0},
+		{0xa2, 0, 0, 17, 0xff, 0x67, 0},
+		{0xb2, 0, 4, 32, 0xff, 0x90, 0},
+		{0xa2, 0, 0, 1, 0x44, 0x90, 0},
+		{0xc0, 0, 0, 1, 0, 0x6f, 0}, // Type one has no response body.
+		{0xa4, 0, 0, 2, 0x6f3a, 0x9f, 15},
+		{0xa2, 0, 0x13, 1, 0x11, 0x9f, 1}, // Undefined PREVIOUS starts at last.
+		{0xc0, 0, 0, 1, 50, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f39, 0x9f, 15},
+		{0xa2, 0, 0, 1, 0x12, 0x94, 8},
+		{0xa4, 0, 0, 2, 0x6f7e, 0x9f, 15},
+		{0xa2, 0, 0, 1, 0x55, 0x94, 8},
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0xa2, 0, 0, 1, 0xff, 0x94, 0},
+		{0xb2, 1, 4, 32, 0, 0x94, 0},
+		{0xb0, 0, 0, 1, 0, 0x94, 0},
+		{0xa4, 0, 0, 2, 0x6f3a, 0x9f, 15},
+		{0xdc, 2, 4, 32, 0xaabb, 0x90, 0}, // Distinct prefix and interior bytes.
+		{0xb2, 2, 4, 32, 0xaabb, 0x90, 0},
+		{0xa2, 0, 0, 1, 0xbb, 0x94, 4}, // Interior-only match must not succeed.
+		{0xa2, 0, 0x10, 1, 0xaa, 0x9f, 1},
+		{0xc0, 0, 0, 1, 2, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -181,7 +230,7 @@ private:
 		{
 			m_simi->tx_fifo_control_w(4);
 			for (unsigned i = offset; i < std::min<unsigned>(offset + 16, item.length); ++i)
-				m_simi->txd_w(u8(item.body));
+				m_simi->txd_w(i == 0 && item.body > 0xff ? u8(item.body >> 8) : u8(item.body));
 			m_simi->tx_fifo_control_w(0);
 		}
 	}
@@ -442,6 +491,12 @@ private:
 					std::equal(result.kc.begin(), result.kc.end(), m_bytes + 5),
 					"valid authentication after malformed commands returns laboratory SRES and Kc");
 			}
+			else if (item.ins == 0xc0 && item.length == 1 && item.sw1 == 0x90)
+			{
+				expect(m_count == 4 && m_bytes[0] == 0xc0 && m_bytes[1] == item.body &&
+					m_bytes[2] == 0x90 && m_bytes[3] == 0,
+					"SEEK type two returns the independently expected record number");
+			}
 			else if ((item.ins == 0xc0 || item.ins == 0xf2) && item.sw1 == 0x90)
 			{
 				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == item.ins &&
@@ -454,7 +509,8 @@ private:
 				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == item.ins &&
 					m_bytes[m_count - 2] == 0x90 && m_bytes[m_count - 1] == 0, "record-write readback response");
 				for (unsigned i = 1; i <= item.length; ++i)
-					expect(m_bytes[i] == u8(item.body), "record-write readback contents");
+					expect(m_bytes[i] == (i == 1 && item.body > 0xff ? u8(item.body >> 8) : u8(item.body)),
+						"record-write readback contents");
 			}
 			else
 			{
@@ -472,9 +528,17 @@ private:
 				osd_printf_info("SIM binary offsets: PASS cases=14 full_high_byte=1 failed_write_preserves_data=1 boundary_readback=1 handset_claim=0\n");
 			if (m_write_case == 51)
 				osd_printf_info("SIM authentication parameters: PASS invalid_parameters=2 invalid_lengths=3 following_authentication=1 laboratory_algorithm=1 handset_claim=0\n");
+			if (m_write_case == 61)
+				osd_printf_info("SIM response sequencing: PASS initial_mf=1 activation_replay=1 cases=10 consumed_once=1 interrupted_pair=1 technical_error=1 handset_claim=0\n");
+			if (m_write_case == 66) save_checkpoint();
+			if (m_write_case == 67 && !m_seek_replayed)
+			{
+				restore_checkpoint(); clear_capture(); m_seek_replayed = true;
+				begin_write_case(); return;
+			}
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
-			osd_printf_info("SIM response sequencing: PASS initial_mf=1 activation_replay=1 cases=10 consumed_once=1 interrupted_pair=1 technical_error=1 handset_claim=0\n");
+			osd_printf_info("SIM record search: PASS directions=4 types=2 undefined_starts=2 prefix_only=1 failed_pointer_preservation=1 parameter_cases=6 incompatible_files=2 no_selected_ef=3 pending_result_replay=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

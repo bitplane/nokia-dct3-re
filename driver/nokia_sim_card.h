@@ -79,7 +79,7 @@ private:
 	};
 
 	// The structure a command requires of the EF it is addressed to. Named
-	// rather than tested inline so the five commands that begin with this
+	// rather than tested inline so the commands that begin with this
 	// lookup cannot disagree about the status a mismatch reports.
 	enum class access_shape : u8 { transparent, record, cyclic };
 
@@ -109,6 +109,7 @@ private:
 	void queue_read_record(unsigned requested);
 	void update_binary();
 	void update_record();
+	void seek_record();
 	void increase_record();
 	void run_gsm_algorithm();
 	void accept_terminal_profile();

@@ -195,6 +195,17 @@ binary transactions on EF_LOCI check high-byte offsets `80` and `FF`, the
 last valid byte, the first invalid byte and readback after rejected writes.
 These are serial-path card conformance checks, not new handset capabilities.
 
+SEEK implements both types and all four linear-fixed search directions under
+[GSM 11.11 sections 8.7 and 9.2.7](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf).
+It matches record prefixes without wrapping, commits the pointer only on
+success, and exposes type-2 record numbers through GET RESPONSE. The serial
+fixture checks both undefined-pointer starts, one- and sixteen-byte patterns,
+interior-only mismatch, six parameter errors, incompatible cyclic/transparent
+files, and pending-result save/replay. Directory-only selection reports `94 00`
+for SEEK and both read commands; incompatible EFs report `94 08`. Current
+linear-fixed EFs have ALWAYS read access. No retained handset trace uses SEEK;
+this is standards-derived card conformance, not new UI capability.
+
 With an authentication algorithm selected, RUN GSM ALGORITHM rejects nonzero
 `P1/P2` with `6B 00` and a RAND length other than sixteen with `67 00`
 (GSM 11.11 sections 9.2.16 and 9.4.5). With no algorithm selected it remains
@@ -212,7 +223,8 @@ The implemented surface is classified by ownership and evidence:
 | IIR write-one-clear and causes `0x10`/`0x40` | Derived contract | Firmware acknowledgement and organic TX/RX progression are observed. Decoded causes `0x02`, `0x20`, and `0x80` have a typed, activity-gated ingress for a future electrical/card backend, but normal traffic never synthesizes them because their physical trigger conditions and timing remain unknown. |
 | Socket detect status bit 3 and FIQ7 | Validated hardware contract | Physical removal deactivates transport/card state and posts the firmware removal result; reinsertion organically reactivates SIMI, ATR and file initialization in v6.00 and v5.01. Phase 2+, removal and save/load variants are independently gated. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
-| SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. INVALIDATE, REHABILITATE, SEEK and broader error behavior remain unsupported: no retained firmware trace issues those commands, including the organic REFRESH lifecycle. |
+| SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is scoped to the immediately preceding SELECT or data-producing command, or implicit MF selection immediately after activation. INVALIDATE, REHABILITATE and broader error behavior remain unsupported: no retained firmware trace issues those commands, including the organic REFRESH lifecycle. |
+| SEEK record search | Standards-derived dormant contract | Both types, all four linear-fixed directions, prefix matching, failure-preserved pointers and pending-result restoration have isolated serial conformance coverage. No handset acceptance trace currently issues SEEK. |
 | UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Relative/current record reads and writes, write-failure preservation and single-record cyclic updates have isolated conformance coverage; only absolute mode has a handset acceptance trace. Multi-record cyclic UPDATE RECORD ordering remains unsupported. |
 | Cyclic EF_ACM and INCREASE | Standards-derived dormant contract | The descriptor, CHV1 access conditions, checked 24-bit addition, `98 50` overflow result, six-byte delayed response and append-only persistence follow GSM 11.11. NSE-3 constructs the exact `A0 32 00 00 03` APDU, but no product firmware acceptance trace currently exercises it. |
 | RUN GSM ALGORITHM | Organic authenticated registration | The card accepts only `A0 88 00 00 10`, consumes the 16-byte RAND and exposes `SRES || Kc` through the immediately following twelve-byte GET RESPONSE. A3/A8 remains explicitly operator-selectable: the card defaults to no algorithm, while the synthetic laboratory subscriber selects TS 55.205 section 5's AES example and a separately provisioned test key. The AES projection has an independent FIPS-derived vector gate. With authentication explicitly enabled, both 3210 v6.00 and 3310 v6.39 organically execute the command, fetch all twelve bytes, require typed result `0x0066`, copy Kc, publish SRES and emit MM Authentication Response. Both then accept Location Updating Accept, persist EF_LOCI, release the dedicated channel and return to camp. |
