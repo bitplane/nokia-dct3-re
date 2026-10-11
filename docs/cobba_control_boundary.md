@@ -392,6 +392,15 @@ proof that each call consumes a different pair. No multiply/addressing defect
 is demonstrated by this captured case. These PCs are values observed during
 bus writes, not independently recovered instruction-start labels.
 
+Source-bus tracing confirms distinct queue addresses: initialization reads
+`0x1a00..0x1a03`; the next 17 four-word groups advance from
+`0x1a04..0x1a07` through `0x1a44..0x1a47`. Each group contains
+`f620 f138 09e0 0ec8`. The consumer waits on producer/consumer pointers
+`0x06b7/0x06b8` between groups. A stuck source cursor is therefore excluded
+for this first window. The repeated values originate in queue contents;
+the next audit is the producers of those contents and their input phase,
+not changing the helper's indirect-address arithmetic.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
