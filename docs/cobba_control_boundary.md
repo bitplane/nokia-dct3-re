@@ -813,10 +813,17 @@ different cached value at `10b589`. It updates the cache before calling
 `253492` with the new value. That consumer independently requires the low
 nibble of `10ffac == 3` and byte `1073d1 != 0`; otherwise it returns.
 Its admitted path processes four records through `25324a` and ends with
-`2533ca(0,5)`. These are bounded control-flow observations, not proof of
-registration, a readiness report, or native acquisition. The records' output
-semantics and the other `211f6c` arguments remain open contracts.
-`nse1_scan_continuation_contract.py roms/noki5110/5110f530.fls` pins 27
+`2533ca(0,5)`. The record consumer iterates over two coordinates, reads
+packed bitmap bits and calls `2531c0` for each point. That routine bounds
+the coordinates to 84 columns and 48 rows, addresses a byte by
+`84 * (y >> 3) + x`, and updates bit `1 << (y & 7)` in buffers rooted at
+`107610` and `107418`. The first buffer supports set, clear and toggle
+operations; the second is updated from a separate argument flag.
+This establishes a framebuffer-presentation branch, not a native DSP
+completion or an acquisition-ready report. No signal-strength units or
+successful RF result follow from those drawing operations. The final
+`2533ca` operation and other `211f6c` arguments remain open contracts.
+`nse1_scan_continuation_contract.py roms/noki5110/5110f530.fls` pins 32
 fragments in the hash-identified own image (dispatch, parser decisions,
 setter, counter/limit roots, status producer and control tail); every pinned
 byte has mutation coverage. Computed aliases, indirect writers and uploaded
