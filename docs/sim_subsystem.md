@@ -222,6 +222,18 @@ authenticated card, then disconnect/reinsert/reactivate it; both produce ATR
 and require fresh VERIFY before IMSI readback. These are isolated socket/card
 contracts, not handset hot-plug acceptance. They do not close the remaining
 transparent/vendor-file policy audit.
+EF_PUCT (`6F41`) also requires CHV1 READ (GSM 11.11 10.2.12). Its FCP and
+READ BINARY now agree; the serial fixture verifies denial before PIN,
+successful five-byte readback, and denial after unverified-state restoration.
+PUCT update policy remains unmapped: the standard permits an administratively
+selected CHV1/CHV2 condition, not an unconditional assumption of either one.
+
+EF_SMSS (`6F43`, SMS status) remains a concrete file-completeness gap. GSM
+11.11 10.3.7 places it under DF_TELECOM with CHV1 READ/UPDATE; the current
+descriptor incorrectly places an immutable erased body under DF_GSM. Its
+last-used TP-MR and capacity-notification flag need card-owned mutable storage,
+save/load and backward-compatible persistence before handset SMS lifecycle
+claims can cover this file. Do not repair its parent alone and call it complete.
 The standard GSM transparent set Kc (`6F20`), PLMNsel (`6F30`), HPLMN
 (`6F31`), ACMmax (`6F37`), BCCH (`6F74`), ACC (`6F78`), FPLMN (`6F7B`)
 and LOCI (`6F7E`) also enforces CHV1 READ. Serial tests independently check

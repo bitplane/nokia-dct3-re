@@ -267,6 +267,15 @@ private:
 		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
 		{0xc0, 0, 0, 12, 0, 0x90, 0, false, true},
 		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f41, 0x90, 0},
+		{0xb0, 0, 0, 5, 0, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb0, 0, 0, 5, 0xff, 0x90, 0, false, true},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
+		{0xb0, 0, 0, 5, 0, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
 		{0xa4, 0, 0, 2, 0x6f30, 0x9f, 15, true, false, true},
 		{0xc0, 0, 0, 15, 0x6f30, 0x90, 0},
 		{0xd6, 0, 0, 24, 0x1122, 0x98, 4},
@@ -740,6 +749,7 @@ private:
 			osd_printf_info("SIM authentication access: PASS before_pin=1 after_pin=1 gsm_directory=1 rejected_result_absent=1 handset_claim=0\n");
 			osd_printf_info("SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0\n");
 			osd_printf_info("SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
+			osd_printf_info("SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

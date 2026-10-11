@@ -21,11 +21,12 @@ BINARY_ACCESS_PASS = "SIM GSM binary read access: PASS files=8 before_pin=1 afte
 AUTH_ACCESS_PASS = "SIM authentication access: PASS before_pin=1 after_pin=1 gsm_directory=1 rejected_result_absent=1 handset_claim=0"
 BLOCKED_DISABLED_PASS = "SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0"
 PLMN_PASS = "SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
+PUCT_PASS = "SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
 
 
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -57,6 +58,7 @@ def main():
             "plmn_serialized_exactly": True,
             "protected_record_files": 4, "read_access_restore": True,
             "imsi_read_access": True,
+            "puct_read_access": True, "puct_unverified_restore": True,
             "additional_protected_binary_files": 8,
             "authentication_access": True, "authentication_directory": True,
             "disabled_chv_blocking": True, "unblock_recovery": True,
@@ -94,6 +96,7 @@ def main():
     print(AUTH_ACCESS_PASS)
     print(BLOCKED_DISABLED_PASS)
     print(PLMN_PASS)
+    print(PUCT_PASS)
 
 
 if __name__ == "__main__":

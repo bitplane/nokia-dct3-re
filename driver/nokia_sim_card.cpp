@@ -1655,7 +1655,7 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x6f31, 0x7f20, 1, 0, file_structure::transparent, false, true },
 		{ 0x6f37, 0x7f20, 3, 0, file_structure::transparent, false, true },
 		{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true, true },
-		{ 0x6f41, 0x7f20, 5, 0, file_structure::transparent, false },
+		{ 0x6f41, 0x7f20, 5, 0, file_structure::transparent, false, true },
 		{ 0x6f43, 0x7f20, 2, 0, file_structure::transparent, false },
 		{ 0x6f46, 0x7f20, 17, 0, file_structure::transparent, false },
 		{ 0x6f13, 0x7f20, 1, 0, file_structure::transparent, false },
