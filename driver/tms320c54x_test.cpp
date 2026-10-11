@@ -2820,6 +2820,38 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_peripheral_mmr_timing_audit(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_mmr_timing_case = variant;
+		u16 const target = variant & 1 ? 0x25 : 0x12;
+		u16 const opcode = (variant >= 2 ? 0x6800 : 0x7700) | target;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, opcode); program.write_word(0x601, 0xff00);
+		program.write_word(0x602, opcode); program.write_word(0x603, 0xff00);
+		program.write_word(0x604, 0xf073); program.write_word(0x605, 0x604);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, 0xffff);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(false);
+		m_pipeline_store_writes = 0;
+		m_first_operand_cycle = m_last_operand_cycle = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(target, target, "peripheral_mmr_timing_audit",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0xff00, "Timing audit reaches the actual register bus");
+				if (!m_pipeline_store_writes++) m_first_operand_cycle = m_cpu->total_cycles();
+				else m_last_operand_cycle = m_cpu->total_cycles();
+			});
+		m_phase = 251210;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(24, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -23311,8 +23343,8 @@ private:
 				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_stm_case < 11) { start_pipeline_stm_case(m_pipeline_stm_case + 1); return; }
 				osd_printf_info("TMS320C54x staged DAGEN immediate: PASS cases=12 targets=AR,SP,BK write=5 conflicting_write=7 deferred_restore=3 committed_restore=6 duplicate_writes=0\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_peripheral_mmr_timing_audit();
+				return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -23325,6 +23357,22 @@ private:
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251190;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 			return;
+		}
+		if (m_phase == 251210)
+		{
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) && m_pipeline_store_writes == 2, "Timing audit executes both register operations without interrupt or peripheral activity");
+			u64 const observed = m_last_operand_cycle - m_first_operand_cycle;
+			unsigned const specified = m_mmr_timing_case & 1 ? 3 : 2;
+			// An observer, not an accepted oracle for a known missing wait state.
+			osd_printf_info("TMS320C54x MMR timing audit: operation=%s destination=%s observed_cycles=%llu ti_cycles=%u matches=%u physical_latency_claim=0\n",
+				m_mmr_timing_case >= 2 ? "ANDM" : "STM", m_mmr_timing_case & 1 ? "PRD" : "AR2",
+				(unsigned long long)observed, specified, observed == specified);
+			if (!(m_mmr_timing_case & 1)) expect(observed == specified, "CPU-register timing control matches the documented two-cycle class");
+			m_pipeline_write_tap.remove();
+			if (m_mmr_timing_case < 3) { start_peripheral_mmr_timing_audit(m_mmr_timing_case + 1); return; }
+			osd_printf_info("TMS320C54x peripheral MMR timing audit: complete cases=4 fidelity_acceptance=0\n");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
@@ -23781,6 +23829,7 @@ private:
 	unsigned m_pipeline_return_case = 0;
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;
+	unsigned m_mmr_timing_case = 0;
 	unsigned m_pipeline_extensions_reads = 0;
 	memory_passthrough_handler m_pipeline_write_tap;
 	memory_passthrough_handler m_pipeline_operand_tap;

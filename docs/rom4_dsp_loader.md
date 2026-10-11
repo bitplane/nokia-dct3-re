@@ -2384,6 +2384,36 @@ that store/STM conflict, not general DAGEN hazard resolution or peripheral
 register initialization timing. The negative Decode fixture now uses an
 unsupported indirect STM rather than the newly supported direct AR1 form.
 
+#### Peripheral MMR timing gap
+
+[TI SPRU172C](https://www.ti.com/lit/ug/spru172c/spru172c.pdf), March 2001,
+classes 12A and 18A (pages 3-26/3-39), specify a two-cycle base cost for
+STM and ANDM respectively, plus one cycle for a peripheral MMR access.
+The downloaded reference is
+`roms/reference-docs/c54x/ti_tms320c54x_mnemonic_spru172c.pdf`, SHA-256
+`c4f89ce4a774a76de1d93a2413e882a71b82d236fc2c52af63f3159368a37e75`.
+
+`check-c54x-core` now includes a native-backend observer of back-to-back
+bus writes, with the timer stopped and INTM set. It compares CPU-register
+AR2 against peripheral-register PRD without handset ROM or provisioning:
+
+| Operation | Destination | Observed Write Interval | TI Class Cost |
+| --- | --- | --- | --- |
+| STM | AR2 | 2 clocks | 2 clocks |
+| STM | PRD | 2 clocks | 3 clocks |
+| ANDM | AR2 | 2 clocks | 2 clocks |
+| ANDM | PRD | 2 clocks | 3 clocks |
+
+The CPU-register controls are asserted. Peripheral results are printed with
+`fidelity_acceptance=0`, not frozen as a passing two-cycle oracle. The native
+`data_read`/`data_write` and instruction-retirement path currently have no
+peripheral MMR wait accounting. The staged frontend still excludes STM to
+PRD/TCR, and its RAM/IMR RMW fixtures do not validate this peripheral timing.
+Next is an evidenced access penalty with executable CPU/peripheral controls,
+save/load and native regression comparison. These class tables establish
+instruction costs, not every multiword operand's exact pipeline bus phase;
+do not extrapolate first-word DAGEN Read timing to all peripheral accesses.
+
 ANDM/ORM retain the immediate separately from the sampled data operand.
 The three-word absolute form consumes address then literal; its two pending
 extensions are saved independently from the completed pipeline slots.
