@@ -136,7 +136,10 @@ class PinRegistrationTest(unittest.TestCase):
         ))
         with patch('tools.noki5210_pin_registration_check.registration') as registration:
             verify_coherent_late(text, make_profile(pin_enabled=True))
-        registration.assert_called_once_with(text, 'nsm5', nsm5_pin=True)
+            registration.assert_called_once_with(text, 'nsm5', nsm5_pin=True, preserved=False)
+            registration.reset_mock()
+            verify_coherent_late(text, make_profile(pin_enabled=True), preserved=True)
+            registration.assert_called_once_with(text, 'nsm5', nsm5_pin=True, preserved=True)
         with self.assertRaisesRegex(ValueError, 'serving-carrier'):
             verify_coherent_late(text.replace('0010005600c4', '0010000100c4'), make_profile(pin_enabled=True))
 

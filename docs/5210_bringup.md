@@ -436,6 +436,16 @@ silently combined with it.
 
 ## Remaining scope
 
+`make verify-5210-pin-phonebook` physically saves `Ada/123` after delayed PIN
+and coherent registration, verifies the exact record-1 UPDATE and untouched
+remaining 49 ADN records, then starts a separate cold process with a private
+copy of only that run's NVRAM. The cold process re-enters PIN, uses physical
+Names/Search/Detail and renders the reviewed `Phone number: 123` frame.
+Stored `Ada/123`, enabled CHV state and registered idle pixels remain required;
+the cold read must not issue an ADN update. Registration uses the explicit
+preserved-location contract rather than requiring a redundant fresh status
+write. No card record, editor content or handset state is injected.
+
 The gates validate v5.40 PPM E, board bring-up, authenticated and
 unauthenticated registration, operator presentation, save/load, the main menu,
 application entry, clean return navigation, idle mobility, RF loss/recovery,

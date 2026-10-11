@@ -90,6 +90,9 @@ physical Answer/End, CC/RR closure and exact idle recovery.
 and pixels during a local-peer RP wait, then requires timed DISC, UA/release,
 paging and physical idle/menu recovery. Whole-interval reference/replay,
 external host transaction restoration and PIN-enabled SIP remain separate.
+`verify-5210-pin-phonebook` independently adds physical `Ada/123` Save,
+exact ADN ownership, cold reauthentication and Search/Detail with retained
+record contents and reviewed number pixels; the cold read cannot rewrite ADN.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record
 consumer before accepted delayed PIN; no random access follows within 45 s.

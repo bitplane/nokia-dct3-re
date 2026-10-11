@@ -41,7 +41,7 @@ def verify(text, card):
     registration(text, 'nsm5')
 
 
-def verify_coherent_late(text, card):
+def verify_coherent_late(text, card, preserved=False):
     verify_authentication(text, card)
     require_in_order(text, (
         'TX packet type=57 payload=4 words=3 radio_phase=serving_bcch data=03050000',
@@ -52,7 +52,7 @@ def verify_coherent_late(text, card):
     ))
     if not re.search(r'RX enqueue type=8b payload=166 [^\n]*data=0010005600c4', text):
         raise ValueError('missing own coherent serving-carrier measurement')
-    registration(text, 'nsm5', nsm5_pin=True)
+    registration(text, 'nsm5', nsm5_pin=True, preserved=preserved)
 
 
 def verify_pin_sms(text, card, state=False):
@@ -205,6 +205,8 @@ def main():
     mode.add_argument('--silent-sms', action='store_true')
     mode.add_argument('--host-incoming-call', action='store_true')
     mode.add_argument('--silent-sms-state', action='store_true')
+    mode.add_argument('--phonebook-save', action='store_true')
+    mode.add_argument('--phonebook-read', action='store_true')
     args = parser.parse_args()
     if args.host_incoming_call:
         args.incoming_call = True
@@ -214,7 +216,23 @@ def main():
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms or args.outgoing_call_state or args.rejected_sms or args.silent_sms else verify)(text, card)
+        if args.phonebook_read:
+            verify_coherent_late(text, card, preserved=True)
+        else:
+            (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms or args.outgoing_call_state or args.rejected_sms or args.silent_sms or args.phonebook_save else verify)(text, card)
+        if args.phonebook_save or args.phonebook_read:
+            from tools.sim_phonebook_check import validate_phonebook, validate_phonebook_storage
+            if args.phonebook_save:
+                validate_phonebook(text, card, b'Ada')
+            else:
+                validate_phonebook_storage(card, b'Ada')
+                if 'update fid=6f3a' in text:
+                    raise ValueError('cold read unexpectedly rewrote phonebook')
+                require_in_order(text, ('SIM status ins=20 sw=9000',
+                                       '5210_pin_physical: key=Right Softkey / C',
+                                       '5210_pin_physical: key=Left Softkey / Menu',
+                                       '5210_pin_physical: key=Left Softkey / Menu',
+                                       '5210_pin_physical: key=Left Softkey / Menu'))
         if args.silent_sms:
             verify_pin_outgoing_sms(text, silent=True, local_silence=args.silent_sms_state)
             if args.silent_sms_state:
@@ -292,7 +310,10 @@ def main():
                                    '5210_pin_state: event=saved',
                                    '5210_pin_state_physical: key=End'))
             call_lifecycle(text, coherent_pin=True, require_state_roundtrip=True)
-        frames = ({'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
+        frames = ({'entered': FRAMES['entered'], 'idle': FRAMES['idle'],
+                   **({'phonebook': 'e423343c5e8a3db00307d333ff04688ff10de205013682742c3282616768aba4'}
+                      if args.phonebook_read else {})} if args.phonebook_save or args.phonebook_read else
+                  {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'sms_recovery_menu': 'b0482e752fafaa38a1adeaca7aafc462e1ac1a07d368e137fefd9cb985512a2c'} if args.silent_sms else
                   {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'sms_rejected': '97376e427eaf1b6bafb9eedc2a657c78668ea96794ddeb3510da4d30010d5fb4',
@@ -318,7 +339,9 @@ def main():
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 PIN-enabled silent SMS timeout and physical recovery PASS; research HLE' if args.silent_sms else
+    print('5210 PIN-enabled cold phonebook Detail and retained Ada/123 PASS; research HLE' if args.phonebook_read else
+          '5210 PIN-enabled physical Ada/123 phonebook Save PASS; research HLE' if args.phonebook_save else
+          '5210 PIN-enabled silent SMS timeout and physical recovery PASS; research HLE' if args.silent_sms else
           '5210 PIN-enabled rejected SMS and physical recovery PASS; research HLE' if args.rejected_sms else
           '5210 PIN-enabled outgoing-call restoration and physical release PASS; HLE signaling, not native speech' if args.outgoing_call_state else
           '5210 PIN-enabled physical outgoing SMS and Message sent PASS; research HLE' if args.outgoing_sms else

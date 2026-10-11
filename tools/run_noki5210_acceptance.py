@@ -61,6 +61,8 @@ SCENARIOS = {
                                       seconds=60, net_masks=('32',), host_call='incoming'),
     'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
                                   seconds=155, sms_mask='24'),
+    'pin-phonebook': Scenario('noki5210_pin_phonebook.lua', '--phonebook-save', seconds=55),
+    'pin-phonebook-read': Scenario('noki5210_pin_phonebook_read.lua', '--phonebook-read'),
 }
 
 
@@ -69,6 +71,7 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--port', type=int, default=18991)
+    parser.add_argument('--preserved-nvram', type=Path)
     parser.add_argument('--scenario', choices=SCENARIOS,
                         default='toolkit-interactive')
     parser.add_argument('--observe-readiness', action='store_true',
@@ -76,6 +79,8 @@ def main():
     args = parser.parse_args()
     if args.observe_readiness and args.scenario != 'pin-registration':
         parser.error('--observe-readiness requires pin-registration')
+    if (args.preserved_nvram is not None) != (args.scenario == 'pin-phonebook-read'):
+        parser.error('--preserved-nvram is required only for pin-phonebook-read')
     root = Path(__file__).resolve().parents[1]
     scenario = SCENARIOS[args.scenario]
     run = args.run_directory.resolve()
@@ -102,8 +107,13 @@ def main():
                                         encoding='utf-8', xml_declaration=True)
         if scenario.pin:
             card = run / 'nvram/noki5210_3/sim_card'
-            card.parent.mkdir()
-            card.write_bytes(make_profile(pin_enabled=True))
+            if args.preserved_nvram:
+                shutil.copytree(args.preserved_nvram.resolve(), run / 'nvram', dirs_exist_ok=True)
+                if not card.is_file():
+                    raise ValueError('own BIOS-local preserved SIM card absent')
+            else:
+                card.parent.mkdir()
+                card.write_bytes(make_profile(pin_enabled=True))
         else:
             shutil.copyfile(root / 'fixtures/sim_toolkit_5210_interactive/noki5210.cfg',
                             run / 'cfg/noki5210.cfg')
@@ -155,6 +165,10 @@ def main():
         if scenario.host_call == 'outgoing':
             from tools.radio_host_outgoing_connect_check import verify as verify_host_call
             verify_host_call((run / 'error.log').read_text(errors='replace'), '5551234')
+        if args.scenario == 'pin-phonebook':
+            subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),
+                            '--scenario', 'pin-phonebook-read', '--preserved-nvram',
+                            str(run / 'nvram'), '--mame', command[0]], check=True)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 

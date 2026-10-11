@@ -31,13 +31,24 @@ class RunnerTests(unittest.TestCase):
             'pin-host-outgoing-call': (60, '--outgoing-call', ('32',)),
             'pin-host-incoming-call': (60, '--host-incoming-call', ('32',)),
             'pin-sms-wait-state': (155, '--silent-sms-state', ()),
+            'pin-phonebook': (55, '--phonebook-save', ()),
+            'pin-phonebook-read': (45, '--phonebook-read', ()),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
             for name, (seconds, flag, masks) in expected.items():
                 with self.subTest(scenario=name):
                     run = Path(temporary) / name
-                    with patch('sys.argv', ['runner', str(run), '--scenario', name]), \
+                    argv = ['runner', str(run), '--scenario', name]
+                    expected_card = make_profile(pin_enabled=True)
+                    if name == 'pin-phonebook-read':
+                        preserved = Path(temporary) / 'preserved'
+                        card = preserved / 'noki5210_3/sim_card'
+                        card.parent.mkdir(parents=True)
+                        expected_card = b'Ada' + expected_card[3:]
+                        card.write_bytes(expected_card)
+                        argv.extend(['--preserved-nvram', str(preserved)])
+                    with patch('sys.argv', argv), \
                             patch.object(runner.subprocess, 'run') as execute, \
                             patch('tools.radio_host_outgoing_connect_check.verify') as host_verify, \
                             patch.object(Path, 'read_text', return_value='host trace'):
@@ -48,7 +59,7 @@ class RunnerTests(unittest.TestCase):
                     silent = name == 'pin-host-silent-sms'
                     call = name in ('pin-host-outgoing-call', 'pin-host-incoming-call')
                     incoming_call = name == 'pin-host-incoming-call'
-                    self.assertEqual(execute.call_count, 3 if host and not call else 2)
+                    self.assertEqual(execute.call_count, 3 if (host and not call) or name == 'pin-phonebook' else 2)
                     if call and not incoming_call:
                         host_verify.assert_called_once_with('host trace', '5551234')
                     else:
@@ -79,6 +90,10 @@ class RunnerTests(unittest.TestCase):
                     self.assertTrue(Path(script).is_file())
                     checker = execute.call_args_list[1].args[0]
                     self.assertEqual(checker[2:], [str(run)] + ([flag] if flag else []))
+                    if name == 'pin-phonebook':
+                        cold = execute.call_args_list[2].args[0]
+                        self.assertEqual(cold[2:7], [str(run / 'cold'), '--scenario',
+                                         'pin-phonebook-read', '--preserved-nvram', str(run / 'nvram')])
                     if host and not call:
                         host_check = execute.call_args_list[2].args[0]
                         self.assertEqual(Path(host_check[1]).name,
@@ -96,7 +111,7 @@ class RunnerTests(unittest.TestCase):
                         self.assertFalse((run / 'nvram/noki5210_3').exists())
                     else:
                         self.assertEqual((run / 'nvram/noki5210_3/sim_card').read_bytes(),
-                                         make_profile(pin_enabled=True))
+                                         expected_card)
                         self.assertFalse((run / 'nvram/noki5210').exists())
                         if masks is None:
                             self.assertFalse(config.exists())
@@ -122,6 +137,14 @@ class RunnerTests(unittest.TestCase):
         with patch('sys.argv', ['runner', 'unused', '--scenario', 'late-pin-registration',
                                 '--observe-readiness']):
             with self.assertRaises(SystemExit) as result:
+                runner.main()
+            self.assertEqual(result.exception.code, 2)
+
+    def test_preserved_storage_only_allowed_for_cold_phonebook_read(self):
+        for argv in (['runner', 'unused', '--scenario', 'pin-phonebook-read'],
+                     ['runner', 'unused', '--preserved-nvram', 'source']):
+            with self.subTest(argv=argv), patch('sys.argv', argv), \
+                    self.assertRaises(SystemExit) as result:
                 runner.main()
             self.assertEqual(result.exception.code, 2)
 
