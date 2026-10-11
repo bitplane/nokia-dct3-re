@@ -762,8 +762,15 @@ using A's high word as the multiplicand, including B accumulation, T
 publication, rounding, and one-cycle DARAM timing. `3693` uses TI's `POLY`
 example operands and results with simple `*AR3+` addressing, not the example's
 circular `*AR3+%`: it checks the rounded A result, B's shifted memory word,
-unchanged T, postincremented AR3, and one-cycle cost. Other `0x30..0x3f`
-variants remain untested.
+unchanged T, postincremented AR3, and one-cycle cost. Sixty-four additional
+`3682` cases check old A-high=1 and T=1 with four old-B rounding boundaries,
+FRCT/OVM/SXM clear/set and pre-existing OVA clear/set. They assert positive
+rounding overflow and saturation, sticky OVA, preserved C/OVB/T, and the
+independent signed/unsigned memory load into B. All pass without changing
+the implementation, following TI SPRU172C POLY (4-126). These cases fix
+SMUL=0 and C16=0; other addressing modes, negative saturation and physical
+pipeline timing remain unestablished. Native FR encoding and decoding retain
+their exact independent comparisons on this build.
 Fixture-only `3083` checks `LD Smem,T`; `3983` and `3a83` check the
 remaining square-add/subtract accumulator destinations. `3c83` through
 `3f83` check all four `ADD Smem,16,src,dst` A/B routes, signed memory

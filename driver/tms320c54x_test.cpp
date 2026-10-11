@@ -63,6 +63,27 @@ private:
 		m_phase = 230000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_poly_boundary_case(unsigned index)
+	{
+		static constexpr u64 before[] = {0x7fff7fff, 0x7fff8000, 0xffffffffffULL, 0xffffff7fffULL};
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0800, 0x3682); // POLY *AR2.
+		program.write_word(0x0801, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0600, 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, before[index % 4]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1a00 | (index & 32 ? 0x0400 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
+			(index & 4 ? 0x0040 : 0) | (index & 8 ? 0x0200 : 0) | (index & 16 ? 0x0100 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 250000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_abdst_overflow_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -21532,6 +21553,27 @@ private:
 				"ABDST accumulates absolute signed-17 old A with FRCT, sticky OVB and OVM saturation");
 			if (index < 15) { start_abdst_overflow_case(index + 1); return; }
 			osd_printf_info("TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0\n");
+			start_poly_boundary_case(0); return;
+		}
+		if (m_phase >= 250000 && m_phase < 250064)
+		{
+			unsigned const index = m_phase - 250000;
+			static constexpr s64 before[] = {0x7fff7fff, 0x7fff8000, -1, -32769};
+			s64 const rounded = (before[index % 4] + (index & 4 ? 2 : 1) + 32768) & ~s64(65535);
+			bool const overflow = rounded > 0x7fffffffLL || rounded < -0x80000000LL;
+			u64 const result = overflow && (index & 8) ? 0x7fffffff : u64(rounded) & 0xffffffffffULL;
+			u16 const flags = 0x1a00 | (overflow || (index & 32) ? 0x0400 : 0);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == result &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (index & 16 ? 0xffffff0000ULL : 0xffff0000ULL) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == flags &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(STATE_GENPC) == 0x0802,
+				"POLY rounds old-B product sum, applies OVM/sticky OVA and independently loads SXM-extended memory into B");
+			if (index < 63) { start_poly_boundary_case(index + 1); return; }
+			osd_printf_info("TMS320C54x POLY boundaries: PASS cases=64 frct=0,1 ovm=0,1 sxm=0,1 sticky_ova=1 pipeline_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
