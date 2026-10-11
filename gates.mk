@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 684 gates: 486 generated from typed steps, 198 copied verbatim (shell).
+# 686 gates: 488 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -316,6 +316,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-hotplug-v501 verify-sim-hotplug-toolkit \
 	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
 	verify-sim-toolkit-3310 verify-sim-toolkit-3330 \
+	verify-5210-radio-measurement-static verify-5210-late-pin-boundary \
 	verify-5210-sim-pin-registration verify-sim-toolkit-interactive-5210 \
 	verify-sim-toolkit-5210 verify-sim-toolkit-state-roundtrip \
 	verify-sim-toolkit-removal verify-sim-phonebook verify-sim-pin \
@@ -4417,6 +4418,12 @@ verify-sim-toolkit-3330:
 	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit_3330/noki3330.cfg $(RUN_DIR)/cfg/; \
 	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3330) RUN_DIR=$(RUN_DIR) SECONDS=70 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg'; \
 	$(PYTHON) tools/sim_toolkit_cross_rom_trace_check.py $(RUN_DIR)/error.log --outcome screen-busy
+
+verify-5210-radio-measurement-static: normalize-5210
+	$(PYTHON) tools/noki5210_radio_contract.py roms/noki5210/5210_5.40_ppm_e.fls
+
+verify-5210-late-pin-boundary: normalize-5210 build
+	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario late-pin-boundary --mame $(MAME_DIR)/mame
 
 verify-5210-sim-pin-registration: normalize-5210 build
 	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario pin-registration --mame $(MAME_DIR)/mame

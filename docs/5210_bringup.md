@@ -99,6 +99,20 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   12-s start with slower keys accepts PIN at 20.018 s and remains interactive,
   but never requests Location Updating during the 45-s window. Late SIM
   readiness remains an open firmware/peer lifecycle boundary, not a PIN failure.
+- `verify-5210-radio-measurement-static` pins the own MCU hash and RX table:
+  `3de7a0[8] -> 3de7f4 -> 37019c`; the selected forwarding branch posts to
+  task 12. Completion `2e336c -> 2bd782` consumes forty four-byte records,
+  with big-endian carrier at message offsets 6/7 and signed RSSI at 9.
+  These are MCU receive semantics, not measured DSP or RF behavior.
+- `verify-5210-late-pin-boundary` repeats delayed physical PIN entry for
+  45 s and passively proves `57:03050000 -> 8b/166 -> 37019c -> 2e336c ->
+  2bd782` before successful VERIFY. The peer now answers that organic
+  request without interrupting its serving receiver. The parser runs at
+  10.209 s; the later accepted PIN still produces no random access during
+  the bounded run. This negative gate must fail if radio progress changes,
+  and does not promote late-PIN registration. Recovery is therefore beyond
+  delivery of this one measurement completion; do not repeat it or delay
+  channel acknowledgements solely to make registration pass.
 - `make verify-sim-toolkit-interactive-5210` independently accepts GET INKEY
   `5` and GET INPUT `42`, with exact successful terminal responses and five
   reviewed prompt/entered/registered-idle frames. NSM-5 requires physical OK

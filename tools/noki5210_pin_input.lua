@@ -13,13 +13,13 @@ local input = coroutine.create(function()
         field:set_value(1)
         assert(emu.wait(0.15))
         field:set_value(0)
-        assert(emu.wait(0.2))
+        assert(emu.wait(_G.noki5210_pin_gap or 0.2))
     end
     local function snapshot(phase)
         machine.screens[':screen']:snapshot('5210_pin_' .. phase .. '.png')
     end
     -- SIM initialization finishes near 6.4 s on this own-ROM cold profile.
-    assert(emu.wait(7))
+    assert(emu.wait(_G.noki5210_pin_start_delay or 7))
     for _, name in ipairs({'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad 4'}) do press(name) end
     snapshot('entered')
     press('Left Softkey / Menu')
@@ -33,4 +33,7 @@ local input = coroutine.create(function()
     snapshot('recovered')
 end)
 _G.noki5210_pin_input = input
+_G.noki5210_pin_stop = emu.add_machine_stop_notifier(function()
+    machine:logerror(string.format('5210_pin_fixture: stopped_at=%.9f\n', machine.time:as_double()))
+end)
 assert(coroutine.resume(input))

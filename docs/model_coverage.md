@@ -48,6 +48,11 @@ old set. See the current audit boundary in
 reviewed masked-code/menu/idle frames and physical recovery. A delayed
 entry accepts the PIN but does not register in the observed 45-s window;
 late-readiness recovery and authenticated call/SMS parity remain unproved.
+`verify-5210-late-pin-boundary` independently proves an organic background
+measurement request, request-correlated reply and its own forty-record
+consumer before accepted delayed PIN; no random access follows within 45 s.
+The missing reply was not the recovery trigger. The negative gate distinguishes
+this unresolved lifecycle from authenticated registration coverage.
 
 `verify-sim-toolkit-interactive-5210` independently extends NSM-5's Phase-2+
 DISPLAY TEXT coverage with physical GET INKEY `5`/GET INPUT `42`, successful

@@ -896,6 +896,11 @@ constexpr nokia_product_config make_5210_config()
 	result.simi_controller = true;
 	result.synthetic_sim_card = true;
 	result.radio = RADIO_NSM5;
+	// Own 3de7a0 table routes RX 8b through 37019c to task 12;
+	// 2e336c -> 2bd782 consumes forty four-byte ARFCN/RSSI records.
+	// Late SIM readiness organically emits 57:03050000. Answer that
+	// request at the DSP boundary, without selecting firmware state.
+	result.radio.background_band_measurements = true;
 	// Physical Answer and End independently publish wire values 0x860b and
 	// 0x840a. Decode that evidenced control field independently of the PCM bus.
 	result.dsp_speech_control = DSP_SPEECH_CONTROL_NSM5;

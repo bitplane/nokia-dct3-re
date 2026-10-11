@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
-from tools.noki5210_pin_registration_check import verify
+from tools.noki5210_pin_registration_check import verify, verify_late_boundary
 
 
 def complete():
@@ -14,6 +14,33 @@ def complete():
 
 
 class PinRegistrationTest(unittest.TestCase):
+    def late_trace(self):
+        prefix = '\n'.join((
+            'TX packet type=57 payload=4 words=3 radio_phase=serving_bcch data=03050000',
+            'RX enqueue type=8b payload=166',
+            '5210_measurement_entry: pc=0037019c',
+            '5210_measurement_entry: pc=002e336c',
+            '5210_measurement_entry: pc=002bd782',
+        ))
+        return prefix + '\n' + complete().replace(
+            'LAPDm Location Updating Accept acknowledged nr=1', '5210_pin_fixture: stopped_at=45.000000000')
+
+    def test_late_boundary(self):
+        verify_late_boundary(self.late_trace(), make_profile(pin_enabled=True))
+
+    def test_late_boundary_requires_consumption_and_full_window(self):
+        for original, replacement in (
+            ('pc=002bd782', 'pc=002bd784'),
+            ('RX enqueue type=8b payload=166', 'RX missing'),
+            ('stopped_at=45.000000000', 'stopped_at=21.000000000'),
+        ):
+            with self.subTest(original=original), self.assertRaises(ValueError):
+                verify_late_boundary(self.late_trace().replace(original, replacement), make_profile(pin_enabled=True))
+
+    def test_late_boundary_rejects_new_radio_progress(self):
+        with self.assertRaisesRegex(ValueError, 'boundary changed'):
+            verify_late_boundary(self.late_trace() + '\nradio_phase=random_access', make_profile(pin_enabled=True))
+
     def test_complete(self):
         with patch('tools.noki5210_pin_registration_check.registration') as registration:
             verify(complete(), make_profile(pin_enabled=True))

@@ -1,6 +1,7 @@
 """Physical NSM-5 PIN verification followed by own laboratory registration."""
 import argparse
 import hashlib
+import re
 from pathlib import Path
 import sys
 
@@ -18,7 +19,7 @@ FRAMES = {
 }
 
 
-def verify(text, card):
+def verify_authentication(text, card):
     if '[LUA ERROR]' in text:
         raise ValueError('physical PIN fixture failed')
     validate(text, card, 'verify', '1234')
@@ -27,27 +28,56 @@ def verify(text, card):
         '5210_pin_physical: key=Keypad 3', '5210_pin_physical: key=Keypad 4',
         '5210_pin_physical: key=Left Softkey / Menu',
         'SIM status ins=20 sw=9000',
+    ))
+
+
+def verify(text, card):
+    verify_authentication(text, card)
+    require_in_order(text, (
+        'SIM status ins=20 sw=9000',
         'LAPDm Location Updating Accept acknowledged nr=1',
     ))
     registration(text, 'nsm5')
+
+
+def verify_late_boundary(text, card):
+    verify_authentication(text, card)
+    require_in_order(text, (
+        'TX packet type=57 payload=4 words=3 radio_phase=serving_bcch data=03050000',
+        'RX enqueue type=8b payload=166',
+        '5210_measurement_entry: pc=0037019c',
+        '5210_measurement_entry: pc=002e336c',
+        '5210_measurement_entry: pc=002bd782',
+        'SIM status ins=20 sw=9000',
+    ))
+    stops = re.findall(r'5210_pin_fixture: stopped_at=([0-9.]+)', text)
+    if len(stops) != 1 or float(stops[0]) < 44:
+        raise ValueError('delayed-readiness observation ended before the bounded run')
+    if ('LAPDm Location Updating Accept acknowledged' in text or
+            'radio_phase=random_access' in text):
+        raise ValueError('late-readiness boundary changed: review radio progress rather than retaining this negative gate')
 
 
 def main():
     from PIL import Image
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
+    parser.add_argument('--late-boundary', action='store_true',
+                        help='verify the unresolved delayed-readiness boundary, not registration')
     args = parser.parse_args()
     try:
         run = args.run_directory
-        verify((run / 'error.log').read_text(errors='replace'),
-               (run / 'nvram/noki5210_3/sim_card').read_bytes())
-        for phase, digest in FRAMES.items():
+        text = (run / 'error.log').read_text(errors='replace')
+        card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
+        (verify_late_boundary if args.late_boundary else verify)(text, card)
+        for phase, digest in ({} if args.late_boundary else FRAMES).items():
             with Image.open(run / f'snap/5210_pin_{phase}.png') as frame:
                 if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 physical SIM PIN and subsequent laboratory registration PASS; research HLE')
+    print('5210 delayed PIN/measurement boundary reproduced; registration unresolved' if args.late_boundary else
+          '5210 physical SIM PIN and subsequent laboratory registration PASS; research HLE')
 
 
 if __name__ == '__main__':

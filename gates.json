@@ -14321,6 +14321,18 @@
       ]
     },
     {
+      "name": "verify-5210-radio-measurement-static", "prerequisites": ["normalize-5210"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/noki5210_radio_contract.py",
+                 "arguments": ["roms/noki5210/5210_5.40_ppm_e.fls"]}]
+    },
+    {
+      "name": "verify-5210-late-pin-boundary", "prerequisites": ["normalize-5210", "build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki5210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "late-pin-boundary", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-5210-sim-pin-registration", "prerequisites": ["normalize-5210", "build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki5210_acceptance.py",
