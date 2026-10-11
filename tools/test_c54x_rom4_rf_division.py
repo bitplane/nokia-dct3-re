@@ -13,6 +13,15 @@ def division_tail(numerator, denominator):
 
 
 class RFDivisionTest(unittest.TestCase):
+    def test_captured_window_accounting(self):
+        # Energy is seeded from a separate queue before 17 adjacent-pair
+        # comparisons. It is not the squared magnitude of the stored pair.
+        queued_energy = 0x00b92340
+        pair_dot = -(2528 ** 2 + 3784 ** 2)
+        self.assertEqual(18 * queued_energy, 0x0d047a80)
+        self.assertEqual(17 * pair_dot, -0x14fc0440)
+        self.assertNotEqual(queued_energy, -pair_dot)
+
     def test_captured_correlation_sum(self):
         # 17 observed helper returns precede the first normalization entry.
         pair_energy = 0x09e0 ** 2 + 0x0ec8 ** 2

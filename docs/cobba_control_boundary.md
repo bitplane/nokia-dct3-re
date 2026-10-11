@@ -415,6 +415,22 @@ the distinct `0x335d/0x335e` producer publishes zero pairs. Keep these
 lifecycles separate when tracing the historical score discrepancy; this does
 not establish the port's physical sample cadence or the old capture's validity.
 
+The first window's two totals have different, observed accumulation contracts.
+At `0x4734/0x4735`, the firmware seeds data `0x124e/0x124f` from the
+double-word energy queue at `0x1a80/0x1a81`, value `0x00b92340`.
+The block with `BRC=0x0010` then makes 17 adjacent-pair comparisons. Each
+adds `-0x13c0040` to the correlation at `0x124a/0x124b` and reads one
+further energy double word, advancing `0x1a82..0x1aa3`. Thus the entry to
+`0x4778` is exactly `18*0x00b92340 = 0x0d047a80`, while the correlation
+is `17*(-0x13c0040) = -0x14fc0440`. The native energy producer publishes
+`0x00b9/0x2340` at observed bus-write PC `0x3374`. Its value is not the
+squared magnitude of the stored correlation pair. The independent integer
+test pins both totals; unequal counts alone are not a repeat defect.
+These are bounded read-only observations on the same synthetic rotating
+input, not an RF-format claim. The next numerical boundary is the energy
+producer around `0x3374` and how it derives its term from filter outputs;
+do not replace the separate energy stream with pair magnitude by assumption.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
