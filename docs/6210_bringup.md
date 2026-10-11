@@ -720,6 +720,21 @@ justify filling nonexistent strong carriers or duplicating the one cell
 to satisfy counters. Recover the mode's weak-result/scan-end behavior
 and retry budget as well as its band selector before changing the peer.
 Evidence: `tmp/6210-plmn-measurement-counts-{national,international}/error.log.gz`.
+The next own-ROM continuation is now statically bounded. Stage 5 with
+input zero checks the referenced measurement state: values 3 or 4 take
+`4cfc92` to `4cfcb0`, then call `38a80a`. The intermediate `38b27a`
+is an empty return in this image, not an unimplemented hardware command.
+`38a80a` collects up to forty ARFCNs from accepted records whose low
+flag nibble is 2. If none exist it returns 3; otherwise it posts a
+type-`09`, 80-byte ARFCN array to task 3 through `3f22ce`, with unused
+bytes initialized to `ff` by `3f22e6`. This is a concrete downstream
+request family, not immediate completion publication. Its response
+contract remains to be recovered before claiming selection completion.
+For configuration 3, `38b662` tests the next response count against 14;
+below that it returns zero, at/above it returns one. A weak record can
+select state 4 earlier, as the measured common response demonstrates.
+Do not interpret this bound as a requirement to send fourteen identical
+responses or fabricate enough strong carriers to fill the count quotas.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the response contract for foreign selection's
 type-`57` mode byte `03`, ownership of the pre-existing completion object,
