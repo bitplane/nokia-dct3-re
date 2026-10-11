@@ -497,6 +497,13 @@ reaches `2d1118` when byte zero of the object referenced by `175458`
 equals 5. These local comparisons are pinned to the own image, but their
 enclosing entry conditions and subsystem semantics are not yet recovered.
 They do not justify treating `07f4` as an ordinary roaming completion.
+Fresh 25-second national and foreign controls reproduce the original
+`09c8/07d4` versus `09c6/07d2` split with clean observer health. Passive
+taps at `2d1118`, `2d111a`, `4cfdd4`, `313218`, `2d0d50` and `2d1048`
+record no hits in either control. This is bounded non-observation, not a
+proof that the code never executes (instruction-fetch tap granularity
+still applies). Evidence:
+`tmp/6210-plmn-completion-entry-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
