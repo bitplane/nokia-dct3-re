@@ -368,6 +368,15 @@ arithmetic chain. No mismatch is established within normalization for these
 inputs; the incoming correlation accumulators and their lifecycle are the
 next boundary to audit. This does not validate all status/saturation cases.
 
+The first correlation input is accounted for by 17 observed returns at
+`0x47f2` before the first `0x4778` entry. Each returns `A=-0x13c0040`,
+`B=0`; their sum is exactly `-0x14fc0440`. Across the first 32 captured
+calls, data `0x1254/0x1255` remains `0x09e0/0x0ec8`, and
+`0x09e0^2 + 0x0ec8^2 = 0x13c0040`. This numerical identity does not establish
+the helper's general dot/cross semantics: its actual indirect reads, prior-pair
+updates and TC-selected lifecycle still need auditing. The advancing outer
+cursor alone is not proof that each call consumes a different pair.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.

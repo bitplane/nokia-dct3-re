@@ -13,6 +13,12 @@ def division_tail(numerator, denominator):
 
 
 class RFDivisionTest(unittest.TestCase):
+    def test_captured_correlation_sum(self):
+        # 17 observed helper returns precede the first normalization entry.
+        pair_energy = 0x09e0 ** 2 + 0x0ec8 ** 2
+        self.assertEqual(pair_energy, 0x13c0040)
+        self.assertEqual(-17 * pair_energy, -0x14fc0440)
+
     def test_captured_normalization_operands(self):
         # Independent signed integers, not the core's masked-accumulator helpers.
         energy = 0x0d047a80
