@@ -241,6 +241,10 @@ private:
 	u16 m_pipeline_return_pc = 0;
 	bool m_pipeline_flush_front = false;
 	bool m_pipeline_vector_pending = false;
+	u8 m_pipeline_decode_flush = 0;
+	u8 m_pipeline_control_words = 0;
+	u8 m_pipeline_delay_decode_words = 0;
+	u32 m_pipeline_control_address = 0;
 	u64 m_pipeline_cycles = 0;
 	std::array<u16, 0x10000> m_opcode_first_pc;
 	std::array<u32, 0x10000> m_opcode_count = {};

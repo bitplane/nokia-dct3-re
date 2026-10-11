@@ -2281,7 +2281,8 @@ enables it. Executable coverage is NOP, one-word immediate loads, two-word
 shifted immediate loads, direct DP-relative loads and STL/STH stores, and
 short indirect loads using plain, post-decrement, post-increment or
 pre-increment addressing, and ANDM/ORM with DP-relative, plain/post-decrement/
-post-increment short indirect or three-word absolute (`f8`) operands.
+post-increment short indirect or three-word absolute (`f8`) operands, and
+RETF/RETFD with one-word load/NOP delay slots.
 SP-relative, other indirect and other multiword forms stop at Decode without
 atomic fallback.
 
@@ -2292,7 +2293,19 @@ Execute at 6, continuation stack write at 7, and first ISR Execute at 10.
 The already-prefetched flush word reaches Fetch at cycle 4 but never Decode
 or Execute. The continuation is the first not-decoded instruction, not the
 prefetch cursor. The test uses a one-word immediate load as the first ISR
-instruction; it does not claim the example's RETFD/return/delay-slot behavior.
+instruction. Separate fast-return fixtures cover the example's return side.
+
+RETF/RETFD increment SP and read RTN in Access, initiating target Prefetch
+without a stack-memory read (SPRU131G examples 7-11/12). Execute clears INTM.
+RETF discards the two sequential delay words; RETFD preserves them and
+defers interrupt acceptance until they retire. Eight fixtures cover both
+forms on base and extended program pages, restoring either pre-Access or
+post-Access checkpoints. With interrupt acceptance at 3, return Access is
+at 8, target Fetch at 9, return Execute at 10, delayed loads Execute at
+11/12 and the resumed target Execute at 13 (example 7-18). No replay
+increments SP twice or reads the stacked continuation. Multiword delay
+slots and pending interrupts during return remain unverified; these tests
+do not establish general control-flow or hazard completeness.
 
 Separate empty-frontend IRQ and NMI fixtures accept at cycle 1, fetch the
 vector at 4, write the continuation at 5 and retire the first ISR load at 8.
@@ -2337,7 +2350,7 @@ ordinary CPU data map: Read at 7 samples mask 1, Execute at 8 writes mask 0,
 the already-accepted interrupt finishes, and a subsequent IRQ remains pending
 with INTM clear. Its restored post-Read leg writes once without rereading IMR.
 This implements the form used by the timer-boundary probe, not that complete
-program: staged returns, idle/control rules and native enablement are still
+program: general staged control flow, idle rules and native enablement are still
 missing, so the timer/recorder starvation boundary remains unclosed.
 
 Two-word immediate loads retain the opcode while the following fetched word
