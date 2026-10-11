@@ -555,7 +555,12 @@ Phase 2+ laboratory card. `verify-8850-sim-toolkit-menu` additionally proves
 card-owned SET UP MENU, physical menu navigation and accepted item-1 ENVELOPE,
 with reviewed entry/list/result pixels and physical End recovery to numeric
 `001 01` registered idle. Selection remains on the item list; it does not
-prove a menu-triggered application or network service. Other proactive
+prove a menu-triggered application or network service.
+`verify-8850-sim-toolkit-sms` separately proves card-requested SEND SHORT
+MESSAGE to `5551234`, one decoded SMS-SUBMIT, CP/RP acknowledgements,
+successful TERMINAL RESPONSE and RR release, followed by physical idle
+recovery. This remains laboratory HLE signaling, not native or public-network
+SMS delivery. Other proactive
 commands and native DSP execution are not established by these gates.
 `verify-8890-sim-toolkit-busy` independently verifies nine-byte profile
 download, STATUS/FETCH and the explicit `20 01` screen-busy terminal response
