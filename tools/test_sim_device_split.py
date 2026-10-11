@@ -114,7 +114,7 @@ class SimDeviceSplitTest(unittest.TestCase):
 
     def test_card_owns_persistent_linear_fixed_adn(self):
         self.assertIn("public device_nvram_interface", self.card_header)
-        self.assertIn("{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true }", self.card)
+        self.assertIn("{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true, true }", self.card)
         self.assertIn(
             "Services 1 (CHV1 disable), 2 (ADN) and 4 (SMS) are active",
             self.card,
@@ -178,7 +178,7 @@ class SimDeviceSplitTest(unittest.TestCase):
 
     def test_acm_is_persistent_cyclic_and_uses_delayed_response(self):
         self.assertIn(
-            "{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true }",
+            "{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true, true }",
             self.card,
         )
         for token in (
