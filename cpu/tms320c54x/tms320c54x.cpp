@@ -1927,9 +1927,8 @@ void tms320c54x_device::execute_one(u16 op)
 			product *= 2;
 		m_b = multiply_result((s64(m_b << 24) >> 24) +
 				multiply_product(product), true);
-		const s64 xsum = BIT(m_st1, 8) ? s64(s16(xvalue)) : s64(xvalue);
-		const s64 ysum = BIT(m_st1, 8) ? s64(s16(yvalue)) : s64(yvalue);
-		m_a = add_sub(0, u64((xsum + ysum) * 0x10000) & ACC_MASK, false, false);
+		m_a = add_sub((data_operand(xvalue) << 16) & ACC_MASK,
+				(data_operand(yvalue) << 16) & ACC_MASK, false, false);
 		dual_modify(x);
 		if (xar != yar)
 			dual_modify(y);

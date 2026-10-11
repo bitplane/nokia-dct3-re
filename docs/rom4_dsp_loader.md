@@ -3672,6 +3672,16 @@ The earlier signed-input fixture now explicitly sets SXM instead of inheriting
 SXM=0 from its preceding multiply test; its expected signed value is unchanged.
 These cases fix SMUL=0 and C16=0; SMUL saturation variants, C16 behavior,
 physical pipeline timing and native speech remain unestablished.
+FIRS now passes its two SXM-extended, shifted memory operands separately to
+the ALU addition helper. Adding them first and passing `0 + sum` preserved
+the result but lost carry from the original operands. Thirty-two executable
+`e001` fixtures cover four high-bit X/Y pairs, SXM and OVM clear/set, and
+pre-existing OVA clear/set. They assert carry, sticky OVA, signed saturation,
+unchanged T and operand addresses, and B accumulation from old A. These
+fixtures fail on the previous implementation and pass on the corrected core,
+following [TI SPRU172C, FIRS, 4-59](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+and the ST0/ST1 rules above. This selected coverage fixes FRCT=0, SMUL=0
+and C16=0; it establishes neither physical pipeline timing nor RF acquisition.
 The core, bounded mixed RF filter, 5110
 Menu/save-state and short/long physical power gates pass on the corrected
 build. Remaining FRCT/OVM and source/destination combinations are not
