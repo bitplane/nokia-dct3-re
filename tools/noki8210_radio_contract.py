@@ -49,6 +49,11 @@ def neighbour_descriptor_sources(image):
 
 def verify_descriptor_observation(text, *, dcs1800):
     """Check the bounded late-PIN observation, not general mode-4 semantics."""
+    horizon = re.search(
+        r'dsp_shared_observe: off=[0-9a-f]+ data=[0-9a-f]+ '
+        r'pc=[0-9a-f]{8} t=(46\.[0-9]+)\b', text)
+    if not horizon:
+        raise ValueError('descriptor absence requires the full 46-second observation horizon')
     writes = re.findall(
         r'8210_shared_descriptor_write: address=([0-9a-f]{8}) '
         r'data=([0-9a-f]{8}) mask=([0-9a-f]{8}) pc=([0-9a-f]{8}) t=([0-9.]+)', text)

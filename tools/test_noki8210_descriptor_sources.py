@@ -64,11 +64,19 @@ class DescriptorObservationTest(unittest.TestCase):
             text += ('8210_neighbour_constructor: descriptor=0013ac98 caller=00286d8d '
                      'data=04137f5c0338796800138038 t=12.262148\n'
                      'TX packet type=11 payload=12 data=040000000000033800000000\n')
-        return text
+        return text + 'dsp_shared_observe: off=1c8 data=00cc pc=002cab02 t=46.000247\n'
 
     def test_paired_bounded_observations(self):
         for dcs in (False, True):
             verify_descriptor_observation(self.trace(dcs), dcs1800=dcs)
+
+    def test_truncated_observation_cannot_prove_absence(self):
+        for dcs in (False, True):
+            text = self.trace(dcs)
+            for changed in (text.rsplit('dsp_shared_observe:', 1)[0],
+                            text.replace('t=46.000247', 't=12.000247')):
+                with self.subTest(dcs=dcs), self.assertRaisesRegex(ValueError, 'horizon'):
+                    verify_descriptor_observation(changed, dcs1800=dcs)
 
     def test_missing_duplicate_and_later_writes_are_not_absence(self):
         text = self.trace(False)

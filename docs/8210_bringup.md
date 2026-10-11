@@ -1777,6 +1777,8 @@ request is `040000000000033800000000`; unused stack bytes are not its fields.
 `noki8210_radio_contract.py --descriptor-trace ... [--dcs1800]` checks the
 bounded observation and rejects missing/duplicate initialization, later writes,
 shared-descriptor calls, changed carriers or nonzero bypassed wire fields.
+It requires a transport observation at 46 seconds; a startup-only or
+truncated trace cannot support the absence result.
 This rules out an active shared-descriptor alternate in these two recipes,
 not all firmware lifecycles or a missing mode-4 reply.
 Retained logs: `tmp/8210-descriptor-watch-gsm/error.log` SHA-256
