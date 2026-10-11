@@ -590,6 +590,17 @@ The corresponding own-ROM BL sites are `2d42d4`, `2d0b36` and `2d0cd2`.
 Trace the latter two entry conditions rather than treating state 1 as
 a missing DSP publication. Evidence:
 `tmp/6210-plmn-controller-reset-call-{national,international}/error.log.gz`.
+The first foreign reset block is selected by incoming `03f5`: comparison
+`2d0902..2d0906` uses literal `2d0c7c`, then branches to `2d0b1c`.
+That block calls initializer `4cfe3a`, copies incoming object fields via
+`4cfdb2`, and passes configuration byte `[172518+34]` to `38b5c6`.
+Fresh paired observation confirms publisher `3cc660` receives `03f5`
+from caller LR `315565` at 10.614435077 s in foreign boot, followed by
+selector R1 `03f5` at 10.614610846 s. National selector observations
+instead include `03f4`, `03ed` and `03fe`, with no observed `03f5`
+publication. Thus the reset is attached to a specific firmware-message
+branch, not an unexplained peer-state loss. Evidence:
+`tmp/6210-plmn-controller-entry-status-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
