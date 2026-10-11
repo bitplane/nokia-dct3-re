@@ -1731,7 +1731,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 605 decoded and 21
+promoted to a boundary. Current cold-idle coverage is 607 decoded and 19
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1863,6 +1863,12 @@ cases. DADD retains independent source/destination selectors; the subtract
 forms retain their direction and single accumulator selector. The required marker
 is `TMS320C54x double arithmetic disassembler: PASS` (SPRU172C instruction
 definitions). Paired-word execution and physical timing are unchanged.
+
+SUBC decodes all 512 Smem/accumulator forms with bounded one/two-word reads
+on two program pages and five exact syntax cases. The required marker is
+`TMS320C54x conditional subtract disassembler: PASS` (SPRU172C, SUBC).
+Its divide-step arithmetic, carry/overflow behavior and timing remain separately
+tested execution contracts, not conclusions of debugger decoding.
 
 Conditional RC/RCD use the same 22 reviewed individual predicates as BC/CC/XC,
 giving 44 one-word forms checked on two program pages. Non-delayed RC has

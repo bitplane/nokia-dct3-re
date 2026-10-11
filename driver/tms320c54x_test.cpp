@@ -1446,6 +1446,31 @@ private:
 				"Double arithmetic syntax preserves separate DADD selectors and subtract direction");
 		}
 		osd_printf_info("TMS320C54x double arithmetic disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x1e00, 0x1f00})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+						"Conditional subtract decoder bounds operand address extensions");
+				}
+		vector const subc_forms[] = {
+			{0x1e82, 1 | dasm::SUPPORTED, "SUBC    *AR2, A"},
+			{0x1e84, 1 | dasm::SUPPORTED, "SUBC    *AR4, A"},
+			{0x1f94, 1 | dasm::SUPPORTED, "SUBC    *AR4+, B"},
+			{0x1fe2, 2 | dasm::SUPPORTED, "SUBC    *AR2($2345), B"},
+			{0x1ef8, 2 | dasm::SUPPORTED, "SUBC    *($2345), A"},
+		};
+		for (auto const &test : subc_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Conditional subtract syntax preserves both accumulator selections");
+		}
+		osd_printf_info("TMS320C54x conditional subtract disassembler: PASS forms=512 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

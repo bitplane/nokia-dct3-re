@@ -270,6 +270,13 @@ public:
 				BIT(op, 8) ? 'B' : 'A');
 			return (1 + extended) | SUPPORTED;
 		}
+		if (family == 0x1e00 || family == 0x1f00)
+		{
+			bool const extended = mode >= 0xe0;
+			stream << "SUBC    "; smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family >= 0x1800 && family <= 0x1d00)
 		{
 			static constexpr char const *names[] = {"AND", "OR", "XOR"};
