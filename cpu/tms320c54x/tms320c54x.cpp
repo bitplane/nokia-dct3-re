@@ -1804,7 +1804,7 @@ void tms320c54x_device::pipeline_step()
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = ((word & 0xfeff) == 0x68f8 || word == 0x76f8) ? 3 :
 				((word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || (word & 0xff00) == 0x7600 || word == 0xf073 || word == 0xf273) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf49b || word == 0xf69b || word == 0xf073 || word == 0xf273))
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf49b || word == 0xf69b || (word & 0xfdfe) == 0xf4e4 || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -1857,7 +1857,7 @@ void tms320c54x_device::pipeline_step()
 		bool const rmw = (word & 0xfe00) == 0x6800 &&
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
-		bool const far_return = (word & 0xfffe) == 0xf4e4;
+		bool const far_return = (word & 0xfdfe) == 0xf4e4;
 		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
 		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
 		bool const branch = word == 0xf073 || word == 0xf273;
@@ -1872,12 +1872,12 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_valid[2] && (fast_return || far_return || branch))
 		{
-			bool const delayed = word == 0xf69b || word == 0xf273;
+			bool const delayed = word == 0xf69b || word == 0xf273 || (far_return && BIT(word, 9));
 			m_pipeline_control_address = m_pipeline_address[2];
 			m_pipeline_control_words = (branch ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed ? 0 : 2;
-			if (far_return) m_pipeline_flush_front = true;
+			if (far_return && !delayed) m_pipeline_flush_front = true;
 		}
 		if (m_pipeline_valid[2] && dagen_immediate) m_pipeline_early_write_deferred[2] = false;
 		if (m_pipeline_valid[2])
@@ -1920,6 +1920,12 @@ void tms320c54x_device::pipeline_step()
 		// SPRU131G examples 7-2/3: the target word's Access starts target
 		// Prefetch; the following two sequential words are delay or flush slots.
 		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
+	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xfffe) == 0xf6e4)
+	{
+		// Delayed class-34 prototype: two stack samples without the plain
+		// return's held Read clock. Placement is not measured silicon timing.
+		m_pipeline_operand[3] = data_read(m_sp++);
 	}
 	auto const basic_address = [this](unsigned stage, u8 mode) -> u16 {
 		if (BIT(mode, 7)) return short_smem_address(mode);
@@ -1987,11 +1993,11 @@ void tms320c54x_device::pipeline_step()
 			u16 const mask = u16(1) << (m_op & 15);
 			status = BIT(m_op, 8) ? status | mask : status & ~mask;
 		}
-		else if ((m_op & 0xfffe) == 0xf4e4)
+		else if ((m_op & 0xfdfe) == 0xf4e4)
 		{
 			m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;
 			m_pc = m_pipeline_operand_address[5];
-			m_pipeline_fetch_address = logical_program_address(m_pc);
+			if (!BIT(m_op, 9)) m_pipeline_fetch_address = logical_program_address(m_pc);
 			m_pipeline_flush_front = false;
 			if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
 		}
@@ -2043,6 +2049,13 @@ void tms320c54x_device::pipeline_step()
 		// An adjacent PSHM commits its stack word in older Execute first.
 		m_pipeline_operand[4] = data_read(m_sp++);
 		m_pipeline_far_return_pending = true;
+	}
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf6e4)
+	{
+		m_pipeline_operand_address[4] = data_read(m_sp++);
+		m_pipeline_fetch_address = ((m_pipeline_operand[4] & 0x7f) << 16) | m_pipeline_operand_address[4];
+		// Both delay words have reached Decode; discard the next sequential word.
+		m_pipeline_decode_flush = 1;
 	}
 	if (entry_stage == 2)
 	{

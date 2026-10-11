@@ -2592,8 +2592,18 @@ Execute writes precede the first stack sample, so an adjacent PSHM's word
 can be observed. This is a declared bus-placement model of the documented
 six-clock return, not independent silicon phase evidence. The FRET cases
 start with INTM set and require it to remain set across return and replay.
-Delayed far returns, general stack conflicts and pending-interrupt timing
-remain unvalidated.
+Delayed FRETD/FRETED retain XPC in Access and PC in Read, then start target
+Prefetch at clock 5 (Fetch 6, Execute 10). This is a declared placement model
+of the documented four-cycle transfer, not independent silicon phase evidence.
+Two one-word delay instructions retire at clocks 7/8, or one two-word delay
+instruction retires at clock 8. The next sequential word is discarded;
+control-word ownership prevents maskable entry before the delay completes.
+Twenty-four delayed cases cover both return forms, both cross-page directions,
+both delay-slot layouts and restore before, between or after stack samples.
+Together with the twelve plain cases, all 36 require one target fetch and two
+ordered stack reads across replay, correct SP/INTM and no extra sequential
+instruction execution. Nested control transfers in delay slots are rejected.
+General stack conflicts and pending-interrupt timing remain unvalidated.
 
 The exact `f6bb`/`f7bb` RSBX/SSBX INTM forms establish protection in Decode
 and retain it through retirement of the next complete instruction, including

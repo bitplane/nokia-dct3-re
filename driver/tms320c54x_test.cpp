@@ -2970,13 +2970,19 @@ private:
 		u32 const target = (base ^ 0x10000) + 0x700;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 20; ++i) { program.write_word(base + 0x600 + i, 0xe933); program.write_word((target & 0x10000) + 0x700 + i, 0xf495); }
-		program.write_word(base + 0x600, variant < 6 ? 0xf4e5 : 0xf4e4);
+		bool const delayed = variant >= 12;
+		program.write_word(base + 0x600, (variant % 12 < 6 ? 0xf4e5 : 0xf4e4) | (delayed ? 0x200 : 0));
+		if (delayed) {
+			program.write_word(base + 0x601, variant >= 24 ? 0xf020 : 0xe811);
+			program.write_word(base + 0x602, variant >= 24 ? 0x1234 : 0xe922);
+		}
 		program.write_word(target, 0xe955);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
 		m_cpu->space(AS_DATA).write_word(0x1000, 0x80 | (target >> 16));
@@ -2986,16 +2992,16 @@ private:
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
 		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1000, 0x1001, "staged_far_return_stack",
-			[this, target](offs_t address, u16 &value, u16) {
+			[this, target, delayed](offs_t address, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
 				expect(address == 0x1000 + m_pipeline_operand_reads && value == (address == 0x1000 ? (0x80 | (target >> 16)) : 0x700) &&
-				m_cpu->pipeline_cycles() == 5 + m_pipeline_operand_reads, "Far return samples XPC then PC once in the declared retained-return model");
+				m_cpu->pipeline_cycles() == (delayed ? 4 : 5) + m_pipeline_operand_reads, "Far return samples XPC then PC once in the declared retained-return model");
 				++m_pipeline_operand_reads;
 			});
 		m_pipeline_fetch_tap = program.install_read_tap(target, target, "staged_far_return_target",
-			[this](offs_t, u16 &, u16) {
+			[this, delayed](offs_t, u16 &, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(m_cpu->pipeline_cycles() == 8, "Far-return target Fetch follows six-clock control redirection"); ++m_pipeline_extensions_reads;
+				expect(m_cpu->pipeline_cycles() == (delayed ? 6 : 8), "Far-return target Fetch follows plain or delayed control redirection"); ++m_pipeline_extensions_reads;
 			});
 		m_phase = 251290; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -23830,24 +23836,28 @@ private:
 		if (m_phase == 251290)
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
-			u64 const checkpoint = 4 + (m_pipeline_peripheral_case % 6) / 2;
+			bool const delayed = m_pipeline_peripheral_case >= 12;
+			bool const long_delay = m_pipeline_peripheral_case >= 24;
+			unsigned const first_read = delayed ? 4 : 5, target_fetch = delayed ? 6 : 8, target_execute = delayed ? 10 : 12;
+			u64 const checkpoint = first_read - 1 + (m_pipeline_peripheral_case % 6) / 2;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
-				m_pipeline_operand_reads == unsigned(cycle >= 5) + unsigned(cycle >= 6) &&
-				m_pipeline_extensions_reads == unsigned(cycle >= 8), "Far return retains both stack samples and fetches the target once across replay");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(cycle >= 5) + unsigned(cycle >= 6) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == (m_pipeline_peripheral_case >= 6 || cycle < 7) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 12 ? 0x55 : 0), "FRET preserves INTM, FRETE enables IRQ after both pops; both flush sequential instructions");
+				m_pipeline_operand_reads == unsigned(cycle >= first_read) + unsigned(cycle > first_read) &&
+				m_pipeline_extensions_reads == unsigned(cycle >= target_fetch), "Far return retains both stack samples and fetches the target once across replay");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(cycle >= first_read) + unsigned(cycle > first_read) &&
+				bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == (m_pipeline_peripheral_case % 12 >= 6 || cycle < (delayed ? 6 : 7)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_A) == (long_delay ? (cycle >= 8 ? 0x1234 : 0) : delayed && cycle >= 7 ? 0x11 : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= target_execute ? 0x55 : delayed && !long_delay && cycle >= 8 ? 0x22 : 0), "Far return preserves its INTM contract and executes exactly its two delay words");
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
 				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before or between retained far-return stack accesses");
 			}
-			if (cycle == 12)
+			if (cycle == target_execute)
 			{
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true;
-					m_pipeline_operand_reads = unsigned(checkpoint >= 5) + unsigned(checkpoint >= 6); m_pipeline_extensions_reads = 0;
+					m_pipeline_operand_reads = unsigned(checkpoint >= first_read) + unsigned(checkpoint > first_read); m_pipeline_extensions_reads = 0;
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore far-return stack samples and pending extra clock");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -23855,8 +23865,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 11) { start_pipeline_far_return(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged far return: PASS cases=12 fret=6 frete=6 stack_reads=5,6 target_fetch=8 target_execute=12 restore=12 duplicate_reads=0 silicon_phase_claim=0\n");
+				if (m_pipeline_peripheral_case < 35) { start_pipeline_far_return(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged far return: PASS cases=36 plain=12 delayed=24 multiword_delay=12 restore=36 duplicate_reads=0 silicon_phase_claim=0\n");
 				start_pipeline_intm(); return;
 			}
 			++m_pipeline_expected_cycle;
