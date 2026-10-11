@@ -504,6 +504,14 @@ to context+0. It reloads the saved header into R1 at `2d2978`; the
 unmatched-status branch redirects through `2d2528`, which can transfer
 to `2d0f18` and `2d0ee4`. These BL transfers participate in the controller
 dispatch; do not infer ordinary call/return ownership from their opcodes.
+The image-wide aligned `0419` literal scan finds three pools (`26dd14`,
+`29e588`, `2d1214`), with Thumb literal-load candidates at `29e1e0`
+and consumer `2d0f18`. The former is not a recovered message publisher:
+it passes `0419` in R1 into local dispatcher `295f2c`, which preserves
+the supplied context in R10 and selects `296bec` by subtracting literal
+`0412` and then 7. Do not count that literal use as an RTOS send site.
+Computed and table-driven producers, and other uses of the remaining
+pool, are not excluded by this scan.
 Fresh 25-second national and foreign controls reproduce the original
 `09c8/07d4` versus `09c6/07d2` split with clean observer health. Passive
 taps at `2d1118`, `2d111a`, `4cfdd4`, `313218`, `2d0d50` and `2d1048`
