@@ -139,15 +139,15 @@ implements:
 SIM NVRAM loading validates the complete serialized record before installing
 card fields. The supported append-only layouts retain base files, then SMS/SMSP,
 then security state, then EF_ACM, then preferred/forbidden PLMN lists, then
-EF_SMSS; missing later fields receive their declared
+EF_SMSS, then EF_ACMmax/EF_PUCT; missing later fields receive their declared
 defaults. Truncated records, trailing bytes and non-boolean CHV1-enable flags
 are rejected atomically. Device startup initializes defaults because MAME
 reports load failure without resetting NVRAM. `verify-sim-nvram-atomic` exercises
-fifteen cases through actual isolated MAME processes, including all five legacy
+eighteen cases through actual isolated MAME processes, including all six legacy
 layouts and an unchanged full record. Its short-ADN negative detects the former
 partial-load defect. This is storage conformance, not a handset-service claim;
 physical phonebook and security gates remain separate.
-The current record is 3562 bytes; its original 3560-byte prefix and all existing
+The current record is 3570 bytes; its original 3562-byte prefix and all existing
 file/security offsets are unchanged. `run_sim_nvram_atomic.py --card-seed`
 additionally cold-loads an independently produced current record and requires
 byte-exact preservation, rejecting silent reinitialization.
@@ -226,8 +226,17 @@ transparent/vendor-file policy audit.
 EF_PUCT (`6F41`) also requires CHV1 READ (GSM 11.11 10.2.12). Its FCP and
 READ BINARY now agree; the serial fixture verifies denial before PIN,
 successful five-byte readback, and denial after unverified-state restoration.
-PUCT update policy remains unmapped: the standard permits an administratively
-selected CHV1/CHV2 condition, not an unconditional assumption of either one.
+The laboratory profile fixes ACMmax (`6F37`) and PUCT UPDATE to CHV1, as for
+its existing ACM profile. GSM 11.11 10.2.6/10.2.12 permits this administratively
+selected CHV1/CHV2 policy; this does not claim all physical cards use CHV1.
+Both files now have mutable card-owned bytes with matching FCP, save-state
+and append-only NVRAM ownership. Serial tests check blocked-PIN denial,
+successful whole-file writes, exact readback, out-of-range write preservation
+and restoration of changed contents. Reset/reinsertion authorization replays
+retain their separate unverified baseline rather than an AoC mutation snapshot.
+The atomic loader gate cold-loads non-default values and rejects partial AoC
+extensions before installing fields.
+This is card conformance; handset tariff/ceiling editing remains unvalidated.
 
 EF_SMSS (`6F43`, SMS status) belongs to DF_TELECOM and enforces CHV1
 READ/UPDATE, with matching FCP (GSM 11.11 10.3.7). Its two card-owned bytes
@@ -246,8 +255,7 @@ The standard GSM transparent set Kc (`6F20`), PLMNsel (`6F30`), HPLMN
 (`6F31`), ACMmax (`6F37`), BCCH (`6F74`), ACC (`6F78`), FPLMN (`6F7B`),
 LOCI (`6F7E`) and SST (`6F38`) also enforces CHV1 READ. Serial tests check
 each FCP, denial before verification and exact one-byte readback afterward,
-including after reset and reinsertion. This is READ-policy coverage: missing
-user-update support for ACMmax/PUCT and other unclassified file policies
+including after reset and reinsertion. Other unclassified file policies
 remain separate work. IMSI, HPLMN, ACC and SST are not CHV1-writable: GSM 11.11
 10.2.2/10.2.5/10.2.15/10.2.7 assigns UPDATE to ADM. Their FCP reports READ CHV1
 and UPDATE ADM (laboratory ADM level 4), while the card implements no ADM

@@ -135,7 +135,7 @@ def check_plmn_reject(text, storage, *, home=False):
     ), '6210 PLMN rejection')
     if 'LAPDm Location Updating Accept acknowledged' in text:
         raise ValueError('rejected PLMN was also accepted')
-    if len(storage) != 3562:
+    if len(storage) not in (3562, 3570):
         raise ValueError('incomplete SIM storage after rejection')
     if storage[1610] != 3:
         raise ValueError('rejected location update did not persist roaming-not-allowed status')
@@ -152,7 +152,7 @@ def check_plmn_reject(text, storage, *, home=False):
 
 def check_forbidden_selection(text, storage, *, forbidden, previous):
     import re
-    if len(storage) != 3562:
+    if len(storage) not in (3562, 3570):
         raise ValueError('incomplete cold SIM storage')
     if 'read-binary fid=6f7b offset=0 length=12' not in text:
         raise ValueError('cold selection did not read EF_FPLMN')

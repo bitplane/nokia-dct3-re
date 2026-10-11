@@ -18,6 +18,6 @@ def verify(text, storage, *, validity_period):
     if read < 0 or read > submit.start() or update < submit.end():
         raise ValueError('SMS status was not read before submission and written afterward')
     reference = int(submit['mr'], 16)
-    if len(storage) != 3562 or storage[3560:] != bytes((reference, 0xff)):
+    if len(storage) not in (3562, 3570) or storage[3560:3562] != bytes((reference, 0xff)):
         raise ValueError('retained SMSS differs from submitted TP-MR/capacity state')
     return reference

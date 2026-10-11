@@ -6,7 +6,7 @@ import subprocess
 
 
 def cases(default):
-    if len(default) != 3562:
+    if len(default) != 3570:
         raise ValueError("unexpected SIM storage layout")
     changed = bytearray(default)
     changed[0] = 0x41
@@ -14,6 +14,7 @@ def cases(default):
     changed[3524] = 0x13
     changed[3548] = 0x33
     changed[3560:3562] = b'\x42\xfe'
+    changed[3562:3570] = bytes(range(8))
     changed = bytes(changed)
     return {
         "current": (changed, changed, False),
@@ -22,6 +23,7 @@ def cases(default):
         "legacy_security": (changed[:3521], changed[:3521] + default[3521:], False),
         "legacy_acm": (changed[:3524], changed[:3524] + default[3524:], False),
         "legacy_plmn": (changed[:3560], changed[:3560] + default[3560:], False),
+        "legacy_smss": (changed[:3562], changed[:3562] + default[3562:], False),
         "short_adn": (changed[:100], default, True),
         "short_sms": (changed[:2000], default, True),
         "short_security": (changed[:3500], default, True),
@@ -29,6 +31,8 @@ def cases(default):
         "short_preferred_plmn": (changed[:3530], default, True),
         "short_forbidden_plmn": (changed[:3550], default, True),
         "short_smss": (changed[:3561], default, True),
+        "short_acm_max": (changed[:3564], default, True),
+        "short_puct": (changed[:3569], default, True),
         "trailing": (changed + b"\x00", default, True),
         "invalid_enabled": (changed[:3520] + b"\x02" + changed[3521:], default, True),
     }

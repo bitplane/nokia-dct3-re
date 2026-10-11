@@ -14,6 +14,7 @@ ENABLED_OFFSET = 3520
 NVRAM_SIZE = 3524
 PLMN_NVRAM_SIZE = 3560
 CURRENT_NVRAM_SIZE = 3562
+AOC_NVRAM_SIZE = 3570
 
 
 def padded_pin(pin: str) -> bytes:
@@ -30,8 +31,8 @@ def statuses(trace: str, instruction: int) -> list[tuple[int, int, int]]:
 
 def validate(trace: str, nvram: bytes, mode: str, expected_pin: str,
              previous_trace: str = "") -> None:
-    if len(nvram) not in (NVRAM_SIZE, PLMN_NVRAM_SIZE, CURRENT_NVRAM_SIZE):
-        raise ValueError(f"SIM NVRAM has {len(nvram)} bytes, expected {NVRAM_SIZE}, {PLMN_NVRAM_SIZE} or {CURRENT_NVRAM_SIZE}")
+    if len(nvram) not in (NVRAM_SIZE, PLMN_NVRAM_SIZE, CURRENT_NVRAM_SIZE, AOC_NVRAM_SIZE):
+        raise ValueError(f"SIM NVRAM has {len(nvram)} bytes, expected {NVRAM_SIZE}, {PLMN_NVRAM_SIZE}, {CURRENT_NVRAM_SIZE} or {AOC_NVRAM_SIZE}")
     if mode != "disabled" and nvram[ENABLED_OFFSET] != 1:
         raise ValueError("CHV1 is not persistently enabled")
 

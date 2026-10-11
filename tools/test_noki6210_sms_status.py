@@ -15,6 +15,13 @@ class SmsStatusTest(unittest.TestCase):
     def test_reference_matches_persistent_file(self):
         self.assertEqual(verify_status(*self.fixture()), 1)
 
+    def test_aoc_extension_preserves_sms_status_offsets(self):
+        text, storage = self.fixture()
+        self.assertEqual(verify_status(text, storage + bytes(range(8))), 1)
+        for size in range(1, 8):
+            with self.subTest(size=size), self.assertRaises(ValueError):
+                verify_status(text, storage + bytes(size))
+
     def test_missing_events(self):
         text, storage = self.fixture()
         for line in text.splitlines():

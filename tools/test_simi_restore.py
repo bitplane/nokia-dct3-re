@@ -1,8 +1,8 @@
 import unittest
-from tools.run_simi_restore import ADM_PASS
+from tools.run_simi_restore import ADM_PASS, AOC_PASS
 from tools.run_simi_restore import ACCESS_PASS, AUTH_ACCESS_PASS, AUTH_PASS, BINARY_ACCESS_PASS, BINARY_PASS, BLOCKED_DISABLED_PASS, HEADER_PASS, IMSI_PASS, PARAMETER_PASS, PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS, RECORD_PASS, RESPONSE_PASS, SEARCH_PASS, UPDATE_PASS, check
 
-COMPLETE = "\n".join((PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS, ADM_PASS)) + "\n"
+COMPLETE = "\n".join((PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS, ADM_PASS, AOC_PASS)) + "\n"
 
 
 class SimiRestoreResultTest(unittest.TestCase):
@@ -47,6 +47,8 @@ class SimiRestoreResultTest(unittest.TestCase):
                              (COMPLETE.replace(ADM_PASS, ""), 0),
                              (COMPLETE.replace('updates: PASS files=4', 'updates: PASS files=3'), 0),
                              (COMPLETE + ADM_PASS, 0),
+                             (COMPLETE.replace(AOC_PASS, ""), 0),
+                             (COMPLETE + AOC_PASS, 0),
                              (COMPLETE + BLOCKED_DISABLED_PASS, 0),
                              (COMPLETE + AUTH_ACCESS_PASS, 0),
                              (COMPLETE + BINARY_ACCESS_PASS, 0),

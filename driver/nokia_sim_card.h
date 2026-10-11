@@ -181,6 +181,8 @@ private:
 	u8 m_sms[sms_record_count * sms_record_length] = { 0 };
 	u8 m_smsp[smsp_record_count * smsp_record_length] = { 0 };
 	u8 m_acm[3] = { 0 };
+	u8 m_acm_max[3] = { 0 };
+	u8 m_puct[5] = { 0 };
 	u8 m_preferred_plmn[24] = { 0 };
 	u8 m_forbidden_plmn[12] = { 0 };
 	u8 m_smss[2] = { 0xff, 0xff };

@@ -335,7 +335,43 @@ private:
 		{0xa4, 0, 0, 2, 0x6f38, 0x9f, 15},
 		{0xc0, 0, 0, 15, 0x6f38, 0x90, 0},
 		{0xd6, 0, 0, 1, 0x55, 0x98, 4},
-		{0xb0, 0, 0, 1, 0xcf, 0x90, 0}
+		{0xb0, 0, 0, 1, 0xcf, 0x90, 0},
+		// AoC UPDATE is CHV1 in this administered laboratory card profile.
+		{0x20, 0, 1, 8, 1, 0x98, 4},
+		{0x20, 0, 1, 8, 1, 0x98, 4},
+		{0x20, 0, 1, 8, 1, 0x98, 0x40},
+		{0xa4, 0, 0, 2, 0x6f37, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f37, 0x90, 0},
+		{0xd6, 0, 0, 3, 0x1122, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f41, 0x90, 0},
+		{0xd6, 0, 0, 5, 0x3344, 0x98, 4},
+		{0x2c, 0, 0, 16, 0, 0x90, 0},
+		{0xb0, 0, 0, 5, 0xff, 0x90, 0, true},
+		{0xa4, 0, 0, 2, 0x6f37, 0x9f, 15},
+		{0xd6, 0, 0, 3, 0x1122, 0x90, 0},
+		{0xb0, 0, 0, 3, 0x1122, 0x90, 0},
+		{0xd6, 0, 3, 1, 0x55, 0x94, 2},
+		{0xb0, 0, 0, 3, 0x1122, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
+		{0xd6, 0, 0, 5, 0x3344, 0x90, 0},
+		{0xd6, 0, 5, 1, 0x55, 0x94, 2},
+		{0xb0, 0, 0, 5, 0x3344, 0x90, 0, true, false, true},
+		{0xd6, 0, 0, 5, 0x55, 0x90, 0},
+		{0xb0, 0, 0, 5, 0x55, 0x90, 0, false, true},
+		{0xb0, 0, 0, 5, 0x3344, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f37, 0x9f, 15},
+		{0xb0, 0, 0, 3, 0x1122, 0x90, 0, false, true},
+		{0xa4, 0, 0, 2, 0x6f37, 0x9f, 15},
+		{0xb0, 0, 0, 3, 0xff, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
+		{0xb0, 0, 0, 5, 0xff, 0x90, 0},
+		// Only the final activation leaves these serial-written values for
+		// the independent cold NVRAM loader gate.
+		{0xa4, 0, 0, 2, 0x6f37, 0x9f, 15},
+		{0xd6, 0, 0, 3, 0x1122, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f41, 0x9f, 15},
+		{0xd6, 0, 0, 5, 0x3344, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -371,6 +407,7 @@ private:
 	// PLMN mutation/restoration nests inside the authorization checkpoint
 	// reused by the later reset and reinsertion sequences.
 	std::string m_previous_checkpoint;
+	std::string m_access_checkpoint;
 	void expect(bool value, char const *message)
 	{
 		if (!value) fatalerror("SIMI restoration: %s", message);
@@ -408,6 +445,10 @@ private:
 	}
 	void begin_write_case()
 	{
+		// Keep the authorization replay's unverified baseline independent of
+		// the appended AoC mutation checkpoints.
+		if (m_write_case == 290)
+			m_access_checkpoint = m_checkpoint.str();
 		auto const &item = WRITE_CASES[m_write_case];
 		transmit({0xa0, item.ins, item.p1, item.p2, item.length});
 		bool const reading = item.ins == 0xb2 || item.ins == 0xb0 || item.ins == 0xc0 || item.ins == 0xf2 || !item.length;
@@ -720,6 +761,8 @@ private:
 					expect(m_bytes[9] == 0x11, "PLMN lists advertise CHV1 READ and UPDATE");
 				if (item.body == 0x6f43)
 					expect(m_bytes[9] == 0x11, "SMSS advertises CHV1 READ and UPDATE");
+				if (item.body == 0x6f37 || item.body == 0x6f41)
+					expect(m_bytes[9] == 0x11, "AoC files advertise administered CHV1 READ and UPDATE");
 				if (m_write_case >= 147)
 					expect((m_bytes[9] & 0xf0) == 0x10, "GSM file advertises CHV1 READ");
 			}
@@ -728,8 +771,13 @@ private:
 				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == item.ins &&
 					m_bytes[m_count - 2] == 0x90 && m_bytes[m_count - 1] == 0, "record-write readback response");
 				for (unsigned i = 1; i <= item.length; ++i)
-					expect(m_bytes[i] == (i == 1 && item.body > 0xff ? u8(item.body >> 8) : u8(item.body)),
-						"record-write readback contents");
+				{
+					u8 const expected = i == 1 && item.body > 0xff ? u8(item.body >> 8) : u8(item.body);
+					if (m_bytes[i] != expected)
+						osd_printf_info("SIM readback mismatch: case=%u byte=%u actual=%02x expected=%02x\n",
+								m_write_case, i, m_bytes[i], expected);
+					expect(m_bytes[i] == expected, "record-write readback contents");
+				}
 			}
 			else
 			{
@@ -773,7 +821,12 @@ private:
 				}
 			}
 			clear_capture();
-			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
+			++m_write_case;
+			if (m_activation_checks < 2 && m_write_case == std::size(WRITE_CASES) - 4)
+				m_write_case = std::size(WRITE_CASES);
+			if (m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
+			m_checkpoint.str(m_access_checkpoint);
+			m_checkpoint.clear();
 			if (m_activation_checks < 2)
 			{
 				if (m_activation_checks++ == 1)
@@ -793,6 +846,7 @@ private:
 			osd_printf_info("SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0\n");
 			osd_printf_info("SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
+			osd_printf_info("SIM AoC binary updates: PASS files=2 blocked_pin_denied=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM administrative updates: PASS files=4 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
