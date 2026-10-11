@@ -29,7 +29,7 @@ REQUIRED = [
     "TMS320C54x staged immediate stores: PASS cases=8 forms=DP,postincrement,absolute,peripheral retained_literal=1 duplicate_writes=0 restore=8",
     "TMS320C54x staged XPC push: PASS cases=6 source_read=5 stack_write=6 restore=6 duplicate_accesses=0 silicon_phase_claim=0",
     "TMS320C54x staged far return: PASS cases=12 fret=6 frete=6 stack_reads=5,6 target_fetch=8 target_execute=12 restore=12 duplicate_reads=0 silicon_phase_claim=0",
-    "TMS320C54x staged INTM protection: PASS cases=6 follower_words=1,2,3 restore=6 duplicate_vectors=0",
+    "TMS320C54x staged INTM protection: PASS cases=12 follower_words=1,2,3 adjacent=6 restore=12 duplicate_vectors=0",
     "TMS320C54x staged timer observation: complete cases=8 fidelity_acceptance=0",
     "TMS320C54x FIRS sum: PASS cases=32 sxm=0,1 ovm=0,1 carry=1 sticky_ova=1 pipeline_claim=0",
     "TMS320C54x ABDST overflow: PASS cases=16 frct=0,1 ovm=0,1 sticky_ovb=1 pipeline_claim=0",
@@ -210,4 +210,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

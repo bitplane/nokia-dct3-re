@@ -3005,19 +3005,21 @@ private:
 		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
 		m_pipeline_peripheral_case = variant;
 		bool const set = BIT(variant, 0);
-		unsigned const words = variant / 2 + 1;
+		unsigned const words = (variant / 2) % 3 + 1;
+		unsigned const adjacent = variant >= 6;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
 		for (unsigned i = 0; i < 24; ++i) program.write_word(0x44 + i, 0xf495);
-		program.write_word(0x600, set ? 0xf7bb : 0xf6bb);
-		program.write_word(0x601, words == 1 ? 0xe842 : words == 2 ? 0xf020 : 0x76f8);
-		if (words >= 2) program.write_word(0x602, words == 2 ? 0x1234 : 0x2000);
-		if (words == 3) program.write_word(0x603, 0x1234);
+		program.write_word(0x600, (set != bool(adjacent)) ? 0xf7bb : 0xf6bb);
+		if (adjacent) program.write_word(0x601, set ? 0xf7bb : 0xf6bb);
+		program.write_word(0x601 + adjacent, words == 1 ? 0xe842 : words == 2 ? 0xf020 : 0x76f8);
+		if (words >= 2) program.write_word(0x602 + adjacent, words == 2 ? 0x1234 : 0x2000);
+		if (words == 3) program.write_word(0x603 + adjacent, 0x1234);
 		program.write_word(0x44, 0xe955);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
-		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, set ? 0 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, (set != bool(adjacent)) ? 0 : 0x800);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
@@ -3029,9 +3031,9 @@ private:
 		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
 		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
 		m_pipeline_fetch_tap = program.install_read_tap(0x44, 0x44, "staged_intm_vector",
-			[this, words](offs_t, u16 &, u16) {
+			[this, words, adjacent](offs_t, u16 &, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(m_cpu->pipeline_cycles() > 6 + words &&
+				expect(m_cpu->pipeline_cycles() > 6 + words + adjacent &&
 					(words == 3 ? m_pipeline_store_writes == 1 :
 					m_cpu->state_int(tms320c54x_device::STATE_A) == (words == 1 ? 0x42 : 0x1234)),
 					"INTM guard retires the complete follower before vector Fetch");
@@ -23820,7 +23822,7 @@ private:
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
 			bool const set = BIT(m_pipeline_peripheral_case, 0);
-			unsigned const words = m_pipeline_peripheral_case / 2 + 1;
+			unsigned const words = (m_pipeline_peripheral_case / 2) % 3 + 1;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "INTM staged stream advances without unsupported forms");
 			if (cycle == 3) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 2);
 			if (cycle == 4 && !m_pipeline_replay)
@@ -23845,8 +23847,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 5) { start_pipeline_intm(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged INTM protection: PASS cases=6 follower_words=1,2,3 restore=6 duplicate_vectors=0\n");
+				if (m_pipeline_peripheral_case < 11) { start_pipeline_intm(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged INTM protection: PASS cases=12 follower_words=1,2,3 adjacent=6 restore=12 duplicate_vectors=0\n");
 				start_timer_boundary_probe(0, true); return;
 			}
 			++m_pipeline_expected_cycle;

@@ -2599,12 +2599,15 @@ The exact `f6bb`/`f7bb` RSBX/SSBX INTM forms establish protection in Decode
 and retain it through retirement of the next complete instruction, including
 its extension words (SPRU131G section 6.10.7). This is instruction-owned
 state, not a fixed clock delay; both the following-instruction latch and
-per-stage protection survive save/restore. Six cases cover both forms with
+per-stage protection survive save/restore. Twelve cases cover both forms with
 one-, two- and three-word followers, injecting a pending maskable interrupt
-after INTM Decode and replaying a checkpoint during follower Decode. RSBX
+after INTM Decode and replaying a checkpoint during follower Decode. Six
+include adjacent opposite INTM operations: protection extends through the
+second operation's complete follower without an intervening vector fetch.
+RSBX
 permits one vector fetch only after the follower retires; SSBX leaves the
 request pending without a vector fetch. The three-word store commits once
-per replay leg. NMI interaction, adjacent INTM operations and silicon phase
+per replay leg. NMI interaction and silicon phase
 placement are not validated by these cases. Handset configurations still
 use the atomic frontend; this does not resolve the MU4 recorder boundary.
 
