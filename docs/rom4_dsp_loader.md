@@ -1800,8 +1800,6 @@ ranked report exactly. All 626 forms now have executable fixture assertions,
 with no execution-only or absent words. The reviewed fingerprint deliberately
 replaces the former 594-word expectation after those gaps were closed; a unit
 negative control rejects the previous fingerprint and a wrong current hash.
-Earlier 594-word closure statements below apply to that earlier trace, not
-the current native execution set.
 
 With verbose logging, the core emits `[opdecode]` alongside `[opcov]`, using
 the actual debugger decoder and synthetic zero extensions without target
@@ -2260,13 +2258,11 @@ Encodings and delay-slot rules follow the
 [TI C54x instruction reference](https://www.ti.com/lit/ug/spru172c/spru172c.pdf).
 
 `tools/c54x_opcode_coverage.py` compares `[opcov]` records from a verbose
-30-second 5110 v5.30 run with the standalone `tms54test` fixture. A fresh native
-idle run dispatches 594 distinct words in 107 high-byte groups (set SHA-256
-`5ec81f25976d365d2bbfe09037d70ac44676b5803535892d8237744c6a167d4e`).
-Against the executable fixture, all 594 are asserted, none execute without an
-assertion, and none are absent; `--require-all-asserted` passes. The independent RF-boundary checker
-passes with 6,499 CTSI frames, 207,040 port-`0x27` reads and three port-`0x32`
-writes; this is not acquisition or speech evidence. Exact `5086` checks
+30-second 5110 v5.30 run with the standalone `tms54test` fixture. The current
+fingerprint and assertion totals are defined only in **Current audit boundary**
+above; `--require-all-asserted` rejects executed-only and absent words.
+The instruction contracts below retain their value/status/addressing evidence,
+not a separate coverage baseline. Exact `5086` checks
 stationary AR6 double-word ADD into A using absolute port markers independent
 of AR6, distinct AR3 source data, preserved B/status/source/pointers,
 continuation PC and one-cycle execution.
@@ -2464,26 +2460,6 @@ Exact `6d95` checks one AR5 increment, unchanged AR6/memory and one cycle.
 Exact `7e92` distinguishes A-addressed program memory from different data
 memory at the same address, checks AR2 post-increment, unchanged A/AR3 and
 five-cycle execution.
-The fresh trace's assertion gaps are closed. The integrated idle/Menu/power
-gate now enforces the 594-word, 107-group primary fingerprint, passes the
-long power-key lifecycle and verifies explicit assertions for all 594 union
-words. Menu and power add no distinct words in this run. This is not evidence
-of acquisition or a reason to fabricate RF samples.
-
-Direct comparison with the retained relative-timer trace finds no removed
-opcode words and 137 added words. Its summary has zero slot expiries,
-29 completion strobes, mode `AC=0` and no port-32 writes; the current run has
-6,467 slot expiries, 6,497 completion strobes, mode `AC=1` and three port-32
-writes. The port-write sequences agree through the first 44 records; the new
-run then continues at `0x0dfe/0x0e03` around 0.134 s instead of returning to
-the older codec-control sequence around 0.158 s. This matches the already
-documented free-running CTSI/absolute-compare expansion introduced in
-`d5c1022`, including its table-driven and accumulator-sourced port-31/32
-writes. It is a comparison of emulated traces, not independent silicon
-validation or a single-change causal experiment.
-
-The retained narrower baseline dispatches 457 words in 91 high-byte groups (set SHA-256
-`e5ab0413453f271100996a54cea8f712eebe6381d4f7b4f7bf959f55631efefc`).
 The tap is in `execute_run` immediately before `execute_one`, not in the
 extension-word fetch helper: these are instructions dispatched by the current
 emulated core, not raw program-memory reads or independent silicon evidence.
@@ -2495,7 +2471,7 @@ currently adds an opcode word; these are measured negative results, not
 evidence that other interactive or radio paths cannot execute more DSP
 instructions. The fixed idle fingerprint still applies only to the untouched
 primary run.
-The fixture asserts all 594 fresh-run words plus fixture-only words. This
+The fixture asserts the current observed set plus fixture-only words. This
 closes exact-word assertion coverage for that captured run, not every operand,
 status or hardware interaction those instructions can encounter.
 The generated report gives the current fixture-only total; these are *word*
@@ -2507,7 +2483,7 @@ the ROM4 idle word set changes or any observed word lacks an assertion. It is
 also part of `make check-c54x-cross-rom`; the gate does not validate unobserved
 instruction variants or silicon-level timing. The tool is given the current
 core source for a separate static decoder inventory.
-The consolidated 594-word checkpoint passes `make check-c54x-cross-rom`:
+`make check-c54x-cross-rom` combines
 native core conformance, ROM4 RF-boundary and observed coverage checks,
 3210 coherent frontier, native 5110 physical Phone book menu, and the
 3310/3330/3410 product frontiers. The sibling frontier checks retain their
@@ -2566,10 +2542,9 @@ destinations with OVM clear/set: `7ffffffe + 3*2` retains `0080000004`
 without OVM or saturates to `007fffffff` with it. Only the destination's
 OVA/OVB bit is set, carry is retained and the other accumulator is unchanged.
 T, AR3, source memory and the two-cycle DARAM cost are independently checked.
-The integrated observed-coverage gate passes with these destination fixtures:
-the idle/Menu/long-power union remains 594 asserted words across 107 groups,
-with its accepted fingerprint unchanged. Neither physical input trace adds
-an unasserted word; the extra arithmetic words remain fixture-only.
+These destination fixtures are additional arithmetic evidence, not a new
+observed-word inventory. Their fixture-only classification and the current
+idle/Menu/power inventory remain separate.
 The immediate-MAC fixtures also assert absolute extension
 order, preincrement timing, T publication, and DARAM cycle cost. A long-offset
 fixture verifies immediate-before-offset fetch and the extra cycle; a separate
@@ -2588,13 +2563,10 @@ Fixture-only `2483` checks that FRCT doubles the unsigned `MPYU` product,
 OVM clamps the overflowing accumulator result, and OVA is set without
 modifying T or AR3. It runs in one DARAM cycle.
 
-The coverage tool now separates fixture execution from explicit result
-assertions. All 457 narrower-baseline ROM4 words have an `opassert` marker
-after a passing exact-word check; none of that set are executed-only or absent.
-The fresh 594-word trace also has explicit passing assertions for every word.
-Neither result
-establishes unexecuted ROM4 paths, unobserved encodings, or the instruction-family
-audit. Existing result
+The coverage tool separates fixture execution from explicit result
+assertions. An `opassert` marker follows a passing exact-word check;
+execution alone is not assertion coverage. Neither establishes unexecuted
+ROM4 paths, unobserved encodings, or the instruction-family audit. Existing result
 checks now explicitly
 assert `7214`, `f5e2`, `f520`, `3292`, `e902`, `e903`, and `f120`, removing
 them from the executed-only class without changing CPU behavior. Observed
