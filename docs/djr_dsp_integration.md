@@ -1510,6 +1510,26 @@ by supplying only that image to the matcher with
 `--catalogue-offset 0xf35bc --image-base 0x200000`. This is a static catalogue
 contract, not proof of its MCU reader or the runtime block-request sequence.
 
+The v6.39 boot initializes a RAM copy at `0x1107c0`: passive catalogue
+reads at PC `0x200194`, beginning at 0.007424 s, show source `0x2f35bc`
+and destination `0x1107c0` advancing together. The RAM-table literal has
+three statically decoded consumers:
+
+| MCU site | Observed instruction contract |
+| --- | --- |
+| `0x2b93bc..0x2b93cc` | Loads the RAM-table base, selects `base + index*4`, reads descriptor destination and size, and skips the payload path for size zero. |
+| `0x2bcad4..0x2bcaea` | Loads entry zero, reads size at `+4`, and forms payload address `descriptor+12` and staging field at `+6`. |
+| `0x2bcfbc..0x2bcfce` | Selects an indexed descriptor and copies its header halfwords into another structure. |
+
+The base literals are at `0x2b974c`, `0x2bcb6c` and `0x2bd1f4`.
+`tools/noki3310_upload_catalogue_observe.lua` records only existing memory
+reads and CPU registers, with a per-PC log cap and an uncapped total. In
+the 16-second research-HLE boot, flash-table reads also occur in a strided
+reader at `0x2bc904` and a bulk reader at `0x2d292c`; neither observation
+alone is evidence of a DSP block request. Runtime selection at the RAM
+consumers remains the next boundary. No resident-ROM compatibility follows
+from this MCU-side mapping.
+
 This establishes byte identity, not unique archival provenance or a compatible
 resident DSP ROM. Other products share complete individual payloads: for
 example, 3210 v6.00 matches blocks `05`, `06`, `0f` and `16`. Raw images were
