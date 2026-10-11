@@ -2,6 +2,17 @@
 
 ## Current Result
 
+Normal `nse6stage` remains at its own DSP-verifier acknowledgement boundary.
+The separate `nse6r4t` fixture retains own MCU flash and uses the acquired
+NSE-1 ROM4 mask as an explicitly unproved compatibility input. Its decoded
+integrity/retry EEPROM fixture and nominal ADC profile establish physical
+security-code entry, Menu / Names and persistent SIM phonebook save/recall
+in the documented compatibility experiments. Those observations are not a
+current full-native handset acceptance gate across the port-`0x36` wait.
+They do not establish a fitted DSP mask, stable native radio, registration,
+calls or SMS. The current native resumption boundary is described below;
+the full-scale ADC startup observations are negative controls, not that frontier.
+
 The current native execution boundary is DSP I/O port `0x36`, not an MCU
 message producer. At 3.649008 seconds, resident routine `0x9129..0x9161`
 reads `0x0080`, clears bits 1--4, sets `0x801c`, and writes `0x809c` to
@@ -1253,8 +1264,9 @@ with one-second samples after six seconds in `0x2d33d6..0x2d33dc`.
 
 These diagnostic results isolate the two integrity gates but do not provide
 valid identity, lock configuration, completed APDUs, physical input acceptance,
-registration or native speech. The next question is the post-initialization
-firmware wait/UI startup boundary. Additional storage changes require their
+registration or native speech. The nominal ADC and keypad status contracts
+below resolve this negative control's startup/input prerequisites; the current
+native boundary is the port-`0x36` completion in Current Result. Additional storage changes require their
 own decoded contract; no donor identity is justified by a blank frame.
 
 ### Parked Task and Physical Input
@@ -1297,9 +1309,10 @@ before clearing the column mask. Report `0x14` sets bitmap bit zero; reports
 `0x16/0x15/0x17` set bits one/two/three respectively. The cold run receives
 those last three reports but not `0x14`; sampled readiness is `06` from two
 seconds and the report bitmap is `0e` from four through twelve seconds.
-Thus the missing report bit is a concrete unmet prerequisite, not proof that
-supplying it would complete every later gate. Next census its own producer
-and input conditions. No external startup report is to be synthesized merely
+Thus the missing report bit is a concrete unmet prerequisite in the
+full-scale ADC negative control, not the current nominal-input frontier.
+The Report-0x14 Producer Boundary and Source Mapping sections recover its
+own producer and input conditions. No external startup report is to be synthesized merely
 because a sibling profile supplies similarly numbered reports.
 
 Reproduce with the isolated-run command above, substituting `nse6r4t` and a
@@ -1307,7 +1320,8 @@ fresh run directory. Its ROM subdirectory additionally requires the hash-pinned
 `nse1_rom4_dsp_program.bin` and `nse1_rom4_dsp_data.bin` declared in the driver.
 A successful handshake does not justify importing a donor EEPROM or claiming
 native radio/speech. Captured results and the two integrity failures are above;
-the current input-enable boundary is distinct from those resolved questions.
+the current native port-`0x36` boundary is distinct from the resolved
+nominal-input report and keypad-status contracts.
 
 The shared memory handshake is not permission to fabricate its result. Memory capacities,
 reset/peripheral attachment, static negative fixtures and the first isolated
