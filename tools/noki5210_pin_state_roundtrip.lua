@@ -3,6 +3,7 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local machine = manager.machine
 local call = _G.noki5210_pin_state_call == true
+local sms = _G.noki5210_pin_state_sms == true
 local cpu = assert(machine.devices[':maincpu'])
 local observe = dofile(directory .. 'dct3_state_snapshot.lua')(machine, cpu, '5210_pin_state')
 local saved, completed
@@ -34,6 +35,15 @@ retained[#retained + 1] = emu.add_machine_post_load_notifier(function()
             end
             error('missing physical key ' .. name)
         end
+        if sms then
+            press('Left Softkey / Menu')
+            assert(emu.wait(1.2))
+            press('Left Softkey / Menu')
+            assert(emu.wait(2.5))
+            machine.screens[':screen']:snapshot('5210_pin_sms_read.png')
+            completed = true
+            return
+        end
         if not call then
             press('Left Softkey / Menu')
             assert(emu.wait(2))
@@ -57,7 +67,7 @@ _G.noki5210_pin_after_accept = function(press)
         press('Send')
         assert(emu.wait(3))
     end
-    local name = call and '5210_pin_call' or '5210_pin_idle'
+    local name = call and '5210_pin_call' or sms and '5210_pin_sms' or '5210_pin_idle'
     machine:save(name)
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--scenario', choices=('toolkit-interactive', 'pin-registration',
                                              'late-pin-boundary', 'late-pin-registration',
-                                             'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state'),
+                                             'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state', 'pin-sms-state'),
                         default='toolkit-interactive')
     parser.add_argument('--observe-readiness', action='store_true',
                         help='passively observe own context roots during the early-PIN control')
@@ -31,8 +31,8 @@ def main():
         for name in ('cfg', 'nvram', 'snap'):
             (run / name).mkdir()
         pin = args.scenario != 'toolkit-interactive'
-        late = args.scenario in ('late-pin-boundary', 'late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state')
-        if args.scenario in ('late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state'):
+        late = args.scenario in ('late-pin-boundary', 'late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state', 'pin-sms-state')
+        if args.scenario in ('late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state', 'pin-sms-state'):
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name='noki5210')
             ports = ET.SubElement(system, 'input')
@@ -42,7 +42,7 @@ def main():
                 for mask in ('2', '32'):
                     ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
                                   mask=mask, defvalue='0', value=mask)
-            if args.scenario == 'pin-incoming-sms':
+            if args.scenario in ('pin-incoming-sms', 'pin-sms-state'):
                 ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
                               mask='4', defvalue='0', value='4')
             ET.ElementTree(config).write(run / 'cfg/noki5210.cfg',
@@ -66,6 +66,8 @@ def main():
             script = 'noki5210_pin_idle_state.lua'
         if args.scenario == 'pin-call-state':
             script = 'noki5210_pin_call_state.lua'
+        if args.scenario == 'pin-sms-state':
+            script = 'noki5210_pin_sms_state.lua'
         checker = 'noki5210_pin_registration_check.py' if pin else 'noki5210_toolkit_interactive_check.py'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'noki5210',
                    '-bios', '540e', '-rompath', str(root / 'roms'), '-cfg_directory', 'cfg',
@@ -82,7 +84,8 @@ def main():
                                      ['--incoming-call'] if args.scenario == 'pin-incoming-call' else
                                      ['--incoming-sms'] if args.scenario == 'pin-incoming-sms' else
                                      ['--idle-state'] if args.scenario == 'pin-idle-state' else
-                                     ['--call-state'] if args.scenario == 'pin-call-state' else []), check=True)
+                                     ['--call-state'] if args.scenario == 'pin-call-state' else
+                                     ['--sms-state'] if args.scenario == 'pin-sms-state' else []), check=True)
     except (OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 

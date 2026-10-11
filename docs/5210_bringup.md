@@ -163,7 +163,16 @@ after Connect Acknowledge and before physical End/Disconnect; the restored
 branch completes CC/RR release and returns to the exact registered-idle frame.
 Idle and call use the same retained-notifier fixture core. This is HLE
 signaling/speech-control state coverage, not proof of native DSP audio or host
-media restoration. PIN-enabled delivered-SMS restoration remains separate.
+media restoration.
+
+`make verify-5210-pin-sms-state` separately saves after incoming SMS delivery
+and CP/RP/RR closure, before physical Read. It restores exact time/PC/SP/RAM
+and identical notification pixels, then physically opens the stored message.
+The body matches the existing `hello` frame and the final card retains read
+status; exactly two EF_SMS writes remain required. The checker places save/load
+between transport closure and the Read inputs, so saving an already-read
+message cannot substitute for this test. PIN-enabled idle, active-call and
+delivered-SMS restoration are independent gates on the same fixture core.
 
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.

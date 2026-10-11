@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 691 gates: 493 generated from typed steps, 198 copied verbatim (shell).
+# 692 gates: 494 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -317,17 +317,17 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-sim-hotplug-state-roundtrip verify-sim-toolkit-v501 \
 	verify-sim-toolkit-3310 verify-sim-toolkit-3330 \
 	verify-5210-radio-measurement-static verify-5210-late-pin-boundary \
-	verify-5210-pin-call-state verify-5210-pin-idle-state \
-	verify-5210-pin-incoming-sms verify-5210-pin-incoming-call \
-	verify-5210-late-pin-registration verify-5210-sim-pin-registration \
-	verify-sim-toolkit-interactive-5210 verify-sim-toolkit-5210 \
-	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
-	verify-sim-phonebook verify-sim-pin verify-sim-pin-unblock \
-	verify-sim-pin-state-roundtrip verify-sim-pin-removal verify-sim-pin-toggle \
-	verify-sim-pin-change verify-sim-pin-change-reject verify-sim-pin-v501 \
-	verify-frontier-stability verify-structure-subset verify-structure \
-	verify-radio-outgoing-call-sip verify-3330-radio-outgoing-call-sip \
-	verify-3330-radio-incoming-call-sip \
+	verify-5210-pin-sms-state verify-5210-pin-call-state \
+	verify-5210-pin-idle-state verify-5210-pin-incoming-sms \
+	verify-5210-pin-incoming-call verify-5210-late-pin-registration \
+	verify-5210-sim-pin-registration verify-sim-toolkit-interactive-5210 \
+	verify-sim-toolkit-5210 verify-sim-toolkit-state-roundtrip \
+	verify-sim-toolkit-removal verify-sim-phonebook verify-sim-pin \
+	verify-sim-pin-unblock verify-sim-pin-state-roundtrip verify-sim-pin-removal \
+	verify-sim-pin-toggle verify-sim-pin-change verify-sim-pin-change-reject \
+	verify-sim-pin-v501 verify-frontier-stability verify-structure-subset \
+	verify-structure verify-radio-outgoing-call-sip \
+	verify-3330-radio-outgoing-call-sip verify-3330-radio-incoming-call-sip \
 	verify-3330-radio-incoming-call-sip-connected-restore \
 	verify-3330-radio-incoming-call-sip-cancel \
 	verify-3330-radio-incoming-call-sip-alerting-restore \
@@ -4427,6 +4427,9 @@ verify-5210-radio-measurement-static: normalize-5210
 
 verify-5210-late-pin-boundary: normalize-5210 build
 	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario late-pin-boundary --mame $(MAME_DIR)/mame
+
+verify-5210-pin-sms-state: normalize-5210 build
+	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario pin-sms-state --mame $(MAME_DIR)/mame
 
 verify-5210-pin-call-state: normalize-5210 build
 	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario pin-call-state --mame $(MAME_DIR)/mame

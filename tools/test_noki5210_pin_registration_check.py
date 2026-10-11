@@ -27,6 +27,11 @@ class PinRegistrationTest(unittest.TestCase):
         verify_pin_idle_state(text)
         call_text = text.replace('5210_pin_state_physical: key=Left Softkey / Menu', '')
         verify_pin_idle_state(call_text, call=True)
+        sms_text = text.replace('5210_pin_state_physical: key=End',
+                                '5210_pin_state_physical: key=Left Softkey / Menu')
+        verify_pin_idle_state(sms_text, sms=True)
+        with self.assertRaises(ValueError):
+            verify_pin_idle_state(sms_text)
         with self.assertRaises(ValueError):
             verify_pin_idle_state(call_text)
         for old, new in (
@@ -57,6 +62,13 @@ class PinRegistrationTest(unittest.TestCase):
             for token in ('data=8901020240', 'downlink kind=17', 'acknowledged nr=3'):
                 with self.subTest(token=token), self.assertRaises(ValueError):
                     verify_pin_sms(text.replace(token, 'missing'), b'card')
+            state_text = text.replace('5210_pin_physical:', '5210_pin_state_physical:').replace(
+                '5210_pin_state_physical: key=Left Softkey / Menu',
+                '5210_pin_state: event=saved\n5210_pin_state: event=restored\n'
+                '5210_pin_state_physical: key=Left Softkey / Menu', 1)
+            verify_pin_sms(state_text, b'card', state=True)
+            with self.assertRaises(ValueError):
+                verify_pin_sms(state_text.replace('event=restored', 'event=missing'), b'card', state=True)
 
     def test_coherent_late_requires_own_measured_carrier(self):
         text = '\n'.join((
