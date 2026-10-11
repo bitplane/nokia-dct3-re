@@ -2970,7 +2970,7 @@ private:
 		u32 const target = (base ^ 0x10000) + 0x700;
 		auto &program = m_cpu->space(AS_PROGRAM);
 		for (unsigned i = 0; i < 20; ++i) { program.write_word(base + 0x600 + i, 0xe933); program.write_word((target & 0x10000) + 0x700 + i, 0xf495); }
-		program.write_word(base + 0x600, 0xf4e5);
+		program.write_word(base + 0x600, variant < 6 ? 0xf4e5 : 0xf4e4);
 		program.write_word(target, 0xe955);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
@@ -2989,13 +2989,13 @@ private:
 			[this, target](offs_t address, u16 &value, u16) {
 				if (machine().side_effects_disabled()) return;
 				expect(address == 0x1000 + m_pipeline_operand_reads && value == (address == 0x1000 ? (0x80 | (target >> 16)) : 0x700) &&
-				m_cpu->pipeline_cycles() == 5 + m_pipeline_operand_reads, "FRETE samples XPC then PC once in the declared retained-return model");
+				m_cpu->pipeline_cycles() == 5 + m_pipeline_operand_reads, "Far return samples XPC then PC once in the declared retained-return model");
 				++m_pipeline_operand_reads;
 			});
 		m_pipeline_fetch_tap = program.install_read_tap(target, target, "staged_far_return_target",
 			[this](offs_t, u16 &, u16) {
 				if (machine().side_effects_disabled()) return;
-				expect(m_cpu->pipeline_cycles() == 8, "FRETE target Fetch follows six-clock control redirection"); ++m_pipeline_extensions_reads;
+				expect(m_cpu->pipeline_cycles() == 8, "Far-return target Fetch follows six-clock control redirection"); ++m_pipeline_extensions_reads;
 			});
 		m_phase = 251290; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -23733,13 +23733,13 @@ private:
 		if (m_phase == 251290)
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
-			u64 const checkpoint = 4 + m_pipeline_peripheral_case / 2;
+			u64 const checkpoint = 4 + (m_pipeline_peripheral_case % 6) / 2;
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
 				m_pipeline_operand_reads == unsigned(cycle >= 5) + unsigned(cycle >= 6) &&
 				m_pipeline_extensions_reads == unsigned(cycle >= 8), "Far return retains both stack samples and fetches the target once across replay");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(cycle >= 5) + unsigned(cycle >= 6) &&
-				bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == (cycle < 7) &&
-				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 12 ? 0x55 : 0), "FRETE pops twice before enabling IRQ and flushes sequential instructions");
+				bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == (m_pipeline_peripheral_case >= 6 || cycle < 7) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 12 ? 0x55 : 0), "FRET preserves INTM, FRETE enables IRQ after both pops; both flush sequential instructions");
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
 				m_saved_pipeline.str({}); m_saved_pipeline.clear();
@@ -23758,8 +23758,8 @@ private:
 					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 				}
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_peripheral_case < 5) { start_pipeline_far_return(m_pipeline_peripheral_case + 1); return; }
-				osd_printf_info("TMS320C54x staged far return: PASS cases=6 stack_reads=5,6 target_fetch=8 target_execute=12 restore=6 duplicate_reads=0 silicon_phase_claim=0\n");
+				if (m_pipeline_peripheral_case < 11) { start_pipeline_far_return(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged far return: PASS cases=12 fret=6 frete=6 stack_reads=5,6 target_fetch=8 target_execute=12 restore=12 duplicate_reads=0 silicon_phase_claim=0\n");
 				start_timer_boundary_probe(0, true); return;
 			}
 			++m_pipeline_expected_cycle;

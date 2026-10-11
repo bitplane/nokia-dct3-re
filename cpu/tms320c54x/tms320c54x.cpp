@@ -1848,7 +1848,7 @@ void tms320c54x_device::pipeline_step()
 		bool const rmw = (word & 0xfe00) == 0x6800 &&
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
-		bool const far_return = word == 0xf4e5;
+		bool const far_return = (word & 0xfffe) == 0xf4e4;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
 		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
@@ -1953,13 +1953,13 @@ void tms320c54x_device::pipeline_step()
 		++m_opcode_count[m_op];
 		if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
-		else if (m_op == 0xf4e5)
+		else if ((m_op & 0xfffe) == 0xf4e4)
 		{
 			m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;
 			m_pc = m_pipeline_operand_address[5];
 			m_pipeline_fetch_address = logical_program_address(m_pc);
 			m_pipeline_flush_front = false;
-			m_st1 &= ~u16(0x0800);
+			if (BIT(m_op, 0)) m_st1 &= ~u16(0x0800);
 		}
 		else if (m_op == 0xf073 || m_op == 0xf273)
 			++m_pc; // Target fetch was already redirected in Access.
@@ -2003,7 +2003,7 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_vector_pending = false;
 	}
 
-	if (m_pipeline_valid[4] && m_pipeline_word[4] == 0xf4e5)
+	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf4e4)
 	{
 		// An adjacent PSHM commits its stack word in older Execute first.
 		m_pipeline_operand[4] = data_read(m_sp++);

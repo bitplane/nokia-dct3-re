@@ -2535,7 +2535,7 @@ not emulated interrupt latency or a physical wall-time replay claim.
 RAM/MMR RMW, multiword/replay/stream, empty IRQ/NMI and unsupported-form markers.
 Existing native execution remains protected by its full conformance suite.
 `verify-5110-save-state` passes with the added partial-Decode fields; this
-revalidates native CPU/register/I/O restoration, not the still-failing exact
+revalidates native CPU/register/I/O restoration independently of the exact
 RF scan snapshot described above.
 
 The short-period timer probe has the following remaining staged dependencies.
@@ -2581,16 +2581,19 @@ Read-owned stack allocation is a declared partial stage model, not a silicon
 phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
 accumulator-source latency are not covered by this implementation or gate.
 
-Plain FRETE now retains two ordered stack samples, masks the restored XPC
-to seven bits, pops SP twice and redirects before enabling interrupts.
-Its prototype holds Read for the second sample, flushes sequential words
+Plain FRET and FRETE retain two ordered stack samples, mask the restored XPC
+to seven bits, pop SP twice and redirect. FRET preserves INTM; FRETE clears it
+after both samples, following SPRU172C pages 4-61--62.
+The prototype holds Read for the second sample, flushes sequential words
 and restarts target Prefetch at clock 7 (Fetch 8, Execute 12 for a return
-starting at Prefetch 1). Six cases cover both cross-page directions and
-restore before the first read, between reads or after both reads. Older
+starting at Prefetch 1). Twelve cases cover both instructions, cross-page
+directions and restore before the first read, between reads or after both reads. Older
 Execute writes precede the first stack sample, so an adjacent PSHM's word
 can be observed. This is a declared bus-placement model of the documented
-six-clock return, not independent silicon phase evidence. Delayed FRETE,
-general stack conflicts and pending-interrupt timing remain unvalidated.
+six-clock return, not independent silicon phase evidence. The FRET cases
+start with INTM set and require it to remain set across return and replay.
+Delayed far returns, general stack conflicts and pending-interrupt timing
+remain unvalidated.
 
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
