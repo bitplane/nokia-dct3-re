@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_c54x_rom4_rf_impulse import check, expected
+from tools.run_c54x_rom4_rf_impulse import check, expected, expected_words, mixed_words
 
 
 def fixture(index=0, amplitude=0x4000):
@@ -13,6 +13,44 @@ def fixture(index=0, amplitude=0x4000):
 
 
 class ImpulseTests(unittest.TestCase):
+    def test_overlap_rounds_after_accumulation(self):
+        # Every individual unit impulse rounds to zero, but the eight-tap
+        # coefficient sum is 1.0, so the settled constant input must be one.
+        self.assertEqual(expected_words([1] * 32)[6:16], [1] * 10)
+        self.assertTrue(all(value == 0 for index in range(32)
+                            for value in expected(index, 1)))
+        self.assertEqual(expected_words([0xffff] * 32)[6:16], [0xffff] * 10)
+
+    def test_bounded_mixed_words_and_full_capture(self):
+        words = mixed_words()
+        signed = [word if word < 0x8000 else word - 0x10000 for word in words]
+        self.assertEqual(len(words), 32)
+        self.assertTrue(all(-2048 <= value <= 2047 for value in signed))
+        self.assertGreater(len(set(words)), 20)
+        lines = [f'rom4_rf_impulse_input: index={index} '
+                 f'pc={(0x330c, 0x3312, 0x3318, 0x331e)[index % 4]:04x} value={word:04x}'
+                 for index, word in enumerate(words)]
+        lines.extend(f'rom4_rf_impulse_output: index={index} pc={0x3322 + index % 2:04x} '
+                     f'address={0x1a48 + index % 16:04x} value={word:04x}'
+                     for index, word in enumerate(expected_words(words)))
+        lines.append('rom4_rf_mixed_summary: samples=32 inputs=100 outputs=48 acquisition_claim=0')
+        text = '\n'.join(lines)
+        check(text, 0, 0, mixed=True)
+        for changed in (text.replace('samples=32', 'samples=31'),
+                        text.replace('value=fcd5', 'value=fcd4'),
+                        text.replace('index=47 ', 'index=48 ')):
+            self.assertNotEqual(text, changed)
+            with self.assertRaises(ValueError):
+                check(changed, 0, 0, mixed=True)
+
+    def test_rejects_invalid_input_domain(self):
+        for words in ([0] * 31, [0] * 33, [-1] * 32, [65536] * 32):
+            with self.assertRaises(ValueError):
+                expected_words(words)
+        for index in (-1, 32):
+            with self.assertRaises(ValueError):
+                expected(index, 0x4000)
+
     def test_known_positive_response(self):
         self.assertEqual(expected(0, 0x4000)[:8], [0, 0x469, 0, 0x1000, 0, 0xab6, 0, 0xe2])
         self.assertEqual(expected(2, 0x4000)[:8], [0, 0xe2, 0, 0xab6, 0, 0x1000, 0, 0x469])

@@ -1259,6 +1259,11 @@ probe-c54x-timer-boundary: build
 .PHONY: check-c54x-timer-registers
 check-c54x-timer-registers: probe-c54x-timer-boundary
 
+.PHONY: check-c54x-rom4-rf-filter-mixed
+check-c54x-rom4-rf-filter-mixed: build
+	$(PYTHON) tools/run_c54x_rom4_rf_impulse.py --mame $(MAME_DIR)/mame \
+		--rompath $(MAME_DIR)/roms --mixed --output-root $(abspath tmp)
+
 prepare-c54x-rom4-fixture:
 	@test -f roms/research/nse1-rom4/working/transform_entry_prog.bin
 	@test -f roms/research/nse1-rom4/working/transform_entry_data.bin

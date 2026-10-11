@@ -418,6 +418,23 @@ not establish the port's physical sample cadence or the old capture's validity.
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
+
+`check-c54x-rom4-rf-filter-mixed` adds a bounded overlapping-input check to
+the isolated impulse contract. It supplies 32 words, signed values
+`((n*7919+1237) mod 4096)-2048`, through port `27`, then zeros. The native
+filter emits 48 captured words spanning three invocations. An independent
+integer convolution accumulates the mapped coefficient contributions and
+rounds each complete sum once; every native word matches, including the
+cross-invocation tail. Unit tests distinguish this from summing rounded
+individual impulse responses: each unit impulse rounds to zero, but the
+settled unit sequence yields one because the eight coefficients sum to
+65536. Both signs and the unchanged isolated-impulse expectations are checked.
+The runner retains actual input/binary hashes and per-case invocation and
+generated EEPROM identity before execution, on disk-backed repo `tmp/`.
+This closes the numerical filter contract for this bounded mixed sequence,
+not arbitrary-input overflow/saturation, physical sample format/cadence,
+the historical rotating-score discrepancy or RF acquisition. No detector
+threshold, input amplitude or CPU instruction semantics is changed.
 Its required fixture ROM directory is `mame/roms`, not the handset `roms`
 directory. Native RF/CRC evidence runners now default to ignored repo `tmp/`
 on disk and accept `--output-root`; they no longer default to tmpfs.

@@ -7,6 +7,7 @@ local start = tonumber(os.getenv("ROM4_RF_IMPULSE_TIME") or "1.6402")
 assert(start and start >= 0)
 local amplitude = tonumber(os.getenv("ROM4_RF_IMPULSE_VALUE") or "16384")
 assert(amplitude and amplitude >= 0 and amplitude <= 0xffff and amplitude % 1 == 0)
+local mixed = os.getenv('ROM4_RF_MIXED_WORDS') == '1'
 local inputs, outputs = 0, 0
 local taps = {}
 taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
@@ -16,6 +17,9 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         -- consumer. Start at the filter's first IN, not a wall-time accident.
         if inputs == 0 and cpu.state["PC"].value ~= 0x330c then return 0 end
         local value = inputs == impulse and amplitude or 0
+        if mixed then
+            value = inputs < 32 and (((inputs * 7919 + 1237) % 4096 - 2048) & 0xffff) or 0
+        end
         if inputs < 32 then
             machine:logerror(string.format(
                 "rom4_rf_impulse_input: index=%d pc=%04x value=%04x\n",
@@ -35,6 +39,12 @@ taps[#taps + 1] = cpu.spaces["data"]:install_write_tap(0x1a48, 0x1a57,
         outputs = outputs + 1
     end)
 local stop = emu.add_machine_stop_notifier(function()
+    if mixed then
+        machine:logerror(string.format(
+            'rom4_rf_mixed_summary: samples=32 inputs=%d outputs=%d acquisition_claim=0\n',
+            inputs, outputs))
+        return
+    end
     machine:logerror(string.format(
         "rom4_rf_impulse_summary: impulse=%d amplitude=%04x inputs=%d outputs=%d acquisition_claim=0\n",
         impulse, amplitude, inputs, outputs))
