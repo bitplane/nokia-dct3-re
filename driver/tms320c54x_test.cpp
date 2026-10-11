@@ -21600,7 +21600,7 @@ private:
 			osd_printf_info("TMS320C54x interrupt entry stages: PASS sources=irq,nmi fetch_to_stack_cycles=1 pipeline_drain_claim=0\n");
 			start_interrupt_acceptance_checkpoint(); return;
 		}
-		if (m_phase >= 190000 && m_phase <= 190002)
+		if (m_phase >= 190000 && m_phase <= 190003)
 		{
 			if (m_phase == 190000)
 			{
@@ -21609,6 +21609,16 @@ private:
 					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
 					m_entry_ack_source == -1 && data.read_word(0x0fff) == 0xbeef,
 					"Accepted maskable interrupt retains IFR and INTM before IACK, with no early SP/stack write");
+				m_phase = 190003;
+				m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+			}
+			if (m_phase == 190003)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == 3 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
+					m_entry_ack_source == -1 && data.read_word(0x0fff) == 0xbeef,
+					"INTR Decode captures continuation before Access decrements SP");
 				m_saved_vector.str(std::string()); m_saved_vector.clear();
 				expect(machine().save().write_stream(m_saved_vector) == STATERR_NONE,
 					"Save accepted interrupt before Access");
@@ -21634,7 +21644,7 @@ private:
 				m_phase = 190002;
 				m_check_timer->adjust(attotime::from_usec(100)); return;
 			}
-			osd_printf_info("TMS320C54x accepted interrupt checkpoint: PASS ifr_until_fetch=1 intm_at_iack=1 later_imr=1 source_latched=1 save_replay=1 pipeline_drain_claim=0\n");
+			osd_printf_info("TMS320C54x accepted interrupt checkpoint: PASS ifr_until_fetch=1 intm_at_iack=1 decode_before_access=1 later_imr=1 source_latched=1 save_replay=1 pipeline_drain_claim=0\n");
 			start_rounding_boundary_case(0); return;
 		}
 		if (m_phase >= 200000 && m_phase < 200128)
@@ -22264,7 +22274,7 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
-		if (m_phase >= 190000 && m_phase <= 190002)
+		if (m_phase >= 190000 && m_phase <= 190003)
 		{
 			expect(m_entry_ack_source == -1 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == 2,
 				"Vector acknowledgement clears IFR exactly once at Fetch");

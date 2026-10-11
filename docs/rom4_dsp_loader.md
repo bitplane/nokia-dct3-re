@@ -996,9 +996,9 @@ phases or silicon latency. Retained vector prefetch precedes the stack write;
 the continuation is captured from the latter's passive tap. Do not choose a
 foreground delay from this trace or interpret bus observability as a pipeline
 correction.
-In `tmp/c54x-entry-timer-observation.log`, opcode fetch and TCR bus write have
+In `tmp/c54x-decode-timer-boundary.log`, opcode fetch and TCR bus write have
 the same accounting timestamp; the first short-period vector fetch follows
-four accounting cycles later after the entry micro-operation split. Both
+five accounting cycles later with explicit INTR Decode before stack Access. Both
 short cases still enter 108 times and stack `0608`,
 with no mask write. Long-period indirect/direct cases mask four/two cycles
 after the reload respectively and never enter the vector. This makes the
@@ -2211,18 +2211,21 @@ ISA coverage or a physical pipeline implementation.
 
 `execute_run()` still recognizes interrupts before an instruction-atomic
 `execute_one()`. Hardware interrupt entry now retains the accepted vector,
-source and continuation, then steps SP decrement, vector fetch/IACK and the
-stack write on separate CPU cycles. All entry continuation state is saved.
+source, then captures the continuation at INTR Decode before stepping SP
+decrement, vector fetch/IACK and stack write on separate CPU cycles. All
+entry continuation state is saved.
 The explicit IRQ/NMI fixture requires the stack write one cycle after vector
 fetch; retained-vector save/replay snapshots now interrupt entry before that
 write and verify its completion without a second fetch or acknowledgement.
 Reset and debugger redirection cancel the pending entry. The aggregate entry
-cost remains the existing calibrated five cycles; its residual cycle does not
-establish foreground drain or the complete physical pipeline.
+cost remains the existing calibrated five cycles. Its former residual cycle
+is now assigned to Decode before Access; this does not establish foreground
+drain or the complete physical pipeline.
 IFR remains pending after source acceptance and is selectively cleared at
 the first vector fetch/IACK, as specified by SPRU131G 6.10.4. A one-clock
-checkpoint before Access asserts unchanged SP/stack, both original IFR bits
-and no acknowledgement, then saves that in-flight entry. Changing IMR to
+checkpoint after acceptance asserts unchanged SP/stack, both original IFR bits
+and no acknowledgement. A second one-clock checkpoint requires those same
+properties after Decode and saves the entry before Access. Changing IMR to
 enable a different pending source cannot reselect the accepted vector; normal
 and restored continuations both clear only the originally accepted bit and
 stack the original PC once. The early-clear implementation fails this
@@ -2238,6 +2241,13 @@ The prior early-setting implementation fails this checkpoint. NMI's existing
 acceptance behavior and the aggregate entry cycle count are unchanged. This
 is an entry-side ordering correction, not foreground pipeline retirement or
 proof of the full instruction pipeline.
+The `decode_before_access=1` checkpoint fails the former Access-first entry
+(`tmp/c54x-decode-before-red.log`). Return-PC capture now belongs to Decode,
+not source acceptance; vector Fetch/IACK follows Access and stack write follows
+Fetch by one cycle for both IRQ and NMI. The first ISR execution retains its
+previous aggregate placement. The short-period timer still enters 108 times
+without reaching the foreground mask write, so this ordering correction does
+not resolve that pipeline-drain boundary or promote recorder completion.
 `check-c54x-rom4-rf-boundary` retains 20,282 frame expiries, 648,096 RF reads
 and 1,519 port-`32` writes, with no port-`38/39` reads;
 `verify-5110-save-state` also passes. These protect the established native

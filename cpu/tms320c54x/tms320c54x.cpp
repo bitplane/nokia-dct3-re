@@ -1451,8 +1451,9 @@ bool tms320c54x_device::service_interrupt()
 		// pipeline drain is still absent; recognition remains instruction-boundary.
 		switch (m_interrupt_entry_stage++)
 		{
-		case 1: m_interrupt_stack_address = --m_sp; break;
-		case 2:
+		case 1: m_rtn = m_pc; break; // INTR Decode, before stack Access.
+		case 2: m_interrupt_stack_address = --m_sp; break;
+		case 3:
 			// SPRU131G 6.10.4 ties IFR clearance to vector Fetch/IACK,
 			// not to the earlier source selection at Decode.
 			if (m_interrupt_ack_source != INPUT_LINE_NMI)
@@ -1467,8 +1468,8 @@ bool tms320c54x_device::service_interrupt()
 			m_vector_prefetch_valid = true;
 			m_pc = m_interrupt_vector_pc;
 			break;
-		case 3: m_data.write_word(m_interrupt_stack_address, m_rtn); break;
-		case 4: // Retain the existing aggregate entry cost; foreground drain is not modeled.
+		case 4:
+			m_data.write_word(m_interrupt_stack_address, m_rtn);
 			m_interrupt_entry_stage = 0;
 			break;
 		}
@@ -1501,7 +1502,6 @@ bool tms320c54x_device::service_interrupt()
 		vector = source + 16;
 		acknowledged_source = source;
 	}
-	m_rtn = m_pc;
 	if (acknowledged_source == INPUT_LINE_NMI)
 		m_st1 |= 0x0800;
 	m_interrupt_vector_pc = (m_pmst & 0xff80) | (vector << 2);

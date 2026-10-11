@@ -33,6 +33,10 @@ class CoreResultTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_result(self.output.replace(' intm_at_iack=1', ''), 3)
 
+    def test_checkpoint_without_decode_order_is_insufficient(self):
+        with self.assertRaises(ValueError):
+            check_result(self.output.replace(' decode_before_access=1', ''), 3)
+
     def test_completion_must_be_terminal(self):
         for output in (self.output.replace(COMPLETION, ''), self.output + 'crash\n'):
             with self.assertRaises(ValueError):
