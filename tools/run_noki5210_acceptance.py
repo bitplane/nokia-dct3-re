@@ -20,7 +20,7 @@ class Scenario:
     coherent_cell: bool = True
     net_masks: tuple[str, ...] = ()
     pin: bool = True
-    host_sms: bool = False
+    host_sms: str | None = None
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -45,7 +45,9 @@ SCENARIOS = {
     'pin-outgoing-call-state': Scenario('noki5210_pin_outgoing_call_state.lua',
                                         '--outgoing-call-state', seconds=60, net_masks=('32',)),
     'pin-host-outgoing-sms': Scenario('noki5210_pin_outgoing_sms.lua', '--outgoing-sms',
-                                     seconds=70, host_sms=True),
+                                     seconds=70, host_sms='outgoing'),
+    'pin-host-incoming-sms': Scenario('noki5210_pin_incoming_sms.lua', '--incoming-sms',
+                                     host_sms='incoming'),
 }
 
 
@@ -103,10 +105,14 @@ def main():
                    '-seconds_to_run', str(scenario.seconds)]
         if scenario.host_sms:
             command.extend(['-http', '-http_port', str(args.port)])
-            launch = [sys.executable, str(root / 'tools/run_host_sms_gate.py'),
-                      '--port', str(args.port), '--cwd', str(run),
-                      '--user-data', '61', '--user-data-length', '1', '--decision', 'accept',
-                      '--'] + command
+            host_script = ('run_host_incoming_sms_gate.py' if scenario.host_sms == 'incoming'
+                           else 'run_host_sms_gate.py')
+            launch = [sys.executable, str(root / 'tools' / host_script),
+                      '--port', str(args.port), '--cwd', str(run)]
+            if scenario.host_sms == 'outgoing':
+                launch.extend(['--user-data', '61', '--user-data-length', '1',
+                               '--decision', 'accept'])
+            launch.extend(['--'] + command)
         else:
             launch = command
         with (run / 'console.log').open('w') as console:
@@ -115,9 +121,13 @@ def main():
                         str(run)] + ([scenario.checker_flag] if scenario.checker_flag else []),
                        check=True)
         if scenario.host_sms:
-            subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
-                            '--octets', '1', '--outcome', 'rp_ack', str(run / 'error.log')],
-                           check=True)
+            host_checker = ('radio_incoming_host_sms_trace_check.py'
+                            if scenario.host_sms == 'incoming'
+                            else 'radio_outgoing_host_sms_trace_check.py')
+            host_args = (['--arfcn', '86'] if scenario.host_sms == 'incoming'
+                         else ['--octets', '1', '--outcome', 'rp_ack'])
+            subprocess.run([sys.executable, str(root / 'tools' / host_checker)] +
+                           host_args + [str(run / 'error.log')], check=True)
     except (OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 

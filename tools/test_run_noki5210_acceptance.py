@@ -25,6 +25,7 @@ class RunnerTests(unittest.TestCase):
             'pin-outgoing-sms': (70, '--outgoing-sms', ()),
             'pin-outgoing-call-state': (60, '--outgoing-call-state', ('32',)),
             'pin-host-outgoing-sms': (70, '--outgoing-sms', ()),
+            'pin-host-incoming-sms': (45, '--incoming-sms', ()),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
@@ -34,12 +35,15 @@ class RunnerTests(unittest.TestCase):
                     with patch('sys.argv', ['runner', str(run), '--scenario', name]), \
                             patch.object(runner.subprocess, 'run') as execute:
                         runner.main()
-                    host = name == 'pin-host-outgoing-sms'
+                    host = name.startswith('pin-host-')
+                    incoming = name == 'pin-host-incoming-sms'
                     self.assertEqual(execute.call_count, 3 if host else 2)
                     command = execute.call_args_list[0].args[0]
                     if host:
-                        self.assertEqual(Path(command[1]).name, 'run_host_sms_gate.py')
-                        self.assertEqual(command[command.index('--user-data') + 1], '61')
+                        self.assertEqual(Path(command[1]).name,
+                                         'run_host_incoming_sms_gate.py' if incoming else 'run_host_sms_gate.py')
+                        if not incoming:
+                            self.assertEqual(command[command.index('--user-data') + 1], '61')
                         command = command[command.index('--') + 1:]
                     self.assertEqual(command[1:4], ['noki5210', '-bios', '540e'])
                     self.assertEqual(command[command.index('-seconds_to_run') + 1], str(seconds))
@@ -52,9 +56,11 @@ class RunnerTests(unittest.TestCase):
                     if host:
                         host_check = execute.call_args_list[2].args[0]
                         self.assertEqual(Path(host_check[1]).name,
-                                         'radio_outgoing_host_sms_trace_check.py')
-                        self.assertEqual(host_check[2:], ['--octets', '1', '--outcome',
-                                                         'rp_ack', str(run / 'error.log')])
+                                         'radio_incoming_host_sms_trace_check.py' if incoming
+                                         else 'radio_outgoing_host_sms_trace_check.py')
+                        self.assertEqual(host_check[2:], (['--arfcn', '86'] if incoming
+                                         else ['--octets', '1', '--outcome', 'rp_ack']) +
+                                         [str(run / 'error.log')])
                     config = run / 'cfg/noki5210.cfg'
                     if name == 'toolkit-interactive':
                         source = Path(runner.__file__).resolve().parents[1] / \

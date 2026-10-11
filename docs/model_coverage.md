@@ -73,7 +73,10 @@ connected call before physical End, requiring exact time/PC/SP/RAM and
 reference/restored pixels, complete release and the idle oracle.
 `verify-5210-pin-host-outgoing-sms` independently adds correlated loopback
 host acceptance to the physical composer, exact SMS-SUBMIT and CP/RP/RR
-closure. Host rejection/timeout, incoming SMS, call/SIP composition and
+closure. `verify-5210-pin-host-incoming-sms` independently adds correlated
+host delivery on ARFCN 86, CP/RP closure, physical Read, exact body pixels and
+persistent read-status SIM storage without automatic laboratory SMS.
+Host rejection/timeout, call/SIP composition and
 outgoing-SMS restoration remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record

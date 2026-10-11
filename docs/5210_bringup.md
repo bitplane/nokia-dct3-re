@@ -210,6 +210,16 @@ The trace checker requires host request/decision/result ownership. This proves
 software-host SMS submission, not external SMS delivery, rejection/timeout
 parity, SIP composition or native DSP execution.
 
+`make verify-5210-pin-host-incoming-sms` separately enables only the host
+adapter (no automatic laboratory SMS), waits for PIN-authenticated network
+registration and sends `hello` through the correlated host request. Paging,
+SAPI-3 CP/RP closure and host queued/delivered states must precede physical
+Read. The final card retains the message with read status, exactly two EF_SMS
+writes occur, and the body frame matches the existing oracle. The host trace
+requires registered ARFCN 86; another product's default carrier cannot satisfy
+this check. This proves incoming host SMS/UI/storage, not external-network
+delivery or native DSP execution.
+
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.
 The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a
