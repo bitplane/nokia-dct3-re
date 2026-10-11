@@ -4,7 +4,8 @@ assert(machine.system.name == 'npe3hle', 'requires NPE-3 research-HLE compositio
 local cpu = assert(machine.devices[':maincpu'])
 local space = cpu.spaces['program']
 local taps, busy = {}, false
-for _, pc in ipairs({0x3b9e34, 0x3ba0c0, 0x3b9a72, 0x3b9a82, 0x3ba0d6}) do
+for _, pc in ipairs({0x3b9e34, 0x3ba0c0, 0x3b9a72, 0x3b9a82, 0x3ba0d6,
+                    0x2d3de6, 0x2d3e1a, 0x2d3e3c, 0x3c915a, 0x4b2df2, 0x4b2e0c}) do
     local hits = 0
     taps[#taps + 1] = space:install_read_tap(pc & ~3, (pc & ~3) + 3,
         'plmn_parse_' .. pc, function(address)

@@ -18,6 +18,8 @@ class RadioContractTest(unittest.TestCase):
         self.assertEqual(result['bcch_status'], '0800')
         self.assertEqual(result['bcch_object_consumer'], '3b9302')
         self.assertEqual(result['si3_parser'], '43f074')
+        self.assertEqual(result['si3_publication_status'], '03f8')
+        self.assertEqual(result['si3_publication_task'], 14)
         self.assertEqual(result['traffic_release'], 'runtime physical End observation required')
 
 

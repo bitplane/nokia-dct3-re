@@ -345,6 +345,24 @@ the own v5.56 research-HLE composition; its addresses are checked by the
 radio contract tool. The next discriminator is downstream selection/admission
 of the parsed SI3, not another synthesized transport message.
 
+SI3 publication also survives the paired controls: caller `3ba2a5` posts
+status `03f8`, word `+4 == 0` and completion byte `+8 == 1` to task 14.
+Both use object `102a4c`; task 14 reads its original `03f8` header at
+`2d3da4` before the object is later reused. National post/read times are
+7.970027308/7.970089538 seconds, international 7.965625846/7.965688077.
+This excludes an absent initial publication, not all later delivery failures.
+Evidence: `tmp/6210-plmn-publication-{national,international}/error.log.gz`.
+
+The first completed-SI3 classifier sequence also agrees: `4b2dd4` returns
+0 at `4b2e0c`, `3c911c` observes that value at `3c915a`, and task 14
+receives classification 1 at `2d3e3c`, with context state 2 and flags `0f`
+in both runs. Earlier partial-SI publications return 1/1/0 at those same
+boundaries. These are observed return values, not recovered semantic enum
+names. Evidence: `tmp/6210-plmn-classifier-{national,international}/error.log.gz`.
+The initial SI3 parser, publication and classification therefore do not
+explain the national/international difference. The next boundary is the
+classification-1 continuation and its downstream selection state.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require
