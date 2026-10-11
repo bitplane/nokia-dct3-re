@@ -1,0 +1,35 @@
+import pathlib
+import tempfile
+import unittest
+
+from dsp_upload_reference_match import matches, read_payload
+
+
+class ReferenceMatchTest(unittest.TestCase):
+    def payload(self, text):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "block00.h"
+            path.write_text(text)
+            return read_payload(path)
+
+    def test_size_and_literals(self):
+        self.assertEqual(self.payload("static struct dsp_codeblock x = {{0x1,0x2,0x2,0x0,0x0},{0x1234,0xabcd}};"), [0x1234, 0xabcd])
+        with self.assertRaises(ValueError):
+            self.payload("static struct dsp_codeblock x = {{0x1,0x2,0x3,0x0,0x0},{0x1234,0xabcd}};")
+        with self.assertRaises(ValueError):
+            self.payload("static struct dsp_codeblock x = {{0x1,0x2,0x1,0x0,0x0},{GUESS}};")
+
+    def test_full_matches_and_both_orders(self):
+        self.assertEqual(matches([0x1234, 0xabcd], bytes.fromhex("001234abcd3412cdab")),
+                         [{"byteorder": "big", "file_offset": 1}, {"byteorder": "little", "file_offset": 5}])
+        self.assertEqual(matches([0x1234, 0xabcd], bytes.fromhex("1234ab00")), [])
+
+    def test_empty_and_repeated(self):
+        self.assertEqual(matches([], b"anything"), [])
+        self.assertEqual(matches([0x1234], bytes.fromhex("12341234")),
+                         [{"byteorder": "big", "file_offset": 0}, {"byteorder": "big", "file_offset": 2},
+                          {"byteorder": "little", "file_offset": 1}])
+
+
+if __name__ == "__main__":
+    unittest.main()

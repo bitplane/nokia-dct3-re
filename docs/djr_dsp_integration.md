@@ -1504,6 +1504,12 @@ comparison. The useful next boundary is the matching firmware's descriptor
 and upload consumer, rather than executing these blocks against an unrelated
 mask ROM.
 
+Reproduce complete-payload matches with
+`tools/dsp_upload_reference_match.py tmp/nok-mados-reference/include/dspblocks roms/noki3310/3310f639e.fls roms/3210f600a.fls`.
+The JSON includes image and payload hashes, all occurrences in both byte
+orders, and explicit file-offset labeling; malformed or size-inconsistent
+source arrays fail rather than silently contributing partial signatures.
+
 Inspection of `hw/dsp.c`, `hw/m_dsp.c`, `hw/dspblocks.c` and their DSP headers
 does not identify the 8810 port-`0x36` completion-bit owner or its timing.
 The MCU SIMI offsets in `include/hw/ioports.h` are a separate address space
