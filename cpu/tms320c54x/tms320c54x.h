@@ -250,6 +250,7 @@ private:
 	u8 m_pipeline_control_words = 0;
 	u8 m_pipeline_delay_decode_words = 0;
 	u32 m_pipeline_control_address = 0;
+	bool m_pipeline_far_return_pending = false;
 	u64 m_pipeline_cycles = 0;
 	std::array<u16, 0x10000> m_opcode_first_pc;
 	std::array<u32, 0x10000> m_opcode_count = {};

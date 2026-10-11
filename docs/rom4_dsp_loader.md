@@ -2504,7 +2504,7 @@ completion list:
 | `7681 literal` | Immediate ST through AR1 to PRD/TCR | Implemented bounded short-indirect ST with retained literal/address and peripheral write wait; this is not STM |
 | `76f8 0501 0001` | Absolute immediate ST of the completion marker | Implemented three-word Decode and retained memory write |
 | `4a1e` | PSHM XPC at the interrupt vector | Implemented retained source sample, stack decrement/address and stack write |
-| `f4e5` | FRETE | Two stack samples/pops, restored XPC/PC, interrupt enable and redirection |
+| `f4e5` | FRETE | Implemented plain retained far return; pending IRQ/adjacent push timing not independently validated |
 
 The probe's `7711` DAGEN initialization, `6881`/`68f8` mask ANDM and `f073`
 branch are already in the bounded subset. Peripheral STM coverage alone
@@ -2538,9 +2538,30 @@ Read-owned stack allocation is a declared partial stage model, not a silicon
 phase claim. Other PSHM sources, indirect forms, SP/DAGEN conflicts and
 accumulator-source latency are not covered by this implementation or gate.
 
-Next implement far interrupt return;
-repeat/delayed-control and idle rules
-remain separate completeness work. Those contracts must precede enabling
+Plain FRETE now retains two ordered stack samples, masks the restored XPC
+to seven bits, pops SP twice and redirects before enabling interrupts.
+Its prototype holds Read for the second sample, flushes sequential words
+and restarts target Prefetch at clock 7 (Fetch 8, Execute 12 for a return
+starting at Prefetch 1). Six cases cover both cross-page directions and
+restore before the first read, between reads or after both reads. Older
+Execute writes precede the first stack sample, so an adjacent PSHM's word
+can be observed. This is a declared bus-placement model of the documented
+six-clock return, not independent silicon phase evidence. Delayed FRETE,
+general stack conflicts and pending-interrupt timing remain unvalidated.
+
+The original four short/long-period, direct/indirect-mask streams now run
+through this staged subset without an unsupported-opcode stop. Each records
+one foreground fetch, one mask write and marker 1, with SP back at `1000`.
+However, all four record zero vector entries. Therefore these observations
+do not yet exercise the adjacent PSHM/FRETE ISR under timer pressure or prove
+the atomic backend's short-period starvation resolved. Timer scheduling and
+delivery must be audited before promoting this result. Staged taps observe
+program bus reads without the atomic backend's PC-at-fetch guard.
+Evidence: `tmp/c54x-staged-far-return.log`.
+
+Next audit timer delivery in the staged stream and pending-IRQ far return;
+repeat/delayed-control and idle rules remain separate completeness work.
+Those contracts must precede enabling
 the frontend for native firmware or claiming the timer/recorder stall fixed.
 A constant interrupt delay or adjusted timer period cannot replace in-flight
 instruction ownership. The legacy vendor activation failure limits the

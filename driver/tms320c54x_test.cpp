@@ -2962,6 +2962,44 @@ private:
 		m_phase = 251270; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_far_return(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		u32 const base = variant & 1 ? 0x10000 : 0;
+		u32 const target = (base ^ 0x10000) + 0x700;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 20; ++i) { program.write_word(base + 0x600 + i, 0xe933); program.write_word((target & 0x10000) + 0x700 + i, 0xf495); }
+		program.write_word(base + 0x600, 0xf4e5);
+		program.write_word(target, 0xe955);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->space(AS_DATA).write_word(0x1000, 0x80 | (target >> 16));
+		m_cpu->space(AS_DATA).write_word(0x1001, 0x700);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x1000, 0x1001, "staged_far_return_stack",
+			[this, target](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(address == 0x1000 + m_pipeline_operand_reads && value == (address == 0x1000 ? (0x80 | (target >> 16)) : 0x700) &&
+				m_cpu->pipeline_cycles() == 5 + m_pipeline_operand_reads, "FRETE samples XPC then PC once in the declared retained-return model");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_fetch_tap = program.install_read_tap(target, target, "staged_far_return_target",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 8, "FRETE target Fetch follows six-clock control redirection"); ++m_pipeline_extensions_reads;
+			});
+		m_phase = 251290; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -3093,7 +3131,7 @@ private:
 		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, flags);
 		osd_printf_info("TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1\n");
 	}
-	void start_timer_boundary_probe(unsigned index)
+	void start_timer_boundary_probe(unsigned index, bool staged = false)
 	{
 		bool const short_period = !(index & 1);
 		bool const direct_mask = index >= 2;
@@ -3125,7 +3163,8 @@ private:
 		m_cpu->set_state_int(STATE_GENPC, 0x010600);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
 		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
-		m_phase = 7000 + index;
+		m_cpu->set_pipeline_frontend(staged);
+		m_phase = (staged ? 7020 : 7000) + index;
 		m_timer_probe_fetch.remove();
 		m_timer_probe_reload.remove();
 		m_timer_probe_stack.remove();
@@ -3161,23 +3200,23 @@ private:
 		// Observe scheduler-cycle accounting, not physical pipeline latency.
 		// Keep opcode fetch distinct from the observable internal-register bus write.
 		m_timer_probe_reload = program.install_read_tap(0x010606, 0x010606, "timer_probe_reload",
-			[this](offs_t address, u16 &, u16)
+			[this, staged](offs_t address, u16 &, u16)
 			{
-				if (!machine().side_effects_disabled() && m_cpu->pc() == address + 1)
+				if (!machine().side_effects_disabled() && (staged || m_cpu->pc() == address + 1))
 					m_timer_probe_reload_cycle = m_cpu->total_cycles();
 			});
 		m_timer_probe_fetch = program.install_read_tap(0x01004c, 0x01004c, "timer_probe_vector",
-			[this](offs_t address, u16 &, u16)
+			[this, staged](offs_t address, u16 &, u16)
 			{
-				if (machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+				if (machine().side_effects_disabled() || (!staged && m_cpu->pc() != address + 1)) return;
 				if (!m_timer_probe_entries++)
 				{
 					m_timer_probe_first_entry_cycle = m_cpu->total_cycles();
 				}
 			});
 		m_timer_probe_foreground = program.install_read_tap(0x010608, 0x010608,
-			"timer_probe_foreground_fetch", [this](offs_t address, u16 &, u16) {
-				if (machine().side_effects_disabled() || m_cpu->pc() != address + 1) return;
+			"timer_probe_foreground_fetch", [this, staged](offs_t address, u16 &, u16) {
+				if (machine().side_effects_disabled() || (!staged && m_cpu->pc() != address + 1)) return;
 				if (!m_timer_probe_foreground_fetches++)
 					m_timer_probe_foreground_first_cycle = m_cpu->total_cycles();
 			});
@@ -5090,6 +5129,22 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			start_timer_boundary_probe(0);
 			return;
+		}
+		if (m_phase >= 7020 && m_phase <= 7023)
+		{
+			unsigned const index = m_phase - 7020;
+			u16 const marker = m_cpu->space(AS_DATA).read_word(0x0501);
+			osd_printf_info("TMS320C54x staged timer observation: case=%u period=%u addressing=%s marker=%u foreground_fetches=%u mask_writes=%u vector_entries=%u pc=%06x sp=%04x illegal=%u silicon_phase_claim=0\n",
+				index, index & 1 ? 256 : 1, index >= 2 ? "direct" : "indirect", marker,
+				m_timer_probe_foreground_fetches, m_timer_probe_masks, m_timer_probe_entries,
+				unsigned(m_cpu->state_int(STATE_GENPC)), unsigned(m_cpu->state_int(tms320c54x_device::STATE_SP)),
+				unsigned(m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL)));
+			expect(!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Original timer stream executes the staged subset without atomic fallback");
+			m_cpu->set_pipeline_frontend(false);
+			if (index < 3) { start_timer_boundary_probe(index + 1, true); return; }
+			osd_printf_info("TMS320C54x staged timer observation: complete cases=4 fidelity_acceptance=0\n");
+			osd_printf_info("TMS320C54x core conformance: PASS\n");
+			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
 		if (m_phase >= 7000 && m_phase <= 7003)
 		{
@@ -23622,8 +23677,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 5) { start_pipeline_xpc_push(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged XPC push: PASS cases=6 source_read=5 stack_write=6 restore=6 duplicate_accesses=0 silicon_phase_claim=0\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_pipeline_far_return(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -23631,6 +23685,46 @@ private:
 		if (m_phase == 251280)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251270;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251290)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const checkpoint = 4 + m_pipeline_peripheral_case / 2;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_pipeline_operand_reads == unsigned(cycle >= 5) + unsigned(cycle >= 6) &&
+				m_pipeline_extensions_reads == unsigned(cycle >= 8), "Far return retains both stack samples and fetches the target once across replay");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 + unsigned(cycle >= 5) + unsigned(cycle >= 6) &&
+				bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == (cycle < 7) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 12 ? 0x55 : 0), "FRETE pops twice before enabling IRQ and flushes sequential instructions");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save before or between retained far-return stack accesses");
+			}
+			if (cycle == 12)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_operand_reads = unsigned(checkpoint >= 5) + unsigned(checkpoint >= 6); m_pipeline_extensions_reads = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore far-return stack samples and pending extra clock");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1; m_phase = 251300;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 5) { start_pipeline_far_return(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged far return: PASS cases=6 stack_reads=5,6 target_fetch=8 target_execute=12 restore=6 duplicate_reads=0 silicon_phase_claim=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251300)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251290;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

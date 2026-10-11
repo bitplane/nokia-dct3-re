@@ -703,6 +703,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_control_words));
 	save_item(NAME(m_pipeline_delay_decode_words));
 	save_item(NAME(m_pipeline_control_address));
+	save_item(NAME(m_pipeline_far_return_pending));
 	save_item(NAME(m_pipeline_cycles));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_pll_locked));
@@ -1698,6 +1699,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_flush_front = m_pipeline_vector_pending = false;
 	m_pipeline_decode_flush = m_pipeline_control_words = m_pipeline_delay_decode_words = 0;
 	m_pipeline_control_address = 0;
+	m_pipeline_far_return_pending = false;
 	m_pipeline_cycles = 0;
 }
 
@@ -1712,6 +1714,15 @@ void tms320c54x_device::set_pipeline_frontend(bool enabled)
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
+	if (m_pipeline_far_return_pending)
+	{
+		// Retain the second stack operand while the return holds Read.
+		// This bus placement is a partial model of class 34, not measured
+		// silicon phases. The first sample follows older Execute writes.
+		m_pipeline_operand_address[4] = data_read(m_sp++);
+		m_pipeline_far_return_pending = false;
+		return;
+	}
 	bool const read_peripheral = m_pipeline_valid[3] &&
 		((m_pipeline_word[3] & 0xfe00) == 0x1000 || (m_pipeline_word[3] & 0xfe00) == 0x6800) &&
 		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f;
@@ -1837,9 +1848,10 @@ void tms320c54x_device::pipeline_step()
 		bool const rmw = (word & 0xfe00) == 0x6800 &&
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
+		bool const far_return = word == 0xf4e5;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && word != 0x4a1e && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1847,13 +1859,14 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true;
 			return;
 		}
-		if (m_pipeline_valid[2] && (fast_return || branch))
+		if (m_pipeline_valid[2] && (fast_return || far_return || branch))
 		{
 			bool const delayed = word == 0xf69b || word == 0xf273;
 			m_pipeline_control_address = m_pipeline_address[2];
 			m_pipeline_control_words = (branch ? 2 : 1) + (delayed ? 2 : 0);
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed ? 0 : 2;
+			if (far_return) m_pipeline_flush_front = true;
 		}
 		if (m_pipeline_valid[2] && dagen_immediate) m_pipeline_early_write_deferred[2] = false;
 	}
@@ -1940,6 +1953,14 @@ void tms320c54x_device::pipeline_step()
 		++m_opcode_count[m_op];
 		if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
+		else if (m_op == 0xf4e5)
+		{
+			m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;
+			m_pc = m_pipeline_operand_address[5];
+			m_pipeline_fetch_address = logical_program_address(m_pc);
+			m_pipeline_flush_front = false;
+			m_st1 &= ~u16(0x0800);
+		}
 		else if (m_op == 0xf073 || m_op == 0xf273)
 			++m_pc; // Target fetch was already redirected in Access.
 		else if ((m_op & 0xff00) == 0x7700)
@@ -1982,6 +2003,12 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_vector_pending = false;
 	}
 
+	if (m_pipeline_valid[4] && m_pipeline_word[4] == 0xf4e5)
+	{
+		// An adjacent PSHM commits its stack word in older Execute first.
+		m_pipeline_operand[4] = data_read(m_sp++);
+		m_pipeline_far_return_pending = true;
+	}
 	if (entry_stage == 2)
 	{
 		m_pipeline_fetch_address = logical_program_address(m_interrupt_vector_pc);
