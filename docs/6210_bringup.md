@@ -793,6 +793,17 @@ into `3f2500`. That constructor publishes type `11`, length 12:
 payload byte 0 is mode, bytes 2/3 are phase, 4/5 are the frame value,
 and 6/7 are ARFCN. This is a source-to-request contract, not proof
 that the existing neighbour peer's mode interpretation is valid here.
+The executable selection-result check now also runs the real `3f2500`
+field-copy block for 96 decoded-field/flag combinations, with both a
+low-band ARFCN and ARFCN 512. It stops after construction, before posting;
+it does not pretend an isolated scheduler stub is an organic transaction.
+Both phase/frame fields are preserved in the outgoing request. The
+constructor maps source byte+8 bit 5 to payload byte 9 values 1/6; the
+physical meaning of that mode-specific choice remains unvalidated.
+The public [NMEAS field notes](https://web.archive.org/web/20160119230146/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typestxd/sub_11.htm)
+corroborate 1/5000-frame phase units, modulo-51 frame, and ARFCN positions,
+but explicitly leave the 1..5 mode selector unnamed. That confirms the
+field units without supplying an authoritative mode-two response sequence.
 The current peer requires membership in its independently received
 neighbour list; the type-`09` PSW-search list is not yet modeled as
 that list. Preserve this distinction when adding selection support.

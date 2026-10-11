@@ -16,6 +16,7 @@ class SelectionResultTest(unittest.TestCase):
         result = check_fields(path.read_bytes())
         self.assertEqual(result['executed_cases'], 48)
         self.assertEqual(result['record_transition_cases'], 9)
+        self.assertEqual(result['request_copy_cases'], 96)
         self.assertEqual(result['phase_modulus'], 5000)
         self.assertEqual(result['frame_modulus'], 51)
         self.assertEqual(result['decoded_prefix_octets'], 8)

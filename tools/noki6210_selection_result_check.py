@@ -3,7 +3,7 @@
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_BIG_ENDIAN, UC_MODE_THUMB
 from unicorn.arm_const import (
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1,
-    UC_ARM_REG_R2, UC_ARM_REG_SP,
+    UC_ARM_REG_R2, UC_ARM_REG_R4, UC_ARM_REG_R5, UC_ARM_REG_SP,
 )
 
 from tools.noki6210_radio_contract import verify
@@ -17,10 +17,10 @@ def check_fields(image):
     cpu.mem_write(0x200000, image)
     cpu.mem_map(0x100000, 0x80000)
     obj, output, stop = 0x101000, 0x102000, 0x200000
-    cases = 0
+    cases, requests = 0, 0
     for frame in (0, 49, 50, 51, 65535, 0xffffff):
         for phase in (0, 1, 4999, 5000, 5001, 9999, 10000, 65535):
-            # Four-byte MCU object prefix precedes the eight-byte RX payload.
+            # Four-byte MCU object prefix precedes the RX payload.
             payload = bytes([0]) + frame.to_bytes(3, 'big')
             payload += (35).to_bytes(2, 'big') + phase.to_bytes(2, 'big')
             # Public vocabulary lists ten bytes; this decoder uses the first
@@ -44,6 +44,31 @@ def check_fields(image):
                     f'type-88 fields differ: frame={frame} phase={phase} '
                     f'actual={actual.hex()} expected={expected.hex()}')
             cases += 1
+            for flags, arfcn in ((0, 35), (0x20, 512)):
+                args, request = 0x104000, 0x105000
+                fields = bytearray(12)
+                fields[0] = 2
+                fields[2:4] = expected[2:4]
+                fields[4:6] = arfcn.to_bytes(2, 'big')
+                fields[6:8] = bytes([0, expected[0]])
+                fields[8] = flags
+                cpu.mem_write(args, bytes(fields))
+                cpu.mem_write(request, bytes(16))
+                cpu.reg_write(UC_ARM_REG_R4, request)
+                cpu.reg_write(UC_ARM_REG_R5, args)
+                # Execute only the constructor's field-copy block, after
+                # allocation and before logging/posting; no scheduler stub.
+                cpu.emu_start(0x3f2515, 0x3f2588, count=200)
+                if cpu.reg_read(UC_ARM_REG_PC) != 0x3f2588:
+                    raise ValueError('mode-2 constructor did not reach post boundary')
+                wire = bytes.fromhex('00020c110200') + expected[2:4]
+                wire += bytes([0, expected[0]]) + arfcn.to_bytes(2, 'big')
+                wire += bytes([0, 6 if flags else 1, 0, 0])
+                actual = bytes(cpu.mem_read(request, 16))
+                if actual != wire:
+                    raise ValueError(
+                        f'mode-2 field copy differs: {actual.hex()} != {wire.hex()}')
+                requests += 1
     transitions = 0
     record = 0x103000
     cpu.mem_write(0x1711d4, record.to_bytes(4, 'big'))
@@ -78,6 +103,7 @@ def check_fields(image):
                     f'expected={expected.hex()}')
             transitions += 1
     return {'executed_cases': cases, 'record_transition_cases': transitions,
+            'request_copy_cases': requests,
             'entry': '38af66',
             'phase_modulus': 5000, 'frame_modulus': 51,
             'decoded_prefix_octets': 8,
