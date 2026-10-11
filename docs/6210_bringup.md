@@ -918,6 +918,41 @@ timings or treat a missing timer message as a firmware failure. Physical
 MIC2/EAR wiring is known, but product-owned clock/framing evidence remains
 required before enabling the media path.
 
+The product's physical topology is independently anchored by the acquired
+NPE-3/SD4 V19 schematic, version 1.0, sheet 3 (COBBA, 09 February 2001).
+N240 is marked `COBBA_GJP_V4.1`; its separate PCM bus has PCMTx at B5,
+PCMDClk at C6, PCMSClk at C5 and PCMRx at D5. The net names place PCMDClk,
+PCMSClk, PCMTx and PCMRx at PCM(1), PCM(2), PCM(0) and PCM(3), respectively.
+This establishes connectivity, not clock direction, divider, sync width,
+sample packing or operative mux/gain values. Sheet 3's RF serial interface
+is separate from PCM; its RF I/Q lines must not be used as an audio framing
+specification.
+
+System Module issue 1 (September 2000), page 19, table 3 specifies the
+13 MHz `RFIclk` into COBBA-GJP and the serial RF I/Q interface. That is
+the RF/reference clock, not a stated PCMDClk frequency. Pages 8 and 24
+establish MAD2-controlled audio and MIC2/EAR connectivity but do not supply
+the missing PCM timing. The acquired Troubleshooting issue 1, page 15,
+lists analogue audio checks, not PCM timing. The independently inspected
+6210 emulator profile supplies no product-owned PCM clock evidence either.
+Other products' 1 MHz/8 kHz descriptions are comparisons only, not NPE-3
+configuration authority.
+
+Reproducible source identities (SHA-256):
+
+- `roms/research/npe3/npe3-schematics-v1.pdf`:
+  `559e9718a9dad703694f17d349383f75af4237b1c26cf94ecdb4aafe641f1e43`.
+- `roms/research/npe3/npe3-system-module.pdf`:
+  `acaf85590cee30a1c8640f7411adf41f14fadf3de58cadb74e92be4d8d506d2e`.
+- `roms/research/npe3/npe3-troubleshooting.pdf`:
+  `f2371b4067111a0e9311e68fc5dead843e415290f87c0afd562e505c9b42a4cb`.
+
+Next evidence is an NPE-3 PCM timing description/capture or execution of its
+matched DSP initialization that establishes the clock/framing registers.
+The MCU command-8 `870b` observation establishes speech-control intent, not
+those downstream clocks. Do not attach a guessed diagnostic clock merely
+to make the HLE speech timer run.
+
 The own System Module issue 1 (09/00), printed page 24, table 8 also supplies
 analog reference conditions, separate from the missing digital framing.
 EARP/EARN typical output is 14 mV at network level -16 dBm0 with nominal
