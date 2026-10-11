@@ -782,6 +782,30 @@ The remaining MCU-side question is the flag/limit provisioning and the
 `20fbb8` continuation contract; it is independent of obtaining valid RF
 samples. Neither should be forced merely to advance the application.
 
+The own NSE-1 image identifies one positive bit-4 setter. In helper
+`210f5c`, status `138e` selects table entry `210f94 -> 211534`, which
+calls parser `210eac`. Its message byte `+6 == 0` path returns 1 at
+`210f0a`; nonzero takes the separate return-2/3 path. Return 1 selects
+`21154e..211556`, ORing `10` into byte `1084bf`, before calling `210e4c`.
+This is a bounded writer contract, not an exhaustive flag census or an
+observed successful native RF result. One upstream status-`138e` publication
+is the type-`80`/channel-`40` receiver branch at `26bd98`, posting the
+original object to task 10. These statuses must not be synthesized from a
+scan-terminal `8a` response merely to set the flag.
+
+Limit getter `27e3b4` reads halfword `1098c4` under synchronization calls;
+its observed return 1 is software configuration, not a physical RF unit.
+The possible continuation `20fbb8` sets controller byte `108427` to 1,
+calls `211f6c(2,0,0)`, and its common tail cancels timer ids `65`, `5a`
+and `1d` and releases pending objects at offsets `3c`, `30` and `20`.
+It is not a bare readiness publication. Its other branches and full semantic
+role are not closed by this decode.
+`nse1_scan_continuation_contract.py roms/noki5110/5110f530.fls` pins 14
+fragments in the hash-identified own image (dispatch, parser decisions,
+setter, counter/limit roots, status producer and control tail); every pinned
+byte has mutation coverage. Computed aliases, indirect writers and uploaded
+replacements remain outside that bounded static contract.
+
 The isolated cold-control runner is:
 
 ```sh
