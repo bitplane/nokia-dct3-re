@@ -976,6 +976,20 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "foreign-registration", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6210-foreign-outgoing-call",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "outgoing-call", "--foreign-cell", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
+      "name": "verify-6210-foreign-incoming-sms",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "incoming-sms", "--foreign-cell", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-calculator",
       "prerequisites": ["build"],
       "variables": {},

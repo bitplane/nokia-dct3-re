@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 732 gates: 534 generated from typed steps, 198 copied verbatim (shell).
+# 734 gates: 536 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -104,7 +104,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-6210-pin-phonebook verify-6210-pin-host-rejected-sms \
 	verify-6210-pin-host-silent-sms verify-6210-pin-state-idle \
 	verify-6210-pin-state-call verify-6210-pin-state-sms verify-6210-registration \
-	verify-6210-foreign-registration verify-6210-calculator verify-6210-phonebook \
+	verify-6210-foreign-registration verify-6210-foreign-outgoing-call \
+	verify-6210-foreign-incoming-sms verify-6210-calculator verify-6210-phonebook \
 	verify-6210-menu verify-8210-call-divert verify-8210-sim-toolkit-call-decline \
 	verify-8210-sim-toolkit-call verify-8210-sim-toolkit-sms \
 	verify-8210-sim-toolkit-menu-state verify-8210-sim-toolkit-menu \
@@ -918,6 +919,12 @@ verify-6210-registration: build
 
 verify-6210-foreign-registration: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario foreign-registration --mame $(MAME_DIR)/mame
+
+verify-6210-foreign-outgoing-call: build
+	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario outgoing-call --foreign-cell --mame $(MAME_DIR)/mame
+
+verify-6210-foreign-incoming-sms: build
+	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario incoming-sms --foreign-cell --mame $(MAME_DIR)/mame
 
 verify-6210-calculator: build
 	$(PYTHON) tools/run_noki6210_acceptance.py $(RUN_DIR) --scenario calculator --mame $(MAME_DIR)/mame

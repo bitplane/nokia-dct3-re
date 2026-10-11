@@ -35,6 +35,19 @@ class MenuAcceptanceTest(unittest.TestCase):
 
 
 class ApplicationAcceptanceTest(unittest.TestCase):
+    def test_foreign_cell_requires_supported_service_scenario(self):
+        for scenario in ('outgoing-call', 'incoming-sms'):
+            with self.subTest(scenario=scenario), \
+                    patch('sys.argv', ['runner', 'unused', '--scenario', scenario, '--foreign-cell']), \
+                    patch.object(runner.Path, 'read_bytes', return_value=b''), \
+                    patch.object(runner, 'assess', side_effect=RuntimeError('admitted')), \
+                    self.assertRaisesRegex(RuntimeError, 'admitted'):
+                runner.main()
+        with patch('sys.argv', ['runner', 'unused', '--scenario', 'security', '--foreign-cell']), \
+                patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit) as error:
+            runner.main()
+        self.assertEqual(error.exception.code, 2)
+
     def test_pin_phonebook_and_states_are_admitted_with_coherent_network(self):
         for scenario in ('phonebook', 'state-idle', 'state-call', 'state-sms',
                          'host-rejected-sms', 'host-silent-sms'):

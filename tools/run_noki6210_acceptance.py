@@ -22,7 +22,7 @@ SCENARIOS = {'stage': ('npe3stage', 'staged_observe', 12),
              'calculator': ('npe3hle', 'application_input', 38),
              'phonebook': ('npe3hle', 'phonebook_input', 33),
              'registration': ('npe3hle', 'menu_input', 25),
-             'foreign-registration': ('npe3hle', 'staged_observe', 25),
+             'foreign-registration': ('npe3hle', 'menu_input', 25),
              'plmn-reject': ('npe3hle', 'staged_observe', 90),
              'home-plmn-reject': ('npe3hle', 'staged_observe', 30),
              'outgoing-call': ('npe3hle', 'outgoing_call_input', 48),
@@ -58,6 +58,7 @@ MENU_SHA256 = '8c7650fdb0514ec34c85b89795e529de062e6f141268a507bafc7eb77370df65'
 CALCULATOR_SHA256 = '2c5e99fd98ab56d41574c613021a7ed5270fe7d39e94ec57a1f52b9f732199fc'
 CONTACT_SHA256 = '39ca7b13f4afdc8c6e3ca553d7fd0bafcdd7dd3de42c054edf0f445713dd09bc'
 OPERATOR_SHA256 = '9b3fe27be727ece0d99040211b125ac319ee93f6c7ce6a0599b9ebe27ab84d37'
+FOREIGN_OPERATOR_SHA256 = '3a130f147f3fb7c3083c9508bf6a3a4f11115a6fa42b0806bfbb7b1d39c48ac3'
 SMS_READ_SHA256 = 'ab21e640456a297698ff12e89d315fb469eca215975b8ba4cc5a1a9cb2a41be3'
 SMS_SENT_SHA256 = '67f74edfd9817c67b2301a1118c32a5764da7ed54e5b1ec09caf9eb332abc7c8'
 SECURITY_MENU_SHA256 = 'dca943c465ed8b7cc2c766e9ac0f6f69ce86228c04aa68cd52d1b20a75a8bf3f'
@@ -271,9 +272,15 @@ def main():
                         help='run at real-time speed to verify host wait budgets')
     parser.add_argument('--coherent-cell', action='store_true',
                         help='configure the laboratory network on ARFCNs 35/36')
+    parser.add_argument('--foreign-cell', action='store_true',
+                        help='use the laboratory 234-15 cell for outgoing-call or incoming-sms')
     parser.add_argument('--pin-enabled', action='store_true',
                         help='authenticate a PIN-enabled SIM before the host service')
     args = parser.parse_args()
+    if args.foreign_cell:
+        if args.scenario not in ('outgoing-call', 'incoming-sms'):
+            parser.error('--foreign-cell requires outgoing-call or incoming-sms')
+        args.coherent_cell = True
     if args.pin_enabled and (not args.coherent_cell or args.scenario not in
                              ('host-incoming-call', 'host-incoming-sms', 'host-outgoing-call',
                               'host-outgoing-sms', 'host-sms-status', 'host-rejected-sms', 'host-silent-sms', 'phonebook', 'state-call',
@@ -296,13 +303,13 @@ def main():
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             card.write_bytes(make_profile(pin_enabled=True))
-        if args.scenario in ('plmn-reject', 'foreign-registration'):
+        if args.scenario in ('plmn-reject', 'foreign-registration') or args.foreign_cell:
             from tools.make_sim_card_profile import make_profile
             card = run / f'nvram/{machine}/sim_card'
             card.parent.mkdir(parents=True)
             # A visited preferred PLMN is external subscriber data, not an
             # injected selection event. Keep IMSI/home identity unchanged.
-            plmn = '32f451' if args.scenario == 'foreign-registration' else '00f120'
+            plmn = '32f451' if args.scenario == 'foreign-registration' or args.foreign_cell else '00f120'
             card.write_bytes(make_profile(pin_enabled=False) + bytes.fromhex(plmn) +
                              b'\xff' * 21 + b'\xff' * 12)
         host = args.scenario.startswith('host-')
@@ -333,7 +340,7 @@ def main():
                 if args.scenario == 'plmn-reject':
                     ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
                                   mask='12', defvalue='0', value='4')
-            if args.scenario == 'foreign-registration':
+            if args.scenario == 'foreign-registration' or args.foreign_cell:
                 ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
                               mask='12', defvalue='0', value='8')
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
@@ -392,6 +399,15 @@ def main():
             check_registration(cold_text, (cold / 'nvram/npe3hle/sim_card').read_bytes(),
                                preserved_location=True, channel_header='1202',
                                expected_lai=bytes.fromhex('32f4510001'))
+            from PIL import Image
+            for directory, trace in ((run, text), (cold, cold_text)):
+                with Image.open(directory / 'snap/6210_before_menu.png') as frame:
+                    check_frame(frame, FOREIGN_OPERATOR_SHA256, 'VODAFONE / DCT3 LAB foreign idle')
+                with Image.open(directory / 'snap/6210_after_menu.png') as frame:
+                    check_menu(trace, frame)
+        if args.foreign_cell:
+            check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
+                               channel_header='1202', expected_lai=bytes.fromhex('32f4510001'))
         if args.pin_enabled:
             from tools.radio_call_lifecycle_common import require_ordered
             from tools.sim_security_trace_check import validate as check_security
@@ -558,7 +574,7 @@ def main():
                 check_frame(frame, OPERATOR_SHA256, 'DCT3 LAB registered idle')
         elif args.scenario in ('outgoing-call', 'host-outgoing-call'):
             from tools.noki6210_outgoing_call_check import verify as check_call
-            check_call(text, coherent_pin=args.pin_enabled)
+            check_call(text, coherent_pin=args.pin_enabled or args.coherent_cell)
             if host:
                 from tools.radio_host_outgoing_connect_check import verify as check_host
                 check_host((run / 'error.log').read_text(errors='replace'), '1234567')
@@ -714,7 +730,7 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
-            'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration'
+            'sim_profile': ('foreign two-digit-MNC preferred laboratory card' if args.scenario == 'foreign-registration' or args.foreign_cell
                             else 'visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
                             else 'PIN-enabled laboratory card' if args.scenario == 'security' or args.pin_enabled
                             else 'default laboratory card'),
@@ -732,7 +748,10 @@ def main():
             'native_dsp_complete': False, 'speech_tested': False, 'command': command,
             'foreign_registration': ({'plmn': '234-15', 'lai': '32f4510001',
                                       'firmware_sim_update': True, 'independent_processes': 2}
-                                     if args.scenario == 'foreign-registration' else None),
+                                     if args.scenario == 'foreign-registration' else
+                                     {'plmn': '234-15', 'lai': '32f4510001',
+                                      'firmware_sim_update': True, 'independent_processes': 1}
+                                     if args.foreign_cell else None),
             'host_command': host_command,
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

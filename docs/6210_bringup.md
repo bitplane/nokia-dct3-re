@@ -906,10 +906,29 @@ the same handset's retained NVRAM/configuration, requires EF_LOCI to be read
 before the retained-LAI Location Updating Request, and verifies acceptance,
 release and continued valid foreign location without a redundant status
 rewrite. Both processes pass. Home registration remains independently
-gate-green. This proves research-HLE foreign registration and storage,
-not native RF, speech or reviewed foreign-operator display pixels.
+gate-green. Both boots also require the reviewed 96x60 idle frame showing
+`VODAFONE` and laboratory SPN `DCT3 LAB` (SHA256
+`3a130f147f3fb7c3083c9508bf6a3a4f11115a6fa42b0806bfbb7b1d39c48ac3`),
+then physical Menu decoding and the existing Messages-menu oracle.
+This proves research-HLE foreign registration, presentation and storage,
+not native RF or speech.
 Evidence: `tmp/6210-foreign-two-digit-cold-persistence/acceptance.json`, its
 `error.log.gz`, and `cold-registration/error.log.gz`.
+
+`verify-6210-foreign-outgoing-call` and
+`verify-6210-foreign-incoming-sms` select the same foreign laboratory cell
+through the runner's explicit `--foreign-cell` option. Both require valid
+foreign EF_LOCI after the complete registration/release exchange before
+their service checks. The call gate physically dials `1234567`, presses
+Send/End and verifies the existing CC/RR establishment, Connect and release
+contract on coherent ARFCNs 35/36. The SMS gate verifies one IMSI page,
+CP/RP acknowledgements, SIM delivery/read-status writes, physical Read keys
+and the exact existing `hello` SMS screen. Both pass; speech remains
+unproved. The option is rejected for unsupported scenarios rather than
+silently altering other acceptance profiles. Runtime evidence:
+`tmp/6210-foreign-outgoing-call/acceptance.json` and
+`tmp/6210-foreign-incoming-sms/acceptance.json`. Presentation evidence:
+`tmp/6210-foreign-presentation-gate/` and its `cold-registration/` captures.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
