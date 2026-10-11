@@ -332,8 +332,18 @@ These static branches are pinned by `noki6210_radio_contract.py`, not all
 asserted as executed by the header-read probe. Object reuse after reception
 must not be interpreted as continued ownership by the original message.
 Evidence: `tmp/6210-plmn-consumer-{national,international}/error.log.gz`.
-The next discriminator is the SI3 parser result and downstream selection
-state, not another synthesized transport message.
+In paired fresh 25-second observations, the first SI3 reaches `3ba0c0` in context
+state 2 with flags `0e`. Both return 1 from `43f074` at `3b9a72`, take
+the success branch `3b9a82`, and return 1 from the enclosing operation at
+`3ba0d6`. The national control subsequently gets Location Updating acceptance;
+the international control does not emit random access. Thus rejection at
+these sampled parser return boundaries is excluded, not all PLMN validation
+or all state-machine branches. Evidence:
+`tmp/6210-plmn-parser-{national,international}/error.log.gz`.
+The compact passive probe is `tools/noki6210_plmn_observe.lua`, scoped to
+the own v5.56 research-HLE composition; its addresses are checked by the
+radio contract tool. The next discriminator is downstream selection/admission
+of the parsed SI3, not another synthesized transport message.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
