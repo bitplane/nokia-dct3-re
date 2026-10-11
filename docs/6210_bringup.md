@@ -410,9 +410,28 @@ call `3ccee8`: national `07d4` at 10.136331077 seconds, international
 posted object; later accesses belong to reuse and confer no message ownership.
 Evidence: `tmp/6210-plmn-input-consumer-{national,international}/error.log.gz`.
 The candidate source path `31506a` remains unobserved (not disproven).
-Current unresolved boundary: which caller/input of dispatcher `29ffb8`
-selects the task-18 status emitted at `2a0610`, and how the receive dispatch
-supplies the saved switch value. No missing DSP response is established.
+The upstream chain is now observed across fresh paired controls:
+
+| Boundary | National | International |
+| --- | --- | --- |
+| Original post `2e2efa`, task 17 | `09c8` | `09c6` |
+| Translator `2a086c`, caller `2a7d16` | `09c8` | `09c6` |
+| Dispatcher `29ffb8`, caller `2a08c0` | `07d4` | `07d2` |
+| Post `2a0610`, task 18 | `07d4` | `07d2` |
+| Saved switch input, then task-14 publication | `07d4 -> 03ec` | `07d2 -> 03ea` |
+
+`2a086c` translates against base literal `09c6`; its base and base+2
+branches load `07d2` and `07d4`, respectively. The mapping and calls are
+pinned, and runtime confirms the arguments, not just the resulting statuses.
+The original task-17 posts occur at 10.134729462/10.083616538 seconds.
+Evidence: `tmp/6210-plmn-{dispatcher,translator,upstream-post}-{national,international}/error.log.gz`.
+The dispatcher observer's 9–11-second window is bounded research instrumentation.
+Constructor `2e2e60` copies its R0 argument into the allocated header;
+the remaining choice is therefore upstream of this constructor, not in the
+post primitive. Current unresolved boundary: which caller supplies `09c8`
+versus `09c6` to `2e2e60` before the task-17 post through `2e2efa`.
+Numeric status semantics remain unproven;
+no missing DSP response or operational roaming contract is established.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures

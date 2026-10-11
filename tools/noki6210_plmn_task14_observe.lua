@@ -15,7 +15,8 @@ local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
         busy = true
         local status = space:read_u16(object)
         busy = false
-        if (status == 0x7d2 or status == 0x7d4) and inputs < 24 then
+        if (status == 0x7d2 or status == 0x7d4 or status == 0x9c6 or status == 0x9c8)
+            and inputs < 24 then
             inputs = inputs + 1
             machine:logerror(string.format(
                 'plmn_input_post: status=%04x task=%d object=%08x caller=%08x t=%.9f\n',
@@ -67,6 +68,39 @@ local switch_tap = space:install_read_tap(0x3151d8, 0x3151db,
             'plmn_status_switch: input=%08x context=%08x t=%.9f\n',
             input, cpu.state['R4'].value, machine.time:as_double()))
     end)
+local dispatches = 0
+local dispatcher_tap = space:install_read_tap(0x29ffb8, 0x29ffbb,
+    'plmn_input_dispatcher', function(address)
+        local time = machine.time:as_double()
+        if address ~= 0x29ffb8 or cpu.state['PC'].value ~= 0x29ffb8
+            or time < 9 or time > 11 or dispatches >= 64 then return end
+        dispatches = dispatches + 1
+        machine:logerror(string.format(
+            'plmn_input_dispatcher: input=%08x arg1=%08x caller=%08x t=%.9f\n',
+            cpu.state['R0'].value, cpu.state['R1'].value,
+            cpu.state['R14'].value, time))
+    end)
+local translations = 0
+local translator_tap = space:install_read_tap(0x2a086c, 0x2a086f,
+    'plmn_input_translator', function(address)
+        if address ~= 0x2a086c or cpu.state['PC'].value ~= 0x2a086c
+            or translations >= 32 then return end
+        translations = translations + 1
+        machine:logerror(string.format(
+            'plmn_input_translator: input=%08x caller=%08x t=%.9f\n',
+            cpu.state['R0'].value, cpu.state['R14'].value, machine.time:as_double()))
+    end)
+local selections = 0
+local selection_tap = space:install_read_tap(0x2a0604, 0x2a0607,
+    'plmn_input_selection', function(address)
+        if address ~= 0x2a0604 or cpu.state['PC'].value ~= 0x2a0606
+            or selections >= 24 then return end
+        selections = selections + 1
+        machine:logerror(string.format(
+            'plmn_input_selection: input=%08x status=%08x t=%.9f\n',
+            cpu.state['R5'].value, cpu.state['R4'].value, machine.time:as_double()))
+    end)
 _G.plmn_task14_census_observer = {
     tap = tap, publisher_tap = publisher_tap, switch_tap = switch_tap,
-    input_taps = input_taps}
+    input_taps = input_taps, dispatcher_tap = dispatcher_tap,
+    selection_tap = selection_tap, translator_tap = translator_tap}

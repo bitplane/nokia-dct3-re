@@ -75,6 +75,31 @@ def verify(image):
         0x29ffb8: ('push', '{r4, r5, r6, lr}'),
         0x29ffba: ('adds', 'r6, r1, #0'),
         0x29ffbc: ('adds', 'r5, r0, #0'),
+        0x2a0606: ('ldr', 'r0, [pc, #0x2cc]'),
+        0x2a086c: ('push', '{lr}'),
+        0x2a086e: ('ldr', 'r1, [pc, #0x2e4]'),
+        0x2a0870: ('subs', 'r0, r0, r1'),
+        0x2a0872: ('cmp', 'r0, #0'),
+        0x2a0874: ('beq', '#0x2a08bc'),
+        0x2a0876: ('subs', 'r0, #1'),
+        0x2a0878: ('cmp', 'r0, #0'),
+        0x2a087a: ('beq', '#0x2a08b8'),
+        0x2a087c: ('subs', 'r0, #1'),
+        0x2a087e: ('cmp', 'r0, #0'),
+        0x2a0880: ('beq', '#0x2a08b4'),
+        0x2a08b4: ('ldr', 'r0, [pc, #0x8c]'),
+        0x2a08bc: ('ldr', 'r0, [pc, #0x8c]'),
+        0x2a08c0: ('bl', '#0x29ffb8'),
+        0x2a7d14: ('ldr', 'r0, [sp, #4]'),
+        0x2a7d16: ('bl', '#0x2a086c'),
+        0x2e2f06: ('movs', 'r0, #0x11'),
+        0x2e2e60: ('push', '{r4, r5, r6, r7, lr}'),
+        0x2e2e62: ('adds', 'r5, r0, #0'),
+        0x2e2e66: ('bl', '#0x3c2c90'),
+        0x2e2e6c: ('strh', 'r5, [r4]'),
+        0x2e2f08: ('b', '#0x2e2ef8'),
+        0x2e2ef8: ('adds', 'r1, r4, #0'),
+        0x2e2efa: ('bl', '#0x3c22c0'),
         0x3ccee8: ('bl', '#0x3c2470'),
         0x3cceec: ('adds', 'r5, r0, #0'),
         0x3ccef0: ('ldrsh', 'r1, [r5, r0]'),
@@ -117,7 +142,8 @@ def verify(image):
         if ins is None or (ins.mnemonic, ins.op_str) != value:
             raise ValueError(f'own acquisition contract differs at {address:x}')
     for address, value in {0x315540: 0x3ea, 0x315548: 0x7d4,
-                           0x315554: 0x7d2}.items():
+                           0x315554: 0x7d2, 0x2a0b54: 0x9c6,
+                           0x2a0944: 0x7d4, 0x2a094c: 0x7d2}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',
