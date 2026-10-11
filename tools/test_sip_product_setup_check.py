@@ -95,7 +95,8 @@ class SipProductSetupCheckTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.check('3210', '3210', rejected=True)
 
-    def check_incoming(self, product, wire_product, release_override=None, answer_override=None):
+    def check_incoming(self, product, wire_product, release_override=None, answer_override=None,
+                       pin_end=False, missing=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             connect, release = {
@@ -108,14 +109,25 @@ class SipProductSetupCheckTest(unittest.TestCase):
             if release_override is not None:
                 release = release_override
             answer_key = answer_override or ('send' if wire_product in ('3410', '5210') else 'enter')
+            end_lines = [
+                '5210_pin_physical: key=End',
+                'GSM service uplink sapi=0 pd=03 message=25 length=5 data=836502e090',
+                'GSM service downlink kind=25 sapi=0 pd=03 message=2d length=2',
+                'GSM service uplink sapi=0 pd=03 message=2a length=2 data=832a',
+            ]
+            release_trace = ('\n'.join(line for index, line in enumerate(end_lines)
+                                      if index != missing) + '\n' if pin_end else
+                             'gsm_call_adapter: termination id=1 cause=16 result=accepted\n'
+                             f'GSM service uplink sapi=0 pd=03 message=2a length=6 data={release}\n')
+            answer_trace = ('5210_pin_physical: key=' + (answer_override or 'Send') + '\n'
+                            if pin_end else f'input-press: t=18.0 name={answer_key}\n')
             (root / 'error.log').write_text(
                 'gsm_call_adapter: incoming state id=1 epoch=1 phase=paging\n'
                 'GSM service downlink kind=9 sapi=0 pd=03 message=05\n'
-                f'input-press: t=18.0 name={answer_key}\n'
+                + answer_trace +
                 f'GSM service uplink sapi=0 pd=03 message=07 length=2 data={connect}\n'
                 'gsm_call_adapter: incoming state id=1 epoch=1 phase=connected\n'
-                'gsm_call_adapter: termination id=1 cause=16 result=accepted\n'
-                f'GSM service uplink sapi=0 pd=03 message=2a length=6 data={release}\n'
+                + release_trace +
                 'gsm_call_adapter: incoming state id=1 epoch=1 phase=ended\n' + ''.join(
                     f'gsm_call_adapter: media direction=downlink id=1 sequence={i} result=accepted\n'
                     for i in range(100)))
@@ -125,6 +137,15 @@ class SipProductSetupCheckTest(unittest.TestCase):
                 'SIP confirmed status=200\nSIP bridge ended ' + json.dumps(counts) + '\n')
             verify_success(root, 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]',
                            SimpleNamespace(incoming=True, restore_idle=False, product=product))
+
+    def test_5210_pin_physical_end_requires_entire_release(self):
+        self.check_incoming('5210', '5210', pin_end=True)
+        for missing in range(4):
+            with self.subTest(missing=missing), self.assertRaises(RuntimeError):
+                self.check_incoming('5210', '5210', pin_end=True, missing=missing)
+        for key in ('Enter', 'Send_extra'):
+            with self.subTest(key=key), self.assertRaises(RuntimeError):
+                self.check_incoming('5210', '5210', pin_end=True, answer_override=key)
 
     def test_own_incoming_connect_and_release_are_accepted(self):
         for product in SETUP:
