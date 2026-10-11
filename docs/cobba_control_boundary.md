@@ -357,6 +357,17 @@ domain only, not all SUBC signed/status semantics or the upstream
 correlation/normalization calculation. The current discrepancy is therefore
 not evidence of a wrong quotient for these captured operands.
 
+Instruction-boundary captures likewise reproduce the normalization arithmetic
+independently for these operands. `EXP` selects exponent 3 for incoming
+`A=0x0d047a80`; normalization followed by right shift 9 yields high word 52,
+whose square is `0x0a90`. The signed double-word loaded at `0x478a` is
+`-0x14fc0440`; the same normalization and right shift yield high word -84,
+whose square is `0x1b90`. The following shifts by 2 and 8 supply numerator
+`0x6e4000`. The independent signed-integer test pins this complete captured
+arithmetic chain. No mismatch is established within normalization for these
+inputs; the incoming correlation accumulators and their lifecycle are the
+next boundary to audit. This does not validate all status/saturation cases.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
