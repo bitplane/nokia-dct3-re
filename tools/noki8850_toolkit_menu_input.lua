@@ -21,6 +21,7 @@ local input = coroutine.create(function()
     machine.screens[':screen']:snapshot('8850_toolkit_menu_entry.png')
     press('Menu', 'menu_open')
     machine.screens[':screen']:snapshot('8850_toolkit_menu_items.png')
+    if _G.noki8850_toolkit_menu_hold then return end
     press('Menu', 'menu_select')
     assert(emu.wait(3))
     machine.screens[':screen']:snapshot('8850_toolkit_menu_result.png')

@@ -556,6 +556,10 @@ card-owned SET UP MENU, physical menu navigation and accepted item-1 ENVELOPE,
 with reviewed entry/list/result pixels and physical End recovery to numeric
 `001 01` registered idle. Selection remains on the item list; it does not
 prove a menu-triggered application or network service.
+`verify-8850-sim-toolkit-menu-state` saves the open item list, restores
+identical CPU registers, RAM checksum and emulated time, then repeats physical
+selection with the same accepted SIM ENVELOPE and reviewed pixels. It does
+not establish restoration during an in-flight APDU or native DSP execution.
 `verify-8850-sim-toolkit-sms` separately proves card-requested SEND SHORT
 MESSAGE to `5551234`, one decoded SMS-SUBMIT, CP/RP acknowledgements,
 successful TERMINAL RESPONSE and RR release, followed by physical idle

@@ -1,7 +1,6 @@
 """Verify physical NSM-3 Toolkit menu selection across emulator restoration."""
 import argparse
 from pathlib import Path
-import re
 import sys
 
 if __package__ in (None, ''):
@@ -9,28 +8,12 @@ if __package__ in (None, ''):
 from tools.noki8210_toolkit_inkey_check import verify_protocol, MENU_FRAMES
 from tools.noki8210_registration_check import verify as registration
 from tools.noki8210_staged_check import verify as stage
-from tools.radio_state_roundtrip import verify_roundtrip
-from tools.sim_toolkit_trace_check import require_in_order
+from tools.dct3_toolkit_menu_state_check import verify_state
 
 
 def verify(text):
-    if '8210_menu_state: FAIL' in text:
-        raise ValueError('menu restoration fixture incomplete')
     verify_protocol(text, menu=True)
-    states = re.findall(r'8210_menu_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
-    if len(states) != 2 or [s[0] for s in states] != ['saved', 'restored'] or states[0][1:] != states[1][1:]:
-        raise ValueError('menu architectural state did not restore exactly')
-    verify_roundtrip(text, ('sim_device:',), '8210 Toolkit menu')
-    compact = text.replace('[:sim_card] ', '')
-    for phase in ('reference', 'restored'):
-        begin = compact.index(f'state_replay: phase={phase} event=begin')
-        end = compact.index(f'state_replay: phase={phase} event=end', begin)
-        require_in_order(compact[begin:end], (
-            f'8210_toolkit_physical: action=menu_select phase={phase}',
-            'header cla=a0 ins=c2 p1=00 p2=00 p3=09',
-            'envelope data=d30702020181100101',
-            'menu selection item=1 accepted', 'SIM status ins=c2 sw=9000',
-        ))
+    verify_state(text, '8210', 'toolkit_physical')
 
 
 def main():

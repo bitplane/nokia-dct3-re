@@ -487,6 +487,12 @@
                  "arguments": ["8850", "$(RUN_DIR)", "--service", "toolkit-sms", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8850-sim-toolkit-menu-state", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8xxx_supplementary.py",
+                 "arguments": ["8850", "$(RUN_DIR)", "--service", "toolkit-menu-state", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8850-sim-toolkit-menu", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8xxx_supplementary.py",

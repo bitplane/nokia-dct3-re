@@ -19,6 +19,15 @@ PROFILES = {
              0x339f4c, 64, 56),
 }
 KEY_TABLE = bytes.fromhex('3e3e3e3e3e11190102030e170405060f18070809101a0c0a0b')
+TOOLKIT_8850 = {
+    'toolkit': ('1', 43, None),
+    'toolkit-interactive': ('3', 53, '--interactive'),
+    'toolkit-menu': ('4', 65, '--menu'),
+    'toolkit-menu-state': ('4', 66, None),
+    'toolkit-sms': ('5', 85, '--sms'),
+    'toolkit-call': ('6', 90, '--call'),
+    'toolkit-call-decline': ('6', 90, '--call-decline'),
+}
 
 
 def verify_inputs(product, mcu, pmm):
@@ -36,7 +45,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('product', choices=PROFILES)
     parser.add_argument('run_directory', type=Path)
-    parser.add_argument('--service', choices=('ussd', 'divert', 'toolkit', 'toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call', 'toolkit-call-decline', 'toolkit-busy'), required=True)
+    parser.add_argument('--service', choices=('ussd', 'divert', *TOOLKIT_8850, 'toolkit-busy'), required=True)
     parser.add_argument('--mame', type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -44,7 +53,7 @@ def main():
     profile = PROFILES[args.product]
     machine = profile[0]
     try:
-        if args.service in ('toolkit', 'toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call', 'toolkit-call-decline') and args.product != '8850':
+        if args.service in TOOLKIT_8850 and args.product != '8850':
             raise ValueError('Toolkit acceptance is not yet established for this product')
         if args.service == 'toolkit-busy' and args.product != '8890':
             raise ValueError('Toolkit screen-busy acceptance is only established for 8890')
@@ -54,15 +63,15 @@ def main():
         run.mkdir(parents=True, exist_ok=False)
         for directory in ('cfg', 'nvram', 'snap'):
             (run / directory).mkdir()
-        if args.service in ('toolkit', 'toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call', 'toolkit-call-decline', 'toolkit-busy'):
+        if args.service in TOOLKIT_8850 or args.service == 'toolkit-busy':
             config = ET.Element('mameconfig', version='10')
             inputs = ET.SubElement(ET.SubElement(config, 'system', name=machine), 'input')
             ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
-                          mask='15', defvalue='0', value={'toolkit-menu': '4', 'toolkit-sms': '5', 'toolkit-call': '6', 'toolkit-call-decline': '6', 'toolkit-interactive': '3'}.get(args.service, '1'))
+                          mask='15', defvalue='0', value=TOOLKIT_8850.get(args.service, ('1',))[0])
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg')
         fixture = args.service.replace('-', '_')
-        duration = {'toolkit': 43, 'toolkit-interactive': 53, 'toolkit-menu': 65, 'toolkit-sms': 85, 'toolkit-call': 90, 'toolkit-call-decline': 90, 'toolkit-busy': 45}.get(
-            args.service, profile[6 if args.service == 'ussd' else 7])
+        duration = (TOOLKIT_8850[args.service][1] if args.service in TOOLKIT_8850
+                    else 45 if args.service == 'toolkit-busy' else profile[6 if args.service == 'ussd' else 7])
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
                    '-cfg_directory', 'cfg', '-snapshot_directory', 'snap', '-noreadconfig',
@@ -74,9 +83,11 @@ def main():
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         if args.service == 'divert':
             checker = [sys.executable, str(root / 'tools/noki8xxx_divert_check.py'), args.product, str(run)]
-        elif args.service in ('toolkit-interactive', 'toolkit-menu', 'toolkit-sms', 'toolkit-call', 'toolkit-call-decline'):
+        elif args.service == 'toolkit-menu-state':
+            checker = [sys.executable, str(root / 'tools/noki8850_toolkit_menu_state_check.py'), str(run)]
+        elif args.service in TOOLKIT_8850 and TOOLKIT_8850[args.service][2]:
             checker = [sys.executable, str(root / 'tools/noki8850_toolkit_check.py'), str(run),
-                       {'toolkit-menu': '--menu', 'toolkit-sms': '--sms', 'toolkit-call': '--call', 'toolkit-call-decline': '--call-decline', 'toolkit-interactive': '--interactive'}[args.service]]
+                       TOOLKIT_8850[args.service][2]]
         else:
             checker = [sys.executable, str(root / f'tools/noki{args.product}_{fixture}_check.py'), str(run)]
         subprocess.run(checker, check=True)
