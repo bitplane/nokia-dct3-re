@@ -611,6 +611,14 @@ that BL `315560` directly publishes `03f5` until control flow and tap
 register timing are reconciled; the received `03f5` and reset-selector
 observations remain separate evidence. Evidence:
 `tmp/6210-plmn-publisher-code-{national,international}/error.log.gz`.
+An independent observation at the actual RTOS post confirms header
+`03f5`, destination task 14 and saved return address `315565` at
+10.614520462 s. The return is read from stack+16, matching publisher
+`3cc660`'s five-register push; thus a stale live LR alone cannot explain
+the mismatch. The literal-versus-executed-path discrepancy remains open
+and requires instruction-level observation around the caller before
+assigning a producer contract. Evidence:
+`tmp/6210-plmn-publisher-return-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

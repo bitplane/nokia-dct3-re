@@ -39,6 +39,17 @@ local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
         busy = true
         local status = space:read_u16(object)
         busy = false
+        if status == 0x3f5 and cpu.state['R14'].value == 0x3cc9fd then
+            local stack = cpu.state['R13'].value
+            if stack >= 0x100000 and stack + 20 < 0x180000 then
+                busy = true
+                local saved = space:read_u32(stack + 16)
+                busy = false
+                machine:logerror(string.format(
+                    'plmn_publisher_return: status=%04x task=%d saved=%08x t=%.9f\n',
+                    status, task, saved, machine.time:as_double()))
+            end
+        end
         local time = machine.time:as_double()
         if (status == 0x3f9 or status == 0x1802) and time >= 9 and time <= 15
             and controller_posts < 24 then
