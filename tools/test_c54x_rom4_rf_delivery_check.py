@@ -1,8 +1,14 @@
 import unittest
+import contextlib
+import io
+from pathlib import Path
+import tempfile
+from unittest.mock import patch
 
 from tools.c54x_rom4_rf_delivery_check import (check, check_request, check_tuning,
     check_tuning_stages, check_tuning_upload, check_tuning_blob, pack_tuning_nonnegative, decode_search_bitmap)
 from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
+from tools.c54x_rom4_rf_delivery_check import check_observer_health, main
 
 
 TRACE = """rom4_rf_native_publication: t=1.0 type=008a bytes=2 words=006d
@@ -16,6 +22,32 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_cli_checks_sibling_and_explicit_console(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'error.log'
+            log.write_text(TRACE)
+            console = log.with_name('console.log')
+            console.write_text('[LUA ERROR] failed read tap')
+            healthy = log.with_name('healthy.log')
+            healthy.write_text('known ROM warning')
+            for extra, expected in (([], 1), (['--console', str(healthy)], 0),
+                                    (['--console', str(log.with_name('missing'))], 1)):
+                with self.subTest(extra=extra), patch('sys.argv', ['check', str(log)] + extra), \
+                        contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(main(), expected)
+
+    def test_observer_errors_reject_otherwise_valid_partial_trace(self):
+        for error in ('[LUA ERROR] error in read tap callback: nil register',
+                      'Fatal error: Error running autoboot script fixture.lua: runtime error'):
+            with self.subTest(error=error), self.assertRaisesRegex(ValueError, 'observer failed'):
+                check(TRACE + error)
+            with self.subTest(console=error), self.assertRaises(ValueError):
+                check_observer_health(error)
+
+    def test_nonfatal_device_warnings_are_not_observer_failures(self):
+        check_observer_health('ALSA [error.sequencer] open failed\n'
+                              'nse1_rom4_boot.bin NOT FOUND (NO GOOD DUMP KNOWN)\n')
+
     def test_status_handler_count_limit_and_flag_return(self):
         effects = ('rom4_rf_task10_consumer: pc=00211eb0 object=00101438 status=1390 control=80000000 t=1.7\n'
                    'rom4_rf_task10_counter: pc=00211ec4 address=0010fee0 value=162f0000 mask=ffff0000 t=1.8\n'

@@ -840,6 +840,10 @@ The isolated cold-control runner is:
 It creates a unique evidence directory under ignored repo `tmp/`, generates matching
 NSE-1 EEPROM for each case, and keeps MAME's working directory, logs and
 NVRAM separate. Default coverage is two fresh 60-second runs per mode.
+The runner rejects Lua callback or autoboot errors from the console as well
+as the trace; the standalone delivery checker checks a sibling `console.log`
+when available, or an explicit `--console` path. Partial observations emitted
+before an observer failure are not acceptance evidence.
 Both score and delivery checkers must pass; repeated score totals,
 accepted-store counts, first response body and received object address
 must agree within each mode. It is a standalone research gate, not a

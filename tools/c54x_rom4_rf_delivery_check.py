@@ -10,6 +10,11 @@ EVENT = re.compile(r"rom4_rf_(\w+): (.*)")
 FIELDS = re.compile(r"(\w+)=([^ ]+)")
 
 
+def check_observer_health(text):
+    if '[LUA ERROR]' in text or 'Error running autoboot script' in text:
+        raise ValueError('native RF observer failed; partial trace is not acceptance evidence')
+
+
 def decode_search_bitmap(words):
     """Static 48f7/4909 reference; physical band interpretation is separate."""
     if len(words) != 33 or any(not 0 <= word <= 0xffff for word in words):
@@ -163,6 +168,7 @@ def check_tuning_blob(text):
 
 
 def check(text, consumer_case=False, consumer_effects=False, consumer_decision=False):
+    check_observer_health(text)
     events = []
     for line in text.splitlines():
         match = EVENT.search(line)
@@ -247,6 +253,8 @@ def check(text, consumer_case=False, consumer_effects=False, consumer_decision=F
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
+    parser.add_argument('--console', type=Path,
+                        help='observer console; otherwise check sibling console.log when present')
     parser.add_argument("--search-list", action="store_true", help="also validate the first single-entry request bitmap")
     parser.add_argument('--consumer-case', action='store_true',
                         help='require correlated downstream task-10 case entry')
@@ -257,6 +265,9 @@ def main():
     args = parser.parse_args()
     try:
         text = args.log.read_text()
+        console = args.console or args.log.with_name('console.log')
+        if args.console or console.is_file():
+            check_observer_health(console.read_text())
         object_address, body = check(text, consumer_case=args.consumer_case,
                                      consumer_effects=args.consumer_effects,
                                      consumer_decision=args.consumer_decision)

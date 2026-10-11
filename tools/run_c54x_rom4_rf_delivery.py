@@ -11,12 +11,12 @@ import tempfile
 
 try:
     from tools.c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
-    from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
+    from tools.c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
     from tools.c54x_rom4_rf_score_check import check as check_score
     from tools.c54x_rom4_rf_consumption_check import check as check_consumption
 except ModuleNotFoundError:
     from c54x_rom4_rf_delivery_check import check as check_delivery, check_request, check_tuning_upload, check_tuning_blob
-    from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency
+    from c54x_rom4_rf_delivery_check import nse1_gsm900_tuning_consistency, check_observer_health
     from c54x_rom4_rf_score_check import check as check_score
     from c54x_rom4_rf_consumption_check import check as check_consumption
 
@@ -92,6 +92,7 @@ def main():
                 subprocess.run(command, cwd=case, env=dict(os.environ, ROM4_RF_SCORE_MODE=mode),
                                stdout=console, stderr=subprocess.STDOUT, check=True)
             text = (case / "error.log").read_text()
+            check_observer_health((case / 'console.log').read_text())
             actual_mode, results, accepted = check_score(text)
             consumption = check_consumption(text)
             scan_consumption = check_consumption(text, scan=True)
