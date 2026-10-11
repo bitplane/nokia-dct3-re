@@ -588,6 +588,14 @@ signed 40-bit MIN/MAX cases, including equal operands and both destinations.
 The remaining boundary is activation and delivery through the handset's
 native speech wrappers and audio transports. Isolated bit-exact codec tests
 do not establish native handset audio, speech during a call or end-to-end calls.
+The isolated algorithm runner retains `evidence.json` before execution:
+command/BIOS, SHA-256 and size of the actual MAME executable, runner,
+fixture source, GSM-FR adapter/packing sources and prepared ROM4 binary inputs.
+Packing, 32-frame decoding and 32-frame encoding remain bit-exact after
+the SQDST/FIRS arithmetic corrections; the separate native mute cases pass.
+This manifest identifies the selected files, not every build dependency or
+the dynamically loaded system codec library. Logs and manifests use
+disk-backed repository `tmp/`, not system tmpfs.
 
 ### Native speech activation and PCM buffers
 

@@ -1,12 +1,27 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 from tools.run_c54x_rom4_crc import COMPLETE, PASS, PACKED_COMPLETE, PACKED_PASS, FR_COMPLETE, FR_PASS, check_result
 from tools.run_c54x_rom4_crc import DECODER_PASS, DECODER_COMPLETE, DECODER_COMPARISON
 from tools.run_c54x_rom4_crc import ENCODER_PASS, ENCODER_COMPLETE, ENCODER_COMPARISON
 from tools.run_c54x_rom4_crc import PCM_MUTE_PASS
+from tools.run_c54x_rom4_crc import file_identity
 
 
 class Rom4HelperResultTest(unittest.TestCase):
+    def test_file_identity_tracks_actual_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "input.bin"
+            path.write_bytes(b"abc")
+            identity = file_identity(path)
+            self.assertEqual(identity["path"], str(path.resolve()))
+            self.assertEqual(identity["bytes"], 3)
+            self.assertEqual(identity["sha256"],
+                             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+            path.write_bytes(b"abcd")
+            self.assertNotEqual(file_identity(path)["sha256"], identity["sha256"])
+
     def test_encoder_completion(self):
         text = "\n".join((ENCODER_COMPARISON, ENCODER_PASS, PCM_MUTE_PASS, ENCODER_COMPLETE))
         check_result(text, 3, fr_encoder=True)

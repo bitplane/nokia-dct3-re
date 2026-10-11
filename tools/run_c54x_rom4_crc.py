@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Run isolated acquired ROM4 algorithms, not handset audio delivery."""
 import argparse
+import hashlib
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -19,6 +21,13 @@ ENCODER_PASS = "TMS320C54x ROM4 FR encoder: PASS frames=32 parameters=2432 hands
 ENCODER_COMPLETE = "Fatal error: TMS320C54x ROM4 FR encoder complete"
 ENCODER_COMPARISON = "ROM4 FR encoder aggregate: frames=32 parameters=2432 mismatches=0"
 PCM_MUTE_PASS = "TMS320C54x ROM4 PCM mute: PASS cases=8 samples=1280 guards=16 handset_audio_claim=0"
+
+
+def file_identity(path):
+    path = Path(path).resolve()
+    with path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    return {"path": str(path), "bytes": path.stat().st_size, "sha256": digest}
 
 
 def check_result(text, returncode, packed=False, fr_packing=False, fr_decoder=False, fr_encoder=False):
@@ -65,6 +74,15 @@ def main():
                "-rompath", str(args.rompath.resolve()), "-video", "none",
                "-sound", "none", "-nothrottle", "-noreadconfig", "-log",
                "-seconds_to_run", "2"]
+    root = Path(__file__).resolve().parents[1]
+    inputs = [args.mame, Path(__file__), root / "driver/tms320c54x_test.cpp"]
+    inputs.extend(root / name for name in ("lib/util/gsmfr.cpp", "lib/util/gsmfr.h",
+                                           "driver/gsm_tch_f_l1.cpp", "driver/gsm_tch_f_l1.h"))
+    inputs.extend(sorted((args.rompath / "tms54rom4").glob("*.bin")))
+    evidence = {"command": command, "bios": bios,
+                "inputs": [file_identity(path) for path in inputs],
+                "handset_audio_claim": False}
+    (run / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
     print(f"ROM4 helper evidence: {run}", flush=True)
     with (run / "console.log").open("w") as output:
         result = subprocess.run(command, cwd=run, stdout=output, stderr=subprocess.STDOUT)
