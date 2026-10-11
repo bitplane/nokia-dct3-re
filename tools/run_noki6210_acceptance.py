@@ -144,9 +144,35 @@ def check_plmn_reject(text, storage, *, home=False):
         return
     if text.find('update-binary fid=6f7b') < text.find('05040b'):
         raise ValueError('handset did not update EF_FPLMN after cause 11')
-    if bytes.fromhex('130062') not in (
+    if bytes.fromhex('00f120') not in (
             storage[offset:offset + 3] for offset in range(3548, 3560, 3)):
         raise ValueError('laboratory PLMN was not retained in EF_FPLMN')
+
+
+def check_forbidden_selection(text, storage, *, forbidden, previous):
+    import re
+    if len(storage) != 3560:
+        raise ValueError('incomplete cold SIM storage')
+    if 'read-binary fid=6f7b offset=0 length=12' not in text:
+        raise ValueError('cold selection did not read EF_FPLMN')
+    if not re.search(r'RX enqueue type=80 .*data=.*061b.*00f120', text):
+        raise ValueError('cold selection did not receive visited test PLMN SI3')
+    if forbidden:
+        if re.search(r'TX packet type=0c |Location Updating Accept acknowledged', text):
+            raise ValueError('automatic selection accessed the forbidden PLMN')
+        if storage != previous:
+            raise ValueError('forbidden-network cold boot changed retained SIM storage')
+    else:
+        from tools.radio_call_lifecycle_common import require_ordered
+        require_ordered(text, (
+            ('random access', re.compile(r'TX packet type=0c ')),
+            ('accepted update', re.compile(r'LAPDm Location Updating Accept acknowledged nr=1')),
+            ('release', re.compile(r'LAPDm Channel Release acknowledged nr=2')),
+        ), '6210 cleared forbidden-list control')
+        if storage[1604:1609] != bytes.fromhex('00f1200001') or storage[1610] != 0:
+            raise ValueError('cleared forbidden-list control did not persist visited location')
+        if storage[3548:] != b'\xff' * 12:
+            raise ValueError('accepted cleared-list control unexpectedly forbade a PLMN')
 
 
 def events(path):
@@ -272,7 +298,7 @@ def main():
             card.parent.mkdir(parents=True)
             # A visited preferred PLMN is external subscriber data, not an
             # injected selection event. Keep IMSI/home identity unchanged.
-            card.write_bytes(make_profile(pin_enabled=False) + bytes.fromhex('130062') +
+            card.write_bytes(make_profile(pin_enabled=False) + bytes.fromhex('00f120') +
                              b'\xff' * 21 + b'\xff' * 12)
         host = args.scenario.startswith('host-')
         configured = args.scenario in ('incoming-call', 'incoming-pcm-missing', 'incoming-sms', 'state-sms') or args.scenario in TOOLKIT_PROFILES or host
@@ -301,7 +327,7 @@ def main():
                               mask='2', defvalue='0', value='2')
                 if args.scenario == 'plmn-reject':
                     ET.SubElement(ports, 'port', tag=':AUTHCFG', type='CONFIG',
-                                  mask='4', defvalue='0', value='4')
+                                  mask='12', defvalue='0', value='4')
             ET.ElementTree(config).write(run / f'cfg/{machine}.cfg', encoding='utf-8', xml_declaration=True)
         command = [str((args.mame or root / 'mame/mame').resolve()), machine,
                    '-rompath', str(root / 'roms'), '-nvram_directory', 'nvram',
@@ -550,8 +576,37 @@ def main():
             with Image.open(run / 'snap/6210_sms_read_1.png') as frame:
                 check_frame(frame, SMS_READ_SHA256, 'received hello SMS')
         elif args.scenario in ('plmn-reject', 'home-plmn-reject'):
-            check_plmn_reject(text, (run / 'nvram/npe3hle/sim_card').read_bytes(),
+            retained = (run / 'nvram/npe3hle/sim_card').read_bytes()
+            check_plmn_reject(text, retained,
                               home=args.scenario == 'home-plmn-reject')
+            if args.scenario == 'plmn-reject':
+                for forbidden in (True, False):
+                    cold = run / ('cold-forbidden' if forbidden else 'cold-cleared')
+                    cold.mkdir()
+                    shutil.copytree(run / 'nvram', cold / 'nvram')
+                    shutil.copytree(run / 'cfg', cold / 'cfg')
+                    config_path = cold / f'cfg/{machine}.cfg'
+                    config = ET.parse(config_path)
+                    for port in config.findall('.//port'):
+                        if port.get('tag') == ':AUTHCFG' and port.get('mask') == '2':
+                            port.set('value', '0')
+                    config.write(config_path, encoding='utf-8', xml_declaration=True)
+                    card = cold / f'nvram/{machine}/sim_card'
+                    if not forbidden:
+                        cleared = bytearray(retained)
+                        cleared[3548:] = b'\xff' * 12
+                        card.write_bytes(cleared)
+                    cold_command = command.copy()
+                    cold_command[cold_command.index('-seconds_to_run') + 1] = '30'
+                    with (cold / 'console.log').open('w') as output:
+                        subprocess.run(cold_command, cwd=cold, stdout=output,
+                                       stderr=subprocess.STDOUT, check=True, timeout=180,
+                                       env=environment)
+                    check_output((cold / 'console.log').read_text(errors='replace'))
+                    cold_text = events(cold / 'error.log')
+                    verify(cold_text, runtime=True, selftest=True)
+                    check_forbidden_selection(cold_text, card.read_bytes(),
+                                              forbidden=forbidden, previous=retained)
         elif args.scenario == 'security':
             import re
             from tools.radio_call_lifecycle_common import require_ordered
@@ -602,7 +657,15 @@ def main():
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': machine, 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired product PMM', 'contract': contract,
-            'sim_profile': 'PIN-enabled laboratory card' if args.scenario == 'security' or args.pin_enabled else 'default laboratory card',
+            'sim_profile': ('visited-test-PLMN preferred laboratory card' if args.scenario == 'plmn-reject'
+                            else 'PIN-enabled laboratory card' if args.scenario == 'security' or args.pin_enabled
+                            else 'default laboratory card'),
+            'plmn_rejection': ({'cause': 11, 'visited_plmn': '001-02',
+                                'firmware_sim_update': True, 'cold_window_seconds': 30,
+                                'controls': ['retained-forbidden', 'cleared-list-only']}
+                               if args.scenario == 'plmn-reject' else
+                               {'cause': 11, 'home_plmn_forbidden': False}
+                               if args.scenario == 'home-plmn-reject' else None),
             'native_dsp_complete': False, 'speech_tested': False, 'command': command,
             'host_command': host_command,
         }, indent=2) + '\n')

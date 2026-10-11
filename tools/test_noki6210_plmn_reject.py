@@ -1,6 +1,6 @@
 import unittest
 
-from tools.run_noki6210_acceptance import check_plmn_reject
+from tools.run_noki6210_acceptance import check_plmn_reject, check_forbidden_selection
 
 
 class PlmnRejectTest(unittest.TestCase):
@@ -12,7 +12,7 @@ class PlmnRejectTest(unittest.TestCase):
                 'LAPDm Location Updating Reject acknowledged nr=1\n'
                 'LAPDm Channel Release acknowledged nr=2\n')
         if not home:
-            storage[3548:3551] = bytes.fromhex('130062')
+            storage[3548:3551] = bytes.fromhex('00f120')
             text += 'update-binary fid=6f7b offset=0 length=12\n'
         return text, storage
 
@@ -51,6 +51,53 @@ class PlmnRejectTest(unittest.TestCase):
         storage[1610] = 0
         with self.assertRaises(ValueError):
             check_plmn_reject(text, storage)
+
+    def cold_fixture(self, forbidden):
+        _, previous = self.fixture()
+        storage = bytearray(previous)
+        text = ('read-binary fid=6f7b offset=0 length=12\n'
+                'RX enqueue type=80 data=061b00f120\n')
+        if not forbidden:
+            storage[3548:] = b'\xff' * 12
+            storage[1604:1609] = bytes.fromhex('00f1200001')
+            storage[1610] = 0
+            text += ('TX packet type=0c payload=8\n'
+                     'LAPDm Location Updating Accept acknowledged nr=1\n'
+                     'LAPDm Channel Release acknowledged nr=2\n')
+        return text, storage, previous
+
+    def test_retained_and_cleared_cold_controls(self):
+        for forbidden in (True, False):
+            text, storage, previous = self.cold_fixture(forbidden)
+            check_forbidden_selection(text, storage, forbidden=forbidden, previous=previous)
+
+    def test_forbidden_access_is_failure(self):
+        text, storage, previous = self.cold_fixture(True)
+        for event in ('TX packet type=0c ', 'Location Updating Accept acknowledged'):
+            with self.subTest(event=event), self.assertRaises(ValueError):
+                check_forbidden_selection(text + event, storage, forbidden=True, previous=previous)
+
+    def test_cold_missing_evidence_is_failure(self):
+        for forbidden in (True, False):
+            text, storage, previous = self.cold_fixture(forbidden)
+            for line in text.splitlines():
+                with self.subTest(forbidden=forbidden, line=line), self.assertRaises(ValueError):
+                    check_forbidden_selection(text.replace(line, ''), storage,
+                                              forbidden=forbidden, previous=previous)
+
+    def test_forbidden_storage_must_be_exact(self):
+        text, storage, previous = self.cold_fixture(True)
+        storage[0] ^= 1
+        with self.assertRaises(ValueError):
+            check_forbidden_selection(text, storage, forbidden=True, previous=previous)
+
+    def test_cleared_control_requires_valid_location(self):
+        text, storage, previous = self.cold_fixture(False)
+        for offset in (1604, 1610, 3548):
+            changed = bytearray(storage)
+            changed[offset] ^= 1
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                check_forbidden_selection(text, changed, forbidden=False, previous=previous)
 
 
 if __name__ == '__main__':

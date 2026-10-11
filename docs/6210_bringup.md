@@ -279,13 +279,21 @@ the forbidden list ([specification](https://www.etsi.org/deliver/etsi_ts/100900_
 The network outcome and visited-PLMN inputs are external laboratory policy;
 they do not alter firmware state or subscriber identity.
 
-The manual `run_noki6210_acceptance.py --scenario plmn-reject --coherent-cell`
-probe instead broadcasts visited PLMN 310-260 and puts it in the external
-card's preferred list. Its 90-second observation receives 57 SI3 blocks and
-reads PLMNsel but emits no random access, Location Updating or FPLMN write.
-It therefore fails the rejection acceptance deliberately; handset-originated
-visited-FPLMN persistence and cold selection remain unproven. Resolve the
-selection boundary before attempting further rejection payloads.
+`verify-6210-forbidden-plmn-persistence` uses visited test PLMN 001-02,
+preferred by the external laboratory card without changing its IMSI/home
+identity. Firmware performs Location Updating, receives cause 11, releases
+the channel and writes the 12-byte EF_FPLMN. Two separate cold boots reuse
+that resulting card and the acquired product PMM, with the network changed
+to acceptance. The retained-list boot reads FPLMN and receives visited SI3
+without issuing random access during 30 seconds; its entire card record
+is unchanged. The control clears only FPLMN before boot: the same cell now
+registers, releases and persists LAI `00f1200001`/status 0. Thus the negative
+result is tied to retained FPLMN rather than merely an unresponsive peer.
+
+International visited PLMN 310-260 remains a separate unresolved selection
+case: a 90-second observation reads PLMNsel and receives 57 SI3 blocks but
+emits no random access. The same-country 001-02 proof does not establish why
+international selection differs or imply roaming coverage for every PLMN.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures

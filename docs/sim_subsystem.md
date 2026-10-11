@@ -235,12 +235,15 @@ in GSM 11.11 10.2.4/10.2.16. Their 24-/12-byte bodies are mutable card-owned
 arrays with exact FCP READ/UPDATE conditions, bounds checking, save/load and
 append-only NVRAM persistence. The serial fixture verifies both updates and
 restoration, then checks the exact serialized bodies; the storage gate cold-loads
-that same record. This does not yet prove a handset-originated rejection updates
-visited FPLMN or alters subsequent network selection; that lifecycle remains
-open. The 6210 home-PLMN rejection control does prove the complementary rule:
+that same record. The 6210 forbidden-PLMN persistence gate additionally proves
+firmware-originated cause-11 handling for visited test PLMN 001-02: an actual
+FPLMN update survives a cold boot and prevents automatic access. Clearing only
+that list allows the same accepting cell to register and persist its LAI.
+This is a bounded 30-second cold-selection comparison, not a claim about every
+roaming PLMN. The 6210 home-PLMN rejection control proves the complementary rule:
 cause 11 updates EF_LOCI to roaming-not-allowed but leaves EF_FPLMN erased.
-The HPLMN must not be forbidden (GSM 03.22); a visited-network probe has not
-yet reached Location Updating. See `6210_bringup.md` for the exact boundary.
+The HPLMN must not be forbidden (GSM 03.22). International visited selection
+remains separate; see `6210_bringup.md` for the exact coverage.
 These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
 ([ETSI specification](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf)).
 No retained handset trace uses SEEK;

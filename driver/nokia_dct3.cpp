@@ -1915,7 +1915,9 @@ void nokia_dct3_state::reset_board_state(bool clear_sram)
 		for (unsigned index = 0; index < m_gsm_network->cell_count(); ++index)
 		{
 			auto cell = *m_gsm_network->cell_at(index);
-			cell.location.plmn = { 0x13, 0x00, 0x62 };
+			cell.location.plmn = BIT(m_authentication_config.read_safe(0x00), 3)
+					? std::array<u8, 3>{ 0x13, 0x00, 0x62 }
+					: std::array<u8, 3>{ 0x00, 0xf1, 0x20 };
 			m_gsm_network->set_cell(index, cell);
 		}
 	}
@@ -2921,9 +2923,10 @@ static INPUT_PORTS_START( dct3_network_config )
 	PORT_CONFNAME(0x02, 0x00, "Laboratory Location Updating outcome")
 	PORT_CONFSETTING(0x00, "Accept")
 	PORT_CONFSETTING(0x02, "Reject: PLMN not allowed")
-	PORT_CONFNAME(0x04, 0x00, "Laboratory serving PLMN")
+	PORT_CONFNAME(0x0c, 0x00, "Laboratory serving PLMN")
 	PORT_CONFSETTING(0x00, "Subscriber home PLMN")
-	PORT_CONFSETTING(0x04, "Visited PLMN 310-260")
+	PORT_CONFSETTING(0x04, "Visited test PLMN 001-02")
+	PORT_CONFSETTING(0x0c, "Visited PLMN 310-260")
 
 	PORT_START("CIPHERCFG")
 	PORT_CONFNAME(0x01, 0x00, "Laboratory GSM cipher policy")
