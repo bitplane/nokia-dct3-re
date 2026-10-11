@@ -685,6 +685,23 @@ modeled response contracts. Do not broaden the background predicate merely
 to make it respond: recover which RX family this mode consumes and how its
 completion advances the pending controller first. This is an HLE peer
 coverage gap, not evidence of a missing MCU publisher or native DSP support.
+The consumer has a viable ordinary measurement entrance: `1802` kind `8b`
+branches at `2d0f56` to `2d1038`, which passes the referenced payload to
+`38b6ae`; unlike kind `8f` and status `3f9`, this dispatch does not require
+the controller state to be 3/4. `38b6ae` consumes at most forty four-byte
+records per response. Completion is cumulative and configuration-dependent:
+`38b5e8(3)` requires count halfword +4 >= 30 **and** +6 >= 40. A single
+forty-record response is therefore not generally a complete scan. The count
+classification and field ownership still need decoding; do not label the
+two count fields as physical bands solely from these thresholds.
+The request mapper `3f2226` independently distinguishes configuration from
+its secondary selector: configuration 3 selects bytes `05 03 03` at
+`2819a9`, indexes them by R1, and writes the result to message byte+5.
+Thus the foreign constructor's secondary input 1 maps to wire byte `03`,
+where input 0 maps to `05`. These are not two configuration IDs inferred
+directly from byte+5. Next capture the configuration and cumulative counts
+around the existing common `8b` response, then decode which records advance
+each count before implementing the unanswered request.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the response contract for foreign selection's
 type-`57` mode byte `03`, ownership of the pre-existing completion object,

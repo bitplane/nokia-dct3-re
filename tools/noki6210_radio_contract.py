@@ -288,6 +288,24 @@ def verify(image):
         0x4269fa: ('orrs', 'r1, r6'),
         0x426a04: ('strh', 'r1, [r5]'),
         0x426a20: ('strh', 'r0, [r2]'),
+        0x2d0f56: ('cmp', 'r2, #0x8b'),
+        0x2d0f58: ('beq', '#0x2d1038'),
+        0x2d1042: ('ldr', 'r1, [r4, #8]'),
+        0x2d1044: ('bl', '#0x38b6ae'),
+        0x38b6c0: ('bl', '#0x38b534'),
+        0x38b6de: ('movs', 'r1, #0x27'),
+        0x38b6e0: ('mvns', 'r6, r1'),
+        0x38b6ec: ('adds', 'r5, #4'),
+        0x38b5f8: ('beq', '#0x38b630'),
+        0x38b636: ('ldrh', 'r2, [r0, #4]'),
+        0x38b638: ('cmp', 'r2, #0x1e'),
+        0x38b63c: ('ldrh', 'r0, [r0, #6]'),
+        0x38b63e: ('cmp', 'r0, #0x28'),
+        0x3f2238: ('beq', '#0x3f225e'),
+        0x3f225e: ('movs', 'r0, #3'),
+        0x3f2266: ('ldr', 'r0, [pc, #0x344]'),
+        0x3f2280: ('ldrb', 'r0, [r0, r1]'),
+        0x3f2282: ('strb', 'r0, [r2]'),
         0x29e1e0: ('ldr', 'r1, [pc, #0x3a4]'),
         0x29e1e6: ('bl', '#0x295f2c'),
         0x295f3a: ('mov', 'sl, r0'),
@@ -391,6 +409,8 @@ def verify(image):
                            0x426e7c: 0x100a4}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
+    if read(0x3f25ac, 4) != bytes.fromhex('002819a9') or read(0x2819a9, 3) != bytes([5, 3, 3]):
+        raise ValueError('own type-57 selector-3 mapping differs')
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',
             'bcch_status': '0800', 'bcch_destination_task': 18,
             'bcch_object_consumer': '3b9302', 'si3_parser': '43f074',
