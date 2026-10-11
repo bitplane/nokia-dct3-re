@@ -2374,6 +2374,16 @@ identifies `Nokia service manual 8890 NSB-6.zip`, 5.66 MB, MD5
 registered account; the archive has not been acquired or inspected. This
 is a retrieval lead only, not timing evidence or a reason to enable PCM.
 
+The [ManualMachine 8890 index](https://manualmachine.com/nokia/8890/13692547-user-manual/)
+also lists a separate `Service Manual 03sys`, 56 pages, 239.15 KB; the linked
+page itself is a Spanish user guide, not that system manual. Its direct
+retrieval returns HTTP 403, as do the ManualsLib page-25 and Guidessimo
+routes; the original electronicsandbooks mirror is currently unreachable.
+The separately indexed NSB-7 manual corroborates the clock-rate family,
+but is not NSB-6 word-alignment or edge evidence. The required artifact
+remains the NSB-6 System Module page-25 timing diagram, not another frequency
+summary or a substituted sibling profile.
+
 The acquired `8850v531.fls` (SHA1
 `9f966787403b68a09530680ad911302403eb1521`) now has a ROM-pinned static
 check:
