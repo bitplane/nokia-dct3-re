@@ -2603,7 +2603,15 @@ both delay-slot layouts and restore before, between or after stack samples.
 Together with the twelve plain cases, all 36 require one target fetch and two
 ordered stack reads across replay, correct SP/INTM and no extra sequential
 instruction execution. Nested control transfers in delay slots are rejected.
-General stack conflicts and pending-interrupt timing remain unvalidated.
+Eight pending-IRQ cases cover plain/delayed returns in both cross-page
+directions, with a request after clock 4 and replay from clock 5. FRETE/FRETED
+fetch the vector in the restored page and stack the first undecoded target
+continuation (`0700` plain, `0702` delayed); decoded target work drains before
+entry. FRET/FRETD controls preserve INTM and the pending request, with no
+vector fetch or entry stack write. Every enabled case requires one vector
+fetch and one continuation write per replay leg. These are staged-model
+observations, not independent evidence of silicon re-entry phases. General
+stack conflicts and physical pending-interrupt timing remain unvalidated.
 
 The exact `f6bb`/`f7bb` RSBX/SSBX INTM forms establish protection in Decode
 and retain it through retirement of the next complete instruction, including
