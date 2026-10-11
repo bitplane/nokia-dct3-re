@@ -1500,6 +1500,33 @@ private:
 					"Accumulator-A multiply syntax distinguishes fixed and selected operands");
 			}
 		osd_printf_info("TMS320C54x accumulator-A multiply disassembler: PASS memory_forms=1024 short_forms=4 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned word = 0; word < 2048; ++word)
+			{
+				words const buffer(pc, 0x2800 | word, 0x2345);
+				std::ostringstream text;
+				unsigned const length = (word & 255) >= 0xe0 ? 2 : 1;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+					"Memory MAC/MAS decoder bounds address extensions across rounding and destination variants");
+			}
+		vector const memory_mac_forms[] = {
+			{0x2882, 1 | dasm::SUPPORTED, "MAC     *AR2, A"},
+			{0x29f8, 2 | dasm::SUPPORTED, "MAC     *($2345), B"},
+			{0x2ae2, 2 | dasm::SUPPORTED, "MACR    *AR2($2345), A"},
+			{0x2b94, 1 | dasm::SUPPORTED, "MACR    *AR4+, B"},
+			{0x2c12, 1 | dasm::SUPPORTED, "MAS     $12, A"},
+			{0x2d92, 1 | dasm::SUPPORTED, "MAS     *AR2+, B"},
+			{0x2ef8, 2 | dasm::SUPPORTED, "MASR    *($2345), A"},
+			{0x2f84, 1 | dasm::SUPPORTED, "MASR    *AR4, B"},
+		};
+		for (auto const &test : memory_mac_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Memory MAC/MAS syntax retains subtraction, rounding and destination bits");
+		}
+		osd_printf_info("TMS320C54x memory MAC/MAS disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

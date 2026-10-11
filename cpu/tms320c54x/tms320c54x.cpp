@@ -247,6 +247,14 @@ public:
 			if (family != 0x3400) util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
 			return (1 + extended) | SUPPORTED;
 		}
+		if (family >= 0x2800 && family <= 0x2f00)
+		{
+			bool const extended = mode >= 0xe0;
+			char const *name = BIT(op, 10) ? (BIT(op, 9) ? "MASR" : "MAS") : (BIT(op, 9) ? "MACR" : "MAC");
+			util::stream_format(stream, "%-8s", name); smem(extended ? next_word() : 0);
+			util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family == 0x3100 || family == 0x3300 || family == 0x3500 || family == 0x3700)
 		{
 			bool const extended = mode >= 0xe0;
