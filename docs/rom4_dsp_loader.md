@@ -1278,6 +1278,21 @@ the direct GTI initialization ABI. Recover a documented initialization and
 configuration contract before attempting execution; exported names alone
 do not establish function signatures or pipeline behavior.
 
+Static export-body audit further limits this route. For `tisim54x.dvr`
+SHA-256 `2d98a6d9729c4ebd5534d8e1d46ec92444102ce7067a03da530470d476e9c9f0`,
+`GTI_GET_PIPELINE_INFO` (RVA `0x3dc0`) selects a context, clears 30 DWORDs
+at output offsets `0x100..0x177`, and returns zero; it does not obtain stage
+state. `GTI_GET_PHASE_NAME` (`0x3d90`) bounds its index against a helper
+that unconditionally returns zero, so it always returns null. Neither
+export supplies pipeline inspection in this binary. The mode getter/setter
+(`0x3e40`/`0x3df0`) instead dispatch simulator operations `0x44`/`0x45`;
+their existence keeps execution-mode testing a candidate, not a verified
+timing oracle. Initialization uses context/configuration data and pointer
+arguments whose complete contract is still unestablished. Retain the
+disassemblies in `tmp/ccs33-pipeline-export-audit.log` and
+`tmp/ccs33-init-export-audit.log`; do not infer callable prototypes from
+export names or replace missing configuration with fabricated structures.
+
 Stage the source in `WORK` and compile with the installed Win32 compiler:
 
 ```sh
