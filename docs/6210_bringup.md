@@ -387,6 +387,17 @@ in `tmp/6210-plmn-task14-census-{national,international}/error.log.gz`.
 `tools/noki6210_plmn_task14_observe.lua` retains the read-only census;
 its 160-publication limit is a diagnostic bound, not a topology closure.
 
+Both divergent statuses enter wrapper `3cc660` from the same call at
+`31525e` (observed LR `315263`). The wrapper copies its R0 argument into
+the new object's status and posts to task 14; it does not choose between
+these two statuses. The preceding own-ROM switch compares the saved word
+at stack offset 8: `07d4` selects `315234 -> 03ec`, while `07d2` selects
+`315256 -> 03ea`. Instructions and pool literals are pinned by the radio
+contract checker. This maps the publication back to an earlier numeric
+input; the meaning and origin of `07d2/07d4` remain unresolved, and the
+saved input has not yet been runtime-observed.
+Evidence: `tmp/6210-plmn-publisher-{national,international}/error.log.gz`.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require

@@ -18,4 +18,16 @@ local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
             'plmn_task14_census: status=%04x caller=%08x t=%.9f\n',
             status, cpu.state['R14'].value, machine.time:as_double()))
     end)
-_G.plmn_task14_census_observer = {tap = tap}
+local publishers = 0
+local publisher_tap = space:install_read_tap(0x3cc660, 0x3cc663,
+    'plmn_status_publisher', function(address)
+        if address ~= 0x3cc660 or cpu.state['PC'].value ~= 0x3cc660
+            or publishers >= 24 then return end
+        local status = cpu.state['R0'].value
+        if status ~= 0x3ea and status ~= 0x3ec then return end
+        publishers = publishers + 1
+        machine:logerror(string.format(
+            'plmn_status_publisher: status=%04x caller=%08x t=%.9f\n',
+            status, cpu.state['R14'].value, machine.time:as_double()))
+    end)
+_G.plmn_task14_census_observer = {tap = tap, publisher_tap = publisher_tap}

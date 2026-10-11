@@ -61,6 +61,25 @@ def verify(image):
         0x2d3f6e: ('adr', 'r0, #0x338'),
         0x2d3930: ('adr', 'r0, #0x5c'),
         0x2d3b16: ('cmp', 'r0, #2'),
+        0x3cc660: ('push', '{r4, r5, r6, r7, lr}'),
+        0x3cc662: ('adds', 'r5, r0, #0'),
+        0x3cc66c: ('strh', 'r5, [r4]'),
+        0x3cc9f6: ('movs', 'r0, #0xe'),
+        0x3cc9f8: ('bl', '#0x3c22c0'),
+        0x3151da: ('ldr', 'r1, [pc, #0x378]'),
+        0x3151dc: ('ldr', 'r0, [sp, #8]'),
+        0x3151de: ('cmp', 'r0, r1'),
+        0x3151e0: ('beq', '#0x315256'),
+        0x3151e2: ('ldr', 'r1, [pc, #0x364]'),
+        0x3151e4: ('ldr', 'r0, [sp, #8]'),
+        0x3151e6: ('cmp', 'r0, r1'),
+        0x3151e8: ('beq', '#0x315234'),
+        0x315234: ('adr', 'r0, #0x2e4'),
+        0x31523a: ('movs', 'r0, #0xfb'),
+        0x31523c: ('lsls', 'r0, r0, #2'),
+        0x315256: ('adr', 'r0, #0x2c4'),
+        0x31525c: ('ldr', 'r0, [pc, #0x2e0]'),
+        0x31525e: ('bl', '#0x3cc660'),
         0x3c9156: ('bl', '#0x4b2dd4'),
         0x3c915a: ('cmp', 'r0, #0'),
         0x4b2df2: ('bl', '#0x4b2ad2'),
@@ -83,6 +102,10 @@ def verify(image):
         ins = next(decoder.disasm(read(address, 4), address), None)
         if ins is None or (ins.mnemonic, ins.op_str) != value:
             raise ValueError(f'own acquisition contract differs at {address:x}')
+    for address, value in {0x315540: 0x3ea, 0x315548: 0x7d4,
+                           0x315554: 0x7d2}.items():
+        if int.from_bytes(read(address, 4), 'big') != value:
+            raise ValueError(f'own selection literal differs at {address:x}')
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',
             'bcch_status': '0800', 'bcch_destination_task': 18,
             'bcch_object_consumer': '3b9302', 'si3_parser': '43f074',
