@@ -317,6 +317,15 @@ not verified acceptance on this executable. First reconcile the score-path
 instruction/peripheral changes and capture provenance; do not increase input
 amplitude or lower the acceptance threshold to make this diagnostic pass.
 
+A fresh cold run with the minimal observer from `ee56297f` (the same
+rotating port input and only the three score-path taps, without the later
+delivery/tuning observations) reproduces the current result exactly:
+991360 input reads, 4889 nonzero scores, maximum `0x0538`, zero second
+comparisons and zero accepted stores. The added observation layer is therefore
+not the cause of this discrepancy. Executable/configuration history and the
+provenance of the earlier capture remain to be reconciled; neither score is
+yet grounds for changing instruction semantics or physical-input assumptions.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
