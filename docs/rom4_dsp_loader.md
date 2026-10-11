@@ -2918,8 +2918,9 @@ remaining two clocks rather than a restarted four-clock word, including replay.
 Pending clock switches round up to the next whole transfer clock; sub-cycle
 switching and PLL startup latency remain unvalidated. MU4 now supplies the
 11.9952 MHz Y101 rate evidenced by its own schematic sheet 4 to this connection.
-The original MU4 system-clock requests are now pinned and observed, but their
-PLLCOUNT scheduling and rate publication remain unimplemented; see the
+The original MU4 system-clock requests now drive delayed PLLSTATUS, CPU
+execution and system-clocked peripheral rates. Reset straps, IDLE3 relock
+and sub-cycle switching remain unvalidated; see the
 [MU4 CLKMD contract](5510_bringup.md#original-clkmd-contract).
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
@@ -3327,7 +3328,10 @@ the corrected core passes all 16 settings and the full native suite
 passes (`tmp/c54x-clkmd-rom4-rf.log`: 648,288 reads, 1,580 port-32 writes,
 no port-38/39 reads). These tests establish register write eligibility,
 not PLL lock latency, input-clock geometry or clock-rate switching. The
-existing immediate status transition remains a declared model limitation.
+unconfigured core retains its declared immediate-status limitation. The
+separate input-clock-configured fixtures now cover delayed status and selected
+execution/peripheral rates, without asserting measured DA150 timing; see the
+[MU4 clock contract](5510_bringup.md#original-clkmd-contract).
 Exact `8812`, `881a`, `8915`, and `891a` check direct `STLM` writes to AR2,
 BRC, AR5, and BRC. An intervening `MVMD BRC,dmad` preserves A's first BRC
 write before B overwrites it; the marker span checks four one-cycle stores and

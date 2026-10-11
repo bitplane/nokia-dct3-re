@@ -578,7 +578,8 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_bio_in_cb(*this, 1),
 	m_xf_out_cb(*this),
 	m_peripheral_clock_stop_cb(*this),
-	m_pll_clock_stop_cb(*this)
+	m_pll_clock_stop_cb(*this),
+	m_system_clock_cb(*this)
 {
 }
 
@@ -599,9 +600,14 @@ std::unique_ptr<util::disasm_interface> tms320c54x_device::create_disassembler()
 void tms320c54x_device::device_start()
 {
 	m_imr = m_power_on_imr;
+	m_reset_clock = unscaled_clock();
+	m_timer_clock = clock();
+	if (m_follow_clkmd && !m_pll_reference_clock)
+		fatalerror("C54x CLKMD rate selection requires an input clock");
 	m_opcode_first_pc.fill(0xffff);
 	m_timer = timer_alloc(FUNC(tms320c54x_device::timer_expired), this);
 	m_pll_timer = timer_alloc(FUNC(tms320c54x_device::pll_transition_complete), this);
+	m_clock_timer = timer_alloc(FUNC(tms320c54x_device::selected_clock_complete), this);
 	// CPU-owned MMRs take precedence over broad board RAM windows.
 	space(AS_DATA).install_device(0, 0x58, *this, &tms320c54x_device::internal_data_map);
 	space(AS_PROGRAM).cache(m_cache);
@@ -677,6 +683,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_interrupt_ack_source));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_pll_locked));
+	save_item(NAME(m_timer_clock));
+	save_item(NAME(m_pending_clock));
 	save_item(NAME(m_tim));
 	save_item(NAME(m_prd));
 	save_item(NAME(m_tcr));
@@ -795,6 +803,10 @@ void tms320c54x_device::device_reset()
 	m_clkmd = 0;
 	m_pll_locked = false;
 	m_pll_timer->adjust(attotime::never);
+	m_clock_timer->adjust(attotime::never);
+	m_pending_clock = 0;
+	if (m_follow_clkmd)
+		set_unscaled_clock(m_reset_clock);
 	m_tim = 0xffff;
 	m_prd = 0xffff;
 	m_tcr = 0;
@@ -813,9 +825,9 @@ u64 tms320c54x_device::timer_remaining_ticks() const
 	const attotime remaining = m_timer->remaining();
 	if (remaining <= attotime::zero)
 		return 0;
-	u64 ticks = remaining.as_ticks(clock());
+	u64 ticks = remaining.as_ticks(m_timer_clock);
 	// A partially remaining clock must not decrement TIM/PSC early.
-	if (attotime::from_ticks(ticks, clock()) < remaining)
+	if (attotime::from_ticks(ticks, m_timer_clock) < remaining)
 		++ticks;
 	return ticks;
 }
@@ -893,6 +905,7 @@ void tms320c54x_device::write_clkmd(u16 value)
 	}
 	u16 const previous = m_clkmd;
 	m_clkmd = (value & ~u16(1)) | unsigned(pll_mode);
+	publish_selected_clock();
 	if (((previous ^ m_clkmd) & 0xf800) || !(m_clkmd & 6))
 		m_pll_locked = false;
 	if (BIT(m_clkmd, 1) == pll_mode)
@@ -929,6 +942,66 @@ TIMER_CALLBACK_MEMBER(tms320c54x_device::pll_transition_complete)
 	m_clkmd = (m_clkmd & ~u16(1)) | BIT(m_clkmd, 1);
 	if (BIT(m_clkmd, 0))
 		m_pll_locked = true;
+	publish_selected_clock();
+}
+
+void tms320c54x_device::publish_selected_clock()
+{
+	if (!m_follow_clkmd)
+		return;
+	u32 const mul = m_clkmd >> 12;
+	u32 numerator = 1, denominator;
+	if (!BIT(m_clkmd, 0))
+		denominator = mul == 15 ? 4 : 2;
+	else if (!BIT(m_clkmd, 11))
+	{
+		numerator = mul == 15 ? 1 : mul + 1;
+		denominator = 1;
+	}
+	else
+	{
+		numerator = mul & 1 ? mul : mul + 1;
+		denominator = mul & 1 ? 4 : 2;
+	}
+	u64 const hz = u64(m_pll_reference_clock) * numerator;
+	if (hz % denominator || hz / denominator > 0xffffffffU || !hz)
+		fatalerror("C54x selected clock cannot be represented as an integer device rate");
+	m_pending_clock = hz / denominator;
+	if (m_pending_clock == unscaled_clock())
+	{
+		m_clock_timer->adjust(attotime::never);
+		return;
+	}
+	if (executing())
+	{
+		// Changing rate inside execute_run would re-price elapsed timeslice
+		// cycles at the new rate. End that slice in the old domain first.
+		m_clock_timer->adjust(attotime::zero);
+	}
+	else
+	{
+		m_clock_timer->adjust(attotime::never);
+		set_unscaled_clock(m_pending_clock);
+	}
+}
+
+TIMER_CALLBACK_MEMBER(tms320c54x_device::selected_clock_complete)
+{
+	set_unscaled_clock(m_pending_clock);
+}
+
+void tms320c54x_device::device_clock_changed()
+{
+	// MAME has already changed clock(). Retain whole pending source clocks;
+	// do not count timer ticks early or restart TIM/PSC at a PLL transition.
+	if (m_timer && m_timer_clock && m_timer_clock != clock())
+	{
+		u64 const ticks = timer_remaining_ticks();
+		if (m_timer->enabled() && !(m_tcr & TIMER_TSS) && m_idle_mode < 2)
+			m_timer->adjust(attotime::from_ticks(ticks, clock()));
+	}
+	m_timer_clock = clock();
+	m_system_clock_cb(clock());
 }
 
 u16 tms320c54x_device::fetch()
@@ -988,6 +1061,7 @@ void tms320c54x_device::device_post_load()
 	// The output cache is derived; re-drive the restored architectural level.
 	update_xf(true);
 	m_pll_clock_stop_cb(m_idle_mode == 3);
+	m_system_clock_cb(clock());
 }
 
 void tms320c54x_device::state_export(const device_state_entry &entry)

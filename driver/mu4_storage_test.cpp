@@ -26,8 +26,18 @@ public:
 	{
 		// Test clock only; DA150 PLL/physical memory mapping is not claimed here.
 		TMS320C54X(config, m_cpu, 13'000'000);
-		// Y101 reference clocks PLLSTATUS transitions, not CPU execution yet.
+		// Y101 clocks original CLKMD selection; reset straps remain unvalidated.
 		m_cpu->set_pll_reference_clock(11'995'200);
+		m_cpu->set_follow_clkmd(true);
+		m_cpu->system_clock_cb().set([this](u32 hz) {
+			m_dma->set_unscaled_clock(hz);
+			m_mcbsp->set_unscaled_clock(hz);
+			m_mcbsp0->set_unscaled_clock(hz);
+			m_mcbsp2->set_unscaled_clock(hz);
+			logerror("mu4_system_clock_selected: cpu=%u dma=%u mcbsp0=%u mcbsp1=%u mcbsp2=%u codec=%u t=%.9f\n",
+				hz, m_dma->clock(), m_mcbsp0->clock(), m_mcbsp->clock(), m_mcbsp2->clock(),
+				subdevice<tlv320aic23_device>("codec")->clock(), machine().time().as_double());
+		});
 		m_cpu->set_extended_program(true);
 		m_cpu->set_addrmap(AS_PROGRAM, &mu4_storage_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &mu4_storage_test_state::data_map);

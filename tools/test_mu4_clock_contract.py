@@ -3,11 +3,27 @@ from fractions import Fraction
 import struct
 import unittest
 
-from tools.mu4_clock_contract import contract, decode_clkmd, check_trace, transition_seconds, WRITES
+from tools.mu4_clock_contract import contract, decode_clkmd, check_trace, check_clock_rates, transition_seconds, WRITES
 from tools.noki5510_a00_inventory import uploaded_word_image
 
 
 class ClockContractTest(unittest.TestCase):
+    def test_selected_rates_keep_external_codec_clock(self):
+        rates = [5_997_600, 95_961_600, 5_997_600, 119_952_000]
+        delays = [0, transition_seconds(0x77fb, entering_pll=True),
+                  transition_seconds(0x77fb, entering_pll=False), transition_seconds(0x97fb, entering_pll=True)]
+        text = self.trace()
+        for index, (rate, delay) in enumerate(zip(rates, delays)):
+            text += (f'\nmu4_system_clock_selected: cpu={rate} dma={rate} mcbsp0={rate} '
+                     f'mcbsp1={rate} mcbsp2={rate} codec=11995200 t={float(index + 1 + delay):.9f}')
+        self.assertTrue(check_clock_rates(text)['execution_clock_propagated'])
+        for wrong in (text.replace('codec=11995200', 'codec=119952000'),
+                      text.replace('dma=95961600', 'dma=13000000'),
+                      text.replace('t=2.000340673', 't=2.000000000'),
+                      text + '\n' + text.splitlines()[-1], self.trace()):
+            with self.assertRaises(ValueError):
+                check_clock_rates(wrong)
+
     def test_pll_transition_delay(self):
         # Original x8/x10 requests: 255*16 lock ticks, six input ticks,
         # then 3.5 ticks of the destination PLL clock.

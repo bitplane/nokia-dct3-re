@@ -25,12 +25,14 @@ public:
 protected:
 	virtual void device_start() override;
 	virtual void device_reset() override;
+	virtual void device_clock_changed() override;
 
 private:
 	TIMER_CALLBACK_MEMBER(transfer);
 	void enable(unsigned channel);
 	void validate(unsigned channel) const;
 	void schedule_transfer(unsigned channel);
+	void retime_transfers(u32 old_rate, u32 new_rate);
 	u32 transfer_clock() const { return m_pll_stopped ? m_input_clock : clock(); }
 	s16 address_step(unsigned index, bool frame_end) const;
 	required_device<cpu_device> m_cpu;
@@ -38,6 +40,7 @@ private:
 	u16 m_control = 0, m_index = 0;
 	bool m_per_channel_reload = false;
 	u32 m_input_clock = 0;
+	u32 m_system_clock = 0;
 	bool m_pll_stopped = false;
 	u64 m_paused_ticks[6] = {};
 	bool valid_index(u16 index) const { return index < 0x28 || (m_per_channel_reload && index >= 0x2a && index <= 0x3d); }

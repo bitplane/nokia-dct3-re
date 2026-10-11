@@ -30,14 +30,15 @@ allow externally triggered McBSP/DMA work during deep idle. The generic DMA
 device now accepts a separate X2/CLKIN rate and CPU PLL-stop line. Coupled
 conformance fixtures verify the IDLE3 source switch, absent-clock pending
 transfers, enabled/masked completion wake and save-state replay. MU4 now wires
-that switch to the schematic's 11.9952 MHz Y101 input. Its normal system/PLL
-clock model and PLL wake timing remain incomplete: the original startup writes
-are pinned and observed, but the CPU still executes at a configured 13 MHz
-instead of applying its requested divider/PLL sequence. See
+that switch to the schematic's 11.9952 MHz Y101 input. The original startup
+divider/PLL sequence now controls CPU execution, core timer, DMA and internal
+McBSP rates after input-derived transition delays. Reset straps, PLL wake
+timing and sub-cycle switching remain unvalidated. See
 [the CLKMD contract](#original-clkmd-contract).
 The `startup` profile passes its 20-second window with zero illegal
-instructions and an active original streaming consumer. It observes 1,739
-consumer entries/notification reads and 1,740 clears, but mode zero skips
+instructions and an active original streaming consumer. With selected CLKMD
+rates it observes 189 consumer entries/notification reads and 190 clears;
+the earlier fixed-rate counts are not acceptance constants. Mode zero skips
 buffer processing. A separate framed
 command fixture reaches the original serial parser and queued acknowledgement.
 The `wireack` fixture completes a native status-query transaction using the
@@ -975,12 +976,12 @@ Both PLL requests specify `PLLCOUNT=255`, or 4,080 input clocks before the
 additional mode-transition delay. These are decoded firmware requests using
 a documented TI-family register contract, not measured DA150 frequencies,
 lock times or a complete writer census. The MU4 bench configures the core's
-`set_pll_reference_clock(11'995'200)` for delayed PLLSTATUS; unconfigured users
-retain the legacy immediate status behavior. The core does not yet change its
-execution rate. Native status service passing at 13 MHz does not validate that
-execution-clock model. The pending implementation boundary is selected
-system-clock publication and peripheral rate propagation, plus reset straps
-and IDLE3 relock behavior.
+`set_pll_reference_clock(11'995'200)` and `set_follow_clkmd(true)` for delayed
+PLLSTATUS and selected execution rates. CPU clock publication fans out to
+DMA and all three McBSPs, not to the externally clocked codec. Unconfigured
+users retain their declared fixed execution rate and legacy immediate status
+behavior. The MU4 reset rate remains a provisional 13 MHz until the first
+CLKMD write; reset straps and IDLE3 relock behavior remain unvalidated.
 
 The tool also calculates exact TI-family transition predictions (SPRU131G
 pp. 8-32/33). An unlocked DIV-to-PLL request adds six input cycles and
@@ -1004,10 +1005,15 @@ exit, repeated requests without deadline extension, retained-lock re-entry
 `77fb` has PLLON/OFF clear; it must not be assumed to retain lock after DIV
 exit. These are controller
 conformance tests, not physical DA150 clock measurements or handset fixtures.
-With delayed status enabled, the original four-write startup/status observation
-and the fresh original `sustain` gate pass: six files, eight TX/RX DMA blocks,
-1,024 DIN words and zero illegal instructions. The instruction and peripheral
-execution rates remain the fixed bench rates, not the requested PLL rates.
+The selected-rate conformance fixture separately checks DIV/2 and PLL x10,
+core timer count preservation, pending DMA and internal McBSP completion at
+the new rate, and save/restore of all three rates without restarting TIM.
+DMA already on the IDLE3 input source retains its original deadline across
+system-rate changes in both directions.
+Pending intervals retain their remaining whole source clocks; sub-cycle phase
+is not established. A clock change requested during CPU execution is applied
+by a zero-delay timer outside the old instruction timeslice, so elapsed cycles
+are not repriced at the new rate.
 
 The passive `tools/mu4_clock_observe.lua`, started with `-autoboot_delay 0`,
 observes all four writes in the original `bootstatus` fixture, from initial
@@ -1017,6 +1023,15 @@ to accept the observation. It uses this MU4 fixture's own retained R060 NAND,
 not another product's provisioning, and makes no firmware/controller writes.
 The copied input NAND remains byte-identical on disk with `-nonvram_save`.
 The timestamps are emulated, not physical clock measurements.
+`--clock-rates` additionally requires the four selected-rate publications to
+match the original writes and transition delays, with CPU/DMA/McBSP rates
+equal and codec clock unchanged at 11.9952 MHz. The three-nanosecond comparison
+tolerance covers the trace's nine-decimal timestamp formatting, not a
+calibrated latency allowance.
+The original startup/status observation, fresh `sustain` and 20-second
+`startup` gates pass with selected rates: six files, eight TX/RX DMA blocks,
+1,024 DIN words and zero illegal instructions. These digital fixture results
+do not establish analog clock stability or complete handset operation.
 
 Attach the observer to an own-source `bootstatus` run with
 `-autoboot_delay 0 -script /absolute/path/to/repo/tools/mu4_clock_observe.lua`,
@@ -1080,7 +1095,7 @@ PLL register or handset clock rate is inferred from these fixture values.
 The [NPM-5 MU4 schematic, sheet 4](https://www.s-manuals.com/manuals/phone/nokia/nokia_5510_npm-5_schematics.pdf)
 labels Y101 as 11.9952 MHz and connects it to DA150 U101 X1 and X2/CLKIN
 (pins 96/97). This supplies the DMA's undivided IDLE3 input independently of
-the codec clock setting and the fixture's calibrated 13 MHz system rate.
+the codec clock setting and the selected system rate.
 The MU4 configuration connects the CPU PLL-stop output to this DMA clock
 selection. The input is crystal-derived; the schematic does not establish
 its instantaneous startup availability or a PLL multiplier/lock delay.
@@ -1155,7 +1170,8 @@ queued words, reset cancellation, XRDY interrupts and pending save/restore.
 Receiver and wider/multiphase formats remain unsupported; active unsupported
 transmit formats fail explicitly. External framed clocks and DMA-ready lines
 have separate conformance coverage below.
-The fixture's 13 MHz source is not a validated DA150 PLL configuration.
+The fixture's provisional 13 MHz reset rate is not a validated DA150 reset
+configuration; subsequent CLKMD selection follows the contract above.
 
 Original MCUSI16 transmits `0c10 0818 0a01 0e53 1023 1201` without illegal
 instructions. The gate ends when the sixth word completes, not after a full

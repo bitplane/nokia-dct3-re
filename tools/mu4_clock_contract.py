@@ -75,7 +75,7 @@ def contract(source):
     return {'source_sha256': SOURCE_SHA256, 'schematic_input_hz': INPUT_HZ,
             'writers': rows,
             'ti_family_transition_predictions': delays,
-            'scope': 'four pinned original writers and TI-family requested ratios; no complete writer census, DA150 PLL lock timing or execution rate validation'}
+            'scope': 'four pinned original writers and TI-family clock selection; no complete writer census or physical DA150 reset/PLL clock measurements'}
 
 
 def check_trace(text):
@@ -101,15 +101,52 @@ def check_trace(text):
             'physical_system_clock_validated': False}
 
 
+def check_clock_rates(text):
+    """Original write -> modeled source switch; never a physical frequency oracle."""
+    check_trace(text)
+    pattern = (r'mu4_system_clock_selected: cpu=(\d+) dma=(\d+) mcbsp0=(\d+) '
+               r'mcbsp1=(\d+) mcbsp2=(\d+) codec=(\d+) t=([0-9.]+)$')
+    raw = re.findall(pattern, text, re.MULTILINE)
+    if text.count('mu4_system_clock_selected:') != len(raw):
+        raise ValueError('malformed system-clock publication')
+    rows = []
+    for row in raw:
+        rates = [int(value) for value in row[:6]]
+        time = Fraction(row[6])
+        if rates[:5] != [rates[0]] * 5 or rates[5] != INPUT_HZ:
+            raise ValueError('system-clock consumers diverged or external codec clock changed')
+        if rates[0] == 13_000_000 and time == 0:
+            continue  # Explicitly provisional reset rate, not CLKMD-derived.
+        rows.append((rates[0], time))
+    expected = [5_997_600, 95_961_600, 5_997_600, 119_952_000]
+    if [rate for rate, _ in rows] != expected:
+        raise ValueError('missing or unexpected original CLKMD system-clock sequence')
+    writes = re.findall(r'mu4_clock_write: .* t=([0-9.]+)$', text, re.MULTILINE)
+    delays = [Fraction(0), transition_seconds(0x77fb, entering_pll=True),
+              transition_seconds(0x77fb, entering_pll=False),
+              transition_seconds(0x97fb, entering_pll=True)]
+    for (_, time), write, delay in zip(rows, writes, delays):
+        if abs(time - Fraction(write) - delay) > Fraction(3, 1_000_000_000):
+            raise ValueError('source switch differs from input-derived transition deadline')
+    return {'selected_hz': expected, 'external_codec_hz': INPUT_HZ,
+            'execution_clock_propagated': True, 'physical_system_clock_validated': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
     parser.add_argument('--trace', type=Path)
+    parser.add_argument('--clock-rates', action='store_true', help='require selected-rate publication in --trace')
     args = parser.parse_args()
     try:
         report = contract(args.image.read_bytes())
         if args.trace:
-            report['runtime'] = check_trace(args.trace.read_text())
+            trace = args.trace.read_text()
+            report['runtime'] = check_trace(trace)
+            if args.clock_rates:
+                report['clock_rates'] = check_clock_rates(trace)
+        elif args.clock_rates:
+            raise ValueError('--clock-rates requires --trace')
         print(json.dumps(report, indent=2))
     except (OSError, ValueError, UnicodeError) as error:
         parser.exit(1, f'MU4 clock contract: {error}\n')

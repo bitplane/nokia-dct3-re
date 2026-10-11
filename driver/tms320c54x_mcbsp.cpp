@@ -13,6 +13,7 @@ tms320c54x_mcbsp_device::tms320c54x_mcbsp_device(machine_config const &config, c
 void tms320c54x_mcbsp_device::device_start()
 {
 	if (!clock()) fatalerror("McBSP requires a CPU source clock");
+	m_system_clock = clock();
 	m_bit_timer = timer_alloc(FUNC(tms320c54x_mcbsp_device::bit_tick), this);
 	save_item(NAME(m_regs)); save_item(NAME(m_index));
 	save_item(NAME(m_buffer)); save_item(NAME(m_shift));
@@ -32,6 +33,25 @@ void tms320c54x_mcbsp_device::device_start()
 	save_item(NAME(m_rx_frame_pending)); save_item(NAME(m_rx_next_delay));
 	save_item(NAME(m_tx_sync_irq));
 	save_item(NAME(m_internal_clock_stopped)); save_item(NAME(m_paused_bit_time));
+	save_item(NAME(m_system_clock));
+}
+
+void tms320c54x_mcbsp_device::device_clock_changed()
+{
+	if (m_bit_timer && m_system_clock && m_system_clock != clock() && internal_clock())
+	{
+		auto retime = [this](attotime remaining) {
+			if (remaining.is_never()) return remaining;
+			u64 ticks = remaining.as_ticks(m_system_clock);
+			if (attotime::from_ticks(ticks, m_system_clock) < remaining) ++ticks;
+			return attotime::from_ticks(ticks, clock());
+		};
+		if (m_internal_clock_stopped)
+			m_paused_bit_time = retime(m_paused_bit_time);
+		else if (m_bit_timer->enabled())
+			m_bit_timer->adjust(retime(m_bit_timer->remaining()));
+	}
+	m_system_clock = clock();
 }
 
 void tms320c54x_mcbsp_device::device_reset()

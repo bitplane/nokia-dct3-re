@@ -15,12 +15,14 @@ public:
 			device_t *owner, u32 clock);
 	void set_power_on_imr(u16 value) { m_power_on_imr = value; }
 	void set_extended_program(bool enabled) { m_extended_program = enabled; }
-	// Enables TI-family PLLSTATUS timing; execution-rate propagation is separate.
+	// Input clock for TI-family PLLSTATUS timing and optional rate selection.
 	void set_pll_reference_clock(u32 hz) { m_pll_reference_clock = hz; }
+	void set_follow_clkmd(bool enabled) { m_follow_clkmd = enabled; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
 	auto pll_clock_stop_cb() { return m_pll_clock_stop_cb.bind(); }
+	auto system_clock_cb() { return m_system_clock_cb.bind(); }
 
 	enum : unsigned
 	{
@@ -58,6 +60,7 @@ protected:
 	virtual void device_reset() override ATTR_COLD;
 	virtual void device_stop() override ATTR_COLD;
 	virtual void device_post_load() override;
+	virtual void device_clock_changed() override;
 
 	virtual u32 execute_min_cycles() const noexcept override { return 1; }
 	virtual u32 execute_max_cycles() const noexcept override { return 5; }
@@ -79,7 +82,9 @@ private:
 
 	TIMER_CALLBACK_MEMBER(timer_expired);
 	TIMER_CALLBACK_MEMBER(pll_transition_complete);
+	TIMER_CALLBACK_MEMBER(selected_clock_complete);
 	void write_clkmd(u16 value);
+	void publish_selected_clock();
 	void update_timer_counter();
 	void arm_timer();
 	u64 timer_remaining_ticks() const;
@@ -191,6 +196,12 @@ private:
 	bool m_extended_program = false;
 	u16 m_clkmd = 0;
 	u32 m_pll_reference_clock = 0;
+	bool m_follow_clkmd = false;
+	u32 m_reset_clock = 0;
+	u32 m_timer_clock = 0;
+	u32 m_pending_clock = 0;
+	emu_timer *m_clock_timer = nullptr;
+	devcb_write32 m_system_clock_cb;
 	bool m_pll_locked = false;
 	emu_timer *m_pll_timer = nullptr;
 	u16 m_tim = 0xffff;

@@ -18,6 +18,7 @@ tms320c54x_dma_device::tms320c54x_dma_device(machine_config const &config, char 
 void tms320c54x_dma_device::device_start()
 {
 	if (!clock()) fatalerror("C54x DMA requires a clock");
+	m_system_clock = clock();
 	for (auto &timer : m_timers) timer = timer_alloc(FUNC(tms320c54x_dma_device::transfer), this);
 	save_item(NAME(m_control));
 	save_item(NAME(m_index));
@@ -26,6 +27,7 @@ void tms320c54x_dma_device::device_start()
 	save_item(NAME(m_sync_levels));
 	save_item(NAME(m_pll_stopped));
 	save_item(NAME(m_paused_ticks));
+	save_item(NAME(m_system_clock));
 }
 
 void tms320c54x_dma_device::device_reset()
@@ -116,6 +118,18 @@ void tms320c54x_dma_device::pll_clock_stop_w(int state)
 	u32 const old_rate = transfer_clock();
 	m_pll_stopped = stopped;
 	u32 const new_rate = transfer_clock();
+	retime_transfers(old_rate, new_rate);
+}
+
+void tms320c54x_dma_device::device_clock_changed()
+{
+	if (m_system_clock && m_system_clock != clock() && !m_pll_stopped)
+		retime_transfers(m_system_clock, clock());
+	m_system_clock = clock();
+}
+
+void tms320c54x_dma_device::retime_transfers(u32 old_rate, u32 new_rate)
+{
 	for (unsigned channel = 0; channel < 6; ++channel)
 	{
 		u64 ticks = m_paused_ticks[channel];

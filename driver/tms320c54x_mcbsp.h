@@ -27,6 +27,7 @@ public:
 protected:
 	void device_start() override ATTR_COLD;
 	void device_reset() override ATTR_COLD;
+	void device_clock_changed() override;
 private:
 	TIMER_CALLBACK_MEMBER(bit_tick);
 	bool internal_clock() const;
@@ -49,6 +50,7 @@ private:
 	bool m_clock_input = false, m_frame_input = false, m_ready_pending = false;
 	bool m_async_bit = false;
 	bool m_internal_clock_stopped = false;
+	u32 m_system_clock = 0;
 	attotime m_paused_bit_time = attotime::never;
 	u16 m_frame_words = 0;
 	bool m_tx_frame_pending = false;
