@@ -1,0 +1,13 @@
+diff --git a/src/mame/mame.lst b/src/mame/mame.lst
+--- a/src/mame/mame.lst
++++ b/src/mame/mame.lst
+@@ -10,6 +10,9 @@
+ *******************************************************************************/
+ 
++@source:nokia/nokia_simi_test.cpp
++simitest
++
+ @source:access/acvirus.cpp
+ virusa
+ virusb
+ virusc

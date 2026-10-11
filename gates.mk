@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 713 gates: 515 generated from typed steps, 198 copied verbatim (shell).
+# 714 gates: 516 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -333,11 +333,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-late-pin-registration verify-5210-sim-pin-registration \
 	verify-sim-toolkit-interactive-5210 verify-sim-toolkit-5210 \
 	verify-sim-toolkit-state-roundtrip verify-sim-toolkit-removal \
-	verify-sim-nvram-atomic verify-sim-phonebook verify-sim-pin \
-	verify-sim-pin-unblock verify-sim-pin-state-roundtrip verify-sim-pin-removal \
-	verify-sim-pin-toggle verify-sim-pin-change verify-sim-pin-change-reject \
-	verify-sim-pin-v501 verify-frontier-stability verify-structure-subset \
-	verify-structure verify-radio-outgoing-call-sip \
+	verify-simi-restore verify-sim-nvram-atomic verify-sim-phonebook \
+	verify-sim-pin verify-sim-pin-unblock verify-sim-pin-state-roundtrip \
+	verify-sim-pin-removal verify-sim-pin-toggle verify-sim-pin-change \
+	verify-sim-pin-change-reject verify-sim-pin-v501 verify-frontier-stability \
+	verify-structure-subset verify-structure verify-radio-outgoing-call-sip \
 	verify-3330-radio-outgoing-call-sip verify-3330-radio-incoming-call-sip \
 	verify-3330-radio-incoming-call-sip-connected-restore \
 	verify-3330-radio-incoming-call-sip-cancel \
@@ -4546,6 +4546,9 @@ verify-sim-toolkit-removal:
 	mkdir -p $(RUN_DIR)/cfg; cp fixtures/sim_toolkit/default.cfg fixtures/sim_toolkit/noki3210.cfg $(RUN_DIR)/cfg/; \
 	$(MAKE) --no-print-directory run-captured $(DCT3_RUN_3210) RUN_DIR=$(RUN_DIR) SECONDS=18 PROVISIONED_IMEI_PREFIX=49015420323751 RUN_VERBOSE=1 RUN_EXTRA_ARGS='-cfg_directory $(abspath $(RUN_DIR))/cfg' RUN_ENV='NOKIA_DCT3_SIM_REMOVE_AT=13'; \
 	$(PYTHON) tools/sim_toolkit_trace_check.py $(RUN_DIR)/error.log $(RUN_DIR) --removal
+
+verify-simi-restore: build
+	$(PYTHON) tools/run_simi_restore.py $(RUN_DIR) --mame $(MAME_DIR)/mame
 
 verify-sim-nvram-atomic: build
 	$(PYTHON) tools/run_sim_nvram_atomic.py $(RUN_DIR) --mame $(MAME_DIR)/mame

@@ -92,7 +92,7 @@ schedules TX-ready and RX-ready on a timer, exposes RX bytes only when ready, an
 trailing event when the RX FIFO empties. A TX-only completion does not hide an
 already-readable character; newly returned card bytes are deferred before they
 become visible. The card may construct a complete T=0 response synchronously,
-so the controller retains a private serialization queue, but `0x39` exposes
+so the controller retains a private serialization queue, but `0x3c` exposes
 only the single character currently transferred to its receive holding register.
 
 Activation and T=0 traffic use the default ten-bit 9,600-bit/s character time,
@@ -100,6 +100,18 @@ approximately 1.042 ms per character. Although the synthetic ATR advertises TA1
 `0x05`, both ROMs answer PPS with `ff 00 ff`, retaining the default parameters.
 A bounded v6.00 trace observes consecutive ATR and PPS receive-register reads
 approximately 1.065 ms apart, with RX count one for each character.
+
+`verify-simi-restore` runs the development-only `simitest` controller/card
+composition without a handset CPU or ROM. It checkpoints SELECT MF with one
+body byte still in TX and the card awaiting that byte, then compares the replayed
+`9f 16` status and TX-empty/RX-ready sequence. A second checkpoint during GET
+RESPONSE replays the procedure byte, 22-byte MF metadata and `90 00` status,
+with identical RX-prefix, interrupt ordering and pending timer deadlines.
+Work started after restore is compared by elapsed time; already-pending RX
+events retain their saved absolute deadlines. Omitting the card's saved
+body-reception latch makes the first replay fail; the unmodified devices pass.
+This is executable save-state conformance for the selected transactions,
+not physical UART timing, every APDU boundary or handset service acceptance.
 
 ## Stateful card device
 
