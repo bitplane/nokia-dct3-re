@@ -1348,6 +1348,18 @@ private:
 				"Memory multiply syntax retains signed/rounded/unsigned distinction and BITT has no accumulator selector");
 		}
 		osd_printf_info("TMS320C54x memory multiply/bit disassembler: PASS forms=1792 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
+				for (unsigned shift = 0; shift < 32; ++shift)
+				{
+					words const buffer(pc, 0xf0e0 | (accumulators << 8) | shift, 0x2345);
+					std::ostringstream text, expected;
+					util::stream_format(expected, "SFTL    %c, %d, %c", accumulators & 2 ? 'B' : 'A',
+						shift & 16 ? int(shift) - 32 : int(shift), accumulators & 1 ? 'B' : 'A');
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1 && text.str() == expected.str(),
+						"SFTL decoder retains signed shift and logical mnemonic without extensions");
+				}
+		osd_printf_info("TMS320C54x logical shift disassembler: PASS forms=128 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

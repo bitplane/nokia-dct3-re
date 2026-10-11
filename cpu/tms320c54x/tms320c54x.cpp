@@ -415,12 +415,13 @@ public:
 		}
 		if ((op & 0xfce0) == 0xf460 || (op & 0xfce0) == 0xf440 || (op & 0xfce0) == 0xf0c0 ||
 			(op & 0xfce0) == 0xf400 || (op & 0xfce0) == 0xf420 ||
-			(op & 0xfce0) == 0xf080 || (op & 0xfce0) == 0xf0a0)
+			(op & 0xfce0) == 0xf080 || (op & 0xfce0) == 0xf0a0 || (op & 0xfce0) == 0xf0e0)
 		{
 			int const shift = (op & 0x10) ? int(op & 31) - 32 : int(op & 31);
 			char const *name = (op & 0xfce0) == 0xf460 ? "SFTA" : (op & 0xfce0) == 0xf440 ? "LD" :
 				(op & 0xfce0) == 0xf400 ? "ADD" : (op & 0xfce0) == 0xf420 ? "SUB" :
-				(op & 0xfce0) == 0xf080 ? "AND" : (op & 0xfce0) == 0xf0a0 ? "OR" : "XOR";
+				(op & 0xfce0) == 0xf080 ? "AND" : (op & 0xfce0) == 0xf0a0 ? "OR" :
+				(op & 0xfce0) == 0xf0e0 ? "SFTL" : "XOR";
 			util::stream_format(stream, "%-8s%c, %d, %c", name, BIT(op, 9) ? 'B' : 'A', shift, BIT(op, 8) ? 'B' : 'A');
 			return 1 | SUPPORTED;
 		}
