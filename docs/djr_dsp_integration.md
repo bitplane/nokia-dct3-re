@@ -1467,6 +1467,30 @@ the corresponding NSE-8 data/strobe pad identities have not been established.
 
 ## MAD2 hardware-acquisition routes
 
+### Retained MADos source reference
+
+The local source archive is
+`roms/research/nok-mados/Nok-MADos-c4b9591e243a74484e27becf343655bb459f99b7.tar.gz`,
+from [Nok-MADos](https://github.com/fandigunawan/Nok-MADos) revision
+`c4b9591e243a74484e27becf343655bb459f99b7`, with SHA-256
+`e568f33b16afecc05a9ae3cbb94590bf4eff2db0173d81ef568ad0ea27546802`.
+This LGPL source is a research reference, not code imported into the devices.
+
+`include/dspblocks/block00.h` through `block1B.h` preserve 28 upload
+descriptors, 20 with nonzero declared sizes. `hw/dspblocks.c` exposes blocks
+`00`, `01` and `14` as initialization, MDI setup and secondary initialization.
+These are upload payloads, not resident mask-ROM captures. Their product and
+firmware provenance must be established by byte comparison before any use in
+a handset configuration; archival MCU addresses alone do not establish it.
+
+Inspection of `hw/dsp.c`, `hw/m_dsp.c`, `hw/dspblocks.c` and their DSP headers
+does not identify the 8810 port-`0x36` completion-bit owner or its timing.
+The MCU SIMI offsets in `include/hw/ioports.h` are a separate address space
+and do not supply a DSP port mapping. This bounded negative result does not
+exclude other historical sources.
+
+### Capture boundary
+
 A September 2026 public-source census found no complete, reproducible MAD2 DSP
 proxy build. The current external emulator contains a remote-DSP transport and
 describes a work-in-progress bridge to a custom MADos handset image, but its
