@@ -20,6 +20,7 @@ cpu.debug:bpset(0x4cfdb0, nil,
     'logerror "plmn_search_stage_return: result=%08x stage=%04x\\n",r0,w@175454;g')
 local busy, posts, inputs = false, 0, 0
 local controller_posts = 0
+local search_requests = 0
 local input_taps, watched = {}, {}
 local owner_taps, owner_watched = {}, {}
 local owner_pointer_tap = space:install_write_tap(0x1711dc, 0x1711df,
@@ -54,6 +55,27 @@ local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
         busy = true
         local status = space:read_u16(object)
         busy = false
+        if task == 3 and status == 2 and search_requests < 12 then
+            busy = true
+            local kind = space:read_u8(object + 3)
+            local words = {space:read_u32(object), space:read_u32(object + 4)}
+            busy = false
+            if kind == 0x57 then
+                search_requests = search_requests + 1
+                machine:logerror(string.format(
+                    'plmn_search_request: object=%08x data=%08x%08x caller=%08x t=%.9f\n',
+                    object, words[1], words[2], cpu.state['R14'].value, machine.time:as_double()))
+                local read = false
+                input_taps[#input_taps + 1] = space:install_read_tap(object, object + 3,
+                    'plmn_search_request_' .. search_requests, function(offset, data, lanes)
+                        if busy or read then return end
+                        read = true
+                        machine:logerror(string.format(
+                            'plmn_search_request_read: object=%08x pc=%08x t=%.9f\n',
+                            object, cpu.state['PC'].value, machine.time:as_double()))
+                    end)
+            end
+        end
         if status == 0x3f5 and cpu.state['R14'].value == 0x3cc9fd then
             local stack = cpu.state['R13'].value
             if stack >= 0x100000 and stack + 20 < 0x180000 then

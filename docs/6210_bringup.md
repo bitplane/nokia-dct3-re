@@ -656,6 +656,14 @@ The static request constructor `3f2684` allocates and zeroes eight bytes,
 sets header 2, byte+2 to 4 and byte+3 to `57`, populates bytes+4/+5
 through `3f2226`, and posts to task 3 at `3f26c6`. These are own-ROM
 message fields, not yet an identified over-the-ring DSP primitive.
+Paired runtime capture records request bytes `0002045703050000` in both
+boots (foreign 10.323085154 s, national 10.327683077 s). Only foreign
+then sends `0002045703030000` at 10.616327769 s. Each is first read at
+`4ea0dc` after task-3 receive `4ea0d6`; own header-2 routing queues its
+pointer at `4ea1d0`. This establishes the actual bytes and queue ingress,
+not the final decoder or DSP primitive. Follow the queued object into
+the subsequent task-3 processing loop before assigning byte+5 semantics.
+Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
