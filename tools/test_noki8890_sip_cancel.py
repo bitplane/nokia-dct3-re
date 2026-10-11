@@ -43,6 +43,10 @@ class CleanupFramesTest(unittest.TestCase):
             run = Path(directory)
             (run / 'snap').mkdir()
             (run / 'console.log').write_text('')
+            (run / 'nvram/nsb6hle').mkdir(parents=True)
+            storage = bytearray(1611)
+            storage[1604:1609] = bytes.fromhex('00f1100001')
+            (run / 'nvram/nsb6hle/sim_card').write_bytes(storage)
             image = Image.new('L', (84, 48), 255)
             digest = hashlib.sha256(image.crop((0, 8, 84, 48)).tobytes()).hexdigest()
             for name in ('8890_registered_idle.png', '8890_after_outgoing_call.png'):
@@ -59,6 +63,12 @@ class CleanupFramesTest(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         check.check_outgoing_result(run)
                 (run / 'error.log').write_text(valid)
+                storage[1610] = 1
+                (run / 'nvram/nsb6hle/sim_card').write_bytes(storage)
+                with self.assertRaisesRegex(ValueError, 'persisted'):
+                    check.check_outgoing_result(run)
+                storage[1610] = 0
+                (run / 'nvram/nsb6hle/sim_card').write_bytes(storage)
                 Image.new('L', (84, 48), 0).save(run / 'snap/8890_after_outgoing_call.png')
                 with self.assertRaisesRegex(ValueError, 'reviewed idle'):
                     check.check_outgoing_result(run)

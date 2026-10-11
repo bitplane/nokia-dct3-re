@@ -66,6 +66,9 @@ def check_outgoing_result(run):
     verify_stage(text, runtime=True, selftest=True)
     if not re.search(r'gsm_call_adapter: network registered=1 arfcn=60\b', text):
         raise ValueError('host registration lacks own configured carrier')
+    storage = (run / 'nvram/nsb6hle/sim_card').read_bytes()
+    if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
+        raise ValueError('outgoing cleanup lacks persisted laboratory SIM location')
     send_at = text.find('8890_call_physical: action=send')
     if send_at < 0 or not re.search(r'8890_keypad_decoded: key=0e\b', text[send_at:]):
         raise ValueError('outgoing call lacks decoded physical Send')
@@ -103,6 +106,8 @@ def main():
     parser.add_argument('--restore-idle', action='store_true',
                         help='restore idle before admitting the fresh unanswered SIP call')
     outgoing = parser.add_mutually_exclusive_group()
+    outgoing.add_argument('--outgoing-connected-signaling', action='store_true',
+                          help='physically connect and end a real SIP dialog without speech acceptance')
     outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='physically dial 1234567 against a real SIP 486 response')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
@@ -115,7 +120,7 @@ def main():
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
-    outgoing_run = outgoing_failure or args.restore_outgoing_pending
+    outgoing_run = outgoing_failure or args.restore_outgoing_pending or args.outgoing_connected_signaling
     if args.restore_idle and (outgoing_run or args.restore_incoming_alerting):
         parser.error('--restore-idle cannot be combined with outgoing failure')
     root = Path(__file__).resolve().parents[1]
@@ -133,7 +138,7 @@ def main():
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
                        'noki8890_sip_outgoing_pending_restore.lua' if args.restore_outgoing_pending else
-                       'noki8890_outgoing_call_input.lua' if outgoing_failure else
+                       'noki8890_outgoing_call_input.lua' if outgoing_failure or args.outgoing_connected_signaling else
                        'noki8890_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
                        'noki8890_sip_idle_restore.lua' if args.restore_idle else
                        'noki8890_sip_cancel_observe.lua')),
@@ -144,7 +149,8 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8890',
-                   *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
+                   *(['--sip-response', '200', '--signaling-only'] if args.outgoing_connected_signaling else
+                     ['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
                       str(run / 'snap/8890_sip_registered_idle.png')] if args.restore_incoming_alerting else
@@ -157,6 +163,9 @@ def main():
                            check=True, timeout=180)
         if outgoing_run:
             check_outgoing_result(run)
+            if args.outgoing_connected_signaling:
+                from tools.noki8890_outgoing_call_check import verify as verify_outgoing
+                verify_outgoing((run / 'error.log').read_text(errors='replace'), configured_gsm900=True)
             if args.restore_outgoing_pending:
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'), outgoing=True)
         else:
@@ -166,7 +175,8 @@ def main():
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),
                         '--configured-gsm900', str(run / 'error.log')], check=True)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsb6hle', 'scenario': ('outgoing-sip-pending-restore' if args.restore_outgoing_pending else
+            'machine': 'nsb6hle', 'scenario': ('outgoing-sip-connected-signaling' if args.outgoing_connected_signaling else
+                                             'outgoing-sip-pending-restore' if args.restore_outgoing_pending else
                                              'incoming-sip-alerting-restore' if args.restore_incoming_alerting else
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else
                                              'outgoing-sip-busy' if args.outgoing_busy else 'incoming-sip-cancel'),

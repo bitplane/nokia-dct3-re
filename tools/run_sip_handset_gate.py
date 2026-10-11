@@ -240,6 +240,9 @@ def verify_success(root, remote_text, args):
             if args.product == '6250':
                 from tools.noki6250_call_check import verify_outgoing as verify_call
                 verify_call(log, number=number, configured_carrier=True)
+            elif args.product == '8890':
+                from tools.noki8890_outgoing_call_check import verify as verify_call
+                verify_call(log, number=number, configured_gsm900=True)
             else:
                 from tools.noki6210_outgoing_call_check import verify as verify_call
                 verify_call(log, number=number)
@@ -652,6 +655,11 @@ def main():
         args.sip_response == 200 and args.calls == 1 and not args.record_media and
         (not args.restore_call or (args.incoming and args.restore_phase == 'connected')) and
         (not args.restore_outgoing or not args.incoming) and not args.restore_idle and
+        not args.cancel_incoming)
+    signaling_connected = signaling_connected or (
+        args.signaling_only and args.product == '8890' and not args.incoming and
+        args.sip_response == 200 and args.calls == 1 and not args.record_media and
+        not args.restore_call and not args.restore_outgoing and not args.restore_idle and
         not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
         parser.error('--signaling-only requires a single verified product SIP-200 fixture, with connected restoration only')

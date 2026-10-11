@@ -12,7 +12,7 @@ from tools.run_sip_handset_gate import main, verify_success
 class ConnectedSignalingTest(unittest.TestCase):
     def test_signaling_scope_rejects_unproved_combinations(self):
         for options in (['--incoming'], ['--cancel-incoming'], ['--record-media'], ['--restore-call'],
-                        ['--product', '8890'], ['--sip-response', '486'], ['--calls', '2']):
+                        ['--product', '8890', '--incoming'], ['--sip-response', '486'], ['--calls', '2']):
             with self.subTest(options=options), \
                     patch('sys.argv', ['gate', '--pjsua', 'unused', '--run-dir', 'unused',
                                        '--product', '6210', '--signaling-only'] + options), \
@@ -33,7 +33,8 @@ class ConnectedSignalingTest(unittest.TestCase):
             (root / 'error.log').write_text(log)
             args = SimpleNamespace(product=product, incoming=incoming, signaling_only=True)
             remote = 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]'
-            checker = (('tools.noki6250_call_check.verify' if incoming else
+            checker = ('tools.noki8890_outgoing_call_check.verify' if product == '8890' else
+                       ('tools.noki6250_call_check.verify' if incoming else
                         'tools.noki6250_call_check.verify_outgoing') if product == '6250' else
                        'tools.noki6210_incoming_call_check.verify' if incoming else
                        'tools.noki6210_outgoing_call_check.verify')
@@ -43,11 +44,21 @@ class ConnectedSignalingTest(unittest.TestCase):
                     verify_call.assert_called_once_with(log, configured_carrier=True)
                 elif incoming:
                     verify_call.assert_called_once_with(log)
+                elif product == '8890':
+                    verify_call.assert_called_once_with(log, number='1234567', configured_gsm900=True)
                 elif product == '6250':
                     verify_call.assert_called_once_with(log, number='123', configured_carrier=True)
                 else:
                     verify_call.assert_called_once_with(log, number='1234567')
             return json.loads((root / 'sip-result.json').read_text())
+
+    def test_8890_uses_own_gsm900_checker_without_promoting_speech(self):
+        result = self.run_check({'uplink': 0, 'downlink': 300}, product='8890')
+        self.assertEqual(result['dialed_digits'], '1234567')
+        self.assertTrue(result['scope'].startswith('8890 '))
+        self.assertFalse(result['speech_tested'])
+        with self.assertRaises(RuntimeError):
+            self.run_check({'uplink': 1}, product='8890')
 
     def test_6250_uses_own_carrier_checker_without_promoting_speech(self):
         result = self.run_check({'uplink': 0, 'downlink': 300}, product='6250')

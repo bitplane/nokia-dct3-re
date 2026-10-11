@@ -458,6 +458,7 @@ The generic SIP runner rejects media-acceptance fixtures for signaling-only
 products `6210`, `6250` and `8890`. The 6210 additionally admits only the
 single incoming/outgoing SIP-200 `--signaling-only` fixtures described below.
 The 6250 admits its separately checked incoming/outgoing SIP-200 signaling fixtures;
+the 8890 admits only its separately checked outgoing SIP-200 signaling fixture.
 recording and multiple calls remain excluded. Connected restoration is
 limited to the independently verified signaling-only fixtures below.
 The 8210 and 8850 have narrowly scoped
@@ -563,6 +564,16 @@ own carrier-19 release confirmation, resumed paging and reviewed idle
 recovery must pass. The original Answer/confirmation identity is ordered
 before epoch change. Zero pre-reset uplink and no HLE codec tick exclude
 speech claims; external dialogs are cleared, never resurrected.
+
+`verify-8890-sip-connected-signaling` physically dials `1234567` and ends a
+real SIP-200 dialog on NSB-6 with unchanged own PMM. The own GSM900 carrier-60
+checker requires decoded Send/End, traffic assignment, CONNECT/acknowledgement,
+complete CC/RR release with product-owned configuration bodies and resumed
+paging. Reviewed pre/post idle pixels and persistent laboratory SIM location
+must hold. Zero bridge uplink and no HLE codec tick are required; remote PCM
+reception remains a host-side observation, not handset playback. Incoming
+answered SIP, recording, connected restoration and native speech remain
+unproved for this product.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:
