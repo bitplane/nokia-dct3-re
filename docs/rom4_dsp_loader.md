@@ -2162,13 +2162,23 @@ ISA coverage or a physical pipeline implementation.
 ### Native timing continuation
 
 `execute_run()` still recognizes interrupts before an instruction-atomic
-`execute_one()`. `service_interrupt()` performs acceptance, SP decrement,
-vector fetch and continuation write together and charges five aggregate
-cycles. The retained vector word and the delayed-transfer/INTM guards are
-saved state, but they are not independently clocked pipeline stages.
+`execute_one()`. Hardware interrupt entry now retains the accepted vector,
+source and continuation, then steps SP decrement, vector fetch/IACK and the
+stack write on separate CPU cycles. All entry continuation state is saved.
+The explicit IRQ/NMI fixture requires the stack write one cycle after vector
+fetch; retained-vector save/replay snapshots now interrupt entry before that
+write and verify its completion without a second fetch or acknowledgement.
+Reset and debugger redirection cancel the pending entry. The aggregate entry
+cost remains the existing calibrated five cycles; its residual cycle does not
+establish foreground drain or the complete physical pipeline.
+`check-c54x-core` requires the IRQ/NMI entry-spacing marker.
+`check-c54x-rom4-rf-boundary` retains 20,282 frame expiries, 648,096 RF reads
+and 1,519 port-`32` writes, with no port-`38/39` reads;
+`verify-5110-save-state` also passes. These protect the established native
+scan and restoration boundary, not RF acquisition or handset speech.
 
-The next implementation milestone is stage-owned request acceptance and
-in-flight instruction retirement, not another opcode-count increase. It
+The next implementation milestone is stage-owned request recognition and
+in-flight foreground instruction retirement, not another opcode-count increase. It
 must reproduce SPRU131G example 7-18's ordering: acceptance at cycle 3,
 INTR Decode at 4, SP decrement at 5, vector fetch/IACK and the preceding
 instruction's execution at 6, continuation stack write at 7, and first ISR

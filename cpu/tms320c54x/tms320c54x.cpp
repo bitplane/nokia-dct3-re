@@ -669,6 +669,10 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_nmi_asserted));
 	save_item(NAME(m_vector_prefetch_word));
 	save_item(NAME(m_vector_prefetch_valid));
+	save_item(NAME(m_interrupt_entry_stage));
+	save_item(NAME(m_interrupt_vector_pc));
+	save_item(NAME(m_interrupt_stack_address));
+	save_item(NAME(m_interrupt_ack_source));
 	save_item(NAME(m_clkmd));
 	save_item(NAME(m_tim));
 	save_item(NAME(m_prd));
@@ -747,6 +751,9 @@ void tms320c54x_device::device_reset()
 	m_op = 0;
 	m_vector_prefetch_word = 0;
 	m_vector_prefetch_valid = false;
+	m_interrupt_entry_stage = 0;
+	m_interrupt_vector_pc = m_interrupt_stack_address = 0;
+	m_interrupt_ack_source = 0;
 	m_a = 0;
 	m_b = 0;
 	m_t = 0;
@@ -887,10 +894,14 @@ u16 tms320c54x_device::fetch()
 void tms320c54x_device::state_import(const device_state_entry &entry)
 {
 	if (entry.index() == STATE_PC || entry.index() == STATE_XPC)
+	{
 		m_vector_prefetch_valid = false;
+		m_interrupt_entry_stage = 0;
+	}
 	if (entry.index() == STATE_GENPC || entry.index() == STATE_GENPCBASE)
 	{
 		m_vector_prefetch_valid = false; // A debugger redirect discards the retained fetch.
+		m_interrupt_entry_stage = 0;
 		m_pc = u16(m_debug_pc);
 		m_xpc = m_extended_program ? (m_debug_pc >> 16) & 0x7f : 0;
 	}
@@ -1434,6 +1445,28 @@ void tms320c54x_device::finish_repeats()
 
 bool tms320c54x_device::service_interrupt()
 {
+	if (m_interrupt_entry_stage)
+	{
+		// Entry micro-operations follow SPRU131G example 7-18. Foreground
+		// pipeline drain is still absent; recognition remains instruction-boundary.
+		switch (m_interrupt_entry_stage++)
+		{
+		case 1: m_interrupt_stack_address = --m_sp; break;
+		case 2:
+			standard_irq_callback(m_interrupt_ack_source, logical_program_address(m_rtn));
+			m_pc = m_interrupt_vector_pc;
+			m_vector_prefetch_word = fetch();
+			m_vector_prefetch_valid = true;
+			m_pc = m_interrupt_vector_pc;
+			break;
+		case 3: m_data.write_word(m_interrupt_stack_address, m_rtn); break;
+		case 4: // Retain the existing aggregate entry cost; foreground drain is not modeled.
+			m_interrupt_entry_stage = 0;
+			break;
+		}
+		--m_icount;
+		return true;
+	}
 	if (m_vector_prefetch_valid) return false; // Finish the accepted entry before recognizing another source.
 	// Maskable hardware sources occupy vectors 16..31 and map directly to
 	// IMR/IFR bits 0..15. PMST.IPTR selects their 128-word vector page.
@@ -1463,18 +1496,11 @@ bool tms320c54x_device::service_interrupt()
 	}
 	m_rtn = m_pc;
 	m_st1 |= 0x0800;
-	u16 const vector_pc = (m_pmst & 0xff80) | (vector << 2);
-	// SPRU131G example 7-18: INTR Access decrements SP before vector Fetch,
-	// but the continuation memory write follows Fetch at INTR Execute.
-	u16 const stack_address = --m_sp;
-	standard_irq_callback(acknowledged_source, logical_program_address(m_pc));
-	m_pc = vector_pc;
-	m_vector_prefetch_word = fetch();
-	m_vector_prefetch_valid = true;
-	m_data.write_word(stack_address, m_rtn);
-	m_pc = vector_pc;
+	m_interrupt_vector_pc = (m_pmst & 0xff80) | (vector << 2);
+	m_interrupt_ack_source = acknowledged_source;
+	m_interrupt_entry_stage = 1;
 	leave_idle();
-	m_icount -= 5;
+	--m_icount;
 	return true;
 }
 

@@ -112,6 +112,43 @@ private:
 		m_phase = 170000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_interrupt_entry_spacing_case(unsigned index)
+	{
+		m_cpu->reset();
+		m_vector_prefetch_tap.remove();
+		m_vector_stack_tap.remove();
+		m_vector_reads = m_entry_stack_writes = 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		auto &data = m_cpu->space(AS_DATA);
+		program.write_word(index ? 4 : 0x40, 0xf4e1);
+		data.write_word(0x0fff, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_vector_prefetch_tap = program.install_read_tap(index ? 4 : 0x40, index ? 4 : 0x40,
+			"entry_fetch_cycle", [this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				++m_vector_reads;
+				m_entry_fetch_cycle = m_cpu->total_cycles();
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+					m_cpu->space(AS_DATA).read_word(0x0fff) == 0xbeef,
+					"Entry Fetch follows SP Access and precedes the stack write");
+			});
+		m_vector_stack_tap = data.install_write_tap(0x0fff, 0x0fff,
+			"entry_write_cycle", [this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				++m_entry_stack_writes;
+				m_entry_stack_cycle = m_cpu->total_cycles();
+				expect(value == 0x0800 && m_vector_reads == 1,
+					"Entry Execute stacks the accepted continuation after one vector read");
+			});
+		m_phase = 180000 + index;
+		if (index) m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE);
+		else m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 1);
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_native_final_gap_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -20853,8 +20890,8 @@ private:
 			if (m_phase == 80000)
 			{
 				expect(m_vector_reads == 1 && m_vector_acks == 1 &&
-					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff && data.read_word(0x0fff) == 0x0800,
-					"Vector prefetch is acknowledged once and followed by the continuation stack write");
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff && data.read_word(0x0fff) == 0xbeef,
+					"Suspension after vector Fetch leaves the later continuation write pending");
 				expect(machine().scheduler().can_save(), "Vector prefetch checkpoint has no synchronized inputs");
 				if (m_vector_case >= 2)
 				{
@@ -20873,6 +20910,7 @@ private:
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					data.read_word(0x0fff) == 0x0800 &&
 					m_vector_reads == 1 && m_vector_acks == 1,
 					"Retained vector opcode executes once with its normally fetched extension");
 				if (m_phase == 80001)
@@ -21199,6 +21237,18 @@ private:
 				"Shifted ADD/SUB uses independent source and destination selectors and preserves the other accumulator");
 			if (index < 103) { start_shifted_arithmetic_selector_case(index + 1); return; }
 			osd_printf_info("TMS320C54x shifted arithmetic selectors: PASS cases=104 operations=2 selectors=4 shifts=-16,-1,0,1,15 sxm=0,1 pipeline_claim=0\n");
+			start_interrupt_entry_spacing_case(0); return;
+		}
+		if (m_phase >= 180000 && m_phase < 180002)
+		{
+			expect(m_vector_reads == 1 && m_entry_stack_writes == 1 &&
+				m_entry_stack_cycle == m_entry_fetch_cycle + 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+				"IRQ/NMI entry stack write is one CPU cycle after vector Fetch");
+			m_vector_prefetch_tap.remove();
+			m_vector_stack_tap.remove();
+			if (m_phase == 180000) { start_interrupt_entry_spacing_case(1); return; }
+			osd_printf_info("TMS320C54x interrupt entry stages: PASS sources=irq,nmi fetch_to_stack_cycles=1 pipeline_drain_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}
@@ -21635,6 +21685,8 @@ private:
 	u64 m_timer_probe_write_cycle = 0, m_timer_probe_mask_cycle = 0;
 	unsigned m_timer_probe_writes = 0, m_timer_probe_masks = 0;
 	unsigned m_vector_reads = 0, m_vector_acks = 0, m_vector_case = 0;
+	unsigned m_entry_stack_writes = 0;
+	u64 m_entry_fetch_cycle = 0, m_entry_stack_cycle = 0;
 	std::stringstream m_saved_vector;
 	u64 m_timer_probe_reload_cycle = 0, m_timer_probe_first_entry_cycle = 0;
 	unsigned m_timer_probe_entries = 0;
