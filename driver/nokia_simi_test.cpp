@@ -18,6 +18,7 @@ public:
 	{
 		NOKIA_SIMI(config, m_simi);
 		NOKIA_SIM_CARD(config, m_card);
+		m_card->set_subscriber_profile(gsm::subscriber::laboratory);
 		m_simi->set_enabled(true);
 		m_simi->set_card_present(true);
 		m_simi->card_activate_cb().set(m_card, FUNC(nokia_sim_card_device::activate_w));
@@ -79,7 +80,14 @@ private:
 		{0xd6, 0, 11, 1, 0x99, 0x94, 2},
 		{0xb0, 0, 10, 1, 0x66, 0x90, 0},
 		{0xb0, 0, 11, 1, 0, 0x94, 2},
-		{0xb0, 0, 0, 1, 0x55, 0x90, 0}
+		{0xb0, 0, 0, 1, 0x55, 0x90, 0},
+		{0x88, 1, 0, 16, 0x5a, 0x6b, 0},
+		{0x88, 0, 1, 16, 0x5a, 0x6b, 0},
+		{0x88, 0, 0, 15, 0x5a, 0x67, 0},
+		{0x88, 0, 0, 17, 0x5a, 0x67, 0},
+		{0x88, 0, 0, 0, 0, 0x67, 0},
+		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
+		{0xc0, 0, 0, 12, 0, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -151,7 +159,7 @@ private:
 	{
 		auto const &item = WRITE_CASES[m_write_case];
 		transmit({0xa0, item.ins, item.p1, item.p2, item.length});
-		bool const reading = item.ins == 0xb2 || item.ins == 0xb0;
+		bool const reading = item.ins == 0xb2 || item.ins == 0xb0 || item.ins == 0xc0 || !item.length;
 		m_phase = reading ? 30 : 29;
 		m_timer->adjust(attotime::from_msec(reading ? 40 : 5));
 	}
@@ -395,7 +403,18 @@ private:
 		case 30:
 		{
 			auto const &item = WRITE_CASES[m_write_case];
-			if ((item.ins == 0xb2 || item.ins == 0xb0) && item.sw1 == 0x90)
+			if (item.ins == 0xc0)
+			{
+				gsm::a3a8::block rand;
+				rand.fill(0x5a);
+				auto const result = gsm::a3a8::aes_example(gsm::subscriber::laboratory.ki, rand);
+				expect(m_count == 15 && m_bytes[0] == 0xc0 && m_bytes[13] == 0x90 && m_bytes[14] == 0,
+					"authentication response framing");
+				expect(std::equal(result.sres.begin(), result.sres.end(), m_bytes + 1) &&
+					std::equal(result.kc.begin(), result.kc.end(), m_bytes + 5),
+					"valid authentication after malformed commands returns laboratory SRES and Kc");
+			}
+			else if ((item.ins == 0xb2 || item.ins == 0xb0) && item.sw1 == 0x90)
 			{
 				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == item.ins &&
 					m_bytes[m_count - 2] == 0x90 && m_bytes[m_count - 1] == 0, "record-write readback response");
@@ -414,9 +433,11 @@ private:
 			if (m_write_case == 9) restore_checkpoint();
 			if (m_write_case == 29)
 				osd_printf_info("SIM record updates: PASS cases=30 linear_mutation=1 failure_preservation=1 state_restore=1 cyclic_previous_only=1 handset_claim=0\n");
+			if (m_write_case == 44)
+				osd_printf_info("SIM binary offsets: PASS cases=14 full_high_byte=1 failed_write_preserves_data=1 boundary_readback=1 handset_claim=0\n");
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
-			osd_printf_info("SIM binary offsets: PASS cases=14 full_high_byte=1 failed_write_preserves_data=1 boundary_readback=1 handset_claim=0\n");
+			osd_printf_info("SIM authentication parameters: PASS invalid_parameters=2 invalid_lengths=3 following_authentication=1 laboratory_algorithm=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

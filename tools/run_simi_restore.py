@@ -10,11 +10,12 @@ PARAMETER_PASS = "SIM card parameter conformance: PASS reserved_parameters=6 sel
 RECORD_PASS = "SIM record addressing: PASS cases=11 linear_no_wrap=1 absolute_preserves_pointer=1 current_record=1 mode_validation=1 handset_claim=0"
 UPDATE_PASS = "SIM record updates: PASS cases=30 linear_mutation=1 failure_preservation=1 state_restore=1 cyclic_previous_only=1 handset_claim=0"
 BINARY_PASS = "SIM binary offsets: PASS cases=14 full_high_byte=1 failed_write_preserves_data=1 boundary_readback=1 handset_claim=0"
+AUTH_PASS = "SIM authentication parameters: PASS invalid_parameters=2 invalid_lengths=3 following_authentication=1 laboratory_algorithm=1 handset_claim=0"
 
 
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -45,6 +46,8 @@ def main():
             "record_addressing_cases": 11,
             "record_update_cases": 30, "record_update_restore": True,
             "binary_offset_cases": 14, "full_binary_offset": True,
+            "authentication_parameter_cases": 2, "authentication_length_cases": 3,
+            "following_laboratory_authentication": True,
             "fixture_class": "controller/card conformance", "handset_claim": False,
         }, indent=2) + "\n")
     except (OSError, ValueError, subprocess.SubprocessError) as error:
@@ -55,6 +58,7 @@ def main():
     print(RECORD_PASS)
     print(UPDATE_PASS)
     print(BINARY_PASS)
+    print(AUTH_PASS)
 
 
 if __name__ == "__main__":

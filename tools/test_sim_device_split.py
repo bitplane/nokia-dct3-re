@@ -202,7 +202,6 @@ class SimDeviceSplitTest(unittest.TestCase):
         for token in (
             "authentication_profile::none",
             "void nokia_sim_card_device::run_gsm_algorithm()",
-            "m_p1 != 0 || m_p2 != 0 || m_tx_len != 16",
             "gsm::a3a8::aes_example(m_ki, rand)",
             "m_pending_response_len =",
             "queue_status(0x9f, m_pending_response_len)",

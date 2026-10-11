@@ -1072,12 +1072,21 @@ void nokia_sim_card_device::accept_envelope()
 
 void nokia_sim_card_device::run_gsm_algorithm()
 {
-	// GSM 11.11 9.2.11: P1/P2 are zero and the command body is the 16-byte
+	// GSM 11.11 9.2.16: P1/P2 are zero and the command body is the 16-byte
 	// RAND.  A successful card returns SRES || Kc through GET RESPONSE.
-	if (m_p1 != 0 || m_p2 != 0 || m_tx_len != 16 ||
-			m_authentication_profile == authentication_profile::none)
+	if (m_authentication_profile == authentication_profile::none)
 	{
 		queue_status(0x6d, 0x00);
+		return;
+	}
+	if (m_p1 != 0 || m_p2 != 0)
+	{
+		queue_status(0x6b, 0x00);
+		return;
+	}
+	if (m_tx_len != 16)
+	{
+		queue_status(0x67, 0x00);
 		return;
 	}
 

@@ -186,6 +186,14 @@ binary transactions on EF_LOCI check high-byte offsets `80` and `FF`, the
 last valid byte, the first invalid byte and readback after rejected writes.
 These are serial-path card conformance checks, not new handset capabilities.
 
+With an authentication algorithm selected, RUN GSM ALGORITHM rejects nonzero
+`P1/P2` with `6B 00` and a RAND length other than sixteen with `67 00`
+(GSM 11.11 sections 9.2.16 and 9.4.5). With no algorithm selected it remains
+unsupported (`6D 00`). The isolated fixture rejects two parameter cases and
+lengths zero, fifteen and seventeen, then checks a valid laboratory RAND and
+the twelve-byte SRES/Kc response. This checks parser recovery and framing;
+the independent algorithm vector gate remains the cryptographic oracle.
+
 The implemented surface is classified by ownership and evidence:
 
 | Surface | Classification | Basis and limitation |
