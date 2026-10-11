@@ -473,12 +473,26 @@ the passive taps do not establish a global absence proof.
 A static predecessor exists: `31321e` loads `09fd`, branches to `313156`,
 and calls publisher `3ccbec` with R1/R3 zero and the existing stack+12
 argument in R2. That publisher copies the status into its message header.
-The invocation conditions and destination for this candidate are not yet
-closed. Both sides of the candidate chain are pinned to the own ROM;
-no synthetic completion is justified.
+The local selector compares saved stack+8 with `07f4` at `312e1e..312e24`
+(literal `313184`) and branches from `312e26` to `313218` on equality.
+For status `09fd`, publisher `3ccbec` subtracts `080b`, `60`, `ff` and
+`8d`, selecting index 6 of its twelve-entry table. Entry `3ccc84` points
+to `3cccf0`: it frees the temporary message, writes the status into the
+pre-existing object at `[172fa4+10]`, and posts that object to task 17
+through `3ccd3c/3ccd44`. This is a static destination contract, not an
+observed completion or proof that ordinary selection produces `07f4`.
+No synthetic completion is justified.
 Evidence: `tmp/6210-plmn-completion-dispatch-{national,international}/error.log.gz`.
-Current unresolved boundary: the lifecycle selecting the `31321e` producer
-and its downstream route, alongside the handler's alternative `1580` route.
+An aligned 32-bit literal scan of the complete acquired image finds two
+`07f4` literals: selector `313184` and publisher pool `4cffb4`. The latter
+has a Thumb literal-load reference at `4cfdde` in routine `4cfdd4`, which
+allocates a 12-byte object, writes its header and payload, and posts to
+task 18 at `4cfe1e`. An image-wide direct Thumb BL candidate scan finds
+one call to that entry, at `2d1126`. This does not cover indirect calls,
+arithmetic status construction or data-driven publication.
+Current unresolved boundary: the lifecycle selecting caller `2d1126`
+and ownership of the pre-existing completion object, alongside
+the handler's alternative `1580` route.
 No operational international-roaming contract is
 established by these observations.
 
