@@ -210,6 +210,15 @@ public:
 			}
 			return 2 | SUPPORTED;
 		}
+		if (family == 0x7c00)
+		{
+			bool const extended = mode >= 0xe0;
+			u16 const first = next_word();
+			u16 const second = extended ? next_word(2) : 0;
+			util::stream_format(stream, "MVPD    $%04X, ", mode >= 0xf8 ? second : first);
+			smem(mode >= 0xf8 ? first : second);
+			return (2 + extended) | SUPPORTED;
+		}
 		if (family == 0x4b00 || family == 0x8b00 || family == 0x7f00)
 		{
 			bool const extended = mode >= 0xe0;
@@ -2752,20 +2761,19 @@ void tms320c54x_device::execute_one(u16 op)
 			u16(m_pc - 1) == m_rpt_address;
 		u16 destination;
 		u16 source;
-		if (low == 0xf8)
+		if (low >= 0xf8)
 		{
-			destination = fetch();
+			destination = prepare_smem_address(low);
 			source = fetch();
 		}
 		else
 		{
 			source = fetch();
-			destination = low >= 0xe0 ? long_offset_address(low) : short_smem_address(low);
+			destination = prepare_smem_address(low);
 		}
 		const u16 value = m_program.read_word(program_address(u16(source + (repeated ? m_rpt_iteration : 0))));
 		data_write(destination, value);
-		if (low >= 0x80 && low < 0xe0)
-			indirect_modify(low);
+		finish_smem_access(low);
 		if (!repeated || !m_rpt_iteration)
 			m_icount -= low >= 0xe0 ? 3 : 2;
 		return;

@@ -239,10 +239,10 @@ private:
 		m_cpu->reset();
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
-		unsigned const family = index >= 25 ? 6 + (index - 25) / 4 : index / 4;
-		unsigned const form = index >= 25 ? (index - 25) % 4 : index % 4;
-		static constexpr u16 families[] = { 0x7100, 0x7d00, 0x7500, 0x7400, 0x7e00, 0x7000, 0x6000, 0x6100, 0x8b00, 0x7f00 };
-		static constexpr u8 modes[] = { 0x00, 0x92, 0xe2, 0xf8 };
+		unsigned const family = index >= 45 ? 10 : index >= 25 ? 6 + (index - 25) / 4 : index / 4;
+		unsigned const form = index == 45 ? 4 : index >= 46 ? 3 : index >= 25 ? (index - 25) % 4 : index % 4;
+		static constexpr u16 families[] = { 0x7100, 0x7d00, 0x7500, 0x7400, 0x7e00, 0x7000, 0x6000, 0x6100, 0x8b00, 0x7f00, 0x7c00 };
+		static constexpr u8 modes[] = { 0x00, 0x92, 0xe2, 0xf8, 0x9a };
 		static constexpr u16 operands[] = { 0x0700, 0x0700, 0x0124, 0x0123, 0, 0x0700, 0xbeef, 0x8000 };
 		u16 pc = 0x0800;
 		if (index == 24)
@@ -252,10 +252,15 @@ private:
 		}
 		else
 		{
-			program.write_word(pc++, families[family] | modes[form]);
+			program.write_word(pc++, families[family] | (index >= 46 ? 0xf9 + index - 46 : modes[form]));
 			if (form == 2)
 			{
-				if (family == 0 || family == 4 || family == 5 || family >= 6)
+				if (family == 10)
+				{
+					program.write_word(pc++, 0x0900);
+					program.write_word(pc++, 5);
+				}
+				else if (family == 0 || family == 4 || family == 5 || family >= 6)
 				{
 					program.write_word(pc++, 5);
 					if (family != 4 && family < 8) program.write_word(pc++, operands[family]);
@@ -269,6 +274,7 @@ private:
 			else
 			{
 				if (form == 3) program.write_word(pc++, 0x0600);
+				if (family == 10) program.write_word(pc++, 0x0900);
 				if (family != 4 && family < 8) program.write_word(pc++, operands[family]);
 			}
 		}
@@ -276,10 +282,11 @@ private:
 		program.write_word(pc, 0xf4e1);
 		program.write_word(0x0900, family == 9 ? 0xdead : 0xbeef);
 		program.write_word(0x0700, 0);
-		data.write_word(0x0600, family == 8 ? 0xdead : 0xbeef); data.write_word(0x0601, 0xcafe);
+		data.write_word(0x0600, family == 8 || family == 10 ? 0xdead : 0xbeef); data.write_word(0x0601, 0xcafe);
+		data.write_word(0x05ff, 0xcafe);
 		data.write_word(0x0700, family == 5 || family == 8 ? 0xbeef : 0);
 		if (family == 8) m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x0700);
-		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, form == 2 ? 0x05fb : 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, form == 4 ? 0x05ff : form == 2 ? 0x05fb : 0x0600);
 		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0601);
 		m_cpu->set_state_int(tms320c54x_device::STATE_A, index == 24 ? 0 : 0x0900);
 		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
@@ -1549,6 +1556,30 @@ private:
 				"Short shifted store syntax retains unsigned shift and dual address modifier");
 		}
 		osd_printf_info("TMS320C54x short shifted store disassembler: PASS forms=1024 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned mode = 0; mode < 256; ++mode)
+			{
+				words const buffer(pc, 0x7c00 | mode, 0x2345, 0x6789);
+				std::ostringstream text;
+				unsigned const length = mode >= 0xe0 ? 3 : 2;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 3 ? 7 : 3),
+					"MVPD fetches only its program address and any destination extension across page wrap");
+			}
+		vector const mvpd_forms[] = {
+			{0x7c12, 2 | dasm::SUPPORTED, "MVPD    $2345, $12"},
+			{0x7c92, 2 | dasm::SUPPORTED, "MVPD    $2345, *AR2+"},
+			{0x7ce2, 3 | dasm::SUPPORTED, "MVPD    $2345, *AR2($6789)"},
+			{0x7cea, 3 | dasm::SUPPORTED, "MVPD    $2345, *+AR2($6789)"},
+			{0x7cf8, 3 | dasm::SUPPORTED, "MVPD    $6789, *($2345)"},
+		};
+		for (auto const &test : mvpd_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345, 0x6789);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"MVPD syntax distinguishes long-offset and absolute extension order");
+		}
+		osd_printf_info("TMS320C54x MVPD disassembler: PASS forms=256 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
@@ -20858,11 +20889,11 @@ private:
 			osd_printf_info("TMS320C54x loop XC protection: PASS cases=4 body_words=1,2 sources=irq,nmi\n");
 			start_operand_fetch_case(0); return;
 		}
-		if (m_phase >= 86000 && m_phase < 86041)
+		if (m_phase >= 86000 && m_phase < 86053)
 		{
 			unsigned const index = m_phase - 86000;
-			unsigned const family = index >= 25 ? 6 + (index - 25) / 4 : index / 4;
-			unsigned const form = index >= 25 ? (index - 25) % 4 : index % 4;
+			unsigned const family = index >= 45 ? 10 : index >= 25 ? 6 + (index - 25) / 4 : index / 4;
+			unsigned const form = index == 45 ? 4 : index >= 46 ? 3 : index >= 25 ? (index - 25) % 4 : index % 4;
 			osd_printf_info("C54x operand fetch case=%u extensions=%u reads=%u early_read=%u\n",
 				index, m_operand_extension_count, m_operand_reads, m_operand_order_violation);
 			m_operand_fetch_tap.remove(); m_operand_data_tap.remove();
@@ -20886,11 +20917,13 @@ private:
 					data.read_word(0x0700) == 0xbeef, "POPD increments SP once and preserves popped stack contents");
 				if (family == 9) expect(m_cpu->space(AS_PROGRAM).read_word(0x0900) == 0xbeef &&
 					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x0900, "WRITA writes the distinct program destination without changing A");
+				if (family == 10) expect(data.read_word(0x05ff) == 0xcafe &&
+					m_cpu->space(AS_PROGRAM).read_word(0x0900) == 0xbeef, "MVPD preserves the preceding destination and program source");
 				expect(m_cpu->state_int(tms320c54x_device::STATE_AR2) ==
 					(form == 1 ? 0x0601 : form == 2 ? 0x05fb : 0x0600), "Address modifier preserved");
 			}
-			if (index < 40) { start_operand_fetch_case(index + 1); return; }
-			osd_printf_info("TMS320C54x operand fetch order: PASS cases=41 families=11 forms=direct,indirect,long,absolute\n");
+			if (index < 52) { start_operand_fetch_case(index + 1); return; }
+			osd_printf_info("TMS320C54x operand fetch order: PASS cases=53 families=12 forms=direct,indirect,long,absolute,preincrement\n");
 			start_cala_rtn_case(0); return;
 		}
 		if (m_phase >= 87000 && m_phase < 87004)

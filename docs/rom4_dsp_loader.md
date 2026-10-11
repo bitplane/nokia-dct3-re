@@ -877,10 +877,11 @@ interrupt pipeline.
 5110 save-state round trip and original MU4 storage/native entry. The separate
 timer observation still exposes short-period starvation.
 Operand-fetch conformance separates Smem address preparation from its read/write
-so MVDK, MVDP, PORTW, PORTR, READA, MVKD, CMPM, BITF, POPD and WRITA fetch their instruction extensions
+so MVDK, MVDP, PORTW, PORTR, READA, MVKD, CMPM, BITF, POPD, WRITA and MVPD fetch their instruction extensions
 before reading data, I/O or program operands. FIRS likewise fetches its coefficient
-address before reading X/Y. Forty-one passive bus-tap cases cover direct,
-postincrement, long-offset and absolute forms plus FIRS; the runner requires
+address before reading X/Y. Fifty-three passive bus-tap cases cover direct,
+postincrement, long-offset and absolute forms plus FIRS, MVPD preincrement
+and all eight MVPD absolute-address encodings; the runner requires
 `TMS320C54x operand fetch order: PASS`. The original MVDK direct case reads
 data before its destination extension and fails this check. The original CMPM
 direct case independently fails before its immediate fetch. Comparison/test
@@ -891,8 +892,14 @@ Its four forms also check a distinct destination sentinel, unchanged stack word,
 single SP increment and selected pointer updates.
 WRITA's four forms additionally check a distinct program destination and
 unchanged accumulator A; they verify existing execution, without a timing change.
-Instruction-family
-extension layouts, address updates and aggregate cycle charges remain unchanged.
+MVPD's preincrement negative control writes the old destination, failing the
+distinct destination sentinel in `tmp/c54x-mvpd-preincrement-red.log`.
+Shared address preparation now increments before the write and completion
+does not increment a second time (SPRU131G table 5-4, MOD 3). The preceding
+destination and program source remain unchanged. MOD 15's unused AR bits
+use the same absolute address-before-pmad order for all eight encodings.
+Instruction-family extension layouts and aggregate cycle charges remain unchanged;
+MVPD's preincrement ordering is the separately evidenced correction above.
 This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
 Access-stage address-update timing, overlapping execution or interrupt drain.
 
@@ -1731,7 +1738,7 @@ the actual debugger decoder and synthetic zero extensions without target
 memory accesses. `tools/c54x_opcode_coverage.py --frontend-report` requires a
 consistent decoder record for every observed word, rejects invalid lengths
 and ranks unsupported forms as `length=unknown`; raw-word fallback is never
-promoted to a boundary. Current cold-idle coverage is 614 decoded and 12
+promoted to a boundary. Current cold-idle coverage is 617 decoded and 9
 unsupported forms. This measures frontend coverage, not silicon legality or
 pipeline timing. Conditional BC/CC/XC and unshifted Smem loads now have
 reviewed boundaries; the isolated report ranks the remaining unsupported
@@ -1792,6 +1799,13 @@ reads on two program pages and four exact syntax cases. Its required marker is
 `TMS320C54x WRITA disassembler: PASS` (SPRU172C, WRITA). Separate executable
 fetch-order cases validate its existing data-to-program transfer, not physical
 pipeline or repeat timing.
+
+MVPD decodes all 256 destination-address forms on two program pages with
+five exact syntax cases. Long offsets follow pmad; absolute addresses precede
+it, matching the independently tested execution layouts. The required marker
+is `TMS320C54x MVPD disassembler: PASS` (SPRU172C, MVPD; SPRU131G
+section 5.5.3.2). Separate passive bus-tap fixtures validate Fetch-before-Read
+and destination effects; neither proves physical pipeline stages or wait states.
 
 Parallel ST/LD decodes 1,536 one-word forms: four accumulator source/destination
 combinations and two accumulator-to-T variants across all dual-memory modifiers.
