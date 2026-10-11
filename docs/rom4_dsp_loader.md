@@ -910,16 +910,22 @@ MVPD's preincrement ordering is the separately evidenced correction above.
 This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
 Access-stage address-update timing, overlapping execution or interrupt drain.
 
-The architectural BRAF correction deliberately changes the exact native NSE-1 scan snapshot:
-two isolated 30-second cold runs (`tmp/nse1-braf-control/error.log` and
-`tmp/nse1-braf-bus/error.log`) reproduce 20,282 frame expiries, 648,096 RF
-reads and 1,519 port-32 writes. The checker re-banks those exact counts and
-the observed programming sequence; a negative test rejects the previous
-private-latch snapshot rather than accepting both. Frame-30 activation,
-32-word read cadence, firmware queue producers, IMR `035f` and zero
-port-38/39 reads remain required. Native Phone book menu, save-state and
-original MU4 storage/native-entry gates pass. This is a deterministic emulator
-regression snapshot, not measured RF timing or acquisition.
+The RF checker retains the BRAF-era exact snapshot established in commit
+`cd3dbd10`: 20,282 frame expiries, 648,096 RF reads and 1,519 port-32 writes.
+It also requires the programming sequence, frame-30 activation, 32-word read
+cadence, firmware queue producers, IMR `035f` and zero port-38/39 reads.
+This is an emulator regression snapshot, not measured RF timing or acquisition.
+
+The current isolated 30-second cold gate fails that snapshot: 20,285 frame
+expiries, 648,192 RF reads and 1,520 port-32 writes (deltas +3/+96/+1).
+Evidence: `tmp/c54x-rf-snapshot-audit.log`; the gate generates this handset's
+own EEPROM profile and fresh flash state, not retained or donor provisioning.
+The checker reports measured deltas without accepting either alternate counts
+or a changed sequence. Its unit tests cover count-only drift, changed prefix
+and missing records. The native save-state gate passes separately; it does
+not make this RF gate green. Snapshot provenance remains unresolved and must
+be explained before deliberately re-banking or attributing the drift to a
+hardware correction.
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free
 instruction cases write PRD `1234`, reload with TSS set and each TDDR value,

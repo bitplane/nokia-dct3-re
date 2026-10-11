@@ -70,13 +70,31 @@ def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> d
         expected_writes += [(sequence, 0x2727 + sequence - 8, 0x30, 0x4028)
                             for sequence in range(8, 17)]
         if (result["frame_expiries"], result["rf_reads"]) != (20282, 648096):
-            raise ValueError("30-second scan frame/read snapshot changed")
+            raise ValueError(
+                "30-second scan frame/read snapshot changed: "
+                f"frames={result['frame_expiries']} expected=20282 "
+                f"delta={result['frame_expiries'] - 20282:+d}; "
+                f"rf_reads={result['rf_reads']} expected=648096 "
+                f"delta={result['rf_reads'] - 648096:+d}; "
+                f"rf_port32_writes={result['rf_port32_writes']} expected={expected_count} "
+                f"delta={result['rf_port32_writes'] - expected_count:+d}"
+            )
         if not re.search(r"space=io direction=write address=000e value=0546 mask=ffff pc=0959\b", text):
             raise ValueError("missing uploaded scan reload")
         if not re.search(r"rom4_speech_state: address=0284 value=007c mask=ffff pc=3d8f\b.*t=6\.", text):
             raise ValueError("missing later search-list selector")
     if result["rf_port32_writes"] != expected_count or writes != expected_writes:
-        raise ValueError("fresh-profile RF port sequence changed")
+        first_difference = next(
+            (index for index in range(max(len(writes), len(expected_writes)))
+             if writes[index:index + 1] != expected_writes[index:index + 1]), None
+        )
+        raise ValueError(
+            "fresh-profile RF port sequence changed: "
+            f"count={result['rf_port32_writes']} expected={expected_count}; "
+            f"first_difference={first_difference}; "
+            f"observed={writes[first_difference:first_difference + 1] if first_difference is not None else []}; "
+            f"expected={expected_writes[first_difference:first_difference + 1] if first_difference is not None else []}"
+        )
     # FIQ1 TX completion exposes this additional firmware-owned queue item.
     # Require its producer, rather than accepting a bare synthetic port pair.
     for address, value in (("1922", "0041"), ("1923", "0040")):
