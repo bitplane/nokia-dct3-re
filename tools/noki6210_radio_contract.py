@@ -15,6 +15,15 @@ def verify(image):
         raise ValueError('own thirteen-entry DSP RX table differs')
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     expected = {
+        0x2a12bc: ('movs', 'r0, #0x13'),
+        0x2a12c2: ('bl', '#0x2a0b70'),
+        0x2a0d5a: ('cmp', 'r2, #5'),
+        0x2a0d5e: ('ldrb', 'r0, [r4, #1]'),
+        0x2a0d60: ('lsrs', 'r0, r0, #4'),
+        0x2a0d62: ('cmp', 'r0, #0xf'),
+        0x2a0d64: ('bne', '#0x2a0d76'),
+        0x2a12d6: ('bne', '#0x2a1332'),
+        0x2a1332: ('movs', 'r5, #0x66'),
         0x29fb68: ('movs', 'r0, #0x31'),
         0x29fb6a: ('strb', 'r0, [r6, #5]'),
         0x29fb6c: ('ldr', 'r0, [pc, #0x1d8]'),

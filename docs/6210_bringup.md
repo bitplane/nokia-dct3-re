@@ -866,6 +866,28 @@ These instruction sites are pinned by `noki6210_radio_contract.py`.
 Evidence: `tmp/6210-foreign-mm-cause-writer/error.log.gz`; the watch and
 transmit observation change no firmware state.
 
+The mandatory-field failure is now identified, not an unknown response
+shape. Location Updating Accept enters `2a12b8`, calls `2a0b70` with IE
+selector `13`, then checks the parse-status byte. The LAI branch at
+`2a0d5a` requires at least five bytes and requires the high nibble of
+LAI byte 1 to equal `F` (`2a0d5e..2a0d64`). The foreign cell's
+`1300620001` has nibble 0 there, denoting a three-digit MNC. A fresh passive
+run observes that exact LAI and nibble 0 at the comparison, then message
+type 2 reaching the `2a1332` error return. This is an own-ROM mandatory LAI
+parser restriction, not an unanswered DSP packet or missing SIM write.
+`noki6210_lai_check.py` executes the complete parser for all sixteen
+nibbles and lengths 0..6: all 112 cases return, and only filler `F` with
+length >= 5 is accepted. This isolated test does not modify a live phone.
+Runtime evidence: `tmp/6210-mm-lai-mnc-gate/error.log.gz`.
+
+Do not patch this validator or relabel `310-260` as a two-digit-MNC cell.
+The next supported roaming fixture should use a separately configured,
+standards-valid foreign two-digit-MNC laboratory cell and require both
+Layer-3 acceptance and persistent EF_LOCI. Retain `310-260` as a negative
+compatibility case. Three-digit-MNC support on this ROM remains unavailable
+through this decoded acceptance path; broader product support is a separate
+cross-ROM question.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require
