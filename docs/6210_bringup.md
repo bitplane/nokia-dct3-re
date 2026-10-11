@@ -300,8 +300,24 @@ registers, releases and persists LAI `00f1200001`/status 0. Thus the negative
 result is tied to retained FPLMN rather than merely an unresponsive peer.
 
 International visited PLMN 310-260 remains a separate unresolved selection
-case: a 90-second observation reads PLMNsel and receives 57 SI3 blocks but
-emits no random access. The same-country 001-02 proof does not establish why
+case. Paired fresh 90-second research-HLE controls use the acquired NPE-3 PMM,
+the same unchanged home IMSI, no PIN, coherent ARFCNs 35/36 and acceptance
+policy. Only the external preferred PLMN and serving PLMN differ:
+
+| Visited PLMN | Preferred-list reads | SI3 deliveries | Random-access-phase TX packets | Location Updating acceptance acknowledgements |
+| --- | ---: | ---: | ---: | ---: |
+| 001-02 (`00f120`) | 1 | 65 | 3 | 1 |
+| 310-260 (`130062`) | 1 | 57 | 0 | 0 |
+
+The captured SI3 PLMN bytes match each configured network, so the difference
+is not an untested selector or absent broadcast. Evidence is retained under
+`tmp/6210-plmn-current-national/` and
+`tmp/6210-plmn-current-international/` (raw `error.log.gz`, console and input
+invocation). This is a bounded no-random-access observation, not proof that
+the phone cannot roam or that a particular peer packet is missing. The next
+boundary is firmware selection/admission of the foreign three-digit-MNC
+PLMN; country/band policy and identity parsing must be distinguished before
+changing the radio peer. The same-country proof does not establish why
 international selection differs or imply roaming coverage for every PLMN.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
