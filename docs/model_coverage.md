@@ -537,6 +537,10 @@ protocol records and reviewed pixels.
 SHORT MESSAGE through the handset's CP/RP/RR lifecycle, with one decoded
 `SAT` submission, accepted terminal response and physical return to idle.
 Delivery outside the laboratory network is not established.
+`verify-8210-sim-toolkit-call` independently covers card-owned SET UP CALL,
+physical consent before SETUP, assigned/connected signaling, successful
+terminal response, physical release and reviewed call/idle frames. It does
+not validate speech.
 
 The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,

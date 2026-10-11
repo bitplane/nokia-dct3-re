@@ -3,6 +3,21 @@ from tools.noki8210_toolkit_inkey_check import EVENTS, INPUT_EVENTS, MENU_EVENTS
 
 
 class InkeyTest(unittest.TestCase):
+    def test_card_owned_call_requires_physical_consent_and_release(self):
+        from tools.test_sim_toolkit_call_trace_check import GOOD
+        call = GOOD.replace('GSM service uplink sapi=0 pd=03 message=05',
+                            '8210_toolkit_physical: action=call_accept\nGSM service uplink sapi=0 pd=03 message=05')
+        call = call.replace('GSM service uplink sapi=0 pd=03 message=25',
+                            '8210_toolkit_physical: action=menu_exit\nGSM service uplink sapi=0 pd=03 message=25')
+        text = '\n'.join(MENU_EVENTS[:-1]) + '\n' + call
+        verify_protocol(text, call=True)
+        for changed in (text.replace('action=call_accept', 'action=ignored'),
+                        text.replace('action=menu_exit', 'action=ignored'),
+                        text.replace('81551532f4', '81214365f7'),
+                        text.replace('terminal-response data=810306100002028281030100', 'wrong response')):
+            with self.assertRaises(ValueError):
+                verify_protocol(changed, call=True)
+
     def test_card_owned_sms_completion(self):
         from tools.test_sim_toolkit_sms_trace_check import GOOD
         sms = GOOD.replace('data=2901', 'data=3901').replace('cp=29', 'cp=39').replace(

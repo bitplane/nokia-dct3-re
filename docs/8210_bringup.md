@@ -696,6 +696,15 @@ channel release before physical End returns to reviewed numeric-PLMN idle.
 Menu and post-network list pixels are also checked. This is laboratory
 SMS signaling/acknowledgment, not public-network delivery or native speech.
 
+`verify-8210-sim-toolkit-call` selects card profile 6. Item-1 selection
+advertises `91 1c`, FETCH supplies SET UP CALL, and physical Menu/Call
+precedes both SETUP and the request for `5551234`. The gate requires
+assignment, connect acknowledgment, successful terminal response
+`810306100002028281030100`, and physical End before Disconnect and the
+complete CC/RR release. Reviewed consent, active `SAT call` and returned
+idle pixels are checked alongside staged boot and persisted registration.
+This establishes laboratory call signaling, not speech or native DSP.
+
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
 idle, compares a one-second reference interval with the restored interval,

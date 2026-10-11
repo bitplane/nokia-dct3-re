@@ -60,11 +60,19 @@ MENU_FRAMES.update({
 })
 
 
-def verify_protocol(text, *, get_input=False, menu=False, sms=False):
+def verify_protocol(text, *, get_input=False, menu=False, sms=False, call=False):
     if '[LUA ERROR]' in text:
         raise ValueError('physical GET INKEY fixture failed')
     require_in_order(text.replace('[:sim_card] ', ''),
-                     MENU_EVENTS[:-1] if sms else MENU_EVENTS if menu else INPUT_EVENTS if get_input else EVENTS)
+                     MENU_EVENTS[:-1] if sms or call else MENU_EVENTS if menu else INPUT_EVENTS if get_input else EVENTS)
+    if call:
+        from tools.sim_toolkit_call_trace_check import verify as verify_call
+        verify_call(text)
+        require_in_order(text, ('8210_toolkit_physical: action=call_accept',
+                               'GSM service uplink sapi=0 pd=03 message=05',
+                               'GSM outgoing request id=1 digits=5551234',
+                               '8210_toolkit_physical: action=menu_exit',
+                               'GSM service uplink sapi=0 pd=03 message=25'))
     if sms:
         from tools.sim_toolkit_sms_trace_check import verify as verify_sms
         verify_sms(text, cp=0x39, message_reference=1)
@@ -78,19 +86,26 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('--get-input', action='store_true')
     parser.add_argument('--menu', action='store_true')
-    parser.add_argument('--sms', action='store_true')
+    network = parser.add_mutually_exclusive_group()
+    network.add_argument('--sms', action='store_true')
+    network.add_argument('--call', action='store_true')
     args = parser.parse_args()
     run = args.log.parent
     try:
         text = args.log.read_text(errors='replace')
-        verify_protocol(text, get_input=args.get_input, menu=args.menu, sms=args.sms)
+        verify_protocol(text, get_input=args.get_input, menu=args.menu, sms=args.sms, call=args.call)
         verify_stage(text, runtime=True, selftest=True, base_record=True)
         verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
-        expected = dict(MENU_FRAMES if args.menu or args.sms else INPUT_FRAMES if args.get_input else FRAMES)
-        if args.sms:
+        expected = dict(MENU_FRAMES if args.menu or args.sms or args.call else INPUT_FRAMES if args.get_input else FRAMES)
+        if args.sms or args.call:
             expected.update({
                 'menu_network_result': MENU_FRAMES['menu_items'],
                 'menu_idle': 'd6d4b05af24a06c42a97e31c3134f7e497e149f4420f87f3d243613f06926300',
+            })
+        if args.call:
+            expected.update({
+                'menu_result': '85b3309e03fcf99e90d3645b92124413531a3e97bdcd5fc096a629daf579a92e',
+                'menu_network_result': '90679abc2694f759ce89182ad0b397099755488389728b95074066a0037d12b4',
             })
         for phase, digest in expected.items():
             with Image.open(run / f'snap/8210_toolkit_{phase}.png') as frame:
@@ -98,7 +113,7 @@ def main():
                     raise ValueError('unreviewed GET INKEY frame: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 GET INKEY FAIL: {error}\n')
-    print('8210 physical ' + ('Toolkit SMS CP/RP/RR' if args.sms else 'SET UP MENU/ENVELOPE' if args.menu else 'GET INPUT' if args.get_input else 'GET INKEY') + ' and laboratory registration PASS')
+    print('8210 physical ' + ('Toolkit call CC/RR' if args.call else 'Toolkit SMS CP/RP/RR' if args.sms else 'SET UP MENU/ENVELOPE' if args.menu else 'GET INPUT' if args.get_input else 'GET INKEY') + ' and laboratory registration PASS')
 
 
 if __name__ == '__main__':
