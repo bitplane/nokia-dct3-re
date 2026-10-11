@@ -3105,8 +3105,11 @@ void tms320c54x_device::execute_one(u16 op)
 		{
 			const int shift = s8((m_st1 & 0x1f) << 3) >> 3;
 			const u64 source = accumulator(BIT(op, 8)) & ACC_MASK;
-			const u64 shifted = shift < 0 ? arithmetic_shift_right(source, -shift) : (source << shift) & ACC_MASK;
-			value = u16(saturated_store(shifted) >> 16);
+			// SACCD obeys SXM, but is not an SST-saturating store (SPRU131G table 4-3).
+			const u64 shifted = shift < 0
+				? (BIT(m_st1, 8) ? arithmetic_shift_right(source, -shift) : source >> -shift)
+				: (source << shift) & ACC_MASK;
+			value = u16(shifted >> 16);
 		}
 		// A false condition still performs a read/write-back bus transaction.
 		data_write(address, value);

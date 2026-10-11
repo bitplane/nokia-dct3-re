@@ -104,6 +104,7 @@ REQUIRED = [
     "TMS320C54x MMR bus: PASS unified_state=1 partial_write=1 ifr_clear=1 passive_tap=1 reserved_gap=1",
     "TMS320C54x zero BK addressing: PASS variants=320",
     "TMS320C54x SACCD conformance: PASS variants=576",
+    "TMS320C54x SACCD boundaries: PASS cases=96 asm=-16,-1,0,15 sxm=0,1 sst_ignored=1 sources=A,B false_store=1 pipeline_claim=0",
     "TMS320C54x RCD accumulator conditions: PASS variants=36",
     "TMS320C54x MIN/MAX conformance: PASS variants=256",
     "TMS320C54x BSP interrupt sources: PASS cases=9 save_replay=9 handset_audio_claim=0",

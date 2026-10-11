@@ -3364,6 +3364,18 @@ PMST.SST now saturates the shifted 40-bit accumulator value to 32 bits before
 ordinary `STH`, `STL`, `STLM`, and `DST` stores, without modifying the
 accumulator. Focused fixtures reproduce TI SPRU131G's signed `STH` and
 unsigned `DST` examples and preserve their one- and two-cycle costs. The
+conditional `SACCD` store is different: TI [SPRU172C, page 4-152](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+specifies ASM/SXM, and [SPRU131G, table 4-3](https://www.ti.com/lit/ug/spru131g/spru131g.pdf)
+excludes it from the SST instruction list. It therefore stores the shifted
+accumulator lane without SST saturation; negative ASM shifts obey SXM.
+The core previously saturated this lane and always sign-extended right
+shifts. In addition to the 576 existing cases, 96 literal-result boundary
+fixtures cover guard-bit overflow, ASM -16/-1/0/15, both SXM/SST settings,
+both sources, false-condition write-back, preserved accumulators/status and
+unconditional pointer update. They failed before the correction and pass
+after it; the full core suite and isolated ROM4 FR encoder/decoder comparisons
+also pass. These are instruction results, not physical pipeline timing,
+native RF acquisition or handset speech evidence. The
 implemented parallel `ST||MAC[R]` form also saturates the pre-MAC store
 source after its ASM shift. Exact `d6e1` fixtures check both zero and nonzero
 ASM shifts, the old B value, unchanged B, A's MACR result, and the one-cycle
