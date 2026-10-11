@@ -22,13 +22,16 @@ def trace():
 
 
 class SipRecoveryCheckTest(unittest.TestCase):
-    def exercise(self, text=None, bad_frame=False):
+    def exercise(self, text=None, bad_frame=False, incoming=False):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / 'snap').mkdir()
             (root / 'nvram/noki5210_3').mkdir(parents=True)
             (root / 'nvram/noki5210_3/sim_card').write_bytes(b'own card')
-            (root / 'error.log').write_text(trace() if text is None else text)
+            observed = trace() if text is None else text
+            if incoming:
+                observed = observed.replace('gsm_call_adapter: state', 'gsm_call_adapter: incoming state')
+            (root / 'error.log').write_text(observed)
             frame = Image.new('L', (84, 48), 255)
             digest = hashlib.sha256(frame.tobytes()).hexdigest()
             frame.save(root / 'snap/5210_pin_entered.png')
@@ -37,12 +40,18 @@ class SipRecoveryCheckTest(unittest.TestCase):
             frame.save(root / 'snap/5210_pin_recovered.png')
             with patch.object(checker, 'verify_coherent_late') as authentication, \
                     patch.object(checker, 'FRAMES', dict(entered=digest, recovered=digest)):
-                checker.verify(root)
-                authentication.assert_called_once_with(
-                    trace() if text is None else text, b'own card')
+                checker.verify(root, incoming=incoming)
+                authentication.assert_called_once_with(observed, b'own card')
 
     def test_authentication_architecture_physical_input_and_recovery(self):
         self.exercise()
+
+    def test_incoming_requires_own_connected_state_and_physical_answer(self):
+        self.exercise(incoming=True)
+        for wrong in (trace().replace('key=Send', 'key=End'),
+                      trace().replace('phase=connected', 'phase=alerting')):
+            with self.subTest(wrong=wrong), self.assertRaises(ValueError):
+                self.exercise(wrong, incoming=True)
 
     def test_changed_architecture_wrong_digits_and_missing_end_fail(self):
         for wrong in (trace().replace('event=restored pc=0000001c', 'event=restored pc=00000020'),

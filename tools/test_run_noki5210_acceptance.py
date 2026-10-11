@@ -14,16 +14,29 @@ from tools.make_sim_card_profile import make_profile
 class RunnerTests(unittest.TestCase):
     def test_sip_restore_has_its_own_bridge_and_recovery_checker(self):
         with tempfile.TemporaryDirectory() as temporary:
-            run = Path(temporary) / 'sip-restore'
-            with patch('sys.argv', ['runner', str(run), '--scenario',
-                       'pin-sip-outgoing-call-state', '--pjsua', 'pjsua']), \
-                    patch.object(runner.subprocess, 'run') as execute:
-                runner.main()
-            launch = execute.call_args_list[0].args[0]
-            self.assertIn('--restore-outgoing', launch)
-            self.assertNotIn('-nothrottle', launch)
-            checker = execute.call_args_list[1].args[0]
-            self.assertEqual(Path(checker[1]).name, 'noki5210_pin_sip_restore_check.py')
+            for direction in ('incoming', 'outgoing'):
+                run = Path(temporary) / direction
+                with patch('sys.argv', ['runner', str(run), '--scenario',
+                           f'pin-sip-{direction}-call-state', '--pjsua', 'pjsua']), \
+                        patch.object(runner.subprocess, 'run') as execute:
+                    runner.main()
+                launch = execute.call_args_list[0].args[0]
+                self.assertIn('--restore-call' if direction == 'incoming' else '--restore-outgoing', launch)
+                self.assertNotIn('-nothrottle', launch)
+                checker = execute.call_args_list[1].args[0]
+                self.assertEqual(Path(checker[1]).name, 'noki5210_pin_sip_restore_check.py')
+                self.assertEqual('--incoming' in checker, direction == 'incoming')
+
+    def test_real_sip_restore_cannot_fall_back_to_mock_host(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for direction in ('incoming', 'outgoing'):
+                run = Path(temporary) / direction
+                with patch('sys.argv', ['runner', str(run), '--scenario',
+                           f'pin-sip-{direction}-call-state']):
+                    with self.assertRaises(SystemExit) as caught:
+                        runner.main()
+                    self.assertEqual(caught.exception.code, 2)
+                    self.assertFalse(run.exists())
 
     def test_input_identity_hashes_actual_bytes_and_marks_absence(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -109,7 +122,8 @@ class RunnerTests(unittest.TestCase):
             'pin-phonebook': (55, '--phonebook-save', ()),
             'pin-phonebook-read': (45, '--phonebook-read', ()),
         }
-        self.assertEqual(set(expected) | {'pin-sip-outgoing-call-state'}, set(runner.SCENARIOS))
+        self.assertEqual(set(expected) | {'pin-sip-outgoing-call-state', 'pin-sip-incoming-call-state'},
+                         set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
             for name, (seconds, flag, masks) in expected.items():
                 with self.subTest(scenario=name):

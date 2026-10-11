@@ -13,15 +13,16 @@ from tools.noki5210_pin_registration_check import (
 )
 
 
-def verify(run):
+def verify(run, *, incoming=False):
     text = (run / 'error.log').read_text(errors='replace')
     card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
     verify_coherent_late(text, card)
     verify_pin_idle_state(text, call=True)
-    require_in_order(text, tuple('5210_pin_physical: key=Keypad ' + digit
-                                for digit in '5551234') + (
+    digits = (() if incoming else tuple('5210_pin_physical: key=Keypad ' + digit
+                                       for digit in '5551234'))
+    require_in_order(text, digits + (
         '5210_pin_physical: key=Send',
-        'gsm_call_adapter: state id=1 epoch=1 phase=connected',
+        'gsm_call_adapter: ' + ('incoming ' if incoming else '') + 'state id=1 epoch=1 phase=connected',
         '5210_pin_state: event=saved', '5210_pin_state: event=restored',
     ))
     for phase in ('entered', 'recovered'):
@@ -33,9 +34,10 @@ def verify(run):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
+    parser.add_argument('--incoming', action='store_true')
     args = parser.parse_args()
     try:
-        verify(args.run_directory)
+        verify(args.run_directory, incoming=args.incoming)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN SIP restoration FAIL: {error}\n')
     print('5210 authenticated architecture restoration and physical recovery PASS; SIP dialog not restored')

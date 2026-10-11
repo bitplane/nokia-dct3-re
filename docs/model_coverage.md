@@ -118,6 +118,13 @@ continuation reaches the exact registered recovery frame. This gate proves
 external-dialog cleanup, not dialog survival, native speech or identical
 active-call pixels after intentional external teardown; the separate local
 and mock-host gates retain their active-call pixel-equality checks.
+`verify-5210-pin-incoming-sip-state` independently applies the same external
+cleanup policy to readiness-gated incoming SIP, physical Answer and connected
+save/load. One confirmed dialog closes with BYE on epoch change; the restored
+GSM call clears once without repeated SIP paging. PIN acceptance, exact
+architecture restoration and physical recovery pixels are checked separately
+from the real SIP/CC/RR evidence. Neither direction restores a live SIP dialog
+or establishes native speech.
 `verify-5210-pin-host-outgoing-media-state` independently adds a continuously
 attached host echo backend, restored GSM-FR cursors, rejection of stale
 epoch-1 media and at least 80 contiguous accepted epoch-2 downlink frames.

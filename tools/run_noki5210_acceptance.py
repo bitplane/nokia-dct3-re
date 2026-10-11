@@ -73,6 +73,8 @@ SCENARIOS = {
                                              seconds=65, net_masks=('32',), host_call='incoming'),
     'pin-sip-outgoing-call-state': Scenario('noki5210_pin_sip_outgoing_state.lua',
                                           seconds=60, net_masks=('32',), host_call='outgoing'),
+    'pin-sip-incoming-call-state': Scenario('noki5210_pin_sip_incoming_state.lua', '--incoming',
+                                          seconds=60, net_masks=('32',), host_call='incoming'),
     'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
                                   seconds=155, sms_mask='24'),
     'pin-phonebook': Scenario('noki5210_pin_phonebook.lua', '--phonebook-save', seconds=55),
@@ -112,7 +114,8 @@ def main():
     scenario = SCENARIOS[args.scenario]
     if args.pjsua and not scenario.host_call:
         parser.error('--pjsua requires a PIN host-call scenario')
-    if args.scenario == 'pin-sip-outgoing-call-state' and not args.pjsua:
+    sip_restore = args.scenario in ('pin-sip-outgoing-call-state', 'pin-sip-incoming-call-state')
+    if sip_restore and not args.pjsua:
         parser.error('PIN SIP restoration requires --pjsua')
     if args.pjsua and args.scenario in ('pin-host-outgoing-call-state',
                                       'pin-host-outgoing-media-state', 'pin-host-incoming-call-state',
@@ -157,7 +160,7 @@ def main():
             script = 'noki5210_pin_early_observe.lua'
         checker = ('noki5210_pin_registration_check.py' if scenario.pin
                    else 'noki5210_toolkit_interactive_check.py')
-        if args.scenario == 'pin-sip-outgoing-call-state':
+        if sip_restore:
             checker = 'noki5210_pin_sip_restore_check.py'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'noki5210',
                    '-bios', '540e', '-rompath', str(root / 'roms'), '-cfg_directory', 'cfg',
@@ -178,6 +181,8 @@ def main():
                 if scenario.host_call == 'incoming':
                     launch.extend(['--incoming', '--ready-file',
                                    str(run / 'snap/5210_pin_host_idle.png')])
+                    if args.scenario == 'pin-sip-incoming-call-state':
+                        launch.append('--restore-call')
                 elif args.scenario == 'pin-sip-outgoing-call-state':
                     launch.append('--restore-outgoing')
                 launch.extend(['--'] + command)
