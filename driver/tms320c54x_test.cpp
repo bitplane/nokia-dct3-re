@@ -2316,6 +2316,20 @@ private:
 		m_phase = 79000 + index;
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
+	void start_pll_transition_case()
+	{
+		// MMIO conformance, not handset provisioning. Suspend instruction
+		// execution so this fixture isolates the independently clocked PLL.
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		auto &data = m_cpu->space(AS_DATA);
+		data.write_word(0x58, 0);
+		m_cpu->set_pll_reference_clock(11'995'200);
+		data.write_word(0x58, 0x6004);
+		data.write_word(0x58, 0x77ff); // x8/count255 with PLLON/OFF set for retained-lock test.
+		expect(data.read_word(0x58) == 0x77fe, "PLLSTATUS remains DIV while lock count runs");
+		m_phase = 79500;
+		m_check_timer->adjust(attotime::from_usec(200));
+	}
 	void start_vector_prefetch_case(unsigned index)
 	{
 		auto &program = m_cpu->space(AS_PROGRAM);
@@ -21320,6 +21334,71 @@ private:
 				"SPRU131G CLKMD protected fields require DIV mode; PLLNDIV remains writable and PLLSTATUS read-only");
 			if (index < 15) { start_clkmd_write_case(index + 1); return; }
 			osd_printf_info("TMS320C54x CLKMD write protection: PASS cases=16 physical_clock_claim=0\n");
+			start_pll_transition_case(); return;
+		}
+		if (m_phase >= 79500 && m_phase <= 79509)
+		{
+			if (m_phase == 79500)
+			{
+				expect(data.read_word(0x58) == 0x77fe, "PLL lock counter remains pending at 200 us");
+				m_saved_repeat.str(std::string()); m_saved_repeat.clear();
+				expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE, "save pending PLL lock timer");
+				data.write_word(0x58, 0);
+				expect(data.read_word(0x58) == 0, "cancel pending PLL before restoring checkpoint");
+				// Restore at the same scheduler timestamp: read_stream inside a
+				// later timer callback cannot rewind that callback's cached time.
+				m_saved_repeat.clear(); m_saved_repeat.seekg(0);
+				expect(machine().save().read_stream(m_saved_repeat) == STATERR_NONE && data.read_word(0x58) == 0x77fe,
+					"restore pending PLL request and its original deadline after cancellation");
+				data.write_word(0x58, 0x77ff); // Repeating a request must retain its original deadline.
+				m_phase = 79501;
+				m_check_timer->adjust(attotime::from_ticks(65'383, 191'923'200) -
+					attotime::from_usec(200) - attotime::from_ticks(1, 11'995'200)); return;
+			}
+			if (m_phase == 79501)
+			{
+				expect(data.read_word(0x58) == 0x77fe, "PLLSTATUS still DIV one reference tick before exact 340.672727 us deadline");
+				++m_phase;
+				m_check_timer->adjust(attotime::from_ticks(1, 11'995'200) + attotime::from_nsec(1)); return;
+			}
+			if (m_phase == 79502)
+			{
+				expect(data.read_word(0x58) == 0x77ff, "restored PLL switches at the same relative deadline");
+				data.write_word(0x58, 0x6004);
+				expect(data.read_word(0x58) == 0x77fd, "PLL fields remain protected throughout pending DIV switch");
+				data.write_word(0x58, 0x97fb);
+				expect(data.read_word(0x58) == 0x77ff, "opposite request cancels pending exit without modifying PLL fields");
+				m_phase = 79505; m_check_timer->adjust(attotime::from_usec(2)); return;
+			}
+			if (m_phase == 79505)
+			{
+				expect(data.read_word(0x58) == 0x77ff, "cancelled source-switch timer cannot change PLLSTATUS later");
+				data.write_word(0x58, 0x6004);
+				m_phase = 79506; m_check_timer->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 79506)
+			{
+				expect(data.read_word(0x58) == 0x77fc, "DIV exit completes without 4080-clock lock delay");
+				data.write_word(0x58, 0x77ff);
+				m_phase = 79507; m_check_timer->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 79507)
+			{
+				expect(data.read_word(0x58) == 0x77ff, "still-powered locked PLL re-entry skips lock delay");
+				data.write_word(0x58, 0x6004);
+				m_phase = 79508; m_check_timer->adjust(attotime::from_usec(1)); return;
+			}
+			if (m_phase == 79508)
+			{
+				data.write_word(0x58, 0x97fb);
+				expect(data.read_word(0x58) == 0x97fa, "new multiplier invalidates previous PLL lock");
+				m_phase = 79509; m_check_timer->adjust(attotime::from_usec(341)); return;
+			}
+			expect(data.read_word(0x58) == 0x97fb, "x10 PLL obtains a new lock before switching");
+			m_cpu->set_pll_reference_clock(0);
+			data.write_word(0x58, 0);
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			osd_printf_info("TMS320C54x PLL transition timing: PASS lock_delay=1 protected_exit=1 cancel=1 retained_lock=1 multiplier_relock=1 save_replay=1 execution_rate_claim=0\n");
 			start_vector_prefetch_case(0); return;
 		}
 		if (m_phase >= 80000 && m_phase <= 80003)

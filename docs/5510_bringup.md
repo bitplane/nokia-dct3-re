@@ -974,11 +974,13 @@ These rates combine the schematic's 11.9952 MHz Y101 input with
 Both PLL requests specify `PLLCOUNT=255`, or 4,080 input clocks before the
 additional mode-transition delay. These are decoded firmware requests using
 a documented TI-family register contract, not measured DA150 frequencies,
-lock times or a complete writer census. The current core publishes PLLSTATUS
-immediately and does not change its execution rate. Native status service
-passing at 13 MHz does not validate that clock model. The pending implementation
-boundary is PLLCOUNT/transition scheduling, selected system-clock publication
-and peripheral rate propagation.
+lock times or a complete writer census. The MU4 bench configures the core's
+`set_pll_reference_clock(11'995'200)` for delayed PLLSTATUS; unconfigured users
+retain the legacy immediate status behavior. The core does not yet change its
+execution rate. Native status service passing at 13 MHz does not validate that
+execution-clock model. The pending implementation boundary is selected
+system-clock publication and peripheral rate propagation, plus reset straps
+and IDLE3 relock behavior.
 
 The tool also calculates exact TI-family transition predictions (SPRU131G
 pp. 8-32/33). An unlocked DIV-to-PLL request adds six input cycles and
@@ -990,6 +992,22 @@ the input-cycle term becomes twelve for PLLMUL=15. A still-locked PLL skips
 the lock-count delay on re-entry. Exact rational tests cover these distinctions
 and fractional PLL ratios. These predictions do not establish DA150 reset
 straps or IDLE3 wake/relock behavior, and are not runtime timing measurements.
+
+`check-c54x-core` tests the delayed status one input tick before the predicted
+deadline and one nanosecond after it. It saves a pending request, cancels it,
+then restores it at the same scheduler timestamp and verifies the original
+deadline. This avoids rewinding from inside a later active timer callback,
+whose cached timestamp is not rewound by `read_stream`. Additional MMIO cases
+cover protected fields throughout a pending DIV exit, cancellation of that
+exit, repeated requests without deadline extension, retained-lock re-entry
+(PLLON/OFF explicitly held high) and multiplier-change relock. The original
+`77fb` has PLLON/OFF clear; it must not be assumed to retain lock after DIV
+exit. These are controller
+conformance tests, not physical DA150 clock measurements or handset fixtures.
+With delayed status enabled, the original four-write startup/status observation
+and the fresh original `sustain` gate pass: six files, eight TX/RX DMA blocks,
+1,024 DIN words and zero illegal instructions. The instruction and peripheral
+execution rates remain the fixed bench rates, not the requested PLL rates.
 
 The passive `tools/mu4_clock_observe.lua`, started with `-autoboot_delay 0`,
 observes all four writes in the original `bootstatus` fixture, from initial

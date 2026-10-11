@@ -26,6 +26,8 @@ public:
 	{
 		// Test clock only; DA150 PLL/physical memory mapping is not claimed here.
 		TMS320C54X(config, m_cpu, 13'000'000);
+		// Y101 reference clocks PLLSTATUS transitions, not CPU execution yet.
+		m_cpu->set_pll_reference_clock(11'995'200);
 		m_cpu->set_extended_program(true);
 		m_cpu->set_addrmap(AS_PROGRAM, &mu4_storage_test_state::program_map);
 		m_cpu->set_addrmap(AS_DATA, &mu4_storage_test_state::data_map);

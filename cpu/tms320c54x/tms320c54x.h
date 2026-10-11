@@ -15,6 +15,8 @@ public:
 			device_t *owner, u32 clock);
 	void set_power_on_imr(u16 value) { m_power_on_imr = value; }
 	void set_extended_program(bool enabled) { m_extended_program = enabled; }
+	// Enables TI-family PLLSTATUS timing; execution-rate propagation is separate.
+	void set_pll_reference_clock(u32 hz) { m_pll_reference_clock = hz; }
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
@@ -76,6 +78,8 @@ private:
 	static constexpr u16 TIMER_WRITABLE_MASK = 0x0c1f; // Free, Soft, TSS and TDDR; reserved bits read zero.
 
 	TIMER_CALLBACK_MEMBER(timer_expired);
+	TIMER_CALLBACK_MEMBER(pll_transition_complete);
+	void write_clkmd(u16 value);
 	void update_timer_counter();
 	void arm_timer();
 	u64 timer_remaining_ticks() const;
@@ -186,6 +190,9 @@ private:
 	u16 m_power_on_imr = 0;
 	bool m_extended_program = false;
 	u16 m_clkmd = 0;
+	u32 m_pll_reference_clock = 0;
+	bool m_pll_locked = false;
+	emu_timer *m_pll_timer = nullptr;
 	u16 m_tim = 0xffff;
 	u16 m_prd = 0xffff;
 	u16 m_tcr = 0;

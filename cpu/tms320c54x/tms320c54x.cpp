@@ -601,6 +601,7 @@ void tms320c54x_device::device_start()
 	m_imr = m_power_on_imr;
 	m_opcode_first_pc.fill(0xffff);
 	m_timer = timer_alloc(FUNC(tms320c54x_device::timer_expired), this);
+	m_pll_timer = timer_alloc(FUNC(tms320c54x_device::pll_transition_complete), this);
 	// CPU-owned MMRs take precedence over broad board RAM windows.
 	space(AS_DATA).install_device(0, 0x58, *this, &tms320c54x_device::internal_data_map);
 	space(AS_PROGRAM).cache(m_cache);
@@ -675,6 +676,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_interrupt_stack_address));
 	save_item(NAME(m_interrupt_ack_source));
 	save_item(NAME(m_clkmd));
+	save_item(NAME(m_pll_locked));
 	save_item(NAME(m_tim));
 	save_item(NAME(m_prd));
 	save_item(NAME(m_tcr));
@@ -791,6 +793,8 @@ void tms320c54x_device::device_reset()
 	// Hardware reset sets INTM and clears IFR, but does not initialise IMR.
 	// Preserve the mask written by the ROM loader across MAD2 DSP reset pulses.
 	m_clkmd = 0;
+	m_pll_locked = false;
+	m_pll_timer->adjust(attotime::never);
 	m_tim = 0xffff;
 	m_prd = 0xffff;
 	m_tcr = 0;
@@ -873,6 +877,58 @@ TIMER_CALLBACK_MEMBER(tms320c54x_device::timer_expired)
 	if (m_imr & 0x0008)
 		leave_idle();
 	arm_timer();
+}
+
+void tms320c54x_device::write_clkmd(u16 value)
+{
+	// SPRU131G table 8-18: protected fields remain protected until the
+	// actual source changes, not merely until PLLNDIV requests DIV mode.
+	bool const pll_mode = BIT(m_clkmd, 0);
+	if (pll_mode)
+		value = (m_clkmd & ~u16(3)) | (value & 2);
+	if (!m_pll_reference_clock)
+	{
+		m_clkmd = (value & ~u16(1)) | BIT(value, 1);
+		return;
+	}
+	u16 const previous = m_clkmd;
+	m_clkmd = (value & ~u16(1)) | unsigned(pll_mode);
+	if (((previous ^ m_clkmd) & 0xf800) || !(m_clkmd & 6))
+		m_pll_locked = false;
+	if (BIT(m_clkmd, 1) == pll_mode)
+	{
+		m_pll_timer->adjust(attotime::never);
+		return;
+	}
+	// Repeating the same request must not postpone the pending switch.
+	if (m_pll_timer->enabled() && previous == m_clkmd)
+		return;
+	unsigned const mul = m_clkmd >> 12;
+	u32 numerator, denominator;
+	if (!BIT(m_clkmd, 11))
+	{
+		numerator = mul == 15 ? 1 : mul + 1;
+		denominator = 1;
+	}
+	else
+	{
+		numerator = mul & 1 ? mul : mul + 1;
+		denominator = mul & 1 ? 4 : 2;
+	}
+	u32 input_cycles = !BIT(m_clkmd, 1) && mul == 15 ? 12 : 6;
+	if (BIT(m_clkmd, 1) && !m_pll_locked)
+		input_cycles += ((m_clkmd >> 3) & 0xff) * 16;
+	// Six CLKIN cycles plus 3.5 PLL cycles, with optional lock count.
+	// Express both terms in the same rational clock domain before rounding.
+	u64 const ticks = u64(input_cycles) * 2 * numerator + 7 * denominator;
+	m_pll_timer->adjust(attotime::from_ticks(ticks, m_pll_reference_clock) / (2 * numerator));
+}
+
+TIMER_CALLBACK_MEMBER(tms320c54x_device::pll_transition_complete)
+{
+	m_clkmd = (m_clkmd & ~u16(1)) | BIT(m_clkmd, 1);
+	if (BIT(m_clkmd, 0))
+		m_pll_locked = true;
 }
 
 u16 tms320c54x_device::fetch()
@@ -1108,13 +1164,7 @@ void tms320c54x_device::register_write(u16 address, u16 value)
 	}
 	else if (address == 0x58)
 	{
-		// SPRU131G table 8-18: only PLLNDIV may be modified in PLL mode.
-		// Multiplier, divider, lock count and PLL power require DIV mode.
-		if (BIT(m_clkmd, 0))
-			value = (m_clkmd & ~u16(3)) | (value & 2);
-		// CLKMD bit 0 is read-only PLLSTATUS. Model the mode transition as
-		// immediate until the input-clock-derived PLL lock timer is exposed.
-		m_clkmd = (value & ~u16(1)) | BIT(value, 1);
+		write_clkmd(value);
 	}
 	else
 		fatalerror("Unmapped C54x register write %04x", address);
