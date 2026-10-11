@@ -2918,8 +2918,9 @@ remaining two clocks rather than a restarted four-clock word, including replay.
 Pending clock switches round up to the next whole transfer clock; sub-cycle
 switching and PLL startup latency remain unvalidated. MU4 now supplies the
 11.9952 MHz Y101 rate evidenced by its own schematic sheet 4 to this connection.
-The normal system/PLL clock relationship remains unresolved; see the
-[MU4 DMA contract](5510_bringup.md#original-dma-backed-loader).
+The original MU4 system-clock requests are now pinned and observed, but their
+PLLCOUNT scheduling and rate publication remain unimplemented; see the
+[MU4 CLKMD contract](5510_bringup.md#original-clkmd-contract).
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
 pointer. The fixture checks both results and the three one-cycle operations

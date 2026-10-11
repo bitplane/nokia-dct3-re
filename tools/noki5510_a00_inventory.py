@@ -213,7 +213,8 @@ def uploaded_word_image(image, marker):
     """Final logical writes from one checked segment, without cross-overlay merging."""
     payload = extract_segment(image, marker)[6:-4]
     words = {}
-    for section in section_inventory(payload)['sections']:
+    report = serial_boot_inventory(payload) if marker == 'aa55' else section_inventory(payload)
+    for section in report['sections']:
         address = section['destination_word_address']
         offset = section['offset'] + 6
         for index, (word,) in enumerate(struct.iter_unpack('>H', payload[offset:offset + section['words'] * 2])):

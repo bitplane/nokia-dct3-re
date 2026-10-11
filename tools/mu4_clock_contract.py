@@ -1,0 +1,98 @@
+"""Read-only R060 CLKMD contract; requested rates are not physical clock measurements."""
+import argparse
+from fractions import Fraction
+import hashlib
+import json
+from pathlib import Path
+import re
+
+if __package__:
+    from .noki5510_a00_inventory import uploaded_word_image
+else:
+    from noki5510_a00_inventory import uploaded_word_image
+
+SOURCE_SHA256 = '65118e00dfd8d78726a45e781e2c7c96714228ec025bc5ccb141d445d85db094'
+INPUT_HZ = 11_995_200
+WRITES = (('aa55', 0x923, 0x6004), ('aa55', 0x92b, 0x77fb),
+          ('aa22', 0x2905d, 0x6004), ('aa22', 0x29065, 0x97fb))
+
+
+def decode_clkmd(value, input_hz=INPUT_HZ):
+    """SPRU131G tables 8-18/19: requested selection, not PLL lock status."""
+    if not 0 <= value <= 0xffff or input_hz <= 0:
+        raise ValueError('invalid CLKMD value or input clock')
+    multiplier = value >> 12
+    pll = bool(value & 2)
+    if not pll:
+        ratio = Fraction(1, 4 if multiplier == 15 else 2)
+    elif not value & 0x800:
+        ratio = Fraction(1 if multiplier == 15 else multiplier + 1)
+    else:
+        ratio = Fraction(multiplier, 4) if multiplier & 1 else Fraction(multiplier + 1, 2)
+    rate = input_hz * ratio
+    return {'clkmd': f'{value:04x}', 'requested_mode': 'PLL' if pll else 'DIV',
+            'ratio': [ratio.numerator, ratio.denominator],
+            'requested_hz': rate.numerator if rate.denominator == 1 else None,
+            'requested_hz_fraction': [rate.numerator, rate.denominator],
+            'lock_count_input_cycles': ((value >> 3) & 0xff) * 16,
+            'physical_system_clock_validated': False}
+
+
+def contract(source):
+    if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
+        raise ValueError('expected original R060 InitData source')
+    image = bytes.fromhex(source.decode('ascii'))
+    words = {marker: uploaded_word_image(image, marker) for marker in ('aa55', 'aa22')}
+    rows = []
+    for marker, address, value in WRITES:
+        # STM #0058,AR1; STM #value,*AR1. Do not scan arbitrary data as instructions.
+        expected = (0x7711, 0x0058, 0x7681, value)
+        actual = tuple(words[marker].get(address + offset) for offset in range(4))
+        if actual != expected:
+            raise ValueError(f'CLKMD writer changed at {marker}:{address:06x}')
+        rows.append({'segment': marker, 'setup_word_address': f'{address:06x}',
+                     'observed_next_pc': f'{address + 4:06x}', **decode_clkmd(value)})
+    return {'source_sha256': SOURCE_SHA256, 'schematic_input_hz': INPUT_HZ,
+            'writers': rows,
+            'scope': 'four pinned original writers and TI-family requested ratios; no complete writer census, DA150 PLL lock timing or execution rate validation'}
+
+
+def check_trace(text):
+    pattern = r'mu4_clock_write: pc=([0-9a-f]{6}) value=([0-9a-f]{4}) mask=([0-9a-f]{4}) previous=([0-9a-f]{4}) t=([0-9.]+)$'
+    rows = re.findall(pattern, text, re.MULTILINE)
+    expected = [(f'{address + 4:06x}', f'{value:04x}', 'ffff') for _, address, value in WRITES]
+    if text.count('mu4_clock_write:') != len(expected) or [row[:3] for row in rows] != expected:
+        raise ValueError('original four-write CLKMD sequence missing or changed')
+    if [row[3] for row in rows] != ['0000', '6004', '77fb', '77f8']:
+        raise ValueError('previous CLKMD values differ from the observed modeled sequence')
+    times = [float(row[4]) for row in rows]
+    if not 0 < times[0] < times[1] < times[2] < times[3] < 20:
+        raise ValueError('CLKMD write timestamps must be ordered within the observation window')
+    initial = re.findall(r'mu4_clock_snapshot: phase=initial resets=0 clkmd=0000 t=0\.000000000$', text, re.MULTILINE)
+    summary = re.findall(r'mu4_clock_summary: resets=0 writes=4 clkmd=97fb t=20\.000000000$', text, re.MULTILINE)
+    if len(initial) != 1 or len(summary) != 1:
+        raise ValueError('clock observation must cover time zero through the full 20-second endpoint')
+    for marker in ('mu4_original_bootstrap_frontier: entry_count=1 resident_count=1 ',
+                   'mu4_native_status_transaction: PASS ', 'mu4_native_receive_pins: PASS '):
+        if text.count(marker) != 1:
+            raise ValueError(f'missing or duplicated native startup boundary: {marker}')
+    return {'writes': len(rows), 'final_clkmd': '97fb', 'native_status_transaction': True,
+            'physical_system_clock_validated': False}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('image', type=Path)
+    parser.add_argument('--trace', type=Path)
+    args = parser.parse_args()
+    try:
+        report = contract(args.image.read_bytes())
+        if args.trace:
+            report['runtime'] = check_trace(args.trace.read_text())
+        print(json.dumps(report, indent=2))
+    except (OSError, ValueError, UnicodeError) as error:
+        parser.exit(1, f'MU4 clock contract: {error}\n')
+
+
+if __name__ == '__main__':
+    main()

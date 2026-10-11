@@ -31,8 +31,10 @@ device now accepts a separate X2/CLKIN rate and CPU PLL-stop line. Coupled
 conformance fixtures verify the IDLE3 source switch, absent-clock pending
 transfers, enabled/masked completion wake and save-state replay. MU4 now wires
 that switch to the schematic's 11.9952 MHz Y101 input. Its normal system/PLL
-clock relationship and PLL wake timing remain unresolved; the existing 13 MHz
-execution fixture is not promoted to a measured system clock.
+clock model and PLL wake timing remain incomplete: the original startup writes
+are pinned and observed, but the CPU still executes at a configured 13 MHz
+instead of applying its requested divider/PLL sequence. See
+[the CLKMD contract](#original-clkmd-contract).
 The `startup` profile passes its 20-second window with zero illegal
 instructions and an active original streaming consumer. It observes 1,739
 consumer entries/notification reads and 1,740 clears, but mode zero skips
@@ -404,7 +406,9 @@ The first segment and standalone InitDisk match the serial-boot grammar in
 [TI SPRA602F, figure 11](https://www.ti.com/lit/an/spra602/spra602.pdf):
 signature, four compatibility words, entry XPC/PC, then word-count/XPC/PC
 sections and a zero-count terminator. The four compatibility words are
-`0018/0003/0800/0010`; they are not assigned register semantics here.
+`0018/0003/0800/0010`. SPRA602F section 2.2.4 and figure 11 explicitly describe
+them as ignored hex-utility compatibility words, not live register settings.
+That is the referenced TI-family boot grammar, not a dump of DA150's mask loader.
 The parallel-boot grammar with only two configuration words does not fit.
 The strict parser accounts for every byte, rejecting truncation, trailing
 data and unsupported XPC bits. All recovered sections use page zero.
@@ -950,6 +954,55 @@ The fixture uses routine ABI wrappers and retained in-memory NAND across
 soft resets. This does not establish host NVRAM persistence, physical DA150
 DMA mapping/timing or native music-DSP boot. The original `2ed4 -> 2f56`
 load is executed below; program-entry execution remains the next boundary.
+
+### Original CLKMD contract
+
+`tools/mu4_clock_contract.py` pins four original R060 writer sequences, without
+merging program overlays. Each loads AR1 with MMR address `0058`, then stores
+its immediate through AR1. Source setup addresses and observed next PCs are
+distinct; these are not mid-instruction ownership claims.
+
+| Segment | Setup address | Observed next PC | CLKMD written | TI-family requested rate |
+| --- | --- | --- | --- | --- |
+| `aa55` | `000923` | `000927` | `6004` | DIV/2, 5,997,600 Hz |
+| `aa55` | `00092b` | `00092f` | `77fb` | PLL x8, 95,961,600 Hz |
+| `aa22` | `02905d` | `029061` | `6004` | DIV/2, 5,997,600 Hz |
+| `aa22` | `029065` | `029069` | `97fb` | PLL x10, 119,952,000 Hz |
+
+These rates combine the schematic's 11.9952 MHz Y101 input with
+[TI SPRU131G tables 8-18/19](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+Both PLL requests specify `PLLCOUNT=255`, or 4,080 input clocks before the
+additional mode-transition delay. These are decoded firmware requests using
+a documented TI-family register contract, not measured DA150 frequencies,
+lock times or a complete writer census. The current core publishes PLLSTATUS
+immediately and does not change its execution rate. Native status service
+passing at 13 MHz does not validate that clock model. The pending implementation
+boundary is PLLCOUNT/transition scheduling, selected system-clock publication
+and peripheral rate propagation.
+
+The passive `tools/mu4_clock_observe.lua`, started with `-autoboot_delay 0`,
+observes all four writes in the original `bootstatus` fixture, from initial
+CLKMD zero at time zero to `97fb` at its 20-second endpoint. Native bootstrap,
+resident entry and pin-level status service must also complete for the checker
+to accept the observation. It uses this MU4 fixture's own retained R060 NAND,
+not another product's provisioning, and makes no firmware/controller writes.
+The copied input NAND remains byte-identical on disk with `-nonvram_save`.
+The timestamps are emulated, not physical clock measurements.
+
+Attach the observer to an own-source `bootstatus` run with
+`-autoboot_delay 0 -script /absolute/path/to/repo/tools/mu4_clock_observe.lua`,
+then check the original upload and completed log together:
+
+```sh
+.venv/bin/python tools/mu4_clock_contract.py \
+  roms/5510-mu4-reference/InitData_R060.a00 --trace "$RUN_DIR/error.log"
+```
+
+The acquired primary references are retained, ignored, as
+`roms/reference-docs/c54x/ti_tms320c54x_spru131g.pdf` (SHA-256
+`d9ea0e695859d605d1f94dabeede327c0e343099102cfd7e224f6f53375a3fa2`)
+and `ti_tms320c54x_bootloader_spra602f.pdf` (SHA-256
+`f308d45b8c90bcfa0be3afc0048786603bb78624400deae98caec5371daa51c5`).
 
 ### Original DMA-backed loader
 
