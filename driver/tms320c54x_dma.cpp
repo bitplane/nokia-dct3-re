@@ -24,12 +24,16 @@ void tms320c54x_dma_device::device_start()
 	save_item(NAME(m_regs));
 	save_item(NAME(m_frame_elements));
 	save_item(NAME(m_sync_levels));
+	save_item(NAME(m_pll_stopped));
+	save_item(NAME(m_paused_ticks));
 }
 
 void tms320c54x_dma_device::device_reset()
 {
 	m_control = m_index = 0;
 	m_sync_levels = 0;
+	m_pll_stopped = false;
+	std::fill(std::begin(m_paused_ticks), std::end(m_paused_ticks), 0);
 	std::fill(std::begin(m_regs), std::end(m_regs), 0);
 	std::fill(std::begin(m_frame_elements), std::end(m_frame_elements), 0);
 	for (auto *timer : m_timers) timer->adjust(attotime::never);
@@ -53,7 +57,11 @@ void tms320c54x_dma_device::write(offs_t offset, u16 value)
 		m_control = value;
 		for (unsigned channel = 0; channel < 6; ++channel)
 		{
-			if (!BIT(value, channel)) m_timers[channel]->adjust(attotime::never);
+			if (!BIT(value, channel))
+			{
+				m_timers[channel]->adjust(attotime::never);
+				m_paused_ticks[channel] = 0;
+			}
 			else if (!BIT(previous, channel)) enable(channel);
 		}
 	}
@@ -91,7 +99,37 @@ void tms320c54x_dma_device::enable(unsigned channel)
 	// Synchronized channels remain enabled but transfer nothing without their event.
 	unsigned const event = m_regs[channel * 5 + 3] >> 12;
 	if (!event || BIT(m_sync_levels, event))
-		m_timers[channel]->adjust(attotime::from_ticks(INTERNAL_TRANSFER_CLOCKS, clock()), channel);
+		schedule_transfer(channel);
+}
+
+void tms320c54x_dma_device::schedule_transfer(unsigned channel)
+{
+	u32 const rate = transfer_clock();
+	m_paused_ticks[channel] = rate ? 0 : INTERNAL_TRANSFER_CLOCKS;
+	m_timers[channel]->adjust(rate ? attotime::from_ticks(INTERNAL_TRANSFER_CLOCKS, rate) : attotime::never, channel);
+}
+
+void tms320c54x_dma_device::pll_clock_stop_w(int state)
+{
+	bool const stopped = bool(state);
+	if (stopped == m_pll_stopped) return;
+	u32 const old_rate = transfer_clock();
+	m_pll_stopped = stopped;
+	u32 const new_rate = transfer_clock();
+	for (unsigned channel = 0; channel < 6; ++channel)
+	{
+		u64 ticks = m_paused_ticks[channel];
+		if (old_rate && m_timers[channel]->enabled() && m_timers[channel]->remaining() != attotime::never)
+		{
+			attotime const remaining = m_timers[channel]->remaining();
+			ticks = remaining.as_ticks(old_rate);
+			// Clock switches take effect at a transfer-clock boundary, not mid-cycle.
+			if (attotime::from_ticks(ticks, old_rate) < remaining) ++ticks;
+		}
+		if (!ticks) continue;
+		m_paused_ticks[channel] = new_rate ? 0 : ticks;
+		m_timers[channel]->adjust(new_rate ? attotime::from_ticks(ticks, new_rate) : attotime::never, channel);
+	}
 }
 
 void tms320c54x_dma_device::validate(unsigned channel) const
@@ -113,9 +151,9 @@ void tms320c54x_dma_device::sync_event(unsigned event)
 	for (unsigned channel = 0; channel < 6; ++channel)
 		if (BIT(m_control, channel) && (m_regs[channel * 5 + 3] >> 12) == event)
 		{
-			if (m_timers[channel]->enabled() && m_timers[channel]->remaining() != attotime::never)
+			if (m_paused_ticks[channel] || (m_timers[channel]->enabled() && m_timers[channel]->remaining() != attotime::never))
 				fatalerror("C54x DMA overlapping synchronization/arbitration is not implemented");
-			m_timers[channel]->adjust(attotime::from_ticks(INTERNAL_TRANSFER_CLOCKS, clock()), channel);
+			schedule_transfer(channel);
 		}
 }
 
@@ -176,5 +214,5 @@ TIMER_CALLBACK_MEMBER(tms320c54x_dma_device::transfer)
 		--m_regs[base + 2];
 	if (BIT(mode, 14) && (block_end || (frame_end && BIT(mode, 13)))) m_completion_cb(u8(param));
 	if (BIT(m_control, param) && !(m_regs[base + 3] >> 12))
-		m_timers[param]->adjust(attotime::from_ticks(INTERNAL_TRANSFER_CLOCKS, clock()), param);
+		schedule_transfer(param);
 }

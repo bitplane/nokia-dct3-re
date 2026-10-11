@@ -11,6 +11,9 @@ public:
 	tms320c54x_dma_device(machine_config const &config, char const *tag, device_t *owner, u32 clock);
 	template <typename T> void set_cpu(T &&tag) { m_cpu.set_tag(std::forward<T>(tag)); }
 	void set_per_channel_reload(bool value) { m_per_channel_reload = value; }
+	// Undivided X2/CLKIN for IDLE3; zero means no external clock is present.
+	void set_input_clock(u32 value) { m_input_clock = value; }
+	void pll_clock_stop_w(int state);
 	auto completion_cb() { return m_completion_cb.bind(); }
 	void sync_event(unsigned event);
 	void sync_w(unsigned event, int state);
@@ -27,11 +30,16 @@ private:
 	TIMER_CALLBACK_MEMBER(transfer);
 	void enable(unsigned channel);
 	void validate(unsigned channel) const;
+	void schedule_transfer(unsigned channel);
+	u32 transfer_clock() const { return m_pll_stopped ? m_input_clock : clock(); }
 	s16 address_step(unsigned index, bool frame_end) const;
 	required_device<cpu_device> m_cpu;
 	devcb_write8 m_completion_cb;
 	u16 m_control = 0, m_index = 0;
 	bool m_per_channel_reload = false;
+	u32 m_input_clock = 0;
+	bool m_pll_stopped = false;
+	u64 m_paused_ticks[6] = {};
 	bool valid_index(u16 index) const { return index < 0x28 || (m_per_channel_reload && index >= 0x2a && index <= 0x3d); }
 	u16 m_regs[0x3e] = {};
 	u16 m_frame_elements[6] = {};

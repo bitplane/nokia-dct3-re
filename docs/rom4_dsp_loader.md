@@ -2891,9 +2891,9 @@ queued internal word stays pending during deep idle and completes after
 enabled external wake, including save-state replay. Four additional pin-driven
 cases verify externally clocked words complete while asleep and wake the CPU
 only with the serial IMR bit enabled. These synthetic edges establish ordering,
-not a physical baud rate. DMA input-clock switching, PLL stabilization and
-unsupported serial clock/frame configurations remain outside this coverage.
-Six coupled CPU/DMA cases additionally cover all three IDLE modes with masked
+not a physical baud rate. PLL stabilization and unsupported serial clock/frame
+configurations remain outside this coverage.
+Eight coupled CPU/DMA cases additionally cover all three IDLE modes with masked
 and enabled completion interrupts while INTM remains set. The real DMA device
 copies a four-word data-memory block after the CPU has entered idle; masked
 completion leaves the foreground asleep, while enabled completion resumes it.
@@ -2905,7 +2905,17 @@ and ordering. An additional completion-time assertion checks sixteen DMA
 device clocks for each four-word block, including every save-state replay,
 against SPRU302B section 3.5's four-clock internal-word transfer. This does not
 establish DA150 arbitration, external wait states, separate read/write bus
-phases or the IDLE3 input-clock rate.
+phases or a product's physical IDLE3 input-clock rate. The generic DMA now
+receives a separate CPU PLL-stop output: IDLE3 selects configured, undivided
+X2/CLKIN while IDLE1/2 retain the system clock, as specified in SPRU302B 3.8.
+Two cases and their replays assert sixteen clocks at a deliberately different
+3.25 MHz test input. Two additional controller cases leave X2/CLKIN absent,
+check that an enabled transfer remains pending without modifying its destination,
+and verify completion after restoring the system clock, including replay.
+Pending clock switches round up to the next whole transfer clock; sub-cycle
+switching and PLL startup latency remain unvalidated. The actual MU4 board
+input-clock relationship is unresolved and this new connection is not enabled
+there by assumption.
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
 pointer. The fixture checks both results and the three one-cycle operations

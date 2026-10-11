@@ -577,7 +577,8 @@ tms320c54x_device::tms320c54x_device(const machine_config &mconfig,
 	m_io_config("io", ENDIANNESS_LITTLE, 16, 16, -1),
 	m_bio_in_cb(*this, 1),
 	m_xf_out_cb(*this),
-	m_peripheral_clock_stop_cb(*this)
+	m_peripheral_clock_stop_cb(*this),
+	m_pll_clock_stop_cb(*this)
 {
 }
 
@@ -797,6 +798,7 @@ void tms320c54x_device::device_reset()
 	m_idle_mode = 0;
 	m_idle_timer_ticks = 0;
 	m_peripheral_clock_stop_cb(0);
+	m_pll_clock_stop_cb(0);
 	arm_timer();
 	m_idle = false;
 	m_illegal = false;
@@ -853,6 +855,8 @@ void tms320c54x_device::arm_timer()
 void tms320c54x_device::leave_idle()
 {
 	m_idle = false;
+	if (m_idle_mode == 3)
+		m_pll_clock_stop_cb(0);
 	if (m_idle_mode >= 2)
 		m_peripheral_clock_stop_cb(0);
 	if (m_idle_mode >= 2 && !(m_tcr & TIMER_TSS))
@@ -927,6 +931,7 @@ void tms320c54x_device::device_post_load()
 {
 	// The output cache is derived; re-drive the restored architectural level.
 	update_xf(true);
+	m_pll_clock_stop_cb(m_idle_mode == 3);
 }
 
 void tms320c54x_device::state_export(const device_state_entry &entry)
@@ -1638,6 +1643,7 @@ void tms320c54x_device::execute_one(u16 op)
 		}
 		m_idle_mode = mode;
 		m_peripheral_clock_stop_cb(mode >= 2);
+		m_pll_clock_stop_cb(mode == 3);
 		m_idle = true;
 		m_icount -= 3; // Four-cycle minimum before the idle interval (SPRU172C).
 		return;

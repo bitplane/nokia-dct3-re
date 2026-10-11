@@ -18,6 +18,7 @@ public:
 	auto bio_in_cb() { return m_bio_in_cb.bind(); }
 	auto xf_out_cb() { return m_xf_out_cb.bind(); }
 	auto peripheral_clock_stop_cb() { return m_peripheral_clock_stop_cb.bind(); }
+	auto pll_clock_stop_cb() { return m_pll_clock_stop_cb.bind(); }
 
 	enum : unsigned
 	{
@@ -131,6 +132,7 @@ private:
 	devcb_write_line m_xf_out_cb;
 	bool m_xf_level = true;
 	devcb_write_line m_peripheral_clock_stop_cb;
+	devcb_write_line m_pll_clock_stop_cb;
 
 	memory_access<23, 1, -1, ENDIANNESS_LITTLE>::cache m_cache;
 	memory_access<23, 1, -1, ENDIANNESS_LITTLE>::specific m_program;

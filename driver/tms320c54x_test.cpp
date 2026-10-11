@@ -2037,7 +2037,7 @@ private:
 		auto &program = m_cpu->space(AS_PROGRAM);
 		auto &data = m_cpu->space(AS_DATA);
 		u16 const idle[] = {0xf4e1, 0xf6e1, 0xf5e1};
-		program.write_word(0x010960, idle[index / 2]);
+		program.write_word(0x010960, idle[std::min(index / 2, 2U)]);
 		program.write_word(0x010961, 0x76f8);
 		program.write_word(0x010962, 0x0501);
 		program.write_word(0x010963, 1);
@@ -2047,6 +2047,8 @@ private:
 		m_idle_mcbsp_external = false;
 		m_idle_mcbsp->reset();
 		m_idle_dma->reset();
+		m_idle_dma->set_input_clock(index >= 6 ? 0 : 3'250'000);
+		m_idle_dma_rate = index / 2 == 2 ? 3'250'000 : m_idle_dma->clock();
 		m_idle_dma_completions = 0;
 		u16 const registers[] = {0x0520, 0x0530, 3, 0, 0x4145}; // Data/data, increment both, block IRQ.
 		m_idle_dma->write(1, 0);
@@ -3092,6 +3094,7 @@ private:
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
 		save_item(NAME(m_idle_dma_start));
+		save_item(NAME(m_idle_dma_rate));
 	}
 
 	virtual void machine_reset() override
@@ -4170,10 +4173,11 @@ private:
 			start_idle_dma_case(0);
 			return;
 		}
-		if ((m_phase >= 6280 && m_phase < 6292) || (m_phase >= 6300 && m_phase < 6306))
+		if ((m_phase >= 6280 && m_phase < 6296) || (m_phase >= 6300 && m_phase < 6308) ||
+			(m_phase >= 6326 && m_phase < 6328))
 		{
-			unsigned const index = m_phase >= 6300 ? m_phase - 6300 : (m_phase - 6280) / 2;
-			unsigned const step = m_phase >= 6300 ? 2 : (m_phase - 6280) % 2;
+			unsigned const index = m_phase >= 6326 ? m_phase - 6320 : m_phase >= 6300 ? m_phase - 6300 : (m_phase - 6280) / 2;
+			unsigned const step = m_phase >= 6326 ? 1 : m_phase >= 6300 ? 2 : (m_phase - 6280) % 2;
 			if (!step)
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
@@ -4186,6 +4190,18 @@ private:
 				expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
 					"save pending DMA transfer with CPU idle");
 				++m_phase;
+				m_check_timer->adjust(attotime::from_usec(100));
+				return;
+			}
+			if (index >= 6 && m_phase < 6300)
+			{
+				expect(m_idle_dma_completions == 0 && (m_idle_dma->read(0) & 1) &&
+					m_cpu->space(AS_DATA).read_word(0x0530) == 0,
+					"IDLE3 DMA stays pending without X2/CLKIN");
+				// Controller fixture restores its system clock; no handset PLL delay is inferred.
+				m_idle_dma_start = machine().time();
+				m_idle_dma->pll_clock_stop_w(0);
+				m_phase = 6320 + index;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
@@ -4208,13 +4224,20 @@ private:
 					m_cpu->space(AS_DATA).read_word(0x0530) == 0,
 					"restore pending DMA and sleeping CPU before the first transfer");
 				m_idle_dma_completions = 0;
+				if (index >= 6)
+				{
+					m_idle_dma_start = machine().time();
+					m_idle_dma->pll_clock_stop_w(0);
+				}
 				m_phase = 6300 + index;
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
-			if (index < 5) { start_idle_dma_case(index + 1); return; }
-			osd_printf_info("TMS320C54x IDLE DMA transfer: PASS cases=6 save_replay=6 clock_rate_claim=0\n");
-			osd_printf_info("TMS320C54x internal DMA cadence: PASS cases=6 replay=6 words=4 clocks=16\n");
+			if (index < 7) { start_idle_dma_case(index + 1); return; }
+			osd_printf_info("TMS320C54x IDLE DMA transfer: PASS cases=8 save_replay=8 clock_rate_claim=0\n");
+			osd_printf_info("TMS320C54x internal DMA cadence: PASS cases=8 replay=8 words=4 clocks=16\n");
+			osd_printf_info("TMS320C54x IDLE3 DMA clock: PASS cases=2 replay=2 system_hz=13000000 input_hz=3250000\n");
+			osd_printf_info("TMS320C54x IDLE3 DMA absent clock: PASS cases=2 replay=2 pending_preserved=1\n");
 			start_rounded_multiply_case(0);
 			return;
 		}
@@ -22356,6 +22379,7 @@ private:
 	optional_device<tms320c54x_dma_device> m_idle_dma;
 	unsigned m_idle_dma_completions = 0;
 	attotime m_idle_dma_start = attotime::zero;
+	u32 m_idle_dma_rate = 0;
 	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
@@ -22416,9 +22440,11 @@ void tms320c54x_test_state::test(machine_config &config)
 	});
 	TMS320C54X_DMA(config, m_idle_dma, 13'000'000);
 	m_idle_dma->set_cpu(m_cpu);
+	m_idle_dma->set_input_clock(3'250'000);
+	m_cpu->pll_clock_stop_cb().set(m_idle_dma, FUNC(tms320c54x_dma_device::pll_clock_stop_w));
 	m_idle_dma->completion_cb().set([this](u8 channel) {
 		expect(channel == 0, "idle DMA fixture completes only its configured channel");
-		expect(machine().time() - m_idle_dma_start == attotime::from_ticks(4, m_idle_dma->clock()) * 4,
+		expect(machine().time() - m_idle_dma_start == attotime::from_ticks(4, m_idle_dma_rate) * 4,
 			"four internal DMA words complete in sixteen transfer clocks, including replay");
 		++m_idle_dma_completions;
 		// Fixture routing selects the documented DMAC0/BRINT2 vector slot.
