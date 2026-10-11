@@ -227,8 +227,10 @@ HOST_USSD_PORT ?= 18094
 HOST_USSD_RESTORE_PORT ?= 18095
 HOST_INCOMING_USSD_PORT ?= 18096
 HOST_INCOMING_USSD_TEXT ?= Host notice
-SIP_PJSUA_BIN ?= $(abspath $(firstword $(wildcard run_sip_build/pjproject-2.16/pjsip-apps/bin/pjsua-*)))
-SIP_PYTHON_PATH ?= $(abspath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python):$(abspath $(firstword $(wildcard run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python/build/lib.*)))
+SIP_PROJECT_DIR ?= $(abspath tmp/sip-build/pjproject-2.16)
+SIP_PJSUA_BIN ?= $(abspath $(firstword $(wildcard $(SIP_PROJECT_DIR)/pjsip-apps/bin/pjsua-*)))
+SIP_PYTHON_PATH ?= $(abspath $(SIP_PROJECT_DIR)/pjsip-apps/src/swig/python):$(abspath $(firstword $(wildcard $(SIP_PROJECT_DIR)/pjsip-apps/src/swig/python/build/lib.*)))
+export SIP_PROJECT_DIR SIP_PJSUA_BIN SIP_PYTHON_PATH
 SIP_HANDSET_RUNNER_ARGS ?=
 SIP_HANDSET_KEYS ?= $(NOKI3210_OUTGOING_DIAL_KEYS)
 SIP_HANDSET_CONFIG ?= ../fixtures/radio_outgoing_host_adapter

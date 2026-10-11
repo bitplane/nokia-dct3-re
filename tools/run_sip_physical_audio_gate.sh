@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+sip_project_dir=${SIP_PROJECT_DIR:-$PWD/tmp/sip-build/pjproject-2.16}
 product=${SIP_PRODUCT:-3210}
 direction=${SIP_DIRECTION:-outgoing}
 incoming_arg=
@@ -108,10 +109,10 @@ router_pid=$!
 if [[ "$product" == 8210 || "$product" == 8850 ]]; then
     media_arg=--outgoing-media
     if [[ "$direction" == incoming ]]; then media_arg=--incoming-media; fi
-    env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python):$(realpath run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python/build/lib.*)}" \
+    env PYTHONPATH="${SIP_PYTHON_PATH:-$(realpath "$sip_project_dir/pjsip-apps/src/swig/python"):$(realpath "$sip_project_dir"/pjsip-apps/src/swig/python/build/lib.*)}" \
         .venv/bin/python "tools/run_noki${product}_sip_cancel.py" "$run_dir/handset" \
         "$media_arg" --record-media --sound pulse \
-        --pjsua "${SIP_PJSUA_BIN:-$(realpath run_sip_build/pjproject-2.16/pjsip-apps/bin/pjsua-*)}"
+        --pjsua "${SIP_PJSUA_BIN:-$(realpath "$sip_project_dir"/pjsip-apps/bin/pjsua-*)}"
 else
 make --no-print-directory verify-radio-outgoing-call-sip RUN_DIR="$run_dir" JOBS="${JOBS:-8}" \
     SIP_HANDSET_RUNNER_ARGS="--record-media --product $product $incoming_arg" SIP_HANDSET_SOUND=pulse \

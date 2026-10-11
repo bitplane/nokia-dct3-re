@@ -249,15 +249,16 @@ Build outside tracked source; the upstream build was run serially because its
 parallel object-directory creation raced in this environment:
 
 ```sh
-mkdir -p run_sip_build
-curl -L --fail https://codeload.github.com/pjsip/pjproject/tar.gz/refs/tags/2.16 -o run_sip_build/pjproject-2.16.tar.gz
-tar -xzf run_sip_build/pjproject-2.16.tar.gz -C run_sip_build
-cd run_sip_build/pjproject-2.16
+ROOT="$PWD"
+mkdir -p tmp/sip-build
+curl -L --fail https://codeload.github.com/pjsip/pjproject/tar.gz/refs/tags/2.16 -o tmp/sip-build/pjproject-2.16.tar.gz
+tar -xzf tmp/sip-build/pjproject-2.16.tar.gz -C tmp/sip-build
+cd tmp/sip-build/pjproject-2.16
 ./configure --disable-video --disable-sound --disable-ssl CFLAGS=-fPIC CXXFLAGS=-fPIC
 make dep
 make
-cd ../..
-.venv/bin/python tools/run_sip_stack_probe.py --pjsua run_sip_build/pjproject-2.16/pjsip-apps/bin/pjsua-x86_64-pc-linux-gnu --run-dir run_sip_probe
+cd "$ROOT"
+.venv/bin/python tools/run_sip_stack_probe.py --pjsua tmp/sip-build/pjproject-2.16/pjsip-apps/bin/pjsua-x86_64-pc-linux-gnu --run-dir tmp/sip-probe
 ```
 
 Use a new run directory for repetition. Bindings and destinations are loopback;
@@ -364,7 +365,7 @@ Build the optional upstream binding in the local source tree (no system install)
 ```sh
 .venv/bin/python -m pip install swig setuptools
 ROOT="$PWD"
-cd run_sip_build/pjproject-2.16/pjsip-apps/src/swig/python
+cd tmp/sip-build/pjproject-2.16/pjsip-apps/src/swig/python
 PATH="$ROOT/.venv/bin:$PATH" make PYTHON_EXE="$ROOT/.venv/bin/python"
 cd "$ROOT"
 ```
@@ -372,7 +373,11 @@ cd "$ROOT"
 Alternatively invoke that `make` with the absolute project `.venv/bin` paths.
 `SIP_PYTHON_PATH` points at the generated `pjsua2.py` directory and its
 `build/lib.*` extension directory; `SIP_PJSUA_BIN` selects the upstream executable.
-Both have local-build defaults in Makefile, but remain optional dependencies.
+Both derive their local-build defaults from `SIP_PROJECT_DIR`, which defaults
+to disk-backed `tmp/sip-build/pjproject-2.16`. Set that variable to reuse a
+retained build elsewhere; explicit binary/binding overrides remain supported.
+Make exports these paths to delegated physical-audio scripts. They remain
+optional dependencies; no build is downloaded automatically.
 
 ```sh
 make verify-radio-outgoing-call-sip RUN_DIR=run_3210_sip_gate
