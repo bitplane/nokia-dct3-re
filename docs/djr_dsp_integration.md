@@ -1527,8 +1527,25 @@ reads and CPU registers, with a per-PC log cap and an uncapped total. In
 the 16-second research-HLE boot, flash-table reads also occur in a strided
 reader at `0x2bc904` and a bulk reader at `0x2d292c`; neither observation
 alone is evidence of a DSP block request. Runtime selection at the RAM
-consumers remains the next boundary. No resident-ROM compatibility follows
+consumers is separately observed below. No resident-ROM compatibility follows
 from this MCU-side mapping.
+
+The passive RAM-table tap records exactly three reads in a fresh 16-second
+v6.39 research-HLE boot:
+
+| Time (seconds) | MCU reader | Table entry | Descriptor |
+| ---: | --- | --- | --- |
+| 0.106164 | `0x2bc890` | `1b` at `0x11082c` | `0x3091d8` |
+| 0.220730 | `0x2bcad6` | `00` at `0x1107c0` | `0x3020b4` |
+| 2.156058 | `0x2b93be` | `15` at `0x110814` | `0x308628` |
+
+The entry-`1b` access adds a fourth consumer to the three base-pointer sites:
+`0x2bc88e..0x2bc8a4` loads the fixed entry pointer, reads size at `+4`,
+and forms the payload address at `+12`. Entry `15` is selected with index
+offset `0x54` and enters the previously decoded indexed path. Blocks `01`
+and `14` are not selected through this RAM table in this window. This
+bounded observation does not establish the complete request lifecycle,
+successful native execution, or the absence of other selection mechanisms.
 
 This establishes byte identity, not unique archival provenance or a compatible
 resident DSP ROM. Other products share complete individual payloads: for
