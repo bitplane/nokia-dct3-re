@@ -1733,7 +1733,7 @@ it still requires a recovered DSP consumer or independent protocol evidence.
 
 The original constructor bypasses timing/BSIC serialization for mode 4.
 An aligned direct-BL scan identifies nine constructor candidates: six
-ROM-descriptor sites (`21c320`, `21c96e`, `21cc1e`, `21d236`, `21d41a`,
+literal-argument sites (`21c320`, `21c96e`, `21cc1e`, `21d236`, `21d41a`,
 `21de2e`) and three stack-descriptor sites (`286d04`, `286d42`, `286d88`).
 This is direct-call candidate coverage, not closure of indirect/data-driven
 entrances. Helper `286d4a` selects modes 4/2/3 from context bits 16..19
@@ -1747,6 +1747,21 @@ the observed packet's provenance but does not name it as an acknowledged
 measurement, cancellation or recovery request. Decode the mode-4 DSP consumer
 or an independent protocol trace before changing eligibility or supplying a
 reply. The queued-request continuation remains the boot frontier.
+
+All six literal-argument sites load the same mutable RAM descriptor `132b18`,
+not ROM templates. Their pools are `21c65c`, `21ccac` (two users), `21d5e0`
+(two users) and `21e190`. `noki8210_radio_contract.py` derives each literal
+address from the Thumb PC-relative load, verifies the shared RAM pointer, and
+does not index that pointer into the ROM image. This is six checked direct
+literal sites, not closure of RAM writers, indirect constructors or runtime
+mode values. The shared descriptor's writer/content is a separate predecessor
+to inspect; no constant mode or DSP reply follows from these callers alone.
+One positively decoded writer loads this base at `248a9c` from pool `248df8`.
+At `248aba..248ace` it writes carrier `+4`, signed timing `+2`, BSIC `+1`,
+frame offset `+6` and mode **2** at `+0`; it then clears bit 5 of `+8`.
+The contract verifier pins those stores. This identifies a populated mode-2
+source for the shared descriptor, not a mode-4 response contract or a complete
+writer census: computed aliases and other lifecycles remain possible.
 
 The observed caller's own eligibility is narrower than the helper's full
 mode selection: `21eee2..21ef06` invokes `286d4a(0)` only for context

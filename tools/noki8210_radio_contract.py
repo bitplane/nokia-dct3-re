@@ -4,6 +4,46 @@ import argparse
 import hashlib
 from pathlib import Path
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
+from capstone.arm import ARM_OP_IMM, ARM_OP_MEM, ARM_REG_PC, ARM_REG_R0
+
+
+DESCRIPTOR_CALLS = (0x21c320, 0x21c96e, 0x21cc1e, 0x21d236, 0x21d41a, 0x21de2e)
+
+
+def neighbour_descriptor_sources(image):
+    """Recover PC-relative descriptor loads, without indexing RAM as ROM."""
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
+    decoder.detail = True
+    result = []
+    for call in DESCRIPTOR_CALLS:
+        call_offset = call - 0x200000
+        branch = list(decoder.disasm(image[call_offset:call_offset + 4], call))
+        if (len(branch) != 1 or branch[0].mnemonic != 'bl' or
+                len(branch[0].operands) != 1 or branch[0].operands[0].type != ARM_OP_IMM or
+                branch[0].operands[0].imm != 0x2b3026):
+            raise ValueError('descriptor caller does not invoke the own constructor')
+        address = call - 2
+        offset = address - 0x200000
+        decoded = list(decoder.disasm(image[offset:offset + 2], address))
+        if len(decoded) != 1:
+            raise ValueError('descriptor argument load is not a decoded Thumb instruction')
+        load = decoded[0]
+        operands = load.operands
+        if (load.mnemonic != 'ldr' or len(operands) != 2 or
+                operands[0].reg != ARM_REG_R0 or operands[1].type != ARM_OP_MEM or
+                operands[1].mem.base != ARM_REG_PC):
+            raise ValueError('descriptor argument is not a PC-relative r0 load')
+        pool = ((address + 4) & ~3) + operands[1].mem.disp
+        pool_offset = pool - 0x200000
+        if not 0 <= pool_offset <= len(image) - 4:
+            raise ValueError('descriptor literal pool is outside the acquired ROM')
+        descriptor = int.from_bytes(image[pool_offset:pool_offset + 4], 'big')
+        if descriptor != 0x132b18:
+            raise ValueError('shared RAM descriptor address differs')
+        result.append({'call': call, 'load': address, 'pool': pool,
+                       'descriptor': descriptor, 'storage': 'ram',
+                       'mode': None})
+    return result
 
 
 def scan_initial_record_flags(rows):
@@ -22,6 +62,7 @@ def verify(image):
         raise ValueError('requires acquired 8210 v5.31 PPM C')
     def read(address, size):
         return image[address - 0x200000:address - 0x200000 + size]
+    neighbour_descriptor_sources(image)
     expected = [0x307060, 0x307058, 0x30707a, 0x307050, 0x307048,
                 0x307040, 0x307038, 0x307030, 0x307028, 0x307020,
                 0x30707a, 0x30707a, 0x307018]
@@ -31,6 +72,19 @@ def verify(image):
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_BIG_ENDIAN)
     def instructions(address, size):
         return [(ins.mnemonic, ins.op_str) for ins in decoder.disasm(read(address, size), address)]
+    if int.from_bytes(read(0x248df8, 4), 'big') != 0x132b18:
+        raise ValueError('neighbour descriptor writer literal differs')
+    if instructions(0x248a9c, 2) != [('ldr', 'r6, [pc, #0x358]')]:
+        raise ValueError('neighbour descriptor writer base load differs')
+    if instructions(0x248aba, 28) != [
+            ('mov', 'r0, sl'), ('strh', 'r0, [r6, #4]'),
+            ('movs', 'r0, #0x20'), ('ldrsh', 'r0, [r0, r4]'),
+            ('strh', 'r0, [r6, #2]'), ('ldrb', 'r0, [r4, #0xa]'),
+            ('strb', 'r0, [r6, #1]'), ('ldrb', 'r0, [r5]'),
+            ('strh', 'r0, [r6, #6]'), ('movs', 'r0, #2'),
+            ('strb', 'r0, [r6]'), ('movs', 'r0, #0xdf'),
+            ('ldrb', 'r1, [r6, #8]'), ('ands', 'r0, r1')]:
+        raise ValueError('shared neighbour descriptor mode-2 population differs')
     if int.from_bytes(read(0x286214, 4), 'big') != 0x137224:
         raise ValueError('acquisition updater current-candidate pointer differs')
     if int.from_bytes(read(0x286384, 4), 'big') != 0x13721c:
@@ -773,6 +827,8 @@ def main():
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 radio contract FAIL: {error}\n')
     print('8210 own RX table, task-12 route and channel correlation PASS')
+    print('8210 neighbour descriptor sources PASS direct_literal_sites=6 '
+          'shared_ram_descriptors=1 rom_templates=0 runtime_mode_claim=0')
 
 
 if __name__ == '__main__':
