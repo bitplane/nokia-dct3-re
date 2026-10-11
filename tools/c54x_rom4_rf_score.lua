@@ -112,7 +112,7 @@ for _, window in ipairs({{0x211a00, 0x211bff}, {0x20cb80, 0x20cbff}}) do
             if window[1] == 0x211a00 then
                 if pc >= 0x211a9a and pc <= 0x211aa4 then
                     local object = pc == 0x211a9a and mcu.state["R0"].value
-                        or space:read_u32(mcu.state["SP"].value + 0x18)
+                        or space:read_u32(mcu.state["R13"].value + 0x18)
                     if object >= 0x100000 and object < 0x180000 then status = space:read_u16(object) end
                     if status ~= 0x1390 then return end
                 elseif pc ~= 0x211a54 and pc ~= 0x211a66 then return end

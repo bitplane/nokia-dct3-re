@@ -777,7 +777,9 @@ has a different status-table case and must not substitute for this proof.
 `--consumer-decision` checks the ordered same-object path, increment, bounded
 limit, flag-clear predicate and preserved count/flags at return. Negative
 tests cover missing entries, changed count/limit/flag, wrong object and time.
-Evidence: `tmp/rom4-task10-decision/error.log`, fresh eight-second native boot.
+Evidence: `tmp/rom4-task10-decision/error.log`, fresh eight-second native boot;
+`tmp/rom4-observer-r13/error.log` independently reproduces the same-object
+consumer-decision check with the MCU stack register read through `R13`.
 The remaining MCU-side question is the flag/limit provisioning and the
 `20fbb8` continuation contract; it is independent of obtaining valid RF
 samples. Neither should be forced merely to advance the application.
@@ -857,23 +859,17 @@ determinism claim.
 
 The consumer's `LSR #26; BCS` tests original controller bit 25: set
 skips the counter increment. A later `LSR #27; BCS` tests bit 26.
-One fresh capture with a case-window tap and narrow counter watch records
-two halfword writes at trace PC `0x211ec4`, values `162f0000` and
-`16300000`, mask `ffff0000`, at 1.645476077 and 1.645605077 seconds.
-The counter had been initialized bytewise to `162e036b`; do not assume
-a zero initial count or assign physical meaning to that value. These
-writes were not reproduced by later retained-storage or a second fresh
-capture with revised probes, although the delivery checker continued
-to pass. The first capture did not correlate the write with the task's
-stack object, so attribution to `0x1390` rather than its shared `0x138f`
-case remains unclosed. Counter behavior is an observation discrepancy,
-not an established emulation defect; the additional probes were removed.
+The correlated fresh capture described above attributes the first increment
+to the same `1390` object received by task 10; the subsequent `138f` object
+is separate. The counter's initialized bytes were `162e036b`, so neither
+a zero initial count nor a physical unit is established. Earlier uncorrelated
+captures do not supersede the same-object consumer-effects acceptance check.
 
 The MCU bitmap-to-entry path and selected-entry tuning arithmetic are now
 correlated with the native capture; see the synthesizer sections above.
 The remaining operational boundaries are SCU serialization/settling and
-RF sample lane, scaling and cadence. Task 10's downstream handling remains
-independently open. The
+RF sample lane, scaling and cadence. Task 10's counted flag-clear return and
+one flag setter are mapped above; successful acquisition remains open. The
 score checker still passes (5146 nonzero results, 500 second comparisons,
 nine accepted stores); it does not validate packet delivery or acquisition.
 The 1523-versus-500 constraint remains a property of the pre-return scan,
