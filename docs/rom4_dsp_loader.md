@@ -1008,10 +1008,12 @@ Interrupt overhead covers cycles 7--9 before the first vector instruction
 executes in cycle 10; the inserted INTR's actual stage placement is detailed
 below. The saved continuation is `i2`, not a fixed number of later
 foreground instructions. A blanket three-instruction deferral would therefore
-implement the wrong contract. The core's current `service_interrupt()` joins
+implement the wrong contract. The former atomic `service_interrupt()` joined
 recognition, IFR clearing, return-PC capture, stack update and vector transfer
-at one retirement boundary and charges five cycles. That aggregate is not a
-stage model; the manual's three-cycle INTR overhead alone does not justify
+at one retirement boundary and charged five cycles. The current entry splits
+the bus operations and defers IFR clearance to vector fetch; foreground
+recognition still occurs at an instruction boundary. The five-cycle aggregate
+is not a full pipeline model; the manual's three-cycle INTR overhead alone does not justify
 replacing it without accounting for recognition and drain separately.
 The next executable timing fixture must distinguish request latching,
 Decode-stage acceptance, memory-write visibility and vector entry. Timer
@@ -2171,6 +2173,16 @@ write and verify its completion without a second fetch or acknowledgement.
 Reset and debugger redirection cancel the pending entry. The aggregate entry
 cost remains the existing calibrated five cycles; its residual cycle does not
 establish foreground drain or the complete physical pipeline.
+IFR remains pending after source acceptance and is selectively cleared at
+the first vector fetch/IACK, as specified by SPRU131G 6.10.4. A one-clock
+checkpoint before Access asserts unchanged SP/stack, both original IFR bits
+and no acknowledgement, then saves that in-flight entry. Changing IMR to
+enable a different pending source cannot reselect the accepted vector; normal
+and restored continuations both clear only the originally accepted bit and
+stack the original PC once. The early-clear implementation fails this
+checkpoint (`tmp/c54x-ifr-fetch-red.log`); the required marker is
+`TMS320C54x accepted interrupt checkpoint: PASS`. This checks entry ordering
+and replay, not Decode-stage foreground drain or full pipeline latency.
 `check-c54x-core` requires the IRQ/NMI entry-spacing marker.
 `check-c54x-rom4-rf-boundary` retains 20,282 frame expiries, 648,096 RF reads
 and 1,519 port-`32` writes, with no port-`38/39` reads;

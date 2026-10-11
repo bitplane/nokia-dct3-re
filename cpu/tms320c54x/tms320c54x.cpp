@@ -1453,6 +1453,10 @@ bool tms320c54x_device::service_interrupt()
 		{
 		case 1: m_interrupt_stack_address = --m_sp; break;
 		case 2:
+			// SPRU131G 6.10.4 ties IFR clearance to vector Fetch/IACK,
+			// not to the earlier source selection at Decode.
+			if (m_interrupt_ack_source != INPUT_LINE_NMI)
+				m_ifr &= ~(u16(1) << m_interrupt_ack_source);
 			standard_irq_callback(m_interrupt_ack_source, logical_program_address(m_rtn));
 			m_pc = m_interrupt_vector_pc;
 			m_vector_prefetch_word = fetch();
@@ -1490,7 +1494,6 @@ bool tms320c54x_device::service_interrupt()
 		unsigned source = 0;
 		while (!BIT(pending, source))
 			++source;
-		m_ifr &= ~(u16(1) << source);
 		vector = source + 16;
 		acknowledged_source = source;
 	}
