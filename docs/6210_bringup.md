@@ -735,6 +735,20 @@ below that it returns zero, at/above it returns one. A weak record can
 select state 4 earlier, as the measured common response demonstrates.
 Do not interpret this bound as a requirement to send fourteen identical
 responses or fabricate enough strong carriers to fill the count quotas.
+The own controller's later response entrances are explicit:
+`1802` kind `8f` at `2d0f30` requires referenced state 3/4 and joins
+stage advancement at `2d1048`. The RX table routes `8f` through
+`4f60cc -> 458054`, posting to task 14 while that handler is enabled.
+The separate positive-content entrance at `2d0fc8` requires kind `80`,
+decoded object channel `40`, and the same state 3/4. It calls `38a27c`
+before joining `2d1048`. That parser extracts an ARFCN from object bytes
++10/+11, looks up an existing record, and returns without record mutation
+if lookup fails; arbitrary channel-40 bytes cannot establish a candidate.
+The parser then delegates content handling to `38a054`. These are bounded
+consumer contracts, not proof that a particular type-`09` request has
+received or completed either response. In particular, a measurement `8b`
+can establish the state guard, but does not supply decoded synchronization
+content or automatically publish the previously mapped `7f4` completion.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the response contract for foreign selection's
 type-`57` mode byte `03`, ownership of the pre-existing completion object,

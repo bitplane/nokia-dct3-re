@@ -23,6 +23,8 @@ class RadioContractTest(unittest.TestCase):
         self.assertEqual(result['selection_tx_writer'], '426a3c')
         self.assertEqual(result['selection_tx_ring'], '10000')
         self.assertEqual(result['selection_tx_write_index'], '100a4')
+        self.assertEqual(result['selection_completion_kind'], '8f')
+        self.assertEqual(result['selection_decoded_channel'], '40')
         self.assertEqual(result['traffic_release'], 'runtime physical End observation required')
 
 
