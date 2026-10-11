@@ -1,5 +1,12 @@
 # Structural boot regression
 
+Native Make gates use `NATIVE_SCRATCH_ROOT` (default: disk-backed, ignored
+`tmp/native-gates`) for fresh per-invocation working directories, not `/tmp`.
+Set an absolute path when overriding it. ROM4 warm/cold frontier logs live
+inside their own run directories and require both the expected frontier text
+and the accepted process status; concurrent runs cannot share those logs.
+Retained native artifacts can be pruned after their findings are banked.
+
 The LCD frame oracle proves the final visible state. Under `-video none`, the
 Lua harness mirrors the PCD8544 command/data stream and snapshots completed and
 frame-visible states; the phone driver has no parallel capture implementation.

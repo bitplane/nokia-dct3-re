@@ -1045,8 +1045,11 @@ check-dsp-rom4-cosim:
 
 .PHONY: check-mu4-nand
 .PHONY: check-mu4-storage-original
+# Native evidence can include large NAND images; never default to tmpfs.
+NATIVE_SCRATCH_ROOT ?= $(abspath tmp/native-gates)
 check-mu4-storage-original: build
-	@set -eu; tmp="$(if $(MU4_STORAGE_RUN_DIR),$(abspath $(MU4_STORAGE_RUN_DIR)),$$(mktemp -d /tmp/mu4-storage.XXXXXX))"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
+		tmp="$(if $(MU4_STORAGE_RUN_DIR),$(abspath $(MU4_STORAGE_RUN_DIR)),$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-storage.XXXXXX"))"; \
 		mkdir -p "$$tmp/roms/mu4nand"; \
 		$(PYTHON) tools/noki5510_a00_inventory.py roms/5510-mu4-reference/InitData_R060.a00 \
 			--extract-container --output "$$tmp/roms/mu4nand/mu4_initdata_container.bin"; \
@@ -1212,7 +1215,7 @@ check-mu4-bootstrap-original: build
 
 check-mu4-nand: build
 	# Controller conformance uses an in-memory save; do not emit 99 MiB of test NVRAM.
-	@set -eu; tmp="$$(mktemp -d /tmp/mu4-nand.XXXXXX)"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-nand.XXXXXX")"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) nandtest -video none -sound none \
 		-nothrottle -debugger none -log -nonvram_save -seconds_to_run 1 >output.log 2>&1; \
 		cat output.log; cat error.log; grep -q 'nandflash_conformance: PASS' error.log
@@ -1280,24 +1283,22 @@ prepare-c54x-rom4-fixture:
 		$(MAME_DIR)/roms/tms54rom4/dsp_cold_data.bin
 
 check-c54x-rom4-execute: build prepare-c54x-rom4-fixture
-	@$(MAME_DIR)/mame tms54rom4 -rompath $(MAME_DIR)/roms -video none -sound none \
-		-nothrottle -seconds_to_run 1 2>&1 | tee /tmp/tms320c54x-rom4-check.log
-	@grep -q "TMS320C54x ROM4 execution frontier: pc=7eca" \
-		/tmp/tms320c54x-rom4-check.log
-	@grep -q "TMS320C54x ROM4 frontier complete" \
-		/tmp/tms320c54x-rom4-check.log
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/rom4-execute.XXXXXX")"; \
+		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) tms54rom4 -rompath $(abspath $(MAME_DIR)/roms) -video none -sound none \
+			-nothrottle -seconds_to_run 1 >output.log 2>&1 || { status=$$?; test "$$status" -eq 3; }; \
+		cat output.log; grep -q "TMS320C54x ROM4 execution frontier: pc=7eca" output.log; \
+		grep -q "TMS320C54x ROM4 frontier complete" output.log
 
 check-c54x-rom4-cold-execute: build prepare-c54x-rom4-fixture
-	@$(MAME_DIR)/mame tms54rom4 -bios cold -rompath $(MAME_DIR)/roms -video none -sound none \
-		-nothrottle -seconds_to_run 1 2>&1 | tee /tmp/tms320c54x-rom4-cold-check.log
-	@grep -q "TMS320C54x ROM4 cold frontier: pc=0f01 sp=0000 pmst=ffa8 idle=0" \
-		/tmp/tms320c54x-rom4-cold-check.log
-	@grep -q "TMS320C54x ROM4 cold frontier complete" \
-		/tmp/tms320c54x-rom4-cold-check.log
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/rom4-cold-execute.XXXXXX")"; \
+		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) tms54rom4 -bios cold -rompath $(abspath $(MAME_DIR)/roms) -video none -sound none \
+			-nothrottle -seconds_to_run 1 >output.log 2>&1 || { status=$$?; test "$$status" -eq 3; }; \
+		cat output.log; grep -q "TMS320C54x ROM4 cold frontier: pc=0f01 sp=0000 pmst=ffa8 idle=0" output.log; \
+		grep -q "TMS320C54x ROM4 cold frontier complete" output.log
 
 .PHONY: check-c54x-rom4-counter-observe
 check-c54x-rom4-counter-observe: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-counter.XXXXXX)"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-counter.XXXXXX")"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
@@ -1315,7 +1316,7 @@ check-c54x-rom4-counter-observe: build
 
 .PHONY: check-c54x-rom4-compare
 check-c54x-rom4-compare: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-compare.XXXXXX)"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-compare.XXXXXX")"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
@@ -1443,7 +1444,7 @@ verify-5110-menu: build
 		echo 'NSE-1 ROM4 unassisted Phone book menu: PASS'
 
 verify-5110-late-input: build
-	@set -eu; tmp="$$(mktemp -d /tmp/noki5110-late-input.XXXXXX)"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-late-input.XXXXXX")"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/nvram/noki5110" "$$tmp/snap"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
@@ -1467,8 +1468,8 @@ verify-5110-late-input: build
 		echo 'NSE-1 ROM4 late physical Menu input: PASS'
 
 verify-5110-power-lifecycle: build
-	@set -eu; for kind in short long; do \
-		tmp="$$(mktemp -d /tmp/noki5110-power.XXXXXX)"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; for kind in short long; do \
+		tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-power.XXXXXX")"; \
 		mkdir -p "$$tmp/nvram/noki5110"; \
 		$(PYTHON) $(abspath tools/make_5110_eeprom_profile.py) \
 			--eeprom $(abspath roms/noki5110/nse-1.bin) \
@@ -1529,7 +1530,7 @@ check-c54x-opcode-coverage:
 	$(PYTHON) tools/c54x_opcode_coverage.py $(LOG) $(if $(ROM4_IDLE),--require-rom4-idle) $(if $(FIXTURE_LOG),--fixture-log $(FIXTURE_LOG)) $(if $(DECODE_SOURCE),--decoder-source $(DECODE_SOURCE)) $(if $(GROUPS),--group-report) $(if $(VARIANTS),--variant-report) $(if $(ALL_GAPS),--all-gaps)
 
 check-c54x-observed-coverage: build
-	@set -eu; tmp="$$(mktemp -d "$${TMPDIR:-/tmp}/noki5110-c54x-coverage.XXXXXX")"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; tmp="$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/noki5110-c54x-coverage.XXXXXX")"; \
 		trap 'rm -rf "$$tmp"' EXIT; \
 		mkdir -p "$$tmp/core" "$$tmp/rom4/nvram/noki5110" "$$tmp/menu/nvram/noki5110" "$$tmp/power/nvram/noki5110"; \
 		(cd "$$tmp/core"; $(abspath $(MAME_DIR))/mame tms54test \
