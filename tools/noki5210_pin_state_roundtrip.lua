@@ -50,6 +50,7 @@ retained[#retained + 1] = emu.add_machine_post_load_notifier(function()
             assert(emu.wait(2))
             machine.screens[':screen']:snapshot('5210_pin_state_menu.png')
         end
+        if _G.noki5210_pin_state_media then assert(emu.wait(3)) end
         press('End')
         assert(emu.wait(call and 8 or 2))
         machine.screens[':screen']:snapshot('5210_pin_recovered.png')

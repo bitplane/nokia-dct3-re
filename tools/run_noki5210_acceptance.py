@@ -62,6 +62,9 @@ SCENARIOS = {
     'pin-host-outgoing-call-state': Scenario('noki5210_pin_outgoing_call_state.lua',
                                             '--outgoing-call-state', seconds=60,
                                             net_masks=('32',), host_call='outgoing'),
+    'pin-host-outgoing-media-state': Scenario('noki5210_pin_host_media_state.lua',
+                                             '--outgoing-call-state', seconds=65,
+                                             net_masks=('32',), host_call='outgoing'),
     'pin-host-incoming-call': Scenario('noki5210_pin_host_incoming_call.lua', '--host-incoming-call',
                                       seconds=60, net_masks=('32',), host_call='incoming'),
     'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
@@ -103,7 +106,8 @@ def main():
     scenario = SCENARIOS[args.scenario]
     if args.pjsua and not scenario.host_call:
         parser.error('--pjsua requires a PIN host-call scenario')
-    if args.pjsua and args.scenario == 'pin-host-outgoing-call-state':
+    if args.pjsua and args.scenario in ('pin-host-outgoing-call-state',
+                                      'pin-host-outgoing-media-state'):
         parser.error('PIN host-call restoration has no promoted SIP contract')
     run = args.run_directory.resolve()
     try:
@@ -167,6 +171,7 @@ def main():
             else:
                 launch = None
             host_script = ('run_host_incoming_signaling_gate.py' if scenario.host_call == 'incoming' else
+                           'run_host_media_restore_gate.py' if args.scenario == 'pin-host-outgoing-media-state' else
                            'run_host_call_adapter_gate.py' if scenario.host_call == 'outgoing' else
                            'run_host_incoming_sms_gate.py' if scenario.host_sms == 'incoming'
                            else 'run_host_sms_gate.py')
@@ -177,7 +182,10 @@ def main():
                 launch.extend(['--caller', '5551234', '--ready-file',
                                str(run / 'snap/5210_pin_host_idle.png')])
             elif scenario.host_call == 'outgoing' and not args.pjsua:
-                launch.extend(['--number', '5551234', '--decision', 'connect'])
+                if args.scenario == 'pin-host-outgoing-media-state':
+                    launch.extend(['--number', '5551234', '--physical-end'])
+                else:
+                    launch.extend(['--number', '5551234', '--decision', 'connect'])
                 if args.scenario == 'pin-host-outgoing-call-state':
                     launch.append('--observe-restore')
             elif scenario.host_sms == 'outgoing':
@@ -220,9 +228,14 @@ def main():
                            host_args + [str(run / 'error.log')], check=True)
         if scenario.host_call == 'outgoing' and not args.pjsua:
             from tools.radio_host_outgoing_connect_check import verify, verify_restored
-            verify_host_call = (verify_restored if args.scenario == 'pin-host-outgoing-call-state'
-                                else verify)
-            verify_host_call((run / 'error.log').read_text(errors='replace'), '5551234')
+            text = (run / 'error.log').read_text(errors='replace')
+            if args.scenario == 'pin-host-outgoing-media-state':
+                from tools.radio_outgoing_host_media_restore_trace_check import check
+                check(text, physical_end=True)
+            else:
+                verify_host_call = (verify_restored if args.scenario == 'pin-host-outgoing-call-state'
+                                    else verify)
+                verify_host_call(text, '5551234')
         if args.scenario == 'pin-phonebook':
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),
                             '--scenario', 'pin-phonebook-read', '--preserved-nvram',

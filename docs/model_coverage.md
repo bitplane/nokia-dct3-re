@@ -98,6 +98,14 @@ then reaches ended after physical End and firmware CC/RR release. The ordinary
 host-connect mock, which disconnects before save/load, cannot prove this
 contract. This gate covers restored host signaling, not surviving or cleaned-up
 SIP dialogs, host media cursor restoration or native speech.
+`verify-5210-pin-host-outgoing-media-state` independently adds a continuously
+attached host echo backend, restored GSM-FR cursors, rejection of stale
+epoch-1 media and at least 80 contiguous accepted epoch-2 downlink frames.
+It retains exact architecture/pixel restoration and physical End followed by
+CC/RR release, ended state and paging. The fixture allows three additional
+seconds before End to exercise sustained restored transport. This is HLE
+frame transport, not decoded speech, a microphone/earpiece waveform test or
+SIP-dialog restoration.
 `verify-5210-pin-outgoing-call-sip` independently combines cold PIN
 authentication, physical dialing and End, real loopback SIP confirmation,
 bidirectional host media transport, ordered DISCONNECT/RELEASE/RELEASE COMPLETE

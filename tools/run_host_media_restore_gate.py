@@ -10,7 +10,7 @@ import sys
 if __package__ in (None, ""):
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from tools.run_host_call_adapter_gate import connect
+from tools.run_host_call_adapter_gate import connect, verify_initial_request
 
 
 async def run(args):
@@ -31,6 +31,8 @@ async def run(args):
                 kind = message.get("type")
                 if kind == "outgoing_call":
                     if initial_epoch is None:
+                        if args.physical_end:
+                            verify_initial_request(message, args.number)
                         initial_epoch = message["epoch"]
                         current_epoch = initial_epoch
                         await websocket.send(json.dumps({
@@ -41,6 +43,14 @@ async def run(args):
                         }))
                     continue
                 if kind == "outgoing_call_state":
+                    if args.physical_end and message.get('phase') == 'ended':
+                        if (message.get('request_id') != 1 or
+                                message.get('epoch') != current_epoch or
+                                current_epoch == initial_epoch or
+                                restored_frames < args.restored_frames):
+                            raise RuntimeError('physical release preceded restored media coverage')
+                        terminated = True
+                        continue
                     if message.get("phase") != "connected":
                         continue
                     previous_epoch = current_epoch
@@ -93,7 +103,7 @@ async def run(args):
                     downlink_sequence += 1
                     if current_epoch != initial_epoch:
                         restored_frames += 1
-                if restored_frames >= args.restored_frames:
+                if restored_frames >= args.restored_frames and not args.physical_end:
                     await websocket.send(json.dumps({
                         "type": "outgoing_call_terminate",
                         "epoch": current_epoch,
@@ -121,6 +131,9 @@ def main():
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--cwd")
     parser.add_argument("--restored-frames", type=int, default=80)
+    parser.add_argument('--physical-end', action='store_true',
+                        help='remain attached until handset-owned release after restored media')
+    parser.add_argument('--number', default='5551234')
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:

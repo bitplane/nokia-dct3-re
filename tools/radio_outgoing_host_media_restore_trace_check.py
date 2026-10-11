@@ -36,7 +36,15 @@ TERMINATION = re.compile(
 )
 
 
-def check(text: str, minimum_restored_frames: int = 80) -> None:
+def check(text: str, minimum_restored_frames: int = 80, *, physical_end: bool = False) -> None:
+    release = (
+        ('physical End', re.compile(r'5210_pin_state_physical: key=End(?:\s|$)')),
+        ('handset Disconnect', re.compile(r'GSM service uplink sapi=0 pd=03 message=25')),
+        ('network Release', re.compile(r'GSM service downlink kind=25 sapi=0 pd=03 message=2d')),
+        ('handset Release Complete', re.compile(r'GSM service uplink sapi=0 pd=03 message=2a')),
+    ) if physical_end else (
+        ('host termination', TERMINATION), ('network Disconnect', NETWORK_DISCONNECT),
+    )
     require_ordered(
         text,
         (
@@ -44,18 +52,22 @@ def check(text: str, minimum_restored_frames: int = 80) -> None:
             ("restored connected/media snapshot", RESTORED_STATE),
             ("stale pre-restore media rejection", STALE_MEDIA),
             ("restored media acceptance", ACCEPTED_MEDIA),
-            ("host termination", TERMINATION),
-            ("network Disconnect", NETWORK_DISCONNECT),
+            *release,
             ("RR release", RR_RELEASE),
+            *((('restored ended', re.compile(
+                r'gsm_call_adapter: state id=1 epoch=2 phase=ended')),)
+              if physical_end else ()),
             ("return to PCH", PCH),
         ),
         "host media restore",
     )
     state = RESTORED_STATE.search(text)
     assert state is not None
+    end = (text.index('5210_pin_state_physical: key=End', state.end())
+           if physical_end else len(text))
     accepted = [
         int(match.group("sequence"))
-        for match in ACCEPTED_MEDIA.finditer(text, state.end())
+        for match in ACCEPTED_MEDIA.finditer(text, state.end(), end)
     ]
     expected = int(state.group("downlink"))
     if len(accepted) < minimum_restored_frames:

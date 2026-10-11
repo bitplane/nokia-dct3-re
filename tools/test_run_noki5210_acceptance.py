@@ -76,6 +76,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-silent-sms': (155, '--silent-sms', ()),
             'pin-host-outgoing-call': (60, '--outgoing-call', ('32',)),
             'pin-host-outgoing-call-state': (60, '--outgoing-call-state', ('32',)),
+            'pin-host-outgoing-media-state': (65, '--outgoing-call-state', ('32',)),
             'pin-host-incoming-call': (60, '--host-incoming-call', ('32',)),
             'pin-sms-wait-state': (155, '--silent-sms-state', ()),
             'pin-phonebook': (55, '--phonebook-save', ()),
@@ -99,6 +100,7 @@ class RunnerTests(unittest.TestCase):
                             patch.object(runner.subprocess, 'run') as execute, \
                             patch('tools.radio_host_outgoing_connect_check.verify') as host_verify, \
                             patch('tools.radio_host_outgoing_connect_check.verify_restored') as restored_verify, \
+                            patch('tools.radio_outgoing_host_media_restore_trace_check.check') as media_verify, \
                             patch.object(Path, 'read_text', return_value='host trace'):
                         runner.main()
                     host = name.startswith('pin-host-')
@@ -106,10 +108,13 @@ class RunnerTests(unittest.TestCase):
                     rejected = name == 'pin-host-rejected-sms'
                     silent = name == 'pin-host-silent-sms'
                     call = name in ('pin-host-outgoing-call', 'pin-host-incoming-call',
-                                    'pin-host-outgoing-call-state')
+                                    'pin-host-outgoing-call-state', 'pin-host-outgoing-media-state')
                     incoming_call = name == 'pin-host-incoming-call'
                     self.assertEqual(execute.call_count, 3 if (host and not call) or name == 'pin-phonebook' else 2)
-                    if name == 'pin-host-outgoing-call-state':
+                    if name == 'pin-host-outgoing-media-state':
+                        media_verify.assert_called_once_with('host trace', physical_end=True)
+                        host_verify.assert_not_called()
+                    elif name == 'pin-host-outgoing-call-state':
                         restored_verify.assert_called_once_with('host trace', '5551234')
                         host_verify.assert_not_called()
                     elif call and not incoming_call:
@@ -124,6 +129,7 @@ class RunnerTests(unittest.TestCase):
                     if host:
                         self.assertEqual(Path(command[1]).name,
                                          'run_host_incoming_signaling_gate.py' if incoming_call else
+                                         'run_host_media_restore_gate.py' if name == 'pin-host-outgoing-media-state' else
                                          'run_host_call_adapter_gate.py' if call else
                                          'run_host_incoming_sms_gate.py' if incoming else 'run_host_sms_gate.py')
                         if incoming_call:
@@ -132,7 +138,10 @@ class RunnerTests(unittest.TestCase):
                                              str(run / 'snap/5210_pin_host_idle.png'))
                         elif call:
                             self.assertEqual(command[command.index('--number') + 1], '5551234')
-                            self.assertEqual(command[command.index('--decision') + 1], 'connect')
+                            if name == 'pin-host-outgoing-media-state':
+                                self.assertIn('--physical-end', command)
+                            else:
+                                self.assertEqual(command[command.index('--decision') + 1], 'connect')
                         elif not incoming:
                             self.assertEqual(command[command.index('--user-data') + 1], '61')
                             self.assertEqual(command[command.index('--decision') + 1],
