@@ -54,8 +54,10 @@ laboratory paging, reviewed caller pixels, physical Answer/End, full CC/RR
 closure and exact idle recovery. `verify-5210-pin-incoming-sms` independently
 adds segmented delivery, CP/RP/RR closure, persistent read-status SIM contents
 and physical Read with the existing exact `hello` frame. These gates establish
-HLE signaling and durable SIM/UI interaction, not native speech; PIN-enabled
-outgoing and save-state composition remain separate coverage.
+HLE signaling and durable SIM/UI interaction, not native speech.
+`verify-5210-pin-idle-state` adds exact time/PC/SP/RAM restoration, identical
+registered-idle pixels and physical post-load Menu/End. PIN-enabled outgoing,
+active-call restoration and delivered-SMS restoration remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record
 consumer before accepted delayed PIN; no random access follows within 45 s.

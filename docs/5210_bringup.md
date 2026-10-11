@@ -149,6 +149,14 @@ read-status update). This is durable card storage and firmware UI interaction,
 not a network-side delivery assertion. It does not establish PIN-enabled
 outgoing messaging, save-state replay or host SMS composition.
 
+`make verify-5210-pin-idle-state` separately saves coherent, PIN-authenticated
+registered idle and restores exact emulated time, PC/SP and the checksum over
+the modeled MCU RAM window. Reference and restored idle frames must be
+byte-identical and match the registered-idle oracle. Physical post-load Menu
+opens the reviewed Messages frame; End returns to the same idle oracle. This
+does not establish active-call or delivered-SMS restoration for the PIN-enabled
+composition; those remain separate tests.
+
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.
 The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a

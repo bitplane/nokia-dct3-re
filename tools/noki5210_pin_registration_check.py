@@ -71,6 +71,19 @@ def verify_pin_sms(text, card):
     ))
 
 
+def verify_pin_idle_state(text):
+    entries = re.findall(r'5210_pin_state: event=(saved|restored) pc=([0-9a-f]{8}) '
+                         r'sp=([0-9a-f]{8}) ram=([0-9a-f]{8}) t=([0-9.]+)', text)
+    if len(entries) != 2 or [entry[0] for entry in entries] != ['saved', 'restored'] or entries[0][1:] != entries[1][1:]:
+        raise ValueError('PIN idle time/PC/SP/RAM restoration differs or is incomplete')
+    require_in_order(text, ('LAPDm Location Updating Accept acknowledged nr=1',
+                           '5210_pin_state: event=saved', '5210_pin_state: event=restored',
+                           '5210_pin_state: result=pass',
+                           '5210_pin_state_physical: key=Left Softkey / Menu',
+                           '5210_pin_state_physical: key=End',
+                           '5210_pin_state: completed=true'))
+
+
 def verify_late_boundary(text, card):
     verify_authentication(text, card)
     require_in_order(text, (
@@ -131,12 +144,22 @@ def main():
                         help='verify physical Answer/End after coherent delayed-PIN registration')
     parser.add_argument('--incoming-sms', action='store_true',
                         help='verify SMS persistence and physical Read after coherent delayed PIN')
+    parser.add_argument('--idle-state', action='store_true',
+                        help='verify exact PIN-authenticated idle restoration and physical continuation')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms else verify)(text, card)
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state else verify)(text, card)
+        if args.idle_state:
+            verify_pin_idle_state(text)
+            with Image.open(run / 'snap/5210_pin_state_reference.png') as reference, \
+                    Image.open(run / 'snap/5210_pin_state_restored.png') as restored:
+                if reference.size != (84, 48) or restored.size != reference.size or reference.convert('L').tobytes() != restored.convert('L').tobytes():
+                    raise ValueError('PIN idle restored pixels differ')
+                if hashlib.sha256(reference.convert('L').tobytes()).hexdigest() != FRAMES['idle']:
+                    raise ValueError('PIN idle reference is not registered idle')
         if args.incoming_sms:
             verify_pin_sms(text, card)
         if args.incoming_call:
@@ -144,7 +167,9 @@ def main():
             require_in_order(text, ('SIM status ins=20 sw=9000',
                                    '5210_pin_physical: key=Send', '5210_pin_physical: key=End'))
             call_lifecycle(text, coherent_pin=True)
-        frames = ({'entered': FRAMES['entered'],
+        frames = ({'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
+                   'state_menu': '19b7a982404067d7ff58d584949b7c6aa3d322cf64215f5877d604f5b6e2ef16'} if args.idle_state else
+                  {'entered': FRAMES['entered'],
                    'sms_read': '6a101291e5215012ec718748cca30958cf55e688c0075678c34bcd30c2c9eea3'} if args.incoming_sms else
                   {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'ringing': '1b60299914790655da2e596290642a5bc16581debf66626cc018f08823ce787b'}
@@ -156,7 +181,8 @@ def main():
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 PIN-enabled persistent incoming SMS and physical Read PASS; research HLE' if args.incoming_sms else
+    print('5210 PIN-authenticated exact idle restoration and physical continuation PASS; research HLE' if args.idle_state else
+          '5210 PIN-enabled persistent incoming SMS and physical Read PASS; research HLE' if args.incoming_sms else
           '5210 PIN-enabled physical incoming-call lifecycle PASS; research HLE signaling, not native speech' if args.incoming_call else
           '5210 delayed PIN/measurement boundary reproduced; registration unresolved' if args.late_boundary else
           '5210 physical SIM PIN and subsequent laboratory registration PASS; research HLE')

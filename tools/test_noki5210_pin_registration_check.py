@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
-from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late, verify_pin_sms
+from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late, verify_pin_sms, verify_pin_idle_state
 
 
 def complete():
@@ -14,6 +14,26 @@ def complete():
 
 
 class PinRegistrationTest(unittest.TestCase):
+    def test_pin_idle_requires_exact_restoration_and_continuation(self):
+        text = '\n'.join((
+            'LAPDm Location Updating Accept acknowledged nr=1',
+            '5210_pin_state: event=saved pc=00200000 sp=00140000 ram=12345678 t=31.000000000',
+            '5210_pin_state: event=restored pc=00200000 sp=00140000 ram=12345678 t=31.000000000',
+            '5210_pin_state: result=pass',
+            '5210_pin_state_physical: key=Left Softkey / Menu',
+            '5210_pin_state_physical: key=End',
+            '5210_pin_state: completed=true',
+        ))
+        verify_pin_idle_state(text)
+        for old, new in (
+            ('restored pc=00200000', 'restored pc=00200002'),
+            ('ram=12345678 t=31.000000000\n5210_pin_state: result',
+             'ram=12345679 t=31.000000000\n5210_pin_state: result'),
+            ('key=End', 'key=missing'), ('completed=true', 'completed=false'),
+        ):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_pin_idle_state(text.replace(old, new))
+
     def test_pin_sms_closure_precedes_physical_read(self):
         text = '\n'.join((
             'sim_device: update fid=6f3c record=1 length=176',
