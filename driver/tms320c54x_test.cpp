@@ -3201,9 +3201,11 @@ private:
 				}
 			});
 		m_timer_probe_stack = data.install_write_tap(0x0fff, 0x0fff, "timer_probe_stack",
-			[this](offs_t, u16 &value, u16) {
+			[this, gap](offs_t, u16 &value, u16) {
 				if (!machine().side_effects_disabled() && m_timer_probe_entries == 1 && !m_timer_probe_return_pc)
 					m_timer_probe_return_pc = value;
+				if (!machine().side_effects_disabled() && gap && m_timer_probe_entries <= 4)
+					osd_printf_info("Staged timer continuation push: cycle=%llu pc=%04x entry=%u\n", (unsigned long long)m_cpu->pipeline_cycles(), value, m_timer_probe_entries);
 			});
 		// Observe scheduler-cycle accounting, not physical pipeline latency.
 		// Keep opcode fetch distinct from the observable internal-register bus write.
@@ -3228,6 +3230,21 @@ private:
 				if (!m_timer_probe_foreground_fetches++)
 					m_timer_probe_foreground_first_cycle = m_cpu->total_cycles();
 			});
+		m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove();
+		m_pipeline_operand_reads = m_pipeline_extensions_reads = 0;
+		if (gap)
+		{
+			m_pipeline_operand_tap = data.install_read_tap(0xffe, 0xfff, "staged_timer_return_samples",
+				[this](offs_t address, u16 &value, u16) {
+					if (machine().side_effects_disabled()) return;
+					if (m_pipeline_operand_reads++ < 8) osd_printf_info("Staged timer return sample: cycle=%llu address=%04x value=%04x\n", (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value);
+				});
+			m_pipeline_fetch_tap = program.install_read_tap(0x10608, 0x10613, "staged_timer_continuation_fetch",
+				[this](offs_t address, u16 &value, u16) {
+					if (machine().side_effects_disabled()) return;
+					if (m_pipeline_extensions_reads++ < 16) osd_printf_info("Staged timer continuation bus: cycle=%llu address=%06x word=%04x\n", (unsigned long long)m_cpu->pipeline_cycles(), unsigned(address), value);
+				});
+		}
 		m_check_timer->adjust(attotime::from_usec(100));
 	}
 	void start_intm_protection_case(unsigned index)

@@ -960,15 +960,17 @@ no-cell boundary, not radio acquisition.
 `make probe-c54x-timer-boundary` runs a separate, firmware-free observation
 profile (`tms54test -bios timer`). It reloads PRD through indirect stores,
 then sets AR1 to IMR and masks TINT. The ISR consists only of `PSHM XPC`
-and `FRETE`. With PRD 1 the current core repeatedly returns to `01:0608`,
-before the mask, with SP `1000` restored and IMR/IFR `0008`. With PRD 256
+and `FRETE`. With PRD 1 the atomic core repeatedly returns to `01:0608`,
+before the mask, with IMR/IFR `0008`; the observation deadline may fall
+inside the ISR with SP `0ffe` or `0fff`. With PRD 256
 it reaches the marker after masking, then the branch loop at `01:060f`;
 SP is again `1000`, IMR is zero and IFR retains pending TINT. No ROM,
 NAND, serial peripheral or handset state participates in this reproduction.
 The long-period control is checked, but the short-period result is printed
 rather than asserted as correct: this probe is not a fidelity gate. It is
-the small executable comparison for a future generic interrupt/write/drain
-timing correction. Full pipeline behavior still requires an independently
+the small executable comparison for generic interrupt/write/drain modeling,
+not proof that a timer period shorter than ISR service time must permit
+foreground progress. Full pipeline behavior still requires an independently
 derived timing oracle; changing PRD to make the handset proceed is not a fix.
 The same profile now checks direct-address masking as well: replacing the
 post-reload AR1 setup and indirect mask with `ANDM #fff7,*(0000)` leaves
@@ -2464,9 +2466,10 @@ A separate absolute ANDM fixture targets the real IMR register through the
 ordinary CPU data map: Read at 7 samples mask 1, Execute at 8 writes mask 0,
 the already-accepted interrupt finishes, and a subsequent IRQ remains pending
 with INTM clear. Its restored post-Read leg writes once without rereading IMR.
-This implements the form used by the timer-boundary probe, not that complete
-program: general staged control flow, idle rules and native enablement are still
-missing, so the timer/recorder starvation boundary remains unclosed.
+The complete synthetic timer program now executes in the staged subset,
+as described below. General control flow, idle rules and native enablement
+remain incomplete; this IMR fixture alone does not establish timer or recorder
+completion.
 
 Two-word immediate loads retain the opcode while the following fetched word
 completes Decode as its literal. They consume distinct program fetches
@@ -2575,7 +2578,20 @@ IMR, IFR and ST1; they separate a live timer from deferred acceptance.
 Evidence: `tmp/c54x-staged-timer-audit.log`. The atomic probe still stalls
 for short PRD and completes for long PRD; its behavior is unchanged.
 
-Next audit pending-IRQ far-return re-entry and the indirect continuation;
+The capped continuation trace distinguishes loss from repeated entry. In the
+short-period indirect gap control, the first entry stacks PC `060e` at clock
+22; FRETE samples XPC `0001` and PC `060e` at clocks 25/26. The mask opcode
+at `01:060e` is fetched at 28, then again at 37/46/55 as successive entries
+replace Decode before the literal arrives. The continuation is preserved,
+but immediate re-entry prevents its two-word Decode completing. In the
+direct control, the already-decoded absolute mask drains during entry at
+clock 22; PC `060f` is stacked at 23, returned through reads 26/27, then
+fetched at 29 before the marker completes. This is implementation evidence
+for retained drain versus pre-Decode replacement, not a silicon proof or
+justification for an added interrupt guard. Evidence:
+`tmp/c54x-staged-continuation.log`.
+
+Next validate far-return re-entry timing against independent pipeline evidence;
 repeat/delayed-control and idle rules remain separate completeness work.
 Those contracts must precede enabling
 the frontend for native firmware or claiming the timer/recorder stall fixed.
@@ -2593,9 +2609,11 @@ addressing fetches it two scheduler cycles after the reload and writes IMR
 four cycles after reload; direct addressing fetches and writes IMR two cycles
 after reload. Evidence: `tmp/c54x-foreground-fetch.log`. Thus the starvation
 is upstream of operand access or instruction retirement, not a fetched mask
-instruction whose store was lost. The future frontend must retain actual
-in-flight instruction ownership across interrupt recognition; adding only a
-late write queue cannot repair this case. These are scheduler-accounting
+instruction whose store was lost. The staged controls above retain in-flight
+instruction ownership and expose a different result according to whether
+the mask was decoded before entry. A late write queue alone cannot model
+that distinction. Neither observation proves that overloaded short-period
+foreground starvation is itself a silicon defect. These are scheduler-accounting
 observations, not measured silicon latencies or permission to insert a fixed
 two-cycle interrupt delay.
 
