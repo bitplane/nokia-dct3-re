@@ -6,6 +6,18 @@ from tools import extract_nsm3_verifier as verifier
 
 
 class VerifierExtractionTest(unittest.TestCase):
+    def test_3310_uses_own_descriptor_and_rejects_wrong_product(self):
+        image = bytearray(verifier.NHM5_DESCRIPTOR_OFFSET + 12)
+        struct.pack_into(">6H", image, verifier.NHM5_DESCRIPTOR_OFFSET,
+                         0x0f00, 0, 223, 0x0f00, 0xdc, 0)
+        image += b"\x12\x34" * 223
+        with patch.object(verifier.hashlib, "sha1", side_effect=[
+                self.digest(verifier.NHM5_FLASH_SHA1), self.digest(verifier.PROGRAM_SHA1)]):
+            self.assertEqual(verifier.extract(image, "3310"), b"\x12\x34" * 223)
+        with patch.object(verifier.hashlib, "sha1", return_value=self.digest(verifier.FLASH_SHA1)):
+            with self.assertRaisesRegex(ValueError, "pinned 3310"):
+                verifier.extract(image, "3310")
+
     def test_fragment_preserves_acquired_word_order(self):
         image = bytearray(0x1177dc)
         struct.pack_into(">6H", image, 0x117700, 0xff80, 0xff80, 104, 0x200, 0x8c, 0)

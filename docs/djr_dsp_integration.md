@@ -1547,6 +1547,19 @@ and `14` are not selected through this RAM table in this window. This
 bounded observation does not establish the complete request lifecycle,
 successful native execution, or the absence of other selection mechanisms.
 
+The own v6.39 entry-`1b` extraction is supported by
+`tools/extract_nsm3_verifier.py --product 3310`: 223 words, SHA-1
+`6646da3c5be9c70deda7e0b5b9f257d5d2ace815`, from descriptor file offset
+`0x1091d8`, guarded by the complete own-image hash. Static initialization
+at `0x2bc8ae..0x2bc8d8` writes the tuple
+`0100 0300 0000 e800 0001 0001 0200` beginning at MCU HPI `0x100f6`.
+The verifier's flash feeder starts at MCU `0x200040`, samples halfwords
+at stride `0x20`, sends 115 full 512-word chunks followed by 510 sampled
+words and two `ffff` words. Thus the own MCU establishes the 116-chunk
+geometry independently; it is not inferred from the matching 8210 payload.
+This prepares an own-input native fixture but does not yet execute it or
+identify the fitted DSP's PROM version and COBBA register values.
+
 This establishes byte identity, not unique archival provenance or a compatible
 resident DSP ROM. Other products share complete individual payloads: for
 example, 3210 v6.00 matches blocks `05`, `06`, `0f` and `16`. Raw images were
