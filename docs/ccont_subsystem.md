@@ -130,6 +130,14 @@ RTC/IRQ fixture, then a new isolated process with a private copy of its NVRAM.
 It requires retained minute/day values, the firmware-owned seconds reset,
 three ordered ticks and retained alarm latches. This is MMIO conformance,
 not proof of battery-removal behavior or cold handset clock provisioning.
+The loader accepts exactly the legacy four-byte counter record or the
+nine-byte retained-domain record. It checks the complete input before
+installing fields: short counters, truncated extensions, invalid armed/mask
+fields and trailing bytes are rejected without partially replacing defaults.
+The retention runner exercises these cases through actual MAME NVRAM loading,
+not an independent parser imitation. The trailing-byte negative fails on the
+old loader and passes after the end-of-file check; the physical 8890 cold-clock
+gate continues to pass with the supported record.
 The day/epoch byte may legitimately be zero after a firmware write; the
 storage format preserves register bytes rather than validating a calendar.
 

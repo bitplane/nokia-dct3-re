@@ -49,7 +49,8 @@ def main():
                            check=True, timeout=90)
         verify((cold / 'error.log').read_text(errors='replace'), stored)
         # Exercise the actual MAME loader, not a Python imitation of its parser.
-        compatibility = {'legacy': stored[:4], 'truncated': stored[:6],
+        compatibility = {'legacy': stored[:4], 'short_counters': stored[:3],
+                         'truncated': stored[:6], 'trailing': stored + b'\x00',
                          'invalid_armed': stored[:-1] + b'\x02',
                          'invalid_mask': stored[:7] + b'\x51\x00'}
         for name, payload in compatibility.items():

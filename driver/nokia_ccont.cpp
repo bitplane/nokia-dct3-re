@@ -120,6 +120,10 @@ bool nokia_ccont_device::nvram_read(util::read_stream &file)
 	if (retained_err || (retained_actual != 0 && retained_actual != sizeof(retained)) ||
 			retained[4] > 1 || (retained[3] & 0x0f))
 		return false;
+	uint8_t trailing;
+	auto const [trailing_err, trailing_actual] = util::read(file, &trailing, 1);
+	if (trailing_err || trailing_actual)
+		return false;
 	// Preserve register bytes, including the firmware's zero day/epoch value;
 	// this is not a serialized Gregorian calendar.
 	std::copy(std::begin(rtc), std::end(rtc), &m_regs[RTC_SECOND]);
