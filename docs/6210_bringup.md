@@ -550,6 +550,16 @@ The local consumer at `2d0f28` recognizes `1802` but its routes toward
 recognizes `03f9`; its continuation additionally checks the referenced
 state at `[1711dc]`. These static guards are pinned, but the runtime
 branch and referenced state's semantic ownership still need observation.
+Source/destination observation identifies the repeated foreign inputs as
+task-14 posts: `1802`/kind `83` has caller LR `457a1b` (post at `457a16`),
+and `03f9` has caller LR `3ba705` (post at `3ba700`). The national run
+also receives `1802` kinds `89`, `8b`, `84` and later `83`, without the
+mapped controller-dispatch hits. Therefore `1802` is not a uniquely
+missing foreign peer message; its MCU routing/context lifecycle matters.
+No `2d0f6e` continuation hits occur in either 25-second control. This
+remains a tap-bounded observation, not a proof that its state check is
+the sole reason the continuation does not run. Evidence:
+`tmp/6210-plmn-controller-post-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

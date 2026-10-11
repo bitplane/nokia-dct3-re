@@ -4,17 +4,29 @@ assert(machine.system.name == 'npe3hle', 'requires NPE-3 research-HLE compositio
 local cpu = assert(machine.devices[':maincpu'])
 local space = cpu.spaces['program']
 local busy, posts, inputs = false, 0, 0
+local controller_posts = 0
 local input_taps, watched = {}, {}
 local tap = space:install_read_tap(0x3c22c0, 0x3c22c3,
     'plmn_task14_census', function(address)
         if busy or address ~= 0x3c22c0 or cpu.state['PC'].value ~= 0x3c22c0 then return end
         local task = cpu.state['R0'].value
-        if task ~= 14 and inputs >= 24 then return end
+        if task ~= 14 and inputs >= 24 and controller_posts >= 24 then return end
         local object = cpu.state['R1'].value
         if object < 0x100000 or object + 9 >= 0x180000 then return end
         busy = true
         local status = space:read_u16(object)
         busy = false
+        local time = machine.time:as_double()
+        if (status == 0x3f9 or status == 0x1802) and time >= 9 and time <= 15
+            and controller_posts < 24 then
+            controller_posts = controller_posts + 1
+            busy = true
+            local kind = space:read_u8(object + 3)
+            busy = false
+            machine:logerror(string.format(
+                'plmn_controller_post: status=%04x kind=%02x task=%d object=%08x caller=%08x t=%.9f\n',
+                status, kind, task, object, cpu.state['R14'].value, time))
+        end
         if (status == 0x7d2 or status == 0x7d4 or status == 0x9c6 or status == 0x9c8
             or status == 0x1589 or status == 0x9fd or status == 0x419 or status == 0x7f4)
             and inputs < 24 then
@@ -88,7 +100,8 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
                     0x2e4f7c, 0x2e50c4, 0x2e6046, 0x2e60a2, 0x2e5c74,
                     0x2e4e62, 0x2e4e70, 0x2e6e68, 0x2a31ca, 0x2a3948,
                     0x2d1118, 0x2d111a, 0x4cfdd4, 0x313218,
-                    0x2d0d50, 0x2d1048, 0x2d2952, 0x2d2528, 0x2d0ee4}) do
+                    0x2d0d50, 0x2d1048, 0x2d2952, 0x2d2528, 0x2d0ee4,
+                    0x2d0f6e}) do
     local hits = 0
     decision_taps[#decision_taps + 1] = space:install_read_tap(pc & ~3, (pc & ~3) + 3,
         'plmn_decision_' .. pc, function(address)
@@ -100,6 +113,19 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
             if pc == 0x2e6e68 then
                 machine:logerror(string.format('plmn_state2_input: status=%08x t=%.9f\n',
                     cpu.state['R6'].value, machine.time:as_double()))
+            end
+            if not busy and pc == 0x2d0f6e then
+                busy = true
+                local owner = space:read_u32(0x1711dc)
+                local state = nil
+                if owner >= 0x100000 and owner + 4 < 0x180000 then
+                    state = space:read_u32(owner)
+                end
+                busy = false
+                machine:logerror(string.format(
+                    'plmn_controller_state: owner=%08x state=%s t=%.9f\n',
+                    owner, state and string.format('%08x', state) or 'unknown',
+                    machine.time:as_double()))
             end
             if not busy and pc == 0x2d2528 then
                 local context = cpu.state['R4'].value
