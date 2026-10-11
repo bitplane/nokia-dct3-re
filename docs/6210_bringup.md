@@ -853,6 +853,19 @@ LAI `1300620001`, rather than treating the LAPDm acknowledgement as Layer-3
 acceptance. Home registration, physical outgoing-call signaling and incoming
 SMS acceptance all pass with this same build.
 
+Passive byte-lane-aware observation locates the first construction of the
+MM STATUS cause at `29fb70`, not the later copies at `50698c`. The
+constructor at `29fb68` writes message type `31` and loads its cause from
+`16a814+8` via the literal at `29fd48`. A write-watch on that cause byte
+observes `60` being stored at `2a343c` at 11.234343692 s, then cleared by
+the constructor at `29fb78`. The own-ROM dispatcher compares its incoming
+input with `66` at `2a340a`; that branch reaches `2a344c`, loads cause `60`
+at `2a3452`, and joins the observed store. Thus the next census target is
+the producer of decoder-error input `66`, not the later release handling.
+These instruction sites are pinned by `noki6210_radio_contract.py`.
+Evidence: `tmp/6210-foreign-mm-cause-writer/error.log.gz`; the watch and
+transmit observation change no firmware state.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require
