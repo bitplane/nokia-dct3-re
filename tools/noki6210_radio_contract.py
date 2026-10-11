@@ -301,6 +301,19 @@ def verify(image):
         0x38b638: ('cmp', 'r2, #0x1e'),
         0x38b63c: ('ldrh', 'r0, [r0, #6]'),
         0x38b63e: ('cmp', 'r0, #0x28'),
+        0x38b2f2: ('bl', '#0x43e9be'),
+        0x38b330: ('strh', 'r1, [r0, #6]'),
+        0x38b346: ('strh', 'r1, [r0, #4]'),
+        0x43e9c2: ('cmp', 'r0, #0x7c'),
+        0x43e9c4: ('ble', '#0x43e9e8'),
+        0x43e9d4: ('blt', '#0x43e9e8'),
+        0x43e9dc: ('blt', '#0x43e9ea'),
+        0x43e9e2: ('bge', '#0x43e9ea'),
+        0x43e9e4: ('movs', 'r1, #2'),
+        0x43e9e8: ('movs', 'r1, #1'),
+        0x38b714: ('asrs', 'r0, r0, #0x18'),
+        0x38b71c: ('adds', 'r0, #0x68'),
+        0x38b720: ('bmi', '#0x38b74c'),
         0x3f2238: ('beq', '#0x3f225e'),
         0x3f225e: ('movs', 'r0, #3'),
         0x3f2266: ('ldr', 'r0, [pc, #0x344]'),
@@ -406,7 +419,8 @@ def verify(image):
                            0x4cffa0: 0x175454,
                            0x426d08: 0x170000, 0x426d80: 0x10000,
                            0x426ddc: 0x16ffe4,
-                           0x426e7c: 0x100a4}.items():
+                           0x426e7c: 0x100a4, 0x43ea98: 975,
+                           0x43ea8c: 886, 0x38b898: 0x1711cc}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
     if read(0x3f25ac, 4) != bytes.fromhex('002819a9') or read(0x2819a9, 3) != bytes([5, 3, 3]):

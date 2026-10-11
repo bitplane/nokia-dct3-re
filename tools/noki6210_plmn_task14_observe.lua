@@ -19,6 +19,10 @@ cpu.debug:bpset(0x4cfc34, nil,
 cpu.debug:bpset(0x4cfdb0, nil,
     'logerror "plmn_search_stage_return: result=%08x stage=%04x\\n",r0,w@175454;g')
 local busy, posts, inputs = false, 0, 0
+for _, pc in ipairs({0x38b6ae, 0x38b79c}) do
+    cpu.debug:bpset(pc, nil, string.format(
+        'logerror "plmn_measurement_counts: pc=%08x r0=%%08x r1=%%08x owner=%%08x state=%%08x counts=%%04x,%%04x,%%04x\\n",r0,r1,d@1711dc,d@(d@1711dc),w@(d@1711dc+4),w@(d@1711dc+6),w@(d@1711dc+8);g', pc))
+end
 local controller_posts = 0
 local search_requests = 0
 local input_taps, watched = {}, {}

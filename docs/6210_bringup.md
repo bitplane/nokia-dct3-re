@@ -702,6 +702,24 @@ where input 0 maps to `05`. These are not two configuration IDs inferred
 directly from byte+5. Next capture the configuration and cumulative counts
 around the existing common `8b` response, then decode which records advance
 each count before implementing the unanswered request.
+Own classifier `43e9be` returns class 1 for ARFCNs 0..124 and
+975..1023, class 2 for 512..885, otherwise zero (for the unsigned
+halfword inputs used here). `38b2ec` increments count +4 for class 1
+and +6 for class 2, bounded to 30/40 when its second argument is one.
+`38b6ae` reads each record's signed RSSI and stops before accepting a
+record below -104 dBm. The existing background peer reports receivable
+cells followed by `ffff`/-127 padding, so forty slots do not mean forty
+accepted measurements.
+Fresh paired read-only runs confirm the consequence in both boots:
+`38b6ae` receives configuration 3 with state/counts `0 / 0,0,0`; at
+`38b79c` the state is 4 and counts are `1,0,0`. Only one class-1 record
+was accepted, not the required 30+40. Foreign selection later resets
+this state and issues the unanswered `03030000` request. This rules out
+describing the common response as a complete multiband scan; it does not
+justify filling nonexistent strong carriers or duplicating the one cell
+to satisfy counters. Recover the mode's weak-result/scan-end behavior
+and retry budget as well as its band selector before changing the peer.
+Evidence: `tmp/6210-plmn-measurement-counts-{national,international}/error.log.gz`.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the response contract for foreign selection's
 type-`57` mode byte `03`, ownership of the pre-existing completion object,
