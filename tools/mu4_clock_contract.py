@@ -38,6 +38,20 @@ def decode_clkmd(value, input_hz=INPUT_HZ):
             'physical_system_clock_validated': False}
 
 
+def transition_seconds(value, *, entering_pll, locked=False, input_hz=INPUT_HZ):
+    """SPRU131G pp. 8-32/33; value supplies the PLL configuration on either exit.
+
+    For PLL -> DIV use the old PLL fields, not the protected write's fields.
+    Reset straps and IDLE3 wake timing are separate contracts.
+    """
+    pll = decode_clkmd(value | 2, input_hz)
+    rate = Fraction(*pll['requested_hz_fraction'])
+    input_cycles = 6 if entering_pll or value >> 12 != 15 else 12
+    if entering_pll and not locked:
+        input_cycles += pll['lock_count_input_cycles']
+    return Fraction(input_cycles, input_hz) + Fraction(7, 2) / rate
+
+
 def contract(source):
     if hashlib.sha256(source).hexdigest() != SOURCE_SHA256:
         raise ValueError('expected original R060 InitData source')
@@ -52,8 +66,15 @@ def contract(source):
             raise ValueError(f'CLKMD writer changed at {marker}:{address:06x}')
         rows.append({'segment': marker, 'setup_word_address': f'{address:06x}',
                      'observed_next_pc': f'{address + 4:06x}', **decode_clkmd(value)})
+    delays = []
+    for value in (0x77fb, 0x97fb):
+        duration = transition_seconds(value, entering_pll=True)
+        delays.append({'clkmd': f'{value:04x}',
+                       'unlocked_div_to_pll_seconds': [duration.numerator, duration.denominator],
+                       'unlocked_div_to_pll_us': float(duration * 1_000_000)})
     return {'source_sha256': SOURCE_SHA256, 'schematic_input_hz': INPUT_HZ,
             'writers': rows,
+            'ti_family_transition_predictions': delays,
             'scope': 'four pinned original writers and TI-family requested ratios; no complete writer census, DA150 PLL lock timing or execution rate validation'}
 
 

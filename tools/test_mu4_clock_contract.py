@@ -1,12 +1,30 @@
 from pathlib import Path
+from fractions import Fraction
 import struct
 import unittest
 
-from tools.mu4_clock_contract import contract, decode_clkmd, check_trace, WRITES
+from tools.mu4_clock_contract import contract, decode_clkmd, check_trace, transition_seconds, WRITES
 from tools.noki5510_a00_inventory import uploaded_word_image
 
 
 class ClockContractTest(unittest.TestCase):
+    def test_pll_transition_delay(self):
+        # Original x8/x10 requests: 255*16 lock ticks, six input ticks,
+        # then 3.5 ticks of the destination PLL clock.
+        for value, multiplier in ((0x77fb, 8), (0x97fb, 10)):
+            expected = Fraction(4086, 11_995_200) + Fraction(7, 2 * multiplier * 11_995_200)
+            self.assertEqual(transition_seconds(value, entering_pll=True), expected)
+            locked = transition_seconds(value, entering_pll=True, locked=True)
+            self.assertEqual(expected - locked, Fraction(4080, 11_995_200))
+            self.assertEqual(transition_seconds(value, entering_pll=False), locked)
+
+    def test_bypass_exit_and_fractional_pll_delay(self):
+        self.assertEqual(transition_seconds(0xf002, entering_pll=False, input_hz=1), Fraction(31, 2))
+        self.assertEqual(transition_seconds(0xf002, entering_pll=True, input_hz=1), Fraction(19, 2))
+        self.assertEqual(transition_seconds(0x3802, entering_pll=True, input_hz=1), Fraction(32, 3))
+        with self.assertRaises(ValueError):
+            transition_seconds(0, entering_pll=True, input_hz=0)
+
     def test_requested_rates(self):
         self.assertEqual([decode_clkmd(value)['requested_hz'] for value in (0x6004, 0x77fb, 0x97fb)],
                          [5_997_600, 95_961_600, 119_952_000])

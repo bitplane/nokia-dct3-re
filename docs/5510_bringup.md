@@ -980,6 +980,17 @@ passing at 13 MHz does not validate that clock model. The pending implementation
 boundary is PLLCOUNT/transition scheduling, selected system-clock publication
 and peripheral rate propagation.
 
+The tool also calculates exact TI-family transition predictions (SPRU131G
+pp. 8-32/33). An unlocked DIV-to-PLL request adds six input cycles and
+3.5 destination PLL cycles to the lock count: `77fb` predicts 340.672727 us,
+`97fb` predicts 340.665433 us. The processor continues in DIV mode during
+lock-up; PLLSTATUS changes only after the source switch. PLL-to-DIV has no
+lock-count delay and uses the old PLL configuration for its 3.5-cycle term;
+the input-cycle term becomes twelve for PLLMUL=15. A still-locked PLL skips
+the lock-count delay on re-entry. Exact rational tests cover these distinctions
+and fractional PLL ratios. These predictions do not establish DA150 reset
+straps or IDLE3 wake/relock behavior, and are not runtime timing measurements.
+
 The passive `tools/mu4_clock_observe.lua`, started with `-autoboot_delay 0`,
 observes all four writes in the original `bootstatus` fixture, from initial
 CLKMD zero at time zero to `97fb` at its 20-second endpoint. Native bootstrap,
