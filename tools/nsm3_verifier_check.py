@@ -51,17 +51,17 @@ def main():
     parser.add_argument("binary", type=Path)
     parser.add_argument("flash", type=Path)
     parser.add_argument("run_dir", type=Path)
-    parser.add_argument("--product", choices=("8210", "6210", "8250", "6250"), default="8210")
+    parser.add_argument("--product", choices=("8210", "6210", "8250", "6250", "3310"), default="8210")
     args = parser.parse_args()
     try:
         binary, flash, run = args.binary.resolve(), args.flash.resolve(), args.run_dir.resolve()
         system = {"8210": "nsm3verify", "6210": "npe3verify",
-                  "8250": "nsm3dverify", "6250": "nhm3verify"}[args.product]
+                  "8250": "nsm3dverify", "6250": "nhm3verify", "3310": "nhm5verify"}[args.product]
         count = 232 if args.product in ("6210", "6250") else 116
         flash_name = {"8210": "8210_5.31ppm_c.fls", "6210": "6210_556c.fls",
-                      "8250": "8250-502mcuppmk.fls", "6250": "6250-503mcuppmc.fls"}[args.product]
+                      "8250": "8250-502mcuppmk.fls", "6250": "6250-503mcuppmc.fls", "3310": "3310f639e.fls"}[args.product]
         fingerprint = {"8210": "c2e06006", "6210": "f65a0d46",
-                       "8250": "f3a3625c", "6250": "c62d430c"}[args.product]
+                       "8250": "f3a3625c", "6250": "c62d430c", "3310": "ce0f433f"}[args.product]
         rom_dir = run / system
         rom_dir.mkdir(parents=True, exist_ok=True)
         (rom_dir / "nsm3_verifier.bin").write_bytes(extract(flash.read_bytes(), args.product))

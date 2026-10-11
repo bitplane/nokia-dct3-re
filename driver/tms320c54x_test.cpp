@@ -22195,6 +22195,20 @@ ROM_START(nsm3dverify)
 		CRC(2c58e48b) SHA1(f26c98ffcfffbbd5714889e10cfa41c5f6dd2529))
 ROM_END
 
+// Own 3310 v6.39 input and MCU-derived 116-block geometry; no donor mask ROM.
+ROM_START(nhm5verify)
+	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
+	ROM_SYSTEM_BIOS(1, "cobba", "COBBA model comparison (not handset validation)")
+	ROM_SYSTEM_BIOS(2, "cobba_alt", "COBBA register-F sensitivity fixture")
+	ROM_SYSTEM_BIOS(3, "rom4", "PROM version sensitivity fixture")
+	ROM_REGION16_LE(446, "verifier", 0)
+	ROM_LOAD16_WORD_SWAP("nsm3_verifier.bin", 0, 446,
+		CRC(53e2de79) SHA1(6646da3c5be9c70deda7e0b5b9f257d5d2ace815))
+	ROM_REGION(0x200000, "flash", 0)
+	ROM_LOAD("3310f639e.fls", 0, 0x200000,
+		CRC(13430c77) SHA1(d5da65f417595200314eb0115bf46ca1fbf53128))
+ROM_END
+
 // NPE-3 additionally supplies a different block count and source extent.
 ROM_START(npe3verify)
 	ROM_SYSTEM_BIOS(0, "boundary", "Fail closed at unsupported peripheral")
@@ -22323,6 +22337,9 @@ SYST(2026, nsm3dverify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, npe3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "NPE-3 stock staged DSP verifier fixture",
+		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
+SYST(2026, nhm5verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
+		"MAME", "3310 own stock staged DSP verifier fixture",
 		MACHINE_NO_SOUND_HW | MACHINE_NOT_WORKING)
 SYST(2026, nhm3verify, 0, 0, verifier, 0, nsm3_verifier_state, empty_init,
 		"MAME", "6250 stock staged DSP verifier fixture",

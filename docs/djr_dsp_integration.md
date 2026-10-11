@@ -1557,8 +1557,16 @@ The verifier's flash feeder starts at MCU `0x200040`, samples halfwords
 at stride `0x20`, sends 115 full 512-word chunks followed by 510 sampled
 words and two `ffff` words. Thus the own MCU establishes the 116-chunk
 geometry independently; it is not inferred from the matching 8210 payload.
-This prepares an own-input native fixture but does not yet execute it or
-identify the fitted DSP's PROM version and COBBA register values.
+`verify-3310-native-verifier` executes this own-input payload in standalone
+native C54x configuration `nhm5verify`, without a donor mask ROM. It requires
+all 116 ordered chunks and fails closed at the first unsupported peripheral
+read: port `0x2d`, PC `0x0f9f`. Explicit comparison variants supply the
+existing COBBA model and PROM-version inputs; they publish at PC `0x0f64`
+with own-flash calculation fingerprint `ce0f433f` and PMST `ffa8`. Changing
+the supplied register-F value changes the published result, and the ROM4
+variant changes the supplied version result. These are peripheral
+sensitivity checks, not identification of the fitted DSP's PROM version,
+COBBA register values, a native handset boot, RF acquisition or speech.
 
 This establishes byte identity, not unique archival provenance or a compatible
 resident DSP ROM. Other products share complete individual payloads: for

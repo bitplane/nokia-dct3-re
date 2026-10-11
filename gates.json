@@ -1663,6 +1663,14 @@
       ]
     },
     {
+      "name": "verify-3310-native-verifier",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [
+        {"step": "check", "silent": false, "interpreter": "$(PYTHON)", "before_script": [], "script": "tools/nsm3_verifier_check.py", "arguments": ["$(MAME_DIR)/mame", "roms/noki3310/3310f639e.fls", "$(RUN_DIR)", "--product", "3310"]}
+      ]
+    },
+    {
       "name": "verify-6210-verifier",
       "prerequisites": ["build"],
       "variables": {},
