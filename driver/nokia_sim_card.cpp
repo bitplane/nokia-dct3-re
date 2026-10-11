@@ -1380,6 +1380,8 @@ void nokia_sim_card_device::queue_read_binary(unsigned requested)
 			selected_file_for(access_shape::transparent);
 	if (!file)
 		return;
+	if (!read_permitted(*file))
+		return;
 	const unsigned start = (unsigned(m_p1) << 8) | m_p2;
 	if (start + requested > file->size)
 	{
@@ -1599,7 +1601,7 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x6f05, 0x7f20, 4, 0, file_structure::transparent, false },
 		{ 0x6fb7, 0x7f20, 15, 0, file_structure::transparent, false },
 		{ 0x6fad, 0x7f20, 4, 0, file_structure::transparent, false },
-		{ 0x6f07, 0x7f20, 9, 0, file_structure::transparent, false },
+		{ 0x6f07, 0x7f20, 9, 0, file_structure::transparent, false, true },
 		{ 0x6f38, 0x7f20, 15, 0, file_structure::transparent, false },
 		{ 0x6f74, 0x7f20, 16, 0, file_structure::transparent, true },
 		{ 0x6f78, 0x7f20, 2, 0, file_structure::transparent, false },

@@ -178,7 +178,18 @@ private:
 		{0xc0, 0, 0, 1, 2, 0x90, 0},
 		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
 		{0xa4, 0, 0, 2, 0x6f39, 0x9f, 15},
-		{0xb2, 1, 4, 3, 0x12, 0x90, 0}
+		{0xb2, 1, 4, 3, 0x12, 0x90, 0, false, true},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f07, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f07, 0x90, 0},
+		{0xb0, 0, 0, 1, 0, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb0, 0, 0, 1, 8, 0x90, 0, false, true},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f07, 0x9f, 15},
+		{0xb0, 0, 0, 1, 0, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb0, 0, 0, 1, 8, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -542,6 +553,8 @@ private:
 					"immediately preceding SELECT supplies the selected file response");
 				if (item.body == 0x6f3a)
 					expect(m_bytes[9] == 0x11, "ADN advertises CHV1 for READ and UPDATE");
+				if (item.body == 0x6f07)
+					expect(m_bytes[9] == 0x10, "IMSI advertises CHV1 READ");
 			}
 			else if ((item.ins == 0xb2 || item.ins == 0xb0) && item.sw1 == 0x90)
 			{
@@ -582,6 +595,7 @@ private:
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
 			osd_printf_info("SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
+			osd_printf_info("SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

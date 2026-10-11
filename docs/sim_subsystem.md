@@ -209,12 +209,12 @@ unverified card returns `98 04`, including after restoration of an earlier
 unverified checkpoint. FCP advertises the same policy. The isolated serial
 fixture covers denial, wrong PIN, successful verification and restoration.
 Other transparent/vendor-file access conditions remain a separate audit.
-In particular, EF_IMSI (`6F07`) still advertises ALWAYS READ and
-`queue_read_binary` does not yet apply descriptor read access. GSM 11.11
-section 10.2.2 requires CHV1 for that file. This is a known remaining
-security gap, not evidence that the current transparent-file policy is valid.
-Its correction must test pre-PIN denial, post-PIN startup, and authorization
-reset independently of the record-file fixtures.
+EF_IMSI (`6F07`) independently enforces and advertises CHV1 READ, as required
+by GSM 11.11 section 10.2.2. READ BINARY applies the descriptor's access
+condition before returning data. The serial fixture proves pre-PIN denial,
+successful verification and readback, then denial after restoring the earlier
+unverified session. This does not close the remaining transparent/vendor-file
+policy audit or claim reset coverage from save-state restoration alone.
 These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
 ([ETSI specification](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf)).
 No retained handset trace uses SEEK;
