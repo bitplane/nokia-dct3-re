@@ -2727,6 +2727,53 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_branch_case(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_branch_case = variant;
+		u32 const base = variant & 2 ? 0x10000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i)
+		{
+			program.write_word(base + 0x600 + i, 0xf495);
+			program.write_word(base + 0x700 + i, 0xf495);
+		}
+		program.write_word(base + 0x600, variant & 1 ? 0xf073 : 0xf273);
+		program.write_word(base + 0x601, 0x700);
+		program.write_word(base + 0x602, 0xe822);
+		program.write_word(base + 0x603, 0xe933);
+		program.write_word(base + 0x604, 0x7711); // Must not reach Decode after redirect.
+		program.write_word(base + 0x700, 0xe844);
+		m_cpu->set_input_line(0, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false;
+		m_pipeline_expected_cycle = 1;
+		m_pipeline_drained_fetches = m_pipeline_extensions_reads = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(base + 0x700, base + 0x700, "branch_target_fetch",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 6, "Branch target Fetch follows literal Access");
+				++m_pipeline_drained_fetches;
+			});
+		m_pipeline_operand_tap = program.install_read_tap(base + 0x601, base + 0x601, "branch_literal_fetch",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 3 && value == 0x700, "Branch literal is fetched once independently of target instructions");
+				++m_pipeline_extensions_reads;
+			});
+		m_phase = 251170;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -23108,8 +23155,8 @@ private:
 				osd_printf_info("TMS320C54x staged fast returns: PASS cases=8 target_fetch=9 return_execute=10 delay_execute=11,12 resumed_execute=13 stack_reads=0 restore=8\n");
 				osd_printf_info("TMS320C54x staged return multiword delay: PASS cases=4 partial_decode_restore=2 completed_decode_restore=2 delay_execute=12 resumed_execute=13\n");
 				osd_printf_info("TMS320C54x staged pending return IRQ: PASS cases=4 request=9 vector_fetch=13,15 stack_write=14,16 continuation=0602,0604 pending_restore=4\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_pipeline_branch_case();
+				return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -23121,6 +23168,54 @@ private:
 			expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement retains the fast-return checkpoint");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 			m_phase = 251150;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251170)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u64 const checkpoint = m_pipeline_branch_case & 4 ? 5 : 3;
+			bool const delayed = !(m_pipeline_branch_case & 1);
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Branch frontend advances without executing flushed words");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 && m_cpu->state_int(tms320c54x_device::STATE_ST1) == 0x800, "Unconditional branch does not modify SP or interrupt mask");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 10 ? 0x44 : delayed && cycle >= 8 ? 0x22 : 0), "Branch delay or flush precedes target Execute");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == (delayed && cycle >= 9 ? 0x33 : 0), "Branch owns exactly two sequential delay words");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save branch partial Decode or redirected Prefetch");
+			}
+			if (cycle == 10)
+			{
+				expect(m_pipeline_drained_fetches == 1 && m_pipeline_extensions_reads == 1, "Branch restoration duplicates neither literal nor target fetch");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_drained_fetches = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore branch target and flush/delay ownership");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1;
+					m_phase = 251180;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_fetch_tap.remove(); m_pipeline_operand_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_branch_case < 7) { start_pipeline_branch_case(m_pipeline_branch_case + 1); return; }
+				osd_printf_info("TMS320C54x staged branches: PASS cases=8 literal_fetch=3 target_fetch=6 delay_execute=8,9 target_execute=10 restore=8\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251180)
+		{
+			expect(m_cpu->pipeline_cycles() == (m_pipeline_branch_case & 4 ? 5 : 3), "Settlement does not advance branch Prefetch");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_phase = 251170;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 			return;
 		}
@@ -23577,6 +23672,7 @@ private:
 	unsigned m_pipeline_indirect_case = 0;
 	unsigned m_pipeline_rmw_case = 0;
 	unsigned m_pipeline_return_case = 0;
+	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_extensions_reads = 0;
 	memory_passthrough_handler m_pipeline_write_tap;
 	memory_passthrough_handler m_pipeline_operand_tap;

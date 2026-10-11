@@ -2283,6 +2283,7 @@ short indirect loads using plain, post-decrement, post-increment or
 pre-increment addressing, and ANDM/ORM with DP-relative, plain/post-decrement/
 post-increment short indirect or three-word absolute (`f8`) operands, and
 RETF/RETFD with one-word load/NOP or two-word immediate-load delay slots.
+Two-word unconditional B/BD use the same retained-literal and redirect path.
 SP-relative, other indirect and other multiword forms stop at Decode without
 atomic fallback.
 
@@ -2319,6 +2320,17 @@ after the fixture callback, so IFR is checked from cycle 10, not inside the
 callback issuing the pulse. These are executable conformance checks of the
 staged acceptance/drain contract, not independent silicon latency measurements
 or general control-flow/hazard completeness.
+
+B/BD consume the target literal in Decode and initiate target Prefetch in
+Access, not at atomic retirement. Eight base/extended-page fixtures match
+SPRU131G examples 7-2/7-3: opcode/literal Fetch at 2/3, target Fetch at 6
+and target Execute at 10. B flushes the two sequential words; BD executes
+them at 8/9. The opcode and literal together retire as one retained operation
+at 7; this frontend does not expose the manual's separate first-word Execute
+occupancy at 6. Restoring partial Decode at 3 or redirected Prefetch at 5
+fetches neither literal nor target twice. SP and INTM remain unchanged.
+Conditional/far branches, calls and pending-interrupt timing during B/BD
+are outside this gate's coverage.
 
 Separate empty-frontend IRQ and NMI fixtures accept at cycle 1, fetch the
 vector at 4, write the continuation at 5 and retire the first ISR load at 8.

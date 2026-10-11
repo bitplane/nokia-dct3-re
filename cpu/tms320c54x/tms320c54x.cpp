@@ -1752,8 +1752,8 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = (word & 0xfeff) == 0x68f8 ? 3 :
-				((word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800) ? 2 : 1;
-			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf49b || word == 0xf69b))
+				((word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || word == 0xf073 || word == 0xf273) ? 2 : 1;
+			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf49b || word == 0xf69b || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
 				m_illegal = true;
@@ -1780,6 +1780,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		else if ((m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
+			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
 			((m_pipeline_word[2] & 0xfe00) == 0x6800 &&
 				(u8(m_pipeline_word[2]) == 0xf8 || (u8(m_pipeline_word[2]) < 0x98 &&
 					(BIT(m_pipeline_word[2], 7) || !BIT(m_st1, 14))))))
@@ -1800,7 +1801,8 @@ void tms320c54x_device::pipeline_step()
 		bool const rmw = (word & 0xfe00) == 0x6800 &&
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && (word & 0xff00) != 0xe800 &&
+		bool const branch = word == 0xf073 || word == 0xf273;
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !branch && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !short_load && !direct_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1808,12 +1810,13 @@ void tms320c54x_device::pipeline_step()
 			m_illegal = true;
 			return;
 		}
-		if (m_pipeline_valid[2] && fast_return)
+		if (m_pipeline_valid[2] && (fast_return || branch))
 		{
+			bool const delayed = word == 0xf69b || word == 0xf273;
 			m_pipeline_control_address = m_pipeline_address[2];
-			m_pipeline_control_words = word == 0xf69b ? 3 : 1;
-			m_pipeline_delay_decode_words = word == 0xf69b ? 2 : 0;
-			m_pipeline_decode_flush = word == 0xf49b ? 2 : 0;
+			m_pipeline_control_words = (branch ? 2 : 1) + (delayed ? 2 : 0);
+			m_pipeline_delay_decode_words = delayed ? 2 : 0;
+			m_pipeline_decode_flush = delayed ? 0 : 2;
 		}
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xf49b || m_pipeline_word[3] == 0xf69b))
@@ -1822,6 +1825,12 @@ void tms320c54x_device::pipeline_step()
 		// allowing target Prefetch now; no stack-memory read occurs.
 		++m_sp;
 		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_rtn;
+	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xf073 || m_pipeline_word[3] == 0xf273))
+	{
+		// SPRU131G examples 7-2/3: the target word's Access starts target
+		// Prefetch; the following two sequential words are delay or flush slots.
+		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
 	}
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
@@ -1852,6 +1861,8 @@ void tms320c54x_device::pipeline_step()
 		++m_opcode_count[m_op];
 		if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
+		else if (m_op == 0xf073 || m_op == 0xf273)
+			++m_pc; // Target fetch was already redirected in Access.
 		else if ((m_op & 0xfe00) == 0x1000)
 			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
 		else if ((m_op & 0xfc80) == 0x8000)
@@ -1873,10 +1884,10 @@ void tms320c54x_device::pipeline_step()
 		else
 			execute_one(m_op);
 		if (m_pipeline_control_words && (address & 0x7f0000) == (m_pipeline_control_address & 0x7f0000) &&
-			u16(address - m_pipeline_control_address) <= 2)
+			u16(address - m_pipeline_control_address) <= 3)
 		{
 			unsigned const words = (m_op & 0xfeff) == 0x68f8 ? 3 :
-				((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800) ? 2 : 1;
+				((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 			m_pipeline_control_words -= words;
 		}
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
