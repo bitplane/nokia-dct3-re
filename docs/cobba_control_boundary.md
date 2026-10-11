@@ -380,10 +380,17 @@ The signed stored pairs are therefore `(-2528,-3784)` and `(2528,3784)`;
 their dot product is exactly `-0x13c0040`, and cross product zero.
 The first 17 calls use the same six reads, with no writes by this helper
 in the observed TC-clear branch. These products are independently pinned in
-the arithmetic test. Prior-pair producers and TC-selected update lifecycle
-remain to be audited; the advancing outer cursor alone is not proof that each
-call consumes a different pair. No multiply/addressing defect is demonstrated
-by this captured case.
+the arithmetic test. The producers are active: initialization writes the four
+words at observed PCs `0x4725..0x4728` at 1.737134 seconds; repeated writes
+at `0x4752/0x4753/0x4756/0x4757` begin at 1.741749 seconds and republish
+the same four values approximately every 4.616 ms (first eight updates
+captured). Earlier filter-path writes at `0x33e5/0x33e7` populate these words,
+and reset clears occur at `0x0f15/0x3074`. Thus this case is not a stalled
+history update. Source-buffer selection and its relationship to the synthetic
+input phase remain to be audited; the advancing outer cursor alone is not
+proof that each call consumes a different pair. No multiply/addressing defect
+is demonstrated by this captured case. These PCs are values observed during
+bus writes, not independently recovered instruction-start labels.
 
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
