@@ -11,7 +11,7 @@ from tools.run_sip_handset_gate import main, verify_success
 
 class ConnectedSignalingTest(unittest.TestCase):
     def test_signaling_scope_rejects_unproved_combinations(self):
-        for options in (['--incoming'], ['--cancel-incoming'], ['--record-media'], ['--restore-outgoing'],
+        for options in (['--incoming'], ['--cancel-incoming'], ['--record-media'], ['--restore-call'],
                         ['--product', '8890'], ['--sip-response', '486'], ['--calls', '2']):
             with self.subTest(options=options), \
                     patch('sys.argv', ['gate', '--pjsua', 'unused', '--run-dir', 'unused',

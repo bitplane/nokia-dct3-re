@@ -49,6 +49,8 @@ def main():
                           help='physically connect and end a SIP dialog without claiming media')
     outgoing.add_argument('--incoming-connected-signaling', action='store_true',
                           help='physically answer and end a SIP dialog without claiming media')
+    outgoing.add_argument('--restore-outgoing-connected-signaling', action='store_true',
+                          help='restore a connected handset call and clear the external SIP dialog, without speech')
     outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='physically dial into SIP 486 instead of receiving CANCEL')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
@@ -60,7 +62,7 @@ def main():
     parser.add_argument('--http-port', type=int, default=18621)
     parser.add_argument('--sip-port', type=int, default=25621)
     args = parser.parse_args()
-    outgoing_status = 200 if args.outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
+    outgoing_status = 200 if args.outgoing_connected_signaling or args.restore_outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
     if (outgoing_status or args.incoming_connected_signaling or args.restore_outgoing_pending or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
@@ -79,7 +81,7 @@ def main():
                    '-autoboot_script', str(root / 'tools' / (
                        'noki6210_host_incoming_input.lua' if args.incoming_connected_signaling else
                        'noki6210_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
-                       'noki6210_sip_outgoing_restore.lua' if args.restore_outgoing_pending else
+                       'noki6210_sip_outgoing_restore.lua' if args.restore_outgoing_pending or args.restore_outgoing_connected_signaling else
                        'noki6210_outgoing_call_input.lua' if outgoing_status else
                        'noki6210_sip_idle_restore.lua' if args.restore_idle else
                        'noki6210_sip_cancel_observe.lua')),
@@ -92,6 +94,7 @@ def main():
                    '--product', '6210',
                    *(['--incoming', '--signaling-only', '--ready-file',
                       str(run / 'snap/6210_host_registered_idle.png')] if args.incoming_connected_signaling else
+                     ['--restore-outgoing', '--sip-response', '200', '--signaling-only'] if args.restore_outgoing_connected_signaling else
                      ['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', str(outgoing_status)] +
                      (['--signaling-only'] if args.outgoing_connected_signaling else []) if outgoing_status else
@@ -109,16 +112,16 @@ def main():
             text = (run / 'error.log').read_text(errors='replace')
             verify(text, runtime=True, selftest=True)
             check_registration(text, (run / 'nvram/npe3hle/sim_card').read_bytes())
-            if args.restore_outgoing_pending:
+            if args.restore_outgoing_pending or args.restore_outgoing_connected_signaling:
                 if ('LUA ERROR' in text.upper() or '6210_state: FAIL' in text or
                         'state_roundtrip: result=pass scenario=call' not in text):
-                    raise ValueError('pending call architecture did not restore exactly')
+                    raise ValueError('outgoing call architecture did not restore exactly')
                 before_save = text.split('6210_state: scenario=call event=saved', 1)[0]
                 check_registration(before_save, (run / 'nvram/npe3hle/sim_card').read_bytes())
             if ('6210_call_physical: action=send' not in text or
                     '6210_keypad_decoded: key=0e' not in text):
                 raise ValueError('outgoing SIP fixture did not physically decode Send')
-            frame_name = ('6210_state_call_after_release.png' if args.restore_outgoing_pending
+            frame_name = ('6210_state_call_after_release.png' if args.restore_outgoing_pending or args.restore_outgoing_connected_signaling
                           else '6210_after_outgoing_call.png')
             with Image.open(run / 'snap' / frame_name) as frame:
                 check_frame(frame, OPERATOR_SHA256, 'registered idle after SIP failure')
@@ -140,6 +143,7 @@ def main():
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6210 SIP signaling FAIL: {error}; inspect {run}\n')
     print('6210 research-HLE SIP ' + ('incoming connected signaling' if args.incoming_connected_signaling else
+          'outgoing connected signaling restoration' if args.restore_outgoing_connected_signaling else
           'incoming alerting restoration' if args.restore_incoming_alerting else
           'pending outgoing restoration' if args.restore_outgoing_pending else
           f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +

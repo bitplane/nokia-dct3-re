@@ -457,7 +457,7 @@ It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects media-acceptance fixtures for signaling-only
 products `6210`, `6250` and `8890`. The 6210 additionally admits only the
 single incoming/outgoing SIP-200 `--signaling-only` fixtures described below;
-recording, multiple calls and connected restoration remain excluded.
+recording, multiple calls and connected-incoming restoration remain excluded.
 The 8210 and 8850 have narrowly scoped
 single-call outgoing and incoming SIP-200 HLE media-transport fixtures and
 a separate connected-outgoing restore fixture. Explicit recording is
@@ -506,7 +506,16 @@ PC, SP, RAM checksum and time exactly. The host rejects the outstanding
 INVITE and clears the handset once under the new epoch. Complete CC/RR
 release, one missed-call notification, physical Exit and exact registered
 idle are required; Answer, CONNECT, accepted media and dialog replay are
-rejected. Connected restoration remains unproved for this product.
+rejected. Connected-incoming restoration remains unproved for this product.
+
+`verify-6210-sip-connected-outgoing-restore` physically dials `1234567` and
+saves after a real SIP-200 connection. Restoring the handset clears, rather
+than resurrects, the external dialog: one BYE, one cause-41 termination,
+complete CC/RR release and exact registered-idle recovery are required.
+The architectural round trip checks PC, SP, RAM and emulated time. The bridge
+reports its uplink count before discarding old-epoch counters; zero uplink
+and absence of HLE codec ticks are mandatory. No redial, native speech or
+audible playback is established by this signaling-only gate.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:

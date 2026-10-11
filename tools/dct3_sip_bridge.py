@@ -268,6 +268,8 @@ async def bridge(args, pj):
                             if event.get('protocol_version') != 1:
                                 raise RuntimeError('unsupported host protocol')
                             if epoch is not None and epoch != event.get('epoch'):
+                                if identity is not None:
+                                    print(f'SIP epoch media discarded {json.dumps(counts)}', flush=True)
                                 endpoint.hangup()
                                 blocked_restore = event.get('calls_idle') is not True
                                 restored_identity = None

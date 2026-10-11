@@ -917,6 +917,14 @@ End and complete release, with exact idle recovery. Zero bridge uplink and
 no HLE speech ticks remain required; incoming signaling does not establish
 PCM timing, audible playback or native DSP speech.
 
+`verify-6210-sip-connected-outgoing-restore` saves a physically dialed,
+connected SIP call and checks an exact handset architectural round trip.
+The external dialog is cleared with BYE under the new epoch, not restored
+or redialed. One cause-41 termination, full CC/RR release and exact idle
+recovery are required. Pre-reset bridge uplink must be zero and no HLE codec
+tick may run. Connected-incoming restoration remains unproved; this gate
+does not change the PCM or native-speech boundary.
+
 `verify-6210-pcm-missing` independently answers and ends an incoming call
 using physical keys, unchanged own PMM and the existing NPE-3 upload,
 registration and call-signaling checks. Only external network configuration

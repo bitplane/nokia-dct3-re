@@ -45,7 +45,7 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 self.check(log=wrong, product='8210')
 
-    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, connected=False, product='3210'):
+    def check(self, log=LOG, bridge=BRIDGE, remote=REMOTE, connected=False, product='3210', signaling_only=False):
         if product == '3310':
             log = log.replace('length=15 data=03450401a05e0581551532f4150101',
                               'length=19 data=03450404600200815e0581551532f4a2150101')
@@ -56,7 +56,7 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
             root = Path(directory)
             (root / 'error.log').write_text(log)
             (root / 'sip-bridge.log').write_text(bridge)
-            verify_outgoing_restore(root, remote, connected, product)
+            verify_outgoing_restore(root, remote, connected, product, signaling_only=signaling_only)
             return (root / 'sip-result.json').read_text()
 
     def test_product_scope(self):
@@ -65,6 +65,26 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
         self.assertIn('5210 pending outgoing', self.check(product='5210'))
         self.assertIn('3330 pending outgoing', self.check(product='3330'))
         self.assertIn('8850 pending outgoing', self.check(product='8850'))
+
+    def test_6210_connected_signaling_restore_requires_no_codec_or_uplink(self):
+        log = LOG.replace('5551234', '1234567').replace(
+            '03450401a05e0581551532f4150101', '03450401a05e0581214365f7150101')
+        log = log.replace('sip_state: saved',
+            'gsm_call_adapter: state id=1 epoch=1 phase=connected\nsip_state: saved')
+        log = log.replace('termination id=1 cause=41 result=accepted\noutgoing termination consumed id=1 cause=41',
+            'outgoing termination consumed id=1 cause=41\ntermination id=1 cause=41 result=accepted')
+        bridge = BRIDGE + 'SIP epoch media discarded {"uplink": 0}\n'
+        remote = 'state changed to CONFIRMED\nRequest msg BYE/\n'
+        result = self.check(log=log, bridge=bridge, remote=remote, connected=True,
+                            product='6210', signaling_only=True)
+        self.assertIn('"speech_tested": false', result)
+        for bad_bridge, bad_log in (
+                (BRIDGE, log), (bridge + 'SIP epoch media discarded {"uplink": 0}\n', log),
+                (bridge.replace('"uplink": 0', '"uplink": 1'), log),
+                (bridge, log + 'dsp_hle: speech tick\n')):
+            with self.subTest(bridge=bad_bridge, log=bad_log), self.assertRaises(RuntimeError):
+                self.check(log=bad_log, bridge=bad_bridge, remote=remote, connected=True,
+                           product='6210', signaling_only=True)
 
     def test_missing_or_malformed_product_setup_is_rejected(self):
         for log in (LOG.replace('message=05', 'message=06'),
