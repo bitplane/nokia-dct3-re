@@ -174,12 +174,28 @@ def main():
                         help='verify physical dialling after coherent delayed PIN')
     mode.add_argument('--outgoing-sms', action='store_true',
                         help='verify physical SMS composition after coherent delayed PIN')
+    mode.add_argument('--outgoing-call-state', action='store_true',
+                      help='restore a physically originated connected call before physical End')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms else verify)(text, card)
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms or args.outgoing_call_state else verify)(text, card)
+        if args.outgoing_call_state:
+            from tools.radio_5210_outgoing_call_trace_check import verify as outgoing_call
+            from tools.radio_outgoing_call_trace_check import CONNECT_ACKNOWLEDGE, DISCONNECT
+            outgoing_call(text, coherent_pin=True)
+            require_in_order(text, ('SIM status ins=20 sw=9000',) + tuple(
+                '5210_pin_physical: key=Keypad ' + digit for digit in '5551234') + (
+                '5210_pin_physical: key=Send', '5210_pin_state: event=saved',
+                '5210_pin_state: event=restored', '5210_pin_state_physical: key=End'))
+            acknowledged = CONNECT_ACKNOWLEDGE.search(text)
+            disconnected = DISCONNECT.search(text)
+            saved = text.index('5210_pin_state: event=saved')
+            restored = text.index('5210_pin_state: event=restored')
+            if not acknowledged or not disconnected or not acknowledged.start() < saved < restored < disconnected.start():
+                raise ValueError('outgoing call restoration must fall between Connect acknowledgment and Disconnect')
         if args.outgoing_sms:
             verify_pin_outgoing_sms(text)
         if args.outgoing_call:
@@ -188,8 +204,8 @@ def main():
                 '5210_pin_physical: key=Keypad ' + digit for digit in '5551234') + (
                 '5210_pin_physical: key=Send', '5210_pin_physical: key=End'))
             outgoing_call(text, coherent_pin=True)
-        if args.idle_state or args.call_state or args.sms_state:
-            verify_pin_idle_state(text, call=args.call_state, sms=args.sms_state)
+        if args.idle_state or args.call_state or args.sms_state or args.outgoing_call_state:
+            verify_pin_idle_state(text, call=args.call_state or args.outgoing_call_state, sms=args.sms_state)
             with Image.open(run / 'snap/5210_pin_state_reference.png') as reference, \
                     Image.open(run / 'snap/5210_pin_state_restored.png') as restored:
                 if reference.size != (84, 48) or restored.size != reference.size or reference.convert('L').tobytes() != restored.convert('L').tobytes():
@@ -213,7 +229,7 @@ def main():
                    'sms_composed': 'f38afdd41fe1284a3f5f1e2e4ca3876c7ad9cc63e0ab6802be72d3a1f24bb3d4',
                    'sms_sent': '1eda22f78cde69cd4f9add1c90732b07254f3742ade7aede18cb818219712a78'} if args.outgoing_sms else
                   {'entered': FRAMES['entered'], 'idle': FRAMES['idle'], 'recovered': FRAMES['recovered']} if args.outgoing_call else
-                  {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered']} if args.call_state else
+                  {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered']} if args.call_state or args.outgoing_call_state else
                   {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'state_menu': '19b7a982404067d7ff58d584949b7c6aa3d322cf64215f5877d604f5b6e2ef16'} if args.idle_state else
                   {'entered': FRAMES['entered'],
@@ -228,7 +244,8 @@ def main():
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 PIN-enabled physical outgoing SMS and Message sent PASS; research HLE' if args.outgoing_sms else
+    print('5210 PIN-enabled outgoing-call restoration and physical release PASS; HLE signaling, not native speech' if args.outgoing_call_state else
+          '5210 PIN-enabled physical outgoing SMS and Message sent PASS; research HLE' if args.outgoing_sms else
           '5210 PIN-enabled physical outgoing-call lifecycle PASS; HLE signaling, not native speech' if args.outgoing_call else
           '5210 PIN-enabled delivered-SMS restoration and persistent physical Read PASS; research HLE' if args.sms_state else
           '5210 PIN-enabled active-call restoration and physical release PASS; HLE signaling, not native speech' if args.call_state else

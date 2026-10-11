@@ -3,6 +3,7 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local machine = manager.machine
 local call = _G.noki5210_pin_state_call == true
+local outgoing = _G.noki5210_pin_state_outgoing == true
 local sms = _G.noki5210_pin_state_sms == true
 local cpu = assert(machine.devices[':maincpu'])
 local observe = dofile(directory .. 'dct3_state_snapshot.lua')(machine, cpu, '5210_pin_state')
@@ -64,10 +65,14 @@ _G.noki5210_pin_state_retained = retained
 _G.noki5210_pin_after_accept = function(press)
     assert(emu.wait(10))
     if call then
+        if outgoing then
+            _G.noki5210_pin_gap = 0.35
+            for digit in ('5551234'):gmatch('.') do press('Keypad ' .. digit) end
+        end
         press('Send')
-        assert(emu.wait(3))
+        assert(emu.wait(outgoing and 6 or 3))
     end
-    local name = call and '5210_pin_call' or sms and '5210_pin_sms' or '5210_pin_idle'
+    local name = outgoing and '5210_pin_outgoing_call' or call and '5210_pin_call' or sms and '5210_pin_sms' or '5210_pin_idle'
     machine:save(name)
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

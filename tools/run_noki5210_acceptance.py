@@ -41,6 +41,8 @@ SCENARIOS = {
     'pin-outgoing-call': Scenario('noki5210_pin_outgoing_call.lua', '--outgoing-call',
                                   seconds=60, net_masks=('32',)),
     'pin-outgoing-sms': Scenario('noki5210_pin_outgoing_sms.lua', '--outgoing-sms', seconds=70),
+    'pin-outgoing-call-state': Scenario('noki5210_pin_outgoing_call_state.lua',
+                                        '--outgoing-call-state', seconds=60, net_masks=('32',)),
 }
 
 

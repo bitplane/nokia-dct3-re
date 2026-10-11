@@ -183,6 +183,14 @@ the original outgoing gate continues to require its own different headers.
 The default laboratory session supplies the remote party. This does not prove
 PIN-enabled host/SIP composition or native speech.
 
+`make verify-5210-pin-outgoing-call-state` separately restores the physically
+originated call after Connect Acknowledge and before physical End. Time,
+PC, SP, full modeled RAM and connected reference/restored pixels must match;
+the restored call then completes CC/RR release and returns to the exact idle
+oracle. The gate also requires the physical dialled digits and coherent PIN
+channel headers. This covers handset-originated HLE call restoration, not
+an external SIP dialog or native speech.
+
 `make verify-5210-pin-outgoing-sms` physically enters Messages after delayed
 PIN, composes the predictive-text character `a`, selects Send and enters
 `5551234`. It requires exactly one complete SMS-SUBMIT
@@ -191,7 +199,7 @@ one, network CP-ACK/RP-ACK, handset final CP-ACK and service RR release.
 Reviewed composer and `Message sent` frames are exact pixel oracles. The
 transaction uses the coherent laboratory network; no editor contents or
 message bytes are injected. This does not establish PIN-enabled host SMS
-submission or outgoing-transaction save-state replay.
+submission or outgoing-SMS transaction save-state replay.
 
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.

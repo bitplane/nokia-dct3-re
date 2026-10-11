@@ -23,6 +23,7 @@ class RunnerTests(unittest.TestCase):
             'pin-sms-state': (45, '--sms-state', ('4',)),
             'pin-outgoing-call': (60, '--outgoing-call', ('32',)),
             'pin-outgoing-sms': (70, '--outgoing-sms', ()),
+            'pin-outgoing-call-state': (60, '--outgoing-call-state', ('32',)),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
