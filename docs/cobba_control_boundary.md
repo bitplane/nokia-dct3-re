@@ -335,6 +335,17 @@ and `-16384` match the existing coefficient, lane and rounding expectations.
 This validates the isolated filter contract on the current core, not the
 continuous correlation score, physical RF timing or acquisition.
 
+Bounded passive taps localize the current rotating-input result further.
+The first eight entries at `0x4778` have `A=0x0d047a80`, `B=0`,
+`ST1=0x6103`; at `0x478a` the scratch denominator at data `0x0060`
+is `0x0a90` and both accumulators are zero. At `0x4791`, `A=0x6e40`
+and `B=0`; at `0x4796`, `A=0x800538`, before the returned low-word
+score becomes `0x0538`. These are current execution observations, not an
+independent arithmetic oracle. The next discriminator is an instruction-level
+audit of this normalization path and its incoming correlation state against
+the documented C54x semantics; changing divisor, scaling or threshold is not
+supported by these observations.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
