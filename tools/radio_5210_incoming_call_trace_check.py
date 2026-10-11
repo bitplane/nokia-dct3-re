@@ -82,8 +82,17 @@ STATE_ROUNDTRIP = re.compile(r"state_roundtrip: result=pass")
 
 def verify(
         text: str, a5_1: bool = False,
-        require_state_roundtrip: bool = False) -> None:
+        require_state_roundtrip: bool = False, coherent_pin: bool = False) -> None:
     checkpoints = list(BASE_CHECKPOINTS)
+    if coherent_pin:
+        replacements = {
+            'NSM-5 traffic-channel configuration':
+                r'TX packet type=02 payload=20 .*data=041202000271012fc10000560000000400000000',
+            'NSM-5 release channel transaction':
+                r'TX packet type=02 payload=20 .*data=041202001117001a600000560000001400000001',
+        }
+        checkpoints = [(label, re.compile(replacements[label]) if label in replacements else pattern)
+                       for label, pattern in checkpoints]
     if a5_1:
         checkpoints[5] = (
             "redacted NSM-5 A5/1 cipher-control publication",

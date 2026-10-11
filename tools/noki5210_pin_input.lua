@@ -23,6 +23,10 @@ local input = coroutine.create(function()
     for _, name in ipairs({'Keypad 1', 'Keypad 2', 'Keypad 3', 'Keypad 4'}) do press(name) end
     snapshot('entered')
     press('Left Softkey / Menu')
+    if _G.noki5210_pin_after_accept then
+        _G.noki5210_pin_after_accept(press, snapshot)
+        return
+    end
     assert(emu.wait(10))
     snapshot('idle')
     press('Left Softkey / Menu')

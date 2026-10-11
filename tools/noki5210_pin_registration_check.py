@@ -111,19 +111,31 @@ def main():
                         help='verify the unresolved delayed-readiness boundary, not registration')
     parser.add_argument('--coherent-late', action='store_true',
                         help='verify delayed PIN with the own ARFCN 86 laboratory topology')
+    parser.add_argument('--incoming-call', action='store_true',
+                        help='verify physical Answer/End after coherent delayed-PIN registration')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late else verify)(text, card)
-        for phase, digest in ({} if args.late_boundary else LATE_FRAMES if args.coherent_late else FRAMES).items():
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call else verify)(text, card)
+        if args.incoming_call:
+            from tools.radio_5210_incoming_call_trace_check import verify as call_lifecycle
+            require_in_order(text, ('SIM status ins=20 sw=9000',
+                                   '5210_pin_physical: key=Send', '5210_pin_physical: key=End'))
+            call_lifecycle(text, coherent_pin=True)
+        frames = ({'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
+                   'ringing': '1b60299914790655da2e596290642a5bc16581debf66626cc018f08823ce787b'}
+                  if args.incoming_call else {} if args.late_boundary else
+                  LATE_FRAMES if args.coherent_late else FRAMES)
+        for phase, digest in frames.items():
             with Image.open(run / f'snap/5210_pin_{phase}.png') as frame:
                 if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 delayed PIN/measurement boundary reproduced; registration unresolved' if args.late_boundary else
+    print('5210 PIN-enabled physical incoming-call lifecycle PASS; research HLE signaling, not native speech' if args.incoming_call else
+          '5210 delayed PIN/measurement boundary reproduced; registration unresolved' if args.late_boundary else
           '5210 physical SIM PIN and subsequent laboratory registration PASS; research HLE')
 
 

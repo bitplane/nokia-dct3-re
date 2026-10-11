@@ -35,6 +35,15 @@ RX enqueue type=80 payload=34 data=600000001311000100001506210001f0
 
 
 class Radio5210IncomingCallTraceCheckTest(unittest.TestCase):
+    def test_coherent_pin_uses_own_channel_headers(self):
+        text = GOOD.replace('040002000271012fc1000001', '041202000271012fc1000056').replace(
+            '040000001117001a60000056', '041202001117001a60000056')
+        verify(text, coherent_pin=True)
+        with self.assertRaises(ValueError):
+            verify(text)
+        with self.assertRaises(ValueError):
+            verify(GOOD, coherent_pin=True)
+
     def test_accepts_complete_lifecycle(self):
         verify(GOOD)
 

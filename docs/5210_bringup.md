@@ -129,6 +129,16 @@ physical End recovery frames are checked independently. The PIN-enabled
 coherent run emits release header `041202`; the original no-PIN/early-PIN gate
 retains its separate `040000` expectation. Neither checker accepts both.
 
+`make verify-5210-pin-incoming-call` composes this delayed physical PIN and
+coherent topology with laboratory paging, caller `5551234`, physical Send/End,
+Connect/Disconnect, CC/RR closure, speech-control start/stop and exact registered
+idle recovery. The ringing frame and masked PIN frame are independently pinned.
+The PIN-enabled traffic request is
+`041202000271012fc10000560000000400000000`; release is
+`041202001117001a600000560000001400000001`. The original call profile retains
+its different headers. This is research-HLE signaling and speech-control
+coverage, not native DSP execution, intelligible speech or a host-originated call.
+
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.
 The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a
