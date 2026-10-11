@@ -2107,6 +2107,14 @@ own registration and persisted EF_LOCI. The interactive idle oracle is
 distinct from the DISPLAY TEXT-only numeric-PLMN frame. Arbitrary text,
 UCS2, cancellation, menu selection and native DSP are outside this gate.
 
+The separate own-ROM 8850 menu, SMS, accepted-call and refused-call gates
+extend this coverage without changing the acquired MCU/PMM. Their current
+contracts are summarized in [Model Coverage](model_coverage.md): physical
+item selection produces the card ENVELOPE; SEND SHORT MESSAGE completes
+through CP/RP/RR; SET UP CALL requires physical consent and complete CC/RR
+release; physical Cancel returns result `22` without starting a GSM call.
+These are laboratory research-HLE contracts, not native DSP or speech claims.
+
 `verify-8890-sim-toolkit-busy` independently covers the NSB-6 cold-start
 response, not successful DISPLAY TEXT. Its own nine-byte TERMINAL PROFILE
 arms the card; STATUS returns `91 16` and FETCH reaches the firmware while
