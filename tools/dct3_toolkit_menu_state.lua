@@ -1,7 +1,7 @@
 -- Save the open card menu, then replay a physical selection from that state.
 local directory = assert(debug.getinfo(1, 'S').source:sub(2):match('^(.*[/])'))
 local product = assert(_G.dct3_toolkit_menu_state_product)
-assert(product == '8210' or product == '8850', 'unvalidated state fixture product')
+assert(product == '8210' or product == '8850' or product == '8890', 'unvalidated state fixture product')
 local prefix = 'noki' .. product .. '_toolkit_menu'
 local actions = product == '8210' and 'toolkit_physical' or 'toolkit_interactive'
 _G[prefix .. '_hold'] = true
@@ -52,7 +52,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(replay))
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(57))
+    assert(emu.wait(product == '8890' and 98 or 57))
     machine:save(product .. '_toolkit_menu')
     assert(emu.wait(1))
     assert(saved, 'save did not execute')

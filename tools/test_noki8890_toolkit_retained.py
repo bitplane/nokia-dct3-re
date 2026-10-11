@@ -5,10 +5,37 @@ import unittest
 from unittest.mock import patch
 from PIL import Image
 from tools.dct3_toolkit_check import display_text_events, interactive_events, menu_events
-from tools.run_noki8890_toolkit_retained import verify, verify_interactive_protocol
+from tools.run_noki8890_toolkit_retained import main, verify, verify_interactive_protocol, verify_menu_state
+from tools.test_noki8850_toolkit_menu_state_check import complete as menu_state_trace
 
 
 class RetainedToolkitTest(unittest.TestCase):
+    def test_menu_state_rejects_network_scenarios(self):
+        for option in ('--sms', '--call', '--call-decline'):
+            with self.subTest(option=option), patch('sys.argv',
+                    ['toolkit', 'unused', '--menu-state', option]), \
+                    patch('tools.run_noki8890_toolkit_retained.subprocess.run') as run, \
+                    patch('sys.stderr'), self.assertRaises(SystemExit) as result:
+                main()
+            self.assertEqual(result.exception.code, 2)
+            run.assert_not_called()
+
+    def test_menu_state_preserves_own_confirmation(self):
+        text = menu_state_trace().replace('8850', '8890').replace(
+            '8890_toolkit_interactive: action=inkey_5',
+            '8890_toolkit_interactive: action=inkey_5\n'
+            '8890_toolkit_interactive: action=inkey_confirm')
+        verify_menu_state(text)
+        verify_menu_state(text.replace('terminal-response data=8103022200020282810301000d020435',
+                                      'terminal-response data=[:sim_card] 81[:sim_card] 03[:sim_card] 02[:sim_card] 22[:sim_card] 00[:sim_card] 02[:sim_card] 02[:sim_card] 82[:sim_card] 81[:sim_card] 03[:sim_card] 01[:sim_card] 00[:sim_card] 0d[:sim_card] 02[:sim_card] 04[:sim_card] 35'))
+        for original, replacement in (
+            ('action=inkey_confirm', 'action=missing'),
+            ('event=restored pc=1c', 'event=restored pc=20'),
+            ('action=menu_select phase=restored', 'action=ignored'),
+        ):
+            with self.subTest(original=original), self.assertRaises(ValueError):
+                verify_menu_state(text.replace(original, replacement))
+
     def interactive_trace(self):
         return '\n'.join(interactive_events('8890')).replace(
             '8890_toolkit_interactive: action=inkey_5',

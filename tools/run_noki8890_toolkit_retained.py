@@ -11,7 +11,8 @@ import xml.etree.ElementTree as ET
 
 if __package__ in (None, ''):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from tools.dct3_toolkit_check import verify_display_text, verify_interactive, verify_menu
+from tools.dct3_toolkit_check import verify_display_text, verify_interactive, verify_menu, menu_events
+from tools.dct3_toolkit_menu_state_check import verify_state
 from tools.sim_toolkit_trace_check import require_in_order
 from tools.noki8890_registration_check import verify as verify_registration
 
@@ -75,14 +76,27 @@ def verify_interactive_protocol(text, *, menu=False, sms=False, call=False, decl
     ])
 
 
-def verify(run, *, interactive=False, menu=False, sms=False, call=False, decline=False):
+def verify_menu_state(text):
+    compact = text.replace('[:sim_card] ', '')
+    require_in_order(compact, menu_events('8890')[:-1])
+    require_in_order(compact, [
+        '8890_toolkit_interactive: action=inkey_5',
+        '8890_toolkit_interactive: action=inkey_confirm',
+        'terminal-response data=8103022200020282810301000d020435',
+    ])
+    verify_state(text, '8890', 'toolkit_interactive')
+
+
+def verify(run, *, interactive=False, menu=False, sms=False, call=False, decline=False, menu_state=False):
     from PIL import Image
     text = (run / 'error.log').read_text(errors='replace')
     if (sms or call) and not menu:
         raise ValueError('Toolkit network request requires the card-menu scenario')
     if menu and not interactive:
         raise ValueError('card-menu acceptance requires interactive prerequisites')
-    if interactive:
+    if menu_state:
+        verify_menu_state(text)
+    elif interactive:
         verify_interactive_protocol(text, menu=menu, sms=sms, call=call, decline=decline)
     else:
         verify_display_text(text, '8890')
@@ -93,6 +107,11 @@ def verify(run, *, interactive=False, menu=False, sms=False, call=False, decline
     expected_frames = dict(INTERACTIVE_FRAMES if interactive else FRAMES)
     if menu:
         expected_frames.update(MENU_FRAMES)
+    if menu_state:
+        expected_frames.pop('8890_toolkit_menu_result.png')
+        expected_frames.pop('8890_toolkit_menu_idle.png')
+        for phase in ('reference', 'restored'):
+            expected_frames[f'8890_toolkit_menu_{phase}.png'] = MENU_FRAMES['8890_toolkit_menu_items.png']
     if sms or call:
         expected_frames['8890_toolkit_network_result.png'] = MENU_FRAMES['8890_toolkit_menu_items.png']
         # The network wait crosses the retained clock's next minute boundary.
@@ -120,6 +139,8 @@ def main():
                         help='require own GET INKEY/GET INPUT physical replies')
     parser.add_argument('--menu', action='store_true',
                         help='extend interactive replies with physical card-menu selection')
+    parser.add_argument('--menu-state', action='store_true',
+                        help='restore an open card menu and replay physical selection')
     network = parser.add_mutually_exclusive_group()
     network.add_argument('--sms', action='store_true',
                         help='require card-requested SMS through laboratory GSM transport')
@@ -127,6 +148,10 @@ def main():
     network.add_argument('--call-decline', action='store_true', help='physically refuse the card-requested call')
     args = parser.parse_args()
     call = args.call or args.call_decline
+    if args.menu_state and (args.sms or call):
+        parser.error('--menu-state cannot be combined with network request scenarios')
+    if args.menu_state:
+        args.menu = True
     if args.sms or call:
         args.menu = True
     if args.menu:
@@ -158,6 +183,8 @@ def main():
         script = 'noki8890_toolkit_interactive_input.lua' if args.interactive else 'noki8890_toolkit_retained_input.lua'
         if args.menu:
             script = 'noki8890_toolkit_menu_input.lua'
+        if args.menu_state:
+            script = 'noki8890_toolkit_menu_state_input.lua'
         if args.sms:
             script = 'noki8890_toolkit_sms_input.lua'
         if call:
@@ -168,10 +195,11 @@ def main():
             subprocess.run(command, cwd=warm, stdout=console, stderr=subprocess.STDOUT,
                            check=True, timeout=180)
         verify(warm, interactive=args.interactive, menu=args.menu, sms=args.sms,
-               call=call, decline=args.call_decline)
+               call=call, decline=args.call_decline, menu_state=args.menu_state)
         (run / 'acceptance.json').write_text(json.dumps({
             'product': '8890', 'result': 'pass', 'seed': 'fresh physical clock/date; own acquired PMM',
-            'scope': ('retained-clock Toolkit call refusal without GSM establishment' if args.call_decline else
+            'scope': ('retained-clock Toolkit open-menu exact restoration and physical selection replay' if args.menu_state else
+                      'retained-clock Toolkit call refusal without GSM establishment' if args.call_decline else
                       'retained-clock Toolkit accepted laboratory call signaling' if call else
                       'retained-clock interactive Toolkit with laboratory SEND SHORT MESSAGE' if args.sms else
                       'retained-clock DISPLAY TEXT/GET INKEY/GET INPUT/SET UP MENU' if args.menu else

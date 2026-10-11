@@ -588,6 +588,11 @@ product difference. Both gates seed the clock physically from own PMM and
 require retained registration/SIM location. `verify-8890-sim-toolkit-menu`
 additionally proves SET UP MENU, physical navigation and item-1 selection,
 exact ENVELOPE and four own localized menu/recovery frames.
+`verify-8890-sim-toolkit-menu-state` independently restores the open list
+with exact CPU/RAM/time and repeated physical selection, accepted ENVELOPE
+and identical localized pixels. The retained-clock seed and NSB-6's extra
+INKEY confirmation remain product-specific; in-flight APDU restoration and
+native DSP behavior are not promoted.
 `verify-8890-sim-toolkit-sms` additionally proves card-requested SMS through
 exact laboratory CP/RP submission/acknowledgements, terminal success and RR
 release, with physical idle recovery. `verify-8890-sim-toolkit-call` additionally

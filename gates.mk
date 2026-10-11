@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 681 gates: 483 generated from typed steps, 198 copied verbatim (shell).
+# 682 gates: 484 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -78,11 +78,11 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8850-sim-toolkit-sms verify-8850-sim-toolkit-menu-state \
 	verify-8850-sim-toolkit-menu verify-8850-sim-toolkit-interactive \
 	verify-8850-sim-toolkit verify-8850-call-divert verify-8890-sim-toolkit \
-	verify-8890-sim-toolkit-interactive verify-8890-sim-toolkit-menu \
-	verify-8890-sim-toolkit-sms verify-8890-sim-toolkit-call \
-	verify-8890-sim-toolkit-call-decline verify-8890-sim-toolkit-busy \
-	verify-8890-ussd verify-8890-call-divert verify-5510-package \
-	verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
+	verify-8890-sim-toolkit-interactive verify-8890-sim-toolkit-menu-state \
+	verify-8890-sim-toolkit-menu verify-8890-sim-toolkit-sms \
+	verify-8890-sim-toolkit-call verify-8890-sim-toolkit-call-decline \
+	verify-8890-sim-toolkit-busy verify-8890-ussd verify-8890-call-divert \
+	verify-5510-package verify-6210-sip-cancel verify-6210-sip-outgoing-busy \
 	verify-6210-sip-outgoing-unavailable \
 	verify-6210-sip-alerting-incoming-restore \
 	verify-6210-sip-pending-outgoing-restore verify-6210-sip-idle-restore \
@@ -704,6 +704,9 @@ verify-8890-sim-toolkit: build
 
 verify-8890-sim-toolkit-interactive: build
 	$(PYTHON) tools/run_noki8890_toolkit_retained.py $(RUN_DIR) --interactive --mame $(MAME_DIR)/mame
+
+verify-8890-sim-toolkit-menu-state: build
+	$(PYTHON) tools/run_noki8890_toolkit_retained.py $(RUN_DIR) --menu-state --mame $(MAME_DIR)/mame
 
 verify-8890-sim-toolkit-menu: build
 	$(PYTHON) tools/run_noki8890_toolkit_retained.py $(RUN_DIR) --menu --mame $(MAME_DIR)/mame
