@@ -67,8 +67,14 @@ message-body oracle and persistent SIM read status.
 SETUP, connection and physical End release with pinned idle recovery. It is
 laboratory HLE signaling. `verify-5210-pin-outgoing-sms` adds physical `a`
 composition for `5551234`, exact one-character SMS-SUBMIT, CP/RP/RR closure
-and reviewed composer/`Message sent` pixels. PIN-enabled host/SIP composition
-and outgoing-transaction restoration remain separate coverage.
+and reviewed composer/`Message sent` pixels.
+`verify-5210-pin-outgoing-call-state` independently restores an outgoing
+connected call before physical End, requiring exact time/PC/SP/RAM and
+reference/restored pixels, complete release and the idle oracle.
+`verify-5210-pin-host-outgoing-sms` independently adds correlated loopback
+host acceptance to the physical composer, exact SMS-SUBMIT and CP/RP/RR
+closure. Host rejection/timeout, incoming SMS, call/SIP composition and
+outgoing-SMS restoration remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record
 consumer before accepted delayed PIN; no random access follows within 45 s.

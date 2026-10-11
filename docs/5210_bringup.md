@@ -199,7 +199,16 @@ one, network CP-ACK/RP-ACK, handset final CP-ACK and service RR release.
 Reviewed composer and `Message sent` frames are exact pixel oracles. The
 transaction uses the coherent laboratory network; no editor contents or
 message bytes are injected. This does not establish PIN-enabled host SMS
-submission or outgoing-SMS transaction save-state replay.
+submission or outgoing-SMS transaction save-state replay by itself.
+
+`make verify-5210-pin-host-outgoing-sms` independently repeats that physical
+composer through the loopback host adapter. The host requires the submitted
+GSM-7 `61` character, sends a correlated accept decision and observes the
+completed transaction; the firmware checker separately requires exact
+SMS-SUBMIT, CP/RP/RR closure and the same reviewed `Message sent` pixels.
+The trace checker requires host request/decision/result ownership. This proves
+software-host SMS submission, not external SMS delivery, rejection/timeout
+parity, SIP composition or native DSP execution.
 
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.

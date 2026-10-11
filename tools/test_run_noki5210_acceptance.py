@@ -24,6 +24,7 @@ class RunnerTests(unittest.TestCase):
             'pin-outgoing-call': (60, '--outgoing-call', ('32',)),
             'pin-outgoing-sms': (70, '--outgoing-sms', ()),
             'pin-outgoing-call-state': (60, '--outgoing-call-state', ('32',)),
+            'pin-host-outgoing-sms': (70, '--outgoing-sms', ()),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
@@ -33,16 +34,27 @@ class RunnerTests(unittest.TestCase):
                     with patch('sys.argv', ['runner', str(run), '--scenario', name]), \
                             patch.object(runner.subprocess, 'run') as execute:
                         runner.main()
-                    self.assertEqual(execute.call_count, 2)
+                    host = name == 'pin-host-outgoing-sms'
+                    self.assertEqual(execute.call_count, 3 if host else 2)
                     command = execute.call_args_list[0].args[0]
+                    if host:
+                        self.assertEqual(Path(command[1]).name, 'run_host_sms_gate.py')
+                        self.assertEqual(command[command.index('--user-data') + 1], '61')
+                        command = command[command.index('--') + 1:]
                     self.assertEqual(command[1:4], ['noki5210', '-bios', '540e'])
-                    self.assertEqual(command[-2:], ['-seconds_to_run', str(seconds)])
+                    self.assertEqual(command[command.index('-seconds_to_run') + 1], str(seconds))
                     self.assertEqual(execute.call_args_list[0].kwargs['cwd'], run)
                     self.assertTrue(execute.call_args_list[0].kwargs['check'])
                     script = command[command.index('-autoboot_script') + 1]
                     self.assertTrue(Path(script).is_file())
                     checker = execute.call_args_list[1].args[0]
                     self.assertEqual(checker[2:], [str(run)] + ([flag] if flag else []))
+                    if host:
+                        host_check = execute.call_args_list[2].args[0]
+                        self.assertEqual(Path(host_check[1]).name,
+                                         'radio_outgoing_host_sms_trace_check.py')
+                        self.assertEqual(host_check[2:], ['--octets', '1', '--outcome',
+                                                         'rp_ack', str(run / 'error.log')])
                     config = run / 'cfg/noki5210.cfg'
                     if name == 'toolkit-interactive':
                         source = Path(runner.__file__).resolve().parents[1] / \
@@ -60,7 +72,8 @@ class RunnerTests(unittest.TestCase):
                             self.assertEqual([(p.get('tag'), p.get('mask'), p.get('value'))
                                               for p in ports],
                                              [(':NEIGHBORCFG', '32', '32')] +
-                                             [(':NETCFG', m, m) for m in masks])
+                                             [(':NETCFG', m, m) for m in masks] +
+                                             ([(':CALLHOST', '1', '1')] if host else []))
 
     def test_existing_directory_is_rejected_without_launch(self):
         with tempfile.TemporaryDirectory() as run, \

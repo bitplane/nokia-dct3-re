@@ -20,6 +20,7 @@ class Scenario:
     coherent_cell: bool = True
     net_masks: tuple[str, ...] = ()
     pin: bool = True
+    host_sms: bool = False
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -43,6 +44,8 @@ SCENARIOS = {
     'pin-outgoing-sms': Scenario('noki5210_pin_outgoing_sms.lua', '--outgoing-sms', seconds=70),
     'pin-outgoing-call-state': Scenario('noki5210_pin_outgoing_call_state.lua',
                                         '--outgoing-call-state', seconds=60, net_masks=('32',)),
+    'pin-host-outgoing-sms': Scenario('noki5210_pin_outgoing_sms.lua', '--outgoing-sms',
+                                     seconds=70, host_sms=True),
 }
 
 
@@ -50,6 +53,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
+    parser.add_argument('--port', type=int, default=18991)
     parser.add_argument('--scenario', choices=SCENARIOS,
                         default='toolkit-interactive')
     parser.add_argument('--observe-readiness', action='store_true',
@@ -73,6 +77,9 @@ def main():
             for mask in scenario.net_masks:
                 ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
                               mask=mask, defvalue='0', value=mask)
+            if scenario.host_sms:
+                ET.SubElement(ports, 'port', tag=':CALLHOST', type='CONFIG',
+                              mask='1', defvalue='0', value='1')
             ET.ElementTree(config).write(run / 'cfg/noki5210.cfg',
                                         encoding='utf-8', xml_declaration=True)
         if scenario.pin:
@@ -94,11 +101,23 @@ def main():
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / script),
                    '-seconds_to_run', str(scenario.seconds)]
+        if scenario.host_sms:
+            command.extend(['-http', '-http_port', str(args.port)])
+            launch = [sys.executable, str(root / 'tools/run_host_sms_gate.py'),
+                      '--port', str(args.port), '--cwd', str(run),
+                      '--user-data', '61', '--user-data-length', '1', '--decision', 'accept',
+                      '--'] + command
+        else:
+            launch = command
         with (run / 'console.log').open('w') as console:
-            subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
+            subprocess.run(launch, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         subprocess.run([sys.executable, str(root / 'tools' / checker),
                         str(run)] + ([scenario.checker_flag] if scenario.checker_flag else []),
                        check=True)
+        if scenario.host_sms:
+            subprocess.run([sys.executable, str(root / 'tools/radio_outgoing_host_sms_trace_check.py'),
+                            '--octets', '1', '--outcome', 'rp_ack', str(run / 'error.log')],
+                           check=True)
     except (OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 
