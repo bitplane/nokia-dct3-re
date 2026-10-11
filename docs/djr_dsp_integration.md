@@ -1483,6 +1483,27 @@ These are upload payloads, not resident mask-ROM captures. Their product and
 firmware provenance must be established by byte comparison before any use in
 a handset configuration; archival MCU addresses alone do not establish it.
 
+A complete-payload comparison against 58 collected `.bin`, `.fls`, `.mcu`
+and `.mcusw` files of at most 16 MiB found all 20 nonempty payloads in
+`roms/noki3310/3310f639e.fls`, as big-endian 16-bit words. Parsed payload
+lengths equal the declared descriptor sizes for all 20 blocks. The three
+exposed blocks match at these **file offsets**, not MCU program addresses:
+
+| Archival block | Words | 3310 v6.39 file offset |
+| --- | ---: | --- |
+| `00` | 638 | `0x1020c0` |
+| `01` | 2986 | `0x1025cc` |
+| `14` | 629 | `0x108128` |
+
+This establishes byte identity, not unique archival provenance or a compatible
+resident DSP ROM. Other products share complete individual payloads: for
+example, 3210 v6.00 matches blocks `05`, `06`, `0f` and `16`. Raw images were
+searched in both 16-bit byte orders; transformed/container offsets require
+their own loader mapping. No handset configuration changes follow from this
+comparison. The useful next boundary is the matching firmware's descriptor
+and upload consumer, rather than executing these blocks against an unrelated
+mask ROM.
+
 Inspection of `hw/dsp.c`, `hw/m_dsp.c`, `hw/dspblocks.c` and their DSP headers
 does not identify the 8810 port-`0x36` completion-bit owner or its timing.
 The MCU SIMI offsets in `include/hw/ioports.h` are a separate address space
