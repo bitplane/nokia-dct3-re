@@ -661,8 +661,18 @@ boots (foreign 10.323085154 s, national 10.327683077 s). Only foreign
 then sends `0002045703030000` at 10.616327769 s. Each is first read at
 `4ea0dc` after task-3 receive `4ea0d6`; own header-2 routing queues its
 pointer at `4ea1d0`. This establishes the actual bytes and queue ingress,
-not the final decoder or DSP primitive. Follow the queued object into
-the subsequent task-3 processing loop before assigning byte+5 semantics.
+not evidence that the queued object has already reached the DSP.
+The own-ROM queue drain loads the object at `4ea266`, checks ring credit
+through `426b9a`, and calls `426a3c(length, object+3)` at `4ea27a`.
+That writer combines length and kind into the first halfword, then calls
+`4269c0` to copy byte pairs in big-endian order into the ring based at
+`10000`, wrapping before `100a4` and publishing its halfword write index
+at `100a4`. Thus the captured common request encodes as
+`0457 0305 0000`; the foreign follow-up encodes as `0457 0303 0000`.
+These are statically derived wire words, not a runtime delivery claim.
+The differing byte is preserved by transport, not interpreted by this
+writer. Next verify ring publication and the peer's type-`57` handling;
+neither its mode semantics nor its expected completion is established.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
