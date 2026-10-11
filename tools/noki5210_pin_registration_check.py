@@ -194,7 +194,10 @@ def main():
                       help='restore a physically originated connected call before physical End')
     mode.add_argument('--rejected-sms', action='store_true')
     mode.add_argument('--silent-sms', action='store_true')
+    mode.add_argument('--host-incoming-call', action='store_true')
     args = parser.parse_args()
+    if args.host_incoming_call:
+        args.incoming_call = True
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
@@ -256,6 +259,11 @@ def main():
             require_in_order(text, ('SIM status ins=20 sw=9000',
                                    '5210_pin_physical: key=Send', '5210_pin_physical: key=End'))
             call_lifecycle(text, coherent_pin=True)
+            if args.host_incoming_call:
+                require_in_order(text, ('gsm_call_adapter: network registered=1 arfcn=86',
+                                       'gsm_call_adapter: incoming id=1 result=accepted') + tuple(
+                    f'gsm_call_adapter: incoming state id=1 epoch=1 phase={phase}'
+                    for phase in ('queued', 'paging', 'alerting', 'connected', 'ended')))
         if args.call_state:
             from tools.radio_5210_incoming_call_trace_check import verify as call_lifecycle
             require_in_order(text, ('5210_pin_physical: key=Send',
@@ -277,7 +285,9 @@ def main():
                   {'entered': FRAMES['entered'],
                    'sms_read': '6a101291e5215012ec718748cca30958cf55e688c0075678c34bcd30c2c9eea3'} if args.incoming_sms or args.sms_state else
                   {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
-                   'ringing': '1b60299914790655da2e596290642a5bc16581debf66626cc018f08823ce787b'}
+                   'ringing': '1617c0312a2bc1ed203df4e42874561ecbf1eca2c3e141b8faf6db2de8eee716'
+                   if args.host_incoming_call else '1b60299914790655da2e596290642a5bc16581debf66626cc018f08823ce787b',
+                   **({'host_idle': FRAMES['idle']} if args.host_incoming_call else {})}
                   if args.incoming_call else {} if args.late_boundary else
                   LATE_FRAMES if args.coherent_late else FRAMES)
         for phase, digest in frames.items():

@@ -29,6 +29,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-rejected-sms': (80, '--rejected-sms', ()),
             'pin-host-silent-sms': (155, '--silent-sms', ()),
             'pin-host-outgoing-call': (60, '--outgoing-call', ('32',)),
+            'pin-host-incoming-call': (60, '--host-incoming-call', ('32',)),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
@@ -44,18 +45,24 @@ class RunnerTests(unittest.TestCase):
                     incoming = name == 'pin-host-incoming-sms'
                     rejected = name == 'pin-host-rejected-sms'
                     silent = name == 'pin-host-silent-sms'
-                    call = name == 'pin-host-outgoing-call'
+                    call = name in ('pin-host-outgoing-call', 'pin-host-incoming-call')
+                    incoming_call = name == 'pin-host-incoming-call'
                     self.assertEqual(execute.call_count, 3 if host and not call else 2)
-                    if call:
+                    if call and not incoming_call:
                         host_verify.assert_called_once_with('host trace', '5551234')
                     else:
                         host_verify.assert_not_called()
                     command = execute.call_args_list[0].args[0]
                     if host:
                         self.assertEqual(Path(command[1]).name,
+                                         'run_host_incoming_signaling_gate.py' if incoming_call else
                                          'run_host_call_adapter_gate.py' if call else
                                          'run_host_incoming_sms_gate.py' if incoming else 'run_host_sms_gate.py')
-                        if call:
+                        if incoming_call:
+                            self.assertEqual(command[command.index('--caller') + 1], '5551234')
+                            self.assertEqual(command[command.index('--ready-file') + 1],
+                                             str(run / 'snap/5210_pin_host_idle.png'))
+                        elif call:
                             self.assertEqual(command[command.index('--number') + 1], '5551234')
                             self.assertEqual(command[command.index('--decision') + 1], 'connect')
                         elif not incoming:

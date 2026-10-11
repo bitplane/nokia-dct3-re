@@ -1,0 +1,15 @@
+-- The host queues only after the physically authenticated idle snapshot.
+local source = debug.getinfo(1, 'S').source:sub(2)
+_G.noki5210_pin_after_accept = function(press, snapshot)
+    assert(emu.wait(10))
+    snapshot('host_idle')
+    assert(emu.wait(5))
+    snapshot('ringing')
+    press('Send')
+    assert(emu.wait(3))
+    snapshot('connected')
+    press('End')
+    assert(emu.wait(5))
+    snapshot('recovered')
+end
+dofile(assert(source:match('^(.*[/])')) .. 'noki5210_pin_late_input.lua')

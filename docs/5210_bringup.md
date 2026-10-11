@@ -191,6 +191,16 @@ states surround handset-owned physical End and full CC/RR release. Registered
 idle/recovery pixels remain pinned. This proves outgoing host call signaling,
 not SIP, external call audio, native speech or external-dialog restoration.
 
+`make verify-5210-pin-host-incoming-call` waits for the physical PIN fixture's
+registered-idle snapshot before queuing a host call from `5551234`. Automatic
+laboratory incoming calls are disabled. Host queued/paging/alerting/connected/
+ended phases and registered ARFCN 86 are correlated to request 1, epoch 1;
+physical Answer/End separately completes own CC/RR and speech-control release.
+Pre-call idle, the reviewed caller screen and recovered idle are exact pixel
+oracles. The host caller frame has its own capture-phase oracle rather than
+relaxing the laboratory-call hash. This proves incoming host signaling and
+physical UI interaction, not speech, SIP or external-dialog restoration.
+
 `make verify-5210-pin-outgoing-call-state` separately restores the physically
 originated call after Connect Acknowledge and before physical End. Time,
 PC, SP, full modeled RAM and connected reference/restored pixels must match;

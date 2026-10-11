@@ -83,7 +83,10 @@ result, firmware-owned timed DISC, UA/release and host termination, with
 reviewed timeout and physical idle/menu recovery pixels.
 `verify-5210-pin-host-outgoing-call` independently adds correlated host connect,
 wrong-id/duplicate rejection, physical End, CC/RR release and exact idle pixels.
-Host incoming calls/SIP composition and
+`verify-5210-pin-host-incoming-call` independently adds host paging after
+registered idle, correlated lifecycle states, reviewed caller pixels,
+physical Answer/End, CC/RR closure and exact idle recovery.
+PIN-enabled SIP composition and
 outgoing-SMS restoration remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record

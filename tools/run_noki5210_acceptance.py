@@ -22,7 +22,7 @@ class Scenario:
     pin: bool = True
     host_sms: str | None = None
     host_outcome: str = 'rp_ack'
-    host_call: bool = False
+    host_call: str | None = None
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -55,7 +55,9 @@ SCENARIOS = {
     'pin-host-silent-sms': Scenario('noki5210_pin_sms_silence.lua', '--silent-sms',
                                    seconds=155, host_sms='outgoing', host_outcome='rp_silence'),
     'pin-host-outgoing-call': Scenario('noki5210_pin_outgoing_call.lua', '--outgoing-call',
-                                      seconds=60, net_masks=('32',), host_call=True),
+                                      seconds=60, net_masks=('32',), host_call='outgoing'),
+    'pin-host-incoming-call': Scenario('noki5210_pin_host_incoming_call.lua', '--host-incoming-call',
+                                      seconds=60, net_masks=('32',), host_call='incoming'),
 }
 
 
@@ -113,12 +115,16 @@ def main():
                    '-seconds_to_run', str(scenario.seconds)]
         if scenario.host_sms or scenario.host_call:
             command.extend(['-http', '-http_port', str(args.port)])
-            host_script = ('run_host_call_adapter_gate.py' if scenario.host_call else
+            host_script = ('run_host_incoming_signaling_gate.py' if scenario.host_call == 'incoming' else
+                           'run_host_call_adapter_gate.py' if scenario.host_call == 'outgoing' else
                            'run_host_incoming_sms_gate.py' if scenario.host_sms == 'incoming'
                            else 'run_host_sms_gate.py')
             launch = [sys.executable, str(root / 'tools' / host_script),
                       '--port', str(args.port), '--cwd', str(run)]
-            if scenario.host_call:
+            if scenario.host_call == 'incoming':
+                launch.extend(['--caller', '5551234', '--ready-file',
+                               str(run / 'snap/5210_pin_host_idle.png')])
+            elif scenario.host_call == 'outgoing':
                 launch.extend(['--number', '5551234', '--decision', 'connect'])
             elif scenario.host_sms == 'outgoing':
                 launch.extend(['--user-data', '61', '--user-data-length', '1',
@@ -140,7 +146,7 @@ def main():
                          else ['--octets', '1', '--outcome', scenario.host_outcome])
             subprocess.run([sys.executable, str(root / 'tools' / host_checker)] +
                            host_args + [str(run / 'error.log')], check=True)
-        if scenario.host_call:
+        if scenario.host_call == 'outgoing':
             from tools.radio_host_outgoing_connect_check import verify as verify_host_call
             verify_host_call((run / 'error.log').read_text(errors='replace'), '5551234')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
