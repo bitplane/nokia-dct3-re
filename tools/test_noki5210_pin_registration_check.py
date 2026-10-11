@@ -21,9 +21,13 @@ class PinRegistrationTest(unittest.TestCase):
             '5210_measurement_entry: pc=0037019c',
             '5210_measurement_entry: pc=002e336c',
             '5210_measurement_entry: pc=002bd782',
+            '5210_readiness_selector: argument=00000000 lr=00234f43 state=10 eligible=5 current=00149440 queued=00000000 t=10.209',
         ))
         return prefix + '\n' + complete().replace(
-            'LAPDm Location Updating Accept acknowledged nr=1', '5210_pin_fixture: stopped_at=45.000000000')
+            'LAPDm Location Updating Accept acknowledged nr=1', '\n'.join((
+                '5210_readiness_selector: argument=00000003 lr=00232069 state=6 eligible=5 current=00149440 queued=00149e90 t=21.025',
+                '5210_readiness_root: final current=00149440 queued=00149e90 previous=00000000 context=00148380 writes=28 selections=2',
+                '5210_pin_fixture: stopped_at=45.000000000')))
 
     def test_late_boundary(self):
         verify_late_boundary(self.late_trace(), make_profile(pin_enabled=True))
@@ -40,6 +44,16 @@ class PinRegistrationTest(unittest.TestCase):
     def test_late_boundary_rejects_new_radio_progress(self):
         with self.assertRaisesRegex(ValueError, 'boundary changed'):
             verify_late_boundary(self.late_trace() + '\nradio_phase=random_access', make_profile(pin_enabled=True))
+
+    def test_late_request_ownership_rejects_missing_or_changed_evidence(self):
+        for original, replacement in (
+            ('selections=2', 'selections=3'), ('writes=28', 'writes=81'),
+            ('argument=00000003', 'argument=00000000'),
+            ('state=6 eligible=5', 'state=6 eligible=0'),
+            ('final current=00149440 queued=00149e90', 'final current=00149440 queued=00000000'),
+        ):
+            with self.subTest(original=original), self.assertRaises(ValueError):
+                verify_late_boundary(self.late_trace().replace(original, replacement), make_profile(pin_enabled=True))
 
     def test_complete(self):
         with patch('tools.noki5210_pin_registration_check.registration') as registration:

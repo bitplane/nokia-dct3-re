@@ -53,9 +53,36 @@ def verify_late_boundary(text, card):
     stops = re.findall(r'5210_pin_fixture: stopped_at=([0-9.]+)', text)
     if len(stops) != 1 or float(stops[0]) < 44:
         raise ValueError('delayed-readiness observation ended before the bounded run')
+    verify_late_request_ownership(text)
     if ('LAPDm Location Updating Accept acknowledged' in text or
             'radio_phase=random_access' in text):
         raise ValueError('late-readiness boundary changed: review radio progress rather than retaining this negative gate')
+
+
+def verify_late_request_ownership(text):
+    selectors = list(re.finditer(
+        r'5210_readiness_selector: argument=([0-9a-f]{8}) lr=([0-9a-f]{8}) '
+        r'state=(\d+) eligible=(\d+) current=([0-9a-f]{8}) queued=([0-9a-f]{8}) t=([0-9.]+)', text))
+    finals = re.findall(
+        r'5210_readiness_root: final current=([0-9a-f]{8}) queued=([0-9a-f]{8}) '
+        r'previous=([0-9a-f]{8}) context=([0-9a-f]{8}) writes=(\d+) selections=(\d+)', text)
+    if len(finals) != 1:
+        raise ValueError('missing unique final request-root observation')
+    current, queued, previous, context, writes, selections = finals[0]
+    if int(writes) > 80 or int(selections) > 64 or len(selectors) != int(selections):
+        raise ValueError('request ownership observation is truncated')
+    if not int(current, 16) or not int(queued, 16) or current == queued or not int(context, 16):
+        raise ValueError('late queued/current request boundary changed')
+    pin = text.index('SIM status ins=20 sw=9000')
+    after = [entry for entry in selectors if entry.start() > pin]
+    if len(after) != 1:
+        raise ValueError('late selector lifecycle changed')
+    argument, caller, state, eligible, selected_current, selected_queued, _ = after[0].groups()
+    if (argument != '00000003' or caller != '00232069' or state != '6' or
+            not int(eligible) or selected_current != current or selected_queued != queued):
+        raise ValueError('late selector no longer preserves the eligible queued request')
+    if not any(entry.start() < pin and entry.group(1) == '00000000' for entry in selectors):
+        raise ValueError('missing pre-PIN argument-zero control')
 
 
 def main():

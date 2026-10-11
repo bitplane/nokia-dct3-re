@@ -138,6 +138,18 @@ with all eight adjacent literal arguments recovered. Its three argument-zero
 sites are `0x234f3e`, `0x2355d6`, and `0x2358a0`. This does not close indirect
 or tail entries and is not a proof that an ordinary producer is absent.
 
+Selector-entry observations establish that the eligibility byte is nonzero
+(`5`) in both runs. The early control has seven entries: its post-PIN
+argument-3 call is followed by argument zero from `0x234f3e` at 10.211 s,
+with the new request already queued. The delayed control has six entries:
+argument-zero calls from that same site occur at 10.208 and 10.209 s, before
+PIN acceptance, and its only post-PIN entry is argument 3. Thus neither a
+missing eligibility flag nor absence of the argument-zero caller explains
+this boundary; the unresolved difference is the ordinary event lifecycle
+that brings that caller and queued request together. The negative gate checks
+retained distinct request pointers, the eligible state-6 post-PIN entry, and
+complete selector coverage below the observation cap.
+
 The next unresolved contract is which ordinary event invokes the eligible
 promotion entrance after late SIM readiness. Do not force selector arguments,
 promote pointers externally, or replay measurement completions to bypass it.
