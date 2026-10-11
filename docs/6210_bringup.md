@@ -444,9 +444,21 @@ but the fields' complete semantic contract is not yet recovered. The
 different status is therefore explained by an actual pair mismatch, not
 an absent parser result or guessed DSP reply.
 Evidence: `tmp/6210-plmn-{constructor,decision,compare-pairs}-{national,international}/error.log.gz`.
-Current unresolved boundary: the mismatch continuation's expected next
-selection action and completion. No operational international-roaming
-contract is established by these observations.
+The foreign mismatch continuation is not waiting indefinitely at its first
+follow-up receive. `2e321c` calls `3c2470`, dispatches/free-loops over
+messages, and returns a surviving numeric status. Foreign return at
+`2e6e38` is `1583` (10.614096923 seconds); national's corresponding
+return at `2e6eec` is `1584` (10.619503462 seconds).
+At foreign branch `2e6e44`, context `16fe18` has words `+60 = 1`,
+`+38 = 2`, `+50 = 0`. Its shifted-word test takes the zero branch;
+the later `1589` comparison fails and enters `2e6046`. Runtime observes
+R0 = 2 at `2e60a2` (10.616668231 seconds), whose pinned instruction
+writes that value to controller halfword `+22`. This is a numeric lifecycle
+transition, not a recovered enum name or proof of cell admission.
+Evidence: `tmp/6210-plmn-followup-{receive,context,transition}-{national,international}/error.log.gz`.
+Current unresolved boundary: controller state 2's next selection action
+and its completion. No operational international-roaming contract is
+established by these observations.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures

@@ -107,6 +107,22 @@ def verify(image):
         0x2e6ee2: ('ldr', 'r0, [pc, #0x3bc]'),
         0x2e6ee4: ('bl', '#0x2e2e60'),
         0x2e374c: ('adds', 'r0, r4, #0'),
+        0x2e321c: ('push', '{r4, r5, r6, r7, lr}'),
+        0x2e321e: ('bl', '#0x3c2470'),
+        0x2e3222: ('adds', 'r6, r0, #0'),
+        0x2e6e38: ('adds', 'r6, r0, #0'),
+        0x2e6e44: ('adr', 'r0, #0x38c'),
+        0x2e6e9a: ('adr', 'r0, #0x350'),
+        0x2e6e72: ('adr', 'r0, #0x370'),
+        0x2e6eec: ('adds', 'r6, r0, #0'),
+        0x2e6e50: ('adr', 'r0, #0x388'),
+        0x2e4f70: ('adr', 'r0, #0x34c'),
+        0x2e4f7c: ('adr', 'r0, #0x340'),
+        0x2e50c4: ('ldr', 'r0, [r4, #0x50]'),
+        0x2e6046: ('movs', 'r0, #0x2b'),
+        0x2e6052: ('movs', 'r0, #2'),
+        0x2e60a2: ('strh', 'r0, [r4, #0x22]'),
+        0x2e5c74: ('movs', 'r6, #0'),
         0x2e374a: ('movs', 'r4, #1'),
         0x2e371a: ('bl', '#0x414a58'),
         0x2e3720: ('bl', '#0x4148ac'),
@@ -161,7 +177,8 @@ def verify(image):
                            0x315554: 0x7d2, 0x2a0b54: 0x9c6,
                            0x2a0944: 0x7d4, 0x2a094c: 0x7d2,
                            0x2e71b0: 0x9c6, 0x2e72a0: 0x9c8,
-                           0x2e37cc: 0x16fe90}.items():
+                           0x2e37cc: 0x16fe90, 0x2e71f4: 0x1583,
+                           0x2e6ed0: 0x1589}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',

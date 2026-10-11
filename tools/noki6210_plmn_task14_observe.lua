@@ -81,7 +81,10 @@ local dispatcher_tap = space:install_read_tap(0x29ffb8, 0x29ffbb,
             cpu.state['R14'].value, time))
     end)
 local decision_taps = {}
-for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c}) do
+for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
+                    0x2e321c, 0x2e3222, 0x2e6e38, 0x2e6e44, 0x2e6e9a,
+                    0x2e6e72, 0x2e6eec, 0x2e6e50, 0x2e4f70,
+                    0x2e4f7c, 0x2e50c4, 0x2e6046, 0x2e60a2, 0x2e5c74}) do
     local hits = 0
     decision_taps[#decision_taps + 1] = space:install_read_tap(pc & ~3, (pc & ~3) + 3,
         'plmn_decision_' .. pc, function(address)
@@ -90,6 +93,17 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c}) do
             machine:logerror(string.format(
                 'plmn_decision: pc=%08x r0=%08x r4=%08x t=%.9f\n',
                 pc, cpu.state['R0'].value, cpu.state['R4'].value, machine.time:as_double()))
+            local context = cpu.state['R4'].value
+            if not busy and (pc == 0x2e6e44 or pc == 0x2e4f70 or pc == 0x2e4f7c
+                or pc == 0x2e50c4) and context >= 0x100000 and context + 0x64 < 0x180000 then
+                busy = true
+                local word60, word38, word50 = space:read_u32(context + 0x60),
+                    space:read_u32(context + 0x38), space:read_u32(context + 0x50)
+                busy = false
+                machine:logerror(string.format(
+                    'plmn_continuation_context: pc=%08x word60=%08x word38=%08x word50=%08x t=%.9f\n',
+                    pc, word60, word38, word50, machine.time:as_double()))
+            end
             if not busy and (pc == 0x2e374a or pc == 0x2e374c) then
                 local stack = cpu.state['R13'].value
                 if stack >= 0x100000 and stack + 12 < 0x180000 then
