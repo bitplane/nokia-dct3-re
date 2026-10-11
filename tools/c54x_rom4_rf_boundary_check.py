@@ -63,19 +63,20 @@ def check(text: str, minimum_frames: int = 6000, *, scan_30s: bool = False) -> d
                        (5, 0x41, 0x40, 0x3712)]
     expected_count = 5
     if scan_30s:
-        # Re-banked after architectural BRAF replaced the private repeat latch;
-        # two isolated cold runs reproduce this snapshot, not silicon timing.
-        expected_count = 1519
+        # EF_SMSS belongs to DF_TELECOM. Restoring its old incorrect GSM
+        # placement alone restores the previous totals; see rom4_dsp_loader.md.
+        # This is an exact cold-input regression snapshot, not silicon timing.
+        expected_count = 1520
         expected_writes += [(6, 0x2A04, 6, 0xA240), (7, 0x2A04, 6, 0xA240)]
         expected_writes += [(sequence, 0x2727 + sequence - 8, 0x30, 0x4028)
                             for sequence in range(8, 17)]
-        if (result["frame_expiries"], result["rf_reads"]) != (20282, 648096):
+        if (result["frame_expiries"], result["rf_reads"]) != (20285, 648192):
             raise ValueError(
                 "30-second scan frame/read snapshot changed: "
-                f"frames={result['frame_expiries']} expected=20282 "
-                f"delta={result['frame_expiries'] - 20282:+d}; "
-                f"rf_reads={result['rf_reads']} expected=648096 "
-                f"delta={result['rf_reads'] - 648096:+d}; "
+                f"frames={result['frame_expiries']} expected=20285 "
+                f"delta={result['frame_expiries'] - 20285:+d}; "
+                f"rf_reads={result['rf_reads']} expected=648192 "
+                f"delta={result['rf_reads'] - 648192:+d}; "
                 f"rf_port32_writes={result['rf_port32_writes']} expected={expected_count} "
                 f"delta={result['rf_port32_writes'] - expected_count:+d}"
             )

@@ -910,101 +910,55 @@ MVPD's preincrement ordering is the separately evidenced correction above.
 This enforces Fetch-before-Read ordering (SPRU131G section 7.1), not physical
 Access-stage address-update timing, overlapping execution or interrupt drain.
 
-The RF checker retains the BRAF-era exact snapshot established in commit
-`cd3dbd10`: 20,282 frame expiries, 648,096 RF reads and 1,519 port-32 writes.
-It also requires the programming sequence, frame-30 activation, 32-word read
-cadence, firmware queue producers, IMR `035f` and zero port-38/39 reads.
-This is an emulator regression snapshot, not measured RF timing or acquisition.
+The exact isolated 30-second RF snapshot is 20,285 frame expiries,
+648,192 RF reads and 1,520 port-32 writes. The checker also requires the
+ordered programming sequence, frame-30 activation, 32-word read cadence,
+firmware queue producers, IMR `035f` and zero port-38/39 reads. Two isolated
+cold runs reproduce it (`tmp/rf-smss-correct-oracle-a.log` and
+`tmp/rf-smss-correct-oracle-b.log`). Each generates this handset's own EEPROM
+and fresh flash state. This is an emulator regression snapshot, not measured
+RF timing or acquisition.
 
-The current isolated 30-second cold gate fails that snapshot: 20,285 frame
-expiries, 648,192 RF reads and 1,520 port-32 writes (deltas +3/+96/+1).
-Evidence: `tmp/c54x-rf-snapshot-audit.log`; the gate generates this handset's
-own EEPROM profile and fresh flash state, not retained or donor provisioning.
-The checker reports measured deltas without accepting either alternate counts
-or a changed sequence. Its unit tests cover count-only drift, changed prefix
-and missing records. The native save-state gate passes separately; it does
-not make this RF gate green. Snapshot provenance remains unresolved and must
-be explained before deliberately re-banking or attributing the drift to a
-hardware correction.
+The snapshot depends on the card contract: EF_SMSS (`6f43`) belongs to
+DF_TELECOM (`7f10`), not DF_GSM (`7f20`). A reversible source control changing
+only that parent to the incorrect `7f20` reproduces the previous exact
+20,282/648,096/1,519 totals. Restoring the correct parent reproduces
++3 frames, +96 reads and +1 write against the old snapshot. Evidence:
+`tmp/rf-smss-placement-control.log` and
+`tmp/rf-smss-correct-placement-restored.log`. The correct placement is retained;
+the checker is deliberately re-banked, not made advisory or widened to accept
+both regimes. Its tests reject the old counts and changed programming sequences.
 
-Two individually rebuilt CPU-source controls preserve the current +3/+96/+1
-drift: restoring the pre-`c052c0d0` RPT-zero block-completion behavior, and
-restoring the pre-`72ae2507` XC word accounting after the block redirect.
-Their separate cold gates still reject the same exact snapshot. Evidence:
-`tmp/c54x-rf-rpt-zero-control.log` and
-`tmp/c54x-rf-xc-redirect-control.log`. Neither correction alone explains the
-drift; this does not exclude combined interactions or later operand/ALU
-changes. Both temporary source controls are removed. DSP transport source
-is unchanged since `cd3dbd10`, and the driver diff has no 5110 product/clock
-configuration change. Preserve the corrected repeat/XC contracts and their
-executable regressions rather than reverting them to chase an oracle.
+The first observed card divergence is SELECT `6f43` at `4.41506615` seconds:
+the incorrect placement returns not-found, while the correct placement selects
+the file and permits a two-byte READ BINARY before selecting `6f42`.
+The first 23 MCU TX commits still match within 2 microseconds. Commit 24 carries
+the same type-`1a`, 68-byte body (`001198` followed by zeroes), but moves from
+`6.425337` to `6.418223` seconds. DSP work-flag publication follows by
+2 microseconds in both traces; RF sequence 6 moves one 4.615-millisecond frame
+earlier. This localizes the schedule change upstream of DSP dispatch.
+No CPU timing, peer latency or firmware state is changed to match the oracle.
+Separate RPT-zero and XC-word-accounting controls did not remove the drift;
+their corrected instruction contracts retain their executable regressions.
+Retained post-run NVRAM does not reconstruct the cold fixture.
 
-Retained-state provenance is not interchangeable with this cold fixture.
-The retained `c54x-frontend-idle-a` run has the old exact totals, but copying
-its own saved NVRAM into an isolated current-binary run does not reproduce
-them: 3,358 completion strobes, 3,323 slot expiries, 21,389 frame expiries,
-683,520 RF reads and 1,646 port-32 writes, with terminal modes `0000/000c`.
-Evidence: `tmp/rf-retained-provenance-control/error.log`. Its saved EEPROM,
-flash, CCONT and network files match the retained current cold-run outputs;
-the SIM file shares every byte of the shorter legacy record and differs
-only by appended storage. These are post-run files, not captured initial
-conditions. This control therefore neither reconstructs the banked cold
-fixture nor explains its +3/+96/+1 drift; do not use its counts to re-bank.
+The late MCU publication chain is observed through passive taps:
 
-An isolated current cold boot with verbose transport observation narrows
-the late-scan difference to MCU request scheduling. The first 23 TX-ring
-commits match the retained old-total trace within 2 microseconds. Commit 24
-publishes the same type-`1a`, 68-byte body (`001198` followed by zeroes),
-from MCU PC `27183e`, at `6.418223` instead of `6.425337` seconds.
-The DSP's work flag changes at `6.418225` and `6.425339` respectively:
-both dispatch latencies are 2 microseconds at the logged precision.
-The subsequent RF sequence-6 command moves from `6.431055` to `6.426440`,
-one 4.615-millisecond frame earlier. Evidence:
-`tmp/rf-cold-commit-audit/error.log` against
-`tmp/c54x-frontend-idle-a/error.log`. This is a current cold run compared
-with retained historical evidence, not a reconstructed historical cold
-fixture. It localizes the observed difference before the type-`1a` DSP
-dispatch; audit the MCU request's timer/lifecycle scheduling next rather
-than assuming the RF totals identify a DSP instruction defect.
+| Boundary | Observed caller / publication |
+| --- | --- |
+| Task-15 `09ec` | Constructor `21fd22`, caller `223010`; post `21fe24` |
+| Task-16 `07d5` | Branch `208d40` receives `09ec`; caller `208d44`, post `206d3e` |
+| Task-13 `05df` | Callers `24f388/24f392`, selectors 0/3; post `26c896` |
+| Task-16 `05e8` | Constructor `237df8`, caller `238f86`; post `237f56` |
+| Task-10 `03e9` | Receive returns `05e8` at `24f47c`; caller `24f49e`, post `26c6ce` |
+| MCU search packet | Caller `211548` enters `20fc94`; branch `20fe38`, TX commit `27183e` |
 
-The current MCU predecessor is observed, not inferred from a packet label.
-`tools/c54x_rom4_scan_schedule.lua` is a capped passive NSE-1 v5.30
-instrument (use as the isolated run's `-autoboot_script`). A fresh eight-second
-run reaches caller `211548` with R0=`2` and task-object header `03e9` at
-`1.549555769` and `6.414681692` seconds. Both enter builder `20fc94`
-with return address `21154d`. The late invocation takes branch `20fe38`
-at `6.417569308`: the ROM sets object byte 5 bit 0 and clears 63 bytes
-from object + 7, matching the late `001198` packet. Notification/control helper
-`269390` is called with R0=`4400`, R1=`108427`, return address `20ff61`
-after each builder. Its semantics are not established by that register
-snapshot. Evidence: `tmp/rf-scan-schedule-headers/error.log`.
-Neither these taps nor the packet commit alone identifies an upstream
-timer owner. The instrument reads only CPU registers and the
-known ordinary-RAM task header, writes no firmware state, and is not a
-new handset acceptance gate.
-
-The late controller input is now traced through its live publication chain.
-Task-10 `03e9` is constructed at `26c394`, called from `24f49e`, and
-posted at `26c6ce` (`6.414274923` seconds). The controller's receive
-helper returns `05e8` at `24f47c` (`6.413684077`); the initial invocation
-instead returns `083b`. Constructor `237df8`, called from `238f86`,
-posts `05e8` to task 16 for records `108094` and `107f2c` at
-`6.412975154` and `6.413326692`. Both follow task-13 input `05df`,
-posted at `26c896` at `6.412429077` and `6.413101077`.
-The live receiver takes branch `238f28` with R0/R1=`05df`; independently,
-the branch comparison loads that ID from literal `239170` using the
-swap16 pool-literal rule. Evidence: `tmp/rf-scan-05df-origin/error.log`.
-The controller calls constructor `26c700` twice from `24f388/24f392`,
-with requested ID `05df`, no supplied buffer, and selectors 0/3.
-Both calls have R5=`07d5`. That input is posted to task 16 at `206d3e`
-at `6.412230923`; constructor `2068d8` receives requested ID `07d5`
-and a null buffer from caller `208d44` at `6.412180846`.
-Evidence: `tmp/rf-scan-07d5-caller/error.log`. The resulting chain is
-`208d44 -> task 16:07d5 -> task 13:05df -> task 16:05e8 -> task 10:03e9`.
-These are repeatable current cold-input observations, not reconstructed
-old timing. Next boundary: the input/lifecycle selecting branch `208d40`,
-before calling this a timer-latency correction. No timer or DSP ownership
-is assigned from a shared publication tail alone.
+`tools/c54x_rom4_scan_schedule.lua` is a capped, observation-only NSE-1 v5.30
+instrument, not another handset acceptance gate. It reads CPU registers and
+bounded ordinary-RAM task headers; it writes no firmware state. A shared
+publication helper or register snapshot alone does not establish timer
+ownership. These checks establish native ROM execution and the recorded
+RF-port lifecycle, not physical RF acquisition, handset speech or end-to-end calls.
 
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free

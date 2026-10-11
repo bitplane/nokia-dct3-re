@@ -734,17 +734,18 @@ queue producer; the obsolete three-pair sequence is rejected. This does not
 assign physical tuning semantics to `0041/0040`.
 
 The 30-second acceptance profile captures a scan in progress: a fresh run
-receives another queue request at 6.431 seconds, repeats `2a04/0006` twice,
+receives another queue request at approximately 6.43 seconds, repeats `2a04/0006` twice,
 then writes `2727/0030`, `2728/0030` and subsequent values. Its terminal
-summary now records 1,519 port-32 writes, 20,282 frame expiries and 648,096 RF
-reads after the architectural BRAF correction. Two isolated cold runs reproduce
-this snapshot; see [the repeat-control acceptance contract](rom4_dsp_loader.md).
+summary records 1,520 port-32 writes, 20,285 frame expiries and 648,192 RF
+reads with EF_SMSS correctly placed in DF_TELECOM. A reversible card-directory
+control explains the difference from the earlier BRAF-era snapshot; two isolated
+cold runs reproduce the current counts. See [the repeat-control acceptance contract](rom4_dsp_loader.md).
 The five-write short-run check rejects this
 run by design. The explicit `--scan-30s` profile instead requires these
 exact counts, all sixteen logged initial writes, the uploaded shorter-reload
 write and the later search-list selector. A fresh isolated rerun reproduces
-it. This deliberate re-bank follows the producer, loop-completion and
-post-scan consumption evidence below; neither profile claims acquisition
+it. The re-bank retains the producer, loop-completion and
+post-scan consumption checks below; neither profile claims acquisition
 or whole-boot completion.
 
 Passive timer-port taps identify the changed cadence: uploaded code writes
