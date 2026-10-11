@@ -497,6 +497,13 @@ reaches `2d1118` when byte zero of the object referenced by `175458`
 equals 5. These local comparisons are pinned to the own image, but their
 enclosing entry conditions and subsystem semantics are not yet recovered.
 They do not justify treating `07f4` as an ordinary roaming completion.
+The `0419` comparison follows receive/dispatch entry `2d2952`, not a
+normal getter: it frees `[R4+8]`, receives through `3c2470`, replaces
+`[R4+8]`, and copies the signed header to context+4 and message byte 3
+to context+0. It reloads the saved header into R1 at `2d2978`; the
+unmatched-status branch redirects through `2d2528`, which can transfer
+to `2d0f18` and `2d0ee4`. These BL transfers participate in the controller
+dispatch; do not infer ordinary call/return ownership from their opcodes.
 Fresh 25-second national and foreign controls reproduce the original
 `09c8/07d4` versus `09c6/07d2` split with clean observer health. Passive
 taps at `2d1118`, `2d111a`, `4cfdd4`, `313218`, `2d0d50` and `2d1048`
