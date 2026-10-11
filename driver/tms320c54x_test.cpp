@@ -7353,6 +7353,7 @@ private:
 			data.write_word(0x0df0, 2);
 			m_port_writes = 0;
 			m_cpu->set_state_int(tms320c54x_device::STATE_A, 10);
+			m_cpu->set_state_int(tms320c54x_device::STATE_B, 0x8176543210ULL);
 			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0df0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
@@ -7364,9 +7365,10 @@ private:
 		if (m_phase == 174)
 		{
 			expect_opcode(0x6f82, m_cpu->state_int(tms320c54x_device::STATE_A) == 14 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8176543210ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0df0 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-					"ROM4 extended ADD shifts Smem and costs two cycles");
+					"ROM4 extended ADD shifts Smem, preserves full B and costs two cycles");
 			program.write_word(0x05e2, 0x6f83); // SUB *AR3,1,A
 			program.write_word(0x05e3, 0x0c21);
 			m_port_writes = 0;
@@ -7381,9 +7383,10 @@ private:
 		if (m_phase == 175)
 		{
 			expect_opcode(0x6f83, m_cpu->state_int(tms320c54x_device::STATE_A) == 6 &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == 0x8176543210ULL &&
 					m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0df0 &&
 					m_port_writes == 2 && m_last_port_cycle - m_first_port_cycle == 4,
-					"ROM4 extended SUB shifts Smem and costs two cycles");
+					"ROM4 extended SUB shifts Smem, preserves full B and costs two cycles");
 			program.write_word(0x05e2, 0x6f92); // STL A,0,*AR2+
 			program.write_word(0x05e3, 0x0c80);
 			m_port_writes = 0;

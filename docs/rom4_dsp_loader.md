@@ -1820,6 +1820,10 @@ one word and checked on ordinary and wrapping program pages without extension
 reads. The required marker is `TMS320C54x accumulator ALU disassembler: PASS`
 (SPRU172C, ADD/SUB syntaxes 9/10 and LD syntax 9). This establishes debugger
 boundaries only, not arithmetic validation or physical pipeline timing.
+The executable `6f82/0c01` ADD and `6f83/0c21` SUB vectors separately assert
+that their A results (14 and 6) leave B's full 40-bit `8176543210` sentinel
+unchanged. `make check-c54x-core` verifies these assertions; they do not
+establish other source/destination selections or physical pipeline timing.
 
 Immediate LD decodes shifts 0–16 and both destinations (34 forms), checked
 on ordinary and wrapping program pages with one literal extension. Unlike
