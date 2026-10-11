@@ -65,6 +65,10 @@ end)
 _G.noki5210_pin_state_retained = retained
 _G.noki5210_pin_after_accept = function(press)
     assert(emu.wait(10))
+    if _G.noki5210_pin_state_host_incoming then
+        machine.screens[':screen']:snapshot('5210_pin_host_idle.png')
+        assert(emu.wait(5))
+    end
     if call then
         if outgoing then
             _G.noki5210_pin_gap = 0.35

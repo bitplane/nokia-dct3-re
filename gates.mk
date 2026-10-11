@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 707 gates: 509 generated from typed steps, 198 copied verbatim (shell).
+# 708 gates: 510 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -319,7 +319,8 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-5210-radio-measurement-static verify-5210-late-pin-boundary \
 	verify-5210-pin-outgoing-sms verify-5210-pin-phonebook \
 	verify-5210-pin-sms-wait-state verify-5210-pin-host-incoming-call \
-	verify-5210-pin-host-outgoing-call verify-5210-pin-host-outgoing-media-state \
+	verify-5210-pin-host-outgoing-call verify-5210-pin-host-incoming-call-state \
+	verify-5210-pin-host-outgoing-media-state \
 	verify-5210-pin-host-outgoing-call-state verify-5210-pin-incoming-call-sip \
 	verify-5210-pin-outgoing-call-sip verify-5210-pin-host-silent-sms \
 	verify-5210-pin-host-rejected-sms verify-5210-pin-host-incoming-sms \
@@ -4450,6 +4451,9 @@ verify-5210-pin-host-incoming-call: normalize-5210 build
 
 verify-5210-pin-host-outgoing-call: normalize-5210 build
 	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario pin-host-outgoing-call --mame $(MAME_DIR)/mame
+
+verify-5210-pin-host-incoming-call-state: normalize-5210 build
+	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario pin-host-incoming-call-state --mame $(MAME_DIR)/mame
 
 verify-5210-pin-host-outgoing-media-state: normalize-5210 build
 	$(PYTHON) tools/run_noki5210_acceptance.py $(RUN_DIR) --scenario pin-host-outgoing-media-state --mame $(MAME_DIR)/mame

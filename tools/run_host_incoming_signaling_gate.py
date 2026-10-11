@@ -36,14 +36,26 @@ async def run(args):
             await socket.send(json.dumps({'type': 'incoming_call', 'epoch': epoch,
                 'request_id': 1, 'caller': args.caller}))
             phases = []
+            restored = False
             while phases[-1:] != ['ended']:
                 message = json.loads(await asyncio.wait_for(socket.recv(), 30))
                 if message.get('type') == 'incoming_call_state':
-                    if message.get('epoch') != epoch or message.get('request_id') != 1:
+                    if message.get('request_id') != 1:
+                        raise RuntimeError('incoming identity/epoch mismatch')
+                    if args.observe_restore and message.get('epoch') == epoch + 1 and not restored:
+                        if phases != ['queued', 'paging', 'alerting', 'connected'] or message['phase'] != 'connected':
+                            raise RuntimeError('incoming restore omitted connected predecessor')
+                        restored = True
+                        await socket.send(json.dumps({'type': 'incoming_call_terminate',
+                            'epoch': epoch, 'request_id': 1, 'cause': 16}))
+                        epoch += 1
+                    if message.get('epoch') != epoch:
                         raise RuntimeError('incoming identity/epoch mismatch')
                     if phases[-1:] != [message['phase']]:
                         phases.append(message['phase'])
             verify_phases(phases)
+            if args.observe_restore and not restored:
+                raise RuntimeError('incoming call ended without restoration')
         if await asyncio.wait_for(process.wait(), 90):
             raise RuntimeError('MAME exited unsuccessfully')
     finally:
@@ -62,6 +74,7 @@ def main():
     parser.add_argument('--ready-file', type=Path, required=True)
     parser.add_argument('--cwd')
     parser.add_argument('--caller', default='447700900123')
+    parser.add_argument('--observe-restore', action='store_true')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ['--']:

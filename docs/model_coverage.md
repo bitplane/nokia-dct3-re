@@ -98,6 +98,12 @@ then reaches ended after physical End and firmware CC/RR release. The ordinary
 host-connect mock, which disconnects before save/load, cannot prove this
 contract. This gate covers restored host signaling, not surviving or cleaned-up
 SIP dialogs, host media cursor restoration or native speech.
+`verify-5210-pin-host-incoming-call-state` independently adds readiness-gated
+host paging, physical Answer, exact active-call architecture/pixel restoration,
+epoch-2 connected republication without repeated paging, stale-epoch termination
+rejection and physical End/CC/RR closure. The backend stays attached through
+the restored ended state. This is host signaling restoration; incoming host
+media cursor restoration and external SIP-dialog cleanup remain separate.
 `verify-5210-pin-host-outgoing-media-state` independently adds a continuously
 attached host echo backend, restored GSM-FR cursors, rejection of stale
 epoch-1 media and at least 80 contiguous accepted epoch-2 downlink frames.

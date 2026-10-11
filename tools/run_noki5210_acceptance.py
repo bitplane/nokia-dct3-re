@@ -67,6 +67,8 @@ SCENARIOS = {
                                              net_masks=('32',), host_call='outgoing'),
     'pin-host-incoming-call': Scenario('noki5210_pin_host_incoming_call.lua', '--host-incoming-call',
                                       seconds=60, net_masks=('32',), host_call='incoming'),
+    'pin-host-incoming-call-state': Scenario('noki5210_pin_host_incoming_state.lua', '--call-state',
+                                            seconds=60, net_masks=('32',), host_call='incoming'),
     'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
                                   seconds=155, sms_mask='24'),
     'pin-phonebook': Scenario('noki5210_pin_phonebook.lua', '--phonebook-save', seconds=55),
@@ -107,7 +109,7 @@ def main():
     if args.pjsua and not scenario.host_call:
         parser.error('--pjsua requires a PIN host-call scenario')
     if args.pjsua and args.scenario in ('pin-host-outgoing-call-state',
-                                      'pin-host-outgoing-media-state'):
+                                      'pin-host-outgoing-media-state', 'pin-host-incoming-call-state'):
         parser.error('PIN host-call restoration has no promoted SIP contract')
     run = args.run_directory.resolve()
     try:
@@ -181,6 +183,8 @@ def main():
             if scenario.host_call == 'incoming' and not args.pjsua:
                 launch.extend(['--caller', '5551234', '--ready-file',
                                str(run / 'snap/5210_pin_host_idle.png')])
+                if args.scenario == 'pin-host-incoming-call-state':
+                    launch.append('--observe-restore')
             elif scenario.host_call == 'outgoing' and not args.pjsua:
                 if args.scenario == 'pin-host-outgoing-media-state':
                     launch.extend(['--number', '5551234', '--physical-end'])
@@ -236,6 +240,9 @@ def main():
                 verify_host_call = (verify_restored if args.scenario == 'pin-host-outgoing-call-state'
                                     else verify)
                 verify_host_call(text, '5551234')
+        if args.scenario == 'pin-host-incoming-call-state':
+            from tools.radio_host_incoming_restore_check import verify as verify_incoming_restore
+            verify_incoming_restore((run / 'error.log').read_text(errors='replace'))
         if args.scenario == 'pin-phonebook':
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),
                             '--scenario', 'pin-phonebook-read', '--preserved-nvram',

@@ -33,6 +33,18 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, 2)
             self.assertFalse(run.exists())
 
+    def test_host_restoration_does_not_silently_promote_sip(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for scenario in ('pin-host-outgoing-call-state', 'pin-host-outgoing-media-state',
+                             'pin-host-incoming-call-state'):
+                run = Path(temporary) / scenario
+                with self.subTest(scenario=scenario), patch('sys.argv', [
+                        'runner', str(run), '--scenario', scenario, '--pjsua', 'pjsua']):
+                    with self.assertRaises(SystemExit) as caught:
+                        runner.main()
+                    self.assertEqual(caught.exception.code, 2)
+                    self.assertFalse(run.exists())
+
     def test_sip_call_launch_retains_authentication_and_uses_wall_time(self):
         with tempfile.TemporaryDirectory() as temporary:
             for direction in ('incoming', 'outgoing'):
@@ -78,6 +90,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-outgoing-call-state': (60, '--outgoing-call-state', ('32',)),
             'pin-host-outgoing-media-state': (65, '--outgoing-call-state', ('32',)),
             'pin-host-incoming-call': (60, '--host-incoming-call', ('32',)),
+            'pin-host-incoming-call-state': (60, '--call-state', ('32',)),
             'pin-sms-wait-state': (155, '--silent-sms-state', ()),
             'pin-phonebook': (55, '--phonebook-save', ()),
             'pin-phonebook-read': (45, '--phonebook-read', ()),
@@ -101,6 +114,7 @@ class RunnerTests(unittest.TestCase):
                             patch('tools.radio_host_outgoing_connect_check.verify') as host_verify, \
                             patch('tools.radio_host_outgoing_connect_check.verify_restored') as restored_verify, \
                             patch('tools.radio_outgoing_host_media_restore_trace_check.check') as media_verify, \
+                            patch('tools.radio_host_incoming_restore_check.verify') as incoming_restore_verify, \
                             patch.object(Path, 'read_text', return_value='host trace'):
                         runner.main()
                     host = name.startswith('pin-host-')
@@ -109,7 +123,8 @@ class RunnerTests(unittest.TestCase):
                     silent = name == 'pin-host-silent-sms'
                     call = name in ('pin-host-outgoing-call', 'pin-host-incoming-call',
                                     'pin-host-outgoing-call-state', 'pin-host-outgoing-media-state')
-                    incoming_call = name == 'pin-host-incoming-call'
+                    call = call or name == 'pin-host-incoming-call-state'
+                    incoming_call = name in ('pin-host-incoming-call', 'pin-host-incoming-call-state')
                     self.assertEqual(execute.call_count, 3 if (host and not call) or name == 'pin-phonebook' else 2)
                     if name == 'pin-host-outgoing-media-state':
                         media_verify.assert_called_once_with('host trace', physical_end=True)
@@ -125,7 +140,11 @@ class RunnerTests(unittest.TestCase):
                         restored_verify.assert_not_called()
                     command = execute.call_args_list[0].args[0]
                     self.assertEqual('--observe-restore' in command,
-                                     name == 'pin-host-outgoing-call-state')
+                                     name in ('pin-host-outgoing-call-state', 'pin-host-incoming-call-state'))
+                    if name == 'pin-host-incoming-call-state':
+                        incoming_restore_verify.assert_called_once_with('host trace')
+                    else:
+                        incoming_restore_verify.assert_not_called()
                     if host:
                         self.assertEqual(Path(command[1]).name,
                                          'run_host_incoming_signaling_gate.py' if incoming_call else
