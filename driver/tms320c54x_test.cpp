@@ -1527,6 +1527,28 @@ private:
 				"Memory MAC/MAS syntax retains subtraction, rounding and destination bits");
 		}
 		osd_printf_info("TMS320C54x memory MAC/MAS disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned word = 0; word < 1024; ++word)
+			{
+				words const buffer(pc, 0x9800 | word, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+					"Short shifted store has no extension across accumulator, half and address variants");
+			}
+		vector const shifted_store_forms[] = {
+			{0x9800, 1 | dasm::SUPPORTED, "STL     A, 0, *AR2"},
+			{0x99ff, 1 | dasm::SUPPORTED, "STL     B, 15, *AR5+0%"},
+			{0x9a5f, 1 | dasm::SUPPORTED, "STH     A, 15, *AR3-"},
+			{0x9b80, 1 | dasm::SUPPORTED, "STH     B, 0, *AR2+"},
+		};
+		for (auto const &test : shifted_store_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Short shifted store syntax retains unsigned shift and dual address modifier");
+		}
+		osd_printf_info("TMS320C54x short shifted store disassembler: PASS forms=1024 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

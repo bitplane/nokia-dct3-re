@@ -138,6 +138,12 @@ public:
 			static constexpr char const *forms[] = {"*AR%u", "*AR%u-", "*AR%u+", "*AR%u+0%%"};
 			util::stream_format(stream, forms[(operand >> 2) & 3], 2 + (operand & 3));
 		};
+		if ((op & 0xfc00) == 0x9800)
+		{
+			util::stream_format(stream, "%-8s%c, %u, ", BIT(op, 9) ? "STH" : "STL", BIT(op, 8) ? 'B' : 'A', op & 15);
+			dual(op >> 4);
+			return 1 | SUPPORTED;
+		}
 		if ((op & 0xfc00) == 0xa000)
 		{
 			util::stream_format(stream, "%-8s", BIT(op, 9) ? "SUB" : "ADD");
