@@ -762,9 +762,20 @@ low nibble 1 instead. An unmatched ARFCN is ignored, not allocated.
 `38a954` searches for nibble 3 and selects the corresponding record.
 By contrast, successful type-`80` channel-`40` content through `38a054`
 writes nibble 4. This establishes distinct selection phases, not
-interchangeable positive-reply shapes. The `88` timing/phase fields and
-their DSP-side physical meaning remain unmapped; zero-filling a success
-payload merely to obtain nibble 3 is not a validated peer contract.
+interchangeable positive-reply shapes.
+The `88` field decoder `38af66` has an executable contract in
+`tools/noki6210_selection_result_check.py`: the eight-byte payload is
+status, a big-endian 24-bit field F, ARFCN, and a big-endian 16-bit field P.
+It stores `(F + floor(P/5000) + 52) mod 51` at record+8 and `P mod 5000`
+at record+4. The division helpers return remainder in R0 and quotient
+in R1; reversing that convention would corrupt both results.
+Isolated own-ROM Thumb execution verifies 48 field-boundary cases and
+nine success/failure/retry-wrap transitions, including preserved unrelated
+record bytes. This identifies the modulo arithmetic and record layout,
+not the DSP's clock origin, timestamp capture point or physical phase units.
+Zero-filling a success payload merely to obtain nibble 3 is not a validated
+peer contract. Derive those source values and transaction ordering before
+implementing an operational selection peer.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the response contract for foreign selection's
 type-`57` mode byte `03`, ownership of the pre-existing completion object,
