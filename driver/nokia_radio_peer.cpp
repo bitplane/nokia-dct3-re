@@ -1419,12 +1419,15 @@ bool nokia_radio_peer_device::decode_neighbour_measurement_instruction(
 	if (m_trace_enabled)
 		LOGMASKED(LOG_RADIO,
 				"dsp_hle: neighbour measurement instruction arfcn=%u "
-				"bsic=%u validated=%u accepted=%u t=%.6f\n",
+				"bsic=%u validated=%u accepted=%u t=%.6f "
+				"mode=%u candidate=%u listed=%u bsic_matches=%u receivable=%u\n",
 				arfcn, expected_bsic,
 				m_protocol.neighbour_instruction_bsic !=
 						neighbour_bsic_encoding::none,
 				m_neighbour_bcch_pending,
-				machine().time().as_double());
+				machine().time().as_double(), packet.payload[0],
+				candidate != nullptr, listed, bsic_matches,
+				m_gsm_network->cell_receivable(arfcn));
 	return true;
 }
 

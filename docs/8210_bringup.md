@@ -1709,6 +1709,12 @@ early/late PIN runs verify the correction. Early PIN still registers;
 late PIN still fails, and the corrected request is rejected by the separate
 neighbour-list eligibility predicate. This does not establish that mode 4
 must populate that list or which reply it requires.
+The peer's eligibility trace distinguishes the individual predicates:
+the observed late-PIN request has `mode=4 candidate=1 listed=0
+bsic_matches=1 receivable=1`. Thus the rejection is list membership,
+not an absent laboratory cell, band exclusion, or BSIC mismatch. This
+does not establish whether that predicate applies to mode 4; changing
+it still requires a recovered DSP consumer or independent protocol evidence.
 
 The original constructor bypasses timing/BSIC serialization for mode 4.
 An aligned direct-BL scan identifies nine constructor candidates: six
