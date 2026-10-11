@@ -22,7 +22,7 @@ The device may provide behavior owned by a physical card:
 - activation and ATR;
 - T=0 procedure bytes and status words;
 - GSM 11.11 SELECT, STATUS, GET RESPONSE, READ BINARY/RECORD, CHV and
-  cyclic-record INCREASE behavior;
+  SEEK, UPDATE BINARY/RECORD and cyclic-record INCREASE behavior;
 - persistent current DF/EF selection and coherent file metadata/content;
 - card-side serial response timing and protocol state.
 
@@ -156,30 +156,25 @@ card NVRAM. The CPHS AoC fixture advertises the service, but no handset has yet
 organically issued INCREASE, so this is standards-conformance coverage rather
 than a promoted product-runtime claim.
 
-The first opt-in Phase-2+ profile admits one proactive DISPLAY TEXT transaction.
-FETCH without a pending command returns `9300`, and a malformed or
-out-of-sequence TERMINAL RESPONSE returns `6a80`.
+SEEK has isolated serial conformance and save-state coverage, but no retained
+handset trace issues it. Its search directions, pointer updates and access
+conditions are authoritative in [sim_subsystem.md](sim_subsystem.md).
 
-The second opt-in profile sequences DISPLAY TEXT into GET INKEY. The firmware
-renders the card-provided prompt, reads a digit through the physical keypad and
-returns it in the TERMINAL RESPONSE Text String TLV. Each command is announced
-by the preceding APDU's `91xx` status; no task message or MMI state is injected.
-
-The third profile appends GET INPUT with a one-to-two-digit response contract.
-The handset organically returns the entered `42`, proving that the same card
-state machine supports variable-length input and more than two consecutive
-proactive commands.
-
-The fourth profile installs a two-item SET UP MENU. The firmware exposes it as
-a normal top-level menu and sends a GSM 11.14 Menu Selection ENVELOPE when the
-user chooses an item. The card accepts only the two installed identifiers in
-the expected BER-TLV shape and rejects malformed or out-of-sequence envelopes
-with `6a80`.
+The opt-in Phase-2+ application has organic handset coverage for DISPLAY TEXT,
+GET INKEY, GET INPUT, SET UP MENU/menu-selection ENVELOPE, SELECT ITEM,
+SEND SHORT MESSAGE, SET UP CALL, REFRESH and polling control. PLAY TONE has
+playback and physical cancellation coverage, not unattended successful
+completion. SET UP EVENT LIST and SEND DTMF have explicit negative capability
+results on 3210 v6.00; they are not missing responses to synthesize.
+The command-specific contracts and acceptance gates live in
+[sim_subsystem.md](sim_subsystem.md). Toolkit call/SMS signalling does not
+establish native DSP speech. All commands remain card-originated APDU/TLV
+transactions with firmware-owned UI and messaging.
 
 Extend it when an organic firmware request or focused protocol conformance test
 establishes a concrete requirement. Later work includes:
 
-- SEEK, INVALIDATE, REHABILITATE and additional access-condition/error
+- INVALIDATE, REHABILITATE and additional access-condition/error
   semantics. GSM 11.11 defines them, but no retained product trace issues the
   corresponding APDUs; the organic REFRESH lifecycle also does not do so;
 - supplying coherent FPLMN and optional EFs beyond the current matched
@@ -190,8 +185,9 @@ establishes a concrete requirement. Later work includes:
   Physical removal and reinsertion
   now use the recovered SIMI status-bit-3/FIQ7 socket-detect contract and are
   covered across both 3210 ROMs, including Phase-2+ and save/load variants;
-- extending the validated Phase-2+ lifecycle beyond DISPLAY TEXT, GET INKEY,
-  GET INPUT and SET UP MENU/menu-selection ENVELOPE;
+- establishing unattended PLAY TONE completion and any further Phase-2+
+  commands only where terminal capabilities and an organic request or focused
+  conformance requirement support them;
 - deriving model-specific filesystem profiles without phone-ROM special cases
   in the transport.
 
