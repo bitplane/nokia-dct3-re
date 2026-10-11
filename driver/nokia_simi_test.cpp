@@ -31,6 +31,21 @@ private:
 	emu_timer *m_timer = nullptr;
 	unsigned m_phase = 0; // Observer control is intentionally outside the saved device state.
 	unsigned m_parameter_case = 0;
+	unsigned m_record_case = 0;
+	static constexpr u8 RECORD_HEADERS[][6] = {
+		// Header followed by expected SW1; successful 32-byte records contain ff.
+		{0xa0, 0xb2, 0, 4, 32, 0x94}, // Undefined current pointer.
+		{0xa0, 0xb2, 0, 3, 32, 0x90}, // Previous from undefined selects last.
+		{0xa0, 0xb2, 0, 2, 32, 0x94}, // Linear last must not wrap.
+		{0xa0, 0xb2, 0, 4, 32, 0x90}, // Failed next preserves current last.
+		{0xa0, 0xb2, 0, 3, 32, 0x90}, // Previous moves to penultimate.
+		{0xa0, 0xb2, 1, 4, 32, 0x90}, // Absolute first leaves pointer unchanged.
+		{0xa0, 0xb2, 0, 2, 32, 0x90}, // Next therefore reaches last again.
+		{0xa0, 0xb2, 0, 2, 32, 0x94},
+		{0xa0, 0xb2, 0, 0, 32, 0x6b}, // Current is P1=0/P2=4, not mode zero.
+		{0xa0, 0xb2, 1, 0x84, 32, 0x6b}, // Do not mask reserved mode bits.
+		{0xa0, 0xb2, 0, 4, 32, 0x90}
+	};
 	static constexpr u8 PARAMETER_HEADERS[][5] = {
 		{0xa0, 0xa4, 1, 0, 2}, {0xa0, 0xa4, 0, 1, 2},
 		{0xa0, 0xf2, 1, 0, 22}, {0xa0, 0xf2, 0, 1, 22},
@@ -76,6 +91,11 @@ private:
 	void transmit_parameter_case()
 	{
 		auto const &header = PARAMETER_HEADERS[m_parameter_case];
+		transmit({header[0], header[1], header[2], header[3], header[4]});
+	}
+	void transmit_record_case()
+	{
+		auto const &header = RECORD_HEADERS[m_record_case];
 		transmit({header[0], header[1], header[2], header[3], header[4]});
 	}
 	void save_checkpoint()
@@ -260,7 +280,45 @@ private:
 				m_bytes[19] == 0x83 && m_bytes[21] == 0x82 && m_bytes[23] == 0x90 && m_bytes[24] == 0,
 				"parameter errors preserve selection, retries and the following APDU");
 			osd_printf_info("SIM card parameter conformance: PASS reserved_parameters=6 select_lengths=3 state_preservation=1 following_apdu=1 handset_claim=0\n");
+			clear_capture(); transmit({0xa0, 0xa4, 0, 0, 2});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 24:
+			expect(m_count == 1 && m_bytes[0] == 0xa4, "DF TELECOM select procedure");
+			clear_capture(); transmit({0x7f, 0x10});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 25:
+			expect(m_count == 2 && m_bytes[0] == 0x9f && m_bytes[1] == 22, "select DF TELECOM");
+			clear_capture(); transmit({0xa0, 0xa4, 0, 0, 2});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 26:
+			expect(m_count == 1 && m_bytes[0] == 0xa4, "ADN select procedure");
+			clear_capture(); transmit({0x6f, 0x3a});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 27:
+			expect(m_count == 2 && m_bytes[0] == 0x9f && m_bytes[1] == 15, "select linear ADN");
+			clear_capture(); transmit_record_case();
+			m_timer->adjust(attotime::from_msec(40)); return;
+		case 28:
+		{
+			u8 const expected = RECORD_HEADERS[m_record_case][5];
+			if (expected == 0x90)
+			{
+				expect(m_count == 35 && m_bytes[0] == 0xb2 && m_bytes[33] == 0x90 && m_bytes[34] == 0,
+					"complete record response");
+				for (unsigned i = 1; i <= 32; ++i) expect(m_bytes[i] == 0xff, "virgin ADN record contents");
+			}
+			else
+				expect(m_count == 2 && m_bytes[0] == expected && m_bytes[1] == (expected == 0x94 ? 2 : 0),
+					"linear record boundary or invalid addressing rejects without data");
+			clear_capture();
+			if (++m_record_case < std::size(RECORD_HEADERS))
+			{
+				--m_phase; transmit_record_case();
+				m_timer->adjust(attotime::from_msec(40)); return;
+			}
+			osd_printf_info("SIM record addressing: PASS cases=11 linear_no_wrap=1 absolute_preserves_pointer=1 current_record=1 mode_validation=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
+		}
 		}
 		fatalerror("unexpected SIMI fixture phase");
 	}

@@ -166,6 +166,15 @@ SELECT rejects a file-ID length other than two with `67 00`. The same fixture
 checks all six reserved-parameter cases and SELECT lengths zero, one and three
 before a valid STATUS confirms unchanged file selection and PIN retries.
 
+Record addressing follows [GSM 11.11 sections 6.4 and 8.5/8.6](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf): linear EFs do
+not wrap at their boundaries; cyclic EFs do. Current access is `P1=0/P2=04`,
+absolute access leaves the pointer unchanged, and successful next/previous
+access alone advances it. A failed access preserves the pointer. The isolated
+fixture exercises eleven READ RECORD cases on virgin EF_ADN, including the
+last-record boundary, current access, absolute-pointer preservation and invalid
+mode bits. UPDATE RECORD shares the address resolver, but this fixture does
+not establish every relative-write or cyclic-update lifecycle.
+
 The implemented surface is classified by ownership and evidence:
 
 | Surface | Classification | Basis and limitation |
@@ -176,7 +185,7 @@ The implemented surface is classified by ownership and evidence:
 | Socket detect status bit 3 and FIQ7 | Validated hardware contract | Physical removal deactivates transport/card state and posts the firmware removal result; reinsertion organically reactivates SIMI, ATR and file initialization in v6.00 and v5.01. Phase 2+, removal and save/load variants are independently gated. |
 | ATR/PPS and T=0 exchange | Partial card contract | The ordinary initialization conversation is coherent. Both ROMs emit PPS `ff 00 ff`, so controller delivery retains the default approximately 1.042 ms character time. ATR start and card turnaround delays remain approximations. |
 | SELECT/STATUS/GET RESPONSE/READ behavior | Partial card contract | It satisfies organically requested initialization, presence polling and the absolute linear-record scan. GET RESPONSE is now scoped to the immediately preceding SELECT or data-producing command. INVALIDATE, REHABILITATE, SEEK and broader error behavior remain unsupported: no retained firmware trace issues those commands, including the organic REFRESH lifecycle. |
-| UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Current/next/previous modes are modeled but only absolute mode has a firmware acceptance trace. |
+| UPDATE RECORD and record persistence | Partial card contract | Firmware organically writes both a standard 32-byte ADN record and a 176-byte unread SMS record. ADN is read after a card-NVRAM reload; the MT-SMS gate checks the exact persisted SMS-DELIVER bytes. Relative/current READ RECORD addressing has isolated conformance coverage; only absolute mode has a handset acceptance trace. Relative writes and general cyclic UPDATE RECORD ordering remain incompletely validated. |
 | Cyclic EF_ACM and INCREASE | Standards-derived dormant contract | The descriptor, CHV1 access conditions, checked 24-bit addition, `98 50` overflow result, six-byte delayed response and append-only persistence follow GSM 11.11. NSE-3 constructs the exact `A0 32 00 00 03` APDU, but no product firmware acceptance trace currently exercises it. |
 | RUN GSM ALGORITHM | Organic authenticated registration | The card accepts only `A0 88 00 00 10`, consumes the 16-byte RAND and exposes `SRES || Kc` through the immediately following twelve-byte GET RESPONSE. A3/A8 remains explicitly operator-selectable: the card defaults to no algorithm, while the synthetic laboratory subscriber selects TS 55.205 section 5's AES example and a separately provisioned test key. The AES projection has an independent FIPS-derived vector gate. With authentication explicitly enabled, both 3210 v6.00 and 3310 v6.39 organically execute the command, fetch all twelve bytes, require typed result `0x0066`, copy Kc, publish SRES and emit MM Authentication Response. Both then accept Location Updating Accept, persist EF_LOCI, release the dedicated channel and return to camp. |
 | Default and CPHS filesystem contents | Provisioning fixture | File sizes are ROM-informed and the data is internally coherent enough for the tested paths, but identities and service contents are synthetic test data, not 3210 hardware behavior. |
