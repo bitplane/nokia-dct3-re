@@ -196,6 +196,39 @@ private:
 				m_bytes[23] == 0x90 && m_bytes[24] == 0,
 				"STATUS reports restored PIN2 attempts and unchanged PIN1 attempts, without repeating VERIFY");
 			osd_printf_info("SIMI restoration: PASS checkpoints=3 partial_apdu=1 pending_rx=1 security_attempts=1 exact_irq_order=1 exact_deadlines=1 handset_claim=0\n");
+			clear_capture(); transmit({0, 0xf2, 0, 0, 22});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 16:
+			expect(m_count == 2 && m_bytes[0] == 0x6e && m_bytes[1] == 0,
+				"unsupported class cannot read GSM directory status");
+			clear_capture(); transmit({0x80, 0x20, 0, 2, 8});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 17:
+			expect(m_count == 2 && m_bytes[0] == 0x6e && m_bytes[1] == 0,
+				"unsupported class cannot begin VERIFY or request its body");
+			clear_capture(); transmit({0xa1, 0xa4, 0, 0, 2});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 18:
+			expect(m_count == 2 && m_bytes[0] == 0x6e && m_bytes[1] == 0,
+				"unsupported class cannot begin SELECT or change selection");
+			clear_capture(); transmit({0xa0, 0xf2, 0, 0, 22});
+			m_timer->adjust(attotime::from_msec(40)); return;
+		case 19:
+			expect(m_count == 25 && m_bytes[5] == 0x3f && m_bytes[6] == 0 &&
+				m_bytes[19] == 0x83 && m_bytes[21] == 0x82 && m_bytes[23] == 0x90 && m_bytes[24] == 0,
+				"valid status after class errors preserves selection and PIN retries");
+			clear_capture(); transmit({0xa0, 0x20, 0, 2, 0});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 20:
+			expect(m_count == 2 && m_bytes[0] == 0x67 && m_bytes[1] == 0,
+				"zero-length incoming VERIFY rejects length without a procedure byte or 256-byte wait");
+			clear_capture(); transmit({0xa0, 0xf2, 0, 0, 22});
+			m_timer->adjust(attotime::from_msec(40)); return;
+		case 21:
+			expect(m_count == 25 && m_bytes[19] == 0x83 && m_bytes[21] == 0x82 &&
+				m_bytes[23] == 0x90 && m_bytes[24] == 0,
+				"next APDU remains aligned and empty VERIFY consumes no PIN attempt");
+			osd_printf_info("SIM card header conformance: PASS unsupported_classes=3 empty_verify=1 retry_preservation=1 following_apdu=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		fatalerror("unexpected SIMI fixture phase");

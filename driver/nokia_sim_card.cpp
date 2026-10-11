@@ -425,6 +425,15 @@ void nokia_sim_card_device::finish_header()
 		LOGMASKED(LOG_SIM, "sim_device: header cla=%02x ins=%02x p1=%02x p2=%02x p3=%02x selected=%04x t=%.8f\n",
 				m_tx[0], m_ins, m_p1, m_p2, m_p3, m_selected_file,
 				machine().time().as_double());
+	if (m_tx[0] != 0xa0)
+	{
+		m_pending_response_len = 0;
+		m_fcp_pending = false;
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		queue_status(0x6e, 0x00);
+		return;
+	}
 	if (m_ins == 0x10 || m_ins == 0x14 ||
 			m_ins == 0xc2 ||
 			m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||
@@ -433,8 +442,14 @@ void nokia_sim_card_device::finish_header()
 	{
 		const u8 procedure = m_ins;
 		m_tx_len = 0;
-		m_tx_expected = m_p3 ? m_p3 : 256;
+		// GSM T=0 reserves zero as 256 only for outgoing data, not incoming bodies.
+		m_tx_expected = m_p3;
 		m_receiving_body = true;
+		if (!m_tx_expected)
+		{
+			finish_body();
+			return;
+		}
 		emit_response(&procedure, 1);
 		return;
 	}
