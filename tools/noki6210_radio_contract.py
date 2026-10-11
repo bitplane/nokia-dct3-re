@@ -395,6 +395,9 @@ def verify(image):
             'bcch_status': '0800', 'bcch_destination_task': 18,
             'bcch_object_consumer': '3b9302', 'si3_parser': '43f074',
             'si3_publication_status': '03f8', 'si3_publication_task': 14,
+            'selection_tx_writer': '426a3c',
+            'selection_tx_ring': '10000',
+            'selection_tx_write_index': '100a4',
             'type_8b_destination_task': 14, 'type_89_handler': '4580e8',
             'correlation': 'body bit 0 equals pending context byte 2',
             'traffic_release': 'runtime physical End observation required'}

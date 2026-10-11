@@ -669,14 +669,26 @@ That writer combines length and kind into the first halfword, then calls
 `10000`, wrapping before `100a4` and publishing its halfword write index
 at `100a4`. Thus the captured common request encodes as
 `0457 0305 0000`; the foreign follow-up encodes as `0457 0303 0000`.
-These are statically derived wire words, not a runtime delivery claim.
+The same paired runtime logs independently confirm HLE TX delivery:
+common type `57`, payload `03050000` at 10.323286 s (foreign) and
+10.327884 s (national); foreign-only payload `03030000` at 10.616529 s.
+The word packing itself is derived statically, while these decoded
+transport observations establish that the queued messages actually drain.
 The differing byte is preserved by transport, not interpreted by this
 writer. Next verify ring publication and the peer's type-`57` handling;
 neither its mode semantics nor its expected completion is established.
+The current peer only accepts the exact configured background request
+`03050000`. NPE-3's candidate-window search decoder accepts types `55`/`56`,
+not `57`, and its serving-SCH request type is unset. Therefore the foreign
+`57:03030000` packet reaches the transport but matches none of these
+modeled response contracts. Do not broaden the background predicate merely
+to make it respond: recover which RX family this mode consumes and how its
+completion advances the pending controller first. This is an HLE peer
+coverage gap, not evidence of a missing MCU publisher or native DSP support.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
-Current unresolved boundary: the lifecycle selecting those branches
-and ownership of the pre-existing completion object, alongside
-the handler's alternative `1580` route.
+Current unresolved boundary: the response contract for foreign selection's
+type-`57` mode byte `03`, ownership of the pre-existing completion object,
+and the handler's alternative `1580` route.
 No operational international-roaming contract is
 established by these observations.
 
