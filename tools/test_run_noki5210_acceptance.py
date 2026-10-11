@@ -10,6 +10,16 @@ from tools.make_sim_card_profile import make_profile
 
 
 class RunnerTests(unittest.TestCase):
+    def test_sip_requires_host_call_before_creating_artifacts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary) / 'invalid'
+            with patch('sys.argv', ['runner', str(run), '--scenario',
+                       'pin-registration', '--pjsua', 'pjsua']):
+                with self.assertRaises(SystemExit) as caught:
+                    runner.main()
+            self.assertEqual(caught.exception.code, 2)
+            self.assertFalse(run.exists())
+
     def test_sip_call_launch_retains_authentication_and_uses_wall_time(self):
         with tempfile.TemporaryDirectory() as temporary:
             for direction in ('incoming', 'outgoing'):
