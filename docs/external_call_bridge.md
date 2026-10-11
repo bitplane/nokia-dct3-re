@@ -347,6 +347,11 @@ Media activation is owned by the exact current PJSUA2 Call object. Late media
 callbacks from released or replaced dialogs cannot create or attach a port for
 the new dialog, even when a request identity is reused. Each port retains only
 its own call's queues.
+Signalling callbacks enforce the same object ownership: late confirmation or
+disconnect from a released/replaced Call cannot enter the event queue or clear
+a replacement dialog, including one with a reused epoch/request identity.
+Executable callback tests cover both stale states and the current-dialog
+positive control; this is host lifecycle coverage, not native DSP speech.
 Null-device PJSIP timing drives the host media port. Run MAME throttled for this
 real-time backend. Its media sequence remains host correlation, not an
 emulation clock. A changed MAME epoch hangs up the old SIP leg and clears codec

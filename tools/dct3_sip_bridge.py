@@ -168,6 +168,10 @@ class SipEndpoint:
 
         class Call(pj.Call):
             def onCallState(call, _):
+                # A reused request identity cannot transfer ownership of a
+                # delayed native confirmation/disconnect to its replacement.
+                if owner.call is not call:
+                    return
                 info = call.getInfo()
                 if info.state == pj.PJSIP_INV_STATE_CONFIRMED:
                     owner.events.append((identity, 'confirmed', info.lastStatusCode))

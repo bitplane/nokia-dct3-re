@@ -26,8 +26,36 @@ class SipDialogMediaOwnershipTest(unittest.TestCase):
         endpoint.events = deque()
         endpoint.pj = SimpleNamespace(Call=Call, AudioMediaPort=Port,
             MediaFormatAudio=SimpleNamespace, PJMEDIA_TYPE_AUDIO=1,
-            PJSUA_CALL_MEDIA_ACTIVE=2)
+            PJSUA_CALL_MEDIA_ACTIVE=2, PJSIP_INV_STATE_CONFIRMED=3,
+            PJSIP_INV_STATE_DISCONNECTED=4)
         return endpoint
+
+    def test_replaced_dialog_cannot_publish_call_state(self):
+        for replacement_identity in ((1, 2), (1, 1)):
+            for state, phase in ((3, 'confirmed'), (4, 'disconnected')):
+                with self.subTest(identity=replacement_identity, state=state):
+                    endpoint = self.endpoint()
+                    endpoint._new_call((1, 1))
+                    old = endpoint.call
+                    old.getInfo.return_value = SimpleNamespace(state=state, lastStatusCode=200)
+                    endpoint._new_call(replacement_identity)
+                    current = endpoint.call
+                    old.onCallState(None)
+                    self.assertEqual(list(endpoint.events), [])
+                    old.getInfo.assert_not_called()
+                    current.getInfo.return_value = SimpleNamespace(state=state, lastStatusCode=200)
+                    current.onCallState(None)
+                    self.assertEqual(list(endpoint.events), [(replacement_identity, phase, 200)])
+
+    def test_released_dialog_cannot_publish_call_state(self):
+        endpoint = self.endpoint()
+        endpoint._new_call((3, 7))
+        call = endpoint.call
+        call.getInfo.return_value = SimpleNamespace(state=4, lastStatusCode=200)
+        endpoint.release((3, 7))
+        call.onCallState(None)
+        self.assertEqual(list(endpoint.events), [])
+        call.getInfo.assert_not_called()
 
     def test_replaced_dialog_cannot_attach_to_new_call_media(self):
         for replacement_identity in ((1, 2), (1, 1)):
