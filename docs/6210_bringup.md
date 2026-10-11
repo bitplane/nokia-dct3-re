@@ -406,6 +406,19 @@ producer census or runtime proof that this store supplied these two values.
 Evidence: `tmp/6210-plmn-publisher-{national,international}/error.log.gz`.
 Switch evidence: `tmp/6210-plmn-switch-{national,international}/error.log.gz`.
 
+The divergent inputs are themselves published to task 18: `07d4` in the
+national control at 10.136268846 seconds, `07d2` in the international
+control at 10.085155923 seconds. Both use object address `103544` in their
+separate cold boots and return through `2a0615` (post call `2a0610`).
+This publisher stores R4 into the object's halfword header and posts with
+R0 = 18; the instruction contract is pinned. The result reproduces in two
+fresh pairs under `tmp/6210-plmn-input-source{-branch,}-{national,international}/`.
+The candidate consumption path `31506a` was not observed by either a
+mid-block or branch-entry tap. Silence is not a proof of absence, and the
+publication has not yet been correlated with the exact task-18 header read.
+The next boundary is task 18's receive/dispatch and the upstream selection
+of the status supplied to `2a0610`, not a DSP response hypothesis.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require
