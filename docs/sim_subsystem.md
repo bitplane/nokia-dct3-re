@@ -247,8 +247,18 @@ The standard GSM transparent set Kc (`6F20`), PLMNsel (`6F30`), HPLMN
 and LOCI (`6F7E`) also enforces CHV1 READ. Serial tests independently check
 each FCP, denial before verification and exact one-byte readback afterward,
 including after reset and reinsertion. This is READ-policy coverage: missing
-update support for currently immutable files and their advertised UPDATE
-conditions remain separate work. The bounded serial runner permits 16 seconds
+user-update support for ACMmax/PUCT and other unclassified file policies
+remain separate work. IMSI, HPLMN and ACC are not CHV1-writable: GSM 11.11
+10.2.2/10.2.5/10.2.15 assigns UPDATE to ADM. Their FCP now reports READ CHV1
+and UPDATE ADM (laboratory ADM level 4), while the card implements no ADM
+credential or administrative update command. The serial fixture checks that
+a verified PIN still receives `98 04` for UPDATE and each file's contents
+remain unchanged, including on reset/reinsertion replay. This corrects
+advertised policy; it does not claim administrator provisioning support.
+The normative reference is
+[GSM 11.11 v4.20.1](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf),
+whose access-level table permits ADM levels 4 through 14.
+The bounded serial runner permits 16 seconds
 for the expanded command sequences and still requires every completion marker.
 PLMNsel and FPLMN now also support CHV1-protected UPDATE BINARY, as specified
 in GSM 11.11 10.2.4/10.2.16. Their 24-/12-byte bodies are mutable card-owned

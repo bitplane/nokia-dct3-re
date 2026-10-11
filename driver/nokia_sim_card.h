@@ -77,6 +77,7 @@ private:
 		file_structure structure;
 		bool mutable_data;
 		bool read_chv1 = false;
+		bool update_adm = false;
 	};
 
 	// The structure a command requires of the EF it is addressed to. Named

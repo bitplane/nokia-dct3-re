@@ -23,11 +23,12 @@ BLOCKED_DISABLED_PASS = "SIM disabled CHV blocking: PASS failed_enable=3 protect
 PLMN_PASS = "SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
 PUCT_PASS = "SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
 SMSS_PASS = "SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
+ADM_PASS = "SIM administrative updates: PASS files=3 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0"
 
 
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS, AUTH_ACCESS_PASS, BLOCKED_DISABLED_PASS, PLMN_PASS, PUCT_PASS, SMSS_PASS, ADM_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -62,6 +63,7 @@ def main():
             "imsi_read_access": True,
             "puct_read_access": True, "puct_unverified_restore": True,
             "smss_access_restore": True, "smss_serialized_exactly": True,
+            "administrative_update_files": 3, "verified_pin_not_adm": True,
             "additional_protected_binary_files": 8,
             "authentication_access": True, "authentication_directory": True,
             "disabled_chv_blocking": True, "unblock_recovery": True,
@@ -101,6 +103,7 @@ def main():
     print(PLMN_PASS)
     print(PUCT_PASS)
     print(SMSS_PASS)
+    print(ADM_PASS)
 
 
 if __name__ == "__main__":
