@@ -10,6 +10,22 @@ from tools import run_noki8890_sip_cancel as check
 
 
 class CleanupFramesTest(unittest.TestCase):
+    def test_connected_restore_requires_own_carrier_and_postload_release(self):
+        for outgoing in (False, True):
+            connected = 'gsm_call_adapter: ' + ('' if outgoing else 'incoming ') + 'state id=1 epoch=1 phase=connected\n'
+            text = ('TX packet type=02 payload=20 data=041202000271012fc100003c0000000400000000\n' +
+                    connected + 'sip_state: restored\n'
+                    'TX packet type=02 payload=20 data=041202001117001a6000003c0000001400000001\n'
+                    'RX enqueue type=89 payload=8 data=0000000000000000\n'
+                    'RX enqueue type=80 payload=34 data=60' + '00' * 9 + '1506210001f0\n')
+            check.check_connected_restoration_radio(text, outgoing=outgoing)
+            for invalid in (text.replace('003c', '0013'),
+                            text.replace('sip_state: restored', ''),
+                            text.replace('phase=connected', 'phase=alerting'),
+                            text.replace('type=89', 'type=88')):
+                with self.subTest(outgoing=outgoing, invalid=invalid), self.assertRaises(ValueError):
+                    check.check_connected_restoration_radio(invalid, outgoing=outgoing)
+
     def test_alerting_restore_requires_exact_architecture_and_order(self):
         state = 'pc=00412345 sp=00170000 ram=12345678 t=52.000000000'
         text = ('incoming state id=1 epoch=1 phase=alerting\n'

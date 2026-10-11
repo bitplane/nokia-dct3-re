@@ -703,6 +703,7 @@ injection or borrowed product verdict is part of these workflows.
 | Ringing restoration with real SIP | `verify-8890-sip-alerting-incoming-restore`; exact R15/R13/RAM/time at 52 s, rejected external INVITE, one cause-41 clear under epoch 2, CC/RR release and decoded Exit to reviewed idle; Answer/CONNECT/media forbidden |
 | Pending outgoing restoration with real SIP | `verify-8890-sip-pending-outgoing-restore`; physical 1234567/Send, real 180, exact R15/R13/RAM/time at 32 s, CANCEL/487, one cause-41 clear and CC/RR release to reviewed idle; no redial/CONNECT/media |
 | Connected outgoing restoration with real SIP | `verify-8890-sip-connected-outgoing-restore`; physical `1234567`/Send, SIP-200 connected before the 32 s save, exact R15/R13/RAM/time, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no redial, zero old-epoch uplink/no HLE codec ticks, no speech claim |
+| Connected incoming restoration with real SIP | `verify-8890-sip-connected-incoming-restore`; fresh clock-settled idle, physical Answer, connection before the 52 s save, exact R15/R13/RAM/time, BYE/one cause-41 clear, own carrier-60 release and idle recovery; no replay, zero old-epoch uplink/no HLE codec ticks, no speech claim |
 
 The host SMS gates use `fixtures/noki8890_host/nsb6hle.cfg` in fresh private
 storage with the unchanged own acquired MCU/PMM. The fixture enables the

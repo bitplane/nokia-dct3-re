@@ -3,7 +3,8 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local outgoing = _G.noki8890_sip_restore_outgoing == true
 local connected = _G.noki8890_sip_restore_connected == true
-dofile(directory .. (outgoing and 'noki8890_outgoing_call_input.lua' or 'noki8890_sip_cancel_observe.lua'))
+dofile(directory .. (outgoing and 'noki8890_outgoing_call_input.lua' or
+    connected and 'noki8890_sip_incoming_connected.lua' or 'noki8890_sip_cancel_observe.lua'))
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local saved, completed
@@ -18,12 +19,19 @@ local post_load = emu.add_machine_post_load_notifier(function()
     for index = 1, 4 do assert(saved[index] == restored[index], 'architectural state mismatch') end
     machine:logerror('sip_state: restored\n')
     machine:logerror('state_roundtrip: result=pass scenario=8890_' ..
-        (outgoing and (connected and 'outgoing_connected' or 'outgoing_pending') or 'incoming_alerting') .. '\n')
+        (outgoing and (connected and 'outgoing_connected' or 'outgoing_pending') or
+         connected and 'incoming_connected' or 'incoming_alerting') .. '\n')
     -- Loading cancels prior Lua waits; resume physical dismissal explicitly.
     local cleanup = coroutine.create(function()
         if outgoing then
             assert(emu.wait(45 - machine.time:as_double()))
             machine.screens[':screen']:snapshot('8890_after_outgoing_call.png')
+            completed = true
+            return
+        end
+        if connected then
+            assert(emu.wait(67 - machine.time:as_double()))
+            machine.screens[':screen']:snapshot('8890_sip_connected_after_restore.png')
             completed = true
             return
         end

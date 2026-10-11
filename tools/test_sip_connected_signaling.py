@@ -80,7 +80,7 @@ class ConnectedSignalingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             ready = str(Path(directory) / 'not-yet-captured.png')
             for options in (['--incoming', '--restore-outgoing'], ['--restore-call'], ['--record-media'],
-                            ['--calls', '2'], ['--incoming', '--restore-call', '--ready-file', ready]):
+                            ['--calls', '2'], ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file', ready]):
                 with self.subTest(options=options), \
                         patch('sys.argv', ['gate', '--pjsua', 'unused', '--run-dir', 'unused',
                                            '--product', '8890', '--signaling-only'] + options), \

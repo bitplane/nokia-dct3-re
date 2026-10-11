@@ -542,10 +542,11 @@ def verify_restore(root, remote_text, phase='connected', product='3210', *, sign
          rf'{product}_incoming_physical: action=Call / Send'),
         (r'6250_raw_matrix_key: value=0a\b' if product == '6250' else
          r'6210_keypad_decoded: key=0e\b' if product == '6210' else
+         r'8890_keypad_decoded: key=0e\b' if product == '8890' else
          r'8850_keypad_decoded key=0e\b' if product == '8850' else
          r'8210_keypad_decoded: key=0e\b'),
         r'GSM service uplink sapi=0 pd=03 message=07 length=2',
-    ) if product in ('6210', '6250', '8210', '8850') and phase == 'connected' else ()
+    ) if product in ('6210', '6250', '8210', '8850', '8890') and phase == 'connected' else ()
     for pattern in physical_answer + (
             rf'incoming state id=1 epoch=1 phase={phase}',
             r'sip_state: saved', r'sip_state: restored',
@@ -663,7 +664,8 @@ def main():
         args.signaling_only and args.product == '8890' and
         (not args.incoming or args.ready_file is not None) and
         args.sip_response == 200 and args.calls == 1 and not args.record_media and
-        not args.restore_call and (not args.restore_outgoing or not args.incoming) and not args.restore_idle and
+        (not args.restore_call or (args.incoming and args.restore_phase == 'connected')) and
+        (not args.restore_outgoing or not args.incoming) and not args.restore_idle and
         not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
         parser.error('--signaling-only requires a single verified product SIP-200 fixture, with connected restoration only')

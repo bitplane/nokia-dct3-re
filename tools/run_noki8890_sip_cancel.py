@@ -87,17 +87,30 @@ def check_alerting_restoration(text, outgoing=False, connected=False):
         raise ValueError('incoming alerting architecture did not restore exactly')
     cursor = 0
     for marker in (('gsm_call_adapter: request id=1 epoch=1 digits=1234567' if outgoing else
-                    'incoming state id=1 epoch=1 phase=alerting'),
+                    'incoming state id=1 epoch=1 phase=' + ('connected' if connected else 'alerting')),
                    'sip_state: saved', 'sip_state: restored',
                    'state_roundtrip: result=pass scenario=8890_' +
                    ('outgoing_connected' if outgoing and connected else
-                    'outgoing_pending' if outgoing else 'incoming_alerting')):
+                    'outgoing_pending' if outgoing else
+                    'incoming_connected' if connected else 'incoming_alerting')):
         position = text.find(marker, cursor)
         if position < 0:
             raise ValueError('missing ordered alerting restoration checkpoint: ' + marker)
         cursor = position + len(marker)
-    if not outgoing and text.find('8890_sip_cancel: physical Exit', cursor) < 0:
+    if not outgoing and not connected and text.find('8890_sip_cancel: physical Exit', cursor) < 0:
         raise ValueError('missing post-load physical Exit')
+
+
+def check_connected_restoration_radio(text, *, outgoing):
+    require_ordered(text, (
+        ('own carrier-60 traffic', r'TX packet type=02 payload=20 .*data=041202000271012fc100003c0000000400000000'),
+        ('connected before save', r'gsm_call_adapter: ' + ('' if outgoing else 'incoming ') +
+         r'state id=1 epoch=1 phase=connected'),
+        ('handset restored', r'sip_state: restored'),
+        ('own carrier-60 release', r'TX packet type=02 payload=20 .*data=041202001117001a6000003c0000001400000001'),
+        ('release confirmation', RELEASE_CONFIRMATION),
+        ('resumed paging', IDLE_PCH),
+    ), 'NSB-6 connected restoration')
 
 
 def main():
@@ -122,12 +135,14 @@ def main():
                           help='restore an outgoing SIP 180 request without redial or media')
     outgoing.add_argument('--restore-outgoing-connected-signaling', action='store_true',
                           help='restore and clear a connected outgoing SIP dialog without speech')
+    outgoing.add_argument('--restore-incoming-connected-signaling', action='store_true',
+                          help='physically answer, restore and clear an incoming SIP dialog without speech')
     parser.add_argument('--http-port', type=int, default=18889)
     parser.add_argument('--sip-port', type=int, default=25889)
     args = parser.parse_args()
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
     outgoing_run = outgoing_failure or args.restore_outgoing_pending or args.outgoing_connected_signaling or args.restore_outgoing_connected_signaling
-    if args.restore_idle and (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_alerting):
+    if args.restore_idle and (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_connected_signaling or args.restore_incoming_alerting):
         parser.error('--restore-idle cannot be combined with outgoing failure')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -143,6 +158,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki8890_sip_incoming_connected_restore.lua' if args.restore_incoming_connected_signaling else
                        'noki8890_sip_outgoing_connected_restore.lua' if args.restore_outgoing_connected_signaling else
                        'noki8890_sip_incoming_connected.lua' if args.incoming_connected_signaling else
                        'noki8890_sip_outgoing_pending_restore.lua' if args.restore_outgoing_pending else
@@ -157,7 +173,9 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8890',
-                   *(['--restore-outgoing', '--sip-response', '200', '--signaling-only'] if args.restore_outgoing_connected_signaling else
+                   *(['--incoming', '--restore-call', '--signaling-only', '--ready-file',
+                      str(run / 'snap/8890_sip_registered_idle.png')] if args.restore_incoming_connected_signaling else
+                     ['--restore-outgoing', '--sip-response', '200', '--signaling-only'] if args.restore_outgoing_connected_signaling else
                      ['--incoming', '--signaling-only', '--ready-file',
                       str(run / 'snap/8890_sip_registered_idle.png')] if args.incoming_connected_signaling else
                      ['--sip-response', '200', '--signaling-only'] if args.outgoing_connected_signaling else
@@ -181,25 +199,26 @@ def main():
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'), outgoing=True,
                                           connected=args.restore_outgoing_connected_signaling)
             if args.restore_outgoing_connected_signaling:
-                require_ordered((run / 'error.log').read_text(errors='replace'), (
-                    ('own carrier-60 traffic', r'TX packet type=02 payload=20 .*data=041202000271012fc100003c0000000400000000'),
-                    ('connected before save', r'gsm_call_adapter: state id=1 epoch=1 phase=connected'),
-                    ('handset restored', r'sip_state: restored'),
-                    ('own carrier-60 release', r'TX packet type=02 payload=20 .*data=041202001117001a6000003c0000001400000001'),
-                    ('release confirmation', RELEASE_CONFIRMATION),
-                    ('resumed paging', IDLE_PCH),
-                ), 'NSB-6 connected outgoing restoration')
-        elif args.incoming_connected_signaling:
+                check_connected_restoration_radio((run / 'error.log').read_text(errors='replace'), outgoing=True)
+        elif args.incoming_connected_signaling or args.restore_incoming_connected_signaling:
             text = (run / 'error.log').read_text(errors='replace')
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             verify_stage(text, runtime=True, selftest=True)
-            from tools.noki8890_incoming_call_check import verify as verify_incoming
-            verify_incoming(text, caller='5551234', configured_gsm900=True)
+            if args.restore_incoming_connected_signaling:
+                check_alerting_restoration(text, connected=True)
+                check_connected_restoration_radio(text, outgoing=False)
+                if len(host_setup_pattern('5551234').findall(text)) != 1:
+                    raise ValueError('connected restoration lacks one own caller SETUP')
+            else:
+                from tools.noki8890_incoming_call_check import verify as verify_incoming
+                verify_incoming(text, caller='5551234', configured_gsm900=True)
             storage = (run / 'nvram/nsb6hle/sim_card').read_bytes()
             if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
                 raise ValueError('incoming cleanup lacks persisted laboratory SIM location')
-            for name in ('8890_sip_registered_idle.png', '8890_after_incoming_call.png'):
+            for name in ('8890_sip_registered_idle.png',
+                         '8890_sip_connected_after_restore.png' if args.restore_incoming_connected_signaling else
+                         '8890_after_incoming_call.png'):
                 with Image.open(run / 'snap' / name) as frame:
                     digest = hashlib.sha256(frame.convert('L').crop((0, 8, 84, 48)).tobytes()).hexdigest()
                     if frame.size != (84, 48) or digest != FRAMES['8890_sip_registered_idle.png']:
@@ -211,7 +230,8 @@ def main():
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),
                         '--configured-gsm900', str(run / 'error.log')], check=True)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsb6hle', 'scenario': ('outgoing-sip-connected-restore' if args.restore_outgoing_connected_signaling else
+            'machine': 'nsb6hle', 'scenario': ('incoming-sip-connected-restore' if args.restore_incoming_connected_signaling else
+                                             'outgoing-sip-connected-restore' if args.restore_outgoing_connected_signaling else
                                              'incoming-sip-connected-signaling' if args.incoming_connected_signaling else
                                              'outgoing-sip-connected-signaling' if args.outgoing_connected_signaling else
                                              'outgoing-sip-pending-restore' if args.restore_outgoing_pending else
@@ -225,6 +245,7 @@ def main():
             'incoming_alerting_restored': args.restore_incoming_alerting,
             'outgoing_pending_restored': args.restore_outgoing_pending,
             'outgoing_connected_restored': args.restore_outgoing_connected_signaling,
+            'incoming_connected_restored': args.restore_incoming_connected_signaling,
             'command': command, 'result': 'pass',
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:

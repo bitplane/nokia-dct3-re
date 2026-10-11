@@ -104,6 +104,24 @@ class SipRestoreCheckTest(unittest.TestCase):
             with self.subTest(log=bad_log, bridge=bad_bridge), self.assertRaises(RuntimeError):
                 self.check(log=bad_log, bridge=bad_bridge, product='6250', signaling_only=True)
 
+    def test_8890_connected_restore_requires_own_decoded_answer(self):
+        prefix = ('8890_incoming_physical: action=Call / Send\n'
+                  '8890_keypad_decoded: key=0e\n'
+                  'GSM service uplink sapi=0 pd=03 message=07 length=2\n')
+        bridge = BRIDGE.replace('SIP epoch changed',
+            'SIP physical answer identity=(1, 1)\n'
+            'SIP confirmed status=200 identity=(1, 1)\n'
+            'SIP epoch media discarded {"uplink": 0}\nSIP epoch changed')
+        result = self.check(log=prefix + LOG, bridge=bridge, product='8890', signaling_only=True)
+        self.assertFalse(result['speech_tested'])
+        for bad_log, bad_bridge in (
+                (LOG, bridge), (prefix.replace('key=0e', 'key=0f') + LOG, bridge),
+                (prefix + LOG, bridge.replace('"uplink": 0', '"uplink": 1')),
+                (prefix + LOG, bridge.replace('identity=(1, 1)', 'identity=(2, 1)')),
+                (prefix + LOG + 'dsp_hle: speech tick\n', bridge)):
+            with self.subTest(log=bad_log, bridge=bad_bridge), self.assertRaises(RuntimeError):
+                self.check(log=bad_log, bridge=bad_bridge, product='8890', signaling_only=True)
+
     def test_connected_restore_clears_both_sides(self):
         self.check()
         self.check(product='3310')

@@ -7,7 +7,7 @@
 # flow is not yet modelled by the gate matrix, so it is copied rather than
 # rebuilt. Those are the remaining migration work.
 
-# 725 gates: 527 generated from typed steps, 198 copied verbatim (shell).
+# 726 gates: 528 generated from typed steps, 198 copied verbatim (shell).
 
 # Shell guards shared by gates that rewrite provisioned state.
 #
@@ -441,6 +441,7 @@ DCT3_PRESS_240_350 := NOKIA_DCT3_POST_READY_KEY_DURATION_MS=240 NOKIA_DCT3_POST_
 	verify-8890-sip-connected-signaling \
 	verify-8890-sip-incoming-connected-signaling \
 	verify-8890-sip-connected-outgoing-restore \
+	verify-8890-sip-connected-incoming-restore \
 	verify-6210-sip-connected-incoming-restore
 
 verify-8210-host-incoming-call: build
@@ -5169,6 +5170,9 @@ verify-8890-sip-incoming-connected-signaling: build
 
 verify-8890-sip-connected-outgoing-restore: build
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py $(RUN_DIR) --restore-outgoing-connected-signaling --pjsua $(SIP_PJSUA_BIN) --mame $(MAME_DIR)/mame
+
+verify-8890-sip-connected-incoming-restore: build
+	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki8890_sip_cancel.py $(RUN_DIR) --restore-incoming-connected-signaling --pjsua $(SIP_PJSUA_BIN) --mame $(MAME_DIR)/mame
 
 verify-6210-sip-connected-incoming-restore: build
 	env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON) tools/run_noki6210_sip_cancel.py $(RUN_DIR) --restore-incoming-connected-signaling --pjsua $(SIP_PJSUA_BIN) --mame $(MAME_DIR)/mame
