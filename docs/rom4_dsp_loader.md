@@ -926,6 +926,18 @@ and missing records. The native save-state gate passes separately; it does
 not make this RF gate green. Snapshot provenance remains unresolved and must
 be explained before deliberately re-banking or attributing the drift to a
 hardware correction.
+
+Two individually rebuilt CPU-source controls preserve the current +3/+96/+1
+drift: restoring the pre-`c052c0d0` RPT-zero block-completion behavior, and
+restoring the pre-`72ae2507` XC word accounting after the block redirect.
+Their separate cold gates still reject the same exact snapshot. Evidence:
+`tmp/c54x-rf-rpt-zero-control.log` and
+`tmp/c54x-rf-xc-redirect-control.log`. Neither correction alone explains the
+drift; this does not exclude combined interactions or later operand/ALU
+changes. Both temporary source controls are removed. DSP transport source
+is unchanged since `cd3dbd10`, and the driver diff has no 5110 product/clock
+configuration change. Preserve the corrected repeat/XC contracts and their
+executable regressions rather than reverting them to chase an oracle.
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free
 instruction cases write PRD `1234`, reload with TSS set and each TDDR value,
