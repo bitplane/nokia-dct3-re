@@ -414,6 +414,26 @@ eligibility rules establish the mode-4 contract. The
 decodes outbound RACH/Layer-2 and inbound Layer-2 traffic, not type `0x11`;
 it supplies no independent mode-4 response specification.
 
+An independent historical layout reference is the archived Project Blacksphere
+documentation, credited to wumpus and its contributors:
+
+- [NMEAS/type `0x11`](https://web.archive.org/web/20160119230146id_/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typestxd/sub_11.htm)
+  lists modes 1 through 5, BSIC at payload offset 1, two-byte timing and frame
+  fields at offsets 2 and 4, and a **two-byte carrier at offset 6**. It does
+  not explain the modes, their eligibility rules, or the required replies.
+  This corroborates the full carrier field recovered from NSM-3; it does not
+  justify relaxing mode-4 membership checks or reusing a mode-3 response.
+- [Received block/type `0x80`](https://web.archive.org/web/20160119230159id_/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typesrxd/sub_80.htm)
+  describes logical channel, tuner/BSIC and error bytes at offsets 0 through 2,
+  a three-byte frame number at offset 3, a two-byte carrier at offset 6,
+  a signed timing displacement at offset 8, and Layer-2 content from offset
+  10. These are historical field descriptions, not a product-independent
+  transaction or scheduling specification.
+
+The type-`0x11` mode-4 request/response contract remains unresolved. Archived
+packet vocabulary is external evidence to check against each ROM, not an
+authority for synthesizing a firmware completion.
+
 The four remaining direct task-10 status types are closed through their first
 semantic consumer:
 
