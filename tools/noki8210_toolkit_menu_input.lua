@@ -26,7 +26,8 @@ local input = coroutine.create(function()
     assert(emu.wait(3))
     machine.screens[':screen']:snapshot('8210_toolkit_menu_result.png')
     if _G.noki8210_toolkit_call then
-        press('Menu', 'call_accept')
+        press(_G.noki8210_toolkit_decline and 'Names / C' or 'Menu',
+              _G.noki8210_toolkit_decline and 'call_decline' or 'call_accept')
     end
     if _G.noki8210_toolkit_network_wait then
         assert(emu.wait(_G.noki8210_toolkit_network_wait))

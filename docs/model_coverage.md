@@ -541,6 +541,8 @@ Delivery outside the laboratory network is not established.
 physical consent before SETUP, assigned/connected signaling, successful
 terminal response, physical release and reviewed call/idle frames. It does
 not validate speech.
+The independent `verify-8210-sim-toolkit-call-decline` gate requires physical
+refusal, the user-rejection terminal response and absence of call signaling.
 
 The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,

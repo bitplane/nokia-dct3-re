@@ -704,6 +704,11 @@ assignment, connect acknowledgment, successful terminal response
 complete CC/RR release. Reviewed consent, active `SAT call` and returned
 idle pixels are checked alongside staged boot and persisted registration.
 This establishes laboratory call signaling, not speech or native DSP.
+`verify-8210-sim-toolkit-call-decline` exercises the same card request but
+physically selects Names/C. Firmware returns
+`810306100002028281030122` (user did not accept), with no outgoing request,
+SETUP, assignment or connect. The gate checks the consent prompt, returned
+item list and physical End to idle as well as boot/registration predicates.
 
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered

@@ -3,6 +3,24 @@ from tools.noki8210_toolkit_inkey_check import EVENTS, INPUT_EVENTS, MENU_EVENTS
 
 
 class InkeyTest(unittest.TestCase):
+    def test_card_owned_call_refusal_never_starts_signaling(self):
+        refusal = '\n'.join((
+            'proactive SET UP CALL ready', 'SIM status ins=c2 sw=911c',
+            'header cla=a0 ins=12 p1=00 p2=00 p3=1c',
+            '8210_toolkit_physical: action=call_decline',
+            'terminal-response data=810306100002028281030122',
+            'SIM status ins=14 sw=9000',
+            '8210_toolkit_physical: action=menu_exit',
+        ))
+        text = '\n'.join(MENU_EVENTS[:-1]) + '\n' + refusal
+        verify_protocol(text, call_decline=True)
+        for changed in (text.replace('030122', '030100'),
+                        text.replace('action=call_decline', 'action=ignored'),
+                        text + '\nGSM outgoing request id=1 digits=5551234',
+                        text + '\nGSM service uplink sapi=0 pd=03 message=05 length=15 data=03450401a05e0581551532f4150101'):
+            with self.assertRaises(ValueError):
+                verify_protocol(changed, call_decline=True)
+
     def test_card_owned_call_requires_physical_consent_and_release(self):
         from tools.test_sim_toolkit_call_trace_check import GOOD
         call = GOOD.replace('GSM service uplink sapi=0 pd=03 message=05',

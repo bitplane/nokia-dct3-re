@@ -58,17 +58,17 @@ def verify(log: str) -> None:
         raise ValueError("toolkit call must contain exactly one traffic assignment")
 
 
-def verify_decline(log: str, product: str) -> None:
+def verify_decline(log: str, product: str, *, action_namespace='toolkit_interactive') -> None:
     if '[LUA ERROR]' in log:
         raise ValueError('physical Toolkit call cancellation failed')
     compact = log.replace('[:sim_card] ', '')
     require_in_order(compact, [
         'proactive SET UP CALL ready', 'SIM status ins=c2 sw=911c',
         'header cla=a0 ins=12 p1=00 p2=00 p3=1c',
-        f'{product}_toolkit_interactive: action=call_decline',
+        f'{product}_{action_namespace}: action=call_decline',
         'terminal-response data=810306100002028281030122',
         'SIM status ins=14 sw=9000',
-        f'{product}_toolkit_interactive: action=menu_exit',
+        f'{product}_{action_namespace}: action=menu_exit',
     ])
     if ('GSM outgoing request' in log or SETUP.search(log) or
             TRAFFIC_ASSIGNMENT.search(log) or CONNECT.search(log)):

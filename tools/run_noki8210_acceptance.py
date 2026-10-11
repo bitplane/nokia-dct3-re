@@ -25,6 +25,7 @@ SCENARIOS = {
     'toolkit-menu-state': ('toolkit_menu_state', 65, 'toolkit_menu_state_check'),
     'toolkit-sms': ('toolkit_sms_input', 85, 'toolkit_inkey_check'),
     'toolkit-call': ('toolkit_call_input', 90, 'toolkit_inkey_check'),
+    'toolkit-call-decline': ('toolkit_call_decline_input', 90, 'toolkit_inkey_check'),
     'power-cycle': ('power_cycle_input', 73, 'power_check'),
     'ussd': ('ussd_input', 40, 'ussd_check'),
     'divert': ('divert_input', 40, 'divert_check'),
@@ -50,7 +51,7 @@ SCENARIOS = {
 MCU_SHA1 = 'c1a0fe95cedb89a92b19654208cc4855e1a4988e'
 TOOLKIT_PROFILES = {'toolkit': 1, 'toolkit-inkey': 2, 'toolkit-input': 3,
                     'toolkit-menu': 4, 'toolkit-menu-state': 4,
-                    'toolkit-sms': 5, 'toolkit-call': 6}
+                    'toolkit-sms': 5, 'toolkit-call': 6, 'toolkit-call-decline': 6}
 PMM_SHA256 = '31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
 
 PIN_SCENARIOS = frozenset((
@@ -245,6 +246,8 @@ def main():
             check.append('--sms')
         elif args.scenario == 'toolkit-call':
             check.append('--call')
+        elif args.scenario == 'toolkit-call-decline':
+            check.append('--call-decline')
         storage = str(run / 'nvram/nsm3hle/sim_card')
         if args.scenario == 'power-cycle':
             check.extend([storage, str(run / 'snap')])
@@ -368,7 +371,7 @@ def main():
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
             'laboratory_carrier': 823 if args.dcs1800 else 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' or args.pin_enabled else None,
-            'sim_profile': 'Phase 2+ interactive menu/SET UP CALL laboratory card' if args.scenario == 'toolkit-call' else 'Phase 2+ interactive menu/SEND SHORT MESSAGE laboratory card' if args.scenario == 'toolkit-sms' else 'Phase 2+ interactive commands/SET UP MENU laboratory card' if args.scenario in ('toolkit-menu', 'toolkit-menu-state') else 'Phase 2+ DISPLAY TEXT/GET INKEY/GET INPUT laboratory card' if args.scenario == 'toolkit-input' else 'Phase 2+ DISPLAY TEXT/GET INKEY laboratory card' if args.scenario == 'toolkit-inkey' else 'Phase 2+ DISPLAY TEXT laboratory card' if args.scenario == 'toolkit'
+            'sim_profile': 'Phase 2+ interactive menu/SET UP CALL laboratory card' if args.scenario in ('toolkit-call', 'toolkit-call-decline') else 'Phase 2+ interactive menu/SEND SHORT MESSAGE laboratory card' if args.scenario == 'toolkit-sms' else 'Phase 2+ interactive commands/SET UP MENU laboratory card' if args.scenario in ('toolkit-menu', 'toolkit-menu-state') else 'Phase 2+ DISPLAY TEXT/GET INKEY/GET INPUT laboratory card' if args.scenario == 'toolkit-input' else 'Phase 2+ DISPLAY TEXT/GET INKEY laboratory card' if args.scenario == 'toolkit-inkey' else 'Phase 2+ DISPLAY TEXT laboratory card' if args.scenario == 'toolkit'
                 else 'PIN-enabled laboratory card' if args.pin_enabled else 'default laboratory card',
             'pin_start_seconds': (args.pin_start if args.pin_start is not None else 8)
                 if args.pin_enabled else None,
