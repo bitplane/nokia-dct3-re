@@ -612,6 +612,17 @@ Recover the specific `03f5` preparation branch before assigning its
 subsystem semantics. Evidence:
 `tmp/6210-plmn-publisher-instruction-{national,international}/error.log.gz`;
 `tmp/6210-plmn-publisher-return-{national,international}/error.log.gz`.
+The concrete `03f5` preparation is `3131f6` (literal `313574`), followed
+by BL `3131f8` to the shared `315560` post. Selector `312e34..312e3c`
+enters that block when saved stack+8 equals `07d7` (literal `313188`).
+Fresh instruction observation confirms selector input `07d7` in foreign
+boot. Its preceding task-18 post is observed at 10.614313769 s, caller
+LR `2a062b`, object `1038d4`; own post site `2a0626` sends the existing
+object from context+68. Do not assume the earlier `09c6/09c8` translator
+owns this publication: a `09cb` constructor/post is observed in the
+national control instead, and no such foreign post is recorded by this
+bounded observer. Recover the condition selecting `2a061a` next.
+Evidence: `tmp/6210-plmn-03f5-selector-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
