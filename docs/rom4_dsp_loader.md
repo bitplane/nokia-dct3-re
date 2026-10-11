@@ -1056,6 +1056,14 @@ vector opcode after that read and checks execution of the retained word,
 normal extension fetch, two save/replays, survival of later IMR masking,
 reset discard and explicit debugger-PC redirect discard. The combined-push
 core fails the Access-before-Fetch assertion in `tmp/c54x-intr-access-red.log`.
+The core gate also replays five modeled entry boundaries for both IRQ and NMI
+(ten independent save/load cases): acceptance, Decode, stack Access, vector
+Fetch/IACK and stack write. Each continuation requires exactly one vector
+read, acknowledgement and original-continuation write, including when IMR
+changes after acceptance. Post-Fetch cases replace vector memory and still
+execute the retained opcode with its normally fetched extension. These are
+entry-state ownership tests, not foreground-pipeline drain or silicon-cycle
+validation; the instruction-atomic timing frontier remains unchanged.
 The complete core gate requires `TMS320C54x vector prefetch: PASS` with
 `sp_access=1`. Core, timer observation, original MU4 storage/loader/serial and
 native NSE-1 RF gates pass in `tmp/c54x-intr-access-final.log`; the RF boundary

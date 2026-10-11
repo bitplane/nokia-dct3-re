@@ -415,6 +415,40 @@ private:
 		m_phase = 190000;
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_entry_stage_restore_case(unsigned index)
+	{
+		m_cpu->reset();
+		m_vector_prefetch_tap.remove(); m_vector_stack_tap.remove();
+		m_vector_reads = m_vector_acks = m_entry_stack_writes = 0;
+		m_stage_restore_case = index;
+		bool const nmi = index >= 5;
+		u16 const vector = nmi ? 4 : 0x40;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(vector, 0xf020); // LD #1234,A, then IDLE.
+		program.write_word(vector + 1, 0x1234);
+		program.write_word(vector + 2, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0fff, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, nmi ? 0x0800 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 3);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_vector_prefetch_tap = program.install_read_tap(vector, vector, "entry_stage_restore_fetch",
+			[this](offs_t, u16 &, u16) {
+				if (!machine().side_effects_disabled()) ++m_vector_reads;
+			});
+		m_vector_stack_tap = m_cpu->space(AS_DATA).install_write_tap(0x0fff, 0x0fff,
+			"entry_stage_restore_stack", [this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				++m_entry_stack_writes;
+				expect(value == 0x0800 && m_vector_reads == 1 && m_vector_acks == 1,
+					"Restored entry stacks the original continuation after one Fetch/IACK");
+			});
+		m_phase = 450000;
+		if (nmi) m_cpu->set_input_line(INPUT_LINE_NMI, ASSERT_LINE);
+		m_check_timer->adjust(attotime::from_ticks(index % 5 + 1, m_cpu->clock()));
+	}
 	void start_native_final_gap_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -21660,7 +21694,54 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100)); return;
 			}
 			osd_printf_info("TMS320C54x accepted interrupt checkpoint: PASS ifr_until_fetch=1 intm_at_iack=1 decode_before_access=1 later_imr=1 source_latched=1 save_replay=1 pipeline_drain_claim=0\n");
-			start_rounding_boundary_case(0); return;
+			start_entry_stage_restore_case(0); return;
+		}
+		if (m_phase >= 450000 && m_phase <= 450002)
+		{
+			unsigned const stage = m_stage_restore_case % 5;
+			bool const nmi = m_stage_restore_case >= 5;
+			u16 const vector = nmi ? 4 : 0x40;
+			if (m_phase == 450000)
+			{
+				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (stage >= 2 ? 0x0fff : 0x1000) &&
+					data.read_word(0x0fff) == (stage >= 4 ? 0x0800 : 0xbeef) &&
+					m_vector_reads == unsigned(stage >= 3) && m_vector_acks == unsigned(stage >= 3) &&
+					m_entry_stack_writes == unsigned(stage >= 4) &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == (nmi || stage < 3 ? 3 : 2),
+					"Checkpoint separates acceptance, Decode, Access, Fetch/IACK and stack Execute");
+				m_saved_vector.str(std::string()); m_saved_vector.clear();
+				expect(machine().save().write_stream(m_saved_vector) == STATERR_NONE,
+					"Save each IRQ/NMI entry boundary");
+			}
+			else
+			{
+				expect(m_vector_reads == 1 && m_vector_acks == 1 && m_entry_stack_writes == 1 &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
+					data.read_word(0x0fff) == 0x0800 &&
+					m_cpu->state_int(tms320c54x_device::STATE_A) == 0x1234 &&
+					m_cpu->state_int(tms320c54x_device::STATE_PC) == vector + 3 &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == (nmi ? 3 : 2) &&
+					m_cpu->state_int(tms320c54x_device::STATE_IDLE),
+					"Reference and restored entry finish once with retained opcode and original source");
+				if (m_phase == 450002)
+				{
+					m_vector_prefetch_tap.remove(); m_vector_stack_tap.remove();
+					if (m_stage_restore_case < 9) { start_entry_stage_restore_case(m_stage_restore_case + 1); return; }
+					osd_printf_info("TMS320C54x entry stage restoration: PASS cases=10 sources=irq,nmi boundaries=5 one_fetch=1 one_ack=1 one_stack_write=1 retained_opcode=1 pipeline_drain_claim=0\n");
+					start_rounding_boundary_case(0); return;
+				}
+				m_saved_vector.clear(); m_saved_vector.seekg(0);
+				expect(machine().save().read_stream(m_saved_vector) == STATERR_NONE,
+					"Restore each IRQ/NMI entry boundary");
+				m_vector_reads = m_vector_acks = unsigned(stage >= 3);
+				m_entry_stack_writes = unsigned(stage >= 4);
+			}
+			// Accepted sources survive later masking. After Fetch, changing memory
+			// must not replace the already retained first vector opcode.
+			m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 2);
+			if (stage >= 3) m_cpu->space(AS_PROGRAM).write_word(vector, 0xf4e1);
+			m_phase = m_phase == 450000 ? 450001 : 450002;
+			m_check_timer->adjust(attotime::from_usec(100)); return;
 		}
 		if (m_phase >= 200000 && m_phase < 200128)
 		{
@@ -22239,6 +22320,7 @@ private:
 	unsigned m_timer_probe_writes = 0, m_timer_probe_masks = 0;
 	unsigned m_vector_reads = 0, m_vector_acks = 0, m_vector_case = 0;
 	unsigned m_entry_stack_writes = 0;
+	unsigned m_stage_restore_case = 0;
 	int m_entry_ack_source = -1;
 	u64 m_entry_fetch_cycle = 0, m_entry_stack_cycle = 0;
 	std::stringstream m_saved_vector;
@@ -22292,6 +22374,12 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase >= 450000 && m_phase <= 450002)
+		{
+			expect(line == (m_stage_restore_case >= 5 ? INPUT_LINE_NMI : 0),
+				"Restored entry acknowledges only the originally accepted IRQ/NMI source");
+			++m_vector_acks;
+		}
 		if (m_phase >= 190000 && m_phase <= 190003)
 		{
 			expect(m_entry_ack_source == -1 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == 2,
