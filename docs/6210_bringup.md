@@ -623,6 +623,14 @@ owns this publication: a `09cb` constructor/post is observed in the
 national control instead, and no such foreign post is recorded by this
 bounded observer. Recover the condition selecting `2a061a` next.
 Evidence: `tmp/6210-plmn-03f5-selector-{national,international}/error.log.gz`.
+That run also records dispatcher `29ffb8` input `07d7` from LR `2a7f7b`
+at 10.614281231 s. The ROM's matching preparation `2a3942` loads `07d7`
+from `2a3ca4` and calls `2a7f74`. Dispatcher table entry `2a015c` points
+to `2a0598`, which loads `07d7` from `2a0934` into R2 and branches to
+`2a061c`; that block writes the status into context+68's existing object
+before posting it to task 18. Adjacent `2a061a` loads a different status
+(`07d1`) and must not be mistaken for this path's predecessor. The
+condition reaching the `2a3942` preparation remains to be observed.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.
