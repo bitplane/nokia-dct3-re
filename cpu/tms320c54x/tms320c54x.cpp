@@ -692,6 +692,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_early_write_deferred));
 	save_item(NAME(m_pipeline_peripheral_wait_paid));
 	save_item(NAME(m_pipeline_intm_protected));
+	save_item(NAME(m_pipeline_direct_status));
 	save_item(NAME(m_pipeline_intm_follow));
 	save_item(NAME(m_pipeline_decode_remaining));
 	save_item(NAME(m_pipeline_decode_extension));
@@ -1692,6 +1693,7 @@ void tms320c54x_device::reset_pipeline()
 	m_pipeline_early_write_deferred.fill(false);
 	m_pipeline_peripheral_wait_paid.fill(false);
 	m_pipeline_intm_protected.fill(false);
+	m_pipeline_direct_status.fill(0);
 	m_pipeline_intm_follow = false;
 	m_pipeline_valid.fill(false);
 	m_pipeline_decode_remaining = 0;
@@ -1760,6 +1762,7 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_early_write_deferred[stage] = m_pipeline_early_write_deferred[stage - 1];
 		m_pipeline_peripheral_wait_paid[stage] = m_pipeline_peripheral_wait_paid[stage - 1];
 		m_pipeline_intm_protected[stage] = m_pipeline_intm_protected[stage - 1];
+		m_pipeline_direct_status[stage] = m_pipeline_direct_status[stage - 1];
 	}
 	m_pipeline_valid[0] = false;
 	m_pipeline_early_write_deferred[0] = false;
@@ -1846,8 +1849,8 @@ void tms320c54x_device::pipeline_step()
 		// Register/immediate loads, short loads, DP stores and bounded RMW forms.
 		// Other memory/control forms need Access/Read/redirect ownership first.
 		bool const short_load = (word & 0xfe00) == 0x1000 && u8(word) < 0xa0 &&
-			(BIT(word, 7) || !BIT(m_st1, 14));
-		bool const direct_store = (word & 0xfc80) == 0x8000 && !BIT(m_st1, 14);
+			(BIT(word, 7) || u8(word) < 0x80);
+		bool const direct_store = (word & 0xfc80) == 0x8000;
 		bool const immediate_store = (word & 0xff00) == 0x7600 && (u8(word) == 0xf8 ||
 			(u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const long_load = (word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062;
@@ -1879,6 +1882,10 @@ void tms320c54x_device::pipeline_step()
 		if (m_pipeline_valid[2] && dagen_immediate) m_pipeline_early_write_deferred[2] = false;
 		if (m_pipeline_valid[2])
 		{
+			// Basic direct operands sample CPL/DP in Decode, before a preceding
+			// RSBX/SSBX retires (SPRU131G tables 7-18 and 7-19).
+			if (short_load || direct_store)
+				m_pipeline_direct_status[2] = (m_st0 & 0x1ff) | (m_st1 & 0x4000);
 			// SPRU131G 6.10.7: protection starts in Decode and covers the
 			// next complete instruction, including all its extension words.
 			m_pipeline_intm_protected[2] = m_pipeline_intm_follow || intm_bit;
@@ -1914,6 +1921,11 @@ void tms320c54x_device::pipeline_step()
 		// Prefetch; the following two sequential words are delay or flush slots.
 		m_pipeline_fetch_address = (m_pipeline_address[3] & 0x7f0000) | m_pipeline_operand[3];
 	}
+	auto const basic_address = [this](unsigned stage, u8 mode) -> u16 {
+		if (BIT(mode, 7)) return short_smem_address(mode);
+		u16 const status = m_pipeline_direct_status[stage];
+		return BIT(status, 14) ? u16(m_sp + mode) : u16((status & 0x1ff) << 7) | mode;
+	};
 	// Load DAGEN and short AR modifications belong to Access (SPRU131G 7.1),
 	// not retirement. Retain that address even if the AR changes before Read.
 	if (m_pipeline_valid[3] && ((m_pipeline_word[3] & 0xfe00) == 0x1000 ||
@@ -1922,7 +1934,8 @@ void tms320c54x_device::pipeline_step()
 		u8 const mode = m_pipeline_word[3];
 		bool const preincrement = BIT(mode, 7) && (mode & 0x78) == 0x18;
 		if (preincrement) indirect_modify(mode);
-		m_pipeline_operand_address[3] = short_smem_address(mode);
+		m_pipeline_operand_address[3] = (m_pipeline_word[3] & 0xfe00) == 0x1000
+			? basic_address(3, mode) : short_smem_address(mode);
 		if (BIT(mode, 7) && !preincrement) indirect_modify(mode);
 	}
 	if (m_pipeline_valid[4] && ((m_pipeline_word[4] & 0xfe00) == 0x1000 ||
@@ -1938,7 +1951,7 @@ void tms320c54x_device::pipeline_step()
 	}
 	// SPRU131G 7.1: a store presents EAB in Read, then writes EB in Execute.
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfc80) == 0x8000)
-		m_pipeline_operand_address[4] = short_smem_address(u8(m_pipeline_word[4]));
+		m_pipeline_operand_address[4] = basic_address(4, u8(m_pipeline_word[4]));
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xff00) == 0x7600)
 	{
 		u8 const mode = m_pipeline_word[4];

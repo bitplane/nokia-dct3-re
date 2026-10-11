@@ -2619,8 +2619,19 @@ Decode-owned follower protection. All 128 combinations of register, bit,
 set/clear and initially all-zero/all-one status are executable fixtures;
 each restores immediately before Execute and verifies both status registers
 on every observed cycle. This includes the original MU4 handler's `f6be`
-RSBX CPL, but does not establish CPL/DAGEN consumer latency, repeat legality
-or full handler execution through the staged subset.
+RSBX CPL. Repeat legality and full handler execution through the staged
+subset remain unvalidated.
+
+Basic direct LD/ST retain Decode-time CPL and DP independently of the later
+address-generation stage. SPRU131G table 7-19 requires three intervening
+instructions after RSBX/SSBX CPL for these category-I consumers. Sixteen
+cases cover set/clear, LD/ST and zero through three NOPs, with distinct
+data-page and stack-relative sentinels. Zero through two NOPs use the old
+CPL; three use the new CPL. Every case restores after consumer Decode,
+before its address is generated, and reproduces the selected address and
+untouched alternate location. DP-producer latency, extended-shift category-II
+consumers, SP conflicts and immediate/RMW direct forms are not established
+by this gate. The atomic frontend and handset configurations are unchanged.
 
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
