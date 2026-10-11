@@ -233,6 +233,7 @@ private:
 	std::array<u16, 6> m_pipeline_operand = {};
 	std::array<u16, 6> m_pipeline_immediate = {};
 	std::array<bool, 6> m_pipeline_valid = {};
+	std::array<bool, 6> m_pipeline_early_write_deferred = {};
 	u8 m_pipeline_decode_remaining = 0;
 	u16 m_pipeline_decode_extension = 0;
 	u16 m_pipeline_decode_word = 0;

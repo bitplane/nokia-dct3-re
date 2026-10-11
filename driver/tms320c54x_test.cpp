@@ -2742,7 +2742,7 @@ private:
 		program.write_word(base + 0x601, 0x700);
 		program.write_word(base + 0x602, 0xe822);
 		program.write_word(base + 0x603, 0xe933);
-		program.write_word(base + 0x604, 0x7711); // Must not reach Decode after redirect.
+		program.write_word(base + 0x604, 0x77e1); // Unsupported indirect STM must not reach Decode.
 		program.write_word(base + 0x700, 0xe844);
 		if (variant >= 8)
 		{
@@ -2778,6 +2778,45 @@ private:
 				++m_pipeline_extensions_reads;
 			});
 		m_phase = 251170;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_pipeline_stm_case(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_stm_case = variant;
+		bool const conflict = variant >= 6;
+		u16 const target = std::array<u16, 3>{0x12, 0x18, 0x19}[variant % 3];
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 20; ++i) program.write_word(0x600 + i, 0xf495);
+		if (conflict) program.write_word(0x600, 0x8011); // STL A,AR1: shared DAGEN bank.
+		program.write_word(0x600 + conflict, 0x7700 | target);
+		program.write_word(0x601 + conflict, 0x1234);
+		m_cpu->set_input_line(0, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR1, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_BK, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x5678);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false;
+		m_pipeline_expected_cycle = 1;
+		m_pipeline_store_writes = 0;
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x10, 0x19, "stm_dagen_write",
+			[this, target, conflict](offs_t address, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				bool const older_store = conflict && address == 0x11;
+				expect(address == (older_store ? 0x11 : target) && value == (older_store ? 0x5678 : 0x1234) &&
+					m_cpu->pipeline_cycles() == (older_store ? 6 : conflict ? 7 : 5), "STM DAGEN bus write uses first-word Read or its one-cycle conflict deferral");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251190;
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
@@ -22711,7 +22750,7 @@ private:
 				m_cpu->set_pipeline_frontend(false);
 				if (!m_pipeline_memory_case) { start_pipeline_frontend_case(true); return; }
 				if (!m_pipeline_memory_b) { start_pipeline_frontend_case(true, true); return; }
-				m_cpu->space(AS_PROGRAM).write_word(0x600, 0x7711);
+				m_cpu->space(AS_PROGRAM).write_word(0x600, 0x77e1);
 				m_cpu->set_state_int(STATE_GENPC, 0x600);
 				m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
 				m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
@@ -23224,8 +23263,8 @@ private:
 				if (m_pipeline_branch_case < 15) { start_pipeline_branch_case(m_pipeline_branch_case + 1); return; }
 				osd_printf_info("TMS320C54x staged branches: PASS cases=8 literal_fetch=3 target_fetch=6 delay_execute=8,9 target_execute=10 restore=8\n");
 				osd_printf_info("TMS320C54x staged branch IRQ: PASS cases=8 request=5 vector_fetch=10,12 stack_write=11,13 continuation=0701,0703 pending_restore=8\n");
-				osd_printf_info("TMS320C54x core conformance: PASS\n");
-				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+				start_pipeline_stm_case();
+				return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
@@ -23237,6 +23276,53 @@ private:
 			expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement does not advance branch Prefetch");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 			m_phase = 251170;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251190)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			bool const conflict = m_pipeline_stm_case >= 6;
+			u64 const write_cycle = conflict ? 7 : 5;
+			u64 const checkpoint = (conflict ? 6 : 4) + ((m_pipeline_stm_case % 6) >= 3);
+			int const reg = std::array<int, 3>{tms320c54x_device::STATE_AR2, tms320c54x_device::STATE_SP, tms320c54x_device::STATE_BK}[m_pipeline_stm_case % 3];
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "STM staged frontend advances without atomic fallback");
+			expect(m_cpu->state_int(reg) == (cycle >= write_cycle ? 0x1234 : reg == tms320c54x_device::STATE_SP ? 0x1000 : 0), "STM DAGEN visibility follows documented Read-stage arbitration");
+			expect(m_pipeline_store_writes == unsigned(conflict && cycle >= 6) + unsigned(cycle >= write_cycle), "Pending DAGEN writes are committed once per instruction");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save STM before/after early or conflict-deferred write");
+			}
+			if (cycle == 9)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_store_writes = unsigned(conflict && checkpoint >= 6) + unsigned(checkpoint >= write_cycle);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore DAGEN write arbitration without repeating a committed store");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1;
+					m_phase = 251200;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_stm_case < 11) { start_pipeline_stm_case(m_pipeline_stm_case + 1); return; }
+				osd_printf_info("TMS320C54x staged DAGEN immediate: PASS cases=12 targets=AR,SP,BK write=5 conflicting_write=7 deferred_restore=3 committed_restore=6 duplicate_writes=0\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251200)
+		{
+			u64 const checkpoint = (m_pipeline_stm_case >= 6 ? 6 : 4) + ((m_pipeline_stm_case % 6) >= 3);
+			expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement does not perform a deferred DAGEN write");
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251190;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 			return;
 		}
@@ -23694,6 +23780,7 @@ private:
 	unsigned m_pipeline_rmw_case = 0;
 	unsigned m_pipeline_return_case = 0;
 	unsigned m_pipeline_branch_case = 0;
+	unsigned m_pipeline_stm_case = 0;
 	unsigned m_pipeline_extensions_reads = 0;
 	memory_passthrough_handler m_pipeline_write_tap;
 	memory_passthrough_handler m_pipeline_operand_tap;

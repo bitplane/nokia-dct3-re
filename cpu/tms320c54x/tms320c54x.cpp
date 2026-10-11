@@ -689,6 +689,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_operand));
 	save_item(NAME(m_pipeline_immediate));
 	save_item(NAME(m_pipeline_valid));
+	save_item(NAME(m_pipeline_early_write_deferred));
 	save_item(NAME(m_pipeline_decode_remaining));
 	save_item(NAME(m_pipeline_decode_extension));
 	save_item(NAME(m_pipeline_decode_word));
@@ -1682,6 +1683,7 @@ bool tms320c54x_device::accept_interrupt()
 
 void tms320c54x_device::reset_pipeline()
 {
+	m_pipeline_early_write_deferred.fill(false);
 	m_pipeline_valid.fill(false);
 	m_pipeline_decode_remaining = 0;
 	m_pipeline_decode_extension = 0;
@@ -1715,8 +1717,10 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand_address[stage] = m_pipeline_operand_address[stage - 1];
 		m_pipeline_operand[stage] = m_pipeline_operand[stage - 1];
 		m_pipeline_immediate[stage] = m_pipeline_immediate[stage - 1];
+		m_pipeline_early_write_deferred[stage] = m_pipeline_early_write_deferred[stage - 1];
 	}
 	m_pipeline_valid[0] = false;
+	m_pipeline_early_write_deferred[0] = false;
 	if (m_pipeline_flush_front) m_pipeline_valid[2] = false;
 	if (m_pipeline_decode_flush)
 	{
@@ -1752,7 +1756,7 @@ void tms320c54x_device::pipeline_step()
 		{
 			u16 const word = m_pipeline_word[2];
 			unsigned const words = (word & 0xfeff) == 0x68f8 ? 3 :
-				((word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || word == 0xf073 || word == 0xf273) ? 2 : 1;
+				((word & 0xfef0) == 0xf020 || (word & 0xfeff) == 0xf062 || (word & 0xfe00) == 0x6800 || (word & 0xff00) == 0x7700 || word == 0xf073 || word == 0xf273) ? 2 : 1;
 			if (!m_pipeline_decode_remaining && (words > m_pipeline_delay_decode_words || word == 0xf49b || word == 0xf69b || word == 0xf073 || word == 0xf273))
 			{
 				logerror("%s: unsupported staged control delay form %04x\n", machine().describe_context(), word);
@@ -1781,6 +1785,7 @@ void tms320c54x_device::pipeline_step()
 		else if ((m_pipeline_word[2] & 0xfef0) == 0xf020 ||
 			(m_pipeline_word[2] & 0xfeff) == 0xf062 ||
 			m_pipeline_word[2] == 0xf073 || m_pipeline_word[2] == 0xf273 ||
+			((m_pipeline_word[2] & 0xff00) == 0x7700 && u8(m_pipeline_word[2]) >= 0x10 && u8(m_pipeline_word[2]) <= 0x19) ||
 			((m_pipeline_word[2] & 0xfe00) == 0x6800 &&
 				(u8(m_pipeline_word[2]) == 0xf8 || (u8(m_pipeline_word[2]) < 0x98 &&
 					(BIT(m_pipeline_word[2], 7) || !BIT(m_st1, 14))))))
@@ -1802,7 +1807,8 @@ void tms320c54x_device::pipeline_step()
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
 		bool const branch = word == 0xf073 || word == 0xf273;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !branch && (word & 0xff00) != 0xe800 &&
+		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && !short_load && !direct_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1818,6 +1824,23 @@ void tms320c54x_device::pipeline_step()
 			m_pipeline_delay_decode_words = delayed ? 2 : 0;
 			m_pipeline_decode_flush = delayed ? 0 : 2;
 		}
+		if (m_pipeline_valid[2] && dagen_immediate) m_pipeline_early_write_deferred[2] = false;
+	}
+	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7700)
+	{
+		// SPRU131G 7.5.2: STM writes DAGEN in the opcode word's Read,
+		// coincident with Access of our retained two-word operation. An older
+		// store using that register bank defers the write one clock (7-22).
+		bool const older_store = m_pipeline_valid[5] &&
+			((m_pipeline_word[5] & 0xfc80) == 0x8000 || (m_pipeline_word[5] & 0xfe00) == 0x6800) &&
+			m_pipeline_operand_address[5] >= 0x10 && m_pipeline_operand_address[5] <= 0x19;
+		m_pipeline_early_write_deferred[3] = older_store;
+		if (!older_store) data_write(u8(m_pipeline_word[3]), m_pipeline_immediate[3]);
+	}
+	if (m_pipeline_valid[4] && m_pipeline_early_write_deferred[4])
+	{
+		data_write(u8(m_pipeline_word[4]), m_pipeline_immediate[4]);
+		m_pipeline_early_write_deferred[4] = false;
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] == 0xf49b || m_pipeline_word[3] == 0xf69b))
 	{
@@ -1863,6 +1886,8 @@ void tms320c54x_device::pipeline_step()
 			m_st1 &= ~u16(0x0800);
 		else if (m_op == 0xf073 || m_op == 0xf273)
 			++m_pc; // Target fetch was already redirected in Access.
+		else if ((m_op & 0xff00) == 0x7700)
+			++m_pc; // DAGEN write already committed in the opcode's Read stage.
 		else if ((m_op & 0xfe00) == 0x1000)
 			accumulator(BIT(m_op, 8)) = data_operand(m_pipeline_operand[5]);
 		else if ((m_op & 0xfc80) == 0x8000)
@@ -1887,7 +1912,7 @@ void tms320c54x_device::pipeline_step()
 			u16(address - m_pipeline_control_address) <= 3)
 		{
 			unsigned const words = (m_op & 0xfeff) == 0x68f8 ? 3 :
-				((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
+				((m_op & 0xfef0) == 0xf020 || (m_op & 0xfeff) == 0xf062 || (m_op & 0xfe00) == 0x6800 || (m_op & 0xff00) == 0x7700 || m_op == 0xf073 || m_op == 0xf273) ? 2 : 1;
 			m_pipeline_control_words -= words;
 		}
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)

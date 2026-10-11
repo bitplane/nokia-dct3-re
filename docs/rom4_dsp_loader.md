@@ -2284,6 +2284,8 @@ pre-increment addressing, and ANDM/ORM with DP-relative, plain/post-decrement/
 post-increment short indirect or three-word absolute (`f8`) operands, and
 RETF/RETFD with one-word load/NOP or two-word immediate-load delay slots.
 Two-word unconditional B/BD use the same retained-literal and redirect path.
+Direct STM immediate initialization of AR0--AR7, SP and BK is also supported;
+other MMR destinations and indirect STM remain excluded from this frontend.
 SP-relative, other indirect and other multiword forms stop at Decode without
 atomic fallback.
 
@@ -2367,6 +2369,20 @@ post-increment/pre-increment addressing. They change AR1 after Access,
 checkpoint there and require one read of the original address per leg,
 without repeating the AR modification on restoration. Extended, indexed,
 circular and compatibility-mode hazard contracts remain outside this scope.
+
+Direct STM to DAGEN registers follows SPRU131G 7.5.2/Table 7-4 rather than
+ordinary store retirement: the opcode word writes in Read, coincident with
+Access of the retained two-word instruction. With STM first in the stream,
+this is cycle 5. If an older STL/STH or RMW store writes ARx/SP/BK that cycle,
+the register bank conflict defers STM by one clock; the deferred flag travels
+with the instruction and is saved. Twelve executable fixtures cover AR2,
+SP and BK, with and without a preceding STL to AR1. The older store writes
+at 6 and the conflicting STM at 7, matching example 7-22's cross-register
+bank arbitration. Checkpoints before/after the normal write and during/after
+the deferred write restore without duplicate bus writes. These tests cover
+that store/STM conflict, not general DAGEN hazard resolution or peripheral
+register initialization timing. The negative Decode fixture now uses an
+unsupported indirect STM rather than the newly supported direct AR1 form.
 
 ANDM/ORM retain the immediate separately from the sampled data operand.
 The three-word absolute form consumes address then literal; its two pending
