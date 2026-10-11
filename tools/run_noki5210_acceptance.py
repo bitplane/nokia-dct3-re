@@ -23,6 +23,7 @@ class Scenario:
     host_sms: str | None = None
     host_outcome: str = 'rp_ack'
     host_call: str | None = None
+    sms_mask: str | None = None
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -58,6 +59,8 @@ SCENARIOS = {
                                       seconds=60, net_masks=('32',), host_call='outgoing'),
     'pin-host-incoming-call': Scenario('noki5210_pin_host_incoming_call.lua', '--host-incoming-call',
                                       seconds=60, net_masks=('32',), host_call='incoming'),
+    'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
+                                  seconds=155, sms_mask='24'),
 }
 
 
@@ -92,6 +95,9 @@ def main():
             if scenario.host_sms or scenario.host_call:
                 ET.SubElement(ports, 'port', tag=':CALLHOST', type='CONFIG',
                               mask='1', defvalue='0', value='1')
+            if scenario.sms_mask:
+                ET.SubElement(ports, 'port', tag=':SMSCFG', type='CONFIG',
+                              mask='24', defvalue='0', value=scenario.sms_mask)
             ET.ElementTree(config).write(run / 'cfg/noki5210.cfg',
                                         encoding='utf-8', xml_declaration=True)
         if scenario.pin:

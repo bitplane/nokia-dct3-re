@@ -73,10 +73,14 @@ def verify_pin_sms(text, card, state=False):
     ))
 
 
-def verify_pin_outgoing_sms(text, rejected=False, silent=False):
+def verify_pin_outgoing_sms(text, rejected=False, silent=False, local_silence=False):
     from tools.radio_outgoing_sms_product_trace_check import CHECKPOINTS
     from tools.radio_call_lifecycle_common import require_ordered
     checkpoints = list(CHECKPOINTS)
+    if local_silence:
+        checkpoints[2] = ('local RP-silence SMS-SUBMIT', re.compile(
+            r'gsm_sms_submit: cp=39 rp=01 smsc=1234567890 destination=5551234 '
+            r'alphabet=0 user_length=1 outcome=3 status_report=0'))
     if silent:
         checkpoints = checkpoints[:4]
         if len(checkpoints[3][1].findall(text)) != 1:
@@ -87,6 +91,11 @@ def verify_pin_outgoing_sms(text, rejected=False, silent=False):
         disconnect = re.search(r'TX packet type=1b .*data=0080015301.*t=([0-9.]+)', text)
         if not submission or not disconnect or not 60 <= float(disconnect[1]) - float(submission[1]) <= 80:
             raise ValueError('firmware DISC absent or outside RP-timeout window')
+        require_ordered(text[disconnect.start():], (
+            ('peer UA', re.compile(r'RX enqueue type=80 .*data=80[0-9a-f]{18}017301')),
+            ('channel release', re.compile(r'TX packet type=02 .*radio_phase=release_channel_change')),
+            ('resumed paging', re.compile(r'PCH no-identity fill')),
+        ), 'NSM-5 RP-timeout clearing')
     elif rejected:
         checkpoints[4] = ('network RP-ERROR', re.compile(
             r'GSM service downlink kind=19 sapi=3 pd=09 message=01 length=7'))
@@ -99,13 +108,13 @@ def verify_pin_outgoing_sms(text, rejected=False, silent=False):
         '5210_pin_physical: key=Keypad ' + digit for digit in '5551234') + (
         menu,
         'GSM service uplink sapi=3 pd=09 message=01 length=27 data=390118000100069121436587090d11010781551532f40000a70161',
-        'gsm_sms_submit: cp=39 rp=01 smsc=1234567890 destination=5551234 alphabet=0 user_length=1 outcome=0 status_report=0',
+        f'gsm_sms_submit: cp=39 rp=01 smsc=1234567890 destination=5551234 alphabet=0 user_length=1 outcome={3 if local_silence else 0} status_report=0',
     ))
     if text.count('gsm_sms_submit:') != 1:
         raise ValueError('expected one PIN-enabled outgoing SMS')
 
 
-def verify_pin_idle_state(text, call=False, sms=False):
+def verify_pin_idle_state(text, call=False, sms=False, physical='5210_pin_state_physical'):
     entries = re.findall(r'5210_pin_state: event=(saved|restored) pc=([0-9a-f]{8}) '
                          r'sp=([0-9a-f]{8}) ram=([0-9a-f]{8}) t=([0-9.]+)', text)
     if len(entries) != 2 or [entry[0] for entry in entries] != ['saved', 'restored'] or entries[0][1:] != entries[1][1:]:
@@ -113,9 +122,9 @@ def verify_pin_idle_state(text, call=False, sms=False):
     require_in_order(text, ('LAPDm Location Updating Accept acknowledged nr=1',
                            '5210_pin_state: event=saved', '5210_pin_state: event=restored',
                            '5210_pin_state: result=pass') +
-                     (('5210_pin_state_physical: key=Left Softkey / Menu',) * 2 if sms else
-                      () if call else ('5210_pin_state_physical: key=Left Softkey / Menu',)) +
-                     (() if sms else ('5210_pin_state_physical: key=End',)) +
+                     ((physical + ': key=Left Softkey / Menu',) * 2 if sms else
+                      () if call else (physical + ': key=Left Softkey / Menu',)) +
+                     (() if sms else (physical + ': key=End',)) +
                      ('5210_pin_state: completed=true',))
 
 
@@ -195,16 +204,29 @@ def main():
     mode.add_argument('--rejected-sms', action='store_true')
     mode.add_argument('--silent-sms', action='store_true')
     mode.add_argument('--host-incoming-call', action='store_true')
+    mode.add_argument('--silent-sms-state', action='store_true')
     args = parser.parse_args()
     if args.host_incoming_call:
         args.incoming_call = True
+    if args.silent_sms_state:
+        args.silent_sms = True
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
         (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms or args.outgoing_call_state or args.rejected_sms or args.silent_sms else verify)(text, card)
         if args.silent_sms:
-            verify_pin_outgoing_sms(text, silent=True)
+            verify_pin_outgoing_sms(text, silent=True, local_silence=args.silent_sms_state)
+            if args.silent_sms_state:
+                # Recovery is End then Menu, independently checked below.
+                verify_pin_idle_state(text, call=True, physical='5210_pin_physical')
+                require_in_order(text, ('GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2',
+                                       '5210_pin_state: event=saved', '5210_pin_state: event=restored',
+                                       'data=0080015301'))
+                with Image.open(run / 'snap/5210_pin_state_reference.png') as reference, \
+                        Image.open(run / 'snap/5210_pin_state_restored.png') as restored:
+                    if reference.size != (84, 48) or restored.size != reference.size or reference.convert('L').tobytes() != restored.convert('L').tobytes():
+                        raise ValueError('SMS RP-wait restored pixels differ')
             require_in_order(text, ('TX packet type=1b', 'data=0080015301',
                                    'radio_phase=release_channel_change',
                                    '5210_pin_physical: key=End',

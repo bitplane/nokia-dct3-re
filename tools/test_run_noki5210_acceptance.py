@@ -30,6 +30,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-silent-sms': (155, '--silent-sms', ()),
             'pin-host-outgoing-call': (60, '--outgoing-call', ('32',)),
             'pin-host-incoming-call': (60, '--host-incoming-call', ('32',)),
+            'pin-sms-wait-state': (155, '--silent-sms-state', ()),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
@@ -105,7 +106,8 @@ class RunnerTests(unittest.TestCase):
                                               for p in ports],
                                              [(':NEIGHBORCFG', '32', '32')] +
                                              [(':NETCFG', m, m) for m in masks] +
-                                             ([(':CALLHOST', '1', '1')] if host else []))
+                                             ([(':CALLHOST', '1', '1')] if host else []) +
+                                             ([(':SMSCFG', '24', '24')] if name == 'pin-sms-wait-state' else []))
 
     def test_existing_directory_is_rejected_without_launch(self):
         with tempfile.TemporaryDirectory() as run, \

@@ -252,8 +252,18 @@ RP-ACK/RP-ERROR. It requires the firmware-owned main-link DISC in the observed
 run), peer UA, channel release and host transaction termination. The reviewed
 `Message sending failed` pixels are distinct from explicit RP rejection;
 physical End/Menu must still recover the exact idle and Messages frames.
-No timeout, release or application state is injected. Retries and restoration
-during the outgoing RP wait remain independently untested for this PIN profile.
+No timeout, release or application state is injected. Retry coverage is not
+inferred; local RP-wait restoration has its own gate below.
+
+`make verify-5210-pin-sms-wait-state` independently uses the local laboratory
+RP-silence setting, saves after network CP-ACK and restores before firmware
+DISC. Exact time/PC/SP/full modeled RAM and reference/restored pixels must
+match. The restored handset then times out, receives peer UA, releases the
+channel, resumes paging and physically recovers the exact idle/menu frames;
+the reviewed timeout pixels are also required. Local submission outcome 3
+is checked separately from host-deferred outcome 0. This validates one
+restored RP-wait continuation, not a reference/replay comparison of the
+whole timeout interval or restoration of an external host/SIP transaction.
 
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.

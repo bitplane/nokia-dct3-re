@@ -14339,6 +14339,12 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "pin-outgoing-sms", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-5210-pin-sms-wait-state", "prerequisites": ["normalize-5210", "build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki5210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "pin-sms-wait-state", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-5210-pin-host-incoming-call", "prerequisites": ["normalize-5210", "build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki5210_acceptance.py",

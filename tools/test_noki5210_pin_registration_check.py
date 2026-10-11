@@ -43,7 +43,14 @@ class PinRegistrationTest(unittest.TestCase):
         silent = text.replace('GSM service downlink kind=18 sapi=3 pd=09 message=01 length=5', '')
         silent = silent.replace('status_report=0', 'status_report=0 t=50.000000')
         silent += '\nTX packet type=1b data=0080015301 t=120.000000'
+        silent += ('\nRX enqueue type=80 data=80' + '00' * 9 + '017301' +
+                   '\nTX packet type=02 radio_phase=release_channel_change' +
+                   '\nPCH no-identity fill')
         verify_pin_outgoing_sms(silent, silent=True)
+        local_silent = silent.replace('outcome=0', 'outcome=3')
+        verify_pin_outgoing_sms(local_silent, silent=True, local_silence=True)
+        with self.assertRaises(ValueError):
+            verify_pin_outgoing_sms(local_silent, silent=True)
         with self.assertRaises(ValueError):
             verify_pin_outgoing_sms(silent.replace('t=120.000000', 't=55.000000'), silent=True)
         with self.assertRaises(ValueError):
