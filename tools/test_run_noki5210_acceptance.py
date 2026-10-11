@@ -10,6 +10,23 @@ from tools.make_sim_card_profile import make_profile
 
 
 class RunnerTests(unittest.TestCase):
+    def test_sip_call_launch_retains_authentication_and_uses_wall_time(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for direction in ('incoming', 'outgoing'):
+                run = Path(temporary) / direction
+                with patch('sys.argv', ['runner', str(run), '--scenario',
+                           f'pin-host-{direction}-call', '--pjsua', 'pjsua']), \
+                        patch.object(runner.subprocess, 'run') as execute:
+                    runner.main()
+                launch = execute.call_args_list[0].args[0]
+                self.assertEqual(Path(launch[1]).name, 'run_sip_handset_gate.py')
+                self.assertEqual(launch[launch.index('--product') + 1], '5210')
+                command = launch[launch.index('--') + 1:]
+                self.assertNotIn('-nothrottle', command)
+                self.assertEqual('--incoming' in launch, direction == 'incoming')
+                self.assertEqual((run / 'nvram/noki5210_3/sim_card').read_bytes(),
+                                 make_profile(pin_enabled=True))
+
     def test_scenario_commands_and_storage(self):
         expected = {
             'toolkit-interactive': (65, None, None),

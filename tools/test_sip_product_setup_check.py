@@ -21,14 +21,19 @@ SETUP = {
 
 
 class SipProductSetupCheckTest(unittest.TestCase):
-    def check(self, product, setup_product, accepted=100, rejected=False, reason='200 (OK)'):
+    def check(self, product, setup_product, accepted=100, rejected=False, reason='200 (OK)',
+              disconnect=False, missing_release=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'error.log').write_text(
                 'GSM service uplink sapi=0 pd=03 message=05 ' + SETUP[setup_product] + '\n'
                 'GSM service downlink kind=12 sapi=0 pd=03 message=07\n'
                 'GSM service uplink sapi=0 pd=03 message=0f data=030f\n'
-                'GSM service uplink sapi=0 pd=03 message=2d data=032d\n'
+                + (('GSM service uplink sapi=0 pd=03 message=25 data=036502e090\n'
+                    + ('' if missing_release else
+                       'GSM service downlink kind=25 sapi=0 pd=03 message=2d\n')
+                    + 'GSM service uplink sapi=0 pd=03 message=2a data=032a\n')
+                   if disconnect else 'GSM service uplink sapi=0 pd=03 message=2d data=032d\n') +
                 'LAPDm service Channel Release acknowledged\n' + ''.join(
                     f'gsm_call_adapter: media direction=downlink id=1 sequence={i} result=accepted\n'
                     for i in range(accepted)) + (
@@ -50,6 +55,11 @@ class SipProductSetupCheckTest(unittest.TestCase):
                 continue  # Own physical-End lifecycle is tested separately.
             with self.subTest(product=product):
                 self.check(product, product)
+
+    def test_5210_physical_disconnect_requires_complete_release(self):
+        self.check('5210', '5210', disconnect=True)
+        with self.assertRaisesRegex(RuntimeError, 'message=2d'):
+            self.check('5210', '5210', disconnect=True, missing_release=True)
 
     def test_8210_uses_full_own_product_lifecycle(self):
         with self.assertRaisesRegex(ValueError, 'physical Send'):

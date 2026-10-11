@@ -89,7 +89,12 @@ physical Answer/End, CC/RR closure and exact idle recovery.
 `verify-5210-pin-sms-wait-state` independently restores exact architecture
 and pixels during a local-peer RP wait, then requires timed DISC, UA/release,
 paging and physical idle/menu recovery. Whole-interval reference/replay,
-external host transaction restoration and PIN-enabled SIP remain separate.
+external host transaction restoration and PIN-enabled incoming SIP remain separate.
+`verify-5210-pin-outgoing-call-sip` independently combines cold PIN
+authentication, physical dialing and End, real loopback SIP confirmation,
+bidirectional host media transport, ordered DISCONNECT/RELEASE/RELEASE COMPLETE
+and exact idle recovery. This is research-HLE signaling and host media transport,
+not microphone/earpiece waveform fidelity or native DSP speech.
 `verify-5210-pin-phonebook` independently adds physical `Ada/123` Save,
 exact ADN ownership, cold reauthentication and Search/Detail with retained
 record contents and reviewed number pixels; the cold read cannot rewrite ADN.

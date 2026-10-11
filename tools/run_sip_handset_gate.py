@@ -275,6 +275,14 @@ def verify_success(root, remote_text, args):
     # These release checks treat CC sequence bit 6 independently of the message body.
     release_complete_data = ('03(?:2a|6a)0802e0d1' if product in ('3330', '3410', '5210') else
                              '036a0802e0d1' if product == '3310' else '032a0802e0d1')
+    outgoing_release = (r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',)
+    if product == '5210' and re.search(
+            r'GSM service uplink sapi=0 pd=03 message=25 .*data=03(?:25|65)', log):
+        outgoing_release = (
+            r'GSM service uplink sapi=0 pd=03 message=25 .*data=03(?:25|65)',
+            r'GSM service downlink kind=25 sapi=0 pd=03 message=2d',
+            r'GSM service uplink sapi=0 pd=03 message=2a .*data=03(?:2a|6a)',
+        )
     patterns = (
             rf'gsm_call_adapter: incoming state id=1 epoch={epoch} phase=paging',
             r'GSM service downlink kind=9 sapi=0 pd=03 message=05',
@@ -289,7 +297,7 @@ def verify_success(root, remote_text, args):
             outgoing_setup_pattern(product),
             r'GSM service downlink kind=12 sapi=0 pd=03 message=07',
             r'GSM service uplink sapi=0 pd=03 message=0f .*data=030f',
-            r'GSM service uplink sapi=0 pd=03 message=2d .*data=03(?:2d|6d)',
+            *outgoing_release,
             r'LAPDm service Channel Release acknowledged')
     if args.restore_idle:
         patterns = (r'sip_state: saved', r'sip_state: restored') + patterns

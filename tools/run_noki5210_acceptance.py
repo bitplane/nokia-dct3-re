@@ -71,6 +71,9 @@ def main():
     parser.add_argument('run_directory', type=Path)
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--port', type=int, default=18991)
+    parser.add_argument('--pjsua', type=Path,
+                        help='use the real loopback SIP bridge for a PIN host-call scenario')
+    parser.add_argument('--sip-port', type=int, default=25100)
     parser.add_argument('--preserved-nvram', type=Path)
     parser.add_argument('--scenario', choices=SCENARIOS,
                         default='toolkit-interactive')
@@ -83,6 +86,8 @@ def main():
         parser.error('--preserved-nvram is required only for pin-phonebook-read')
     root = Path(__file__).resolve().parents[1]
     scenario = SCENARIOS[args.scenario]
+    if args.pjsua and not scenario.host_call:
+        parser.error('--pjsua requires a PIN host-call scenario')
     run = args.run_directory.resolve()
     try:
         run.mkdir(parents=True, exist_ok=False)
@@ -131,22 +136,37 @@ def main():
                    '-seconds_to_run', str(scenario.seconds)]
         if scenario.host_sms or scenario.host_call:
             command.extend(['-http', '-http_port', str(args.port)])
+            if args.pjsua:
+                # Real SIP timers run in wall time; retain normal handset pacing.
+                command.remove('-nothrottle')
+                launch = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
+                          '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
+                          '--product', '5210', '--http-port', str(args.port),
+                          '--sip-port', str(args.sip_port)]
+                if scenario.host_call == 'incoming':
+                    launch.extend(['--incoming', '--ready-file',
+                                   str(run / 'snap/5210_pin_host_idle.png')])
+                launch.extend(['--'] + command)
+            else:
+                launch = None
             host_script = ('run_host_incoming_signaling_gate.py' if scenario.host_call == 'incoming' else
                            'run_host_call_adapter_gate.py' if scenario.host_call == 'outgoing' else
                            'run_host_incoming_sms_gate.py' if scenario.host_sms == 'incoming'
                            else 'run_host_sms_gate.py')
-            launch = [sys.executable, str(root / 'tools' / host_script),
-                      '--port', str(args.port), '--cwd', str(run)]
-            if scenario.host_call == 'incoming':
+            if not args.pjsua:
+                launch = [sys.executable, str(root / 'tools' / host_script),
+                          '--port', str(args.port), '--cwd', str(run)]
+            if scenario.host_call == 'incoming' and not args.pjsua:
                 launch.extend(['--caller', '5551234', '--ready-file',
                                str(run / 'snap/5210_pin_host_idle.png')])
-            elif scenario.host_call == 'outgoing':
+            elif scenario.host_call == 'outgoing' and not args.pjsua:
                 launch.extend(['--number', '5551234', '--decision', 'connect'])
             elif scenario.host_sms == 'outgoing':
                 launch.extend(['--user-data', '61', '--user-data-length', '1',
                                '--decision', {'rp_ack': 'accept', 'rp_error': 'rp_error',
                                               'rp_silence': 'rp_silence'}[scenario.host_outcome]])
-            launch.extend(['--'] + command)
+            if not args.pjsua:
+                launch.extend(['--'] + command)
         else:
             launch = command
         with (run / 'console.log').open('w') as console:
@@ -162,7 +182,7 @@ def main():
                          else ['--octets', '1', '--outcome', scenario.host_outcome])
             subprocess.run([sys.executable, str(root / 'tools' / host_checker)] +
                            host_args + [str(run / 'error.log')], check=True)
-        if scenario.host_call == 'outgoing':
+        if scenario.host_call == 'outgoing' and not args.pjsua:
             from tools.radio_host_outgoing_connect_check import verify as verify_host_call
             verify_host_call((run / 'error.log').read_text(errors='replace'), '5551234')
         if args.scenario == 'pin-phonebook':
