@@ -1247,8 +1247,12 @@ check-c54x-rom4-fr-encoder: build prepare-c54x-rom4-fixture
 # Diagnostic observation only: the short-period outcome is deliberately not
 # asserted until interrupt recognition/drain timing has an independent oracle.
 .PHONY: probe-c54x-timer-boundary
+C54X_TIMER_PROBE_RUN_DIR ?= tmp/c54x-timer-boundary
 probe-c54x-timer-boundary: build
-	$(MAME_DIR)/mame tms54test -bios timer -video none -sound none -nothrottle -seconds_to_run 1
+	mkdir -p $(C54X_TIMER_PROBE_RUN_DIR)
+	cd $(C54X_TIMER_PROBE_RUN_DIR) && $(abspath $(MAME_DIR)/mame) tms54test \
+		-bios timer -video none -sound none -nothrottle -seconds_to_run 1 \
+		-rompath $(abspath $(MAME_DIR)/roms) -cfg_directory cfg -nvram_directory nvram
 
 # Assert TRB/PSC register behavior before the non-asserting short-period
 # interrupt observations. This is deliberately not an interrupt-latency gate.
