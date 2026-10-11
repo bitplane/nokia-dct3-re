@@ -764,7 +764,7 @@ By contrast, successful type-`80` channel-`40` content through `38a054`
 writes nibble 4. This establishes distinct selection phases, not
 interchangeable positive-reply shapes.
 The `88` field decoder `38af66` has an executable contract in
-`tools/noki6210_selection_result_check.py`: the eight-byte payload is
+`tools/noki6210_selection_result_check.py`: the first eight payload bytes are
 status, a big-endian 24-bit field F, ARFCN, and a big-endian 16-bit field P.
 It stores `(F + floor(P/5000) + 52) mod 51` at record+8 and `P mod 5000`
 at record+4. The division helpers return remainder in R0 and quotient
@@ -776,6 +776,29 @@ not the DSP's clock origin, timestamp capture point or physical phase units.
 Zero-filling a success payload merely to obtain nibble 3 is not a validated
 peer contract. Derive those source values and transaction ordering before
 implementing an operational selection peer.
+The archived Black Sphere primary vocabulary independently names TX `09`
+as `PSW_SEARCH_LIST` (forty halfwords), RX `88` as
+`NEIGHBOUR_TIMING_OFFSET` (ten-byte body), and RX `8f` as `NO_PSW_LEFT`.
+Those names corroborate the own-ROM list/result/completion distinction;
+they do not specify this product's timing origin or ordering. Its TX `57`
+entry is explicitly unnamed, so that source does not settle the `03`/`05`
+selector semantics. The executable decoder check now uses a ten-byte
+body with nonzero trailing bytes, but validates only the consumed
+eight-byte prefix. Do not present that check as a complete type-`88`
+encoder or assign meanings to its unconsumed final two bytes.
+The recovered source fields have a concrete downstream use:
+selected record nibble 3 makes `38ae9a` call `38ae5c`, which builds
+mode 2 and copies record+4 phase, record+6 ARFCN, and record+8 frame
+into `3f2500`. That constructor publishes type `11`, length 12:
+payload byte 0 is mode, bytes 2/3 are phase, 4/5 are the frame value,
+and 6/7 are ARFCN. This is a source-to-request contract, not proof
+that the existing neighbour peer's mode interpretation is valid here.
+The current peer requires membership in its independently received
+neighbour list; the type-`09` PSW-search list is not yet modeled as
+that list. Preserve this distinction when adding selection support.
+Primary references:
+[TX vocabulary](https://web.archive.org/web/20160119223852/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typestxd.htm),
+[RX vocabulary](https://web.archive.org/web/20160119223857/http://nokix.sourceforge.net/help/blacksphere/sub_100hardware/sub_dsp/sub_mdi/sub_typesrxd.htm).
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the response contract for foreign selection's
 type-`57` mode byte `03`, ownership of the pre-existing completion object,

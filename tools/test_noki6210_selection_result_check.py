@@ -18,6 +18,7 @@ class SelectionResultTest(unittest.TestCase):
         self.assertEqual(result['record_transition_cases'], 9)
         self.assertEqual(result['phase_modulus'], 5000)
         self.assertEqual(result['frame_modulus'], 51)
+        self.assertEqual(result['decoded_prefix_octets'], 8)
 
 
 if __name__ == '__main__':

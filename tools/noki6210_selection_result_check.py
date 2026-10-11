@@ -23,6 +23,9 @@ def check_fields(image):
             # Four-byte MCU object prefix precedes the eight-byte RX payload.
             payload = bytes([0]) + frame.to_bytes(3, 'big')
             payload += (35).to_bytes(2, 'big') + phase.to_bytes(2, 'big')
+            # Public vocabulary lists ten bytes; this decoder uses the first
+            # eight. Nonzero trailing bytes avoid implying a complete encoder.
+            payload += bytes([0x5a, 0xc3])
             cpu.mem_write(obj, bytes(4) + payload)
             cpu.mem_write(output, bytes([0xa5]) * 4)
             cpu.reg_write(UC_ARM_REG_SP, 0x10f000)
@@ -48,6 +51,7 @@ def check_fields(image):
         for retries in (0, 254, 255):
             payload = bytes([status]) + (50).to_bytes(3, 'big')
             payload += (35).to_bytes(2, 'big') + (5001).to_bytes(2, 'big')
+            payload += bytes([0x5a, 0xc3])
             cpu.mem_write(obj, bytes(4) + payload)
             initial = bytearray([0xa5] * 16)
             initial[11], initial[13] = retries, 0xa2
@@ -76,4 +80,5 @@ def check_fields(image):
     return {'executed_cases': cases, 'record_transition_cases': transitions,
             'entry': '38af66',
             'phase_modulus': 5000, 'frame_modulus': 51,
+            'decoded_prefix_octets': 8,
             'scope': 'isolated MCU decode, not physical DSP encoding proof'}
