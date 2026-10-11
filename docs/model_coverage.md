@@ -110,6 +110,14 @@ adapter-state JSON pins the epoch-2 downlink cursor; the gate requires stale
 epoch-1 media rejection and 80 contiguous accepted frames from that cursor
 before physical End. Exact restored architecture/pixels and CC/RR teardown
 remain required. External SIP-dialog cleanup and native speech remain separate.
+`verify-5210-pin-outgoing-sip-state` independently verifies cold PIN acceptance,
+physical dialing, one confirmed real outgoing SIP dialog and exact handset
+architecture restoration. Epoch change closes the external dialog with BYE
+and clears the restored GSM call once under epoch 2, without redial. Physical
+continuation reaches the exact registered recovery frame. This gate proves
+external-dialog cleanup, not dialog survival, native speech or identical
+active-call pixels after intentional external teardown; the separate local
+and mock-host gates retain their active-call pixel-equality checks.
 `verify-5210-pin-host-outgoing-media-state` independently adds a continuously
 attached host echo backend, restored GSM-FR cursors, rejection of stale
 epoch-1 media and at least 80 contiguous accepted epoch-2 downlink frames.

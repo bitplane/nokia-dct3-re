@@ -86,11 +86,14 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
         log = log.replace('termination id=1 cause=41 result=accepted\noutgoing termination consumed id=1 cause=41',
             'outgoing termination consumed id=1 cause=41\ntermination id=1 cause=41 result=accepted')
         remote = 'state changed to CONFIRMED\nRequest msg BYE/\n'
-        self.check(log=log, remote=remote, connected=True)
-        with self.assertRaises(RuntimeError):
-            self.check(remote=remote, connected=True)
-        with self.assertRaises(RuntimeError):
-            self.check(log=log, remote='state changed to CONFIRMED\n', connected=True)
+        for product in ('3210', '5210'):
+            with self.subTest(product=product):
+                self.check(log=log, remote=remote, connected=True, product=product)
+                with self.assertRaises(RuntimeError):
+                    self.check(remote=remote, connected=True, product=product)
+                with self.assertRaises(RuntimeError):
+                    self.check(log=log, remote='state changed to CONFIRMED\n',
+                               connected=True, product=product)
 
     def test_missing_real_cancel_is_rejected(self):
         with self.assertRaises(RuntimeError):

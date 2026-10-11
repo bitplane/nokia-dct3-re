@@ -11,9 +11,11 @@ local saved, completed
 local retained = {}
 retained[#retained + 1] = emu.add_machine_pre_save_notifier(function()
     saved = observe('saved')
+    if _G.noki5210_pin_state_sip then machine:logerror('sip_state: saved\n') end
 end)
 retained[#retained + 1] = emu.add_machine_post_load_notifier(function()
     local restored = observe('restored')
+    if _G.noki5210_pin_state_sip then machine:logerror('sip_state: restored\n') end
     assert(saved, 'save observation absent')
     for index = 1, 4 do
         assert(saved[index] == restored[index], 'PIN architectural state mismatch')
