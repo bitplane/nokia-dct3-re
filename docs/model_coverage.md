@@ -149,6 +149,13 @@ microphone/earpiece waveform fidelity or native DSP speech.
 `verify-5210-pin-phonebook` independently adds physical `Ada/123` Save,
 exact ADN ownership, cold reauthentication and Search/Detail with retained
 record contents and reviewed number pixels; the cold read cannot rewrite ADN.
+`verify-5210-pin-ussd` independently combines an own fresh PIN-protected card,
+physical PIN acceptance, coherent NSM-5 registration and physical `*123#`/Send.
+It requires the exact GSM 04.80 request, correlated success response and RR
+release before dismissal, the existing product-specific USSD result pixels,
+and physical End returning to the exact registered-idle frame. This is
+laboratory HLE supplementary-service evidence, not native DSP execution or
+public-network connectivity.
 The isolated 5210 runner writes `invocation.json` before launching firmware:
 resolved command/cwd, actual executable and primary fixture/checker hashes,
 selected loose BIOS inputs, and initial config/NVRAM hashes. Missing loose

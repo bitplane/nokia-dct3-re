@@ -78,6 +78,7 @@ SCENARIOS = {
     'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
                                   seconds=155, sms_mask='24'),
     'pin-phonebook': Scenario('noki5210_pin_phonebook.lua', '--phonebook-save', seconds=55),
+    'pin-ussd': Scenario('noki5210_pin_ussd.lua', seconds=60),
     'pin-phonebook-read': Scenario('noki5210_pin_phonebook_read.lua', '--phonebook-read'),
 }
 
@@ -162,6 +163,8 @@ def main():
                    else 'noki5210_toolkit_interactive_check.py')
         if sip_restore:
             checker = 'noki5210_pin_sip_restore_check.py'
+        elif args.scenario == 'pin-ussd':
+            checker = 'noki5210_pin_ussd_check.py'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'noki5210',
                    '-bios', '540e', '-rompath', str(root / 'roms'), '-cfg_directory', 'cfg',
                    '-nvram_directory', 'nvram', '-snapshot_directory', 'snap', '-noreadconfig',

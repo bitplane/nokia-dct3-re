@@ -12,6 +12,19 @@ from tools.make_sim_card_profile import make_profile
 
 
 class RunnerTests(unittest.TestCase):
+    def test_pin_ussd_selects_authenticated_physical_checker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            run = Path(temporary) / 'ussd'
+            with patch('sys.argv', ['runner', str(run), '--scenario', 'pin-ussd']), \
+                    patch.object(runner.subprocess, 'run') as execute:
+                runner.main()
+            launch = execute.call_args_list[0].args[0]
+            self.assertTrue(any(value.endswith('noki5210_pin_ussd.lua') for value in launch))
+            self.assertEqual((run / 'nvram/noki5210_3/sim_card').read_bytes(),
+                             make_profile(pin_enabled=True))
+            self.assertEqual(Path(execute.call_args_list[1].args[0][1]).name,
+                             'noki5210_pin_ussd_check.py')
+
     def test_sip_restore_has_its_own_bridge_and_recovery_checker(self):
         with tempfile.TemporaryDirectory() as temporary:
             for direction in ('incoming', 'outgoing'):
@@ -120,6 +133,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-incoming-media-state': (65, '--call-state', ('32',)),
             'pin-sms-wait-state': (155, '--silent-sms-state', ()),
             'pin-phonebook': (55, '--phonebook-save', ()),
+            'pin-ussd': (60, None, ()),
             'pin-phonebook-read': (45, '--phonebook-read', ()),
         }
         self.assertEqual(set(expected) | {'pin-sip-outgoing-call-state', 'pin-sip-incoming-call-state'},
