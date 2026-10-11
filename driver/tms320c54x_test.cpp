@@ -35,6 +35,32 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void start_sqdst_difference_case(unsigned index)
+	{
+		static constexpr u16 x[] = {0xffff, 0, 0x8000, 0x7fff};
+		static constexpr u16 y[] = {1, 0xffff, 0x7fff, 0x8000};
+		unsigned const pair = index % 4;
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0800, 0xe201);
+		program.write_word(0x0801, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0600, x[pair]);
+		m_cpu->space(AS_DATA).write_word(0x0601, y[pair]);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0601);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x10000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0,
+			0x1200 | (x[pair] < y[pair] ? 0x0800 : 0) | (index >= 16 ? 0x0400 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
+			(index & 4 ? 0x0100 : 0) | (index & 8 ? 0x0200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 220000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_sqdst_overflow_case(unsigned index)
 	{
 		m_cpu->reset();
@@ -12933,6 +12959,7 @@ private:
 			m_cpu->set_state_int(tms320c54x_device::STATE_B, 3);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0f80);
 			m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0f81);
+			m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140); // Signed SQDST inputs and fractional square.
 			m_cpu->set_state_int(tms320c54x_device::STATE_PC, 0x05e0);
 			m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
 			m_phase = 413;
@@ -21387,6 +21414,29 @@ private:
 				"SQDST sets sticky OVB and applies OVM to B's signed accumulation, preserving OVA/T/addresses");
 			if (index < 7) { start_sqdst_overflow_case(index + 1); return; }
 			osd_printf_info("TMS320C54x SQDST B overflow: PASS cases=8 ovm=0,1 sticky_ovb=1 smul=0 pipeline_claim=0\n");
+			start_sqdst_difference_case(0); return;
+		}
+		if (m_phase >= 220000 && m_phase < 220032)
+		{
+			unsigned const index = m_phase - 220000, pair = index % 4;
+			static constexpr s64 differences[2][4] = {{65534, -65535, 1, -1}, {-2, 1, -65535, 65535}};
+			static constexpr bool carries[] = {true, false, true, false};
+			s64 const shifted = differences[bool(index & 4)][pair] * 65536;
+			bool const overflow = shifted > 0x7fffffffLL || shifted < -0x80000000LL;
+			u64 const result = overflow && (index & 8) ?
+				(shifted < 0 ? 0xff80000000ULL : 0x7fffffff) : u64(shifted) & 0xffffffffffULL;
+			u16 const flags = 0x1200 | (carries[pair] ? 0x0800 : 0) |
+				(overflow || index >= 16 ? 0x0400 : 0);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == result &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == 1 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == flags &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(STATE_GENPC) == 0x0802,
+				"SQDST extends X/Y under SXM, updates carry/borrow and sticky OVA, and saturates A under OVM");
+			if (index < 31) { start_sqdst_difference_case(index + 1); return; }
+			osd_printf_info("TMS320C54x SQDST difference: PASS cases=32 sxm=0,1 ovm=0,1 carry_borrow=1 sticky_ova=1 pipeline_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

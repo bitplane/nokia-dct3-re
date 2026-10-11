@@ -3659,10 +3659,20 @@ under OVM; adding B=-1 produces the in-range `0x7fffffff` without clearing
 an existing OVB. They preserve OVA, T and both operand addresses. The new
 fixtures fail before this correction and pass afterward. The rule follows
 [TI SPRU172C, SQDST, 4-160](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
-and the existing accumulator saturation contract. This acceptance fixes
-SMUL=0 and SXM=1; it does not establish SQDST's carry/OVA update on arbitrary
-differences, SXM-clear input extension, SMUL saturation variants, physical
-pipeline timing or native speech. The core, bounded mixed RF filter, 5110
+and the existing accumulator saturation contract.
+The parallel difference now uses SXM-controlled memory extension and the
+shared ALU subtraction path, rather than unconditional signed-16 narrowing
+and a raw accumulator assignment. Thirty-two `e201` fixtures use four
+high-bit X/Y pairs, SXM clear/set, OVM clear/set and pre-existing OVA
+clear/set. Explicit signed/unsigned differences assert carry/borrow, sticky
+OVA and both signs of saturation; B still receives the square of old A,
+and its OVB remains unchanged. This follows SQDST's status list and
+[TI SPRU131G, ST0/ST1, 4-3/4-5](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
+The earlier signed-input fixture now explicitly sets SXM instead of inheriting
+SXM=0 from its preceding multiply test; its expected signed value is unchanged.
+These cases fix SMUL=0 and C16=0; SMUL saturation variants, C16 behavior,
+physical pipeline timing and native speech remain unestablished.
+The core, bounded mixed RF filter, 5110
 Menu/save-state and short/long physical power gates pass on the corrected
 build. Remaining FRCT/OVM and source/destination combinations are not
 established by these selected fixtures.

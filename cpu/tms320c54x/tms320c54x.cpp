@@ -3070,15 +3070,15 @@ void tms320c54x_device::execute_one(u16 op)
 		const u8 y = op;
 		const unsigned xar = 2 + (x & 3);
 		const unsigned yar = 2 + (y & 3);
-		const s32 xvalue = s16(data_read(m_ar[xar]));
-		const s32 yvalue = s16(data_read(m_ar[yar]));
+		const u64 xvalue = (data_operand(data_read(m_ar[xar])) << 16) & ACC_MASK;
+		const u64 yvalue = (data_operand(data_read(m_ar[yar])) << 16) & ACC_MASK;
 		const s64 old_a_high = accumulator_high17(m_a);
 		s64 square = old_a_high * old_a_high;
 		if (BIT(m_st1, 6))
 			square *= 2;
 		const u64 old_b = m_b & ACC_MASK;
 		m_b = multiply_result((s64(old_b << 24) >> 24) + multiply_product(square), true);
-		m_a = u64(s64(xvalue - yvalue) * 0x10000) & ACC_MASK;
+		m_a = add_sub(xvalue, yvalue, true, false);
 		dual_modify(x);
 		if (xar != yar)
 			dual_modify(y);
