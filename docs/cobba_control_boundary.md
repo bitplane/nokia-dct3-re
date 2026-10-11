@@ -401,6 +401,16 @@ for this first window. The repeated values originate in queue contents;
 the next audit is the producers of those contents and their input phase,
 not changing the helper's indirect-address arithmetic.
 
+The queue producer publishes the four-word groups at observed PCs
+`0x3338/0x3339/0x3342/0x3343`. In the first complete correlation window,
+input-read counts advance from 10976 through 11520 in steps of 32, one group
+per approximately 4.615385 ms. The diagnostic tone has period 32 words, so
+each block sees the same stimulus phase. Repeated queue values are consistent
+with that periodic input, not evidence of a stuck producer. After this window,
+the distinct `0x335d/0x335e` producer publishes zero pairs. Keep these
+lifecycles separate when tracing the historical score discrepancy; this does
+not establish the port's physical sample cadence or the old capture's validity.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
