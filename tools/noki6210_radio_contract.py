@@ -189,6 +189,13 @@ def verify(image):
         0x2d0f58: ('beq', '#0x2d1038'),
         0x2d0f5a: ('ldr', 'r0, [pc, #0x374]'),
         0x2d0f5c: ('cmp', 'r1, r0'),
+        0x2d0f60: ('ldr', 'r0, [pc, #0x120]'),
+        0x2d0f62: ('ldr', 'r0, [r0]'),
+        0x2d0f64: ('ldr', 'r0, [r0]'),
+        0x2d0f66: ('cmp', 'r0, #3'),
+        0x2d0f68: ('beq', '#0x2d0f6e'),
+        0x2d0f6a: ('cmp', 'r0, #4'),
+        0x2d0f6c: ('bne', '#0x2d0fc8'),
         0x457a00: ('push', '{lr}'),
         0x457a02: ('adds', 'r1, r0, #0'),
         0x457a14: ('movs', 'r0, #0xe'),
@@ -287,7 +294,8 @@ def verify(image):
                            0x2d1214: 0x419, 0x2d121c: 0x175458,
                            0x29e588: 0x419, 0x296a18: 0x412,
                            0x26dd14: 0x419, 0x46a8c4: 0x26dbac,
-                           0x2d129c: 0x1802, 0x2d12d0: 0x3f9}.items():
+                           0x2d129c: 0x1802, 0x2d12d0: 0x3f9,
+                           0x2d1084: 0x1711dc}.items():
         if int.from_bytes(read(address, 4), 'big') != value:
             raise ValueError(f'own selection literal differs at {address:x}')
     return {'rx_table': '4f6078', 'type_8b_handler': '45835c',

@@ -560,6 +560,14 @@ No `2d0f6e` continuation hits occur in either 25-second control. This
 remains a tap-bounded observation, not a proof that its state check is
 the sole reason the continuation does not run. Evidence:
 `tmp/6210-plmn-controller-post-{national,international}/error.log.gz`.
+Sampling the referenced guard at the active `2d2528` entry shows
+`[1711dc] = 102754` and `[102754] = 1` at all twelve foreign observations
+(10.902136692..12.726838000 s). Thus these samples do not satisfy the
+`03f9` continuation's own state-3/state-4 comparison at `2d0f60..2d0f6c`.
+This establishes a concrete unsatisfied MCU state predicate, not its
+meaning or a justified state replacement; observe its actual writers
+and lifecycle next. Evidence:
+`tmp/6210-plmn-controller-guard-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

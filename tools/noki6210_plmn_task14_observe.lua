@@ -134,10 +134,19 @@ for _, pc in ipairs({0x2e6da6, 0x2e6e18, 0x2e6ec0, 0x2e374a, 0x2e374c,
                     local header = space:read_u16(context + 4)
                     local kind = space:read_u8(context)
                     local object = space:read_u32(context + 8)
+                    local owner = space:read_u32(0x1711dc)
+                    local state = nil
+                    if owner >= 0x100000 and owner + 4 < 0x180000 then
+                        state = space:read_u32(owner)
+                    end
                     busy = false
                     machine:logerror(string.format(
                         'plmn_controller_input: status=%08x header=%04x kind=%02x object=%08x t=%.9f\n',
                         cpu.state['R1'].value, header, kind, object, machine.time:as_double()))
+                    machine:logerror(string.format(
+                        'plmn_controller_guard: owner=%08x state=%s t=%.9f\n',
+                        owner, state and string.format('%08x', state) or 'unknown',
+                        machine.time:as_double()))
                 end
             end
             if not busy and pc == 0x2a31ca then
