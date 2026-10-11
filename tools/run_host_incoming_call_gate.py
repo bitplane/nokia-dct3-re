@@ -24,6 +24,7 @@ async def run(args):
             phases = []
             downlink_sequence = None
             returned_frames = 0
+            restored_frames = 0
             restored = False
             termination_sent = False
             while phases[-1:] != ["ended"]:
@@ -85,8 +86,11 @@ async def run(args):
                     }))
                     downlink_sequence += 1
                     returned_frames += 1
+                    if restored:
+                        restored_frames += 1
                 restore_ready = not args.require_restore or restored
-                if (restore_ready and returned_frames >= args.frames and
+                covered_frames = restored_frames if args.require_restore else returned_frames
+                if (restore_ready and covered_frames >= args.frames and
                         not termination_sent):
                     await websocket.send(json.dumps({
                         "type": "incoming_call_terminate",

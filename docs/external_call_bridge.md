@@ -203,7 +203,9 @@ number registered organically by the handset's supplementary-service request.
 `verify-radio-incoming-call-host-adapter` is the complete external-origin
 contract gate. `verify-radio-incoming-call-host-restore` repeats the connected
 call across save/load and proves epoch/cursor republication before remote
-release.
+release. Its 80-frame quota counts only valid frames echoed under the restored
+epoch; pre-save media and stale-epoch uplink cannot satisfy restored transport
+coverage. The non-restoration gate retains its ordinary total-frame quota.
 
 To originate from the external endpoint instead, run MAME with
 `fixtures/radio_incoming_host_adapter` and attach:
