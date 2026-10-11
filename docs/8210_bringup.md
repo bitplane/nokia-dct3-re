@@ -686,6 +686,16 @@ nonempty card protocol records including the accepted ENVELOPE and status
 words, and exact reviewed menu pixels. This covers the live menu/card state,
 not an in-flight partial APDU, menu replacement or native DSP execution.
 
+`verify-8210-sim-toolkit-sms` selects card profile 5. Physical item-1
+selection advertises `91 24`; firmware fetches SEND SHORT MESSAGE and
+submits the card's 8-bit `SAT` payload to `5551234` through its own CP/RP
+path (`CP=39`, TP message reference 1). The gate requires exactly one
+decoded submission, network CP/RP acknowledgment, successful terminal
+response `810305130002028281030100`, handset CP acknowledgment and RR
+channel release before physical End returns to reviewed numeric-PLMN idle.
+Menu and post-network list pixels are also checked. This is laboratory
+SMS signaling/acknowledgment, not public-network delivery or native speech.
+
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
 idle, compares a one-second reference interval with the restored interval,

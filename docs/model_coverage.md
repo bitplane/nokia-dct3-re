@@ -533,6 +533,10 @@ other menu items or native DSP is promoted.
 `verify-8210-sim-toolkit-menu-state` additionally restores the open menu and
 replays physical selection with identical architectural snapshots, card
 protocol records and reviewed pixels.
+`verify-8210-sim-toolkit-sms` additionally completes the card-owned SEND
+SHORT MESSAGE through the handset's CP/RP/RR lifecycle, with one decoded
+`SAT` submission, accepted terminal response and physical return to idle.
+Delivery outside the laboratory network is not established.
 
 The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,

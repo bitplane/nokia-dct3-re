@@ -3,6 +3,19 @@ from tools.noki8210_toolkit_inkey_check import EVENTS, INPUT_EVENTS, MENU_EVENTS
 
 
 class InkeyTest(unittest.TestCase):
+    def test_card_owned_sms_completion(self):
+        from tools.test_sim_toolkit_sms_trace_check import GOOD
+        sms = GOOD.replace('data=2901', 'data=3901').replace('cp=29', 'cp=39').replace(
+            'data=2904', 'data=3904').replace('090e01000781', '090e01010781')
+        text = '\n'.join(MENU_EVENTS[:-1]) + '\n' + sms + '\n8210_toolkit_physical: action=menu_exit'
+        verify_protocol(text, sms=True)
+        for changed in (text.replace('3534154', '3534155'),
+                        text.replace('menu_exit', 'ignored'),
+                        text.replace('terminal-response data=810305130002028281030100', 'wrong response'),
+                        text + '\ngsm_sms_submit: duplicate'):
+            with self.assertRaises(ValueError):
+                verify_protocol(changed, sms=True)
+
     def test_menu_sequence_and_missing_links(self):
         verify_protocol('\n'.join(MENU_EVENTS), menu=True)
         for index in range(len(MENU_EVENTS)):

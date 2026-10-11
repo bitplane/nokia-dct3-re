@@ -60,11 +60,16 @@ MENU_FRAMES.update({
 })
 
 
-def verify_protocol(text, *, get_input=False, menu=False):
+def verify_protocol(text, *, get_input=False, menu=False, sms=False):
     if '[LUA ERROR]' in text:
         raise ValueError('physical GET INKEY fixture failed')
     require_in_order(text.replace('[:sim_card] ', ''),
-                     MENU_EVENTS if menu else INPUT_EVENTS if get_input else EVENTS)
+                     MENU_EVENTS[:-1] if sms else MENU_EVENTS if menu else INPUT_EVENTS if get_input else EVENTS)
+    if sms:
+        from tools.sim_toolkit_sms_trace_check import verify as verify_sms
+        verify_sms(text, cp=0x39, message_reference=1)
+        require_in_order(text, ('LAPDm service Channel Release acknowledged nr=2',
+                               '8210_toolkit_physical: action=menu_exit'))
 
 
 def main():
@@ -73,20 +78,27 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('--get-input', action='store_true')
     parser.add_argument('--menu', action='store_true')
+    parser.add_argument('--sms', action='store_true')
     args = parser.parse_args()
     run = args.log.parent
     try:
         text = args.log.read_text(errors='replace')
-        verify_protocol(text, get_input=args.get_input, menu=args.menu)
+        verify_protocol(text, get_input=args.get_input, menu=args.menu, sms=args.sms)
         verify_stage(text, runtime=True, selftest=True, base_record=True)
         verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
-        for phase, digest in (MENU_FRAMES if args.menu else INPUT_FRAMES if args.get_input else FRAMES).items():
+        expected = dict(MENU_FRAMES if args.menu or args.sms else INPUT_FRAMES if args.get_input else FRAMES)
+        if args.sms:
+            expected.update({
+                'menu_network_result': MENU_FRAMES['menu_items'],
+                'menu_idle': 'd6d4b05af24a06c42a97e31c3134f7e497e149f4420f87f3d243613f06926300',
+            })
+        for phase, digest in expected.items():
             with Image.open(run / f'snap/8210_toolkit_{phase}.png') as frame:
                 if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
                     raise ValueError('unreviewed GET INKEY frame: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 GET INKEY FAIL: {error}\n')
-    print('8210 physical ' + ('SET UP MENU/ENVELOPE' if args.menu else 'GET INPUT' if args.get_input else 'GET INKEY') + ' and laboratory registration PASS')
+    print('8210 physical ' + ('Toolkit SMS CP/RP/RR' if args.sms else 'SET UP MENU/ENVELOPE' if args.menu else 'GET INPUT' if args.get_input else 'GET INKEY') + ' and laboratory registration PASS')
 
 
 if __name__ == '__main__':
