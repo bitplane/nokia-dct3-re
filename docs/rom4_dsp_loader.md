@@ -2154,8 +2154,31 @@ The required marker is `TMS320C54x move/test disassembler: PASS`.
 
 Unknown forms still return a raw one-word display entry without `SUPPORTED`.
 That fallback is not a verified instruction boundary and must not be used to
-populate a future decoded-instruction pipeline. Coverage beyond these families
-is still required before replacing retirement-time interrupt recognition.
+populate a future decoded-instruction pipeline. The current observed 626-word
+set, including its 18 captured extension-controlled tuples, now has reviewed
+boundaries. This satisfies the observed-set frontend prerequisite, not full
+ISA coverage or a physical pipeline implementation.
+
+### Native timing continuation
+
+`execute_run()` still recognizes interrupts before an instruction-atomic
+`execute_one()`. `service_interrupt()` performs acceptance, SP decrement,
+vector fetch and continuation write together and charges five aggregate
+cycles. The retained vector word and the delayed-transfer/INTM guards are
+saved state, but they are not independently clocked pipeline stages.
+
+The next implementation milestone is stage-owned request acceptance and
+in-flight instruction retirement, not another opcode-count increase. It
+must reproduce SPRU131G example 7-18's ordering: acceptance at cycle 3,
+INTR Decode at 4, SP decrement at 5, vector fetch/IACK and the preceding
+instruction's execution at 6, continuation stack write at 7, and first ISR
+execution at 10. It must preserve already-tested repeat, delayed-control,
+NMI, held-line and save/load behavior. A constant interrupt delay or adjusted
+timer period cannot establish those orderings. The legacy vendor activation
+failure is a limitation of the optional differential oracle, not evidence
+that this core already implements the stages or that all software work is
+blocked. Native acquisition, recorder finalization and handset speech remain
+unpromoted until their own end-to-end gates pass.
 
 This is bounded debugger coverage, not a complete ISA disassembler or new
 execution/timing evidence. Other forms remain unsupported raw words.

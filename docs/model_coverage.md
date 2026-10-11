@@ -11,7 +11,7 @@ requirement.
 
 Native NSE-1 opcode coverage is currently 626 asserted forms out of 626
 observed in cold idle; Menu and long-power runs add no unasserted forms.
-The older 594-word closure cited below is historical; the current exact
+The older 594-word closure is historical; the current exact
 fingerprint is deliberately rebanked with a negative control rejecting the
 old set. See the current audit boundary in
 `rom4_dsp_loader.md`. No native RF acquisition or speech is promoted.
