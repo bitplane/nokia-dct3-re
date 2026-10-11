@@ -456,8 +456,20 @@ R0 = 2 at `2e60a2` (10.616668231 seconds), whose pinned instruction
 writes that value to controller halfword `+22`. This is a numeric lifecycle
 transition, not a recovered enum name or proof of cell admission.
 Evidence: `tmp/6210-plmn-followup-{receive,context,transition}-{national,international}/error.log.gz`.
-Current unresolved boundary: controller state 2's next selection action
-and its completion. No operational international-roaming contract is
+The state table at `2e4e78` selects `2e6e68` for controller state 2.
+That handler compares R6 with `1589`; a mismatch enters `2e6046`, which
+retains state 2 except for its separate `1580` branch. The foreign run
+observes R6 = `1583` at `2e6e68` before its state-2 write, then enters
+another `2e321c` receive. No later receive return or `1589` RAM-object post
+through the observed RTOS primitive is captured during the 25-second run;
+this is bounded non-observation, not proof of producer absence.
+The candidate source is in ROM: `2a394e` loads literal `1589`, calls
+`2a7f74`, and that entry forwards it to dispatcher `29ffb8` with R1 = 0.
+Instructions, pool literal and state-table entry are pinned by the contract
+checker. Evidence: `tmp/6210-plmn-state2-dispatch-{national,international}/error.log.gz`.
+Current unresolved boundary: the lifecycle selecting the `2a394e` publisher
+and its prerequisites, alongside the handler's alternative `1580` route.
+No operational international-roaming contract is
 established by these observations.
 
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
