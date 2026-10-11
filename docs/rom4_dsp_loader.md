@@ -2329,8 +2329,16 @@ them at 8/9. The opcode and literal together retire as one retained operation
 at 7; this frontend does not expose the manual's separate first-word Execute
 occupancy at 6. Restoring partial Decode at 3 or redirected Prefetch at 5
 fetches neither literal nor target twice. SP and INTM remain unchanged.
-Conditional/far branches, calls and pending-interrupt timing during B/BD
-are outside this gate's coverage.
+Eight further B/BD fixtures pulse INT0 after cycle 5, then restore at 6
+or 8. The implemented acceptance contract keeps BD protected through
+delay-word retirement at 9; its vector Fetch is at 12, continuation `0703`
+is stacked at 13 and first ISR Execute is at 16. B accepts after its
+retained two-word operation retires at 7: target Execute at 10 drains
+alongside vector Fetch, `0701` is stacked at 11 and ISR Execute is at 14.
+Every leg performs one vector acknowledgment and one literal/target Fetch.
+This tests the model's interrupt acceptance/drain contract and restoration,
+not independently measured silicon timing during a nondelayed branch's
+flush occupancy. Conditional/far branches and calls remain outside coverage.
 
 Separate empty-frontend IRQ and NMI fixtures accept at cycle 1, fetch the
 vector at 4, write the continuation at 5 and retire the first ISR load at 8.
