@@ -45,6 +45,26 @@ def descriptor_match(header: list[int], image: bytes, hit: dict) -> dict | None:
             "archival_header_equal": observed[:5] == header}
 
 
+def verify_catalogue(payloads, image: bytes, offset: int, base: int) -> list[dict]:
+    entries = []
+    for source, header, words in payloads:
+        index = int(source.stem[5:], 16)
+        slot = offset + index * 4
+        if slot < 0 or slot + 4 > len(image):
+            raise ValueError("catalogue pointer outside image")
+        address = int.from_bytes(image[slot:slot + 4], "big")
+        start = address - base
+        end = start + 12 + len(words) * 2
+        if start < 0 or end > len(image):
+            raise ValueError(f"{source.stem}: catalogue descriptor outside image")
+        expected = encode_words(header + [0] + words, "big")
+        if image[start:end] != expected:
+            raise ValueError(f"{source.stem}: catalogue descriptor/payload mismatch")
+        entries.append({"block": source.stem, "pointer_file_offset": slot,
+                        "descriptor_address": address, "descriptor_file_offset": start})
+    return entries
+
+
 def matches(words: list[int], image: bytes) -> list[dict]:
     if not words:
         return []
@@ -62,7 +82,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("reference_dir", type=Path)
     parser.add_argument("images", type=Path, nargs="+")
+    parser.add_argument("--catalogue-offset", type=lambda value: int(value, 0))
+    parser.add_argument("--image-base", type=lambda value: int(value, 0))
     args = parser.parse_args()
+    if (args.catalogue_offset is None) != (args.image_base is None):
+        parser.error("catalogue verification requires both --catalogue-offset and --image-base")
     try:
         sources = sorted(args.reference_dir.glob("block*.h"))
         if not sources:
@@ -84,6 +108,9 @@ def main() -> None:
                                     "matches": hits})
             report["images"].append({"path": str(path), "sha256": hashlib.sha256(image).hexdigest(),
                                      "size": len(image), "blocks": entries})
+            if args.catalogue_offset is not None:
+                report["images"][-1]["verified_catalogue"] = verify_catalogue(
+                    payloads, image, args.catalogue_offset, args.image_base)
     except (OSError, ValueError) as error:
         parser.exit(1, f"error: {error}\n")
     print(json.dumps(report, indent=2))

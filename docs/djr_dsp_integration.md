@@ -1502,6 +1502,14 @@ descriptor file offsets are respectively `0x1020b4`, `0x1025c0` and
 `0x10811c`. This checks both payload identity and descriptor metadata; it
 does not establish which blocks a particular runtime boot requests.
 
+The own 3310 v6.39 image also contains the complete ordered pointer catalogue
+at file offset `0x0f35bc` (MCU address `0x2f35bc`, image base `0x200000`).
+All 28 entries index the matching six-word descriptor and complete payload,
+including the eight zero-length blocks. Verify this stronger correspondence
+by supplying only that image to the matcher with
+`--catalogue-offset 0xf35bc --image-base 0x200000`. This is a static catalogue
+contract, not proof of its MCU reader or the runtime block-request sequence.
+
 This establishes byte identity, not unique archival provenance or a compatible
 resident DSP ROM. Other products share complete individual payloads: for
 example, 3210 v6.00 matches blocks `05`, `06`, `0f` and `16`. Raw images were

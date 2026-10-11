@@ -2,10 +2,20 @@ import pathlib
 import tempfile
 import unittest
 
-from dsp_upload_reference_match import descriptor_match, matches, read_payload
+from dsp_upload_reference_match import descriptor_match, matches, read_payload, verify_catalogue
 
 
 class ReferenceMatchTest(unittest.TestCase):
+    def test_catalogue_including_empty_entry(self):
+        header = [1, 2, 0, 4, 5]
+        data = (0x200004).to_bytes(4, "big") + b"".join(v.to_bytes(2, "big") for v in header + [0])
+        payloads = [(pathlib.Path("block00.h"), header, [])]
+        self.assertEqual(len(verify_catalogue(payloads, data, 0, 0x200000)), 1)
+        with self.assertRaises(ValueError):
+            verify_catalogue(payloads, data[:-1] + b"\x01", 0, 0x200000)
+        with self.assertRaises(ValueError):
+            verify_catalogue(payloads, data, 0, 0x300000)
+
     def payload(self, text):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "block00.h"
