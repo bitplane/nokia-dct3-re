@@ -17,13 +17,13 @@ SEARCH_PASS = "SIM record search: PASS directions=4 types=2 undefined_starts=2 p
 
 ACCESS_PASS = "SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
 IMSI_PASS = "SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 reset_revokes=1 removal_revokes=1 fcp_matches=1 handset_claim=0"
-BINARY_ACCESS_PASS = "SIM GSM binary read access: PASS files=8 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0"
+BINARY_ACCESS_PASS = "SIM GSM binary read access: PASS files=9 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0"
 AUTH_ACCESS_PASS = "SIM authentication access: PASS before_pin=1 after_pin=1 gsm_directory=1 rejected_result_absent=1 handset_claim=0"
 BLOCKED_DISABLED_PASS = "SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0"
 PLMN_PASS = "SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
 PUCT_PASS = "SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
 SMSS_PASS = "SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0"
-ADM_PASS = "SIM administrative updates: PASS files=3 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0"
+ADM_PASS = "SIM administrative updates: PASS files=4 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0"
 
 
 def check(text, returncode):
@@ -63,8 +63,8 @@ def main():
             "imsi_read_access": True,
             "puct_read_access": True, "puct_unverified_restore": True,
             "smss_access_restore": True, "smss_serialized_exactly": True,
-            "administrative_update_files": 3, "verified_pin_not_adm": True,
-            "additional_protected_binary_files": 8,
+            "administrative_update_files": 4, "verified_pin_not_adm": True,
+            "additional_protected_binary_files": 9,
             "authentication_access": True, "authentication_directory": True,
             "disabled_chv_blocking": True, "unblock_recovery": True,
             "reset_revokes_authorization": True,

@@ -243,13 +243,13 @@ actual submitted TP-MR and its cold increment on the 6210 and 8210. Their
 first references differ (1 and 0 respectively), as do relative TP-VP bytes
 (`FF` and `A7`); the shared checker does not normalize those product choices.
 The standard GSM transparent set Kc (`6F20`), PLMNsel (`6F30`), HPLMN
-(`6F31`), ACMmax (`6F37`), BCCH (`6F74`), ACC (`6F78`), FPLMN (`6F7B`)
-and LOCI (`6F7E`) also enforces CHV1 READ. Serial tests independently check
+(`6F31`), ACMmax (`6F37`), BCCH (`6F74`), ACC (`6F78`), FPLMN (`6F7B`),
+LOCI (`6F7E`) and SST (`6F38`) also enforces CHV1 READ. Serial tests check
 each FCP, denial before verification and exact one-byte readback afterward,
 including after reset and reinsertion. This is READ-policy coverage: missing
 user-update support for ACMmax/PUCT and other unclassified file policies
-remain separate work. IMSI, HPLMN and ACC are not CHV1-writable: GSM 11.11
-10.2.2/10.2.5/10.2.15 assigns UPDATE to ADM. Their FCP now reports READ CHV1
+remain separate work. IMSI, HPLMN, ACC and SST are not CHV1-writable: GSM 11.11
+10.2.2/10.2.5/10.2.15/10.2.7 assigns UPDATE to ADM. Their FCP reports READ CHV1
 and UPDATE ADM (laboratory ADM level 4), while the card implements no ADM
 credential or administrative update command. The serial fixture checks that
 a verified PIN still receives `98 04` for UPDATE and each file's contents

@@ -217,7 +217,11 @@ private:
 		{0xa4, 0, 0, 2, 0x6f7e, 0x9f, 15},
 		{0xc0, 0, 0, 15, 0x6f7e, 0x90, 0},
 		{0xb0, 0, 0, 1, 0, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x6f38, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f38, 0x90, 0},
+		{0xb0, 0, 0, 1, 0, 0x98, 4},
 		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb0, 0, 0, 1, 0xcf, 0x90, 0},
 		{0xa4, 0, 0, 2, 0x6f20, 0x9f, 15},
 		{0xb0, 0, 0, 1, 0xff, 0x90, 0},
 		{0xa4, 0, 0, 2, 0x6f30, 0x9f, 15},
@@ -327,7 +331,11 @@ private:
 		{0xa4, 0, 0, 2, 0x6f78, 0x9f, 15},
 		{0xc0, 0, 0, 15, 0x6f78, 0x90, 0},
 		{0xd6, 0, 0, 1, 0x55, 0x98, 4},
-		{0xb0, 0, 0, 1, 0, 0x90, 0}
+		{0xb0, 0, 0, 1, 0, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f38, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f38, 0x90, 0},
+		{0xd6, 0, 0, 1, 0x55, 0x98, 4},
+		{0xb0, 0, 0, 1, 0xcf, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -706,7 +714,7 @@ private:
 					"immediately preceding SELECT supplies the selected file response");
 				if (item.body == 0x6f3a)
 					expect(m_bytes[9] == 0x11, "ADN advertises CHV1 for READ and UPDATE");
-				if (item.body == 0x6f07 || item.body == 0x6f31 || item.body == 0x6f78)
+				if (item.body == 0x6f07 || item.body == 0x6f31 || item.body == 0x6f78 || item.body == 0x6f38)
 					expect(m_bytes[9] == 0x14, "administrative files advertise CHV1 READ and ADM UPDATE");
 				if (item.body == 0x6f30 || item.body == 0x6f7b)
 					expect(m_bytes[9] == 0x11, "PLMN lists advertise CHV1 READ and UPDATE");
@@ -780,13 +788,13 @@ private:
 			}
 			osd_printf_info("SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 reset_revokes=1 removal_revokes=1 fcp_matches=1 handset_claim=0\n");
-			osd_printf_info("SIM GSM binary read access: PASS files=8 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0\n");
+			osd_printf_info("SIM GSM binary read access: PASS files=9 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM authentication access: PASS before_pin=1 after_pin=1 gsm_directory=1 rejected_result_absent=1 handset_claim=0\n");
 			osd_printf_info("SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0\n");
 			osd_printf_info("SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM PUCT read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM SMS status: PASS telecom_parent=1 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
-			osd_printf_info("SIM administrative updates: PASS files=3 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0\n");
+			osd_printf_info("SIM administrative updates: PASS files=4 fcp_adm=1 verified_pin_denied=1 data_preserved=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}
