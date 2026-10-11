@@ -75,6 +75,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-rejected-sms': (80, '--rejected-sms', ()),
             'pin-host-silent-sms': (155, '--silent-sms', ()),
             'pin-host-outgoing-call': (60, '--outgoing-call', ('32',)),
+            'pin-host-outgoing-call-state': (60, '--outgoing-call-state', ('32',)),
             'pin-host-incoming-call': (60, '--host-incoming-call', ('32',)),
             'pin-sms-wait-state': (155, '--silent-sms-state', ()),
             'pin-phonebook': (55, '--phonebook-save', ()),
@@ -97,20 +98,29 @@ class RunnerTests(unittest.TestCase):
                     with patch('sys.argv', argv), \
                             patch.object(runner.subprocess, 'run') as execute, \
                             patch('tools.radio_host_outgoing_connect_check.verify') as host_verify, \
+                            patch('tools.radio_host_outgoing_connect_check.verify_restored') as restored_verify, \
                             patch.object(Path, 'read_text', return_value='host trace'):
                         runner.main()
                     host = name.startswith('pin-host-')
                     incoming = name == 'pin-host-incoming-sms'
                     rejected = name == 'pin-host-rejected-sms'
                     silent = name == 'pin-host-silent-sms'
-                    call = name in ('pin-host-outgoing-call', 'pin-host-incoming-call')
+                    call = name in ('pin-host-outgoing-call', 'pin-host-incoming-call',
+                                    'pin-host-outgoing-call-state')
                     incoming_call = name == 'pin-host-incoming-call'
                     self.assertEqual(execute.call_count, 3 if (host and not call) or name == 'pin-phonebook' else 2)
-                    if call and not incoming_call:
+                    if name == 'pin-host-outgoing-call-state':
+                        restored_verify.assert_called_once_with('host trace', '5551234')
+                        host_verify.assert_not_called()
+                    elif call and not incoming_call:
                         host_verify.assert_called_once_with('host trace', '5551234')
                     else:
                         host_verify.assert_not_called()
+                    if name != 'pin-host-outgoing-call-state':
+                        restored_verify.assert_not_called()
                     command = execute.call_args_list[0].args[0]
+                    self.assertEqual('--observe-restore' in command,
+                                     name == 'pin-host-outgoing-call-state')
                     if host:
                         self.assertEqual(Path(command[1]).name,
                                          'run_host_incoming_signaling_gate.py' if incoming_call else

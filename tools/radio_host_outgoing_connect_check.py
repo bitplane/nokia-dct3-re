@@ -17,3 +17,22 @@ def verify(text, number):
         raise ValueError('expected exactly one accepted connect decision')
     if text.count('outgoing decision queued id=1 outcome=0') != 1:
         raise ValueError('expected one queued connect decision')
+
+
+def verify_restored(text, number):
+    patterns = (
+        ('own host request', rf'gsm_call_adapter: request id=1 epoch=1 digits={re.escape(number)} clients=1\b'),
+        ('connect accepted', r'gsm_call_adapter: decision id=1 outcome=0 result=accepted'),
+        ('connected', r'gsm_call_adapter: state id=1 epoch=1 phase=connected'),
+        ('saved', r'5210_pin_state: event=saved'),
+        ('restored', r'5210_pin_state: event=restored'),
+        ('attached restored request', rf'gsm_call_adapter: request id=1 epoch=2 digits={re.escape(number)} clients=1\b'),
+        ('restored connected', r'gsm_call_adapter: state id=1 epoch=2 phase=connected'),
+        ('stale decision rejected', r'gsm_call_adapter: stale epoch=1 current=2 type=decision id=1'),
+        ('physical End', r'5210_pin_state_physical: key=End(?:\s|$)'),
+        ('restored ended', r'gsm_call_adapter: state id=1 epoch=2 phase=ended'),
+    )
+    require_ordered(text, tuple((name, re.compile(pattern)) for name, pattern in patterns),
+                    'host outgoing restoration')
+    if text.count('gsm_call_adapter: decision id=1 outcome=0 result=accepted') != 1:
+        raise ValueError('restoration accepted a second connect decision')

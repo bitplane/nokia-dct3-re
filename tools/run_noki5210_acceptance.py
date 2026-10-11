@@ -59,6 +59,9 @@ SCENARIOS = {
                                    seconds=155, host_sms='outgoing', host_outcome='rp_silence'),
     'pin-host-outgoing-call': Scenario('noki5210_pin_outgoing_call.lua', '--outgoing-call',
                                       seconds=60, net_masks=('32',), host_call='outgoing'),
+    'pin-host-outgoing-call-state': Scenario('noki5210_pin_outgoing_call_state.lua',
+                                            '--outgoing-call-state', seconds=60,
+                                            net_masks=('32',), host_call='outgoing'),
     'pin-host-incoming-call': Scenario('noki5210_pin_host_incoming_call.lua', '--host-incoming-call',
                                       seconds=60, net_masks=('32',), host_call='incoming'),
     'pin-sms-wait-state': Scenario('noki5210_pin_sms_wait_state.lua', '--silent-sms-state',
@@ -100,6 +103,8 @@ def main():
     scenario = SCENARIOS[args.scenario]
     if args.pjsua and not scenario.host_call:
         parser.error('--pjsua requires a PIN host-call scenario')
+    if args.pjsua and args.scenario == 'pin-host-outgoing-call-state':
+        parser.error('PIN host-call restoration has no promoted SIP contract')
     run = args.run_directory.resolve()
     try:
         run.mkdir(parents=True, exist_ok=False)
@@ -173,6 +178,8 @@ def main():
                                str(run / 'snap/5210_pin_host_idle.png')])
             elif scenario.host_call == 'outgoing' and not args.pjsua:
                 launch.extend(['--number', '5551234', '--decision', 'connect'])
+                if args.scenario == 'pin-host-outgoing-call-state':
+                    launch.append('--observe-restore')
             elif scenario.host_sms == 'outgoing':
                 launch.extend(['--user-data', '61', '--user-data-length', '1',
                                '--decision', {'rp_ack': 'accept', 'rp_error': 'rp_error',
@@ -212,7 +219,9 @@ def main():
             subprocess.run([sys.executable, str(root / 'tools' / host_checker)] +
                            host_args + [str(run / 'error.log')], check=True)
         if scenario.host_call == 'outgoing' and not args.pjsua:
-            from tools.radio_host_outgoing_connect_check import verify as verify_host_call
+            from tools.radio_host_outgoing_connect_check import verify, verify_restored
+            verify_host_call = (verify_restored if args.scenario == 'pin-host-outgoing-call-state'
+                                else verify)
             verify_host_call((run / 'error.log').read_text(errors='replace'), '5551234')
         if args.scenario == 'pin-phonebook':
             subprocess.run([sys.executable, str(Path(__file__).resolve()), str(run / 'cold'),

@@ -89,15 +89,15 @@ physical Answer/End, CC/RR closure and exact idle recovery.
 `verify-5210-pin-sms-wait-state` independently restores exact architecture
 and pixels during a local-peer RP wait, then requires timed DISC, UA/release,
 paging and physical idle/menu recovery. Whole-interval reference/replay,
-external host transaction restoration remain separate.
-Combining the local outgoing-call save fixture with the ordinary host-connect
-mock is insufficient: that mock closes its WebSocket after its correlated
-decision, before save/load. The captured handset round trip preserves PC/SP/RAM
-and pixels and releases physically, but the restored epoch-2 call publishes
-with `clients=0`. This does not demonstrate active external transaction
-restoration or a handset defect. A restoration backend must remain attached
-through save/load and assert old-epoch invalidation, host dialog cleanup and
-the restored lifecycle before this coverage can be promoted.
+external SMS transaction restoration remain separate.
+`verify-5210-pin-host-outgoing-call-state` restores a physically dialed,
+PIN-authenticated host-connected call with exact PC/SP/RAM and pixel equality.
+The backend remains attached through save/load; the adapter republishes the
+connected call in epoch 2 with `clients=1`, rejects a stale epoch-1 decision,
+then reaches ended after physical End and firmware CC/RR release. The ordinary
+host-connect mock, which disconnects before save/load, cannot prove this
+contract. This gate covers restored host signaling, not surviving or cleaned-up
+SIP dialogs, host media cursor restoration or native speech.
 `verify-5210-pin-outgoing-call-sip` independently combines cold PIN
 authentication, physical dialing and End, real loopback SIP confirmation,
 bidirectional host media transport, ordered DISCONNECT/RELEASE/RELEASE COMPLETE
