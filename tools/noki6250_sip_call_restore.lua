@@ -3,8 +3,9 @@ local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local outgoing = _G.noki6250_sip_restore_outgoing == true
 local connected = _G.noki6250_sip_restore_connected == true
-_G.noki6250_call_hold = outgoing
-dofile(directory .. (outgoing and 'noki6250_call_observe.lua' or 'noki6250_sip_cancel_observe.lua'))
+_G.noki6250_call_hold = outgoing or connected
+dofile(directory .. (outgoing and 'noki6250_call_observe.lua' or
+    connected and 'noki6250_host_incoming_input.lua' or 'noki6250_sip_cancel_observe.lua'))
 local machine = manager.machine
 local snapshot = dofile(directory .. 'dct3_state_snapshot.lua')(
     machine, assert(machine.devices[':maincpu']), '6250_state')
@@ -19,11 +20,18 @@ local post_load = emu.add_machine_post_load_notifier(function()
     for index = 1, 4 do assert(saved[index] == restored[index], 'architectural state mismatch') end
     machine:logerror('sip_state: restored\n')
     machine:logerror('state_roundtrip: result=pass scenario=6250_' ..
-        (outgoing and (connected and 'outgoing_connected' or 'outgoing_pending') or 'incoming_alerting') .. '\n')
+        (outgoing and (connected and 'outgoing_connected' or 'outgoing_pending') or
+         connected and 'incoming_connected' or 'incoming_alerting') .. '\n')
     local cleanup = coroutine.create(function()
         if outgoing then
             assert(emu.wait(32 - machine.time:as_double()))
             machine.screens[':screen']:snapshot('6250_call_4.png')
+            completed = true
+            return
+        end
+        if connected then
+            assert(emu.wait(54 - machine.time:as_double()))
+            machine.screens[':screen']:snapshot('6250_sip_connected_after_restore.png')
             completed = true
             return
         end
@@ -46,7 +54,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     assert(coroutine.resume(cleanup))
 end)
 local runner = coroutine.create(function()
-    assert(emu.wait(outgoing and 24 or 40))
+    assert(emu.wait(outgoing and 24 or connected and 41 or 40))
     machine:save('6250_sip_alerting')
     assert(emu.wait(0.5))
     assert(saved, 'save did not execute')

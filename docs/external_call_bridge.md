@@ -535,8 +535,8 @@ carrier-19 traffic and release contract, complete CC/RR clearing and resumed
 paging, with reviewed idle recovery and persistent SIM location. The SIP
 dialog confirms and releases normally, but uplink remains zero and no HLE
 codec tick is permitted. `sip-result.json` retains explicit non-speech and
-non-native scope. No 6210 PCM assumptions or connected-incoming restoration
-is enabled for the 6250.
+non-native scope. No 6210 PCM assumptions are enabled for the 6250;
+connected restoration is limited to the separately checked fixtures below.
 
 `verify-6250-sip-incoming-connected-signaling` waits for a fresh registered
 idle frame before admitting caller `5551234`. Ordered unique Answer and SIP
@@ -554,6 +554,15 @@ reviewed idle recovery. The bridge publishes its old-epoch uplink count
 before resetting counters; zero uplink and no HLE codec ticks are required.
 The external dialog is cleared, not restored or redialed; speech and native
 DSP remain unproved.
+
+`verify-6250-sip-connected-incoming-restore` admits a fresh caller after
+idle, requires physical Answer decoded as own matrix value `0a`, and saves
+after handset/SIP connection. Exact R15/R13/RAM/time restoration clears the
+original dialog with BYE and the restored handset once with cause 41. The
+own carrier-19 release confirmation, resumed paging and reviewed idle
+recovery must pass. The original Answer/confirmation identity is ordered
+before epoch change. Zero pre-reset uplink and no HLE codec tick exclude
+speech claims; external dialogs are cleared, never resurrected.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:
