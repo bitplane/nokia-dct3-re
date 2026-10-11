@@ -25,6 +25,9 @@ class RadioContractTest(unittest.TestCase):
         self.assertEqual(result['records'], 40)
         self.assertEqual(result['signed_rssi_message_offset'], 9)
         self.assertEqual(result['receive_context_message'], '1802')
+        self.assertEqual(result['current_request_dispatch']['03eb'], '2e20dc')
+        self.assertEqual(result['current_request_dispatch']['03ec'], '2e202e')
+        self.assertEqual(result['initial_request_continuation'], '2e1f5e')
         self.assertEqual(result['direct_census_coverage']['arguments_recovered'], 8)
         self.assertFalse(result['direct_census_coverage']['indirect_and_tail_entries_closed'])
 

@@ -99,12 +99,28 @@ def verify(image):
             ('beq', '#0x234f12'), ('b', '#0x2351b2'),
             ('ldr', 'r5, [pc, #0x16c]'), ('b', '#0x234f30')]:
         raise ValueError('own message-1802/type-89 receive branch differs')
+    if int.from_bytes(read(0x2e2370, 4), 'big') != 0x03ea:
+        raise ValueError('own current-request discriminator base differs')
+    if instructions(0x2e200c, 34) != [
+            ('ldr', 'r2, [r4, #8]'), ('movs', 'r0, #0'),
+            ('ldrsh', 'r0, [r2, r0]'), ('ldr', 'r1, [pc, #0x35c]'),
+            ('subs', 'r0, r0, r1'), ('cmp', 'r0, #0'), ('beq', '#0x2e20e2'),
+            ('subs', 'r0, #1'), ('cmp', 'r0, #0'), ('beq', '#0x2e20dc'),
+            ('subs', 'r0, #1'), ('cmp', 'r0, #0'), ('beq', '#0x2e202e'),
+            ('subs', 'r0, #1'), ('cmp', 'r0, #0'), ('beq', '#0x2e20e6'),
+            ('b', '#0x2e20ec')]:
+        raise ValueError('own current-request four-way dispatch differs')
+    if instructions(0x2e20dc, 6) != [('bl', '#0x2e1f5e'), ('b', '#0x2e20ec')]:
+        raise ValueError('own request-03eb continuation differs')
     return {'product': '5210', 'type_8b_destination_task': 12,
             'records': 40, 'record_stride': 4,
             'carrier_message_offsets': [6, 7], 'signed_rssi_message_offset': 9,
             'request_root': '13e78c', 'current_offset': 8, 'queued_offset': 12,
             'request_flag_offset': 12, 'state6_promote_argument': 0,
             'receive_context_message': '1802',
+            'current_request_dispatch': {'03ea': '2e20e2', '03eb': '2e20dc',
+                                         '03ec': '2e202e', '03ed': '2e20e6'},
+            'initial_request_continuation': '2e1f5e',
             'direct_selector_calls': [{'site': f'{site:06x}', 'argument': argument}
                                       for site, argument in direct_sites],
             'direct_census_coverage': {'aligned_pairs': (len(image) - 2) // 2,

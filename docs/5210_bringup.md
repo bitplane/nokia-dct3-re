@@ -160,12 +160,23 @@ transport timestamps. The ROM-pinned contract also checks the explicit
 `0x1802`/`0x89` branch to the common argument-zero call; runtime proves the
 `0x8b` case reaches that call too, without claiming it enters that same branch.
 The captured object headers differ (`0x03eb` for the initial current request,
-`0x03ec` for the queued request), but their complete semantics remain open.
+`0x03ec` for the queued request). ROM function `0x2e2000` consumes the current
+request's signed halfword and subtracts literal base `0x03ea`: the four exact
+branches are `03ea -> 2e20e2`, `03eb -> 2e20dc`, `03ec -> 2e202e`, and
+`03ed -> 2e20e6`. The initial variant calls `0x2e1f5e`; the post-PIN variant
+instead enters the previous-request comparison and configuration path. The
+static gate checks this entire discriminator cascade, not an inferred name
+for these requests. Their complete lifecycle semantics remain open.
 
 The outstanding lifecycle question is why late `0x03ec` readiness retains
 the initial request after both ordinary completion inputs have occurred, and
 which firmware-owned continuation should retire or promote it. A second
 channel-change or measurement reply is not justified merely by this ordering.
+The next own-ROM target is initial-request continuation `0x2e1f5e` and its
+completion conditions. The post-measurement type-`0x11` mode-4 instruction is
+currently logged as unaccepted by the neighbour decoder; this is a separate
+candidate contract mismatch, not evidence that fabricating its response would
+promote the queued request.
 
 The next unresolved contract is which ordinary event invokes the eligible
 promotion entrance after late SIM readiness. Do not force selector arguments,
