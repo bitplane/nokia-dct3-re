@@ -232,6 +232,9 @@ private:
 	std::array<u16, 6> m_pipeline_operand_address = {};
 	std::array<u16, 6> m_pipeline_operand = {};
 	std::array<bool, 6> m_pipeline_valid = {};
+	bool m_pipeline_decode_pending = false;
+	u16 m_pipeline_decode_word = 0;
+	u32 m_pipeline_decode_address = 0;
 	u32 m_pipeline_fetch_address = 0;
 	u16 m_pipeline_return_pc = 0;
 	bool m_pipeline_flush_front = false;

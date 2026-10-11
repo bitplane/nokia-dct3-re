@@ -2418,6 +2418,80 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_multiword_pipeline_case(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_long_case = variant;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i)
+		{
+			program.write_word(0x600 + i, 0xf495);
+			program.write_word(0x40 + i, 0xf495);
+		}
+		constexpr u16 opcodes[] = { 0xf020, 0xf120, 0xf02f, 0xf162 };
+		constexpr u16 literals[] = { 0xe833, 0xf495, 0x7fff, 0x8001 };
+		program.write_word(0x600, opcodes[variant]);
+		program.write_word(0x601, literals[variant]); // Opcode-shaped data is never executed.
+		program.write_word(0x602, 0xe822); // First not-decoded continuation.
+		program.write_word(0x40, 0xe955);
+		m_cpu->space(AS_DATA).write_word(0xfff, 0xbeef);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, variant == 1 || variant == 2 ? 0x0100 : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 1);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_expected_cycle = 1;
+		m_pipeline_replay = false;
+		m_vector_reads = m_vector_acks = 0;
+		m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = program.install_read_tap(0x601, 0x601, "pipeline_literal",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 3, "Immediate literal uses its own Fetch clock");
+				++m_pipeline_operand_reads;
+			});
+		m_vector_prefetch_tap = program.install_read_tap(0x40, 0x40, "multiword_vector",
+			[this](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() == 7 && m_vector_acks == 1,
+					"Interrupt waits for complete multiword Decode before vector Fetch");
+				++m_vector_reads;
+			});
+		m_phase = 251040;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
+	void start_multiword_stream_case()
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, 0xf495);
+		program.write_word(0x600, 0xf020); program.write_word(0x601, 0xe833);
+		program.write_word(0x602, 0xf162); program.write_word(0x603, 0xf495);
+		program.write_word(0x604, 0xe877);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = 0;
+		m_pipeline_operand_tap = program.install_read_tap(0x601, 0x603, "pipeline_stream_literals",
+			[this](offs_t address, u16 &, u16) {
+				if (machine().side_effects_disabled() || address == 0x602) return;
+				expect(m_cpu->pipeline_cycles() == (address == 0x601 ? 3 : 5),
+					"Consecutive literals retain their independent Fetch clocks");
+				++m_pipeline_operand_reads;
+			});
+		m_phase = 251060;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -22404,8 +22478,87 @@ private:
 			m_cpu->set_pipeline_frontend(false);
 			if (!m_pipeline_empty_nmi) { start_empty_pipeline_case(true); return; }
 			osd_printf_info("TMS320C54x staged empty frontend: PASS irq=1 nmi=1 return_pc=0600 vector_fetch=4 stack_write=5 isr_execute=8\n");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			start_multiword_pipeline_case();
+			return;
+		}
+		if (m_phase == 251040)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			constexpr u64 results[] = { 0xe833, 0xfffffff495ULL, 0x3fff8000, 0x80010000 };
+			bool const destination_b = m_pipeline_long_case == 1 || m_pipeline_long_case == 3;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"Two-word frontend advances one active clock at a time");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle < 7 || destination_b ? 0 : results[m_pipeline_long_case]) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 11 ? 0x55 : cycle >= 7 && destination_b ? results[m_pipeline_long_case] : 0),
+				"Literal is not executed and decoded multiword load retires while entry drains");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle < 6 ? 0x1000 : 0xfff) &&
+				m_cpu->space(AS_DATA).read_word(0xfff) == (cycle < 8 ? 0xbeef : 0x602),
+				"Interrupt continuation skips the owned extension but not the next instruction");
+			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
+			if (cycle == 3 && !m_pipeline_replay)
+			{
+				expect(m_pipeline_operand_reads == 1 && m_vector_acks == 0,
+					"Partial Decode retains pending IRQ without acknowledgement");
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE,
+					"Save incomplete two-word Decode and fetched literal");
+			}
+			if (cycle == 11)
+			{
+				expect(m_vector_reads == 1 && m_vector_acks == 1 && m_pipeline_operand_reads == 1,
+					"Each leg consumes one retained literal and one vector");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_vector_reads = m_vector_acks = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == 3,
+						"Restore incomplete Decode without rereading its literal");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_phase = 251050;
+					m_pipeline_expected_cycle = 4;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_operand_tap.remove(); m_vector_prefetch_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_long_case < 3) { start_multiword_pipeline_case(m_pipeline_long_case + 1); return; }
+				osd_printf_info("TMS320C54x staged multiword: PASS cases=4 literal_fetch=3 complete_decode=4 execute=7 vector_fetch=7 return_pc=0602 pending_decode_restore=4\n");
+				start_multiword_stream_case();
+				return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251050)
+		{
+			expect(m_cpu->pipeline_cycles() == 3, "Scheduler settlement preserves partial Decode");
+			m_cpu->resume(SUSPEND_REASON_DISABLE);
+			m_phase = 251040;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251060)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL),
+				"Consecutive multiword forms consume one frontend clock per word");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle >= 10 ? 0x77 : cycle >= 7 ? 0xe833 : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == (cycle >= 9 ? 0xf4950000ULL : 0),
+				"Long A/B loads retire in order before the following one-word instruction");
+			if (cycle == 10)
+			{
+				expect(m_pipeline_operand_reads == 2, "Each consecutive literal is fetched only once");
+				m_pipeline_operand_tap.remove();
+				m_cpu->set_pipeline_frontend(false);
+				osd_printf_info("TMS320C54x staged multiword stream: PASS long_execute=7,9 short_execute=10 literal_reads=2\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
@@ -22854,6 +23007,7 @@ private:
 	bool m_pipeline_memory_case = false;
 	bool m_pipeline_memory_b = false;
 	unsigned m_pipeline_operand_reads = 0;
+	unsigned m_pipeline_long_case = 0;
 	memory_passthrough_handler m_pipeline_operand_tap;
 	bool m_pipeline_replay = false;
 	unsigned m_pipeline_drained_fetches = 0;
@@ -22911,6 +23065,12 @@ void tms320c54x_test_state::test(machine_config &config)
 	TMS320C54X(config, m_cpu, 13'000'000);
 	m_cpu->set_extended_program(true);
 	m_cpu->set_irq_acknowledge_callback([this](device_t &, int line) {
+		if (m_phase == 251040)
+		{
+			expect(line == 0 && m_cpu->pipeline_cycles() == 7,
+				"Two-word instruction completes Decode before interrupt IACK");
+			++m_vector_acks;
+		}
 		if (m_phase == 251030)
 		{
 			expect(line == (m_pipeline_empty_nmi ? INPUT_LINE_NMI : 0) && m_cpu->pipeline_cycles() == 4,

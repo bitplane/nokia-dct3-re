@@ -2277,9 +2277,10 @@ RF acquisition or handset speech.
 The optional `set_pipeline_frontend` path owns Prefetch, Fetch, Decode,
 Access, Read and Execute slots inside the existing CPU, reusing its semantic
 backend and interrupt-source/entry operations. No handset or MU4 configuration
-enables it. Initial executable coverage is NOP, one-word immediate loads
-to A/B and direct DP-relative loads to A/B. Indirect, SP-relative and multiword
-forms stop at Decode without atomic fallback.
+enables it. Initial executable coverage is NOP, one-word immediate loads,
+two-word shifted immediate loads and direct DP-relative loads to A/B.
+Indirect, SP-relative and other multiword forms stop at Decode without
+atomic fallback.
 
 Its firmware-free fixture reproduces the entry-side ordering of SPRU131G
 example 7-18: acceptance after Decode at cycle 3, INTR Decode at 4, SP
@@ -2302,16 +2303,34 @@ both normal and restored retirement use the captured value, not a second bus
 read. This covers both accumulators; it does not establish modifying address
 modes, address/data hazards, multiple data accesses or memory writes.
 
-Slot addresses, fetched words, operand addresses/values, validity, pending frontend redirection,
+Two-word immediate loads retain the opcode while the following fetched word
+completes Decode as its literal. They consume distinct program fetches
+(SPRU131G 7.1), never interpret opcode-shaped literals as instructions and
+retire one clock later than one-word loads. Four IRQ fixtures cover A/B,
+unsigned/signed extension and shifts 0/15/16: literal Fetch is at cycle 3,
+complete Decode at 4, load Execute/vector Fetch at 7, and stacked continuation
+`0602` at 8. All four replay a saved incomplete-Decode checkpoint without
+rereading the literal. A separate uninterrupted stream retires consecutive
+long loads at 7/9 and the following short load at 10, fetching each literal
+once. The prototype defers interrupt acceptance until its two-word Decode
+completes; these are executable implementation checks, not independent
+silicon validation of multiword interrupt latency or pipeline hazards.
+
+Slot addresses, fetched words, operand addresses/values, incomplete Decode,
+validity, pending frontend redirection,
 continuation and active-clock counter are saved. A checkpoint after cycle-4
 Decode reproduces every subsequent observed stage and architectural result,
 with one vector fetch/acknowledgement per leg. The bench suspends execution
 for scheduler settlement after loading inside a live callback; that pause is
 not emulated interrupt latency or a physical wall-time replay claim.
-`check-c54x-core` requires staged-frontend, direct-load, empty IRQ/NMI and unsupported-form markers.
+`check-c54x-core` requires staged-frontend, direct-load, multiword/replay/stream,
+empty IRQ/NMI and unsupported-form markers.
 Existing native execution remains protected by its full conformance suite.
+`verify-5110-save-state` passes with the added partial-Decode fields; this
+revalidates native CPU/register/I/O restoration, not the still-failing exact
+RF scan snapshot described above.
 
-The next implementation work is multiword instruction fetch/decode and
+The next implementation work is the remaining multiword grammar and
 stage-owned operand address/read/write handling, then branches, returns,
 repeat/delayed-control and idle rules. Those contracts must precede enabling
 the frontend for native firmware or claiming the timer/recorder stall fixed.
