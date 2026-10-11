@@ -43,7 +43,7 @@ def check_frames(directory):
                 raise ValueError('NHM-3 reviewed SIP cleanup pixels differ: ' + name)
 
 
-def check_alerting_restoration(text, outgoing=False):
+def check_alerting_restoration(text, outgoing=False, connected=False):
     if outgoing and not re.search(r'gsm_call_adapter: request id=1 epoch=1 digits=123\b', text):
         raise ValueError('pending NHM-3 restoration lacks own dialed digits')
     states = re.findall(r'6250_state: event=(saved|restored) pc=(\w+) sp=(\w+) ram=(\w+) t=([0-9.]+)', text)
@@ -54,7 +54,8 @@ def check_alerting_restoration(text, outgoing=False):
     for marker in (('gsm_call_adapter: request id=1 epoch=1 digits=123' if outgoing else
                     'incoming state id=1 epoch=1 phase=alerting'), 'sip_state: saved',
                    'sip_state: restored', 'state_roundtrip: result=pass scenario=6250_' +
-                   ('outgoing_pending' if outgoing else 'incoming_alerting')):
+                   ('outgoing_connected' if outgoing and connected else
+                    'outgoing_pending' if outgoing else 'incoming_alerting')):
         position = text.find(marker, cursor)
         if position < 0:
             raise ValueError('missing ordered NHM-3 restoration checkpoint: ' + marker)
@@ -110,8 +111,9 @@ def main():
     outgoing.add_argument('--outgoing-unavailable', action='store_true')
     outgoing.add_argument('--restore-incoming-alerting', action='store_true')
     outgoing.add_argument('--restore-outgoing-pending', action='store_true')
+    outgoing.add_argument('--restore-outgoing-connected-signaling', action='store_true')
     args = parser.parse_args()
-    outgoing_status = 200 if args.outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
+    outgoing_status = 200 if args.outgoing_connected_signaling or args.restore_outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
     outgoing_run = outgoing_status or args.restore_outgoing_pending
     if (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
@@ -120,7 +122,8 @@ def main():
     try:
         accessory, audit = prepare_run(run, root)
         apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
-        script = ('noki6250_host_incoming_input.lua' if args.incoming_connected_signaling else
+        script = ('noki6250_sip_outgoing_connected_restore.lua' if args.restore_outgoing_connected_signaling else
+                  'noki6250_host_incoming_input.lua' if args.incoming_connected_signaling else
                   'noki6250_sip_outgoing_pending_restore.lua' if args.restore_outgoing_pending else
                   'noki6250_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
                   'noki6250_call_observe.lua' if outgoing_status else
@@ -136,7 +139,8 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6250',
-                   *(['--incoming', '--signaling-only', '--ready-file',
+                   *(['--restore-outgoing', '--sip-response', '200', '--signaling-only'] if args.restore_outgoing_connected_signaling else
+                     ['--incoming', '--signaling-only', '--ready-file',
                       str(run / 'snap/6250_host_registered_idle.png')] if args.incoming_connected_signaling else
                      ['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', str(outgoing_status)] +
@@ -157,8 +161,8 @@ def main():
             check_output(text)
             check_output((run / 'console.log').read_text(errors='replace'))
             check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
-            if args.restore_outgoing_pending:
-                check_alerting_restoration(text, outgoing=True)
+            if args.restore_outgoing_pending or args.restore_outgoing_connected_signaling:
+                check_alerting_restoration(text, outgoing=True, connected=args.restore_outgoing_connected_signaling)
             if args.outgoing_connected_signaling:
                 from tools.noki6250_call_check import verify_outgoing
                 verify_outgoing(text, number='123', configured_carrier=True)
@@ -200,7 +204,8 @@ def main():
                                  restore_alerting=args.restore_incoming_alerting)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nhm3hle',
-            'scenario': ('incoming-sip-connected-signaling' if args.incoming_connected_signaling else
+            'scenario': ('outgoing-sip-connected-restore' if args.restore_outgoing_connected_signaling else
+                         'incoming-sip-connected-signaling' if args.incoming_connected_signaling else
                          'outgoing-sip-pending-restore' if args.restore_outgoing_pending else
                          'incoming-sip-alerting-restore' if args.restore_incoming_alerting else
                          'outgoing-sip-connected-signaling' if outgoing_status == 200 else
@@ -212,6 +217,7 @@ def main():
             'idle_restored_before_fresh_sip': args.restore_idle,
             'incoming_alerting_restored': args.restore_incoming_alerting,
             'outgoing_pending_restored': args.restore_outgoing_pending,
+            'outgoing_connected_restored': args.restore_outgoing_connected_signaling,
             'external_dialog_restored': False,
             'laboratory_carrier': 19, 'command': command, 'result': 'pass',
         }, indent=2) + '\n')

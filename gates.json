@@ -16135,6 +16135,16 @@
                                "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-6250-sip-connected-outgoing-restore",
+      "prerequisites": ["build"],
+      "variables": {},
+      "steps": [{"step": "check", "silent": false,
+                 "interpreter": "env PYTHONPATH='$(SIP_PYTHON_PATH)' $(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki6250_sip_cancel.py",
+                 "arguments": ["$(RUN_DIR)", "--restore-outgoing-connected-signaling",
+                               "--pjsua", "$(SIP_PJSUA_BIN)", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-6210-sip-connected-incoming-restore",
       "prerequisites": ["build"],
       "variables": {},

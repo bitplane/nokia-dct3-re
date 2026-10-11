@@ -648,10 +648,10 @@ def main():
         args.signaling_only and args.product == '6250' and
         (not args.incoming or args.ready_file is not None) and
         args.sip_response == 200 and args.calls == 1 and not args.record_media and
-        not args.restore_call and not args.restore_outgoing and not args.restore_idle and
+        not args.restore_call and (not args.restore_outgoing or not args.incoming) and not args.restore_idle and
         not args.cancel_incoming)
     if args.signaling_only and not signaling_connected:
-        parser.error('--signaling-only requires a single verified product SIP-200 fixture; restoration is 6210-only')
+        parser.error('--signaling-only requires a single verified product SIP-200 fixture; incoming restoration is 6210-only')
     if args.ready_file and not args.incoming:
         parser.error('--ready-file requires --incoming')
     if args.ready_file and args.ready_file.exists():

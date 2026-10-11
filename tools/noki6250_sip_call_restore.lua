@@ -2,6 +2,7 @@
 local source = debug.getinfo(1, 'S').source:sub(2)
 local directory = assert(source:match('^(.*[/])'))
 local outgoing = _G.noki6250_sip_restore_outgoing == true
+local connected = _G.noki6250_sip_restore_connected == true
 _G.noki6250_call_hold = outgoing
 dofile(directory .. (outgoing and 'noki6250_call_observe.lua' or 'noki6250_sip_cancel_observe.lua'))
 local machine = manager.machine
@@ -18,7 +19,7 @@ local post_load = emu.add_machine_post_load_notifier(function()
     for index = 1, 4 do assert(saved[index] == restored[index], 'architectural state mismatch') end
     machine:logerror('sip_state: restored\n')
     machine:logerror('state_roundtrip: result=pass scenario=6250_' ..
-        (outgoing and 'outgoing_pending' or 'incoming_alerting') .. '\n')
+        (outgoing and (connected and 'outgoing_connected' or 'outgoing_pending') or 'incoming_alerting') .. '\n')
     local cleanup = coroutine.create(function()
         if outgoing then
             assert(emu.wait(32 - machine.time:as_double()))

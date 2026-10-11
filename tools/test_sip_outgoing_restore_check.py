@@ -86,6 +86,24 @@ class SipOutgoingRestoreCheckTest(unittest.TestCase):
                 self.check(log=bad_log, bridge=bad_bridge, remote=remote, connected=True,
                            product='6210', signaling_only=True)
 
+    def test_6250_connected_restore_requires_own_digits_and_connection(self):
+        log = LOG.replace('5551234', '123').replace(
+            '03450401a05e0581551532f4150101', '03450401a05e038121f3150101').replace('length=15', 'length=13')
+        log = log.replace('sip_state: saved',
+            'gsm_call_adapter: state id=1 epoch=1 phase=connected\nsip_state: saved')
+        log = log.replace('termination id=1 cause=41 result=accepted\noutgoing termination consumed id=1 cause=41',
+            'outgoing termination consumed id=1 cause=41\ntermination id=1 cause=41 result=accepted')
+        bridge = BRIDGE + 'SIP epoch media discarded {"uplink": 0}\n'
+        remote = 'state changed to CONFIRMED\nRequest msg BYE/\n'
+        self.check(log=log, bridge=bridge, remote=remote, connected=True,
+                   product='6250', signaling_only=True)
+        for bad_log in (log.replace('digits=123', 'digits=1234567'),
+                        log.replace('phase=connected', 'phase=alerting'),
+                        log + 'dsp_hle: speech tick\n'):
+            with self.subTest(log=bad_log), self.assertRaises(RuntimeError):
+                self.check(log=bad_log, bridge=bridge, remote=remote, connected=True,
+                           product='6250', signaling_only=True)
+
     def test_missing_or_malformed_product_setup_is_rejected(self):
         for log in (LOG.replace('message=05', 'message=06'),
                     LOG.replace('03450401a05e0581551532f4150101',

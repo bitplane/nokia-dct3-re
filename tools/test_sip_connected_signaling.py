@@ -58,7 +58,7 @@ class ConnectedSignalingTest(unittest.TestCase):
             self.run_check({'uplink': 1}, product='6250')
 
     def test_6250_signaling_scope_rejects_unready_incoming_and_restoration(self):
-        for options in (['--incoming'], ['--restore-outgoing'], ['--restore-call'],
+        for options in (['--incoming'], ['--incoming', '--restore-outgoing'], ['--restore-call'],
                         ['--record-media'], ['--calls', '2'], ['--sip-response', '486']):
             with self.subTest(options=options), \
                     patch('sys.argv', ['gate', '--pjsua', 'unused', '--run-dir', 'unused',

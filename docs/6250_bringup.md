@@ -471,7 +471,7 @@ are checked independently before resumed paging.
 
 The reviewed 96x60 `1 missed call` screen must appear, followed by physical
 Names/C Exit decoded as own raw matrix value `15` and the reviewed operator
-idle frame. The generic SIP runner rejects media and connected-dialog
+idle frame. The generic SIP runner rejects media and connected-incoming
 restoration fixtures for this profile; only the independently verified
 incoming/outgoing SIP-200 signaling fixtures below are admitted. The own idle-restore runner admits a
 fresh dialog only after handset restoration. This proves an unanswered external SIP
@@ -496,7 +496,8 @@ or CONNECT/media. Own carrier-19 release uses
 `body=00 input=0409 expected=00 pending=00`, followed by resumed paging and
 the reviewed registered-idle frame. The fixture's hold control omits its
 scheduled physical End; it never writes firmware state or supplies a
-handset completion event. Connected restoration and native speech remain unproved.
+handset completion event. This pending fixture does not prove connected
+restoration or native speech.
 
 `verify-6250-sip-outgoing-busy` independently verifies physical `123`/Send
 against real local PJSIP 486 on the same declared initial-record composition.
@@ -518,7 +519,7 @@ the own deconfiguration body and confirmation, and resumed paging. Reviewed
 registered-idle pixels must return. Bridge uplink must be zero and no HLE
 codec tick may run; the result explicitly excludes speech and native DSP
 completion. Remote PCM reception is not handset playback. Recording and
-connected restoration remain excluded.
+connected-incoming restoration remain excluded.
 
 `verify-6250-sip-incoming-connected-signaling` separately admits caller
 `5551234` after a fresh registered-idle artifact. Physical Answer and End
@@ -528,6 +529,17 @@ must precede confirmation; duplicates and wrong epochs are rejected.
 Own release confirmation and resumed paging, persistent SIM location and
 reviewed pre/post idle pixels are mandatory. Zero uplink and no HLE codec
 ticks keep this explicitly signaling-only, not native or audible speech.
+
+`verify-6250-sip-connected-outgoing-restore` physically dials `123` into a
+real SIP-200 dialog and saves at 24 seconds with the scheduled End omitted.
+R15/R13, full-RAM digest and emulated time restore exactly. The connected
+handset state must precede save; epoch change clears the external dialog
+with BYE rather than redialing it. One cause-41 termination, complete CC/RR
+release, the own carrier-19 deconfiguration and confirmation, resumed
+paging and reviewed idle pixels are required. The bridge reports zero
+uplink before old-epoch counters are discarded, and no HLE codec tick may
+run. This is signaling-only restoration, not external dialog resurrection,
+native DSP completion or speech.
 
 `verify-6250-sip-outgoing-unavailable` independently verifies the same physical
 `123`/Send against real local PJSIP 480. Unlike busy, the no-answer decision
