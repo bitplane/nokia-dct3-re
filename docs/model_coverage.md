@@ -530,6 +530,9 @@ gates also cover GET INKEY and GET INPUT. `verify-8210-sim-toolkit-menu`
 adds card-owned SET UP MENU, physical menu selection, the accepted item-1
 ENVELOPE and reviewed entry/list pixels. No PIN/DCS Toolkit combination,
 other menu items or native DSP is promoted.
+`verify-8210-sim-toolkit-menu-state` additionally restores the open menu and
+replays physical selection with identical architectural snapshots, card
+protocol records and reviewed pixels.
 
 The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,

@@ -679,6 +679,13 @@ the preceding interactive commands. Selection leaves the item list visible;
 it does not establish a launched application. Other item IDs,
 help requests, menu replacement and native DSP behavior remain unproved.
 
+`verify-8210-sim-toolkit-menu-state` saves with that item list open and
+physically selects item 1 in both reference and restored intervals. It
+requires exact PC/SP/mapped-RAM digest/emulated-time restoration, identical
+nonempty card protocol records including the accepted ENVELOPE and status
+words, and exact reviewed menu pixels. This covers the live menu/card state,
+not an in-flight partial APDU, menu replacement or native DSP execution.
+
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code
 acceptance and laboratory registration. At 32 seconds it saves registered
 idle, compares a one-second reference interval with the restored interval,

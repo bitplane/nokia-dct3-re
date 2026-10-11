@@ -22,6 +22,7 @@ SCENARIOS = {
     'toolkit-inkey': ('toolkit_inkey_input', 43, 'toolkit_inkey_check'),
     'toolkit-input': ('toolkit_input_digits', 50, 'toolkit_inkey_check'),
     'toolkit-menu': ('toolkit_menu_input', 65, 'toolkit_inkey_check'),
+    'toolkit-menu-state': ('toolkit_menu_state', 65, 'toolkit_menu_state_check'),
     'power-cycle': ('power_cycle_input', 73, 'power_check'),
     'ussd': ('ussd_input', 40, 'ussd_check'),
     'divert': ('divert_input', 40, 'divert_check'),
@@ -157,7 +158,7 @@ def main():
     try:
         mcu = (root / 'roms/noki8210/8210_5.31ppm_c.fls').read_bytes()
         pmm = (root / 'roms/noki8210/8210 virgin eeprom 003d0000.fls').read_bytes()
-        if args.scenario in ('ussd', 'divert', 'toolkit', 'toolkit-inkey', 'toolkit-input', 'toolkit-menu'):
+        if args.scenario in ('ussd', 'divert', 'toolkit', 'toolkit-inkey', 'toolkit-input', 'toolkit-menu', 'toolkit-menu-state'):
             from tools.noki8210_ussd_check import verify_key_table
             verify_key_table(mcu)
         prepare_run(run, mcu, pmm)
@@ -171,12 +172,12 @@ def main():
                   'sms-state': 'radio_incoming_sms'}.get(args.scenario)
         if config:
             shutil.copyfile(root / f'fixtures/{config}/nsm3hle.cfg', run / 'cfg/nsm3hle.cfg')
-        if args.scenario in ('toolkit', 'toolkit-inkey', 'toolkit-input', 'toolkit-menu'):
+        if args.scenario in ('toolkit', 'toolkit-inkey', 'toolkit-input', 'toolkit-menu', 'toolkit-menu-state'):
             config_tree = ET.Element('mameconfig', version='10')
             inputs = ET.SubElement(ET.SubElement(config_tree, 'system', name='nsm3hle'), 'input')
             ET.SubElement(inputs, 'port', tag=':SATCFG', type='CONFIG',
                           mask='15', defvalue='0',
-                          value={'toolkit': '1', 'toolkit-inkey': '2', 'toolkit-input': '3', 'toolkit-menu': '4'}[args.scenario])
+                          value={'toolkit': '1', 'toolkit-inkey': '2', 'toolkit-input': '3', 'toolkit-menu': '4', 'toolkit-menu-state': '4'}[args.scenario])
             ET.ElementTree(config_tree).write(run / 'cfg/nsm3hle.cfg')
         if args.dcs1800:
             configure_dcs_topology(run / 'cfg/nsm3hle.cfg',
@@ -358,7 +359,7 @@ def main():
             'provisioning': 'unchanged acquired base record; later low journal omitted',
             'native_dsp_complete': False, 'speech_tested': False,
             'laboratory_carrier': 823 if args.dcs1800 else 4 if args.scenario.startswith('host-') or args.scenario == 'power-cycle' or args.pin_enabled else None,
-            'sim_profile': 'Phase 2+ interactive commands/SET UP MENU laboratory card' if args.scenario == 'toolkit-menu' else 'Phase 2+ DISPLAY TEXT/GET INKEY/GET INPUT laboratory card' if args.scenario == 'toolkit-input' else 'Phase 2+ DISPLAY TEXT/GET INKEY laboratory card' if args.scenario == 'toolkit-inkey' else 'Phase 2+ DISPLAY TEXT laboratory card' if args.scenario == 'toolkit'
+            'sim_profile': 'Phase 2+ interactive commands/SET UP MENU laboratory card' if args.scenario in ('toolkit-menu', 'toolkit-menu-state') else 'Phase 2+ DISPLAY TEXT/GET INKEY/GET INPUT laboratory card' if args.scenario == 'toolkit-input' else 'Phase 2+ DISPLAY TEXT/GET INKEY laboratory card' if args.scenario == 'toolkit-inkey' else 'Phase 2+ DISPLAY TEXT laboratory card' if args.scenario == 'toolkit'
                 else 'PIN-enabled laboratory card' if args.pin_enabled else 'default laboratory card',
             'pin_start_seconds': (args.pin_start if args.pin_start is not None else 8)
                 if args.pin_enabled else None,
