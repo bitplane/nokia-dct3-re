@@ -1763,6 +1763,23 @@ The contract verifier pins those stores. This identifies a populated mode-2
 source for the shared descriptor, not a mode-4 response contract or a complete
 writer census: computed aliases and other lifecycles remain possible.
 
+Paired 46-second cold registration observations with physical PIN at 8 seconds
+see only three full-word clears of this descriptor at `200168`, at 0.009891s,
+in both bands. No later descriptor population or constructor using `132b18`
+is observed. GSM registers with zero neighbour-constructor calls; DCS emits
+one stack-built mode-4 call (`13ac98`, caller `286d8d`, carrier `0338`) at
+12.262148s and still fails the unchanged registration checker. The serialized
+request is `040000000000033800000000`; unused stack bytes are not its fields.
+`noki8210_radio_contract.py --descriptor-trace ... [--dcs1800]` checks the
+bounded observation and rejects missing/duplicate initialization, later writes,
+shared-descriptor calls, changed carriers or nonzero bypassed wire fields.
+This rules out an active shared-descriptor alternate in these two recipes,
+not all firmware lifecycles or a missing mode-4 reply.
+Retained logs: `tmp/8210-descriptor-watch-gsm/error.log` SHA-256
+`90b432d293f0f3fe20640b173c5355ffb83d44b2cb90e7339291261613720719`;
+`tmp/8210-descriptor-watch-dcs/error.log` SHA-256
+`b251bb5d7d3ee7bcfcaf703d0fbd642fb485e1a4209e1cc59e8c390509ba4c52`.
+
 The observed caller's own eligibility is narrower than the helper's full
 mode selection: `21eee2..21ef06` invokes `286d4a(0)` only for context
 selectors 2 or 3. Other selectors bypass this invocation. Consequently this

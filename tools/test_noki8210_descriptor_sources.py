@@ -1,6 +1,6 @@
 import unittest
 
-from tools.noki8210_radio_contract import DESCRIPTOR_CALLS, neighbour_descriptor_sources
+from tools.noki8210_radio_contract import DESCRIPTOR_CALLS, neighbour_descriptor_sources, verify_descriptor_observation
 
 
 class DescriptorSourcesTest(unittest.TestCase):
@@ -53,6 +53,47 @@ class DescriptorSourcesTest(unittest.TestCase):
     def test_incomplete_image_is_rejected(self):
         with self.assertRaises(ValueError):
             neighbour_descriptor_sources(self.image()[:DESCRIPTOR_CALLS[0] - 0x200000])
+
+
+class DescriptorObservationTest(unittest.TestCase):
+    def trace(self, dcs):
+        text = ''.join(f'8210_shared_descriptor_write: address={address:08x} '
+            'data=00000000 mask=ffffffff pc=00200168 t=0.009891\n'
+            for address in (0x132b18, 0x132b1c, 0x132b20))
+        if dcs:
+            text += ('8210_neighbour_constructor: descriptor=0013ac98 caller=00286d8d '
+                     'data=04137f5c0338796800138038 t=12.262148\n'
+                     'TX packet type=11 payload=12 data=040000000000033800000000\n')
+        return text
+
+    def test_paired_bounded_observations(self):
+        for dcs in (False, True):
+            verify_descriptor_observation(self.trace(dcs), dcs1800=dcs)
+
+    def test_missing_duplicate_and_later_writes_are_not_absence(self):
+        text = self.trace(False)
+        for changed in ('', text.split('\n', 1)[1], text + text,
+                        text.replace('t=0.009891', 't=12.1'),
+                        text + '8210_shared_descriptor_write: malformed\n',
+                        text + '8210_neighbour_constructor: malformed\n'):
+            with self.subTest(text=changed), self.assertRaises(ValueError):
+                verify_descriptor_observation(changed, dcs1800=False)
+
+    def test_shared_call_wrong_carrier_and_wire_replay_are_rejected(self):
+        text = self.trace(True)
+        for changed in (text.replace('descriptor=0013ac98', 'descriptor=00132b18'),
+                        text.replace('0338', '0337'),
+                        text.replace('caller=00286d8d', 'caller=0021c325'),
+                        text.replace('t=12.262148', 't=5.1'),
+                        text + text.splitlines()[3] + '\n',
+                        text + text.splitlines()[4] + '\n',
+                        text.replace('040000000000033800000000', '040100000000033800000000')):
+            with self.subTest(text=changed), self.assertRaises(ValueError):
+                verify_descriptor_observation(changed, dcs1800=True)
+
+    def test_control_cannot_inherit_dcs_constructor(self):
+        with self.assertRaises(ValueError):
+            verify_descriptor_observation(self.trace(True), dcs1800=False)
 
 
 if __name__ == '__main__':

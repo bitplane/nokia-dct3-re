@@ -2,6 +2,7 @@
 
 import argparse
 import hashlib
+import re
 from pathlib import Path
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
 from capstone.arm import ARM_OP_IMM, ARM_OP_MEM, ARM_REG_PC, ARM_REG_R0
@@ -44,6 +45,35 @@ def neighbour_descriptor_sources(image):
                        'descriptor': descriptor, 'storage': 'ram',
                        'mode': None})
     return result
+
+
+def verify_descriptor_observation(text, *, dcs1800):
+    """Check the bounded late-PIN observation, not general mode-4 semantics."""
+    writes = re.findall(
+        r'8210_shared_descriptor_write: address=([0-9a-f]{8}) '
+        r'data=([0-9a-f]{8}) mask=([0-9a-f]{8}) pc=([0-9a-f]{8}) t=([0-9.]+)', text)
+    expected = [('00132b18', '00000000', 'ffffffff', '00200168'),
+                ('00132b1c', '00000000', 'ffffffff', '00200168'),
+                ('00132b20', '00000000', 'ffffffff', '00200168')]
+    if (text.count('8210_shared_descriptor_write:') != len(writes) or
+            [item[:4] for item in writes] != expected or
+            any(not 0 < float(item[4]) < 0.1 for item in writes)):
+        raise ValueError('shared descriptor has missing initialization or later population')
+    calls = re.findall(
+        r'8210_neighbour_constructor: descriptor=([0-9a-f]{8}) '
+        r'caller=([0-9a-f]{8}) data=([0-9a-f]{24}) t=([0-9.]+)', text)
+    if text.count('8210_neighbour_constructor:') != len(calls):
+        raise ValueError('malformed constructor observation cannot prove absence')
+    if dcs1800:
+        if (len(calls) != 1 or calls[0][0] != '0013ac98' or
+                calls[0][1] != '00286d8d' or calls[0][2][:2] != '04' or
+                calls[0][2][8:12] != '0338' or not 12 < float(calls[0][3]) < 13):
+            raise ValueError('late-PIN DCS constructor is not the observed stack mode-4 path')
+        if re.findall(r'TX packet type=11 .*data=([0-9a-f]+)\b', text) != [
+                '040000000000033800000000']:
+            raise ValueError('mode-4 constructor lacks its zeroed serialized instruction')
+    elif calls:
+        raise ValueError('GSM control unexpectedly invokes a neighbour constructor')
 
 
 def scan_initial_record_flags(rows):
@@ -821,14 +851,25 @@ def verify(image):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('image', type=Path)
+    parser.add_argument('--descriptor-trace', type=Path,
+                        help='bounded passive descriptor-write/constructor observation')
+    parser.add_argument('--dcs1800', action='store_true')
     args = parser.parse_args()
+    if args.dcs1800 and not args.descriptor_trace:
+        parser.error('--dcs1800 requires --descriptor-trace')
     try:
         verify(args.image.read_bytes())
+        if args.descriptor_trace:
+            verify_descriptor_observation(args.descriptor_trace.read_text(), dcs1800=args.dcs1800)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 radio contract FAIL: {error}\n')
     print('8210 own RX table, task-12 route and channel correlation PASS')
     print('8210 neighbour descriptor sources PASS direct_literal_sites=6 '
           'shared_ram_descriptors=1 rom_templates=0 runtime_mode_claim=0')
+    if args.descriptor_trace:
+        print('8210 descriptor observation PASS shared_initialization_writes=3 '
+              f'shared_populations=0 stack_mode4_calls={int(args.dcs1800)} '
+              'reply_contract_claim=0')
 
 
 if __name__ == '__main__':
