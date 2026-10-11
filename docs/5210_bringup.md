@@ -154,8 +154,16 @@ registered idle and restores exact emulated time, PC/SP and the checksum over
 the modeled MCU RAM window. Reference and restored idle frames must be
 byte-identical and match the registered-idle oracle. Physical post-load Menu
 opens the reviewed Messages frame; End returns to the same idle oracle. This
-does not establish active-call or delivered-SMS restoration for the PIN-enabled
-composition; those remain separate tests.
+does not by itself establish active-call or delivered-SMS restoration.
+
+`make verify-5210-pin-call-state` separately answers the laboratory incoming
+call after delayed physical PIN, saves while connected and restores exact
+time/PC/SP/RAM and reference pixels. The call checker requires the round trip
+after Connect Acknowledge and before physical End/Disconnect; the restored
+branch completes CC/RR release and returns to the exact registered-idle frame.
+Idle and call use the same retained-notifier fixture core. This is HLE
+signaling/speech-control state coverage, not proof of native DSP audio or host
+media restoration. PIN-enabled delivered-SMS restoration remains separate.
 
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.

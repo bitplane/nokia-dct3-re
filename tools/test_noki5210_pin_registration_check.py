@@ -25,6 +25,10 @@ class PinRegistrationTest(unittest.TestCase):
             '5210_pin_state: completed=true',
         ))
         verify_pin_idle_state(text)
+        call_text = text.replace('5210_pin_state_physical: key=Left Softkey / Menu', '')
+        verify_pin_idle_state(call_text, call=True)
+        with self.assertRaises(ValueError):
+            verify_pin_idle_state(call_text)
         for old, new in (
             ('restored pc=00200000', 'restored pc=00200002'),
             ('ram=12345678 t=31.000000000\n5210_pin_state: result',

@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--scenario', choices=('toolkit-interactive', 'pin-registration',
                                              'late-pin-boundary', 'late-pin-registration',
-                                             'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state'),
+                                             'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state'),
                         default='toolkit-interactive')
     parser.add_argument('--observe-readiness', action='store_true',
                         help='passively observe own context roots during the early-PIN control')
@@ -31,14 +31,14 @@ def main():
         for name in ('cfg', 'nvram', 'snap'):
             (run / name).mkdir()
         pin = args.scenario != 'toolkit-interactive'
-        late = args.scenario in ('late-pin-boundary', 'late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state')
-        if args.scenario in ('late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state'):
+        late = args.scenario in ('late-pin-boundary', 'late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state')
+        if args.scenario in ('late-pin-registration', 'pin-incoming-call', 'pin-incoming-sms', 'pin-idle-state', 'pin-call-state'):
             config = ET.Element('mameconfig', version='10')
             system = ET.SubElement(config, 'system', name='noki5210')
             ports = ET.SubElement(system, 'input')
             ET.SubElement(ports, 'port', tag=':NEIGHBORCFG', type='CONFIG',
                           mask='32', defvalue='0', value='32')
-            if args.scenario == 'pin-incoming-call':
+            if args.scenario in ('pin-incoming-call', 'pin-call-state'):
                 for mask in ('2', '32'):
                     ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
                                   mask=mask, defvalue='0', value=mask)
@@ -64,6 +64,8 @@ def main():
             script = 'noki5210_pin_incoming_sms.lua'
         if args.scenario == 'pin-idle-state':
             script = 'noki5210_pin_idle_state.lua'
+        if args.scenario == 'pin-call-state':
+            script = 'noki5210_pin_call_state.lua'
         checker = 'noki5210_pin_registration_check.py' if pin else 'noki5210_toolkit_interactive_check.py'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'noki5210',
                    '-bios', '540e', '-rompath', str(root / 'roms'), '-cfg_directory', 'cfg',
@@ -71,7 +73,7 @@ def main():
                    '-debug', '-debugger', 'none', '-verbose', '-log', '-video', 'none',
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / script),
-                   '-seconds_to_run', '45' if pin else '65']
+                   '-seconds_to_run', '55' if args.scenario == 'pin-call-state' else '45' if pin else '65']
         with (run / 'console.log').open('w') as console:
             subprocess.run(command, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         subprocess.run([sys.executable, str(root / 'tools' / checker),
@@ -79,7 +81,8 @@ def main():
                                      ['--coherent-late'] if args.scenario == 'late-pin-registration' else
                                      ['--incoming-call'] if args.scenario == 'pin-incoming-call' else
                                      ['--incoming-sms'] if args.scenario == 'pin-incoming-sms' else
-                                     ['--idle-state'] if args.scenario == 'pin-idle-state' else []), check=True)
+                                     ['--idle-state'] if args.scenario == 'pin-idle-state' else
+                                     ['--call-state'] if args.scenario == 'pin-call-state' else []), check=True)
     except (OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 
