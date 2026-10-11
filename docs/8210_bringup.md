@@ -667,14 +667,16 @@ unchanged own-product startup and persistent-location predicates. Its
 accepted response is two GSM-default-alphabet digits; arbitrary text,
 UCS2, cancellation, timeout and PIN/DCS combinations are not established.
 
-The physical fixture `tools/noki8210_toolkit_menu_input.lua` extends this
+`verify-8210-sim-toolkit-menu` uses `tools/noki8210_toolkit_menu_input.lua` to extend this
 sequence with the existing card-owned `SATCFG=4` profile. An isolated
 65-second NSM-3 run preserves staged boot and laboratory registration,
 accepts SET UP MENU with terminal response `810304250002028281030100`,
 and physical Menu, Up, Menu, Menu navigation produces ENVELOPE
 `d30702020181100101`, accepted item 1 and `90 00`. This establishes
-card/handset menu-selection protocol behavior in research HLE; it is not
-yet a wired acceptance gate or a reviewed pixel oracle. Other item IDs,
+card/handset menu-selection protocol behavior in research HLE. The gate
+checks exact reviewed entry, item-list and post-selection pixels alongside
+the preceding interactive commands. Selection leaves the item list visible;
+it does not establish a launched application. Other item IDs,
 help requests, menu replacement and native DSP behavior remain unproved.
 
 `idle-state` uses `noki8210_state_idle.lua` after physical security-code

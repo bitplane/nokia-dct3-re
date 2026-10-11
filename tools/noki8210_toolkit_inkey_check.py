@@ -39,12 +39,32 @@ INPUT_FRAMES.update({
     'get_input': 'c26d453971ea775fd7bdee10235bba195eb70254ce522fda3fbc6cab13bc09f9',
     'input_complete': FRAMES['inkey_complete'],
 })
+MENU_EVENTS = INPUT_EVENTS[:-1] + (
+    'proactive SET UP MENU ready', 'SIM status ins=14 sw=9128',
+    'header cla=a0 ins=12 p1=00 p2=00 p3=28',
+    'terminal-response data=810304250002028281030100',
+    'SIM status ins=14 sw=9000',
+    '8210_toolkit_physical: action=menu',
+    '8210_toolkit_physical: action=menu_last',
+    '8210_toolkit_physical: action=menu_open',
+    '8210_toolkit_physical: action=menu_select',
+    'header cla=a0 ins=c2 p1=00 p2=00 p3=09',
+    'envelope data=d30702020181100101',
+    'menu selection item=1 accepted', 'SIM status ins=c2 sw=9000',
+)
+MENU_FRAMES = {key: INPUT_FRAMES[key] for key in ('display', 'inkey', 'get_input')}
+MENU_FRAMES.update({
+    'menu_entry': '9c849d8f8a691029f0f4b029d4566a2f62b5234a989ccec3f2c5ab73dd9beb97',
+    'menu_items': '81615371eea5c88138ed06095c244d9235578d760f9a251716bf310f9daa00a9',
+    'menu_result': '81615371eea5c88138ed06095c244d9235578d760f9a251716bf310f9daa00a9',
+})
 
 
-def verify_protocol(text, *, get_input=False):
+def verify_protocol(text, *, get_input=False, menu=False):
     if '[LUA ERROR]' in text:
         raise ValueError('physical GET INKEY fixture failed')
-    require_in_order(text.replace('[:sim_card] ', ''), INPUT_EVENTS if get_input else EVENTS)
+    require_in_order(text.replace('[:sim_card] ', ''),
+                     MENU_EVENTS if menu else INPUT_EVENTS if get_input else EVENTS)
 
 
 def main():
@@ -52,20 +72,21 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('log', type=Path)
     parser.add_argument('--get-input', action='store_true')
+    parser.add_argument('--menu', action='store_true')
     args = parser.parse_args()
     run = args.log.parent
     try:
         text = args.log.read_text(errors='replace')
-        verify_protocol(text, get_input=args.get_input)
+        verify_protocol(text, get_input=args.get_input, menu=args.menu)
         verify_stage(text, runtime=True, selftest=True, base_record=True)
         verify_registration(text, (run / 'nvram/nsm3hle/sim_card').read_bytes())
-        for phase, digest in (INPUT_FRAMES if args.get_input else FRAMES).items():
+        for phase, digest in (MENU_FRAMES if args.menu else INPUT_FRAMES if args.get_input else FRAMES).items():
             with Image.open(run / f'snap/8210_toolkit_{phase}.png') as frame:
                 if frame.size != (84, 48) or hashlib.sha256(frame.convert('L').tobytes()).hexdigest() != digest:
                     raise ValueError('unreviewed GET INKEY frame: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'8210 GET INKEY FAIL: {error}\n')
-    print('8210 physical ' + ('GET INPUT' if args.get_input else 'GET INKEY') + ' and registered idle PASS')
+    print('8210 physical ' + ('SET UP MENU/ENVELOPE' if args.menu else 'GET INPUT' if args.get_input else 'GET INKEY') + ' and laboratory registration PASS')
 
 
 if __name__ == '__main__':

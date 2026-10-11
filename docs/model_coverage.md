@@ -525,8 +525,11 @@ gates validate invalidation and one fresh-epoch GSM release, not dialog replay.
 The 8210 acquired base-record research comparison independently passes
 `verify-8210-sim-toolkit`: own nine-byte profile, STATUS/FETCH DISPLAY TEXT,
 physical successful dismissal, exact 84x48 text/numeric-PLMN idle frames,
-own staged predicates and persisted laboratory registration. No PIN/DCS
-Toolkit combination, other proactive command or native DSP is promoted.
+own staged predicates and persisted laboratory registration. Its interactive
+gates also cover GET INKEY and GET INPUT. `verify-8210-sim-toolkit-menu`
+adds card-owned SET UP MENU, physical menu selection, the accepted item-1
+ENVELOPE and reviewed entry/list pixels. No PIN/DCS Toolkit combination,
+other menu items or native DSP is promoted.
 
 The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,

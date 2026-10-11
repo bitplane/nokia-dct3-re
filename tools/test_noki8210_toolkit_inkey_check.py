@@ -1,8 +1,17 @@
 import unittest
-from tools.noki8210_toolkit_inkey_check import EVENTS, INPUT_EVENTS, verify_protocol
+from tools.noki8210_toolkit_inkey_check import EVENTS, INPUT_EVENTS, MENU_EVENTS, verify_protocol
 
 
 class InkeyTest(unittest.TestCase):
+    def test_menu_sequence_and_missing_links(self):
+        verify_protocol('\n'.join(MENU_EVENTS), menu=True)
+        for index in range(len(MENU_EVENTS)):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                verify_protocol('\n'.join(MENU_EVENTS[:index] + MENU_EVENTS[index + 1:]), menu=True)
+        for wrong in ('d30702020181100102', 'd30702028101100101'):
+            with self.assertRaises(ValueError):
+                verify_protocol('\n'.join(MENU_EVENTS).replace('d30702020181100101', wrong), menu=True)
+
     def test_get_input_sequence(self):
         verify_protocol('\n'.join(INPUT_EVENTS), get_input=True)
         for index in range(len(INPUT_EVENTS)):
