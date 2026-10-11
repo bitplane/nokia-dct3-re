@@ -3077,7 +3077,7 @@ void tms320c54x_device::execute_one(u16 op)
 		if (BIT(m_st1, 6))
 			square *= 2;
 		const u64 old_b = m_b & ACC_MASK;
-		m_b = u64((s64(old_b << 24) >> 24) + square) & ACC_MASK;
+		m_b = multiply_result((s64(old_b << 24) >> 24) + multiply_product(square), true);
 		m_a = u64(s64(xvalue - yvalue) * 0x10000) & ACC_MASK;
 		dual_modify(x);
 		if (xar != yar)

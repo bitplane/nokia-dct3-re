@@ -35,6 +35,27 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	void start_sqdst_overflow_case(unsigned index)
+	{
+		m_cpu->reset();
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0800, 0xe201); // SQDST *AR2,*AR3.
+		program.write_word(0x0801, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0600, 0);
+		m_cpu->space(AS_DATA).write_word(0x0601, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, 0x0601);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x0080000000ULL);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, index & 2 ? 0xffffffffffULL : 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x1234);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0x1400 | (index & 4 ? 0x0200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x0140 | (index & 1 ? 0x0200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0); // No pre-accumulation SMUL saturation.
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 210000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	void start_rounding_boundary_case(unsigned index)
 	{
 		static constexpr u64 inputs[] = {0, 0xffffffffffULL, 0x7fffffff,
@@ -21345,6 +21366,27 @@ private:
 				"RND preserves source and status across selectors, signed boundaries and OVM");
 			if (index < 127) { start_rounding_boundary_case(index + 1); return; }
 			osd_printf_info("TMS320C54x RND boundaries: PASS cases=128 selectors=4 inputs=8 ovm=0,1 status_preserved=1 pipeline_claim=0\n");
+			start_sqdst_overflow_case(0); return;
+		}
+		if (m_phase >= 210000 && m_phase < 210008)
+		{
+			unsigned const index = m_phase - 210000;
+			// (32768 squared) * 2 is 80000000h; adding -1 is in range.
+			bool const overflow = !(index & 2);
+			u64 const result = index & 2 ? 0x7fffffff : index & 1 ? 0x7fffffff : 0x80000000;
+			u16 const flags = 0x0400 | (overflow || (index & 4) ? 0x0200 : 0);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == 0 &&
+				m_cpu->state_int(tms320c54x_device::STATE_B) == result &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST0) & 0x0600) == flags &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x1234 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == 0x0600 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == 0x0601 &&
+				m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(STATE_GENPC) == 0x0802,
+				"SQDST sets sticky OVB and applies OVM to B's signed accumulation, preserving OVA/T/addresses");
+			if (index < 7) { start_sqdst_overflow_case(index + 1); return; }
+			osd_printf_info("TMS320C54x SQDST B overflow: PASS cases=8 ovm=0,1 sticky_ovb=1 smul=0 pipeline_claim=0\n");
 			osd_printf_info("TMS320C54x core conformance: PASS\n");
 			throw emu_fatalerror(0, "TMS320C54x core tests complete");
 		}

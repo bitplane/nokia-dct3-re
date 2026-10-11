@@ -3650,9 +3650,22 @@ The T-source `MPYA` (`f48c/f58c`) and `MACA[R]/MASA[R]`
 (`f488..f78b`) forms are now decoded at TI's one-cycle cost. Fixtures
 `f58c`, `3183`, and `f488` distinguish the 17-bit result from the old 16-bit
 result; `f48b` checks rounded subtraction, while `e211` and `f48d` check
-the shared high-word rule for SQDST and SQUR. Other FRCT/OVM boundaries and
-the remaining source/destination combinations are not established by these
-fixtures.
+the shared high-word rule for SQDST and SQUR.
+The SQDST B accumulation now uses the shared multiplier/accumulator overflow
+path instead of an unchecked 40-bit assignment. Eight executable `e201`
+fixtures pin old A-high=32768, FRCT=1, B=0/-1, OVM clear/set and pre-existing
+OVB clear/set: B=0 produces `0x80000000` with sticky OVB, or `0x7fffffff`
+under OVM; adding B=-1 produces the in-range `0x7fffffff` without clearing
+an existing OVB. They preserve OVA, T and both operand addresses. The new
+fixtures fail before this correction and pass afterward. The rule follows
+[TI SPRU172C, SQDST, 4-160](https://www.ti.com/lit/ug/spru172c/spru172c.pdf)
+and the existing accumulator saturation contract. This acceptance fixes
+SMUL=0 and SXM=1; it does not establish SQDST's carry/OVA update on arbitrary
+differences, SXM-clear input extension, SMUL saturation variants, physical
+pipeline timing or native speech. The core, bounded mixed RF filter, 5110
+Menu/save-state and short/long physical power gates pass on the corrected
+build. Remaining FRCT/OVM and source/destination combinations are not
+established by these selected fixtures.
 TI SPRU172C's `ADD/SUB src,ASM,dst` diagrams assign `f480..f780` and
 `f481..f781` to the one-word, one-cycle accumulator forms. They were absent
 from the decoder despite the corresponding immediate-SHIFT forms already
