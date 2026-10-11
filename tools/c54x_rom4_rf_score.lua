@@ -19,6 +19,19 @@ local taps = {}
 local mcu = assert(machine.devices[":maincpu"])
 local mcu_ring_writes = 0
 local post_fetches = 0
+local consumer_case_observations = 0
+taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(0x211e80, 0x211eff,
+    "rf_task10_consumer_case", function(address)
+        if mcu.state["PC"].value ~= 0x211eb0 or address ~= 0x211eb0 then return end
+        if consumer_case_observations >= 16 then return end
+        consumer_case_observations = consumer_case_observations + 1
+        local space = mcu.spaces["program"]
+        local object = space:read_u32(mcu.state["R13"].value + 0x18)
+        machine:logerror(string.format(
+            "rom4_rf_task10_consumer: pc=%08x object=%08x status=%04x control=%08x t=%.9f\n",
+            mcu.state["PC"].value, object, space:read_u16(object),
+            space:read_u32(mcu.state["R4"].value + 0x7c), machine.time:as_double()))
+    end)
 for _, address in ipairs({0x295444, 0x298688, 0x299894}) do
     local reads_at_blob = 0
     taps[#taps + 1] = mcu.spaces["program"]:install_read_tap(address, address + 19,

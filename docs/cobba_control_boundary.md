@@ -704,11 +704,9 @@ covering `0x138f/0x1390`, both targeting `0x211eb0`. That case calls
 `0x269266` with the incoming object and length 8, tests the shifted
 controller word at offset `0x7c`, and conditionally increments halfword
 `0x10fee0` (pool `0x211f58`). The carry-producing shifts must be
-decoded before assigning flag semantics. Task ownership and runtime
-receipt at this candidate are not yet established: a 60-second retained-
-storage repeat captures a second post from `0x26be5d` at 36.631877231
-seconds, but no candidate-case observation. That silent window is not
-an absence proof; confirm the actual task entry/receive loop first.
+decoded before assigning flag semantics. A silent narrow case window is not
+an absence proof; ownership, receipt and case execution are established below
+with wider fetch windows and correlated objects.
 The contiguous 12-byte creation records begin at `0x2a4fa0`; record
 10 at `0x2a5018` contains Thumb entry `0x211a55`. Entry `0x211a54`
 calls initializer `0x20cb80` before reaching receive call `0x254ed8`
@@ -734,13 +732,29 @@ wrong masks/cursors and reversed time; ring wrap is covered. The checker
 passes this capture. It does not prove payload preservation into the task,
 candidate acquisition, or the downstream case's flag/counter semantics.
 
+A fresh generated-profile eight-second zero-input observation now reaches
+case `0x211eb0` with the same object `101438`, status `1390`, at
+1.816215538 seconds, after receive return at 1.816208846 seconds.
+Its controller word at offset `7c` is `80000000`. The same case also receives
+a separate object `101480`, status `138f`, at 1.816344538 seconds; a case
+entry count alone cannot distinguish these statuses. The bounded passive
+observer records object/status/control at entry rather than interpreting
+the shifted flags. This establishes execution of the mapped downstream
+case, not payload retention, counter mutation or acquisition success.
+Evidence is `tmp/rom4-task10-consumer-final/error.log`, captured with the
+reusable passive observation in `c54x_rom4_rf_score.lua`. Run
+`c54x_rom4_rf_delivery_check.py ... --search-list --consumer-case` to require
+both request correlation and the same object reaching that case after receipt.
+Negative tests reject missing entry, wrong object/status, reversed time and
+malformed controller words. No firmware or DSP state is written by this tap.
+
 The isolated cold-control runner is:
 
 ```sh
 .venv/bin/python tools/run_c54x_rom4_rf_delivery.py --mame mame/mame --rompath mame/roms
 ```
 
-It creates a unique evidence directory under `/tmp`, generates matching
+It creates a unique evidence directory under ignored repo `tmp/`, generates matching
 NSE-1 EEPROM for each case, and keeps MAME's working directory, logs and
 NVRAM separate. Default coverage is two fresh 60-second runs per mode.
 Both score and delivery checkers must pass; repeated score totals,

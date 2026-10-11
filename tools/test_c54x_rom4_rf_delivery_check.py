@@ -16,6 +16,16 @@ rom4_rf_task10_lifecycle: t=1.6 pc=00211a9a r0=00101438 status=1390
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_correlated_consumer_case(self):
+        case = ('rom4_rf_task10_consumer: pc=00211eb0 object=00101438 '
+                'status=1390 control=80000000 t=1.7\n')
+        self.assertEqual(check(TRACE + case, consumer_case=True), ('00101438', '006d'))
+        for changed in ('', case.replace('00101438', '00101480'),
+                        case.replace('1390', '138f'), case.replace('1.7', '1.5'),
+                        case.replace('80000000', 'malformed')):
+            with self.subTest(case=changed), self.assertRaises(ValueError):
+                check(TRACE + changed, consumer_case=True)
+
     def test_manual_frequency_consistency(self):
         actual = nse1_gsm900_tuning_consistency(0x302813)
         self.assertEqual((actual["channel"], actual["lo_hz"], actual["rx_hz"], actual["tx_hz"]),
