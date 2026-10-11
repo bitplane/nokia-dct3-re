@@ -36,7 +36,7 @@ class RunnerTests(unittest.TestCase):
     def test_host_restoration_does_not_silently_promote_sip(self):
         with tempfile.TemporaryDirectory() as temporary:
             for scenario in ('pin-host-outgoing-call-state', 'pin-host-outgoing-media-state',
-                             'pin-host-incoming-call-state'):
+                             'pin-host-incoming-call-state', 'pin-host-incoming-media-state'):
                 run = Path(temporary) / scenario
                 with self.subTest(scenario=scenario), patch('sys.argv', [
                         'runner', str(run), '--scenario', scenario, '--pjsua', 'pjsua']):
@@ -91,6 +91,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-outgoing-media-state': (65, '--outgoing-call-state', ('32',)),
             'pin-host-incoming-call': (60, '--host-incoming-call', ('32',)),
             'pin-host-incoming-call-state': (60, '--call-state', ('32',)),
+            'pin-host-incoming-media-state': (65, '--call-state', ('32',)),
             'pin-sms-wait-state': (155, '--silent-sms-state', ()),
             'pin-phonebook': (55, '--phonebook-save', ()),
             'pin-phonebook-read': (45, '--phonebook-read', ()),
@@ -115,6 +116,7 @@ class RunnerTests(unittest.TestCase):
                             patch('tools.radio_host_outgoing_connect_check.verify_restored') as restored_verify, \
                             patch('tools.radio_outgoing_host_media_restore_trace_check.check') as media_verify, \
                             patch('tools.radio_host_incoming_restore_check.verify') as incoming_restore_verify, \
+                            patch('tools.radio_host_incoming_restore_check.verify_media') as incoming_media_verify, \
                             patch.object(Path, 'read_text', return_value='host trace'):
                         runner.main()
                     host = name.startswith('pin-host-')
@@ -123,8 +125,9 @@ class RunnerTests(unittest.TestCase):
                     silent = name == 'pin-host-silent-sms'
                     call = name in ('pin-host-outgoing-call', 'pin-host-incoming-call',
                                     'pin-host-outgoing-call-state', 'pin-host-outgoing-media-state')
-                    call = call or name == 'pin-host-incoming-call-state'
-                    incoming_call = name in ('pin-host-incoming-call', 'pin-host-incoming-call-state')
+                    call = call or name in ('pin-host-incoming-call-state', 'pin-host-incoming-media-state')
+                    incoming_call = name in ('pin-host-incoming-call', 'pin-host-incoming-call-state',
+                                             'pin-host-incoming-media-state')
                     self.assertEqual(execute.call_count, 3 if (host and not call) or name == 'pin-phonebook' else 2)
                     if name == 'pin-host-outgoing-media-state':
                         media_verify.assert_called_once_with('host trace', physical_end=True)
@@ -145,8 +148,15 @@ class RunnerTests(unittest.TestCase):
                         incoming_restore_verify.assert_called_once_with('host trace')
                     else:
                         incoming_restore_verify.assert_not_called()
+                    if name == 'pin-host-incoming-media-state':
+                        incoming_media_verify.assert_called_once_with('host trace', 'host trace')
+                        self.assertIn('--physical-end', command)
+                        self.assertIn('--require-restore', command)
+                    else:
+                        incoming_media_verify.assert_not_called()
                     if host:
                         self.assertEqual(Path(command[1]).name,
+                                         'run_host_incoming_call_gate.py' if name == 'pin-host-incoming-media-state' else
                                          'run_host_incoming_signaling_gate.py' if incoming_call else
                                          'run_host_media_restore_gate.py' if name == 'pin-host-outgoing-media-state' else
                                          'run_host_call_adapter_gate.py' if call else

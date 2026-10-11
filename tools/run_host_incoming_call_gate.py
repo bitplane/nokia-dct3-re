@@ -14,6 +14,10 @@ from tools.run_host_call_adapter_gate import connect
 
 
 async def run(args):
+    if args.ready_file and args.ready_file.exists():
+        raise RuntimeError('readiness artifact already exists; use a fresh run')
+    if args.restored_state_file and args.restored_state_file.exists():
+        raise RuntimeError('restored state artifact already exists; use a fresh run')
     process = await asyncio.create_subprocess_exec(*args.command, cwd=args.cwd)
     try:
         websocket = await connect(args.port, process)
@@ -44,6 +48,13 @@ async def run(args):
                         restored = True
                     epoch = new_epoch
                     if not request_sent:
+                        if args.ready_file:
+                            async def wait_ready():
+                                while not args.ready_file.exists():
+                                    if process.returncode is not None:
+                                        raise RuntimeError('MAME ended before readiness artifact')
+                                    await asyncio.sleep(0.01)
+                            await asyncio.wait_for(wait_ready(), 60)
                         await websocket.send(json.dumps({
                             "type": "incoming_call",
                             "epoch": epoch,
@@ -66,6 +77,19 @@ async def run(args):
                         if not isinstance(downlink_sequence, int):
                             raise RuntimeError(
                                 "connected state omitted downlink cursor")
+                        if restored and args.physical_end:
+                            print(f'host_incoming_media_restored: epoch={epoch} downlink_cursor={downlink_sequence}',
+                                  flush=True)
+                            if args.restored_state_file:
+                                args.restored_state_file.write_text(json.dumps(message, indent=2) + '\n')
+                            await websocket.send(json.dumps({
+                                'type': 'incoming_call_media_downlink', 'epoch': initial_epoch,
+                                'request_id': 1, 'sequence': downlink_sequence,
+                                'source_time_us': 0, 'frame': '00' * 33,
+                            }))
+                    if phase == 'ended' and args.physical_end and args.require_restore:
+                        if not restored or restored_frames < args.frames:
+                            raise RuntimeError('physical release preceded restored media quota')
                     continue
                 if kind != "incoming_call_media_uplink":
                     continue
@@ -90,7 +114,7 @@ async def run(args):
                         restored_frames += 1
                 restore_ready = not args.require_restore or restored
                 covered_frames = restored_frames if args.require_restore else returned_frames
-                if (restore_ready and covered_frames >= args.frames and
+                if (restore_ready and covered_frames >= args.frames and not args.physical_end and
                         not termination_sent):
                     await websocket.send(json.dumps({
                         "type": "incoming_call_terminate",
@@ -126,6 +150,9 @@ def main():
     parser.add_argument("--caller", default="447700900123")
     parser.add_argument("--frames", type=int, default=40)
     parser.add_argument("--require-restore", action="store_true")
+    parser.add_argument('--ready-file', type=pathlib.Path)
+    parser.add_argument('--physical-end', action='store_true')
+    parser.add_argument('--restored-state-file', type=pathlib.Path)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     if args.command[:1] == ["--"]:

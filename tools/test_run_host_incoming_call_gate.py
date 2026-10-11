@@ -39,7 +39,7 @@ def frame(epoch, index):
 
 
 class IncomingMediaQuotaTest(unittest.IsolatedAsyncioTestCase):
-    async def exercise(self, require_restore):
+    async def exercise(self, require_restore, *, physical_end=False):
         events = [dict(type='call_adapter_ready', protocol_version=1, epoch=1)]
         events += [state(1, phase) for phase in ('queued', 'paging', 'alerting', 'connected')]
         events += [frame(1, index) for index in range(5)]
@@ -50,12 +50,20 @@ class IncomingMediaQuotaTest(unittest.IsolatedAsyncioTestCase):
         socket = Socket(events)
         process = SimpleNamespace(returncode=0, wait=AsyncMock(return_value=0))
         args = SimpleNamespace(command=['mame'], cwd=None, port=1, caller='5551234',
-                               frames=2, require_restore=require_restore)
+                               frames=2, require_restore=require_restore,
+                               ready_file=None, physical_end=physical_end, restored_state_file=None)
         with patch.object(gate.asyncio, 'create_subprocess_exec', AsyncMock(return_value=process)), \
                 patch.object(gate, 'connect', AsyncMock(return_value=socket)):
             await gate.run(args)
         terminations = [(message, delivered) for message, delivered in socket.sent
                         if message['type'] == 'incoming_call_terminate']
+        if physical_end:
+            self.assertEqual(len(terminations), 0)
+            stale = [message for message, _ in socket.sent
+                     if message['type'] == 'incoming_call_media_downlink' and message['epoch'] == 1
+                     and message.get('source_time_us') == 0]
+            self.assertGreaterEqual(len(stale), 1)
+            return None, socket.sent
         self.assertEqual(len(terminations), 1)
         return terminations[0], socket.sent
 
@@ -73,3 +81,6 @@ class IncomingMediaQuotaTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(termination['epoch'], 1)
         media = [event for event in delivered if event['type'] == 'incoming_call_media_uplink']
         self.assertEqual(len(media), 2)
+
+    async def test_physical_end_does_not_send_remote_termination(self):
+        await self.exercise(True, physical_end=True)

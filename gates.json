@@ -14363,6 +14363,12 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "pin-host-outgoing-call", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-5210-pin-host-incoming-media-state", "prerequisites": ["normalize-5210", "build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki5210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "pin-host-incoming-media-state", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-5210-pin-host-incoming-call-state", "prerequisites": ["normalize-5210", "build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki5210_acceptance.py",

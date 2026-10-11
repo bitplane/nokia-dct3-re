@@ -102,8 +102,14 @@ SIP dialogs, host media cursor restoration or native speech.
 host paging, physical Answer, exact active-call architecture/pixel restoration,
 epoch-2 connected republication without repeated paging, stale-epoch termination
 rejection and physical End/CC/RR closure. The backend stays attached through
-the restored ended state. This is host signaling restoration; incoming host
-media cursor restoration and external SIP-dialog cleanup remain separate.
+the restored ended state. This is host signaling restoration, not media or
+external SIP-dialog cleanup.
+`verify-5210-pin-host-incoming-media-state` independently adds incoming HLE
+frame echo across the same authenticated lifecycle. Its dedicated received
+adapter-state JSON pins the epoch-2 downlink cursor; the gate requires stale
+epoch-1 media rejection and 80 contiguous accepted frames from that cursor
+before physical End. Exact restored architecture/pixels and CC/RR teardown
+remain required. External SIP-dialog cleanup and native speech remain separate.
 `verify-5210-pin-host-outgoing-media-state` independently adds a continuously
 attached host echo backend, restored GSM-FR cursors, rejection of stale
 epoch-1 media and at least 80 contiguous accepted epoch-2 downlink frames.

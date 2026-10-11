@@ -1,5 +1,6 @@
 import unittest
-from tools.radio_host_incoming_restore_check import verify
+import json
+from tools.radio_host_incoming_restore_check import verify, verify_media
 
 
 TRACE = '''SIM status ins=20 sw=9000
@@ -21,6 +22,21 @@ gsm_call_adapter: incoming state id=1 epoch=2 phase=ended
 
 
 class IncomingRestoreTest(unittest.TestCase):
+    def test_media_requires_published_cursor_continuity_before_end(self):
+        accepted = ''.join(f'gsm_call_adapter: media direction=downlink id=1 sequence={n} result=accepted\n'
+                           for n in (42, 43))
+        trace = TRACE.replace('type=termination', 'type=media').replace(
+            '5210_pin_state_physical: key=End', accepted + '5210_pin_state_physical: key=End')
+        console = json.dumps(dict(type='incoming_call_state', epoch=2, request_id=1,
+                                  phase='connected', media_downlink_sequence=42))
+        verify_media(trace, console, 2)
+        for text, output in ((trace, ''), (trace.replace('sequence=43', 'sequence=44'), console),
+                             (trace.replace(accepted, '') + accepted, console),
+                             (trace, console.replace('42', '41')),
+                             (trace, console.replace('"epoch": 2', '"epoch": 1'))):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                verify_media(text, output, 2)
+
     def test_complete_lifecycle(self):
         verify(TRACE)
 
