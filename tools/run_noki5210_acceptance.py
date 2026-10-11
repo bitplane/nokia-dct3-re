@@ -51,6 +51,8 @@ SCENARIOS = {
                                      host_sms='incoming'),
     'pin-host-rejected-sms': Scenario('noki5210_pin_sms_reject.lua', '--rejected-sms',
                                      seconds=80, host_sms='outgoing', host_outcome='rp_error'),
+    'pin-host-silent-sms': Scenario('noki5210_pin_sms_silence.lua', '--silent-sms',
+                                   seconds=155, host_sms='outgoing', host_outcome='rp_silence'),
 }
 
 
@@ -114,7 +116,8 @@ def main():
                       '--port', str(args.port), '--cwd', str(run)]
             if scenario.host_sms == 'outgoing':
                 launch.extend(['--user-data', '61', '--user-data-length', '1',
-                               '--decision', 'rp_error' if scenario.host_outcome == 'rp_error' else 'accept'])
+                               '--decision', {'rp_ack': 'accept', 'rp_error': 'rp_error',
+                                              'rp_silence': 'rp_silence'}[scenario.host_outcome]])
             launch.extend(['--'] + command)
         else:
             launch = command

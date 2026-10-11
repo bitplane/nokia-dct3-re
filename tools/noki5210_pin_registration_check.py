@@ -73,11 +73,21 @@ def verify_pin_sms(text, card, state=False):
     ))
 
 
-def verify_pin_outgoing_sms(text, rejected=False):
+def verify_pin_outgoing_sms(text, rejected=False, silent=False):
     from tools.radio_outgoing_sms_product_trace_check import CHECKPOINTS
     from tools.radio_call_lifecycle_common import require_ordered
     checkpoints = list(CHECKPOINTS)
-    if rejected:
+    if silent:
+        checkpoints = checkpoints[:4]
+        if len(checkpoints[3][1].findall(text)) != 1:
+            raise ValueError('silent SMS requires exactly one network CP-ACK')
+        if re.search(r'GSM service downlink kind=(?:18|19) sapi=3', text):
+            raise ValueError('network RP result during silent SMS')
+        submission = re.search(r'gsm_sms_submit: .*t=([0-9.]+)', text)
+        disconnect = re.search(r'TX packet type=1b .*data=0080015301.*t=([0-9.]+)', text)
+        if not submission or not disconnect or not 60 <= float(disconnect[1]) - float(submission[1]) <= 80:
+            raise ValueError('firmware DISC absent or outside RP-timeout window')
+    elif rejected:
         checkpoints[4] = ('network RP-ERROR', re.compile(
             r'GSM service downlink kind=19 sapi=3 pd=09 message=01 length=7'))
         if re.search(r'GSM service downlink kind=18 sapi=3', text):
@@ -183,12 +193,27 @@ def main():
     mode.add_argument('--outgoing-call-state', action='store_true',
                       help='restore a physically originated connected call before physical End')
     mode.add_argument('--rejected-sms', action='store_true')
+    mode.add_argument('--silent-sms', action='store_true')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms or args.outgoing_call_state or args.rejected_sms else verify)(text, card)
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms or args.idle_state or args.call_state or args.sms_state or args.outgoing_call or args.outgoing_sms or args.outgoing_call_state or args.rejected_sms or args.silent_sms else verify)(text, card)
+        if args.silent_sms:
+            verify_pin_outgoing_sms(text, silent=True)
+            require_in_order(text, ('TX packet type=1b', 'data=0080015301',
+                                   'radio_phase=release_channel_change',
+                                   '5210_pin_physical: key=End',
+                                   '5210_pin_physical: key=Left Softkey / Menu'))
+            timeout_hashes = set()
+            for path in (run / 'snap').glob('5210_pin_sms_timeout_*.png'):
+                with Image.open(path) as frame:
+                    if frame.size != (84, 48):
+                        raise ValueError('unexpected timeout frame geometry')
+                    timeout_hashes.add(hashlib.sha256(frame.convert('L').tobytes()).hexdigest())
+            if '62a7b5673d7356255226d07195925e82a5e1d6e59c38c2eb0854af6dc1749f1c' not in timeout_hashes:
+                raise ValueError('reviewed Message sending failed pixels absent')
         if args.rejected_sms:
             verify_pin_outgoing_sms(text, rejected=True)
             require_in_order(text, ('LAPDm service Channel Release acknowledged nr=2',
@@ -238,6 +263,8 @@ def main():
                                    '5210_pin_state_physical: key=End'))
             call_lifecycle(text, coherent_pin=True, require_state_roundtrip=True)
         frames = ({'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
+                   'sms_recovery_menu': 'b0482e752fafaa38a1adeaca7aafc462e1ac1a07d368e137fefd9cb985512a2c'} if args.silent_sms else
+                  {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'sms_rejected': '97376e427eaf1b6bafb9eedc2a657c78668ea96794ddeb3510da4d30010d5fb4',
                    'sms_recovery_menu': 'b0482e752fafaa38a1adeaca7aafc462e1ac1a07d368e137fefd9cb985512a2c'} if args.rejected_sms else
                   {'entered': FRAMES['entered'],
@@ -259,7 +286,8 @@ def main():
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 PIN-enabled rejected SMS and physical recovery PASS; research HLE' if args.rejected_sms else
+    print('5210 PIN-enabled silent SMS timeout and physical recovery PASS; research HLE' if args.silent_sms else
+          '5210 PIN-enabled rejected SMS and physical recovery PASS; research HLE' if args.rejected_sms else
           '5210 PIN-enabled outgoing-call restoration and physical release PASS; HLE signaling, not native speech' if args.outgoing_call_state else
           '5210 PIN-enabled physical outgoing SMS and Message sent PASS; research HLE' if args.outgoing_sms else
           '5210 PIN-enabled physical outgoing-call lifecycle PASS; HLE signaling, not native speech' if args.outgoing_call else

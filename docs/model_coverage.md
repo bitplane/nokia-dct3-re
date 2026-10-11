@@ -78,7 +78,10 @@ host delivery on ARFCN 86, CP/RP closure, physical Read, exact body pixels and
 persistent read-status SIM storage without automatic laboratory SMS.
 `verify-5210-pin-host-rejected-sms` independently verifies correlated RP-error,
 no success RP-ACK, closure, exact failure/idle/menu pixels and physical recovery.
-Host timeout, call/SIP composition and
+`verify-5210-pin-host-silent-sms` independently observes CP-ACK without RP
+result, firmware-owned timed DISC, UA/release and host termination, with
+reviewed timeout and physical idle/menu recovery pixels.
+Host call/SIP composition and
 outgoing-SMS restoration remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record

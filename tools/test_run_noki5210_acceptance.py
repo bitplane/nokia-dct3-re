@@ -27,6 +27,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-outgoing-sms': (70, '--outgoing-sms', ()),
             'pin-host-incoming-sms': (45, '--incoming-sms', ()),
             'pin-host-rejected-sms': (80, '--rejected-sms', ()),
+            'pin-host-silent-sms': (155, '--silent-sms', ()),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
@@ -39,6 +40,7 @@ class RunnerTests(unittest.TestCase):
                     host = name.startswith('pin-host-')
                     incoming = name == 'pin-host-incoming-sms'
                     rejected = name == 'pin-host-rejected-sms'
+                    silent = name == 'pin-host-silent-sms'
                     self.assertEqual(execute.call_count, 3 if host else 2)
                     command = execute.call_args_list[0].args[0]
                     if host:
@@ -47,7 +49,7 @@ class RunnerTests(unittest.TestCase):
                         if not incoming:
                             self.assertEqual(command[command.index('--user-data') + 1], '61')
                             self.assertEqual(command[command.index('--decision') + 1],
-                                             'rp_error' if rejected else 'accept')
+                                             'rp_silence' if silent else 'rp_error' if rejected else 'accept')
                         command = command[command.index('--') + 1:]
                     self.assertEqual(command[1:4], ['noki5210', '-bios', '540e'])
                     self.assertEqual(command[command.index('-seconds_to_run') + 1], str(seconds))
@@ -64,7 +66,7 @@ class RunnerTests(unittest.TestCase):
                                          else 'radio_outgoing_host_sms_trace_check.py')
                         self.assertEqual(host_check[2:], (['--arfcn', '86'] if incoming
                                          else ['--octets', '1', '--outcome',
-                                               'rp_error' if rejected else 'rp_ack']) +
+                                               'rp_silence' if silent else 'rp_error' if rejected else 'rp_ack']) +
                                          [str(run / 'error.log')])
                     config = run / 'cfg/noki5210.cfg'
                     if name == 'toolkit-interactive':

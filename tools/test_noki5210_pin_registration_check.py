@@ -40,6 +40,16 @@ class PinRegistrationTest(unittest.TestCase):
             verify_pin_outgoing_sms(rejected)
         with self.assertRaises(ValueError):
             verify_pin_outgoing_sms(rejected + '\nGSM service downlink kind=18 sapi=3', rejected=True)
+        silent = text.replace('GSM service downlink kind=18 sapi=3 pd=09 message=01 length=5', '')
+        silent = silent.replace('status_report=0', 'status_report=0 t=50.000000')
+        silent += '\nTX packet type=1b data=0080015301 t=120.000000'
+        verify_pin_outgoing_sms(silent, silent=True)
+        with self.assertRaises(ValueError):
+            verify_pin_outgoing_sms(silent.replace('t=120.000000', 't=55.000000'), silent=True)
+        with self.assertRaises(ValueError):
+            verify_pin_outgoing_sms(silent + '\nGSM service downlink kind=19 sapi=3', silent=True)
+        with self.assertRaises(ValueError):
+            verify_pin_outgoing_sms(silent + '\nGSM service downlink kind=17 sapi=3 pd=09 message=04 length=2', silent=True)
         for old, new in (('a70161', 'a70162'), ('user_length=1', 'user_length=2'),
                          ('key=Keypad 5', 'key=Keypad 6'), ('downlink kind=18', 'downlink kind=19')):
             with self.subTest(old=old), self.assertRaises(ValueError):

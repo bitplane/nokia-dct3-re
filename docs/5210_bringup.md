@@ -228,6 +228,15 @@ from successful submission. Physical End returns to the exact idle oracle;
 Menu opens the reviewed Messages frame. No retry or timeout coverage is
 inferred from this explicit rejection.
 
+`make verify-5210-pin-host-silent-sms` supplies one network CP-ACK but no
+RP-ACK/RP-ERROR. It requires the firmware-owned main-link DISC in the observed
+60..80-second interval after submission (about 67 seconds in the verified
+run), peer UA, channel release and host transaction termination. The reviewed
+`Message sending failed` pixels are distinct from explicit RP rejection;
+physical End/Menu must still recover the exact idle and Messages frames.
+No timeout, release or application state is injected. Retries and restoration
+during the outgoing RP wait remain independently untested for this PIN profile.
+
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.
 The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a
