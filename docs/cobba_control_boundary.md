@@ -346,6 +346,17 @@ audit of this normalization path and its incoming correlation state against
 the documented C54x semantics; changing divisor, scaling or threshold is not
 supported by these observations.
 
+The captured division tail is independently consistent: at `0x4791`,
+`ADD B,A` leaves `A=0x6e40`, and `SFTA A,8` supplies numerator `0x6e4000`.
+For the following 15 `SUBC` iterations, unsigned integer division gives
+`divmod(0x6e4000, 2*0x0a90) = (0x0538, 0x0100)`; remainder shifted by 15
+plus quotient is exactly the observed accumulator `0x800538`.
+`test_c54x_rom4_rf_division.py` pins this calculation without reproducing the
+core's iterative implementation. This checks the captured unsigned division
+domain only, not all SUBC signed/status semantics or the upstream
+correlation/normalization calculation. The current discrepancy is therefore
+not evidence of a wrong quotient for these captured operands.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.
