@@ -2611,6 +2611,17 @@ per replay leg. NMI interaction and silicon phase
 placement are not validated by these cases. Handset configurations still
 use the atomic frontend; this does not resolve the MU4 recorder boundary.
 
+Both RSBX and SSBX support all sixteen bits in ST0 and ST1, matching the
+one-word class-1 forms in SPRU172C pages 4-151 and 4-166. The staged
+implementation changes only the selected bit at Execute, without invoking
+the atomic backend's interrupt guard. Only the ST1 INTM forms establish
+Decode-owned follower protection. All 128 combinations of register, bit,
+set/clear and initially all-zero/all-one status are executable fixtures;
+each restores immediately before Execute and verifies both status registers
+on every observed cycle. This includes the original MU4 handler's `f6be`
+RSBX CPL, but does not establish CPL/DAGEN consumer latency, repeat legality
+or full handler execution through the staged subset.
+
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
 foreground fetch, one mask write and marker 1, with SP back at `1000`, but

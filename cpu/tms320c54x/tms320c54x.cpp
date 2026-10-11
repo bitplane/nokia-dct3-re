@@ -1856,9 +1856,10 @@ void tms320c54x_device::pipeline_step()
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
 		bool const far_return = (word & 0xfffe) == 0xf4e4;
 		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
+		bool const status_bit = (word & 0xfcf0) == 0xf4b0;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !intm_bit && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !status_bit && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && word != 0x4a1e && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1967,8 +1968,12 @@ void tms320c54x_device::pipeline_step()
 		++m_opcode_count[m_op];
 		if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
-		else if (m_op == 0xf6bb || m_op == 0xf7bb)
-			m_st1 = BIT(m_op, 8) ? m_st1 | 0x0800 : m_st1 & ~u16(0x0800);
+		else if ((m_op & 0xfcf0) == 0xf4b0)
+		{
+			u16 &status = BIT(m_op, 9) ? m_st1 : m_st0;
+			u16 const mask = u16(1) << (m_op & 15);
+			status = BIT(m_op, 8) ? status | mask : status & ~mask;
+		}
 		else if ((m_op & 0xfffe) == 0xf4e4)
 		{
 			m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;

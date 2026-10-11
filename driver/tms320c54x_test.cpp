@@ -3048,6 +3048,27 @@ private:
 		m_phase = 251310; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_status_bit(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		u16 const opcode = 0xf4b0 | ((variant & 0x30) << 4) | (variant & 15);
+		u16 const initial = BIT(variant, 6) ? 0xffff : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 16; ++i) program.write_word(0x600 + i, i ? 0xf495 : opcode);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, initial);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_phase = 251330; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -23849,7 +23870,7 @@ private:
 				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 11) { start_pipeline_intm(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged INTM protection: PASS cases=12 follower_words=1,2,3 adjacent=6 restore=12 duplicate_vectors=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_status_bit(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -23857,6 +23878,45 @@ private:
 		if (m_phase == 251320)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251310;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251330)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			u16 const initial = BIT(m_pipeline_peripheral_case, 6) ? 0xffff : 0;
+			u16 const mask = u16(1) << (m_pipeline_peripheral_case & 15);
+			u16 const result = BIT(m_pipeline_peripheral_case, 4) ? initial | mask : initial & ~mask;
+			bool const st1 = BIT(m_pipeline_peripheral_case, 5);
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Staged status-bit operation advances without fallback");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST0) == (cycle >= 6 && !st1 ? result : initial) &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) == (cycle >= 6 && st1 ? result : initial),
+				"RSBX/SSBX modifies only its selected status bit at Execute");
+			if (cycle == 5 && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save staged status-bit operation before Execute");
+			}
+			if (cycle == 9)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore status-bit operation before Execute");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = 6; m_phase = 251340;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 127) { start_pipeline_status_bit(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged status bits: PASS cases=128 registers=2 bits=16 operations=2 initial_patterns=2 restore=128\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251340)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251330;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
