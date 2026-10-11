@@ -202,6 +202,14 @@ public:
 			smem(extended ? next_word() : 0);
 			return (1 + extended) | SUPPORTED;
 		}
+		if (family == 0x4700 || family == 0x8c00 || family == 0x8d00)
+		{
+			bool const extended = mode >= 0xe0;
+			if (family == 0x4700) stream << "RPT     ";
+			else util::stream_format(stream, "ST      %s, ", family == 0x8c00 ? "T" : "TRN");
+			smem(extended ? next_word() : 0);
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family >= 0x8000 && family <= 0x8700)
 		{
 			bool const extended = mode >= 0xe0;

@@ -1393,6 +1393,32 @@ private:
 				"Dual arithmetic syntax preserves X/Y order and destination");
 		}
 		osd_printf_info("TMS320C54x dual/accumulator arithmetic disassembler: PASS dual_forms=1024 accumulator_forms=16 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x4700, 0x8c00, 0x8d00})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+						"Memory repeat and register-store decoders bound address extensions");
+				}
+		vector const repeat_store_forms[] = {
+			{0x47f8, 2 | dasm::SUPPORTED, "RPT     *($2345)"},
+			{0x4792, 1 | dasm::SUPPORTED, "RPT     *AR2+"},
+			{0x8cf8, 2 | dasm::SUPPORTED, "ST      T, *($2345)"},
+			{0x8ce2, 2 | dasm::SUPPORTED, "ST      T, *AR2($2345)"},
+			{0x8d12, 1 | dasm::SUPPORTED, "ST      TRN, $12"},
+			{0x8d94, 1 | dasm::SUPPORTED, "ST      TRN, *AR4+"},
+		};
+		for (auto const &test : repeat_store_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Memory repeat and register-store syntax distinguishes count source and stored register");
+		}
+		osd_printf_info("TMS320C54x memory repeat/store disassembler: PASS forms=768 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{
