@@ -974,13 +974,12 @@ run reaches caller `211548` with R0=`2` and task-object header `03e9` at
 `1.549555769` and `6.414681692` seconds. Both enter builder `20fc94`
 with return address `21154d`. The late invocation takes branch `20fe38`
 at `6.417569308`: the ROM sets object byte 5 bit 0 and clears 63 bytes
-from object + 7, matching the late `001198` packet. Timer/control helper
+from object + 7, matching the late `001198` packet. Notification/control helper
 `269390` is called with R0=`4400`, R1=`108427`, return address `20ff61`
 after each builder. Its semantics are not established by that register
 snapshot. Evidence: `tmp/rf-scan-schedule-headers/error.log`.
-Resolve the second `03e9` object's publication/delivery and its scheduling
-dependency next; neither these taps nor the packet commit identifies its
-upstream timer owner. The instrument reads only CPU registers and the
+Neither these taps nor the packet commit alone identifies an upstream
+timer owner. The instrument reads only CPU registers and the
 known ordinary-RAM task header, writes no firmware state, and is not a
 new handset acceptance gate.
 
@@ -991,13 +990,21 @@ helper returns `05e8` at `24f47c` (`6.413684077`); the initial invocation
 instead returns `083b`. Constructor `237df8`, called from `238f86`,
 posts `05e8` to task 16 for records `108094` and `107f2c` at
 `6.412975154` and `6.413326692`. Both follow task-13 input `05df`,
-posted at `26c898` at `6.412429077` and `6.413101077`.
+posted at `26c896` at `6.412429077` and `6.413101077`.
 The live receiver takes branch `238f28` with R0/R1=`05df`; independently,
 the branch comparison loads that ID from literal `239170` using the
 swap16 pool-literal rule. Evidence: `tmp/rf-scan-05df-origin/error.log`.
+The controller calls constructor `26c700` twice from `24f388/24f392`,
+with requested ID `05df`, no supplied buffer, and selectors 0/3.
+Both calls have R5=`07d5`. That input is posted to task 16 at `206d3e`
+at `6.412230923`; constructor `2068d8` receives requested ID `07d5`
+and a null buffer from caller `208d44` at `6.412180846`.
+Evidence: `tmp/rf-scan-07d5-caller/error.log`. The resulting chain is
+`208d44 -> task 16:07d5 -> task 13:05df -> task 16:05e8 -> task 10:03e9`.
 These are repeatable current cold-input observations, not reconstructed
-old timing. Next boundary: the caller/lifecycle owning the `26c898`
-publication of `05df`, before calling this a timer-latency correction.
+old timing. Next boundary: the input/lifecycle selecting branch `208d40`,
+before calling this a timer-latency correction. No timer or DSP ownership
+is assigned from a shared publication tail alone.
 
 `make check-c54x-timer-registers` asserts the stopped TRB reload contract
 before running the separate timing observations. Forty-eight firmware-free
