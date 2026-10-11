@@ -2858,6 +2858,47 @@ private:
 		m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(24, m_cpu->clock()));
 	}
+	void start_pipeline_peripheral_case(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		unsigned const family = variant % 4;
+		u32 const base = variant & 8 ? 0x10000 : 0;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(base + 0x600 + i, 0xf495);
+		program.write_word(base + 0x600, std::array<u16, 4>{0x1025, 0x8025, 0x6825, 0x68f8}[family]);
+		if (family >= 2) program.write_word(base + 0x601, family == 3 ? 0x25 : 0xfffe);
+		if (family == 3) program.write_word(base + 0x602, 0xfffe);
+		m_cpu->set_input_line(0, CLEAR_LINE);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PRD, family == 0 ? 0x1234 : family == 1 ? 0xaaaa : 0xffff);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0x5678);
+		m_cpu->set_state_int(STATE_GENPC, base + 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false;
+		m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_operand_tap = m_cpu->space(AS_DATA).install_read_tap(0x25, 0x25, "staged_peripheral_read",
+			[this, family](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(family != 1 && value == (family == 0 ? 0x1234 : 0xffff) &&
+					m_cpu->pipeline_cycles() == (family == 0 ? 6 : family == 2 ? 7 : 8), "Peripheral operand is read once after its retained wait");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x25, 0x25, "staged_peripheral_write",
+			[this, family](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(family != 0 && value == (family == 1 ? 0x5678 : 0xfffe) &&
+					m_cpu->pipeline_cycles() == (family == 1 ? 7 : family == 2 ? 8 : 9), "Peripheral write commits once without charging the RMW twice");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251220;
+		m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -23376,8 +23417,59 @@ private:
 			m_pipeline_write_tap.remove();
 			if (m_mmr_timing_case < 19) { start_peripheral_mmr_timing_audit(m_mmr_timing_case + 1); return; }
 			osd_printf_info("TMS320C54x peripheral MMR timing: PASS cases=20 families=STM,ANDM,ORM,ST,LD extra_cycles=1 rmw_double_charge=0 scratch_wait=0\n");
-			osd_printf_info("TMS320C54x core conformance: PASS\n");
-			throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			start_pipeline_peripheral_case();
+			return;
+		}
+		if (m_phase == 251220)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			unsigned const family = m_pipeline_peripheral_case % 4;
+			u64 const wait_cycle = family == 0 ? 5 : family == 3 ? 7 : 6;
+			u64 const checkpoint = wait_cycle + unsigned(bool(m_pipeline_peripheral_case & 4));
+			u64 const read_cycle = family == 0 ? 6 : family == 2 ? 7 : 8;
+			u64 const write_cycle = family == 1 ? 7 : family == 2 ? 8 : 9;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Peripheral wait retains stages without an atomic fallback");
+			expect(m_pipeline_operand_reads == unsigned(family != 1 && cycle >= read_cycle) &&
+				m_pipeline_store_writes == unsigned(family != 0 && cycle >= write_cycle), "Peripheral stall neither repeats nor speculates bus side effects");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (family == 0 && cycle >= 7 ? 0x1234 : 0x5678), "Peripheral load retires its retained operand after the access wait");
+			if (cycle == checkpoint && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save held peripheral stages or resumed access");
+			}
+			if (cycle == 10)
+			{
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true;
+					m_pipeline_operand_reads = unsigned(family != 1 && checkpoint >= read_cycle);
+					m_pipeline_store_writes = unsigned(family != 0 && checkpoint >= write_cycle);
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore paid wait and operand ownership");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = checkpoint + 1;
+					m_phase = 251230;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+					return;
+				}
+				m_pipeline_operand_tap.remove(); m_pipeline_write_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 15) { start_pipeline_peripheral_case(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged peripheral waits: PASS cases=16 extra_cycles=1 rmw_double_charge=0 held_stage_restore=8 resumed_access_restore=8 duplicate_bus_accesses=0 silicon_phase_claim=0\n");
+				osd_printf_info("TMS320C54x core conformance: PASS\n");
+				throw emu_fatalerror(0, "TMS320C54x core tests complete");
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
+		}
+		if (m_phase == 251230)
+		{
+			unsigned const family = m_pipeline_peripheral_case % 4;
+			u64 const checkpoint = (family == 0 ? 5 : family == 3 ? 7 : 6) + unsigned(bool(m_pipeline_peripheral_case & 4));
+			expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement does not consume a restored peripheral wait");
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251220;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+			return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)
 		{
@@ -23835,6 +23927,7 @@ private:
 	unsigned m_pipeline_branch_case = 0;
 	unsigned m_pipeline_stm_case = 0;
 	unsigned m_mmr_timing_case = 0;
+	unsigned m_pipeline_peripheral_case = 0;
 	unsigned m_pipeline_extensions_reads = 0;
 	memory_passthrough_handler m_pipeline_write_tap;
 	memory_passthrough_handler m_pipeline_operand_tap;

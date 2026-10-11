@@ -690,6 +690,7 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_immediate));
 	save_item(NAME(m_pipeline_valid));
 	save_item(NAME(m_pipeline_early_write_deferred));
+	save_item(NAME(m_pipeline_peripheral_wait_paid));
 	save_item(NAME(m_pipeline_decode_remaining));
 	save_item(NAME(m_pipeline_decode_extension));
 	save_item(NAME(m_pipeline_decode_word));
@@ -1686,6 +1687,7 @@ bool tms320c54x_device::accept_interrupt()
 void tms320c54x_device::reset_pipeline()
 {
 	m_pipeline_early_write_deferred.fill(false);
+	m_pipeline_peripheral_wait_paid.fill(false);
 	m_pipeline_valid.fill(false);
 	m_pipeline_decode_remaining = 0;
 	m_pipeline_decode_extension = 0;
@@ -1710,6 +1712,27 @@ void tms320c54x_device::set_pipeline_frontend(bool enabled)
 void tms320c54x_device::pipeline_step()
 {
 	++m_pipeline_cycles;
+	bool const read_peripheral = m_pipeline_valid[3] &&
+		((m_pipeline_word[3] & 0xfe00) == 0x1000 || (m_pipeline_word[3] & 0xfe00) == 0x6800) &&
+		m_pipeline_operand_address[3] >= 0x20 && m_pipeline_operand_address[3] <= 0x5f;
+	bool const write_peripheral = m_pipeline_valid[4] &&
+		((m_pipeline_word[4] & 0xfc80) == 0x8000 || (m_pipeline_word[4] & 0xfe00) == 0x6800) &&
+		m_pipeline_operand_address[4] >= 0x20 && m_pipeline_operand_address[4] <= 0x5f;
+	if (read_peripheral && write_peripheral)
+	{
+		logerror("%s: simultaneous staged peripheral read/write arbitration is unsupported\n", machine().describe_context());
+		m_illegal = true;
+		return;
+	}
+	unsigned const access_stage = read_peripheral ? 3 : 4;
+	if ((read_peripheral || write_peripheral) && !m_pipeline_peripheral_wait_paid[access_stage])
+	{
+		// SPRU172C establishes one extra peripheral-access clock. Holding
+		// pipeline advancement at the bus access is this prototype's declared
+		// latency model, not independently recovered silicon stage placement.
+		m_pipeline_peripheral_wait_paid[access_stage] = true;
+		return;
+	}
 	u8 const entry_stage = m_interrupt_entry_stage;
 	for (unsigned stage = 5; stage; --stage)
 	{
@@ -1720,9 +1743,11 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_operand[stage] = m_pipeline_operand[stage - 1];
 		m_pipeline_immediate[stage] = m_pipeline_immediate[stage - 1];
 		m_pipeline_early_write_deferred[stage] = m_pipeline_early_write_deferred[stage - 1];
+		m_pipeline_peripheral_wait_paid[stage] = m_pipeline_peripheral_wait_paid[stage - 1];
 	}
 	m_pipeline_valid[0] = false;
 	m_pipeline_early_write_deferred[0] = false;
+	m_pipeline_peripheral_wait_paid[0] = false;
 	if (m_pipeline_flush_front) m_pipeline_valid[2] = false;
 	if (m_pipeline_decode_flush)
 	{

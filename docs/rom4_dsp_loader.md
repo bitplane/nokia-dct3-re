@@ -2428,10 +2428,23 @@ not replace Decode/Execute ownership. A new fresh 30-second 5110 run retains
 20,285 frame expiries, 648,192 RF reads and 1,520 port-32 writes, exactly the
 previously reproduced mismatching snapshot. The strict RF gate remains
 failing and unchanged, not re-banked as part of this correction.
-The staged frontend still lacks peripheral wait/stall ownership, and its
-RAM/IMR fixtures do not validate that timing. These class tables establish
-instruction costs, not every multiword operand's exact bus phase; do not
-extrapolate first-word DAGEN Read timing to all peripheral accesses.
+The opt-in staged frontend holds pipeline advancement for one clock before
+a peripheral LD read, STL/STH write or ANDM/ORM read. A saved per-operation
+flag owns the paid wait and travels with the retained operand; RMW does not
+pay again at its write. Sixteen executable cases cover LD, STL, DP-relative
+ANDM and absolute ANDM in both program pages, restoring either the held
+stages or the resumed access. They assert the access/retirement clocks and
+that save/load never repeats a bus side effect.
+
+This stall placement is a declared prototype latency model, not recovered
+silicon bus-phase timing. These class tables establish instruction costs,
+not every multiword operand's exact bus phase; do not extrapolate first-word
+DAGEN Read timing to all peripheral accesses. Peripheral STM remains outside
+the staged instruction subset. Simultaneous peripheral read/write stage
+occupancy stops as unsupported rather than inventing arbitration; that
+exclusion still needs a dedicated executable fixture. No handset enables
+the staged frontend, and these fixtures do not establish native RF or speech
+completion.
 
 ANDM/ORM retain the immediate separately from the sampled data operand.
 The three-word absolute form consumes address then literal; its two pending
