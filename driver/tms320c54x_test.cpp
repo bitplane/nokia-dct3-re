@@ -35,6 +35,44 @@ public:
 	void rom4(machine_config &config);
 
 private:
+	static constexpr u64 SMUL_RESULTS[4][3] = {
+		{0x003fffffffULL, 0x007fffffffULL, 0x007ffffffeULL},
+		{0x0040000000ULL, 0x0080000000ULL, 0x0080000000ULL},
+		{0xffc0000001ULL, 0xff80000001ULL, 0xff80000002ULL},
+		{0xffc0000000ULL, 0xff80000000ULL, 0xff80000000ULL},
+	};
+	void start_smul_control_case(unsigned index)
+	{
+		unsigned const family = index / 64, kind = (index / 16) % 4, controls = (index / 2) & 7;
+		bool const destination_b = index & 1;
+		u64 const seed = kind < 2 ? 0xffffffffffULL : 1;
+		u16 const status = 0x1800 | (destination_b ? 0x0400 : 0x0200);
+		u16 op;
+		if (family == 0)
+			op = 0x2893 | (kind << 9) | (destination_b ? 0x100 : 0);
+		else
+			op = (family == 1 ? 0xb089 : 0xd089) | ((kind & 1) << 10) |
+				((kind >> 1) << 11) | (destination_b ? 0x100 : 0) |
+				((family == 1 ? destination_b : !destination_b) ? 0x200 : 0);
+		auto &program = m_cpu->space(AS_PROGRAM);
+		program.write_word(0x0800, op);
+		program.write_word(0x0801, 0xf4e1);
+		m_cpu->space(AS_DATA).write_word(0x0600, 0x8000);
+		m_cpu->space(AS_DATA).write_word(0x0610, 0x8000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR2, 0x0600);
+		m_cpu->set_state_int(tms320c54x_device::STATE_AR3, family == 0 ? 0x0600 : 0x0610);
+		m_cpu->set_state_int(tms320c54x_device::STATE_T, 0x8000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, destination_b ? 0x12340000 : seed);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, destination_b ? seed : 0x12340000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST0, status);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1,
+			0x0900 | (controls & 1 ? 0x40 : 0) | (controls & 2 ? 0x200 : 0));
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, controls & 4 ? 2 : 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x0800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IDLE, 0);
+		m_phase = 290000 + index;
+		m_check_timer->adjust(attotime::from_usec(100));
+	}
 	struct store_shift_vector { u64 value; int shift; u32 results[4]; };
 	static constexpr store_shift_vector STORE_SHIFTS[] = {
 		{0x8000000001ULL, -16, {0x00800000, 0xff800000, 0x00800000, 0xff800000}},
@@ -20907,6 +20945,35 @@ private:
 				"store right shifts obey SXM before SST, preserve source/status and update pointers");
 			if (index < 119) { start_store_shift_case(index + 1); return; }
 			osd_printf_info("TMS320C54x store shift boundaries: PASS cases=120 asm=-16,-1 sxm=0,1 sst=0,1 forms=5 sources=A,B pipeline_claim=0\n");
+			start_smul_control_case(0);
+			return;
+		}
+		if (m_phase >= 290000 && m_phase < 290192)
+		{
+			unsigned const index = m_phase - 290000;
+			unsigned const family = index / 64, kind = (index / 16) % 4, controls = (index / 2) & 7;
+			bool const destination_b = index & 1;
+			bool const overflow = kind == 1 && (controls & 1);
+			u64 const expected = overflow && (controls & 2) ? 0x007fffffffULL :
+				SMUL_RESULTS[kind][controls & 1 ? (controls == 7 ? 2 : 1) : 0];
+			u16 const status = 0x1800 | (destination_b ? 0x0400 : 0x0200) |
+				(overflow ? (destination_b ? 0x0200 : 0x0400) : 0);
+			expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
+				!m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL) &&
+				m_cpu->state_int(destination_b ? tms320c54x_device::STATE_B : tms320c54x_device::STATE_A) == expected &&
+				m_cpu->state_int(destination_b ? tms320c54x_device::STATE_A : tms320c54x_device::STATE_B) == 0x12340000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST0) == status &&
+				m_cpu->state_int(tms320c54x_device::STATE_ST1) ==
+					(0x0900 | (controls & 1 ? 0x40 : 0) | (controls & 2 ? 0x200 : 0)) &&
+				m_cpu->state_int(tms320c54x_device::STATE_PMST) == (controls & 4 ? 2 : 0) &&
+				m_cpu->state_int(tms320c54x_device::STATE_T) == 0x8000 &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR2) == (family == 0 ? 0x0600 : 0x0601) &&
+				m_cpu->state_int(tms320c54x_device::STATE_AR3) == (family == 0 ? 0x0601 : 0x0611) &&
+				m_cpu->space(AS_DATA).read_word(0x0600) == 0x8000 &&
+				m_cpu->space(AS_DATA).read_word(0x0610) == (family == 2 ? 0x1234 : 0x8000),
+				"SMUL requires FRCT and OVM, precedes MAC/MAS rounding, and preserves other status/source");
+			if (index < 191) { start_smul_control_case(index + 1); return; }
+			osd_printf_info("TMS320C54x SMUL controls: PASS cases=192 families=3 rounded=0,1 frct=0,1 ovm=0,1 smul=0,1 destinations=A,B pipeline_claim=0\n");
 			start_reverse_carry_case(0);
 			return;
 		}

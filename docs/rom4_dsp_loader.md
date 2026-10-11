@@ -3360,6 +3360,18 @@ four additional vectors preserve opposite accumulator/status, carry, TC, T,
 PMST and addressing state across both destinations and addressing modes.
 It does not cover every addressing form or SMUL combination, cycle cost or
 Nokia RF sample format.
+An additional 192-case literal-result control matrix compares Smem,
+dual-memory and parallel-store MAC/MAS, rounded and unrounded, across all
+eight FRCT/OVM/SMUL combinations and both destinations. It uses
+`8000h * 8000h` with -1/+1 accumulation to distinguish pre-product
+saturation, checks rounding-owned overflow separately, and preserves the
+opposite accumulator/overflow, carry/TC, control registers and operands.
+Pointer updates and the parallel store are checked too. This extends the
+existing rounded Smem boundary tests to the other two families; it is not
+exhaustive operand or pipeline coverage and requires no arithmetic change.
+Removing the OVM guard from product saturation makes this matrix fail;
+the restored core passes. TI limits SMUL to particular C54x revisions, so
+these generic-core fixtures do not prove its presence on every MAD2 DSP.
 PMST.SST now saturates the shifted 40-bit accumulator value to 32 bits before
 ordinary `STH`, `STL`, `STLM`, and `DST` stores, without modifying the
 accumulator. Focused fixtures reproduce TI SPRU131G's signed `STH` and
