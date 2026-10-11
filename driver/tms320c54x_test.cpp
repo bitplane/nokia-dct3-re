@@ -21606,8 +21606,9 @@ private:
 			{
 				expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x1000 &&
 					m_cpu->state_int(tms320c54x_device::STATE_IFR) == 3 &&
+					!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
 					m_entry_ack_source == -1 && data.read_word(0x0fff) == 0xbeef,
-					"Accepted interrupt retains IFR before vector Fetch and performs no early SP/stack/IACK operation");
+					"Accepted maskable interrupt retains IFR and INTM before IACK, with no early SP/stack write");
 				m_saved_vector.str(std::string()); m_saved_vector.clear();
 				expect(machine().save().write_stream(m_saved_vector) == STATERR_NONE,
 					"Save accepted interrupt before Access");
@@ -21616,6 +21617,7 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100)); return;
 			}
 			expect(m_entry_ack_source == 0 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == 2 &&
+				(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
 				m_cpu->state_int(tms320c54x_device::STATE_SP) == 0x0fff &&
 				data.read_word(0x0fff) == 0x0800 && m_cpu->state_int(tms320c54x_device::STATE_IDLE),
 				"Later IMR changes do not reselect the accepted source; vector Fetch clears only its IFR bit");
@@ -21624,12 +21626,15 @@ private:
 				m_saved_vector.clear(); m_saved_vector.seekg(0);
 				expect(machine().save().read_stream(m_saved_vector) == STATERR_NONE,
 					"Restore accepted interrupt before Access");
+				expect(!(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800) &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == 3,
+					"Restored accepted maskable interrupt retains pre-IACK INTM and IFR");
 				m_entry_ack_source = -1;
 				m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 2);
 				m_phase = 190002;
 				m_check_timer->adjust(attotime::from_usec(100)); return;
 			}
-			osd_printf_info("TMS320C54x accepted interrupt checkpoint: PASS ifr_until_fetch=1 later_imr=1 source_latched=1 save_replay=1 pipeline_drain_claim=0\n");
+			osd_printf_info("TMS320C54x accepted interrupt checkpoint: PASS ifr_until_fetch=1 intm_at_iack=1 later_imr=1 source_latched=1 save_replay=1 pipeline_drain_claim=0\n");
 			start_rounding_boundary_case(0); return;
 		}
 		if (m_phase >= 200000 && m_phase < 200128)
@@ -22263,6 +22268,8 @@ void tms320c54x_test_state::test(machine_config &config)
 		{
 			expect(m_entry_ack_source == -1 && m_cpu->state_int(tms320c54x_device::STATE_IFR) == 2,
 				"Vector acknowledgement clears IFR exactly once at Fetch");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x0800,
+				"Maskable vector acknowledgement sets INTM with IFR clearance");
 			m_entry_ack_source = line;
 		}
 		if (m_phase >= 80000 && m_phase <= 80003)

@@ -1456,7 +1456,11 @@ bool tms320c54x_device::service_interrupt()
 			// SPRU131G 6.10.4 ties IFR clearance to vector Fetch/IACK,
 			// not to the earlier source selection at Decode.
 			if (m_interrupt_ack_source != INPUT_LINE_NMI)
+			{
+				// SPRU131G 6.10.8 couples maskable INTM setting to IACK.
+				m_st1 |= 0x0800;
 				m_ifr &= ~(u16(1) << m_interrupt_ack_source);
+			}
 			standard_irq_callback(m_interrupt_ack_source, logical_program_address(m_rtn));
 			m_pc = m_interrupt_vector_pc;
 			m_vector_prefetch_word = fetch();
@@ -1498,7 +1502,8 @@ bool tms320c54x_device::service_interrupt()
 		acknowledged_source = source;
 	}
 	m_rtn = m_pc;
-	m_st1 |= 0x0800;
+	if (acknowledged_source == INPUT_LINE_NMI)
+		m_st1 |= 0x0800;
 	m_interrupt_vector_pc = (m_pmst & 0xff80) | (vector << 2);
 	m_interrupt_ack_source = acknowledged_source;
 	m_interrupt_entry_stage = 1;

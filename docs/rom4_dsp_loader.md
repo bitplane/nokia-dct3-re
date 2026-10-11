@@ -2230,6 +2230,14 @@ checkpoint (`tmp/c54x-ifr-fetch-red.log`); the required marker is
 `TMS320C54x accepted interrupt checkpoint: PASS`. This checks entry ordering
 and replay, not Decode-stage foreground drain or full pipeline latency.
 `check-c54x-core` requires the IRQ/NMI entry-spacing marker.
+Maskable INTM setting belongs to that same vector Fetch/IACK stage, following
+SPRU131G 6.10.8, rather than the earlier source selection. The accepted-entry
+checkpoint requires INTM clear before IACK and set inside the acknowledgement
+callback, both before and after save/load; its marker includes `intm_at_iack=1`.
+The prior early-setting implementation fails this checkpoint. NMI's existing
+acceptance behavior and the aggregate entry cycle count are unchanged. This
+is an entry-side ordering correction, not foreground pipeline retirement or
+proof of the full instruction pipeline.
 `check-c54x-rom4-rf-boundary` retains 20,282 frame expiries, 648,096 RF reads
 and 1,519 port-`32` writes, with no port-`38/39` reads;
 `verify-5110-save-state` also passes. These protect the established native

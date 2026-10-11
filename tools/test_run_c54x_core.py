@@ -29,6 +29,10 @@ class CoreResultTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_result(REQUIRED[0] + '\n' + self.output, 3)
 
+    def test_old_interrupt_checkpoint_is_insufficient(self):
+        with self.assertRaises(ValueError):
+            check_result(self.output.replace(' intm_at_iack=1', ''), 3)
+
     def test_completion_must_be_terminal(self):
         for output in (self.output.replace(COMPLETION, ''), self.output + 'crash\n'):
             with self.assertRaises(ValueError):
