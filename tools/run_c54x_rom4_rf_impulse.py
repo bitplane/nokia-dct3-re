@@ -9,6 +9,11 @@ import re
 import subprocess
 import tempfile
 
+try:
+    from tools.c54x_rom4_rf_delivery_check import check_observer_health
+except ModuleNotFoundError:
+    from c54x_rom4_rf_delivery_check import check_observer_health
+
 
 COEFFICIENTS = (0x0387, 0x11a3, 0x2ad6, 0x4000,
                 0x4000, 0x2ad6, 0x11a3, 0x0387)
@@ -16,7 +21,9 @@ INPUT = re.compile(r"rom4_rf_impulse_input: index=(\d+) pc=([0-9a-f]{4}) value=(
 OUTPUT = re.compile(r"rom4_rf_impulse_output: index=(\d+) pc=([0-9a-f]{4}) address=([0-9a-f]{4}) value=([0-9a-f]{4})")
 
 
-def mixed_words():
+def mixed_words(full_scale=False):
+    if full_scale:
+        return [0, 0x7fff, 0x8000, 0xffff, 0x7ffe, 0x8001, 0x1234, 0xedcb] * 4
     return [(((index * 7919 + 1237) % 4096) - 2048) & 0xffff for index in range(32)]
 
 
@@ -42,12 +49,15 @@ def expected(index, amplitude):
     return expected_words(inputs)
 
 
-def check(text, index, amplitude, mixed=False):
+def check(text, index, amplitude, mixed=False, full_scale=False):
+    check_observer_health(text)
+    if full_scale and not mixed:
+        raise ValueError('full-scale control requires mixed input')
     inputs = INPUT.findall(text)
     outputs = OUTPUT.findall(text)
     if len(inputs) != 32 or len(outputs) != 48:
         raise ValueError("missing complete input/output capture")
-    wanted_inputs = mixed_words() if mixed else [amplitude if number == index else 0 for number in range(32)]
+    wanted_inputs = mixed_words(full_scale) if mixed else [amplitude if number == index else 0 for number in range(32)]
     for number, (position, pc, value) in enumerate(inputs):
         if int(position) != number or int(pc, 16) != (0x330c, 0x3312, 0x3318, 0x331e)[number % 4]:
             raise ValueError(f"input alignment changed at {number}")
@@ -58,7 +68,8 @@ def check(text, index, amplitude, mixed=False):
             raise ValueError(f"output alignment changed at {number}")
         if int(value, 16) != wanted:
             raise ValueError(f"output {number}: actual={value} expected={wanted:04x}")
-    marker = ('rom4_rf_mixed_summary: samples=32' if mixed else
+    marker = ('rom4_rf_mixed_full_scale_summary: samples=32' if full_scale else
+              'rom4_rf_mixed_summary: samples=32' if mixed else
               f"rom4_rf_impulse_summary: impulse={index} amplitude={amplitude:04x}")
     if text.count(marker) != 1:
         raise ValueError("missing or duplicate case summary")
@@ -70,9 +81,12 @@ def main():
     parser.add_argument("--rompath", type=Path, required=True)
     parser.add_argument('--mixed', action='store_true',
                         help='check overlapping bounded nonzero words instead of isolated impulses')
+    parser.add_argument('--mixed-full-scale', action='store_true',
+                        help='check signed extrema and overlapping full-scale words')
     parser.add_argument("--output-root", type=Path,
                         default=Path(__file__).resolve().parents[1] / 'tmp')
     args = parser.parse_args()
+    args.mixed = args.mixed or args.mixed_full_scale
     root = Path(__file__).resolve().parent.parent
     args.output_root.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="run_rom4_rf_impulse_", dir=args.output_root))
@@ -96,6 +110,7 @@ def main():
         identities[name] = identity
     (run / 'inputs.json').write_text(json.dumps({
         'schema': 1, 'inputs': identities, 'mixed': args.mixed,
+        'mixed_full_scale': args.mixed_full_scale,
         'physical_iq_claim': False, 'acquisition_claim': False}, indent=2) + '\n')
     cases = 0
     for amplitude in ((0,) if args.mixed else (0x4000, 0xc000)):
@@ -113,6 +128,7 @@ def main():
                 env['ROM4_RF_MIXED_WORDS'] = '1'
             else:
                 env.pop('ROM4_RF_MIXED_WORDS', None)
+            env['ROM4_RF_MIXED_FULL_SCALE'] = '1' if args.mixed_full_scale else '0'
             command = [str(args.mame.resolve()), "noki5110", "-rompath", str(args.rompath.resolve()),
                        "-nvram_directory", str(case / "nvram"), "-video", "none", "-sound", "none",
                        "-log", "-skip_gameinfo", "-nothrottle", "-seconds_to_run", "8",
@@ -120,18 +136,21 @@ def main():
             (case / 'invocation.json').write_text(json.dumps({
                 'command': command, 'cwd': str(case.resolve()),
                 'stimulus': 'mixed' if args.mixed else 'impulse',
-                'input_words': mixed_words() if args.mixed else
+                'mixed_full_scale': args.mixed_full_scale,
+                'input_words': mixed_words(args.mixed_full_scale) if args.mixed else
                     [amplitude if number == index else 0 for number in range(32)],
                 'generated_eeprom_sha256': hashlib.sha256((nvram / 'eeprom').read_bytes()).hexdigest(),
             }, indent=2) + '\n')
             with (case / "console.log").open("w") as console:
                 subprocess.run(command, cwd=case, env=env, stdout=console, stderr=subprocess.STDOUT, check=True)
-            check((case / "error.log").read_text(), index, amplitude, mixed=args.mixed)
+            check_observer_health((case / 'console.log').read_text())
+            check((case / "error.log").read_text(), index, amplitude,
+                  mixed=args.mixed, full_scale=args.mixed_full_scale)
             cases += 1
             print('RF mixed convolution case: PASS words=32 outputs=48' if args.mixed else
                   f"RF impulse case: PASS index={index} amplitude={amplitude:04x}", flush=True)
     print(f"ROM4 RF {'mixed convolution' if args.mixed else 'impulse'}: PASS cases={cases} "
-          'physical_iq_claim=0 acquisition_claim=0')
+          f'full_scale={int(args.mixed_full_scale)} physical_iq_claim=0 acquisition_claim=0')
 
 
 if __name__ == "__main__":

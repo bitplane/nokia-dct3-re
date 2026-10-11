@@ -8,6 +8,9 @@ assert(start and start >= 0)
 local amplitude = tonumber(os.getenv("ROM4_RF_IMPULSE_VALUE") or "16384")
 assert(amplitude and amplitude >= 0 and amplitude <= 0xffff and amplitude % 1 == 0)
 local mixed = os.getenv('ROM4_RF_MIXED_WORDS') == '1'
+local full_scale = os.getenv('ROM4_RF_MIXED_FULL_SCALE') == '1'
+assert(not full_scale or mixed)
+local extrema = {0, 0x7fff, 0x8000, 0xffff, 0x7ffe, 0x8001, 0x1234, 0xedcb}
 local inputs, outputs = 0, 0
 local taps = {}
 taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
@@ -19,6 +22,7 @@ taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
         local value = inputs == impulse and amplitude or 0
         if mixed then
             value = inputs < 32 and (((inputs * 7919 + 1237) % 4096 - 2048) & 0xffff) or 0
+            if full_scale then value = inputs < 32 and extrema[inputs % #extrema + 1] or 0 end
         end
         if inputs < 32 then
             machine:logerror(string.format(
@@ -41,8 +45,8 @@ taps[#taps + 1] = cpu.spaces["data"]:install_write_tap(0x1a48, 0x1a57,
 local stop = emu.add_machine_stop_notifier(function()
     if mixed then
         machine:logerror(string.format(
-            'rom4_rf_mixed_summary: samples=32 inputs=%d outputs=%d acquisition_claim=0\n',
-            inputs, outputs))
+            '%s: samples=32 inputs=%d outputs=%d acquisition_claim=0\n',
+            full_scale and 'rom4_rf_mixed_full_scale_summary' or 'rom4_rf_mixed_summary', inputs, outputs))
         return
     end
     machine:logerror(string.format(

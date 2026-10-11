@@ -13,6 +13,33 @@ def fixture(index=0, amplitude=0x4000):
 
 
 class ImpulseTests(unittest.TestCase):
+    def test_full_scale_capture_and_profile_identity(self):
+        words = mixed_words(full_scale=True)
+        self.assertEqual(len(words), 32)
+        self.assertIn(0x7fff, words)
+        self.assertIn(0x8000, words)
+        lines = [f'rom4_rf_impulse_input: index={index} '
+                 f'pc={(0x330c, 0x3312, 0x3318, 0x331e)[index % 4]:04x} value={word:04x}'
+                 for index, word in enumerate(words)]
+        lines.extend(f'rom4_rf_impulse_output: index={index} pc={0x3322 + index % 2:04x} '
+                     f'address={0x1a48 + index % 16:04x} value={word:04x}'
+                     for index, word in enumerate(expected_words(words)))
+        lines.append('rom4_rf_mixed_full_scale_summary: samples=32 inputs=100 outputs=48 acquisition_claim=0')
+        text = '\n'.join(lines)
+        check(text, 0, 0, mixed=True, full_scale=True)
+        for changed in (text.replace('value=8000', 'value=7fff'),
+                        text.replace('mixed_full_scale_summary', 'mixed_summary')):
+            with self.assertRaises(ValueError):
+                check(changed, 0, 0, mixed=True, full_scale=True)
+        with self.assertRaises(ValueError):
+            check(text, 0, 0, mixed=True)
+        with self.assertRaises(ValueError):
+            check(text, 0, 0, full_scale=True)
+
+    def test_full_scale_constant_rounding(self):
+        self.assertEqual(expected_words([0x7fff] * 32)[6:16], [0x7fff] * 10)
+        self.assertEqual(expected_words([0x8000] * 32)[6:16], [0x8000] * 10)
+
     def test_overlap_rounds_after_accumulation(self):
         # Every individual unit impulse rounds to zero, but the eight-tap
         # coefficient sum is 1.0, so the settled constant input must be one.
@@ -66,7 +93,8 @@ class ImpulseTests(unittest.TestCase):
 
     def test_reject_corrupt_evidence(self):
         text = fixture()
-        for changed in (text.replace("pc=330c", "pc=324b"),
+        for changed in (text + '\n[LUA ERROR] error in write tap callback',
+                        text.replace("pc=330c", "pc=324b"),
                         text.replace("value=0469", "value=0468"),
                         text.replace("address=1a48", "address=1a49"),
                         text.rsplit("\n", 1)[0], text + "\n" + text.splitlines()[32]):

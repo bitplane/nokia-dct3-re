@@ -926,6 +926,18 @@ buffer depth, latch policy, lane order or sample-production clock.
 Do not connect read-indexed tone/GMSK data as an operational RF source
 merely because both windows are frame-paced.
 
+Full-scale arithmetic control: `run_c54x_rom4_rf_impulse.py --mame mame/mame
+--rompath mame/roms --mixed-full-scale` supplies 32 diagnostic port words
+repeating `0000,7fff,8000,ffff,7ffe,8001,1234,edcb`. In a fresh eight-second
+native boot, all 48 captured filter outputs match the independent integer
+convolution reference, with rounding after accumulation. The runner records
+the actual input sequence and binary/ROM identities and rejects observer
+errors in both console and trace. Evidence:
+`tmp/run_rom4_rf_impulse_9s7qvlq_/0000_00/error.log`.
+This extends signed numerical coverage beyond the bounded mixed fixture;
+it does not validate all accumulator modes, saturation settings, physical
+I/Q assignment, production cadence, or native acquisition.
+
 ### Product-specific physical buses
 
 Do not generalize the NSE-1 parallel connection across DCT3. Nokia's
