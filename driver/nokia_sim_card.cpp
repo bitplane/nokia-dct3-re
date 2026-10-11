@@ -321,6 +321,14 @@ nokia_sim_card_device::selected_file_for(access_shape shape)
 	return file;
 }
 
+bool nokia_sim_card_device::read_permitted(const file_descriptor &file)
+{
+	if (!file.read_chv1 || !m_chv1_enabled || m_chv_verified[0])
+		return true;
+	queue_status(0x98, 0x04);
+	return false;
+}
+
 bool nokia_sim_card_device::write_permitted(const file_descriptor &file)
 {
 	if (access_allowed(file))
@@ -1322,7 +1330,9 @@ void nokia_sim_card_device::queue_fcp(u16 fid, unsigned requested)
 			u8 fcp[15] = { 0, 0, u8(size >> 8), u8(size), u8(fid >> 8), u8(fid),
 				0x04, 0, 0, 0, 0, 0x01, 0x02, 0x00, 0x00 };
 			if (file->mutable_data)
-				fcp[8] = 0x01; // READ is always; UPDATE requires disabled CHV1.
+				fcp[8] = 0x01; // UPDATE requires CHV1 (satisfied while disabled).
+			if (file->read_chv1)
+				fcp[8] |= 0x10;
 			if (file->fid == 0x6f39)
 			{
 				// EF_ACM is READ/UPDATE/INCREASE under CHV1. Access-condition
@@ -1396,11 +1406,8 @@ void nokia_sim_card_device::queue_read_record(unsigned requested)
 			selected_file_for(access_shape::record);
 	if (!file)
 		return;
-	if (file->fid == 0x6f39 && m_chv1_enabled && !m_chv_verified[0])
-	{
-		queue_status(0x98, 0x04);
+	if (!read_permitted(*file))
 		return;
-	}
 	if (requested != file->record_length)
 	{
 		queue_status(0x67, 0x00);
@@ -1489,6 +1496,8 @@ void nokia_sim_card_device::seek_record()
 		queue_status(0x94, 0x08);
 		return;
 	}
+	if (!read_permitted(*file))
+		return;
 	if (m_p1 != 0 || (m_p2 & 0xec))
 	{
 		queue_status(0x6b, 0x00);
@@ -1582,11 +1591,11 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x7f40, 0x3f00, 0, 0, file_structure::directory, false },
 		{ 0x2fe2, 0x3f00, 10, 0, file_structure::transparent, false },
 		{ 0x2fe6, 0x3f00, 4, 0, file_structure::transparent, false },
-		{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true },
+		{ 0x6f3a, 0x7f10, 50 * 32, 32, file_structure::linear_fixed, true, true },
 		{ 0x6f3c, 0x7f10, sms_record_count * sms_record_length,
-				sms_record_length, file_structure::linear_fixed, true },
+				sms_record_length, file_structure::linear_fixed, true, true },
 		{ 0x6f42, 0x7f10, smsp_record_count * smsp_record_length,
-				smsp_record_length, file_structure::linear_fixed, true },
+				smsp_record_length, file_structure::linear_fixed, true, true },
 		{ 0x6f05, 0x7f20, 4, 0, file_structure::transparent, false },
 		{ 0x6fb7, 0x7f20, 15, 0, file_structure::transparent, false },
 		{ 0x6fad, 0x7f20, 4, 0, file_structure::transparent, false },
@@ -1601,7 +1610,7 @@ const nokia_sim_card_device::file_descriptor *nokia_sim_card_device::find_file(u
 		{ 0x6fae, 0x7f20, 1, 0, file_structure::transparent, false },
 		{ 0x6f31, 0x7f20, 1, 0, file_structure::transparent, false },
 		{ 0x6f37, 0x7f20, 3, 0, file_structure::transparent, false },
-		{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true },
+		{ 0x6f39, 0x7f20, 3, 3, file_structure::cyclic, true, true },
 		{ 0x6f41, 0x7f20, 5, 0, file_structure::transparent, false },
 		{ 0x6f43, 0x7f20, 2, 0, file_structure::transparent, false },
 		{ 0x6f46, 0x7f20, 17, 0, file_structure::transparent, false },

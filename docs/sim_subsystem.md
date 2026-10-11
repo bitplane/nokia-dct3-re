@@ -203,7 +203,15 @@ fixture checks both undefined-pointer starts, one- and sixteen-byte patterns,
 interior-only mismatch, six parameter errors, incompatible cyclic/transparent
 files, and pending-result save/replay. Directory-only selection reports `94 00`
 for SEEK and both read commands; incompatible EFs report `94 08`. Current
-linear-fixed EFs have ALWAYS read access. No retained handset trace uses SEEK;
+ADN, SMS, SMSP and ACM require CHV1 for READ; SEEK applies the selected
+file's READ condition. Disabled CHV1 satisfies that condition; an enabled,
+unverified card returns `98 04`, including after restoration of an earlier
+unverified checkpoint. FCP advertises the same policy. The isolated serial
+fixture covers denial, wrong PIN, successful verification and restoration.
+Other transparent/vendor-file access conditions remain a separate audit.
+These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
+([ETSI specification](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf)).
+No retained handset trace uses SEEK;
 this is standards-derived card conformance, not new UI capability.
 
 With an authentication algorithm selected, RUN GSM ALGORITHM rejects nonzero

@@ -15,9 +15,12 @@ RESPONSE_PASS = "SIM response sequencing: PASS initial_mf=1 activation_replay=1 
 SEARCH_PASS = "SIM record search: PASS directions=4 types=2 undefined_starts=2 prefix_only=1 failed_pointer_preservation=1 parameter_cases=6 incompatible_files=2 no_selected_ef=3 pending_result_replay=1 handset_claim=0"
 
 
+ACCESS_PASS = "SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
+
+
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -40,7 +43,8 @@ def main():
                                     stderr=subprocess.STDOUT, timeout=90)
         check((run / "console.log").read_text(), result.returncode)
         (run / "acceptance.json").write_text(json.dumps({
-            "result": "pass", "command": command, "checkpoints": 6,
+            "result": "pass", "command": command, "checkpoints": 7,
+            "protected_record_files": 4, "read_access_restore": True,
             "controller_checkpoints": 3, "record_update_checkpoints": 1,
             "unsupported_classes": 3, "empty_verify": True,
             "retry_preservation": True, "following_apdu": True,
@@ -67,6 +71,7 @@ def main():
     print(AUTH_PASS)
     print(RESPONSE_PASS)
     print(SEARCH_PASS)
+    print(ACCESS_PASS)
 
 
 if __name__ == "__main__":

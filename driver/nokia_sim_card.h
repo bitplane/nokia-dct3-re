@@ -76,6 +76,7 @@ private:
 		u8 record_length;
 		file_structure structure;
 		bool mutable_data;
+		bool read_chv1 = false;
 	};
 
 	// The structure a command requires of the EF it is addressed to. Named
@@ -88,6 +89,7 @@ private:
 	// tested in: which status a malformed command receives depends on it.
 	const file_descriptor *selected_file_for(access_shape shape);
 	bool write_permitted(const file_descriptor &file);
+	bool read_permitted(const file_descriptor &file);
 	u8 *writable_body(const file_descriptor &file);
 	bool resolve_record(const file_descriptor &file, unsigned &record);
 	bool chv_ready(unsigned index);

@@ -9,6 +9,13 @@
 #include <cmath>
 
 namespace {
+struct write_case {
+	u8 ins, p1, p2, length;
+	u16 body;
+	u8 sw1, sw2;
+	bool checkpoint = false, restore = false;
+};
+
 class nokia_simi_test_state : public driver_device
 {
 public:
@@ -35,7 +42,6 @@ private:
 	unsigned m_record_case = 0;
 	unsigned m_write_case = 0;
 	bool m_seek_replayed = false;
-	struct write_case { u8 ins, p1, p2, length; u16 body; u8 sw1, sw2; };
 	static constexpr write_case WRITE_CASES[] = {
 		{0xdc, 0, 4, 32, 0x11, 0x90, 0},
 		{0xb2, 50, 4, 32, 0x11, 0x90, 0},
@@ -146,7 +152,33 @@ private:
 		{0xb2, 2, 4, 32, 0xaabb, 0x90, 0},
 		{0xa2, 0, 0, 1, 0xbb, 0x94, 4}, // Interior-only match must not succeed.
 		{0xa2, 0, 0x10, 1, 0xaa, 0x9f, 1},
-		{0xc0, 0, 0, 1, 2, 0x90, 0}
+		{0xc0, 0, 0, 1, 2, 0x90, 0},
+		{0x28, 0, 1, 8, 0, 0x90, 0, true}, // ENABLE revokes the implicit disabled-CHV authorization.
+		{0xb2, 2, 4, 32, 0, 0x98, 4},
+		{0xa2, 0, 0, 1, 0xaa, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x6f3c, 0x9f, 15},
+		{0xb2, 1, 4, 176, 0, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x6f42, 0x9f, 15},
+		{0xb2, 1, 4, 44, 0, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f39, 0x9f, 15},
+		{0xb2, 1, 4, 3, 0, 0x98, 4},
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f3a, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f3a, 0x90, 0},
+		{0x20, 0, 1, 8, 1, 0x98, 4},
+		{0xb2, 2, 4, 32, 0, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb2, 2, 4, 32, 0xaabb, 0x90, 0, false, true},
+		{0xb2, 2, 4, 32, 0, 0x98, 4}, // Restored enabled/unverified card must deny again.
+		{0xa2, 0, 0, 1, 0xaa, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb2, 2, 4, 32, 0xaabb, 0x90, 0},
+		{0xa2, 0, 0x10, 1, 0xaa, 0x9f, 1},
+		{0xc0, 0, 0, 1, 2, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f39, 0x9f, 15},
+		{0xb2, 1, 4, 3, 0x12, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -226,6 +258,11 @@ private:
 	{
 		auto const &item = WRITE_CASES[m_write_case];
 		if (item.ins == 0xa4) { transmit({u8(item.body >> 8), u8(item.body)}); return; }
+		if (item.ins == 0x20 || item.ins == 0x28)
+		{
+			transmit({u8(item.body ? '9' : '1'), '2', '3', '4', 0xff, 0xff, 0xff, 0xff});
+			return;
+		}
 		for (unsigned offset = 0; offset < item.length; offset += 16)
 		{
 			m_simi->tx_fifo_control_w(4);
@@ -503,6 +540,8 @@ private:
 					m_bytes[5] == u8(item.body >> 8) && m_bytes[6] == u8(item.body) &&
 					m_bytes[m_count - 2] == 0x90 && m_bytes[m_count - 1] == 0,
 					"immediately preceding SELECT supplies the selected file response");
+				if (item.body == 0x6f3a)
+					expect(m_bytes[9] == 0x11, "ADN advertises CHV1 for READ and UPDATE");
 			}
 			else if ((item.ins == 0xb2 || item.ins == 0xb0) && item.sw1 == 0x90)
 			{
@@ -536,9 +575,13 @@ private:
 				restore_checkpoint(); clear_capture(); m_seek_replayed = true;
 				begin_write_case(); return;
 			}
+			if (m_write_case == 109)
+				osd_printf_info("SIM record search: PASS directions=4 types=2 undefined_starts=2 prefix_only=1 failed_pointer_preservation=1 parameter_cases=6 incompatible_files=2 no_selected_ef=3 pending_result_replay=1 handset_claim=0\n");
+			if (item.checkpoint) save_checkpoint();
+			if (item.restore) restore_checkpoint();
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
-			osd_printf_info("SIM record search: PASS directions=4 types=2 undefined_starts=2 prefix_only=1 failed_pointer_preservation=1 parameter_cases=6 incompatible_files=2 no_selected_ef=3 pending_result_replay=1 handset_claim=0\n");
+			osd_printf_info("SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}
