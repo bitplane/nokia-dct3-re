@@ -2,7 +2,8 @@
 local machine = manager.machine
 local cpu = assert(machine.devices[':maincpu'])
 local taps = {}
-for _, address in ipairs({0x37019c, 0x2e336c, 0x2bd782}) do
+for _, address in ipairs({0x37019c, 0x2e336c, 0x2bd782,
+                         0x2e1f5e, 0x2bd3d8, 0x2bd424}) do
     local count = 0
     taps[#taps + 1] = cpu.spaces['program']:install_read_tap(address & ~3,
       (address & ~3) + 3, '5210_measurement_entry', function(offset, data, mask)
@@ -10,7 +11,9 @@ for _, address in ipairs({0x37019c, 0x2e336c, 0x2bd782}) do
         count = count + 1
         if count <= 8 then
             machine:logerror(string.format(
-                '5210_measurement_entry: pc=%08x r0=%08x r1=%08x t=%.9f\n',
+                '%s: pc=%08x r0=%08x r1=%08x t=%.9f\n',
+                (address == 0x37019c or address == 0x2e336c or address == 0x2bd782)
+                    and '5210_measurement_entry' or '5210_request_entry',
                 address, cpu.state['R0'].value, cpu.state['R1'].value,
                 machine.time:as_double()))
         end

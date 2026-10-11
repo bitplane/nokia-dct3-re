@@ -48,6 +48,9 @@ def verify_late_boundary(text, card):
         '5210_measurement_entry: pc=0037019c',
         '5210_measurement_entry: pc=002e336c',
         '5210_measurement_entry: pc=002bd782',
+        '5210_request_entry: pc=002e1f5e',
+        '5210_request_entry: pc=002bd3d8 r0=00000005',
+        '5210_request_entry: pc=002bd424',
         'SIM status ins=20 sw=9000',
     ))
     stops = re.findall(r'5210_pin_fixture: stopped_at=([0-9.]+)', text)

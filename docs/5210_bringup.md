@@ -172,8 +172,16 @@ The outstanding lifecycle question is why late `0x03ec` readiness retains
 the initial request after both ordinary completion inputs have occurred, and
 which firmware-owned continuation should retire or promote it. A second
 channel-change or measurement reply is not justified merely by this ordering.
-The next own-ROM target is initial-request continuation `0x2e1f5e` and its
-completion conditions. The post-measurement type-`0x11` mode-4 instruction is
+The initial continuation `0x2e1f5e` is observed once in the delayed run at
+10.209223 s, after background-result parsing and before PIN acceptance; the
+successful early control never enters it. It passes value 5 to `0x2bd3d8`,
+whose recovered operation replaces record byte 13's upper three bits while
+preserving its lower five bits, then calls `0x2bd424` and marks context byte 4.
+This is a configuration/record update, not proof of request retirement or a
+new completion message. The late boundary gate requires those ordered entry
+observations; the static contract checks the setter and continuation tail.
+The remaining own-ROM target is the lifetime of that retained initial scan
+after this update. The post-measurement type-`0x11` mode-4 instruction is
 currently logged as unaccepted by the neighbour decoder; this is a separate
 candidate contract mismatch, not evidence that fabricating its response would
 promote the queued request.

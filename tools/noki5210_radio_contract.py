@@ -112,6 +112,18 @@ def verify(image):
         raise ValueError('own current-request four-way dispatch differs')
     if instructions(0x2e20dc, 6) != [('bl', '#0x2e1f5e'), ('b', '#0x2e20ec')]:
         raise ValueError('own request-03eb continuation differs')
+    if instructions(0x2e1fcc, 6) != [('adds', 'r0, r4, #0'), ('bl', '#0x2bd3d8')]:
+        raise ValueError('own initial-request packed-state setter differs')
+    if instructions(0x2bd3e4, 14) != [
+            ('lsls', 'r1, r4, #0x15'), ('asrs', 'r1, r1, #0x10'),
+            ('ldrb', 'r2, [r0, #0xd]'), ('lsls', 'r2, r2, #0x1b'),
+            ('lsrs', 'r2, r2, #0x1b'), ('orrs', 'r1, r2'), ('strb', 'r1, [r0, #0xd]')]:
+        raise ValueError('own record upper-three-bit setter differs')
+    if instructions(0x2e1ff0, 16) != [
+            ('bl', '#0x2bd424'), ('ldr', 'r0, [pc, #0x268]'),
+            ('ldr', 'r1, [r0]'), ('movs', 'r0, #1'), ('strb', 'r0, [r1, #4]'),
+            ('add', 'sp, #0xc'), ('pop', '{r4, r5, pc}')]:
+        raise ValueError('own initial-request finish differs')
     return {'product': '5210', 'type_8b_destination_task': 12,
             'records': 40, 'record_stride': 4,
             'carrier_message_offsets': [6, 7], 'signed_rssi_message_offset': 9,
@@ -121,6 +133,8 @@ def verify(image):
             'current_request_dispatch': {'03ea': '2e20e2', '03eb': '2e20dc',
                                          '03ec': '2e202e', '03ed': '2e20e6'},
             'initial_request_continuation': '2e1f5e',
+            'initial_record_update': {'setter': '2bd3d8', 'byte_offset': 13,
+                                      'preserved_mask': 31, 'value_shift': 5},
             'direct_selector_calls': [{'site': f'{site:06x}', 'argument': argument}
                                       for site, argument in direct_sites],
             'direct_census_coverage': {'aligned_pairs': (len(image) - 2) // 2,

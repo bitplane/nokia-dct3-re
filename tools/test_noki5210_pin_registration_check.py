@@ -21,6 +21,9 @@ class PinRegistrationTest(unittest.TestCase):
             '5210_measurement_entry: pc=0037019c',
             '5210_measurement_entry: pc=002e336c',
             '5210_measurement_entry: pc=002bd782',
+            '5210_request_entry: pc=002e1f5e',
+            '5210_request_entry: pc=002bd3d8 r0=00000005',
+            '5210_request_entry: pc=002bd424',
             '5210_readiness_selector: argument=00000000 lr=00234f43 state=10 eligible=5 current=00149440 queued=00000000 t=10.209',
         ))
         return prefix + '\n' + complete().replace(
@@ -36,6 +39,7 @@ class PinRegistrationTest(unittest.TestCase):
         for original, replacement in (
             ('pc=002bd782', 'pc=002bd784'),
             ('RX enqueue type=8b payload=166', 'RX missing'),
+            ('pc=002bd3d8 r0=00000005', 'pc=002bd3d8 r0=00000004'),
             ('stopped_at=45.000000000', 'stopped_at=21.000000000'),
         ):
             with self.subTest(original=original), self.assertRaises(ValueError):
