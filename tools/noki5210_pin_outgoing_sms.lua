@@ -19,6 +19,10 @@ _G.noki5210_pin_after_accept = function(press, snapshot)
     for digit in ('5551234'):gmatch('.') do press('Keypad ' .. digit) end
     assert(emu.wait(1))
     press('Left Softkey / Menu')
+    if _G.noki5210_pin_sms_after_submit then
+        _G.noki5210_pin_sms_after_submit(press, snapshot)
+        return
+    end
     assert(emu.wait(1.2))
     snapshot('sms_sent')
 end

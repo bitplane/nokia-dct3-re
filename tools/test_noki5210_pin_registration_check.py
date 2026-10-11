@@ -31,6 +31,15 @@ class PinRegistrationTest(unittest.TestCase):
             'LAPDm service Channel Release acknowledged nr=2',
         ))
         verify_pin_outgoing_sms(text)
+        rejected = text.replace('downlink kind=18 sapi=3 pd=09 message=01 length=5',
+                                'downlink kind=19 sapi=3 pd=09 message=01 length=7')
+        verify_pin_outgoing_sms(rejected, rejected=True)
+        with self.assertRaises(ValueError):
+            verify_pin_outgoing_sms(text, rejected=True)
+        with self.assertRaises(ValueError):
+            verify_pin_outgoing_sms(rejected)
+        with self.assertRaises(ValueError):
+            verify_pin_outgoing_sms(rejected + '\nGSM service downlink kind=18 sapi=3', rejected=True)
         for old, new in (('a70161', 'a70162'), ('user_length=1', 'user_length=2'),
                          ('key=Keypad 5', 'key=Keypad 6'), ('downlink kind=18', 'downlink kind=19')):
             with self.subTest(old=old), self.assertRaises(ValueError):

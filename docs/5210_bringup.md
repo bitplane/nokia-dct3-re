@@ -220,6 +220,14 @@ requires registered ARFCN 86; another product's default carrier cannot satisfy
 this check. This proves incoming host SMS/UI/storage, not external-network
 delivery or native DSP execution.
 
+`make verify-5210-pin-host-rejected-sms` separately sends the same physically
+composed SMS and supplies a correlated host RP-error decision. It requires
+RP-ERROR, final handset CP-ACK, RR release and absence of success RP-ACK.
+The reviewed `Message not sent, try again later` frame is pinned separately
+from successful submission. Physical End returns to the exact idle oracle;
+Menu opens the reviewed Messages frame. No retry or timeout coverage is
+inferred from this explicit rejection.
+
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.
 The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a

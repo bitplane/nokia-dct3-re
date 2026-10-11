@@ -21,6 +21,7 @@ class Scenario:
     net_masks: tuple[str, ...] = ()
     pin: bool = True
     host_sms: str | None = None
+    host_outcome: str = 'rp_ack'
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -48,6 +49,8 @@ SCENARIOS = {
                                      seconds=70, host_sms='outgoing'),
     'pin-host-incoming-sms': Scenario('noki5210_pin_incoming_sms.lua', '--incoming-sms',
                                      host_sms='incoming'),
+    'pin-host-rejected-sms': Scenario('noki5210_pin_sms_reject.lua', '--rejected-sms',
+                                     seconds=80, host_sms='outgoing', host_outcome='rp_error'),
 }
 
 
@@ -111,7 +114,7 @@ def main():
                       '--port', str(args.port), '--cwd', str(run)]
             if scenario.host_sms == 'outgoing':
                 launch.extend(['--user-data', '61', '--user-data-length', '1',
-                               '--decision', 'accept'])
+                               '--decision', 'rp_error' if scenario.host_outcome == 'rp_error' else 'accept'])
             launch.extend(['--'] + command)
         else:
             launch = command
@@ -125,7 +128,7 @@ def main():
                             if scenario.host_sms == 'incoming'
                             else 'radio_outgoing_host_sms_trace_check.py')
             host_args = (['--arfcn', '86'] if scenario.host_sms == 'incoming'
-                         else ['--octets', '1', '--outcome', 'rp_ack'])
+                         else ['--octets', '1', '--outcome', scenario.host_outcome])
             subprocess.run([sys.executable, str(root / 'tools' / host_checker)] +
                            host_args + [str(run / 'error.log')], check=True)
     except (OSError, subprocess.SubprocessError) as error:

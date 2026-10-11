@@ -1,0 +1,13 @@
+local source = debug.getinfo(1, 'S').source:sub(2)
+_G.noki5210_pin_sms_after_submit = function(press, snapshot)
+    assert(emu.wait(1.2))
+    snapshot('sms_rejected')
+    assert(emu.wait(3.8))
+    press('End')
+    assert(emu.wait(4))
+    snapshot('recovered')
+    press('Left Softkey / Menu')
+    assert(emu.wait(2))
+    snapshot('sms_recovery_menu')
+end
+dofile(assert(source:match('^(.*[/])')) .. 'noki5210_pin_outgoing_sms.lua')
