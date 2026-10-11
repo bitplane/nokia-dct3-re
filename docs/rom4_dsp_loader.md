@@ -1824,6 +1824,12 @@ The executable `6f82/0c01` ADD and `6f83/0c21` SUB vectors separately assert
 that their A results (14 and 6) leave B's full 40-bit `8176543210` sentinel
 unchanged. `make check-c54x-core` verifies these assertions; they do not
 establish other source/destination selections or physical pipeline timing.
+An additional 24-case execution matrix verifies ADD and SUB with all four
+A/B source-destination selections and shifts -1, 0 and +1. Memory is 8,
+initial A/B are 10/30, and explicit expected operands are 4/8/16; assertions
+also require unchanged memory and AR2, preservation of the unselected
+accumulator, legal execution and the two-word continuation. This does not
+cover all signed operands, shift magnitudes, saturation or pipeline timing.
 
 Immediate LD decodes shifts 0–16 and both destinations (34 forms), checked
 on ordinary and wrapping program pages with one literal extension. Unlike
