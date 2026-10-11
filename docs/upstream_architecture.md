@@ -101,7 +101,11 @@ and base cycle counts come from [TI SPRU172C](https://www.ti.com/lit/ug/spru172c
 and [SPRU131G, section 6](https://www.ti.com/lit/ug/spru131g/spru131g.pdf).
 This does not model a DA150 peripheral map, on-chip RAM aliases, external
 wait states or full pipeline timing. XPC and pending delayed-page state are
-save-registered; an extended-mode save/restore execution gate remains due.
+save-registered. `check-c54x-core` requires executed save/replay of pending
+far calls and returns after the first delay word: restored XPC/PC,
+accumulators, stack RAM and the remaining delay word reproduce the original
+continuation after those values are deliberately changed in the fixture.
+This does not establish full pipeline timing or a fitted handset DSP mask.
 
 The first semantic tranche covers the generic encodings exercised at the
 transform boundary for CALL/RET, RPT/RPTB, immediate auxiliary-register loads,
