@@ -108,6 +108,8 @@ def main():
     outgoing = parser.add_mutually_exclusive_group()
     outgoing.add_argument('--outgoing-connected-signaling', action='store_true',
                           help='physically connect and end a real SIP dialog without speech acceptance')
+    outgoing.add_argument('--incoming-connected-signaling', action='store_true',
+                          help='physically answer and end a real SIP dialog without speech acceptance')
     outgoing.add_argument('--outgoing-busy', action='store_true',
                         help='physically dial 1234567 against a real SIP 486 response')
     outgoing.add_argument('--outgoing-unavailable', action='store_true',
@@ -121,7 +123,7 @@ def main():
     args = parser.parse_args()
     outgoing_failure = args.outgoing_busy or args.outgoing_unavailable
     outgoing_run = outgoing_failure or args.restore_outgoing_pending or args.outgoing_connected_signaling
-    if args.restore_idle and (outgoing_run or args.restore_incoming_alerting):
+    if args.restore_idle and (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_alerting):
         parser.error('--restore-idle cannot be combined with outgoing failure')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
@@ -137,6 +139,7 @@ def main():
                    '-cfg_directory', str(run / 'cfg'), '-noreadconfig',
                    '-debug', '-debugger', 'none', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / (
+                       'noki8890_sip_incoming_connected.lua' if args.incoming_connected_signaling else
                        'noki8890_sip_outgoing_pending_restore.lua' if args.restore_outgoing_pending else
                        'noki8890_outgoing_call_input.lua' if outgoing_failure or args.outgoing_connected_signaling else
                        'noki8890_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
@@ -149,7 +152,9 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '8890',
-                   *(['--sip-response', '200', '--signaling-only'] if args.outgoing_connected_signaling else
+                   *(['--incoming', '--signaling-only', '--ready-file',
+                      str(run / 'snap/8890_sip_registered_idle.png')] if args.incoming_connected_signaling else
+                     ['--sip-response', '200', '--signaling-only'] if args.outgoing_connected_signaling else
                      ['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', '480' if args.outgoing_unavailable else '486'] if outgoing_failure else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
@@ -168,6 +173,21 @@ def main():
                 verify_outgoing((run / 'error.log').read_text(errors='replace'), configured_gsm900=True)
             if args.restore_outgoing_pending:
                 check_alerting_restoration((run / 'error.log').read_text(errors='replace'), outgoing=True)
+        elif args.incoming_connected_signaling:
+            text = (run / 'error.log').read_text(errors='replace')
+            check_output(text)
+            check_output((run / 'console.log').read_text(errors='replace'))
+            verify_stage(text, runtime=True, selftest=True)
+            from tools.noki8890_incoming_call_check import verify as verify_incoming
+            verify_incoming(text, caller='5551234', configured_gsm900=True)
+            storage = (run / 'nvram/nsb6hle/sim_card').read_bytes()
+            if len(storage) < 1611 or storage[1604:1609] != bytes.fromhex('00f1100001') or storage[1610] != 0:
+                raise ValueError('incoming cleanup lacks persisted laboratory SIM location')
+            for name in ('8890_sip_registered_idle.png', '8890_after_incoming_call.png'):
+                with Image.open(run / 'snap' / name) as frame:
+                    digest = hashlib.sha256(frame.convert('L').crop((0, 8, 84, 48)).tobytes()).hexdigest()
+                    if frame.size != (84, 48) or digest != FRAMES['8890_sip_registered_idle.png']:
+                        raise ValueError('incoming cleanup differs from reviewed idle content: ' + name)
         else:
             check_product_result(run, args.restore_idle)
             if args.restore_incoming_alerting:
@@ -175,7 +195,8 @@ def main():
         subprocess.run([sys.executable, str(root / 'tools/noki8890_registration_check.py'),
                         '--configured-gsm900', str(run / 'error.log')], check=True)
         (run / 'acceptance.json').write_text(json.dumps({
-            'machine': 'nsb6hle', 'scenario': ('outgoing-sip-connected-signaling' if args.outgoing_connected_signaling else
+            'machine': 'nsb6hle', 'scenario': ('incoming-sip-connected-signaling' if args.incoming_connected_signaling else
+                                             'outgoing-sip-connected-signaling' if args.outgoing_connected_signaling else
                                              'outgoing-sip-pending-restore' if args.restore_outgoing_pending else
                                              'incoming-sip-alerting-restore' if args.restore_incoming_alerting else
                                              'outgoing-sip-unavailable' if args.outgoing_unavailable else

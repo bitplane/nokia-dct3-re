@@ -33,14 +33,17 @@ class ConnectedSignalingTest(unittest.TestCase):
             (root / 'error.log').write_text(log)
             args = SimpleNamespace(product=product, incoming=incoming, signaling_only=True)
             remote = 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]'
-            checker = ('tools.noki8890_outgoing_call_check.verify' if product == '8890' else
+            checker = (('tools.noki8890_incoming_call_check.verify' if incoming else
+                        'tools.noki8890_outgoing_call_check.verify') if product == '8890' else
                        ('tools.noki6250_call_check.verify' if incoming else
                         'tools.noki6250_call_check.verify_outgoing') if product == '6250' else
                        'tools.noki6210_incoming_call_check.verify' if incoming else
                        'tools.noki6210_outgoing_call_check.verify')
             with patch(checker) as verify_call:
                 verify_success(root, remote, args)
-                if incoming and product == '6250':
+                if incoming and product == '8890':
+                    verify_call.assert_called_once_with(log, caller='5551234', configured_gsm900=True)
+                elif incoming and product == '6250':
                     verify_call.assert_called_once_with(log, configured_carrier=True)
                 elif incoming:
                     verify_call.assert_called_once_with(log)
@@ -59,6 +62,31 @@ class ConnectedSignalingTest(unittest.TestCase):
         self.assertFalse(result['speech_tested'])
         with self.assertRaises(RuntimeError):
             self.run_check({'uplink': 1}, product='8890')
+
+    def test_8890_incoming_uses_own_caller_and_gsm900_contract(self):
+        result = self.run_check({'uplink': 0}, product='8890', incoming=True)
+        self.assertEqual(result['caller'], '5551234')
+        self.assertNotIn('dialed_digits', result)
+        self.assertFalse(result['speech_tested'])
+        for transform in (
+                lambda text: text.replace('SIP physical answer identity=(1, 1)',
+                                          'SIP physical answer identity=(2, 1)'),
+                lambda text: text + 'SIP physical answer identity=(1, 1)\n'):
+            with self.assertRaises(RuntimeError):
+                self.run_check({'uplink': 0}, product='8890', incoming=True,
+                               bridge_transform=transform)
+
+    def test_8890_signaling_scope_rejects_restoration_and_media(self):
+        with tempfile.TemporaryDirectory() as directory:
+            ready = str(Path(directory) / 'not-yet-captured.png')
+            for options in (['--restore-outgoing'], ['--restore-call'], ['--record-media'],
+                            ['--calls', '2'], ['--incoming', '--restore-call', '--ready-file', ready]):
+                with self.subTest(options=options), \
+                        patch('sys.argv', ['gate', '--pjsua', 'unused', '--run-dir', 'unused',
+                                           '--product', '8890', '--signaling-only'] + options), \
+                        patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit) as error:
+                    main()
+                self.assertEqual(error.exception.code, 2)
 
     def test_6250_uses_own_carrier_checker_without_promoting_speech(self):
         result = self.run_check({'uplink': 0, 'downlink': 300}, product='6250')

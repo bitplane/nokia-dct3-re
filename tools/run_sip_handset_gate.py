@@ -233,6 +233,9 @@ def verify_success(root, remote_text, args):
             if args.product == '6250':
                 from tools.noki6250_call_check import verify as verify_call
                 verify_call(log, configured_carrier=True)
+            elif args.product == '8890':
+                from tools.noki8890_incoming_call_check import verify as verify_call
+                verify_call(log, caller='5551234', configured_gsm900=True)
             else:
                 from tools.noki6210_incoming_call_check import verify as verify_call
                 verify_call(log)
@@ -657,7 +660,8 @@ def main():
         (not args.restore_outgoing or not args.incoming) and not args.restore_idle and
         not args.cancel_incoming)
     signaling_connected = signaling_connected or (
-        args.signaling_only and args.product == '8890' and not args.incoming and
+        args.signaling_only and args.product == '8890' and
+        (not args.incoming or args.ready_file is not None) and
         args.sip_response == 200 and args.calls == 1 and not args.record_media and
         not args.restore_call and not args.restore_outgoing and not args.restore_idle and
         not args.cancel_incoming)

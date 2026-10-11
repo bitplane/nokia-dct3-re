@@ -458,7 +458,7 @@ The generic SIP runner rejects media-acceptance fixtures for signaling-only
 products `6210`, `6250` and `8890`. The 6210 additionally admits only the
 single incoming/outgoing SIP-200 `--signaling-only` fixtures described below.
 The 6250 admits its separately checked incoming/outgoing SIP-200 signaling fixtures;
-the 8890 admits only its separately checked outgoing SIP-200 signaling fixture.
+the 8890 admits its separately checked incoming/outgoing SIP-200 signaling fixtures.
 recording and multiple calls remain excluded. Connected restoration is
 limited to the independently verified signaling-only fixtures below.
 The 8210 and 8850 have narrowly scoped
@@ -571,9 +571,18 @@ checker requires decoded Send/End, traffic assignment, CONNECT/acknowledgement,
 complete CC/RR release with product-owned configuration bodies and resumed
 paging. Reviewed pre/post idle pixels and persistent laboratory SIM location
 must hold. Zero bridge uplink and no HLE codec tick are required; remote PCM
-reception remains a host-side observation, not handset playback. Incoming
-answered SIP, recording, connected restoration and native speech remain
-unproved for this product.
+reception remains a host-side observation, not handset playback. Recording,
+connected restoration and native speech remain unproved for this product.
+
+`verify-8890-sip-incoming-connected-signaling` captures fresh registered
+idle at 45 seconds after physical clock/date settlement, then admits caller
+`5551234`. The existing physical fixture answers at 48 seconds and ends at
+56 seconds. The own caller-specific SETUP, carrier-60 traffic/release bodies,
+decoded keys, full CC/RR release and resumed paging must pass, along with
+reviewed pre/post idle pixels and persistent SIM location. The original
+identity's unique Answer precedes SIP confirmation. Zero bridge uplink and
+no HLE codec ticks keep this signaling-only; remote PCM reception is not
+handset playback, and no unsupported PCM clock is enabled.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:
