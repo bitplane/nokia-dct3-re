@@ -2468,7 +2468,7 @@ upload finds four `3766/3767` operands, all in this dispatcher: two reads
 and its two previous-command updates. This is direct-reference coverage,
 not proof that no indirect writer or initialization record exists.
 Reproduce it with `make check-mu4-bootstrap-original
-MU4_BOOTSTRAP_SOURCE_RUN=tmp/research-runs-20261010/run_mu4-retained.Yh686K
+MU4_BOOTSTRAP_SOURCE_RUN=tmp/native-gates/mu4-retained
 MU4_BOOTSTRAP_BIOS=bootreccontrol`.
 Its receive PASS label proves native packet receipt and acknowledgement,
 not successful control-handler execution or recording.
@@ -2479,29 +2479,49 @@ boundary. `tmp/mu4-recorder-control-xc/error.log` receives
 selector `36`/parameter `4` at 11.406 seconds with previous class/selector
 `1/36`; native receipt/acknowledgement passes, recording completion remains
 unclaimed.
-The current replay after staged interrupt entry and vector-fetch IFR clearance
-is `tmp/c54x-entry-recorder-save/error.log`. It receives control at 12.236
-seconds with previous selector `49`. This is unchanged from the earlier
-operand-fetch/CALA replay; entry micro-operation ordering did not resolve
-the metadata transaction. This latency is an observation, not a calibrated
-peer delay or proof of correct foreground pipeline timing.
-Completion reaches `8009` and the resident image returns, but the endpoint
-is `02:3da4`, ST1 `6900`, IMR `0ac9`, IFR `0c78`, cursor 28 and RX-ready set: 50
-application calls, two dequeued messages and one processing-wait entry.
-RX/TX are 37/47, with three responses and two ACKs; TIM/PRD/TCR are
-`0001/0001/0000`. It exits 3 because metadata has not been delivered.
-The terminal snapshot remains identical to the earlier replay, so the newer
-CPU corrections do not resolve this transaction. The source and isolated NAND
-copy compare byte-for-byte after the run with NVRAM saving disabled and no
-firmware-state forcing. The control fixture's working warm dispatch does
-not close the save fixture's timer/interrupt recognition and drain boundary.
+With input-derived CLKMD rates and the C5416-compatible reset profile,
+`bootrecsave` receives control at 10.086 seconds with previous selector `49`.
+The resident image returns at approximately 10.718 seconds and completion
+reaches `8009`. The 20-second endpoint is `02:3d79`, ST1 `2900`, IMR `0ac9`,
+IFR `0c78`, cursor 27/50 and RX-ready set: 611 application calls, two dequeued
+messages, 23 processing-wait entries and 611 processing-return observations.
+RX/TX are 36/47, with three responses and two ACKs; TIM/PRD/TCR are
+`0000/0001/0000`. It exits 3 because metadata has not been delivered.
+These counts and endpoint PC are observations, not acceptance constants.
+Correcting the reset/PLL execution rates changes progress and phase but does
+not remove the warm timer/receive stall. The source and isolated NAND copy
+compare byte-for-byte with NVRAM saving disabled and no firmware-state forcing.
+The control fixture's working warm dispatch does not close the save fixture's
+timer/interrupt recognition and drain boundary.
 Packet-delay tuning is not a substitute for that CPU contract.
 
 Resident command and loader addresses are reused by the recorder overlay;
 their resident trace counters must stop when that overlay takes ownership.
 
-Reproduce with `make check-mu4-bootstrap-original
-MU4_BOOTSTRAP_SOURCE_RUN=run_mu4-retained.Yh686K MU4_BOOTSTRAP_BIOS=bootrecord`.
+Create a fresh firmware-owned source first:
+
+```sh
+make check-mu4-retained-original MU4_RETAINED_RUN_DIR=tmp/native-gates/mu4-retained
+make check-mu4-bootstrap-original \
+  MU4_BOOTSTRAP_SOURCE_RUN=tmp/native-gates/mu4-retained \
+  MU4_BOOTSTRAP_RUN_DIR=tmp/native-gates/mu4-recorder \
+  MU4_BOOTSTRAP_BIOS=bootrecsave
+```
+
+Use new output paths for subsequent runs; extraction does not overwrite them.
+Without explicit output paths both gates allocate unique directories under
+the disk-backed `NATIVE_SCRATCH_ROOT` (default `tmp/native-gates`).
+`MU4_STORAGE_SECONDS` defaults to 1,800 emulated seconds: the one-millisecond
+upload cadence plus two complete readbacks at the compatible reset divider
+outlast the former 1,200-second reset-fixture limit. This is an outer harness
+deadline, not a timer/serial/NAND calibration change.
+Fresh original provisioning, reset/reload and fresh-process status service
+pass with this clock profile. The resulting NAND is byte-identical to the
+previous firmware-created source, without donor provisioning or a runtime
+snapshot. The independent complete-startup `bootstatus` gate also passes.
+The metadata gate currently fails at the stated receive boundary; that failure
+must not be treated as recorder acceptance. Use `bootrecord` for the initial
+recorder-loader diagnostic.
 This runs in an isolated NAND copy, forbids NVRAM saving and verifies that
 the source disk file remains unchanged. `bootstatus` supplies the independent
 complete-startup lifecycle observation.

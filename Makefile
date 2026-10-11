@@ -1050,6 +1050,9 @@ check-dsp-rom4-cosim:
 .PHONY: check-mu4-storage-original
 # Native evidence can include large NAND images; never default to tmpfs.
 NATIVE_SCRATCH_ROOT ?= $(abspath tmp/native-gates)
+# The 1 ms/byte upload plus two complete readbacks at the evidenced reset
+# divider exceed 1200 emulated seconds in the reset/retained fixture.
+MU4_STORAGE_SECONDS ?= 1800
 check-mu4-storage-original: build
 	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
 		tmp="$(if $(MU4_STORAGE_RUN_DIR),$(abspath $(MU4_STORAGE_RUN_DIR)),$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-storage.XXXXXX"))"; \
@@ -1075,7 +1078,7 @@ check-mu4-storage-original: build
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -rompath "$$tmp/roms" \
 			-video none -sound none -nothrottle -debugger none -log \
 			$(if $(MU4_STORAGE_NVRAM_DIR),-nvram_directory "$(abspath $(MU4_STORAGE_NVRAM_DIR))" -nvram_save,-nonvram_save) \
-			-bios $(or $(MU4_STORAGE_BIOS),setup) -seconds_to_run 1200 >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
+			-bios $(or $(MU4_STORAGE_BIOS),setup) -seconds_to_run $(MU4_STORAGE_SECONDS) >output.log 2>&1 || { cat output.log; cat error.log; exit 1; }; \
 		cat output.log; cat error.log; grep -q 'mu4_storage_original: PASS' error.log; \
 		grep -q 'mu4_storage_flush: PASS' error.log; grep -q 'mu4_storage_mount: PASS' error.log; \
 		grep -q 'mu4_storage_template: PASS' error.log; grep -q 'mu4_storage_format: PASS' error.log; \
@@ -1129,7 +1132,8 @@ check-mu4-storage-original: build
 .PHONY: check-mu4-retained-original
 check-mu4-retained-original:
 	# The complete 66 MiB NAND and its read-only copy exceed some /tmp quotas.
-	@set -eu; tmp="$$(mktemp -d '$(abspath run_mu4-retained).XXXXXX')"; \
+	@set -eu; mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
+		tmp="$(if $(MU4_RETAINED_RUN_DIR),$(abspath $(MU4_RETAINED_RUN_DIR)),$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-retained.XXXXXX"))"; \
 		$(MAKE) check-mu4-storage-original MU4_STORAGE_BIOS=reset \
 			MU4_STORAGE_RUN_DIR="$$tmp/seed" MU4_STORAGE_NVRAM_DIR="$$tmp/nvram"; \
 		mkdir -p "$$tmp/nvram/mu4nand_14" "$$tmp/retained"; \
@@ -1171,7 +1175,8 @@ check-mu4-bootstrap-original: build
 		bios="$(or $(MU4_BOOTSTRAP_BIOS),bootstrap)"; \
 		case "$$bios" in bootstrap) nvtag=mu4nand_15;; bootstatus) nvtag=mu4nand_16;; bootreset) nvtag=mu4nand_17;; bootreplay) nvtag=mu4nand_18;; bootmeasure) nvtag=mu4nand_19;; bootrecord) nvtag=mu4nand_20;; bootrecordram) nvtag=mu4nand_21;; bootreccontrol) nvtag=mu4nand_22;; bootrecpoll) nvtag=mu4nand_23;; bootrecsave) nvtag=mu4nand_24;; \
 			*) echo 'Unsupported MU4 bootstrap diagnostic BIOS' >&2; exit 1;; esac; \
-		tmp="$$(mktemp -d '$(abspath run_mu4-bootstrap).XXXXXX')"; \
+		mkdir -p "$(NATIVE_SCRATCH_ROOT)"; \
+		tmp="$(if $(MU4_BOOTSTRAP_RUN_DIR),$(abspath $(MU4_BOOTSTRAP_RUN_DIR)),$$(mktemp -d "$(NATIVE_SCRATCH_ROOT)/mu4-bootstrap.XXXXXX"))"; \
 		mkdir -p "$$tmp/nvram/$$nvtag"; \
 		cp "$$source/nvram/mu4nand_13/nand" "$$tmp/nvram/$$nvtag/nand"; \
 		cd "$$tmp"; $(abspath $(MAME_DIR)/mame) mu4nand -bios "$$bios" \
