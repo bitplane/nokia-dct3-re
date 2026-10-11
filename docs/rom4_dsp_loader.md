@@ -2595,6 +2595,19 @@ start with INTM set and require it to remain set across return and replay.
 Delayed far returns, general stack conflicts and pending-interrupt timing
 remain unvalidated.
 
+The exact `f6bb`/`f7bb` RSBX/SSBX INTM forms establish protection in Decode
+and retain it through retirement of the next complete instruction, including
+its extension words (SPRU131G section 6.10.7). This is instruction-owned
+state, not a fixed clock delay; both the following-instruction latch and
+per-stage protection survive save/restore. Six cases cover both forms with
+one-, two- and three-word followers, injecting a pending maskable interrupt
+after INTM Decode and replaying a checkpoint during follower Decode. RSBX
+permits one vector fetch only after the follower retires; SSBX leaves the
+request pending without a vector fetch. The three-word store commits once
+per replay leg. NMI interaction, adjacent INTM operations and silicon phase
+placement are not validated by these cases. Handset configurations still
+use the atomic frontend; this does not resolve the MU4 recorder boundary.
+
 The original four short/long-period, direct/indirect-mask streams run through
 this staged subset without an unsupported-opcode stop. Each records one
 foreground fetch, one mask write and marker 1, with SP back at `1000`, but

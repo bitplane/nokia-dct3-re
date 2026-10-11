@@ -691,6 +691,8 @@ void tms320c54x_device::device_start()
 	save_item(NAME(m_pipeline_valid));
 	save_item(NAME(m_pipeline_early_write_deferred));
 	save_item(NAME(m_pipeline_peripheral_wait_paid));
+	save_item(NAME(m_pipeline_intm_protected));
+	save_item(NAME(m_pipeline_intm_follow));
 	save_item(NAME(m_pipeline_decode_remaining));
 	save_item(NAME(m_pipeline_decode_extension));
 	save_item(NAME(m_pipeline_decode_word));
@@ -1689,6 +1691,8 @@ void tms320c54x_device::reset_pipeline()
 {
 	m_pipeline_early_write_deferred.fill(false);
 	m_pipeline_peripheral_wait_paid.fill(false);
+	m_pipeline_intm_protected.fill(false);
+	m_pipeline_intm_follow = false;
 	m_pipeline_valid.fill(false);
 	m_pipeline_decode_remaining = 0;
 	m_pipeline_decode_extension = 0;
@@ -1755,10 +1759,12 @@ void tms320c54x_device::pipeline_step()
 		m_pipeline_immediate[stage] = m_pipeline_immediate[stage - 1];
 		m_pipeline_early_write_deferred[stage] = m_pipeline_early_write_deferred[stage - 1];
 		m_pipeline_peripheral_wait_paid[stage] = m_pipeline_peripheral_wait_paid[stage - 1];
+		m_pipeline_intm_protected[stage] = m_pipeline_intm_protected[stage - 1];
 	}
 	m_pipeline_valid[0] = false;
 	m_pipeline_early_write_deferred[0] = false;
 	m_pipeline_peripheral_wait_paid[0] = false;
+	m_pipeline_intm_protected[0] = false;
 	if (m_pipeline_flush_front) m_pipeline_valid[2] = false;
 	if (m_pipeline_decode_flush)
 	{
@@ -1849,9 +1855,10 @@ void tms320c54x_device::pipeline_step()
 			(u8(word) == 0xf8 || (u8(word) < 0x98 && (BIT(word, 7) || !BIT(m_st1, 14))));
 		bool const fast_return = word == 0xf49b || word == 0xf69b;
 		bool const far_return = (word & 0xfffe) == 0xf4e4;
+		bool const intm_bit = word == 0xf6bb || word == 0xf7bb;
 		bool const branch = word == 0xf073 || word == 0xf273;
 		bool const dagen_immediate = (word & 0xff00) == 0x7700 && u8(word) >= 0x10 && u8(word) <= 0x19;
-		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
+		if (m_pipeline_valid[2] && word != 0xf495 && !fast_return && !far_return && !intm_bit && !branch && !dagen_immediate && (word & 0xff00) != 0xe800 &&
 			(word & 0xff00) != 0xe900 && word != 0x4a1e && !short_load && !direct_store && !immediate_store && !long_load && !rmw)
 		{
 			logerror("%s: unsupported staged C54x form %04x at %06x\n",
@@ -1869,6 +1876,13 @@ void tms320c54x_device::pipeline_step()
 			if (far_return) m_pipeline_flush_front = true;
 		}
 		if (m_pipeline_valid[2] && dagen_immediate) m_pipeline_early_write_deferred[2] = false;
+		if (m_pipeline_valid[2])
+		{
+			// SPRU131G 6.10.7: protection starts in Decode and covers the
+			// next complete instruction, including all its extension words.
+			m_pipeline_intm_protected[2] = m_pipeline_intm_follow || intm_bit;
+			m_pipeline_intm_follow = intm_bit;
+		}
 	}
 	if (m_pipeline_valid[3] && (m_pipeline_word[3] & 0xff00) == 0x7700)
 	{
@@ -1953,6 +1967,8 @@ void tms320c54x_device::pipeline_step()
 		++m_opcode_count[m_op];
 		if (m_op == 0xf49b || m_op == 0xf69b)
 			m_st1 &= ~u16(0x0800);
+		else if (m_op == 0xf6bb || m_op == 0xf7bb)
+			m_st1 = BIT(m_op, 8) ? m_st1 | 0x0800 : m_st1 & ~u16(0x0800);
 		else if ((m_op & 0xfffe) == 0xf4e4)
 		{
 			m_xpc = m_extended_program ? m_pipeline_operand[5] & 0x7f : 0;
@@ -2001,6 +2017,7 @@ void tms320c54x_device::pipeline_step()
 		}
 		if (m_pipeline_vector_pending && u16(address) == m_interrupt_vector_pc)
 			m_pipeline_vector_pending = false;
+		m_pipeline_intm_protected[5] = false;
 	}
 
 	if (m_pipeline_valid[4] && (m_pipeline_word[4] & 0xfffe) == 0xf4e4)
@@ -2022,7 +2039,10 @@ void tms320c54x_device::pipeline_step()
 	}
 	// Acceptance occurs after this cycle's Decode. Retain decoded slots,
 	// replace the next Decode with INTR, and drain the prefetched bus word.
-	if (!m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
+	bool intm_protected = m_pipeline_intm_follow;
+	for (unsigned stage = 0; stage < 5; ++stage)
+		intm_protected |= m_pipeline_valid[stage] && m_pipeline_intm_protected[stage];
+	if ((!intm_protected || m_nmi_pending) && !m_interrupt_entry_stage && !m_pipeline_vector_pending && !m_pipeline_decode_remaining &&
 		!m_pipeline_control_words && accept_interrupt())
 	{
 		m_pipeline_return_pc = u16(m_pipeline_valid[1] ? m_pipeline_address[1] :

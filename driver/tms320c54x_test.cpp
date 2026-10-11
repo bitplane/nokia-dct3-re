@@ -3000,6 +3000,52 @@ private:
 		m_phase = 251290; m_cpu->resume(SUSPEND_REASON_DISABLE);
 		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
 	}
+	void start_pipeline_intm(unsigned variant = 0)
+	{
+		m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+		m_pipeline_peripheral_case = variant;
+		bool const set = BIT(variant, 0);
+		unsigned const words = variant / 2 + 1;
+		auto &program = m_cpu->space(AS_PROGRAM);
+		for (unsigned i = 0; i < 32; ++i) program.write_word(0x600 + i, 0xf495);
+		for (unsigned i = 0; i < 24; ++i) program.write_word(0x44 + i, 0xf495);
+		program.write_word(0x600, set ? 0xf7bb : 0xf6bb);
+		program.write_word(0x601, words == 1 ? 0xe842 : words == 2 ? 0xf020 : 0x76f8);
+		if (words >= 2) program.write_word(0x602, words == 2 ? 0x1234 : 0x2000);
+		if (words == 3) program.write_word(0x603, 0x1234);
+		program.write_word(0x44, 0xe955);
+		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
+		m_cpu->set_state_int(tms320c54x_device::STATE_PMST, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_ST1, set ? 0 : 0x800);
+		m_cpu->set_state_int(tms320c54x_device::STATE_A, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_B, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_SP, 0x1000);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 0);
+		m_cpu->set_state_int(tms320c54x_device::STATE_IMR, 2);
+		m_cpu->space(AS_DATA).write_word(0x2000, 0);
+		m_cpu->set_state_int(STATE_GENPC, 0x600);
+		m_cpu->set_pipeline_frontend(true);
+		m_pipeline_replay = false; m_pipeline_expected_cycle = 1;
+		m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+		m_pipeline_fetch_tap = program.install_read_tap(0x44, 0x44, "staged_intm_vector",
+			[this, words](offs_t, u16 &, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(m_cpu->pipeline_cycles() > 6 + words &&
+					(words == 3 ? m_pipeline_store_writes == 1 :
+					m_cpu->state_int(tms320c54x_device::STATE_A) == (words == 1 ? 0x42 : 0x1234)),
+					"INTM guard retires the complete follower before vector Fetch");
+				++m_pipeline_operand_reads;
+			});
+		m_pipeline_write_tap = m_cpu->space(AS_DATA).install_write_tap(0x2000, 0x2000, "staged_intm_follower",
+			[this](offs_t, u16 &value, u16) {
+				if (machine().side_effects_disabled()) return;
+				expect(value == 0x1234 && m_pipeline_operand_reads == 0, "INTM-protected absolute store precedes IRQ acknowledgement");
+				++m_pipeline_store_writes;
+			});
+		m_phase = 251310; m_cpu->resume(SUSPEND_REASON_DISABLE);
+		m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
+	}
 	void start_pll_transition_case()
 	{
 		// MMIO conformance, not handset provisioning. Suspend instruction
@@ -23760,7 +23806,7 @@ private:
 				m_pipeline_operand_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
 				if (m_pipeline_peripheral_case < 11) { start_pipeline_far_return(m_pipeline_peripheral_case + 1); return; }
 				osd_printf_info("TMS320C54x staged far return: PASS cases=12 fret=6 frete=6 stack_reads=5,6 target_fetch=8 target_execute=12 restore=12 duplicate_reads=0 silicon_phase_claim=0\n");
-				start_timer_boundary_probe(0, true); return;
+				start_pipeline_intm(); return;
 			}
 			++m_pipeline_expected_cycle;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
@@ -23768,6 +23814,47 @@ private:
 		if (m_phase == 251300)
 		{
 			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251290;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251310)
+		{
+			u64 const cycle = m_cpu->pipeline_cycles();
+			bool const set = BIT(m_pipeline_peripheral_case, 0);
+			unsigned const words = m_pipeline_peripheral_case / 2 + 1;
+			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "INTM staged stream advances without unsupported forms");
+			if (cycle == 3) m_cpu->set_state_int(tms320c54x_device::STATE_IFR, 2);
+			if (cycle == 4 && !m_pipeline_replay)
+			{
+				m_saved_pipeline.str({}); m_saved_pipeline.clear();
+				expect(machine().save().write_stream(m_saved_pipeline) == STATERR_NONE, "Save Decode-owned INTM follower protection with pending IRQ");
+			}
+			if (cycle == 20)
+			{
+				expect(m_pipeline_operand_reads == unsigned(!set) && m_pipeline_store_writes == unsigned(words == 3) &&
+					m_cpu->state_int(tms320c54x_device::STATE_B) == (set ? 0 : 0x55) &&
+					m_cpu->state_int(tms320c54x_device::STATE_IFR) == (set ? 2 : 0) &&
+					m_cpu->state_int(tms320c54x_device::STATE_SP) == (set ? 0x1000 : 0xfff),
+					"RSBX admits one IRQ only after the follower; SSBX retains pending IRQ without vector entry");
+				if (!m_pipeline_replay)
+				{
+					m_pipeline_replay = true; m_pipeline_operand_reads = m_pipeline_store_writes = 0;
+					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
+					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE, "Restore Decode-owned INTM protection and multiword follower");
+					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
+					m_pipeline_expected_cycle = 5; m_phase = 251320;
+					m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+				}
+				m_pipeline_write_tap.remove(); m_pipeline_fetch_tap.remove(); m_cpu->set_pipeline_frontend(false);
+				if (m_pipeline_peripheral_case < 5) { start_pipeline_intm(m_pipeline_peripheral_case + 1); return; }
+				osd_printf_info("TMS320C54x staged INTM protection: PASS cases=6 follower_words=1,2,3 restore=6 duplicate_vectors=0\n");
+				start_timer_boundary_probe(0, true); return;
+			}
+			++m_pipeline_expected_cycle;
+			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
+		}
+		if (m_phase == 251320)
+		{
+			m_cpu->resume(SUSPEND_REASON_DISABLE); m_phase = 251310;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock())); return;
 		}
 		if (m_phase >= 72000 && m_phase < 72064)

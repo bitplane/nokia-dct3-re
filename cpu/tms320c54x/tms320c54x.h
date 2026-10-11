@@ -238,6 +238,8 @@ private:
 	std::array<bool, 6> m_pipeline_valid = {};
 	std::array<bool, 6> m_pipeline_early_write_deferred = {};
 	std::array<bool, 6> m_pipeline_peripheral_wait_paid = {};
+	std::array<bool, 6> m_pipeline_intm_protected = {};
+	bool m_pipeline_intm_follow = false;
 	u8 m_pipeline_decode_remaining = 0;
 	u16 m_pipeline_decode_extension = 0;
 	u16 m_pipeline_decode_word = 0;
