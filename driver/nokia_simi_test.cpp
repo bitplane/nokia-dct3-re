@@ -161,7 +161,41 @@ private:
 			m_timer->adjust(attotime::from_msec(40)); return;
 		case 8:
 			compare_result(true);
-			osd_printf_info("SIMI restoration: PASS checkpoints=2 partial_apdu=1 pending_rx=1 exact_irq_order=1 exact_deadlines=1 handset_claim=0\n");
+			clear_capture(); transmit({0xa0, 0x20, 0, 2, 8});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 9:
+			expect(m_count == 1 && m_bytes[0] == 0x20, "VERIFY CHV procedure byte");
+			clear_capture(); transmit({0x30, 0x30, 0x30, 0x30, 0xff, 0xff, 0xff, 0xff});
+			expect(m_count == 0, "failed VERIFY status is still queued");
+			save_checkpoint();
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 10:
+			expect(m_count == 2 && m_bytes[0] == 0x98 && m_bytes[1] == 4,
+				"failed VERIFY consumes one attempt");
+			remember_result(); clear_capture(); transmit({0xa0, 0x20, 0, 2, 8});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 11:
+			expect(m_count == 1 && m_bytes[0] == 0x20, "second VERIFY procedure byte");
+			clear_capture(); transmit({0x30, 0x30, 0x30, 0x30, 0xff, 0xff, 0xff, 0xff});
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 12:
+			expect(m_count == 2 && m_bytes[0] == 0x98 && m_bytes[1] == 4,
+				"second failed VERIFY status");
+			clear_capture(); transmit({0xa0, 0xf2, 0, 0, 22});
+			m_timer->adjust(attotime::from_msec(40)); return;
+		case 13:
+			expect(m_count == 25 && m_bytes[19] == 0x83 && m_bytes[21] == 0x81,
+				"STATUS proves second failed VERIFY consumed another attempt before restore");
+			restore_checkpoint();
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 14:
+			compare_result(true); clear_capture(); transmit({0xa0, 0xf2, 0, 0, 22});
+			m_timer->adjust(attotime::from_msec(40)); return;
+		case 15:
+			expect(m_count == 25 && m_bytes[0] == 0xf2 && m_bytes[19] == 0x83 && m_bytes[21] == 0x82 &&
+				m_bytes[23] == 0x90 && m_bytes[24] == 0,
+				"STATUS reports restored PIN2 attempts and unchanged PIN1 attempts, without repeating VERIFY");
+			osd_printf_info("SIMI restoration: PASS checkpoints=3 partial_apdu=1 pending_rx=1 security_attempts=1 exact_irq_order=1 exact_deadlines=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		fatalerror("unexpected SIMI fixture phase");

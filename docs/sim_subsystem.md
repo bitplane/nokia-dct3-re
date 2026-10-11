@@ -107,6 +107,13 @@ body byte still in TX and the card awaiting that byte, then compares the replaye
 `9f 16` status and TX-empty/RX-ready sequence. A second checkpoint during GET
 RESPONSE replays the procedure byte, 22-byte MF metadata and `90 00` status,
 with identical RX-prefix, interrupt ordering and pending timer deadlines.
+A third checkpoint saves a failed VERIFY CHV2 after its attempt has been
+consumed but before its status is received. A second wrong PIN2 and STATUS
+prove one attempt remains before restore; replaying the saved status and
+issuing STATUS then prove two attempts remain, without repeating VERIFY.
+The security counter and queued response therefore restore together; the
+unchanged CHV1 counter is checked independently.
+Omitting the saved retry-counter array makes this final STATUS comparison fail.
 Work started after restore is compared by elapsed time; already-pending RX
 events retain their saved absolute deadlines. Omitting the card's saved
 body-reception latch makes the first replay fail; the unmodified devices pass.

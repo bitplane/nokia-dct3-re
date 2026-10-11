@@ -10,7 +10,8 @@ class SimiRestoreResultTest(unittest.TestCase):
         for text, status in (("", 0), (PASS, 3), (PASS + "\n" + PASS, 0),
                              (PASS + "\nFatal error: later failure", 0),
                              ("Error reading NVRAM file\n" + PASS, 0),
-                             (PASS.replace("checkpoints=2", "checkpoints=1"), 0)):
+                             (PASS.replace("checkpoints=3", "checkpoints=2"), 0),
+                             (PASS.replace("security_attempts=1", "security_attempts=0"), 0)):
             with self.subTest(text=text, status=status), self.assertRaises(ValueError):
                 check(text, status)
 

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 
-PASS = "SIMI restoration: PASS checkpoints=2 partial_apdu=1 pending_rx=1 exact_irq_order=1 exact_deadlines=1 handset_claim=0"
+PASS = "SIMI restoration: PASS checkpoints=3 partial_apdu=1 pending_rx=1 security_attempts=1 exact_irq_order=1 exact_deadlines=1 handset_claim=0"
 
 
 def check(text, returncode):
@@ -31,7 +31,7 @@ def main():
                                     stderr=subprocess.STDOUT, timeout=90)
         check((run / "console.log").read_text(), result.returncode)
         (run / "acceptance.json").write_text(json.dumps({
-            "result": "pass", "command": command, "checkpoints": 2,
+            "result": "pass", "command": command, "checkpoints": 3,
             "fixture_class": "controller/card conformance", "handset_claim": False,
         }, indent=2) + "\n")
     except (OSError, ValueError, subprocess.SubprocessError) as error:
