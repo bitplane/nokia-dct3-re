@@ -104,6 +104,8 @@ def main():
     outgoing = parser.add_mutually_exclusive_group()
     outgoing.add_argument('--outgoing-connected-signaling', action='store_true',
                           help='physically connect and end a SIP dialog without claiming speech')
+    outgoing.add_argument('--incoming-connected-signaling', action='store_true',
+                          help='physically answer and end an incoming SIP dialog without claiming speech')
     outgoing.add_argument('--outgoing-busy', action='store_true')
     outgoing.add_argument('--outgoing-unavailable', action='store_true')
     outgoing.add_argument('--restore-incoming-alerting', action='store_true')
@@ -111,14 +113,15 @@ def main():
     args = parser.parse_args()
     outgoing_status = 200 if args.outgoing_connected_signaling else 486 if args.outgoing_busy else 480 if args.outgoing_unavailable else None
     outgoing_run = outgoing_status or args.restore_outgoing_pending
-    if (outgoing_run or args.restore_incoming_alerting) and args.restore_idle:
+    if (outgoing_run or args.incoming_connected_signaling or args.restore_incoming_alerting) and args.restore_idle:
         parser.error('outgoing failures cannot use the incoming idle-restore fixture')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
         accessory, audit = prepare_run(run, root)
         apply_coherent_config(run / 'cfg/nhm3hle.cfg', root / 'fixtures/noki6250_host_gsm900/nhm3hle.cfg')
-        script = ('noki6250_sip_outgoing_pending_restore.lua' if args.restore_outgoing_pending else
+        script = ('noki6250_host_incoming_input.lua' if args.incoming_connected_signaling else
+                  'noki6250_sip_outgoing_pending_restore.lua' if args.restore_outgoing_pending else
                   'noki6250_sip_incoming_alerting_restore.lua' if args.restore_incoming_alerting else
                   'noki6250_call_observe.lua' if outgoing_status else
                   'noki6250_sip_idle_restore.lua' if args.restore_idle else 'noki6250_sip_cancel_observe.lua')
@@ -133,7 +136,9 @@ def main():
         command = [sys.executable, str(root / 'tools/run_sip_handset_gate.py'),
                    '--pjsua', str(args.pjsua.resolve()), '--run-dir', str(run),
                    '--product', '6250',
-                   *(['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
+                   *(['--incoming', '--signaling-only', '--ready-file',
+                      str(run / 'snap/6250_host_registered_idle.png')] if args.incoming_connected_signaling else
+                     ['--restore-outgoing', '--sip-response', '180'] if args.restore_outgoing_pending else
                      ['--sip-response', str(outgoing_status)] +
                      (['--signaling-only'] if args.outgoing_connected_signaling else []) if outgoing_status else
                      ['--incoming', '--restore-call', '--restore-phase', 'alerting', '--ready-file',
@@ -178,12 +183,25 @@ def main():
                 if frame.size != (96, 60) or hashlib.sha256(
                         frame.convert('L').crop((0, 8, 96, 60)).tobytes()).hexdigest() != FRAMES['6250_sip_after_cancel.png']:
                     raise ValueError('NHM-3 registered idle after failure differs')
+        elif args.incoming_connected_signaling:
+            text = (run / 'error.log').read_text(errors='replace')
+            check_output(text)
+            check_output((run / 'console.log').read_text(errors='replace'))
+            check_registration(text, (run / 'nvram/nhm3hle/sim_card').read_bytes())
+            from tools.noki6250_call_check import verify as verify_incoming
+            verify_incoming(text, configured_carrier=True)
+            for name in ('6250_host_registered_idle.png', '6250_call_3.png'):
+                with Image.open(run / 'snap' / name) as frame:
+                    if frame.size != (96, 60) or hashlib.sha256(
+                            frame.convert('L').crop((0, 8, 96, 60)).tobytes()).hexdigest() != FRAMES['6250_sip_after_cancel.png']:
+                        raise ValueError('NHM-3 incoming SIP idle pixels differ: ' + name)
         else:
             check_product_result(run, restore_idle=args.restore_idle,
                                  restore_alerting=args.restore_incoming_alerting)
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nhm3hle',
-            'scenario': ('outgoing-sip-pending-restore' if args.restore_outgoing_pending else
+            'scenario': ('incoming-sip-connected-signaling' if args.incoming_connected_signaling else
+                         'outgoing-sip-pending-restore' if args.restore_outgoing_pending else
                          'incoming-sip-alerting-restore' if args.restore_incoming_alerting else
                          'outgoing-sip-connected-signaling' if outgoing_status == 200 else
                          'outgoing-sip-busy' if outgoing_status == 486 else
@@ -199,7 +217,8 @@ def main():
         }, indent=2) + '\n')
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'6250 SIP signaling FAIL: {error}; inspect {run}\n')
-    print('6250 real SIP ' + (f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +
+    print('6250 real SIP ' + ('incoming connected' if args.incoming_connected_signaling else
+                            f'outgoing {outgoing_status}' if outgoing_status else 'CANCEL') +
           ' signaling PASS; initial-record comparison, speech unproved')
 
 

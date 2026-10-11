@@ -457,7 +457,7 @@ It does not inherit the five media-capable profiles' answered-call coverage.
 The generic SIP runner rejects media-acceptance fixtures for signaling-only
 products `6210`, `6250` and `8890`. The 6210 additionally admits only the
 single incoming/outgoing SIP-200 `--signaling-only` fixtures described below.
-The 6250 admits only its separately checked outgoing SIP-200 signaling fixture;
+The 6250 admits its separately checked incoming/outgoing SIP-200 signaling fixtures;
 recording and multiple calls remain excluded. Connected restoration is
 limited to the independently verified signaling-only fixtures below.
 The 8210 and 8850 have narrowly scoped
@@ -535,8 +535,16 @@ carrier-19 traffic and release contract, complete CC/RR clearing and resumed
 paging, with reviewed idle recovery and persistent SIM location. The SIP
 dialog confirms and releases normally, but uplink remains zero and no HLE
 codec tick is permitted. `sip-result.json` retains explicit non-speech and
-non-native scope. No 6210 PCM assumptions, incoming answered-call fixture or
-connected restoration is enabled for the 6250.
+non-native scope. No 6210 PCM assumptions or connected restoration is
+enabled for the 6250.
+
+`verify-6250-sip-incoming-connected-signaling` waits for a fresh registered
+idle frame before admitting caller `5551234`. Ordered unique Answer and SIP
+confirmation must belong to the original call identity. Physical Answer/End
+are checked through the own carrier-19 incoming CC/RR lifecycle, release
+confirmation and resumed paging. Reviewed pre/post idle pixels and persistent
+SIM location must hold. Bridge uplink remains zero and no HLE codec tick may
+execute; remote PCM reception does not establish handset playback or speech.
 
 A bounded outgoing SIP-200 research probe on unchanged own-PMM `npe3hle`
 confirmed and released the real dialog, but failed full media acceptance:

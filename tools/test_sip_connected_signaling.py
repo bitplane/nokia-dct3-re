@@ -33,12 +33,15 @@ class ConnectedSignalingTest(unittest.TestCase):
             (root / 'error.log').write_text(log)
             args = SimpleNamespace(product=product, incoming=incoming, signaling_only=True)
             remote = 'state changed to CONFIRMED\nDISCONNECTED [reason=200 (OK)]'
-            checker = ('tools.noki6250_call_check.verify_outgoing' if product == '6250' else
+            checker = (('tools.noki6250_call_check.verify' if incoming else
+                        'tools.noki6250_call_check.verify_outgoing') if product == '6250' else
                        'tools.noki6210_incoming_call_check.verify' if incoming else
                        'tools.noki6210_outgoing_call_check.verify')
             with patch(checker) as verify_call:
                 verify_success(root, remote, args)
-                if incoming:
+                if incoming and product == '6250':
+                    verify_call.assert_called_once_with(log, configured_carrier=True)
+                elif incoming:
                     verify_call.assert_called_once_with(log)
                 elif product == '6250':
                     verify_call.assert_called_once_with(log, number='123', configured_carrier=True)
@@ -54,7 +57,7 @@ class ConnectedSignalingTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.run_check({'uplink': 1}, product='6250')
 
-    def test_6250_signaling_scope_rejects_incoming_and_restoration(self):
+    def test_6250_signaling_scope_rejects_unready_incoming_and_restoration(self):
         for options in (['--incoming'], ['--restore-outgoing'], ['--restore-call'],
                         ['--record-media'], ['--calls', '2'], ['--sip-response', '486']):
             with self.subTest(options=options), \
@@ -63,6 +66,19 @@ class ConnectedSignalingTest(unittest.TestCase):
                     patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit) as error:
                 main()
             self.assertEqual(error.exception.code, 2)
+
+    def test_6250_incoming_uses_own_carrier_answer_checker(self):
+        result = self.run_check({'uplink': 0}, product='6250', incoming=True)
+        self.assertEqual(result['caller'], '5551234')
+        self.assertNotIn('dialed_digits', result)
+        self.assertFalse(result['speech_tested'])
+        for transform in (
+                lambda text: text.replace('SIP physical answer identity=(1, 1)',
+                                          'SIP physical answer identity=(2, 1)'),
+                lambda text: text + 'SIP physical answer identity=(1, 1)\n'):
+            with self.assertRaises(RuntimeError):
+                self.run_check({'uplink': 0}, product='6250', incoming=True,
+                               bridge_transform=transform)
 
     def test_scope_does_not_promote_bridge_downlink_to_speech(self):
         result = self.run_check({'uplink': 0, 'downlink': 300, 'pcm_received': 300})

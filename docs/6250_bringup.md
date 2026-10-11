@@ -473,7 +473,7 @@ The reviewed 96x60 `1 missed call` screen must appear, followed by physical
 Names/C Exit decoded as own raw matrix value `15` and the reviewed operator
 idle frame. The generic SIP runner rejects media and connected-dialog
 restoration fixtures for this profile; only the independently verified
-outgoing SIP-200 signaling fixture below is admitted. The own idle-restore runner admits a
+incoming/outgoing SIP-200 signaling fixtures below are admitted. The own idle-restore runner admits a
 fresh dialog only after handset restoration. This proves an unanswered external SIP
 lifecycle, not speech, native DSP, live RF or authentic factory PMM repair.
 The normal `noki6250` machine remains fail-closed.
@@ -507,7 +507,7 @@ with firmware confirmation `body=00 input=0409 expected=01 pending=00`;
 the answered-call deconfiguration is not applicable. Repeated confirmation
 tuples are retained in outgoing fixtures to distinguish this release from
 registration. Resumed paging and reviewed registered-idle pixels are required.
-Incoming answered SIP and speech remain unproved.
+This failure fixture establishes neither answered SIP nor speech.
 
 `verify-6250-sip-connected-signaling` physically dials `123`/Send against a
 real local SIP-200 endpoint, then physically ends the dialog. The unchanged
@@ -517,8 +517,17 @@ carrier-19 traffic assignment, physical End, complete CC/RR release with
 the own deconfiguration body and confirmation, and resumed paging. Reviewed
 registered-idle pixels must return. Bridge uplink must be zero and no HLE
 codec tick may run; the result explicitly excludes speech and native DSP
-completion. Remote PCM reception is not handset playback. Incoming
-connected signaling, recording and connected restoration remain excluded.
+completion. Remote PCM reception is not handset playback. Recording and
+connected restoration remain excluded.
+
+`verify-6250-sip-incoming-connected-signaling` separately admits caller
+`5551234` after a fresh registered-idle artifact. Physical Answer and End
+must drive the own paging, SETUP, carrier-19 assignment, CONNECT/acknowledgement
+and complete CC/RR release lifecycle. The original SIP identity's Answer
+must precede confirmation; duplicates and wrong epochs are rejected.
+Own release confirmation and resumed paging, persistent SIM location and
+reviewed pre/post idle pixels are mandatory. Zero uplink and no HLE codec
+ticks keep this explicitly signaling-only, not native or audible speech.
 
 `verify-6250-sip-outgoing-unavailable` independently verifies the same physical
 `123`/Send against real local PJSIP 480. Unlike busy, the no-answer decision

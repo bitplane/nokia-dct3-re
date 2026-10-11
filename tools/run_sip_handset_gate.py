@@ -230,8 +230,12 @@ def verify_success(root, remote_text, args):
                 if position < 0 or bridge_text.count(marker) != 1:
                     raise RuntimeError('missing unique ordered incoming SIP identity/Answer/confirmation')
                 cursor = position + len(marker)
-            from tools.noki6210_incoming_call_check import verify as verify_call
-            verify_call(log)
+            if args.product == '6250':
+                from tools.noki6250_call_check import verify as verify_call
+                verify_call(log, configured_carrier=True)
+            else:
+                from tools.noki6210_incoming_call_check import verify as verify_call
+                verify_call(log)
         else:
             if args.product == '6250':
                 from tools.noki6250_call_check import verify_outgoing as verify_call
@@ -641,7 +645,8 @@ def main():
                            (not args.restore_call or (args.incoming and args.restore_phase == 'connected')) and
                            (not args.restore_outgoing or not args.incoming) and not args.cancel_incoming)
     signaling_connected = signaling_connected or (
-        args.signaling_only and args.product == '6250' and not args.incoming and
+        args.signaling_only and args.product == '6250' and
+        (not args.incoming or args.ready_file is not None) and
         args.sip_response == 200 and args.calls == 1 and not args.record_media and
         not args.restore_call and not args.restore_outgoing and not args.restore_idle and
         not args.cancel_incoming)
