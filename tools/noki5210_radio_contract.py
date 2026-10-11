@@ -6,6 +6,22 @@ from pathlib import Path
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_BIG_ENDIAN
 
 
+def direct_bl_candidates(image, target, base=0x200000):
+    """All aligned old-Thumb BL encodings, including possible data matches."""
+    sites = []
+    for offset in range(0, len(image) - 3, 2):
+        first = int.from_bytes(image[offset:offset + 2], 'big')
+        second = int.from_bytes(image[offset + 2:offset + 4], 'big')
+        if first & 0xf800 != 0xf000 or second & 0xf800 != 0xf800:
+            continue
+        displacement = ((first & 0x7ff) << 12) | ((second & 0x7ff) << 1)
+        if displacement & (1 << 22):
+            displacement -= 1 << 23
+        if base + offset + 4 + displacement == target:
+            sites.append(base + offset)
+    return sites
+
+
 def verify(image):
     if hashlib.sha1(image).hexdigest() != 'f6c11cb013468c1d5e8550a2903f58ffa467a001':
         raise ValueError('requires acquired NSM-5 v5.40 PPM E')
@@ -41,9 +57,48 @@ def verify(image):
             ('ldrb', 'r1, [r5, #9]'), ('lsls', 'r0, r1, #0x18'),
             ('asrs', 'r0, r0, #0x18')]:
         raise ValueError('own big-endian carrier/signed-RSSI lanes differ')
+    if int.from_bytes(read(0x2e2168, 4), 'big') != 0x13e78c:
+        raise ValueError('own request-root literal differs')
+    if instructions(0x2e1e20, 6) != [
+            ('str', 'r0, [r1, #8]'), ('movs', 'r0, #0'), ('str', 'r0, [r1, #0xc]')]:
+        raise ValueError('own queued-to-current promotion differs')
+    if instructions(0x2e1e2c, 6) != [
+            ('ldrb', 'r1, [r0, #0xc]'), ('cmp', 'r1, #1'), ('bne', '#0x2e1e46')]:
+        raise ValueError('own request flag offset differs')
+    selector_table = [int.from_bytes(read(0x2e23c8 + index * 4, 4), 'big') for index in range(11)]
+    if selector_table[5:7] != [0x2e24c2, 0x2e24b0]:
+        raise ValueError('own readiness selector table differs')
+    if instructions(0x2e24b0, 18) != [
+            ('cmp', 'r6, #0'), ('bne', '#0x2e24be'),
+            ('adr', 'r0, #0x298'), ('bl', '#0x3558e0'),
+            ('movs', 'r7, #2'), ('b', '#0x2e24ce'),
+            ('movs', 'r0, #6'), ('b', '#0x2e2946')]:
+        raise ValueError('own state-6 argument-zero continuation differs')
+    if int.from_bytes(read(0x2e2830, 4), 'big') != 0x13c52e:
+        raise ValueError('own promotion eligibility flag differs')
+    if instructions(0x2e24ce, 20) != [
+            ('ldr', 'r0, [pc, #0x360]'), ('ldrb', 'r0, [r0]'),
+            ('cmp', 'r0, #0'), ('bne', '#0x2e24d8'), ('b', '#0x2e29f4'),
+            ('adr', 'r0, #0x35c'), ('bl', '#0x3558e0'), ('bl', '#0x2e1df4')]:
+        raise ValueError('own eligibility-gated promotion path differs')
+    direct_sites = [(0x232064, 3), (0x2322f2, 2), (0x234f3e, 0),
+                    (0x2355d6, 0), (0x2358a0, 0), (0x2e2f1a, 1),
+                    (0x2e2f54, 1), (0x2e3362, 1)]
+    if direct_bl_candidates(image, 0x2e23ac) != [site for site, _ in direct_sites]:
+        raise ValueError('own aligned direct selector call census differs')
+    for site, argument in direct_sites:
+        if instructions(site - 2, 6) != [('movs', f'r0, #{argument}'), ('bl', '#0x2e23ac')]:
+            raise ValueError('own direct selector argument differs')
     return {'product': '5210', 'type_8b_destination_task': 12,
             'records': 40, 'record_stride': 4,
             'carrier_message_offsets': [6, 7], 'signed_rssi_message_offset': 9,
+            'request_root': '13e78c', 'current_offset': 8, 'queued_offset': 12,
+            'request_flag_offset': 12, 'state6_promote_argument': 0,
+            'direct_selector_calls': [{'site': f'{site:06x}', 'argument': argument}
+                                      for site, argument in direct_sites],
+            'direct_census_coverage': {'aligned_pairs': (len(image) - 2) // 2,
+                                       'arguments_recovered': 8,
+                                       'indirect_and_tail_entries_closed': False},
             'scope': 'ROM-derived receive grammar; runtime request ownership checked separately'}
 
 

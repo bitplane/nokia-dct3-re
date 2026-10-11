@@ -16,7 +16,11 @@ def main():
     parser.add_argument('--mame', type=Path)
     parser.add_argument('--scenario', choices=('toolkit-interactive', 'pin-registration', 'late-pin-boundary'),
                         default='toolkit-interactive')
+    parser.add_argument('--observe-readiness', action='store_true',
+                        help='passively observe own context roots during the early-PIN control')
     args = parser.parse_args()
+    if args.observe_readiness and args.scenario != 'pin-registration':
+        parser.error('--observe-readiness requires pin-registration')
     root = Path(__file__).resolve().parents[1]
     run = args.run_directory.resolve()
     try:
@@ -34,6 +38,8 @@ def main():
                             run / 'cfg/noki5210.cfg')
         script = ('noki5210_pin_late_input.lua' if late else
                   'noki5210_pin_input.lua' if pin else 'noki5210_toolkit_interactive_input.lua')
+        if args.observe_readiness:
+            script = 'noki5210_pin_early_observe.lua'
         checker = 'noki5210_pin_registration_check.py' if pin else 'noki5210_toolkit_interactive_check.py'
         command = [str((args.mame or root / 'mame/mame').resolve()), 'noki5210',
                    '-bios', '540e', '-rompath', str(root / 'roms'), '-cfg_directory', 'cfg',

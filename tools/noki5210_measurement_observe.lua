@@ -17,3 +17,32 @@ for _, address in ipairs({0x37019c, 0x2e336c, 0x2bd782}) do
       end)
 end
 _G.noki5210_measurement_observers = taps
+local writes = 0
+taps[#taps + 1] = cpu.spaces['program']:install_write_tap(0x13e78c,
+  0x13e7a3, '5210_readiness_root', function(offset, data, mask)
+    writes = writes + 1
+    if writes <= 80 then
+        machine:logerror(string.format(
+            '5210_readiness_root: address=%08x data=%08x mask=%08x pc=%08x lr=%08x t=%.9f\n',
+            offset, data, mask, cpu.state['R15'].value, cpu.state['R14'].value,
+            machine.time:as_double()))
+    end
+  end)
+taps[#taps + 1] = emu.add_machine_stop_notifier(function()
+    local memory = cpu.spaces['program']
+    machine:logerror(string.format(
+        '5210_readiness_root: final current=%08x queued=%08x previous=%08x context=%08x writes=%d\n',
+        memory:read_u32(0x13e794), memory:read_u32(0x13e798),
+        memory:read_u32(0x13e79c), memory:read_u32(0x13e7a0), writes))
+    for _, role in ipairs({{'current', 0x13e794}, {'queued', 0x13e798}}) do
+        local pointer = memory:read_u32(role[2])
+        if pointer >= 0x100000 and pointer <= 0x17fff0 then
+            local bytes = {}
+            for offset = 0, 15 do
+                bytes[#bytes + 1] = string.format('%02x', memory:read_u8(pointer + offset))
+            end
+            machine:logerror('5210_readiness_object: role=' .. role[1] ..
+                ' data=' .. table.concat(bytes) .. '\n')
+        end
+    end
+end)

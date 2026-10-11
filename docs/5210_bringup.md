@@ -113,6 +113,40 @@ NSM-5 differs from the other validated products at explicit device boundaries:
   and does not promote late-PIN registration. Recovery is therefore beyond
   delivery of this one measurement completion; do not repeat it or delay
   channel acknowledgements solely to make registration pass.
+
+## Delayed-PIN request ownership
+
+Paired passive RAM observations distinguish successful PIN verification from
+radio-request promotion. The own v5.40E root is `0x13e78c`: selector state is
+the halfword at `+2`, current request is `+8`, queued request is `+12`, previous
+request is `+16`, and context is `+20`. The request's flag is at object offset
+12; another product's offset must not be imported.
+
+With early physical PIN entry, firmware queues a request at 9.398 s and
+promotes it at 10.211 s through `0x2e24de -> 0x2e1df4`; registration follows
+and the request roots clear. With delayed entry, measurement completion puts
+the selector in state 6 at 10.210 s, before PIN verification. Firmware queues
+the post-PIN request at 21.025 s, but it remains queued alongside the original
+current request through the 45-s observation. Both captures stay below the
+80-write observation cap (44 early, 28 late).
+
+The state-6 selector case requires argument zero to reach the common promotion
+path, additionally gated by byte `0x13c52e`. The observed post-PIN caller
+`0x232064` supplies argument 3 and preserves state 6 instead. A full-image,
+aligned old-Thumb direct-BL census finds eight calls to selector `0x2e23ac`,
+with all eight adjacent literal arguments recovered. Its three argument-zero
+sites are `0x234f3e`, `0x2355d6`, and `0x2358a0`. This does not close indirect
+or tail entries and is not a proof that an ordinary producer is absent.
+
+The next unresolved contract is which ordinary event invokes the eligible
+promotion entrance after late SIM readiness. Do not force selector arguments,
+promote pointers externally, or replay measurement completions to bypass it.
+`run_noki5210_acceptance.py --scenario pin-registration --observe-readiness`
+provides the successful physical-input control; `--scenario late-pin-boundary`
+provides the delayed negative control. Both use passive root observations.
+
+## Additional acceptance gates
+
 - `make verify-sim-toolkit-interactive-5210` independently accepts GET INKEY
   `5` and GET INPUT `42`, with exact successful terminal responses and five
   reviewed prompt/entered/registered-idle frames. NSM-5 requires physical OK
