@@ -231,6 +231,12 @@ These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
 No retained handset trace uses SEEK;
 this is standards-derived card conformance, not new UI capability.
 
+RUN GSM ALGORITHM also requires current directory DFGSM and CHV1
+authorization (satisfied while CHV1 is disabled), following GSM 11.11 8.16.
+The serial fixture proves `98 04` before PIN verification, `94 08` under
+DF_TELECOM, no pending authentication result after either rejection, and
+independently computed SRES/Kc after valid verification and directory selection.
+These checks are repeated following controller reset and reinsertion.
 With an authentication algorithm selected, RUN GSM ALGORITHM rejects nonzero
 `P1/P2` with `6B 00` and a RAND length other than sixteen with `67 00`
 (GSM 11.11 sections 9.2.16 and 9.4.5). With no algorithm selected it remains

@@ -1111,6 +1111,17 @@ void nokia_sim_card_device::run_gsm_algorithm()
 		queue_status(0x67, 0x00);
 		return;
 	}
+	// GSM 11.11 8.16: authentication belongs to DFGSM and requires CHV1.
+	if (m_selected_df != 0x7f20)
+	{
+		queue_status(0x94, 0x08);
+		return;
+	}
+	if (m_chv1_enabled && !m_chv_verified[0])
+	{
+		queue_status(0x98, 0x04);
+		return;
+	}
 
 	gsm::a3a8::block rand;
 	std::copy_n(m_tx, rand.size(), rand.begin());

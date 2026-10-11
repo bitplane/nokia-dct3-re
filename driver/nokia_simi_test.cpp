@@ -232,7 +232,19 @@ private:
 		{0xa4, 0, 0, 2, 0x6f7b, 0x9f, 15},
 		{0xb0, 0, 0, 1, 0xff, 0x90, 0},
 		{0xa4, 0, 0, 2, 0x6f7e, 0x9f, 15},
-		{0xb0, 0, 0, 1, 0x55, 0x90, 0}
+		{0xb0, 0, 0, 1, 0x55, 0x90, 0, false, true},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0x88, 0, 0, 16, 0x5a, 0x98, 4},
+		{0xc0, 0, 0, 12, 0, 0x6f, 0},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
+		{0xc0, 0, 0, 12, 0, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x7f10, 0x9f, 22},
+		{0x88, 0, 0, 16, 0x5a, 0x94, 8},
+		{0xc0, 0, 0, 12, 0, 0x6f, 0},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
+		{0xc0, 0, 0, 12, 0, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -577,7 +589,7 @@ private:
 		case 30:
 		{
 			auto const &item = WRITE_CASES[m_write_case];
-			if (m_write_case == 51)
+			if (item.ins == 0xc0 && item.length == 12 && item.sw1 == 0x90)
 			{
 				gsm::a3a8::block rand;
 				rand.fill(0x5a);
@@ -660,6 +672,7 @@ private:
 			osd_printf_info("SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 reset_revokes=1 removal_revokes=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM GSM binary read access: PASS files=8 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0\n");
+			osd_printf_info("SIM authentication access: PASS before_pin=1 after_pin=1 gsm_directory=1 rejected_result_absent=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}
