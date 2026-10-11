@@ -537,8 +537,12 @@ protocol records and reviewed pixels.
 The 8850 research-HLE profile independently passes `verify-8850-sim-toolkit`:
 its own nine-byte TERMINAL PROFILE, STATUS/FETCH DISPLAY TEXT, physical OK,
 successful TERMINAL RESPONSE, reviewed 84x48 result/registered-idle frames
-and persisted EF_LOCI. Other proactive commands, 8890 Toolkit and native
-DSP execution are not established by this gate.
+and persisted EF_LOCI. `verify-8850-sim-toolkit-interactive` additionally
+accepts card-owned GET INKEY and GET INPUT: physical digit 5 plus OK and
+digits 4/2 plus OK produce the expected terminal responses, with reviewed
+prompt and registered-idle pixels. This uses unchanged own MCU/PMM and the
+Phase 2+ laboratory card. Other proactive commands and native DSP execution
+are not established by these gates.
 `verify-8890-sim-toolkit-busy` independently verifies nine-byte profile
 download, STATUS/FETCH and the explicit `20 01` screen-busy terminal response
 during physical date entry, followed by successful date-editor recovery and

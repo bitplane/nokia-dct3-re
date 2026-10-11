@@ -469,6 +469,12 @@
                  "arguments": ["8850", "$(RUN_DIR)", "--service", "ussd", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8850-sim-toolkit-interactive", "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
+                 "before_script": [], "script": "tools/run_noki8xxx_supplementary.py",
+                 "arguments": ["8850", "$(RUN_DIR)", "--service", "toolkit-interactive", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8850-sim-toolkit", "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(PYTHON)",
                  "before_script": [], "script": "tools/run_noki8xxx_supplementary.py",

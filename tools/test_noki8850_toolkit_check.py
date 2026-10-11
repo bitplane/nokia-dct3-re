@@ -1,8 +1,20 @@
 import unittest
 from tools.noki8850_toolkit_check import EVENTS, verify_protocol
+from tools.dct3_toolkit_check import interactive_events
 
 
 class ToolkitProtocolTest(unittest.TestCase):
+    def test_interactive_exchange_requires_every_link(self):
+        events = interactive_events('8850')
+        verify_protocol('\n'.join(events), interactive=True)
+        for index in range(len(events)):
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                verify_protocol('\n'.join(events[:index] + events[index + 1:]), interactive=True)
+        for old, new in (('0d020435', '0d020436'), ('0d03043432', '0d03043433'),
+                         ('8850_toolkit', '8210_toolkit')):
+            with self.subTest(old=old), self.assertRaises(ValueError):
+                verify_protocol('\n'.join(events).replace(old, new), interactive=True)
+
     def test_complete_exchange(self):
         verify_protocol('\n'.join(EVENTS))
         verify_protocol('\n'.join('[:sim_card] ' + event for event in EVENTS))
