@@ -641,6 +641,21 @@ organic chain is therefore `2e6e50` continuation -> `09c9` -> `07d7` ->
 and the condition for completing that lifecycle remain unresolved; no
 additional peer completion is justified solely by this mapping.
 Evidence: `tmp/6210-plmn-07d7-selector-{national,international}/error.log.gz`.
+Search selector `4cfc34` uses a stored halfword at `175454`. Instruction
+observations show two input-1 calls in each control retaining stage 1
+and returning 5. Only foreign boot then calls with input 0, enters with
+stage 1, returns 0 and leaves stage 5. The own stage-1 path at
+`4cfd6a..4cfd84` sets result 0 and writes stage 5 via `4cfcd6`; do not
+conflate that stage with the separate state word referenced by `1711dc`.
+The following task-14 zero-result branch writes that separate word to 1
+and calls `3f2684` with R1=1. Recover the issued lower-layer request and
+its completion contract next; input/stage numbers alone do not name
+manual selection, full-band search or a GSM service. Evidence:
+`tmp/6210-plmn-search-stage-{national,international}/error.log.gz`.
+The static request constructor `3f2684` allocates and zeroes eight bytes,
+sets header 2, byte+2 to 4 and byte+3 to `57`, populates bytes+4/+5
+through `3f2226`, and posts to task 3 at `3f26c6`. These are own-ROM
+message fields, not yet an identified over-the-ring DSP primitive.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
 the handler's alternative `1580` route.

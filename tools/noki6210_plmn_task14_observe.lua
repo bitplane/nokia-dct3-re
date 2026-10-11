@@ -14,6 +14,10 @@ cpu.debug:bpset(0x3131f0, nil,
     'logerror "plmn_03f5_selector: input=%08x\\n",d@(r13+8);g')
 cpu.debug:bpset(0x2a393c, nil,
     'logerror "plmn_07d7_selector: input=%08x\\n",d@(r13+4);g')
+cpu.debug:bpset(0x4cfc34, nil,
+    'logerror "plmn_search_stage_entry: input=%08x stage=%04x\\n",r0,w@175454;g')
+cpu.debug:bpset(0x4cfdb0, nil,
+    'logerror "plmn_search_stage_return: result=%08x stage=%04x\\n",r0,w@175454;g')
 local busy, posts, inputs = false, 0, 0
 local controller_posts = 0
 local input_taps, watched = {}, {}
