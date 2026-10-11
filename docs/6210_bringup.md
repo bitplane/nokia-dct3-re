@@ -373,6 +373,20 @@ national/international discriminator, not later selection or admission.
 Evidence: `tmp/6210-plmn-continuation-{national,international}/error.log.gz`;
 the observation addresses are pinned by `noki6210_radio_contract.py`.
 
+A bounded task-14 publication census locates the first message-stream
+difference after this shared SI3 path. The first fourteen `(status, caller)`
+pairs agree. The next publication is `03ec` in the national control at
+10.136467923 seconds, versus `03ea` in the international control at
+10.085341846 seconds; both return through publisher wrapper `3cc9fd`.
+The national stream later reaches `03ed`, `03fe` and `0402`; the foreign
+stream instead reaches `03f5` and repeated `03f9` publications.
+These are numeric observations, not yet decoded selection outcomes.
+The next discriminating boundary is the upstream choice of `03ec` versus
+`03ea`, before random access. Evidence: fresh 25-second isolated controls
+in `tmp/6210-plmn-task14-census-{national,international}/error.log.gz`.
+`tools/noki6210_plmn_task14_observe.lua` retains the read-only census;
+its 160-publication limit is a diagnostic bound, not a topology closure.
+
 `verify-6210-outgoing-call` physically dials `1234567` and presses Send/End.
 `verify-6210-incoming-call` queues one laboratory network call, captures
 ringing and connected screens and physically answers/ends it. Both require
