@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 from tools.make_sim_card_profile import make_profile
-from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late
+from tools.noki5210_pin_registration_check import verify, verify_late_boundary, verify_coherent_late, verify_pin_sms
 
 
 def complete():
@@ -14,6 +14,26 @@ def complete():
 
 
 class PinRegistrationTest(unittest.TestCase):
+    def test_pin_sms_closure_precedes_physical_read(self):
+        text = '\n'.join((
+            'sim_device: update fid=6f3c record=1 length=176',
+            'GSM service uplink sapi=3 pd=09 message=04 length=2 data=8904',
+            'GSM service uplink sapi=3 pd=09 message=01 length=5 data=8901020240',
+            'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2',
+            'LAPDm service Channel Release acknowledged nr=3',
+            '5210_pin_physical: key=Left Softkey / Menu',
+            '5210_pin_physical: key=Left Softkey / Menu',
+            'sim_device: update fid=6f3c record=1 length=176',
+        ))
+        with patch('tools.noki5210_pin_registration_check.verify_coherent_late') as coherent, \
+                patch('tools.radio_incoming_sms_trace_check.verify') as sms:
+            verify_pin_sms(text, b'card')
+            coherent.assert_called_once_with(text, b'card')
+            sms.assert_called_once_with(text, b'card', 'nsm5', read=True)
+            for token in ('data=8901020240', 'downlink kind=17', 'acknowledged nr=3'):
+                with self.subTest(token=token), self.assertRaises(ValueError):
+                    verify_pin_sms(text.replace(token, 'missing'), b'card')
+
     def test_coherent_late_requires_own_measured_carrier(self):
         text = '\n'.join((
             'TX packet type=57 payload=4 words=3 radio_phase=serving_bcch data=03050000',

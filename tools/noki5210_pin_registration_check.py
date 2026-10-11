@@ -55,6 +55,22 @@ def verify_coherent_late(text, card):
     registration(text, 'nsm5', nsm5_pin=True)
 
 
+def verify_pin_sms(text, card):
+    from tools.radio_incoming_sms_trace_check import verify as sms_lifecycle
+    verify_coherent_late(text, card)
+    sms_lifecycle(text, card, 'nsm5', read=True)
+    require_in_order(text, (
+        'sim_device: update fid=6f3c record=1 length=176',
+        'GSM service uplink sapi=3 pd=09 message=04 length=2 data=8904',
+        'GSM service uplink sapi=3 pd=09 message=01 length=5 data=8901020240',
+        'GSM service downlink kind=17 sapi=3 pd=09 message=04 length=2',
+        'LAPDm service Channel Release acknowledged nr=',
+        '5210_pin_physical: key=Left Softkey / Menu',
+        '5210_pin_physical: key=Left Softkey / Menu',
+        'sim_device: update fid=6f3c record=1 length=176',
+    ))
+
+
 def verify_late_boundary(text, card):
     verify_authentication(text, card)
     require_in_order(text, (
@@ -113,18 +129,24 @@ def main():
                         help='verify delayed PIN with the own ARFCN 86 laboratory topology')
     parser.add_argument('--incoming-call', action='store_true',
                         help='verify physical Answer/End after coherent delayed-PIN registration')
+    parser.add_argument('--incoming-sms', action='store_true',
+                        help='verify SMS persistence and physical Read after coherent delayed PIN')
     args = parser.parse_args()
     try:
         run = args.run_directory
         text = (run / 'error.log').read_text(errors='replace')
         card = (run / 'nvram/noki5210_3/sim_card').read_bytes()
-        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call else verify)(text, card)
+        (verify_late_boundary if args.late_boundary else verify_coherent_late if args.coherent_late or args.incoming_call or args.incoming_sms else verify)(text, card)
+        if args.incoming_sms:
+            verify_pin_sms(text, card)
         if args.incoming_call:
             from tools.radio_5210_incoming_call_trace_check import verify as call_lifecycle
             require_in_order(text, ('SIM status ins=20 sw=9000',
                                    '5210_pin_physical: key=Send', '5210_pin_physical: key=End'))
             call_lifecycle(text, coherent_pin=True)
-        frames = ({'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
+        frames = ({'entered': FRAMES['entered'],
+                   'sms_read': '6a101291e5215012ec718748cca30958cf55e688c0075678c34bcd30c2c9eea3'} if args.incoming_sms else
+                  {'entered': FRAMES['entered'], 'recovered': FRAMES['recovered'],
                    'ringing': '1b60299914790655da2e596290642a5bc16581debf66626cc018f08823ce787b'}
                   if args.incoming_call else {} if args.late_boundary else
                   LATE_FRAMES if args.coherent_late else FRAMES)
@@ -134,7 +156,8 @@ def main():
                     raise ValueError('unexpected PIN/menu recovery pixels: ' + phase)
     except (OSError, ValueError) as error:
         parser.exit(1, f'5210 PIN registration FAIL: {error}\n')
-    print('5210 PIN-enabled physical incoming-call lifecycle PASS; research HLE signaling, not native speech' if args.incoming_call else
+    print('5210 PIN-enabled persistent incoming SMS and physical Read PASS; research HLE' if args.incoming_sms else
+          '5210 PIN-enabled physical incoming-call lifecycle PASS; research HLE signaling, not native speech' if args.incoming_call else
           '5210 delayed PIN/measurement boundary reproduced; registration unresolved' if args.late_boundary else
           '5210 physical SIM PIN and subsequent laboratory registration PASS; research HLE')
 

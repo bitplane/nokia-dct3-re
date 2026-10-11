@@ -51,8 +51,11 @@ entry, own-carrier background measurements and full Location Updating on a
 coherent ARFCN 86/87 laboratory topology, with registered idle/menu/recovery
 frames. `verify-5210-pin-incoming-call` extends that configuration through
 laboratory paging, reviewed caller pixels, physical Answer/End, full CC/RR
-closure and exact idle recovery. PIN-enabled SMS remains separately unproved;
-this call gate establishes HLE signaling, not native speech.
+closure and exact idle recovery. `verify-5210-pin-incoming-sms` independently
+adds segmented delivery, CP/RP/RR closure, persistent read-status SIM contents
+and physical Read with the existing exact `hello` frame. These gates establish
+HLE signaling and durable SIM/UI interaction, not native speech; PIN-enabled
+outgoing and save-state composition remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record
 consumer before accepted delayed PIN; no random access follows within 45 s.

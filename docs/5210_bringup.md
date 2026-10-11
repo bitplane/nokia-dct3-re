@@ -139,6 +139,16 @@ The PIN-enabled traffic request is
 its different headers. This is research-HLE signaling and speech-control
 coverage, not native DSP execution, intelligible speech or a host-originated call.
 
+`make verify-5210-pin-incoming-sms` independently composes the same delayed
+physical PIN and coherent topology with laboratory paging, segmented SAPI-3
+SMS-DELIVER, handset CP-ACK/RP-ACK, network CP-ACK and service RR release.
+Physical Read opens `hello`; the exact message-body frame matches the existing
+no-PIN 5210 oracle. The saved card must contain the same SMS-DELIVER with read
+status, and the trace must contain exactly two EF_SMS writes (delivery and
+read-status update). This is durable card storage and firmware UI interaction,
+not a network-side delivery assertion. It does not establish PIN-enabled
+outgoing messaging, save-state replay or host SMS composition.
+
 The former delayed-PIN failure is a mismatched external network fixture, not
 proof of an unavailable firmware continuation or missing DSP acknowledgement.
 The retained `verify-5210-late-pin-boundary` deliberately keeps ARFCN 1/2 as a
