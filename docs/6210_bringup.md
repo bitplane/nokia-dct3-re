@@ -360,8 +360,7 @@ in both runs. Earlier partial-SI publications return 1/1/0 at those same
 boundaries. These are observed return values, not recovered semantic enum
 names. Evidence: `tmp/6210-plmn-classifier-{national,international}/error.log.gz`.
 The initial SI3 parser, publication and classification therefore do not
-explain the national/international difference. The next boundary is the
-classification-1 continuation and its downstream selection state.
+explain the national/international difference.
 
 The first classification-1 continuation also agrees in the paired controls:
 both reach `2d3ec0`, `2d3f26`, `2d3f64` and `2d3f6e`. At `2d3f26`,
@@ -381,8 +380,7 @@ pairs agree. The next publication is `03ec` in the national control at
 The national stream later reaches `03ed`, `03fe` and `0402`; the foreign
 stream instead reaches `03f5` and repeated `03f9` publications.
 These are numeric observations, not yet decoded selection outcomes.
-The next discriminating boundary is the upstream choice of `03ec` versus
-`03ea`, before random access. Evidence: fresh 25-second isolated controls
+Evidence: fresh 25-second isolated controls
 in `tmp/6210-plmn-task14-census-{national,international}/error.log.gz`.
 `tools/noki6210_plmn_task14_observe.lua` retains the read-only census;
 its 160-publication limit is a diagnostic bound, not a topology closure.
@@ -467,8 +465,20 @@ The candidate source is in ROM: `2a394e` loads literal `1589`, calls
 `2a7f74`, and that entry forwards it to dispatcher `29ffb8` with R1 = 0.
 Instructions, pool literal and state-table entry are pinned by the contract
 checker. Evidence: `tmp/6210-plmn-state2-dispatch-{national,international}/error.log.gz`.
-Current unresolved boundary: the lifecycle selecting the `2a394e` publisher
-and its prerequisites, alongside the handler's alternative `1580` route.
+The dispatch condition for this candidate is explicit: saved stack-offset-4
+status `09fd` at `2a31ca` matches literal `2a3534`, then branches through
+`2a3948` to the `1589` publisher. Neither `09fd/1589` RAM-object posts nor
+the completion-dispatch entry is observed in either 25-second control;
+the passive taps do not establish a global absence proof.
+A static predecessor exists: `31321e` loads `09fd`, branches to `313156`,
+and calls publisher `3ccbec` with R1/R3 zero and the existing stack+12
+argument in R2. That publisher copies the status into its message header.
+The invocation conditions and destination for this candidate are not yet
+closed. Both sides of the candidate chain are pinned to the own ROM;
+no synthetic completion is justified.
+Evidence: `tmp/6210-plmn-completion-dispatch-{national,international}/error.log.gz`.
+Current unresolved boundary: the lifecycle selecting the `31321e` producer
+and its downstream route, alongside the handler's alternative `1580` route.
 No operational international-roaming contract is
 established by these observations.
 
