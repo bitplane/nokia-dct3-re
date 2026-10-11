@@ -343,6 +343,10 @@ key press, paging shortcut or firmware-state change.
 Each call owns independent libgsm encoder/decoder state. Media callbacks only
 exchange 160-sample, native-endian signed PCM blocks through bounded eight-frame
 queues; they never call WebSocket or emulate hardware. Queue overflow is counted.
+Media activation is owned by the exact current PJSUA2 Call object. Late media
+callbacks from released or replaced dialogs cannot create or attach a port for
+the new dialog, even when a request identity is reused. Each port retains only
+its own call's queues.
 Null-device PJSIP timing drives the host media port. Run MAME throttled for this
 real-time backend. Its media sequence remains host correlation, not an
 emulation clock. A changed MAME epoch hangs up the old SIP leg and clears codec

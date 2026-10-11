@@ -1,7 +1,66 @@
 import queue
 import unittest
+from collections import deque
+from types import SimpleNamespace
+from unittest.mock import Mock
 
-from tools.dct3_sip_bridge import MediaQueues, incoming_caller, failure_messages
+from tools.dct3_sip_bridge import MediaQueues, SipEndpoint, incoming_caller, failure_messages
+
+
+class SipDialogMediaOwnershipTest(unittest.TestCase):
+    def endpoint(self):
+        class Port:
+            def __init__(self):
+                self.createPort = Mock()
+                self.startTransmit = Mock()
+
+        class Call:
+            def __init__(self, account, call_id):
+                self.getInfo = Mock(return_value=SimpleNamespace(media=[
+                    SimpleNamespace(type=1, status=2, index=0)]))
+                self.audio = SimpleNamespace(startTransmit=Mock())
+                self.getAudioMedia = Mock(return_value=self.audio)
+
+        endpoint = SipEndpoint.__new__(SipEndpoint)
+        endpoint.account = object()
+        endpoint.events = deque()
+        endpoint.pj = SimpleNamespace(Call=Call, AudioMediaPort=Port,
+            MediaFormatAudio=SimpleNamespace, PJMEDIA_TYPE_AUDIO=1,
+            PJSUA_CALL_MEDIA_ACTIVE=2)
+        return endpoint
+
+    def test_replaced_dialog_cannot_attach_to_new_call_media(self):
+        for replacement_identity in ((1, 2), (1, 1)):
+            with self.subTest(identity=replacement_identity):
+                endpoint = self.endpoint()
+                endpoint._new_call((1, 1))
+                old = endpoint.call
+                old_media = endpoint.media
+                endpoint._new_call(replacement_identity)
+                current = endpoint.call
+                old.onCallMediaState(None)
+                self.assertIsNone(endpoint.media_port)
+                old.getInfo.assert_not_called()
+                old.getAudioMedia.assert_not_called()
+                self.assertIsNot(endpoint.media, old_media)
+                current.onCallMediaState(None)
+                port = endpoint.media_port
+                current.audio.startTransmit.assert_called_once_with(port)
+                port.startTransmit.assert_called_once_with(current.audio)
+                old.onCallMediaState(None)
+                self.assertIs(endpoint.media_port, port)
+                port.startTransmit.assert_called_once_with(current.audio)
+
+    def test_released_dialog_cannot_recreate_media_port(self):
+        endpoint = self.endpoint()
+        endpoint._new_call((3, 7))
+        call = endpoint.call
+        call.onCallMediaState(None)
+        call.getInfo.reset_mock()
+        endpoint.release((3, 7))
+        call.onCallMediaState(None)
+        self.assertIsNone(endpoint.media_port)
+        call.getInfo.assert_not_called()
 
 
 class SipMediaQueuesTest(unittest.TestCase):

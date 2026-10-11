@@ -175,6 +175,11 @@ class SipEndpoint:
                     owner.events.append((identity, 'disconnected', info.lastStatusCode))
 
             def onCallMediaState(call, _):
+                # Native callbacks can arrive after release/replacement. The
+                # port and its captured queues belong to this exact dialog,
+                # not merely to a possibly reused epoch/request identity.
+                if owner.call is not call:
+                    return
                 info = call.getInfo()
                 for entry in info.media:
                     if entry.type == pj.PJMEDIA_TYPE_AUDIO and entry.status == pj.PJSUA_CALL_MEDIA_ACTIVE:
