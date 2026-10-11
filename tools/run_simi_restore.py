@@ -17,11 +17,12 @@ SEARCH_PASS = "SIM record search: PASS directions=4 types=2 undefined_starts=2 p
 
 ACCESS_PASS = "SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
 IMSI_PASS = "SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 reset_revokes=1 removal_revokes=1 fcp_matches=1 handset_claim=0"
+BINARY_ACCESS_PASS = "SIM GSM binary read access: PASS files=8 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0"
 
 
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS, SEARCH_PASS, ACCESS_PASS, IMSI_PASS, BINARY_ACCESS_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -38,7 +39,7 @@ def main():
         command = [str(args.mame.resolve()), "simitest", "-noreadconfig",
                    "-nvram_directory", "nvram", "-cfg_directory", "cfg",
                    "-video", "none", "-sound", "none", "-nothrottle",
-                   "-seconds_to_run", "8"]
+                   "-seconds_to_run", "16"]
         with (run / "console.log").open("w") as output:
             result = subprocess.run(command, cwd=run, stdout=output,
                                     stderr=subprocess.STDOUT, timeout=90)
@@ -47,6 +48,7 @@ def main():
             "result": "pass", "command": command, "checkpoints": 7,
             "protected_record_files": 4, "read_access_restore": True,
             "imsi_read_access": True,
+            "additional_protected_binary_files": 8,
             "reset_revokes_authorization": True,
             "removal_revokes_authorization": True,
             "controller_checkpoints": 3, "record_update_checkpoints": 1,
@@ -77,6 +79,7 @@ def main():
     print(SEARCH_PASS)
     print(ACCESS_PASS)
     print(IMSI_PASS)
+    print(BINARY_ACCESS_PASS)
 
 
 if __name__ == "__main__":

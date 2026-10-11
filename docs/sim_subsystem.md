@@ -218,6 +218,14 @@ authenticated card, then disconnect/reinsert/reactivate it; both produce ATR
 and require fresh VERIFY before IMSI readback. These are isolated socket/card
 contracts, not handset hot-plug acceptance. They do not close the remaining
 transparent/vendor-file policy audit.
+The standard GSM transparent set Kc (`6F20`), PLMNsel (`6F30`), HPLMN
+(`6F31`), ACMmax (`6F37`), BCCH (`6F74`), ACC (`6F78`), FPLMN (`6F7B`)
+and LOCI (`6F7E`) also enforces CHV1 READ. Serial tests independently check
+each FCP, denial before verification and exact one-byte readback afterward,
+including after reset and reinsertion. This is READ-policy coverage: missing
+update support for currently immutable files and their advertised UPDATE
+conditions remain separate work. The bounded serial runner permits 16 seconds
+for the expanded command sequences and still requires every completion marker.
 These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
 ([ETSI specification](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf)).
 No retained handset trace uses SEEK;
