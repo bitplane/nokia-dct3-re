@@ -3,6 +3,13 @@ local machine = manager.machine
 assert(machine.system.name == 'npe3hle', 'requires NPE-3 research-HLE composition')
 local cpu = assert(machine.devices[':maincpu'])
 local space = cpu.spaces['program']
+assert(cpu.debug, 'PLMN publisher instruction probes require the debugger')
+for _, pc in ipairs({0x31555e, 0x315560, 0x315564}) do
+    cpu.debug:bpset(pc, nil, string.format(
+        'logerror "plmn_publisher_instruction: pc=%08x r0=%%08x r14=%%08x\\n",r0,r14;g', pc))
+end
+cpu.debug:bpset(0x3cc660, 'r0==3f5 || r0==3fa',
+    'logerror "plmn_publisher_instruction: pc=003cc660 r0=%08x r14=%08x\\n",r0,r14;g')
 local busy, posts, inputs = false, 0, 0
 local controller_posts = 0
 local input_taps, watched = {}, {}

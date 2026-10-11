@@ -601,23 +601,16 @@ instead include `03f4`, `03ed` and `03fe`, with no observed `03f5`
 publication. Thus the reset is attached to a specific firmware-message
 branch, not an unexplained peer-state loss. Evidence:
 `tmp/6210-plmn-controller-entry-status-{national,international}/error.log.gz`.
-Publisher caller attribution remains provisional: the recorded LR
-`315565` is adjacent to BL `315560`, but the preceding own-ROM load at
-`31555e` reads literal `3158fc = 03fa`, not `03f5`. A fresh runtime
-observation confirms `3158fc = 000003fa` and code word at `31555c =
-f81548e7` while the publisher-entry tap reports R0 `03f5` and that LR.
-Thus changed flash bytes do not explain the discrepancy. Do not claim
-that BL `315560` directly publishes `03f5` until control flow and tap
-register timing are reconciled; the received `03f5` and reset-selector
-observations remain separate evidence. Evidence:
-`tmp/6210-plmn-publisher-code-{national,international}/error.log.gz`.
-An independent observation at the actual RTOS post confirms header
-`03f5`, destination task 14 and saved return address `315565` at
-10.614520462 s. The return is read from stack+16, matching publisher
-`3cc660`'s five-register push; thus a stale live LR alone cannot explain
-the mismatch. The literal-versus-executed-path discrepancy remains open
-and requires instruction-level observation around the caller before
-assigning a producer contract. Evidence:
+Instruction breakpoints confirm `315560` executes with R0 `03f5` and
+LR `3131fd` in foreign boot, then `3cc660` receives R0 `03f5` and LR
+`315565`. The actual task-14 post independently has header `03f5` and
+saved return `315565`. This is a shared publication point: direct branches
+from multiple status-preparation blocks reach `315560`. Its physically
+preceding literal load (`31555e`, value `03fa`) must not be assumed to
+have executed on every incoming path. There is no ROM-byte discrepancy.
+Recover the specific `03f5` preparation branch before assigning its
+subsystem semantics. Evidence:
+`tmp/6210-plmn-publisher-instruction-{national,international}/error.log.gz`;
 `tmp/6210-plmn-publisher-return-{national,international}/error.log.gz`.
 Current unresolved boundary: the lifecycle selecting those branches
 and ownership of the pre-existing completion object, alongside
