@@ -800,7 +800,15 @@ calls `211f6c(2,0,0)`, and its common tail cancels timer ids `65`, `5a`
 and `1d` and releases pending objects at offsets `3c`, `30` and `20`.
 It is not a bare readiness publication. Its other branches and full semantic
 role are not closed by this decode.
-`nse1_scan_continuation_contract.py roms/noki5110/5110f530.fls` pins 14
+The argument-2 arm of `211f6c` selects `211f92`: it calls `28f9ec(0)`
+and clears bytes `+3` and `+0d` of the structure at `1066a0`.
+In `28f9ec`, zero input bypasses the measurement/threshold path and selects
+state 0 for byte `10b543`. Only a changed state calls notifier `28d726`;
+an already-zero state returns without notification. Thus this part of the
+continuation resets local history and conditionally publishes a state change,
+not an unconditional acquisition-ready event. The notifier's downstream
+meaning and the other `211f6c` arguments remain separate open contracts.
+`nse1_scan_continuation_contract.py roms/noki5110/5110f530.fls` pins 19
 fragments in the hash-identified own image (dispatch, parser decisions,
 setter, counter/limit roots, status producer and control tail); every pinned
 byte has mutation coverage. Computed aliases, indirect writers and uploaded
