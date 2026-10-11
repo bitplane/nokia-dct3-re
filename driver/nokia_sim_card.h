@@ -133,6 +133,7 @@ private:
 	bool access_allowed(const file_descriptor &file) const;
 	bool chv1_authorized() const;
 	void initialize_sms_files();
+	void initialize_plmn_files();
 
 	static constexpr unsigned sms_record_length = 176;
 	static constexpr unsigned sms_record_count = 10;
@@ -179,6 +180,8 @@ private:
 	u8 m_sms[sms_record_count * sms_record_length] = { 0 };
 	u8 m_smsp[smsp_record_count * smsp_record_length] = { 0 };
 	u8 m_acm[3] = { 0 };
+	u8 m_preferred_plmn[24] = { 0 };
+	u8 m_forbidden_plmn[12] = { 0 };
 	u8 m_chv[2][8] = { { 0 }, { 0 } };
 	u8 m_unblock_chv[2][8] = { { 0 }, { 0 } };
 	u8 m_chv_attempts[2] = { 3, 3 };

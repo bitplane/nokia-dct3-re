@@ -14,6 +14,7 @@ struct write_case {
 	u16 body;
 	u8 sw1, sw2;
 	bool checkpoint = false, restore = false;
+	bool preserve_checkpoint = false;
 };
 
 class nokia_simi_test_state : public driver_device
@@ -264,7 +265,27 @@ private:
 		{0xb2, 2, 4, 32, 0xaabb, 0x90, 0},
 		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
 		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
-		{0xc0, 0, 0, 12, 0, 0x90, 0}
+		{0xc0, 0, 0, 12, 0, 0x90, 0, false, true},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xa4, 0, 0, 2, 0x6f30, 0x9f, 15, true, false, true},
+		{0xc0, 0, 0, 15, 0x6f30, 0x90, 0},
+		{0xd6, 0, 0, 24, 0x1122, 0x98, 4},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xd6, 0, 0, 24, 0x1122, 0x90, 0},
+		{0xb0, 0, 0, 1, 0x11, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f7b, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f7b, 0x90, 0},
+		{0xd6, 0, 0, 12, 0x3344, 0x90, 0},
+		{0xd6, 0, 12, 1, 0x55, 0x94, 2},
+		{0xb0, 0, 0, 1, 0x33, 0x90, 0, false, true},
+		{0x20, 0, 1, 8, 0, 0x90, 0},
+		{0xb0, 0, 0, 1, 0, 0x90, 0}, // Restored SELECT is PLMNsel, not FPLMN.
+		{0xa4, 0, 0, 2, 0x6f7b, 0x9f, 15},
+		{0xb0, 0, 0, 1, 0xff, 0x90, 0},
+		{0xd6, 0, 0, 12, 0x3344, 0x90, 0},
+		{0xa4, 0, 0, 2, 0x6f30, 0x9f, 15},
+		{0xd6, 0, 0, 24, 0x1122, 0x90, 0},
+		{0xb0, 0, 0, 1, 0x11, 0x90, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -297,6 +318,9 @@ private:
 	unsigned m_snapshot_cause_count = 0;
 	double m_saved_time = 0, m_replay_time = 0;
 	std::stringstream m_checkpoint;
+	// PLMN mutation/restoration nests inside the authorization checkpoint
+	// reused by the later reset and reinsertion sequences.
+	std::string m_previous_checkpoint;
 	void expect(bool value, char const *message)
 	{
 		if (!value) fatalerror("SIMI restoration: %s", message);
@@ -642,6 +666,8 @@ private:
 					expect(m_bytes[9] == 0x11, "ADN advertises CHV1 for READ and UPDATE");
 				if (item.body == 0x6f07)
 					expect(m_bytes[9] == 0x10, "IMSI advertises CHV1 READ");
+				if (item.body == 0x6f30 || item.body == 0x6f7b)
+					expect(m_bytes[9] == 0x11, "PLMN lists advertise CHV1 READ and UPDATE");
 				if (m_write_case >= 147)
 					expect((m_bytes[9] & 0xf0) == 0x10, "GSM file advertises CHV1 READ");
 			}
@@ -679,8 +705,21 @@ private:
 			}
 			if (m_write_case == 109)
 				osd_printf_info("SIM record search: PASS directions=4 types=2 undefined_starts=2 prefix_only=1 failed_pointer_preservation=1 parameter_cases=6 incompatible_files=2 no_selected_ef=3 pending_result_replay=1 handset_claim=0\n");
-			if (item.checkpoint) save_checkpoint();
-			if (item.restore) restore_checkpoint();
+			if (item.checkpoint)
+			{
+				if (item.preserve_checkpoint) m_previous_checkpoint = m_checkpoint.str();
+				save_checkpoint();
+			}
+			if (item.restore)
+			{
+				restore_checkpoint();
+				if (!m_previous_checkpoint.empty())
+				{
+					m_checkpoint.str(m_previous_checkpoint);
+					m_checkpoint.clear();
+					m_previous_checkpoint.clear();
+				}
+			}
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
 			if (m_activation_checks < 2)
@@ -700,6 +739,7 @@ private:
 			osd_printf_info("SIM GSM binary read access: PASS files=8 before_pin=1 after_pin=1 fcp_matches=1 handset_claim=0\n");
 			osd_printf_info("SIM authentication access: PASS before_pin=1 after_pin=1 gsm_directory=1 rejected_result_absent=1 handset_claim=0\n");
 			osd_printf_info("SIM disabled CHV blocking: PASS failed_enable=3 protected_read=1 protected_write=1 authentication=1 always_read=1 unblock_recovery=1 failed_write_preservation=1 handset_claim=0\n");
+			osd_printf_info("SIM PLMN updates: PASS files=2 pin_access=1 readback=1 bounds_preserve=1 state_restore=1 fcp_matches=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

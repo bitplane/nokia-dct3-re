@@ -138,14 +138,18 @@ implements:
 
 SIM NVRAM loading validates the complete serialized record before installing
 card fields. The supported append-only layouts retain base files, then SMS/SMSP,
-then security state, then EF_ACM; missing later fields receive their declared
+then security state, then EF_ACM, then preferred/forbidden PLMN lists; missing later fields receive their declared
 defaults. Truncated records, trailing bytes and non-boolean CHV1-enable flags
 are rejected atomically. Device startup initializes defaults because MAME
 reports load failure without resetting NVRAM. `verify-sim-nvram-atomic` exercises
-ten cases through actual isolated MAME processes, including all three legacy
+thirteen cases through actual isolated MAME processes, including all four legacy
 layouts and an unchanged full record. Its short-ADN negative detects the former
 partial-load defect. This is storage conformance, not a handset-service claim;
 physical phonebook and security gates remain separate.
+The current record is 3560 bytes; its original 3524-byte prefix and all existing
+file/security offsets are unchanged. `run_sim_nvram_atomic.py --card-seed`
+additionally cold-loads an independently produced current record and requires
+byte-exact preservation, rejecting silent reinitialization.
 
 It does not inject task messages, call firmware handlers, or write SIM/registration RAM. When the
 device is disabled, SIMI reads and writes retain the legacy behavior used by the
@@ -226,6 +230,13 @@ including after reset and reinsertion. This is READ-policy coverage: missing
 update support for currently immutable files and their advertised UPDATE
 conditions remain separate work. The bounded serial runner permits 16 seconds
 for the expanded command sequences and still requires every completion marker.
+PLMNsel and FPLMN now also support CHV1-protected UPDATE BINARY, as specified
+in GSM 11.11 10.2.4/10.2.16. Their 24-/12-byte bodies are mutable card-owned
+arrays with exact FCP READ/UPDATE conditions, bounds checking, save/load and
+append-only NVRAM persistence. The serial fixture verifies both updates and
+restoration, then checks the exact serialized bodies; the storage gate cold-loads
+that same record. This does not yet prove a handset-originated rejection updates
+FPLMN or alters subsequent network selection; that lifecycle remains open.
 These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
 ([ETSI specification](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf)).
 No retained handset trace uses SEEK;

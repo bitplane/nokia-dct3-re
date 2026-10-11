@@ -1010,7 +1010,7 @@ measured.
 `tools/noki6250_phonebook_observe.lua` uses only physical cells to open
 Names, select Add name, enter `A`, enter `123`, and confirm. Captures show
 the Name editor, Phone number editor and `Saved to SIM card`. After normal
-MAME exit, `nvram/nhm3hle/sim_card` contains a 3524-byte card image whose
+MAME exit, `nvram/nhm3hle/sim_card` contains a card image whose
 first 32-byte ADN record is `41`, 17 erased bytes, `03 81 21 f3`, then ten
 erased bytes; the remaining 49 ADN records are erased. Thus the save reaches
 durable card storage, not just a UI acknowledgment.
