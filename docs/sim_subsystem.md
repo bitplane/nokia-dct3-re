@@ -238,6 +238,10 @@ and exact restoration. Both bytes are saved and appended to NVRAM; complete
 legacy PLMN records receive defaults, while partial extensions are rejected
 before any retained state is installed. A serial-written record is independently
 cold-loaded byte-for-byte by the atomic-storage gate.
+Physical two-process SMS gates additionally correlate retained SMSS with
+actual submitted TP-MR and its cold increment on the 6210 and 8210. Their
+first references differ (1 and 0 respectively), as do relative TP-VP bytes
+(`FF` and `A7`); the shared checker does not normalize those product choices.
 The standard GSM transparent set Kc (`6F20`), PLMNsel (`6F30`), HPLMN
 (`6F31`), ACMmax (`6F37`), BCCH (`6F74`), ACC (`6F78`), FPLMN (`6F7B`)
 and LOCI (`6F7E`) also enforces CHV1 READ. Serial tests independently check

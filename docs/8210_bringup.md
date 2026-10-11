@@ -17,6 +17,14 @@ Identity and record success replies remain unselected. This is research-HLE
 phone-service acceptance, not a promotion of the normal machine, complete
 hardware fidelity, native DSP speech, or authentic factory-default provisioning.
 
+`verify-8210-sms-status-persistence` checks two separate PIN-enabled
+research-HLE processes with retained own-product storage and physical SMS
+composition. Firmware reads and updates EF_SMSS, and the submitted TP-MR
+advances from 0 to 1 across cold restart. Both processes independently pass
+registration, host CP/RP/RR closure and the sent-screen oracle. The shared
+status checker preserves the product's relative TP-VP (`A7`); neither its
+initial reference nor its validity period is borrowed from the 6210.
+
 ### Documented PCM bus
 
 Nokia's NSM-3 System Module, issue 1 (12/1999), printed page 24,

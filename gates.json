@@ -1258,6 +1258,13 @@
                  "arguments": ["$(RUN_DIR)", "--scenario", "host-outgoing-sms", "--pin-enabled", "--mame", "$(MAME_DIR)/mame"]}]
     },
     {
+      "name": "verify-8210-sms-status-persistence",
+      "prerequisites": ["build"], "variables": {},
+      "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",
+                 "before_script": [], "script": "tools/run_noki8210_acceptance.py",
+                 "arguments": ["$(RUN_DIR)", "--scenario", "host-sms-status", "--pin-enabled", "--mame", "$(MAME_DIR)/mame"]}]
+    },
+    {
       "name": "verify-8210-pin-phonebook",
       "prerequisites": ["build"], "variables": {},
       "steps": [{"step": "check", "silent": false, "interpreter": "$(VENV)/bin/python",

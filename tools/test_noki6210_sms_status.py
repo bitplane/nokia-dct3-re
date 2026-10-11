@@ -41,6 +41,18 @@ class SmsStatusTest(unittest.TestCase):
         text = text.replace('0d11010781', '0d11020781')
         self.assertEqual(verify_status(text, storage[:-2] + b'\x02\xff'), 2)
 
+    def test_product_validity_period_and_zero_reference(self):
+        from tools.sim_sms_status_check import verify
+        text, storage = self.fixture()
+        text = text.replace('0d11010781', '0d11000781').replace('0000ff0141', '0000a70141')
+        storage = storage[:-2] + b'\x00\xff'
+        self.assertEqual(verify(text, storage, validity_period=0xa7), 0)
+        with self.assertRaises(ValueError):
+            verify_status(text, storage)
+        for invalid in (-1, 256, 'a7'):
+            with self.subTest(value=invalid), self.assertRaises(ValueError):
+                verify(text, storage, validity_period=invalid)
+
 
 if __name__ == '__main__':
     unittest.main()

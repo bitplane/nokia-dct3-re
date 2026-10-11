@@ -43,6 +43,7 @@ SCENARIOS = {
     'host-outgoing-call': ('outgoing_call_input', 49, 'outgoing_call_check'),
     'host-incoming-sms': ('incoming_sms_input', 32, 'incoming_sms_check'),
     'host-outgoing-sms': ('outgoing_sms_input', 46, 'outgoing_sms_check'),
+    'host-sms-status': ('outgoing_sms_input', 46, 'outgoing_sms_check'),
     'host-rejected-sms': ('sms_reject_input', 58, 'outgoing_sms_check'),
     'host-silent-sms': ('sms_silence_input', 125, 'outgoing_sms_check'),
 }
@@ -56,7 +57,7 @@ PMM_SHA256 = '31f51bcd69e183f23c39136574bd6a44864eb2ba1939417b9d848a3e0639ec59'
 
 PIN_SCENARIOS = frozenset((
     'registration', 'incoming-call', 'host-incoming-call', 'host-outgoing-call',
-    'host-incoming-sms', 'host-outgoing-sms', 'host-rejected-sms', 'host-silent-sms',
+    'host-incoming-sms', 'host-outgoing-sms', 'host-sms-status', 'host-rejected-sms', 'host-silent-sms',
     'idle-state', 'call-state', 'sms-state', 'phonebook',
 ))
 DCS_SCENARIOS = PIN_SCENARIOS | frozenset((
@@ -171,7 +172,7 @@ def main():
         if args.pin_enabled:
             from tools.make_sim_card_profile import make_profile
             (run / 'nvram/nsm3hle/sim_card').write_bytes(make_profile(pin_enabled=True))
-        host_sms = args.scenario.startswith('host-') and args.scenario.endswith('-sms')
+        host_sms = args.scenario.startswith('host-') and (args.scenario.endswith('-sms') or args.scenario == 'host-sms-status')
         config = 'noki8210_host_gsm900' if args.scenario.startswith('host-') or args.scenario == 'power-cycle' else {
                   'incoming-call': 'radio_incoming_call_answered',
                   'incoming-sms': 'radio_incoming_sms',
@@ -204,10 +205,10 @@ def main():
                    '-autoboot_script', str(root / f'tools/noki8210_{script}.lua'),
                    '-autoboot_delay', '0', '-seconds_to_run', str(seconds),
                    '-video', 'none', '-sound', 'none', '-nothrottle', '-log', '-verbose']
-        def execute(cmd, output):
-            with (run / output).open('w') as console:
-                subprocess.run(cmd, cwd=run, stdout=console, stderr=subprocess.STDOUT,
-                               check=True, env=environment)
+        def execute(cmd, output, directory=run):
+            with (directory / output).open('w') as console:
+                subprocess.run(cmd, cwd=directory, stdout=console, stderr=subprocess.STDOUT,
+                               check=True, env=environment, timeout=180)
         host_command = None
         if args.scenario.startswith('host-'):
             command.extend(['-http', '-http_port', str(args.port)])
@@ -219,6 +220,8 @@ def main():
                     '--number', '1234567', '--decision', 'connect']),
                 'host-incoming-sms': ('run_host_incoming_sms_gate', []),
                 'host-outgoing-sms': ('run_host_sms_gate', [
+                    '--user-data', '41', '--user-data-length', '1']),
+                'host-sms-status': ('run_host_sms_gate', [
                     '--user-data', '41', '--user-data-length', '1']),
                 'host-rejected-sms': ('run_host_sms_gate', [
                     '--user-data', '41', '--user-data-length', '1', '--decision', 'rp_error']),
@@ -270,7 +273,7 @@ def main():
                                 (run / 'nvram/nsm3hle/sim_card').read_bytes(),
                                 dcs1800=True)
             check.extend(['--dcs1800', '--frames', str(run / 'snap')])
-        elif args.scenario == 'host-outgoing-sms':
+        elif args.scenario in ('host-outgoing-sms', 'host-sms-status'):
             check.extend(['--sent-frame', str(run / 'snap/8210_sms_sent.png')])
         elif args.scenario == 'outgoing-sms' and args.dcs1800:
             verify_registration((run / 'error.log').read_text(errors='replace'),
@@ -366,6 +369,33 @@ def main():
             if args.scenario == 'host-outgoing-call':
                 from tools.radio_host_outgoing_connect_check import verify as check_host_call
                 check_host_call(text, '1234567')
+        sms_status = None
+        if args.scenario == 'host-sms-status':
+            from tools.sim_sms_status_check import verify as check_status
+            from tools.noki8210_outgoing_sms_check import verify as check_submission, check_sent_frame
+            from tools.radio_outgoing_host_sms_trace_check import verify as check_host_sms
+            first_reference = check_status(text, Path(storage).read_bytes(), validity_period=0xa7)
+            cold = run / 'cold-sms-status'
+            cold.mkdir()
+            shutil.copytree(run / 'nvram', cold / 'nvram')
+            shutil.copytree(run / 'cfg', cold / 'cfg')
+            cold_command = host_command.copy()
+            cold_command[cold_command.index('--cwd') + 1] = str(cold)
+            execute(cold_command, 'console.log', directory=cold)
+            cold_text = (cold / 'error.log').read_text(errors='replace')
+            cold_card = (cold / 'nvram/nsm3hle/sim_card').read_bytes()
+            check_host_registration(cold_text, cold_card, dcs1800=args.dcs1800)
+            check_submission(cold_text)
+            check_sent_frame(cold / 'snap/8210_sms_sent.png')
+            check_host_sms(cold_text, octets=1, outcome='rp_ack')
+            if args.pin_enabled:
+                check_security(cold_text, cold_card, 'verify', '1234')
+                verify_pin_measurement_registration(cold_text, dcs1800=args.dcs1800)
+            cold_reference = check_status(cold_text, cold_card, validity_period=0xa7)
+            if cold_reference != (first_reference + 1) % 256:
+                raise ValueError('cold SMS reference did not advance from retained SMSS')
+            sms_status = {'first_reference': first_reference, 'cold_reference': cold_reference,
+                          'processes': 2, 'firmware_read_and_write': True}
         (run / 'acceptance.json').write_text(json.dumps({
             'machine': 'nsm3hle', 'scenario': args.scenario, 'passed': True,
             'provisioning': 'unchanged acquired base record; later low journal omitted',
@@ -377,8 +407,9 @@ def main():
                 if args.pin_enabled else None,
             'command': command,
             'host_command': host_command,
+            'smss_status_persistence': sms_status,
         }, indent=2) + '\n')
-    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'8210 acceptance FAIL: {error}\n')
     print(f'8210 {args.scenario} acceptance PASS: {run}')
 
