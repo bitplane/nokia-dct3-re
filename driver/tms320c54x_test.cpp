@@ -1360,6 +1360,39 @@ private:
 						"SFTL decoder retains signed shift and logical mnemonic without extensions");
 				}
 		osd_printf_info("TMS320C54x logical shift disassembler: PASS forms=128 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned word = 0; word < 1024; ++word)
+			{
+				words const buffer(pc, 0xa000 | word, 0x2345);
+				std::ostringstream text;
+				expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1,
+					"Dual-memory ADD/SUB decoder consumes only the packed operand word");
+			}
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (unsigned accumulators = 0; accumulators < 4; ++accumulators)
+				for (unsigned operation = 0; operation < 4; ++operation)
+				{
+					words const buffer(pc, 0xf488 | (accumulators << 8) | operation, 0x2345);
+					std::ostringstream text, expected;
+					char const *names[] = {"MACA", "MACAR", "MASA", "MASAR"};
+					util::stream_format(expected, "%-8sT, %c, %c", names[operation], accumulators & 2 ? 'B' : 'A', accumulators & 1 ? 'B' : 'A');
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (1 | dasm::SUPPORTED) && buffer.seen() == 1 && text.str() == expected.str(),
+						"Accumulator multiply-accumulate decoder retains subtraction and rounding fields");
+				}
+		vector const dual_arithmetic_forms[] = {
+			{0xa249, 1 | dasm::SUPPORTED, "SUB     *AR2-, *AR3+, A"},
+			{0xa201, 1 | dasm::SUPPORTED, "SUB     *AR2, *AR3, A"},
+			{0xa3c9, 1 | dasm::SUPPORTED, "SUB     *AR2+0%, *AR3+, B"},
+			{0xa198, 1 | dasm::SUPPORTED, "ADD     *AR3+, *AR2+, B"},
+		};
+		for (auto const &test : dual_arithmetic_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Dual arithmetic syntax preserves X/Y order and destination");
+		}
+		osd_printf_info("TMS320C54x dual/accumulator arithmetic disassembler: PASS dual_forms=1024 accumulator_forms=16 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

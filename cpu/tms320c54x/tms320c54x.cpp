@@ -129,6 +129,13 @@ public:
 			static constexpr char const *forms[] = {"*AR%u", "*AR%u-", "*AR%u+", "*AR%u+0%%"};
 			util::stream_format(stream, forms[(operand >> 2) & 3], 2 + (operand & 3));
 		};
+		if ((op & 0xfc00) == 0xa000)
+		{
+			util::stream_format(stream, "%-8s", BIT(op, 9) ? "SUB" : "ADD");
+			dual(op >> 4); stream << ", "; dual(op);
+			util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
+		}
 		if (family == 0xe500)
 		{
 			stream << "MVDD    "; dual(op >> 4); stream << ", "; dual(op);
@@ -389,6 +396,12 @@ public:
 			util::stream_format(stream, "%-8s#$%04X, %u, %c, %c", name, next_word(), high ? 16 : op & 15,
 				BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
 			return 2 | SUPPORTED;
+		}
+		if ((op & 0xfcfc) == 0xf488)
+		{
+			char const *name = BIT(op, 1) ? (BIT(op, 0) ? "MASAR" : "MASA") : (BIT(op, 0) ? "MACAR" : "MACA");
+			util::stream_format(stream, "%-8sT, %c, %c", name, BIT(op, 9) ? 'B' : 'A', BIT(op, 8) ? 'B' : 'A');
+			return 1 | SUPPORTED;
 		}
 		if ((op & 0xfcff) == 0xf484 || (op & 0xfcff) == 0xf485 || (op & 0xfcff) == 0xf48f || (op & 0xfcff) == 0xf49f)
 		{
