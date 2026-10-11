@@ -8,6 +8,14 @@ def words(*values):
 
 
 class C54xRom4PortCensusTest(unittest.TestCase):
+    def test_all_absolute_aliases_put_address_before_port(self):
+        for family, direction in ((0x7400, "R"), (0x7500, "W")):
+            for mode in range(0xf8, 0x100):
+                with self.subTest(direction=direction, mode=mode):
+                    self.assertEqual(census(words(family | mode, 0x0008, 0x0036)),
+                                     {(direction, 0x36): [0]})
+                    self.assertEqual(census(words(family | mode, 0x0008)), {})
+
     def test_indirect_and_absolute_port_operands(self):
         result = census(words(
             0x7492, 0x0039,

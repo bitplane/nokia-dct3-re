@@ -29,6 +29,13 @@ Most accesses are in `0x8d96..0x92a4`; additional reads occur at
 instruction-boundary or computed-port census. The other entry at `0x9116`
 is not observed in this run; do not infer its callers from the blocked
 `0x9129` path.
+The scanner now handles all absolute-address aliases `f8..ff`, rather than
+only `f8`; sixteen read/write alias controls and incomplete-word cases guard
+address-before-port selection. The corrected acquired-ROM census retains
+the same 18 port-36 read and 13 write candidates. It adds raw candidates
+`71e5` (port `0f`) and `71ef` (port `0a`) elsewhere; neither is promoted to a
+validated instruction site or peripheral contract. The before/after inventories
+are `tmp/c54x-port-census-{before,after}.txt`.
 
 The recovered legacy IDA database also has no names or comments for this
 serial-control region; see the [archive annotation contract](djr_dsp_integration.md#recovered-ida-annotations).
