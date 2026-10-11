@@ -107,6 +107,14 @@ accumulators, stack RAM and the remaining delay word reproduce the original
 continuation after those values are deliberately changed in the fixture.
 This does not establish full pipeline timing or a fitted handset DSP mask.
 
+The native gate also checks RND against explicit results from
+[SPRU172C page 4-142](https://www.ti.com/lit/ug/spru172c/spru172c.pdf):
+128 executions cover all four source/destination selectors, eight signed
+40-bit boundary inputs, OVM clear/set and two initial ST0 patterns. The
+result matrix distinguishes 40-bit wrap from signed 32-bit saturation,
+preserves the other accumulator and requires unchanged status flags.
+This is arithmetic conformance, not repeatability or pipeline timing.
+
 The first semantic tranche covers the generic encodings exercised at the
 transform boundary for CALL/RET, RPT/RPTB, immediate auxiliary-register loads,
 auxiliary-register moves, ordinary indirect pre/post addressing, accumulator
