@@ -964,8 +964,13 @@ word. Low-address wrap does not modify the program-page register. Registers
 and pending timers are saved. Subsequent serial synchronization, interrupt,
 autoinitialization and multiframe extensions are documented under the
 streaming boundary below. ABU, indexed addressing and overlapping arbitration
-remain outside the validated subset; unsupported active modes fail explicitly. The two-clock cadence
-at the fixture's 13 MHz is an assumption, not measured DA150 latency.
+remain outside the validated subset; unsupported active modes fail explicitly.
+The device uses four clocks per internal word, as specified by SPRU302B section
+3.5 (two for the read, two for the write). Six coupled CPU/DMA cases and their
+save-state replays require a four-word block to finish in sixteen device clocks.
+The fixture's 13 MHz, DA150 arbitration, external wait states and IDLE3 input-clock
+switching are not validated by this timing check. The single completion timer
+does not yet expose separate read/write bus phases.
 
 MMIO conformance checks exercise deferred completion, program-page wrap,
 zero-count one-word transfer, cancellation and pending save/restore replay.
@@ -1081,7 +1086,7 @@ and channel 3), not a complete ASIC interrupt-controller implementation.
 The DMA device now accepts single-word multiframe transfers, all nonreserved
 sorting/index modes, shared or per-channel auto-reload, and block/frame completion
 callbacks. Each selected sync event schedules one element after the assumed
-two-clock bus delay; mismatched events do nothing. A synchronized channel does
+four-clock internal transfer delay; mismatched events do nothing. A synchronized channel does
 not advance merely because DE is set. Isolated tests verify a two-frame sorted
 stream, exact completion order, reload, non-reloading DE clearance and pending
 save/replay. Completion callbacks identify the channel; the surrounding ASIC

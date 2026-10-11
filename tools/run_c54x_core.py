@@ -45,6 +45,7 @@ REQUIRED = [
     "TMS320C54x IDLE2/3 McBSP internal clock: PASS cases=4 save_replay=4",
     "TMS320C54x IDLE2/3 McBSP external clock: PASS cases=4",
     "TMS320C54x IDLE DMA transfer: PASS cases=6 save_replay=6 clock_rate_claim=0",
+    "TMS320C54x internal DMA cadence: PASS cases=6 replay=6 words=4 clocks=16",
     "TMS320C54x extended save replay: PASS pending_call pending_return xpc stack delay",
     "TMS320C54x accepted interrupt checkpoint: PASS ifr_until_fetch=1 intm_at_iack=1 decode_before_access=1 later_imr=1 source_latched=1 save_replay=1 pipeline_drain_claim=0",
     "TMS320C54x interrupt entry stages: PASS sources=irq,nmi fetch_to_stack_cycles=1 pipeline_drain_claim=0",

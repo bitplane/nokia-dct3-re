@@ -6,6 +6,10 @@
 
 DEFINE_DEVICE_TYPE(TMS320C54X_DMA, tms320c54x_dma_device, "tms320c54x_dma", "TMS320C54x enhanced DMA subset")
 
+// SPRU302B 3.5: an internal word needs two read clocks and two write clocks.
+// External wait states and inter-channel arbitration are not modeled here.
+static constexpr unsigned INTERNAL_TRANSFER_CLOCKS = 4;
+
 tms320c54x_dma_device::tms320c54x_dma_device(machine_config const &config, char const *tag, device_t *owner, u32 clock)
 	: device_t(config, TMS320C54X_DMA, tag, owner, clock), m_cpu(*this, finder_base::DUMMY_TAG), m_completion_cb(*this)
 {
@@ -87,7 +91,7 @@ void tms320c54x_dma_device::enable(unsigned channel)
 	// Synchronized channels remain enabled but transfer nothing without their event.
 	unsigned const event = m_regs[channel * 5 + 3] >> 12;
 	if (!event || BIT(m_sync_levels, event))
-		m_timers[channel]->adjust(attotime::from_ticks(2, clock()), channel);
+		m_timers[channel]->adjust(attotime::from_ticks(INTERNAL_TRANSFER_CLOCKS, clock()), channel);
 }
 
 void tms320c54x_dma_device::validate(unsigned channel) const
@@ -111,8 +115,7 @@ void tms320c54x_dma_device::sync_event(unsigned event)
 		{
 			if (m_timers[channel]->enabled() && m_timers[channel]->remaining() != attotime::never)
 				fatalerror("C54x DMA overlapping synchronization/arbitration is not implemented");
-			// Two-clock bus cadence is an assumption, not measured DA150 arbitration.
-			m_timers[channel]->adjust(attotime::from_ticks(2, clock()), channel);
+			m_timers[channel]->adjust(attotime::from_ticks(INTERNAL_TRANSFER_CLOCKS, clock()), channel);
 		}
 }
 
@@ -173,5 +176,5 @@ TIMER_CALLBACK_MEMBER(tms320c54x_dma_device::transfer)
 		--m_regs[base + 2];
 	if (BIT(mode, 14) && (block_end || (frame_end && BIT(mode, 13)))) m_completion_cb(u8(param));
 	if (BIT(m_control, param) && !(m_regs[base + 3] >> 12))
-		m_timers[param]->adjust(attotime::from_ticks(2, clock()), param);
+		m_timers[param]->adjust(attotime::from_ticks(INTERNAL_TRANSFER_CLOCKS, clock()), param);
 }

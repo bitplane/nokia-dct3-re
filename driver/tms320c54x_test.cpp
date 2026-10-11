@@ -3091,6 +3091,7 @@ private:
 	virtual void machine_start() override
 	{
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
+		save_item(NAME(m_idle_dma_start));
 	}
 
 	virtual void machine_reset() override
@@ -4178,6 +4179,7 @@ private:
 				expect(m_cpu->state_int(tms320c54x_device::STATE_IDLE) &&
 					m_cpu->state_int(STATE_GENPC) == 0x010961 && m_idle_dma_completions == 0,
 					"DMA fixture starts with CPU idle and channel disabled");
+				m_idle_dma_start = machine().time();
 				m_idle_dma->write(0, 1);
 				m_saved_repeat.str(std::string());
 				m_saved_repeat.clear();
@@ -4212,6 +4214,7 @@ private:
 			}
 			if (index < 5) { start_idle_dma_case(index + 1); return; }
 			osd_printf_info("TMS320C54x IDLE DMA transfer: PASS cases=6 save_replay=6 clock_rate_claim=0\n");
+			osd_printf_info("TMS320C54x internal DMA cadence: PASS cases=6 replay=6 words=4 clocks=16\n");
 			start_rounded_multiply_case(0);
 			return;
 		}
@@ -22352,6 +22355,7 @@ private:
 	bool m_idle_mcbsp_external = false;
 	optional_device<tms320c54x_dma_device> m_idle_dma;
 	unsigned m_idle_dma_completions = 0;
+	attotime m_idle_dma_start = attotime::zero;
 	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
@@ -22414,6 +22418,8 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_idle_dma->set_cpu(m_cpu);
 	m_idle_dma->completion_cb().set([this](u8 channel) {
 		expect(channel == 0, "idle DMA fixture completes only its configured channel");
+		expect(machine().time() - m_idle_dma_start == attotime::from_ticks(4, m_idle_dma->clock()) * 4,
+			"four internal DMA words complete in sixteen transfer clocks, including replay");
 		++m_idle_dma_completions;
 		// Fixture routing selects the documented DMAC0/BRINT2 vector slot.
 		m_cpu->set_input_line(6, ASSERT_LINE);
