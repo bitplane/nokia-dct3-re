@@ -736,6 +736,9 @@ select state 4 earlier, as the measured common response demonstrates.
 Do not interpret this bound as a requirement to send fourteen identical
 responses or fabricate enough strong carriers to fill the count quotas.
 The own controller's later response entrances are explicit:
+kind `88` at `2d0ee4` requires referenced state 3/4, calls `38afea`,
+and returns to receive rather than immediately advancing the selection
+stage. The RX table maps `88 -> 45808c -> task 14`.
 `1802` kind `8f` at `2d0f30` requires referenced state 3/4 and joins
 stage advancement at `2d1048`. The RX table routes `8f` through
 `4f60cc -> 458054`, posting to task 14 while that handler is enabled.
@@ -749,6 +752,19 @@ consumer contracts, not proof that a particular type-`09` request has
 received or completed either response. In particular, a measurement `8b`
 can establish the state guard, but does not supply decoded synchronization
 content or automatically publish the previously mapped `7f4` completion.
+The distinct `88` result supplies the missing record-state transition.
+`38afea` extracts ARFCN from object bytes +8/+9 (payload +4/+5), looks
+up an existing measured record, and calls `38afa8`. Success requires
+object byte+4 (payload byte 0) to be zero; `38af66` parses its remaining
+fields, then the firmware writes low flag nibble 3 at record+13.
+Nonzero status increments record+11 and, unless that byte wraps, sets
+low nibble 1 instead. An unmatched ARFCN is ignored, not allocated.
+`38a954` searches for nibble 3 and selects the corresponding record.
+By contrast, successful type-`80` channel-`40` content through `38a054`
+writes nibble 4. This establishes distinct selection phases, not
+interchangeable positive-reply shapes. The `88` timing/phase fields and
+their DSP-side physical meaning remain unmapped; zero-filling a success
+payload merely to obtain nibble 3 is not a validated peer contract.
 Evidence: `tmp/6210-plmn-search-request-{national,international}/error.log.gz`.
 Current unresolved boundary: the response contract for foreign selection's
 type-`57` mode byte `03`, ownership of the pre-existing completion object,
