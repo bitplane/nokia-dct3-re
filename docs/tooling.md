@@ -114,6 +114,10 @@
   - `dsp_rom4_upload_trace_check.py` — checks a sibling-harness trace for the
     ordered ROM4 cold upload, reset-preserved warm entry, loader2 request and
     catalogue-backed run-mode demand uploads. Raw traces remain local.
+  - `nsm3d_loader_compare.py` — manual hash-pinned 8250 v5.02/v6.00
+    upload comparison. Classifies all changed first-loader branch operands
+    and retains overlapping declared destination coverage without promoting
+    program ownership, native boot or fitted-mask completeness.
   - `dsp_upload_extract.py` — reconstructs contiguous type-`0x51`
     DSP-addressed images or bounded shared-RAM staging snapshots from passive
     traces, with explicit word byte order.

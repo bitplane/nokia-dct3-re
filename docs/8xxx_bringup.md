@@ -46,8 +46,8 @@ An exhaustive exact-byte search finds one complete descriptor/payload copy
 of the v5.02 fragment at raw offset `0x117be0` and one of its verifier at
 `0x118dc8`. The complete loader descriptor occurs once at `0x1121f4`,
 but its 638-word payload differs (SHA-1
-`15da89872f54fc7e0c2ca8f1f9707054aedb2508`). The changed loader is a
-remaining software comparison target, not evidence that resident ROM6
+`15da89872f54fc7e0c2ca8f1f9707054aedb2508`). The paired-loader census below
+classifies those differences; they do not supply evidence that resident ROM6
 code or matching provisioning is present. No v6.00 boot is established,
 and the v5.02 hash-pinned extraction contract is unchanged.
 
@@ -57,6 +57,25 @@ All descriptor payloads fit the acquired image. Compared by selector with
 v5.02, only decimal selectors 0, 1, 12 and 20 have changed payload hashes.
 Selector 0 changes 22 table-region words; its 126-word executable tail is
 identical (SHA-1 `5bcd6f091b23730b2484eb844841361ef7a12889`).
+`tools.nsm3d_loader_compare` checks all 638 words: all differences lie in
+the recovered 422-word branch table, and every changed word is an operand
+of the two-word absolute `B` encoding (TI SPRU172C, B[D], page 4-14).
+Nineteen operands move by -11 words; both old and new targets have unique
+declared coverage in selector 1, whose payload shrinks from 2652 to 2641
+words. Three operands move by +10 words; their declared ranges overlap
+several catalogue entries, so range coverage alone cannot name their
+program owner. This matches, but does not prove ownership by, the second
+loader's ten-word growth. Padding and executable tail are byte-identical.
+Reproduce the hash-pinned comparison without donor code:
+
+```sh
+.venv/bin/python -m tools.nsm3d_loader_compare \
+  roms/noki8250/8250-502mcuppmk.fls \
+  roms/research/nsm3d/8250-v600-ppmk.bin
+```
+
+This closes the first-loader byte-difference classification, not dynamic
+relocation, v6.00 execution or fitted-mask completeness.
 Selector `0x14` (decimal 20), the second loader, grows from 613 to 623
 words, SHA-1 `8e9e4aefa311375ae090b90a607f00cb8e7059ca`.
 Its raw word pairs still include `f074/2c75` at declared program `0x0a4a`,
