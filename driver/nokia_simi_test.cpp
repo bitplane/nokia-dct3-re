@@ -87,7 +87,17 @@ private:
 		{0x88, 0, 0, 17, 0x5a, 0x67, 0},
 		{0x88, 0, 0, 0, 0, 0x67, 0},
 		{0x88, 0, 0, 16, 0x5a, 0x9f, 12},
-		{0xc0, 0, 0, 12, 0, 0x90, 0}
+		{0xc0, 0, 0, 12, 0, 0x90, 0},
+		{0xc0, 0, 0, 12, 0, 0x6f, 0}, // A response is consumed once.
+		{0xa4, 0, 0, 2, 0x3f00, 0x9f, 22},
+		{0xc0, 0, 0, 22, 0x3f00, 0x90, 0},
+		{0xc0, 0, 0, 22, 0, 0x6f, 0},
+		{0xa4, 0, 0, 2, 0x7f20, 0x9f, 22},
+		{0xf2, 0, 0, 22, 0x7f20, 0x90, 0}, // STATUS breaks SELECT/GET RESPONSE adjacency.
+		{0xc0, 0, 0, 22, 0, 0x6f, 0},
+		{0xa4, 0, 0, 2, 0x6f7e, 0x9f, 15},
+		{0xc0, 0, 0, 15, 0x6f7e, 0x90, 0},
+		{0xc0, 0, 0, 15, 0, 0x6f, 0}
 	};
 	static constexpr u8 RECORD_HEADERS[][6] = {
 		// Header followed by expected SW1; successful 32-byte records contain ff.
@@ -159,7 +169,7 @@ private:
 	{
 		auto const &item = WRITE_CASES[m_write_case];
 		transmit({0xa0, item.ins, item.p1, item.p2, item.length});
-		bool const reading = item.ins == 0xb2 || item.ins == 0xb0 || item.ins == 0xc0 || !item.length;
+		bool const reading = item.ins == 0xb2 || item.ins == 0xb0 || item.ins == 0xc0 || item.ins == 0xf2 || !item.length;
 		m_phase = reading ? 30 : 29;
 		m_timer->adjust(attotime::from_msec(reading ? 40 : 5));
 	}
@@ -232,7 +242,25 @@ private:
 			m_timer->adjust(attotime::from_msec(30)); return;
 		case 1:
 			expect(m_count != 0, "ATR delivered through controller"); clear_capture();
+			save_checkpoint();
+			transmit({0xa0, 0xc0, 0, 0, 22});
+			m_phase = 31;
+			m_timer->adjust(attotime::from_msec(40)); return;
+		case 31:
+		case 32:
+			expect(m_count == 25 && m_bytes[0] == 0xc0 && m_bytes[5] == 0x3f &&
+				m_bytes[6] == 0 && m_bytes[7] == 1 && m_bytes[23] == 0x90 && m_bytes[24] == 0,
+				"GET RESPONSE immediately after activation returns implicitly selected MF");
+			if (m_phase == 32)
+			{
+				restore_checkpoint(); clear_capture();
+				transmit({0xa0, 0xc0, 0, 0, 22});
+				m_phase = 32;
+				m_timer->adjust(attotime::from_msec(40)); return;
+			}
+			clear_capture();
 			transmit({0xa0, 0xa4, 0, 0, 2});
+			m_phase = 2;
 			m_timer->adjust(attotime::from_msec(5)); return;
 		case 2:
 			expect(m_count == 1 && m_bytes[0] == 0xa4, "SELECT procedure byte");
@@ -403,7 +431,7 @@ private:
 		case 30:
 		{
 			auto const &item = WRITE_CASES[m_write_case];
-			if (item.ins == 0xc0)
+			if (m_write_case == 51)
 			{
 				gsm::a3a8::block rand;
 				rand.fill(0x5a);
@@ -413,6 +441,13 @@ private:
 				expect(std::equal(result.sres.begin(), result.sres.end(), m_bytes + 1) &&
 					std::equal(result.kc.begin(), result.kc.end(), m_bytes + 5),
 					"valid authentication after malformed commands returns laboratory SRES and Kc");
+			}
+			else if ((item.ins == 0xc0 || item.ins == 0xf2) && item.sw1 == 0x90)
+			{
+				expect(m_count == unsigned(item.length) + 3 && m_bytes[0] == item.ins &&
+					m_bytes[5] == u8(item.body >> 8) && m_bytes[6] == u8(item.body) &&
+					m_bytes[m_count - 2] == 0x90 && m_bytes[m_count - 1] == 0,
+					"immediately preceding SELECT supplies the selected file response");
 			}
 			else if ((item.ins == 0xb2 || item.ins == 0xb0) && item.sw1 == 0x90)
 			{
@@ -435,9 +470,11 @@ private:
 				osd_printf_info("SIM record updates: PASS cases=30 linear_mutation=1 failure_preservation=1 state_restore=1 cyclic_previous_only=1 handset_claim=0\n");
 			if (m_write_case == 44)
 				osd_printf_info("SIM binary offsets: PASS cases=14 full_high_byte=1 failed_write_preserves_data=1 boundary_readback=1 handset_claim=0\n");
+			if (m_write_case == 51)
+				osd_printf_info("SIM authentication parameters: PASS invalid_parameters=2 invalid_lengths=3 following_authentication=1 laboratory_algorithm=1 handset_claim=0\n");
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
-			osd_printf_info("SIM authentication parameters: PASS invalid_parameters=2 invalid_lengths=3 following_authentication=1 laboratory_algorithm=1 handset_claim=0\n");
+			osd_printf_info("SIM response sequencing: PASS initial_mf=1 activation_replay=1 cases=10 consumed_once=1 interrupted_pair=1 technical_error=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

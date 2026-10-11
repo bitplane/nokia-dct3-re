@@ -166,6 +166,15 @@ SELECT rejects a file-ID length other than two with `67 00`. The same fixture
 checks all six reserved-parameter cases and SELECT lengths zero, one and three
 before a valid STATUS confirms unchanged file selection and PIN retries.
 
+GET RESPONSE also accepts the implicitly selected MF immediately after card
+activation. That allowance and pending command responses are consumed once;
+an intervening command or repeated GET RESPONSE returns `6F 00`, following
+[GSM 11.11 sections 9.2.18 and 9.4.5](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf).
+The isolated fixture checks initial MF access and its save/replay, ten further
+transactions covering authentication/MF/DF/EF responses, and STATUS interrupting
+a SELECT/GET RESPONSE pair. These are card-conformance checks, not proof that
+a handset uses first-command GET RESPONSE.
+
 Record addressing follows [GSM 11.11 sections 6.4 and 8.5/8.6](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf): linear EFs do
 not wrap at their boundaries; cyclic EFs do. Current access is `P1=0/P2=04`,
 absolute access leaves the pointer unchanged, and successful next/previous

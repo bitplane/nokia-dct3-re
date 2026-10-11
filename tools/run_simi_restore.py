@@ -11,11 +11,12 @@ RECORD_PASS = "SIM record addressing: PASS cases=11 linear_no_wrap=1 absolute_pr
 UPDATE_PASS = "SIM record updates: PASS cases=30 linear_mutation=1 failure_preservation=1 state_restore=1 cyclic_previous_only=1 handset_claim=0"
 BINARY_PASS = "SIM binary offsets: PASS cases=14 full_high_byte=1 failed_write_preserves_data=1 boundary_readback=1 handset_claim=0"
 AUTH_PASS = "SIM authentication parameters: PASS invalid_parameters=2 invalid_lengths=3 following_authentication=1 laboratory_algorithm=1 handset_claim=0"
+RESPONSE_PASS = "SIM response sequencing: PASS initial_mf=1 activation_replay=1 cases=10 consumed_once=1 interrupted_pair=1 technical_error=1 handset_claim=0"
 
 
 def check(text, returncode):
     if returncode != 0 or any(text.splitlines().count(marker) != 1
-                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS)):
+                              for marker in (PASS, HEADER_PASS, PARAMETER_PASS, RECORD_PASS, UPDATE_PASS, BINARY_PASS, AUTH_PASS, RESPONSE_PASS)):
         raise ValueError("missing unique completed restoration or APDU-header result")
     if "Fatal error:" in text or "Error reading NVRAM" in text:
         raise ValueError("runtime failure or invalid initial storage")
@@ -38,7 +39,7 @@ def main():
                                     stderr=subprocess.STDOUT, timeout=90)
         check((run / "console.log").read_text(), result.returncode)
         (run / "acceptance.json").write_text(json.dumps({
-            "result": "pass", "command": command, "checkpoints": 4,
+            "result": "pass", "command": command, "checkpoints": 5,
             "controller_checkpoints": 3, "record_update_checkpoints": 1,
             "unsupported_classes": 3, "empty_verify": True,
             "retry_preservation": True, "following_apdu": True,
@@ -48,6 +49,8 @@ def main():
             "binary_offset_cases": 14, "full_binary_offset": True,
             "authentication_parameter_cases": 2, "authentication_length_cases": 3,
             "following_laboratory_authentication": True,
+            "initial_mf_response": True, "activation_response_replay": True,
+            "response_sequence_cases": 10,
             "fixture_class": "controller/card conformance", "handset_claim": False,
         }, indent=2) + "\n")
     except (OSError, ValueError, subprocess.SubprocessError) as error:
@@ -59,6 +62,7 @@ def main():
     print(UPDATE_PASS)
     print(BINARY_PASS)
     print(AUTH_PASS)
+    print(RESPONSE_PASS)
 
 
 if __name__ == "__main__":

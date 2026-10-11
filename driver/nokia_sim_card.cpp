@@ -75,7 +75,9 @@ void nokia_sim_card_device::reset_session_state()
 	m_record_pointer = 0;
 	m_receiving_body = false;
 	m_pending_response_len = 0;
-	m_fcp_pending = false;
+	// GSM 11.11 9.2.18 permits GET RESPONSE as the first command after
+	// activation because MF is implicitly selected.
+	m_fcp_pending = true;
 	m_terminal_profile_received = false;
 	m_proactive_pending = false;
 	m_proactive_fetched = false;
@@ -478,7 +480,7 @@ void nokia_sim_card_device::finish_header()
 	else if (m_ins == 0xf2)
 		queue_fcp(m_selected_file, m_p3 ? m_p3 : 256);
 	else if (m_ins == 0xc0)
-		queue_status(0x94, 0x00);
+		queue_status(0x6f, 0x00); // Broken command/response adjacency (GSM 11.11 9.2.18).
 	else if (m_ins == 0xb0)
 		queue_read_binary(m_p3 ? m_p3 : 256);
 	else if (m_ins == 0xb2)
