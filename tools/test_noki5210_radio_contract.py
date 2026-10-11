@@ -24,6 +24,7 @@ class RadioContractTest(unittest.TestCase):
         self.assertEqual(result['type_8b_destination_task'], 12)
         self.assertEqual(result['records'], 40)
         self.assertEqual(result['signed_rssi_message_offset'], 9)
+        self.assertEqual(result['receive_context_message'], '1802')
         self.assertEqual(result['direct_census_coverage']['arguments_recovered'], 8)
         self.assertFalse(result['direct_census_coverage']['indirect_and_tail_entries_closed'])
 

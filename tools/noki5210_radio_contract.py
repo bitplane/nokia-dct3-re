@@ -89,11 +89,22 @@ def verify(image):
     for site, argument in direct_sites:
         if instructions(site - 2, 6) != [('movs', f'r0, #{argument}'), ('bl', '#0x2e23ac')]:
             raise ValueError('own direct selector argument differs')
+    if int.from_bytes(read(0x235004, 4), 'big') != 0x1802:
+        raise ValueError('own receive-context message identifier differs')
+    if instructions(0x234efe, 24) != [
+            ('movs', 'r0, #4'), ('ldrsh', 'r1, [r0, r4]'),
+            ('ldr', 'r0, [pc, #0x100]'), ('cmp', 'r1, r0'),
+            ('beq', '#0x234f0a'), ('b', '#0x2351b2'),
+            ('ldrb', 'r0, [r4]'), ('cmp', 'r0, #0x89'),
+            ('beq', '#0x234f12'), ('b', '#0x2351b2'),
+            ('ldr', 'r5, [pc, #0x16c]'), ('b', '#0x234f30')]:
+        raise ValueError('own message-1802/type-89 receive branch differs')
     return {'product': '5210', 'type_8b_destination_task': 12,
             'records': 40, 'record_stride': 4,
             'carrier_message_offsets': [6, 7], 'signed_rssi_message_offset': 9,
             'request_root': '13e78c', 'current_offset': 8, 'queued_offset': 12,
             'request_flag_offset': 12, 'state6_promote_argument': 0,
+            'receive_context_message': '1802',
             'direct_selector_calls': [{'site': f'{site:06x}', 'argument': argument}
                                       for site, argument in direct_sites],
             'direct_census_coverage': {'aligned_pairs': (len(image) - 2) // 2,

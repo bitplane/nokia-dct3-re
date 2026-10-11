@@ -30,6 +30,16 @@ taps[#taps + 1] = cpu.spaces['program']:install_read_tap(0x2e23ac,
             memory:read_u16(0x13e78e), memory:read_u8(0x13c52e),
             memory:read_u32(0x13e794), memory:read_u32(0x13e798),
             machine.time:as_double()))
+        local context = cpu.state['R4'].value
+        if context >= 0x100000 and context <= 0x17fff0 then
+            local bytes = {}
+            for index = 0, 15 do
+                bytes[#bytes + 1] = string.format('%02x', memory:read_u8(context + index))
+            end
+            machine:logerror(string.format(
+                '5210_readiness_receive_context: lr=%08x address=%08x data=%s\n',
+                cpu.state['R14'].value, context, table.concat(bytes)))
+        end
     end
   end)
 local writes = 0

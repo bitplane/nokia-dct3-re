@@ -150,6 +150,23 @@ that brings that caller and queued request together. The negative gate checks
 retained distinct request pointers, the eligible state-6 post-PIN entry, and
 complete selector coverage below the observation cap.
 
+Passive caller-context captures identify the message-side difference. At
+`0x234f3e`, the successful early run receives internal message `0x1802` with
+type byte `0x89` while the post-PIN request is queued. The delayed run reaches
+the same caller with `0x1802`/`0x89`, then `0x1802`/`0x8b`, before PIN
+acceptance. Its post-PIN argument-3 call receives `0x03ec`/`0x83` instead.
+These headers are read from the live caller context, not inferred from nearby
+transport timestamps. The ROM-pinned contract also checks the explicit
+`0x1802`/`0x89` branch to the common argument-zero call; runtime proves the
+`0x8b` case reaches that call too, without claiming it enters that same branch.
+The captured object headers differ (`0x03eb` for the initial current request,
+`0x03ec` for the queued request), but their complete semantics remain open.
+
+The outstanding lifecycle question is why late `0x03ec` readiness retains
+the initial request after both ordinary completion inputs have occurred, and
+which firmware-owned continuation should retire or promote it. A second
+channel-change or measurement reply is not justified merely by this ordering.
+
 The next unresolved contract is which ordinary event invokes the eligible
 promotion entrance after late SIM readiness. Do not force selector arguments,
 promote pointers externally, or replay measurement completions to bypass it.
