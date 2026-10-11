@@ -12,7 +12,7 @@ class ScanContinuationContractTest(unittest.TestCase):
         return image
 
     def test_bounded_fragments(self):
-        self.assertEqual(check_fragments(self.image()), 19)
+        self.assertEqual(check_fragments(self.image()), 27)
 
     def test_every_fragment_byte_is_protected(self):
         image = self.image()

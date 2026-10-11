@@ -806,9 +806,17 @@ In `28f9ec`, zero input bypasses the measurement/threshold path and selects
 state 0 for byte `10b543`. Only a changed state calls notifier `28d726`;
 an already-zero state returns without notification. Thus this part of the
 continuation resets local history and conditionally publishes a state change,
-not an unconditional acquisition-ready event. The notifier's downstream
-meaning and the other `211f6c` arguments remain separate open contracts.
-`nse1_scan_continuation_contract.py roms/noki5110/5110f530.fls` pins 19
+not an unconditional acquisition-ready event.
+The notifier `28d726` reads that same byte through getter `28facc`, then
+requires byte `10b590 == 1`, the low nibble of `10ffac != 2`, and a
+different cached value at `10b589`. It updates the cache before calling
+`253492` with the new value. That consumer independently requires the low
+nibble of `10ffac == 3` and byte `1073d1 != 0`; otherwise it returns.
+Its admitted path processes four records through `25324a` and ends with
+`2533ca(0,5)`. These are bounded control-flow observations, not proof of
+registration, a readiness report, or native acquisition. The records' output
+semantics and the other `211f6c` arguments remain open contracts.
+`nse1_scan_continuation_contract.py roms/noki5110/5110f530.fls` pins 27
 fragments in the hash-identified own image (dispatch, parser decisions,
 setter, counter/limit roots, status producer and control tail); every pinned
 byte has mutation coverage. Computed aliases, indirect writers and uploaded

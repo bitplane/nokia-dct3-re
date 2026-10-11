@@ -7,6 +7,14 @@ from pathlib import Path
 
 IMAGE_SHA256 = '92778c5f51ded38ef395cc45aa5e40abbc51340b3eec9ff30827bfc481647d0c'
 FRAGMENTS = {
+    0x28d726: bytes.fromhex('b530f002f9d01c054c6f7a202801d10af001fc682802d006786042a8d00370651c28f7c5fea3bd30'),
+    0x28facc: bytes.fromhex('4842780046f7'),
+    0x28fbd8: bytes.fromhex('0010b543'),
+    0x28d8ec: bytes.fromhex('0010b588'),
+    0x28f00a: bytes.fromhex('4872780007000f0006000e0046f7'),
+    0x28f1d4: bytes.fromhex('0010ffac'),
+    0x253492: bytes.fromhex('b5f04641464a4653b40eb0834681f03bfdb32803d16a48e578012900d06646482804dd01200446812000'),
+    0x253840: bytes.fromhex('001073d1'),
     0x211f6c: bytes.fromhex('b5f01e402800d01638012800d00b38012800d13a'),
     0x211f92: bytes.fromhex('2000f07dfd2a48dc210070c17341bdf0'),
     0x21230c: bytes.fromhex('001066a0'),
