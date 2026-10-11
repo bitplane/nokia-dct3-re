@@ -29,9 +29,10 @@ serial wake. This is not blanket DMA suspension: SPRU302B sections 2.10/3.8
 allow externally triggered McBSP/DMA work during deep idle. The generic DMA
 device now accepts a separate X2/CLKIN rate and CPU PLL-stop line. Coupled
 conformance fixtures verify the IDLE3 source switch, absent-clock pending
-transfers, enabled/masked completion wake and save-state replay. This is not
-yet wired into MU4: its physical input/system-clock relationship and PLL wake
-timing remain unresolved, so no oscillator rate is invented for that board.
+transfers, enabled/masked completion wake and save-state replay. MU4 now wires
+that switch to the schematic's 11.9952 MHz Y101 input. Its normal system/PLL
+clock relationship and PLL wake timing remain unresolved; the existing 13 MHz
+execution fixture is not promoted to a measured system clock.
 The `startup` profile passes its 20-second window with zero illegal
 instructions and an active original streaming consumer. It observes 1,739
 consumer entries/notification reads and 1,740 clears, but mode zero skips
@@ -970,7 +971,7 @@ autoinitialization and multiframe extensions are documented under the
 streaming boundary below. ABU, indexed addressing and overlapping arbitration
 remain outside the validated subset; unsupported active modes fail explicitly.
 The device uses four clocks per internal word, as specified by SPRU302B section
-3.5 (two for the read, two for the write). Eight coupled CPU/DMA cases and their
+3.5 (two for the read, two for the write). Ten coupled CPU/DMA cases and their
 save-state replays require a four-word block to finish in sixteen transfer clocks.
 The fixture clocks are not measured DA150 rates; arbitration and external wait
 states are not validated by this timing check. The single completion timer does
@@ -985,9 +986,22 @@ replays are asserted. Two absent-input cases retain the enabled channel and
 unchanged destination for 100 us, then complete after the controller fixture
 restores its system clock; restored snapshots reproduce that pending state.
 Missing-clock pending ticks and the selected clock source are saved.
+Two further cases remove the clock after exactly two system clocks of the first
+word. No destination write occurs during the ensuing clockless interval; both
+ordinary continuation and snapshot replay require only the remaining two clocks
+for that word, followed by three four-clock words. These cases distinguish
+preserving a pending transfer from restarting it on clock return.
 Clock changes retime a pending transfer at the next whole transfer-clock
 boundary; sub-cycle switching and PLL stabilization are not modeled. No MU4
 PLL register or handset clock rate is inferred from these fixture values.
+
+The [NPM-5 MU4 schematic, sheet 4](https://www.s-manuals.com/manuals/phone/nokia/nokia_5510_npm-5_schematics.pdf)
+labels Y101 as 11.9952 MHz and connects it to DA150 U101 X1 and X2/CLKIN
+(pins 96/97). This supplies the DMA's undivided IDLE3 input independently of
+the codec clock setting and the fixture's calibrated 13 MHz system rate.
+The MU4 configuration connects the CPU PLL-stop output to this DMA clock
+selection. The input is crystal-derived; the schematic does not establish
+its instantaneous startup availability or a PLL multiplier/lock delay.
 
 MMIO conformance checks exercise deferred completion, program-page wrap,
 zero-count one-word transfer, cancellation and pending save/restore replay.

@@ -2049,6 +2049,7 @@ private:
 		m_idle_dma->reset();
 		m_idle_dma->set_input_clock(index >= 6 ? 0 : 3'250'000);
 		m_idle_dma_rate = index / 2 == 2 ? 3'250'000 : m_idle_dma->clock();
+		m_idle_dma_first_ticks = index >= 8 ? 2 : 4;
 		m_idle_dma_completions = 0;
 		u16 const registers[] = {0x0520, 0x0530, 3, 0, 0x4145}; // Data/data, increment both, block IRQ.
 		m_idle_dma->write(1, 0);
@@ -3095,6 +3096,7 @@ private:
 		m_check_timer = timer_alloc(FUNC(tms320c54x_test_state::check_results), this);
 		save_item(NAME(m_idle_dma_start));
 		save_item(NAME(m_idle_dma_rate));
+		save_item(NAME(m_idle_dma_first_ticks));
 	}
 
 	virtual void machine_reset() override
@@ -4173,8 +4175,23 @@ private:
 			start_idle_dma_case(0);
 			return;
 		}
-		if ((m_phase >= 6280 && m_phase < 6296) || (m_phase >= 6300 && m_phase < 6308) ||
-			(m_phase >= 6326 && m_phase < 6328))
+		if (m_phase >= 6348 && m_phase < 6350)
+		{
+			unsigned const index = m_phase - 6340;
+			expect(machine().time() - m_idle_dma_start == attotime::from_ticks(2, m_idle_dma_rate) &&
+				m_idle_dma_completions == 0 && m_cpu->space(AS_DATA).read_word(0x0530) == 0,
+				"DMA clock loss occurs halfway through its first four-clock word");
+			m_idle_dma->pll_clock_stop_w(1);
+			m_saved_repeat.str(std::string());
+			m_saved_repeat.clear();
+			expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
+				"save clockless DMA with two clocks remaining on its first word");
+			m_phase = 6281 + index * 2;
+			m_check_timer->adjust(attotime::from_usec(100));
+			return;
+		}
+		if ((m_phase >= 6280 && m_phase < 6300) || (m_phase >= 6300 && m_phase < 6310) ||
+			(m_phase >= 6326 && m_phase < 6330))
 		{
 			unsigned const index = m_phase >= 6326 ? m_phase - 6320 : m_phase >= 6300 ? m_phase - 6300 : (m_phase - 6280) / 2;
 			unsigned const step = m_phase >= 6326 ? 1 : m_phase >= 6300 ? 2 : (m_phase - 6280) % 2;
@@ -4184,7 +4201,14 @@ private:
 					m_cpu->state_int(STATE_GENPC) == 0x010961 && m_idle_dma_completions == 0,
 					"DMA fixture starts with CPU idle and channel disabled");
 				m_idle_dma_start = machine().time();
+				if (index >= 8) m_idle_dma->pll_clock_stop_w(0);
 				m_idle_dma->write(0, 1);
+				if (index >= 8)
+				{
+					m_phase = 6340 + index;
+					m_check_timer->adjust(attotime::from_ticks(2, m_idle_dma_rate));
+					return;
+				}
 				m_saved_repeat.str(std::string());
 				m_saved_repeat.clear();
 				expect(machine().save().write_stream(m_saved_repeat) == STATERR_NONE,
@@ -4233,11 +4257,12 @@ private:
 				m_check_timer->adjust(attotime::from_usec(100));
 				return;
 			}
-			if (index < 7) { start_idle_dma_case(index + 1); return; }
-			osd_printf_info("TMS320C54x IDLE DMA transfer: PASS cases=8 save_replay=8 clock_rate_claim=0\n");
-			osd_printf_info("TMS320C54x internal DMA cadence: PASS cases=8 replay=8 words=4 clocks=16\n");
+			if (index < 9) { start_idle_dma_case(index + 1); return; }
+			osd_printf_info("TMS320C54x IDLE DMA transfer: PASS cases=10 save_replay=10 clock_rate_claim=0\n");
+			osd_printf_info("TMS320C54x internal DMA cadence: PASS cases=10 replay=10 words=4 clocks=16\n");
 			osd_printf_info("TMS320C54x IDLE3 DMA clock: PASS cases=2 replay=2 system_hz=13000000 input_hz=3250000\n");
 			osd_printf_info("TMS320C54x IDLE3 DMA absent clock: PASS cases=2 replay=2 pending_preserved=1\n");
+			osd_printf_info("TMS320C54x DMA partial clock loss: PASS cases=2 replay=2 first_word_remaining_clocks=2\n");
 			start_rounded_multiply_case(0);
 			return;
 		}
@@ -22380,6 +22405,7 @@ private:
 	unsigned m_idle_dma_completions = 0;
 	attotime m_idle_dma_start = attotime::zero;
 	u32 m_idle_dma_rate = 0;
+	u8 m_idle_dma_first_ticks = 4;
 	unsigned m_port_writes_at_irq = 0;
 	u64 m_first_operand_cycle = 0;
 	u64 m_last_operand_cycle = 0;
@@ -22444,8 +22470,9 @@ void tms320c54x_test_state::test(machine_config &config)
 	m_cpu->pll_clock_stop_cb().set(m_idle_dma, FUNC(tms320c54x_dma_device::pll_clock_stop_w));
 	m_idle_dma->completion_cb().set([this](u8 channel) {
 		expect(channel == 0, "idle DMA fixture completes only its configured channel");
-		expect(machine().time() - m_idle_dma_start == attotime::from_ticks(4, m_idle_dma_rate) * 4,
-			"four internal DMA words complete in sixteen transfer clocks, including replay");
+		expect(machine().time() - m_idle_dma_start == attotime::from_ticks(4, m_idle_dma_rate) * 3 +
+			attotime::from_ticks(m_idle_dma_first_ticks, m_idle_dma_rate),
+			"internal DMA retains its first-word clock phase through clock loss and replay");
 		++m_idle_dma_completions;
 		// Fixture routing selects the documented DMAC0/BRINT2 vector slot.
 		m_cpu->set_input_line(6, ASSERT_LINE);

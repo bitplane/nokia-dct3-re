@@ -2893,7 +2893,7 @@ cases verify externally clocked words complete while asleep and wake the CPU
 only with the serial IMR bit enabled. These synthetic edges establish ordering,
 not a physical baud rate. PLL stabilization and unsupported serial clock/frame
 configurations remain outside this coverage.
-Eight coupled CPU/DMA cases additionally cover all three IDLE modes with masked
+Ten coupled CPU/DMA cases additionally cover all three IDLE modes with masked
 and enabled completion interrupts while INTM remains set. The real DMA device
 copies a four-word data-memory block after the CPU has entered idle; masked
 completion leaves the foreground asleep, while enabled completion resumes it.
@@ -2912,10 +2912,14 @@ Two cases and their replays assert sixteen clocks at a deliberately different
 3.25 MHz test input. Two additional controller cases leave X2/CLKIN absent,
 check that an enabled transfer remains pending without modifying its destination,
 and verify completion after restoring the system clock, including replay.
+Two further cases interrupt the first DMA word after exactly two clocks,
+retain its pending state through a 100-us clockless interval, and assert the
+remaining two clocks rather than a restarted four-clock word, including replay.
 Pending clock switches round up to the next whole transfer clock; sub-cycle
-switching and PLL startup latency remain unvalidated. The actual MU4 board
-input-clock relationship is unresolved and this new connection is not enabled
-there by assumption.
+switching and PLL startup latency remain unvalidated. MU4 now supplies the
+11.9952 MHz Y101 rate evidenced by its own schematic sheet 4 to this connection.
+The normal system/PLL clock relationship remains unresolved; see the
+[MU4 DMA contract](5510_bringup.md#original-dma-backed-loader).
 ROM4 `ed00` now clears a preloaded ASM=-1 before an ASM-based accumulator
 load; `8083` then stores A's low word through *AR3 without changing the
 pointer. The fixture checks both results and the three one-cycle operations

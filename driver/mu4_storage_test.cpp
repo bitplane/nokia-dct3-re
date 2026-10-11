@@ -33,6 +33,9 @@ public:
 		m_cpu->bio_in_cb().set(FUNC(mu4_storage_test_state::bio_r));
 		TMS320C54X_DMA(config, m_dma, 13'000'000);
 		m_dma->set_cpu(m_cpu);
+		// NPM-5 MU4 schematic sheet 4: Y101, DA150 X1/X2, 11.9952 MHz.
+		m_dma->set_input_clock(11'995'200);
+		m_cpu->pll_clock_stop_cb().set(m_dma, FUNC(tms320c54x_dma_device::pll_clock_stop_w));
 		m_dma->set_per_channel_reload(true);
 		m_dma->completion_cb().set(FUNC(mu4_storage_test_state::dma_complete));
 		TMS320C54X_MCBSP(config, m_mcbsp, 13'000'000);
