@@ -434,6 +434,19 @@ void nokia_sim_card_device::finish_header()
 		queue_status(0x6e, 0x00);
 		return;
 	}
+	// SELECT, STATUS and GET RESPONSE reserve P1/P2; SELECT has a two-byte file ID.
+	const bool fixed_parameters = m_ins == 0xa4 || m_ins == 0xf2 || m_ins == 0xc0;
+	const bool bad_parameters = fixed_parameters && (m_p1 != 0 || m_p2 != 0);
+	const bool bad_select_length = m_ins == 0xa4 && m_p3 != 2;
+	if (bad_parameters || bad_select_length)
+	{
+		m_pending_response_len = 0;
+		m_fcp_pending = false;
+		m_tx_len = m_tx_expected = 0;
+		m_receiving_body = false;
+		queue_status(bad_parameters ? 0x6b : 0x67, 0x00);
+		return;
+	}
 	if (m_ins == 0x10 || m_ins == 0x14 ||
 			m_ins == 0xc2 ||
 			m_ins == 0x20 || m_ins == 0x24 || m_ins == 0x26 ||

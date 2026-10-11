@@ -30,6 +30,14 @@ private:
 	required_device<nokia_sim_card_device> m_card;
 	emu_timer *m_timer = nullptr;
 	unsigned m_phase = 0; // Observer control is intentionally outside the saved device state.
+	unsigned m_parameter_case = 0;
+	static constexpr u8 PARAMETER_HEADERS[][5] = {
+		{0xa0, 0xa4, 1, 0, 2}, {0xa0, 0xa4, 0, 1, 2},
+		{0xa0, 0xf2, 1, 0, 22}, {0xa0, 0xf2, 0, 1, 22},
+		{0xa0, 0xc0, 1, 0, 22}, {0xa0, 0xc0, 0, 1, 22},
+		{0xa0, 0xa4, 0, 0, 0}, {0xa0, 0xa4, 0, 0, 1},
+		{0xa0, 0xa4, 0, 0, 3}
+	};
 	u8 m_bytes[64] = {};
 	u8 m_causes[64] = {};
 	double m_times[64] = {};
@@ -64,6 +72,11 @@ private:
 		m_simi->tx_fifo_control_w(4);
 		for (u8 byte : bytes) m_simi->txd_w(byte);
 		m_simi->tx_fifo_control_w(0);
+	}
+	void transmit_parameter_case()
+	{
+		auto const &header = PARAMETER_HEADERS[m_parameter_case];
+		transmit({header[0], header[1], header[2], header[3], header[4]});
 	}
 	void save_checkpoint()
 	{
@@ -229,6 +242,24 @@ private:
 				m_bytes[23] == 0x90 && m_bytes[24] == 0,
 				"next APDU remains aligned and empty VERIFY consumes no PIN attempt");
 			osd_printf_info("SIM card header conformance: PASS unsupported_classes=3 empty_verify=1 retry_preservation=1 following_apdu=1 handset_claim=0\n");
+			clear_capture(); transmit_parameter_case();
+			m_timer->adjust(attotime::from_msec(5)); return;
+		case 22:
+			expect(m_count == 2 && m_bytes[0] == (m_parameter_case < 6 ? 0x6b : 0x67) && m_bytes[1] == 0,
+				"invalid fixed parameters reject at the header without accepting a body");
+			clear_capture();
+			if (++m_parameter_case < std::size(PARAMETER_HEADERS))
+			{
+				--m_phase; transmit_parameter_case();
+				m_timer->adjust(attotime::from_msec(5)); return;
+			}
+			transmit({0xa0, 0xf2, 0, 0, 22});
+			m_timer->adjust(attotime::from_msec(40)); return;
+		case 23:
+			expect(m_count == 25 && m_bytes[5] == 0x3f && m_bytes[6] == 0 &&
+				m_bytes[19] == 0x83 && m_bytes[21] == 0x82 && m_bytes[23] == 0x90 && m_bytes[24] == 0,
+				"parameter errors preserve selection, retries and the following APDU");
+			osd_printf_info("SIM card parameter conformance: PASS reserved_parameters=6 select_lengths=3 state_preservation=1 following_apdu=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		fatalerror("unexpected SIMI fixture phase");

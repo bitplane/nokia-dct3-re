@@ -157,10 +157,14 @@ The card implements the GSM application class `A0`. Other APDU classes return
 `6E 00` without executing a command or accepting its body. Incoming `P3=0`
 means no body, whereas outgoing `P3=0` requests 256 bytes; an empty VERIFY
 therefore returns `67 00` without consuming a retry. These rules follow
-[GSM 11.11 sections 9.1 and 9.4.5](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf).
+[GSM 11.11 sections 9.1, 9.2 and 9.4.5](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf).
 The isolated `verify-simi-restore` fixture checks three rejected classes,
 empty VERIFY, unchanged selection/retries and a subsequent valid APDU. This
 is card/controller conformance, not additional handset-service coverage.
+SELECT, STATUS and GET RESPONSE reject nonzero reserved `P1/P2` with `6B 00`;
+SELECT rejects a file-ID length other than two with `67 00`. The same fixture
+checks all six reserved-parameter cases and SELECT lengths zero, one and three
+before a valid STATUS confirms unchanged file selection and PIN retries.
 
 The implemented surface is classified by ownership and evidence:
 
