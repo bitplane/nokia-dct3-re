@@ -326,6 +326,15 @@ not the cause of this discrepancy. Executable/configuration history and the
 provenance of the earlier capture remain to be reconciled; neither score is
 yet grounds for changing instruction semantics or physical-input assumptions.
 
+The same executable passes all 64 signed RF-filter impulse controls after
+correcting fixture alignment. The previous fixed `1.6402`-second onset selected
+port reads at `0x33cb/0x33d1/0x33d7/0x33dd`, not the filter under test, and
+failed its unchanged input-PC check. The fixture now waits for the first filter
+read at `0x330c` after that minimum time. All 32 positions at both `+16384`
+and `-16384` match the existing coefficient, lane and rounding expectations.
+This validates the isolated filter contract on the current core, not the
+continuous correlation score, physical RF timing or acquisition.
+
 The same executable independently passes the ROM4 native FR decoder fixture:
 32 frames, 5120 PCM samples, zero reference mismatches. That arithmetic fixture
 does not establish handset RF acquisition, a fitted codec clock or speech.

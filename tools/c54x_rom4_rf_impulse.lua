@@ -12,6 +12,9 @@ local taps = {}
 taps[#taps + 1] = cpu.spaces["io"]:install_read_tap(0x27, 0x27,
     "external_rf_impulse", function()
         if machine.time:as_double() < start then return 0 end
+        -- Clock/core changes can move the first eligible read into another
+        -- consumer. Start at the filter's first IN, not a wall-time accident.
+        if inputs == 0 and cpu.state["PC"].value ~= 0x330c then return 0 end
         local value = inputs == impulse and amplitude or 0
         if inputs < 32 then
             machine:logerror(string.format(
