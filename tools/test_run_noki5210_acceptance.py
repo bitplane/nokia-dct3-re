@@ -28,6 +28,7 @@ class RunnerTests(unittest.TestCase):
             'pin-host-incoming-sms': (45, '--incoming-sms', ()),
             'pin-host-rejected-sms': (80, '--rejected-sms', ()),
             'pin-host-silent-sms': (155, '--silent-sms', ()),
+            'pin-host-outgoing-call': (60, '--outgoing-call', ('32',)),
         }
         self.assertEqual(set(expected), set(runner.SCENARIOS))
         with tempfile.TemporaryDirectory() as temporary:
@@ -35,18 +36,29 @@ class RunnerTests(unittest.TestCase):
                 with self.subTest(scenario=name):
                     run = Path(temporary) / name
                     with patch('sys.argv', ['runner', str(run), '--scenario', name]), \
-                            patch.object(runner.subprocess, 'run') as execute:
+                            patch.object(runner.subprocess, 'run') as execute, \
+                            patch('tools.radio_host_outgoing_connect_check.verify') as host_verify, \
+                            patch.object(Path, 'read_text', return_value='host trace'):
                         runner.main()
                     host = name.startswith('pin-host-')
                     incoming = name == 'pin-host-incoming-sms'
                     rejected = name == 'pin-host-rejected-sms'
                     silent = name == 'pin-host-silent-sms'
-                    self.assertEqual(execute.call_count, 3 if host else 2)
+                    call = name == 'pin-host-outgoing-call'
+                    self.assertEqual(execute.call_count, 3 if host and not call else 2)
+                    if call:
+                        host_verify.assert_called_once_with('host trace', '5551234')
+                    else:
+                        host_verify.assert_not_called()
                     command = execute.call_args_list[0].args[0]
                     if host:
                         self.assertEqual(Path(command[1]).name,
+                                         'run_host_call_adapter_gate.py' if call else
                                          'run_host_incoming_sms_gate.py' if incoming else 'run_host_sms_gate.py')
-                        if not incoming:
+                        if call:
+                            self.assertEqual(command[command.index('--number') + 1], '5551234')
+                            self.assertEqual(command[command.index('--decision') + 1], 'connect')
+                        elif not incoming:
                             self.assertEqual(command[command.index('--user-data') + 1], '61')
                             self.assertEqual(command[command.index('--decision') + 1],
                                              'rp_silence' if silent else 'rp_error' if rejected else 'accept')
@@ -59,7 +71,7 @@ class RunnerTests(unittest.TestCase):
                     self.assertTrue(Path(script).is_file())
                     checker = execute.call_args_list[1].args[0]
                     self.assertEqual(checker[2:], [str(run)] + ([flag] if flag else []))
-                    if host:
+                    if host and not call:
                         host_check = execute.call_args_list[2].args[0]
                         self.assertEqual(Path(host_check[1]).name,
                                          'radio_incoming_host_sms_trace_check.py' if incoming

@@ -183,6 +183,14 @@ the original outgoing gate continues to require its own different headers.
 The default laboratory session supplies the remote party. This does not prove
 PIN-enabled host/SIP composition or native speech.
 
+`make verify-5210-pin-host-outgoing-call` independently connects the physical
+`5551234` dialling route to the loopback host adapter. The host requires the
+correct digits and transport epoch; wrong-id and duplicate decisions are
+rejected, exactly one connect decision is queued/accepted, and connected/ended
+states surround handset-owned physical End and full CC/RR release. Registered
+idle/recovery pixels remain pinned. This proves outgoing host call signaling,
+not SIP, external call audio, native speech or external-dialog restoration.
+
 `make verify-5210-pin-outgoing-call-state` separately restores the physically
 originated call after Connect Acknowledge and before physical End. Time,
 PC, SP, full modeled RAM and connected reference/restored pixels must match;

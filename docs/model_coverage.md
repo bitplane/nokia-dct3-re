@@ -81,7 +81,9 @@ no success RP-ACK, closure, exact failure/idle/menu pixels and physical recovery
 `verify-5210-pin-host-silent-sms` independently observes CP-ACK without RP
 result, firmware-owned timed DISC, UA/release and host termination, with
 reviewed timeout and physical idle/menu recovery pixels.
-Host call/SIP composition and
+`verify-5210-pin-host-outgoing-call` independently adds correlated host connect,
+wrong-id/duplicate rejection, physical End, CC/RR release and exact idle pixels.
+Host incoming calls/SIP composition and
 outgoing-SMS restoration remain separate coverage.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record

@@ -22,6 +22,7 @@ class Scenario:
     pin: bool = True
     host_sms: str | None = None
     host_outcome: str = 'rp_ack'
+    host_call: bool = False
 
 
 # The early and negative controls deliberately retain the default cell topology.
@@ -53,6 +54,8 @@ SCENARIOS = {
                                      seconds=80, host_sms='outgoing', host_outcome='rp_error'),
     'pin-host-silent-sms': Scenario('noki5210_pin_sms_silence.lua', '--silent-sms',
                                    seconds=155, host_sms='outgoing', host_outcome='rp_silence'),
+    'pin-host-outgoing-call': Scenario('noki5210_pin_outgoing_call.lua', '--outgoing-call',
+                                      seconds=60, net_masks=('32',), host_call=True),
 }
 
 
@@ -84,7 +87,7 @@ def main():
             for mask in scenario.net_masks:
                 ET.SubElement(ports, 'port', tag=':NETCFG', type='CONFIG',
                               mask=mask, defvalue='0', value=mask)
-            if scenario.host_sms:
+            if scenario.host_sms or scenario.host_call:
                 ET.SubElement(ports, 'port', tag=':CALLHOST', type='CONFIG',
                               mask='1', defvalue='0', value='1')
             ET.ElementTree(config).write(run / 'cfg/noki5210.cfg',
@@ -108,13 +111,16 @@ def main():
                    '-sound', 'none', '-nothrottle', '-autoboot_delay', '0',
                    '-autoboot_script', str(root / 'tools' / script),
                    '-seconds_to_run', str(scenario.seconds)]
-        if scenario.host_sms:
+        if scenario.host_sms or scenario.host_call:
             command.extend(['-http', '-http_port', str(args.port)])
-            host_script = ('run_host_incoming_sms_gate.py' if scenario.host_sms == 'incoming'
+            host_script = ('run_host_call_adapter_gate.py' if scenario.host_call else
+                           'run_host_incoming_sms_gate.py' if scenario.host_sms == 'incoming'
                            else 'run_host_sms_gate.py')
             launch = [sys.executable, str(root / 'tools' / host_script),
                       '--port', str(args.port), '--cwd', str(run)]
-            if scenario.host_sms == 'outgoing':
+            if scenario.host_call:
+                launch.extend(['--number', '5551234', '--decision', 'connect'])
+            elif scenario.host_sms == 'outgoing':
                 launch.extend(['--user-data', '61', '--user-data-length', '1',
                                '--decision', {'rp_ack': 'accept', 'rp_error': 'rp_error',
                                               'rp_silence': 'rp_silence'}[scenario.host_outcome]])
@@ -134,7 +140,10 @@ def main():
                          else ['--octets', '1', '--outcome', scenario.host_outcome])
             subprocess.run([sys.executable, str(root / 'tools' / host_checker)] +
                            host_args + [str(run / 'error.log')], check=True)
-    except (OSError, subprocess.SubprocessError) as error:
+        if scenario.host_call:
+            from tools.radio_host_outgoing_connect_check import verify as verify_host_call
+            verify_host_call((run / 'error.log').read_text(errors='replace'), '5551234')
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(1, f'5210 isolated {args.scenario} FAIL: {error}\n')
 
 
