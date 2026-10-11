@@ -1419,6 +1419,33 @@ private:
 				"Memory repeat and register-store syntax distinguishes count source and stored register");
 		}
 		osd_printf_info("TMS320C54x memory repeat/store disassembler: PASS forms=768 pages=2 bounded_extensions=1 pipeline_claim=0\n");
+		for (u32 pc : {0x010100, 0x01ffff})
+			for (u16 family : {0x5000, 0x5100, 0x5200, 0x5300, 0x5400, 0x5500, 0x5800, 0x5900})
+				for (unsigned mode = 0; mode < 256; ++mode)
+				{
+					words const buffer(pc, family | mode, 0x2345);
+					std::ostringstream text;
+					unsigned const length = mode >= 0xe0 ? 2 : 1;
+					expect(decoder.disassemble(text, pc, buffer, buffer) == (length | dasm::SUPPORTED) && buffer.seen() == (length == 2 ? 3 : 1),
+						"Double arithmetic decoder bounds long-memory address extensions");
+				}
+		vector const double_arithmetic_forms[] = {
+			{0x5082, 1 | dasm::SUPPORTED, "DADD    *AR2, A, A"},
+			{0x5385, 1 | dasm::SUPPORTED, "DADD    *AR5, B, B"},
+			{0x51f8, 2 | dasm::SUPPORTED, "DADD    *($2345), A, B"},
+			{0x54e2, 2 | dasm::SUPPORTED, "DSUB    *AR2($2345), A"},
+			{0x5512, 1 | dasm::SUPPORTED, "DSUB    $12, B"},
+			{0x5894, 1 | dasm::SUPPORTED, "DRSUB   *AR4+, A"},
+			{0x59f8, 2 | dasm::SUPPORTED, "DRSUB   *($2345), B"},
+		};
+		for (auto const &test : double_arithmetic_forms)
+		{
+			words const buffer(0x01ffff, test.op, 0x2345);
+			std::ostringstream text;
+			expect(decoder.disassemble(text, 0x01ffff, buffer, buffer) == test.result && text.str() == test.text,
+				"Double arithmetic syntax preserves separate DADD selectors and subtract direction");
+		}
+		osd_printf_info("TMS320C54x double arithmetic disassembler: PASS forms=2048 pages=2 bounded_extensions=1 pipeline_claim=0\n");
 	}
 	void start_idle_nmi_case(unsigned index)
 	{

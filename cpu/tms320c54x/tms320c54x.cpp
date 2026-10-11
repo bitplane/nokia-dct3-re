@@ -101,6 +101,15 @@ public:
 			smem(extended ? next_word() : 0);
 			return (2 + extended) | SUPPORTED | STEP_COND;
 		}
+		if ((family >= 0x5000 && family <= 0x5500) || family == 0x5800 || family == 0x5900)
+		{
+			bool const extended = mode >= 0xe0;
+			char const *name = family < 0x5400 ? "DADD" : family < 0x5800 ? "DSUB" : "DRSUB";
+			util::stream_format(stream, "%-8s", name); smem(extended ? next_word() : 0);
+			if (family < 0x5400) util::stream_format(stream, ", %c", BIT(op, 9) ? 'B' : 'A');
+			util::stream_format(stream, ", %c", BIT(op, 8) ? 'B' : 'A');
+			return (1 + extended) | SUPPORTED;
+		}
 		if (family == 0x4e00 || family == 0x4f00 || family == 0x5600 || family == 0x5700)
 		{
 			bool const extended = mode >= 0xe0;
