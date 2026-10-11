@@ -1,6 +1,8 @@
 """Exercise isolated acceptance setup without launching MAME."""
 from pathlib import Path
 import tempfile
+import json
+import hashlib
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
@@ -10,6 +12,17 @@ from tools.make_sim_card_profile import make_profile
 
 
 class RunnerTests(unittest.TestCase):
+    def test_input_identity_hashes_actual_bytes_and_marks_absence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'binary'
+            path.write_bytes(b'actual executable')
+            identity = runner.file_identity(path)
+            self.assertEqual(identity['sha256'], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertEqual(identity['bytes'], len(path.read_bytes()))
+            path.unlink()
+            self.assertEqual(runner.file_identity(path),
+                             {'path': str(path.resolve()), 'present': False})
+
     def test_sip_requires_host_call_before_creating_artifacts(self):
         with tempfile.TemporaryDirectory() as temporary:
             run = Path(temporary) / 'invalid'
@@ -36,6 +49,12 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual('--incoming' in launch, direction == 'incoming')
                 self.assertEqual((run / 'nvram/noki5210_3/sim_card').read_bytes(),
                                  make_profile(pin_enabled=True))
+                manifest = json.loads((run / 'invocation.json').read_text())
+                self.assertEqual(manifest['command'], launch)
+                card = next(item for item in manifest['inputs']
+                            if item['path'].endswith('/sim_card'))
+                self.assertEqual(card['sha256'], hashlib.sha256(
+                    make_profile(pin_enabled=True)).hexdigest())
 
     def test_scenario_commands_and_storage(self):
         expected = {

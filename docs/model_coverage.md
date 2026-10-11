@@ -106,6 +106,12 @@ microphone/earpiece waveform fidelity or native DSP speech.
 `verify-5210-pin-phonebook` independently adds physical `Ada/123` Save,
 exact ADN ownership, cold reauthentication and Search/Detail with retained
 record contents and reviewed number pixels; the cold read cannot rewrite ADN.
+The isolated 5210 runner writes `invocation.json` before launching firmware:
+resolved command/cwd, actual executable and primary fixture/checker hashes,
+selected loose BIOS inputs, and initial config/NVRAM hashes. Missing loose
+inputs are explicit, not silently treated as hashed ROM evidence. The manifest
+does not prove source-to-binary correspondence or capture every Python/Lua
+dependency; the runtime checkers remain the behavioral acceptance evidence.
 `verify-5210-late-pin-boundary` independently proves an organic background
 measurement request, request-correlated reply and its own forty-record
 consumer before accepted delayed PIN; no random access follows within 45 s.

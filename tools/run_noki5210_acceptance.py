@@ -1,6 +1,8 @@
 """Isolated fresh own-product NSM-5 SIM acceptance."""
 import argparse
 from dataclasses import dataclass
+import hashlib
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -64,6 +66,16 @@ SCENARIOS = {
     'pin-phonebook': Scenario('noki5210_pin_phonebook.lua', '--phonebook-save', seconds=55),
     'pin-phonebook-read': Scenario('noki5210_pin_phonebook_read.lua', '--phonebook-read'),
 }
+
+
+def file_identity(path):
+    path = Path(path).resolve()
+    result = {'path': str(path), 'present': path.is_file()}
+    if result['present']:
+        with path.open('rb') as source:
+            result['sha256'] = hashlib.file_digest(source, 'sha256').hexdigest()
+        result['bytes'] = path.stat().st_size
+    return result
 
 
 def main():
@@ -169,6 +181,23 @@ def main():
                 launch.extend(['--'] + command)
         else:
             launch = command
+        # Capture initial storage before firmware can mutate it. Source HEAD is
+        # not executable provenance; hash the binary actually being launched.
+        inputs = [Path(command[0]), root / 'tools' / script,
+                  Path(__file__).resolve(), root / 'tools' / checker]
+        inputs.extend(root / 'roms/noki5210' / name for name in (
+            '5210_5.40_ppm_e.fls', '5210 virgin eeprom 007f0000.fls',
+            'mad2_mask_rom.bin', 'dsp_prom', 'dsp_drom', 'dsp_pdrom'))
+        inputs.extend(sorted(path for directory in ('cfg', 'nvram')
+                             for path in (run / directory).rglob('*') if path.is_file()))
+        if args.pjsua:
+            inputs.extend((args.pjsua, root / 'tools/run_sip_handset_gate.py'))
+        (run / 'invocation.json').write_text(json.dumps({
+            'schema': 1, 'scenario': args.scenario, 'machine': 'noki5210',
+            'bios': '540e', 'cwd': str(run), 'command': launch,
+            'inputs': [file_identity(path) for path in inputs],
+            'scope': 'research HLE; not native DSP speech',
+        }, indent=2) + '\n')
         with (run / 'console.log').open('w') as console:
             subprocess.run(launch, cwd=run, stdout=console, stderr=subprocess.STDOUT, check=True)
         subprocess.run([sys.executable, str(root / 'tools' / checker),
