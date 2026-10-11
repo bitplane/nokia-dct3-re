@@ -33,6 +33,8 @@ class SimiRestoreResultTest(unittest.TestCase):
                              (COMPLETE.replace(ACCESS_PASS, ""), 0),
                              (COMPLETE + ACCESS_PASS, 0),
                              (COMPLETE.replace(IMSI_PASS, ""), 0),
+                             (COMPLETE.replace("reset_revokes=1", "reset_revokes=0"), 0),
+                             (COMPLETE.replace("removal_revokes=1", "removal_revokes=0"), 0),
                              (COMPLETE + IMSI_PASS, 0)):
             with self.subTest(text=text, status=status), self.assertRaises(ValueError):
                 check(text, status)

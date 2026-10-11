@@ -38,6 +38,7 @@ private:
 	required_device<nokia_sim_card_device> m_card;
 	emu_timer *m_timer = nullptr;
 	unsigned m_phase = 0; // Observer control is intentionally outside the saved device state.
+	unsigned m_activation_checks = 0;
 	unsigned m_parameter_case = 0;
 	unsigned m_record_case = 0;
 	unsigned m_write_case = 0;
@@ -343,6 +344,12 @@ private:
 			transmit({0xa0, 0xc0, 0, 0, 22});
 			m_phase = 31;
 			m_timer->adjust(attotime::from_msec(40)); return;
+		case 40:
+			expect(m_count != 0 && m_bytes[0] == 0x3b,
+				"reset or reinsertion delivers ATR through SIMI");
+			clear_capture();
+			m_write_case = 136; // Re-run IMSI SELECT/FCP, denial and verification.
+			begin_write_case(); return;
 		case 31:
 		case 32:
 			expect(m_count == 25 && m_bytes[0] == 0xc0 && m_bytes[5] == 0x3f &&
@@ -594,8 +601,20 @@ private:
 			if (item.restore) restore_checkpoint();
 			clear_capture();
 			if (++m_write_case < std::size(WRITE_CASES)) { begin_write_case(); return; }
+			if (m_activation_checks < 2)
+			{
+				if (m_activation_checks++ == 1)
+				{
+					m_simi->set_card_present(false);
+					m_simi->set_card_present(true);
+				}
+				m_simi->control_w(0);
+				m_simi->control_w(0x80);
+				m_phase = 40;
+				m_timer->adjust(attotime::from_msec(30)); return;
+			}
 			osd_printf_info("SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
-			osd_printf_info("SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0\n");
+			osd_printf_info("SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 reset_revokes=1 removal_revokes=1 fcp_matches=1 handset_claim=0\n");
 			machine().schedule_exit(); return;
 		}
 		}

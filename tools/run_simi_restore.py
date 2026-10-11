@@ -16,7 +16,7 @@ SEARCH_PASS = "SIM record search: PASS directions=4 types=2 undefined_starts=2 p
 
 
 ACCESS_PASS = "SIM record read access: PASS protected_files=4 before_pin=1 wrong_pin=1 after_pin=1 seek_access=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
-IMSI_PASS = "SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 fcp_matches=1 handset_claim=0"
+IMSI_PASS = "SIM IMSI read access: PASS before_pin=1 after_pin=1 restored_unverified=1 reset_revokes=1 removal_revokes=1 fcp_matches=1 handset_claim=0"
 
 
 def check(text, returncode):
@@ -47,6 +47,8 @@ def main():
             "result": "pass", "command": command, "checkpoints": 7,
             "protected_record_files": 4, "read_access_restore": True,
             "imsi_read_access": True,
+            "reset_revokes_authorization": True,
+            "removal_revokes_authorization": True,
             "controller_checkpoints": 3, "record_update_checkpoints": 1,
             "unsupported_classes": 3, "empty_verify": True,
             "retry_preservation": True, "following_apdu": True,

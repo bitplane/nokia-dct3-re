@@ -213,8 +213,11 @@ EF_IMSI (`6F07`) independently enforces and advertises CHV1 READ, as required
 by GSM 11.11 section 10.2.2. READ BINARY applies the descriptor's access
 condition before returning data. The serial fixture proves pre-PIN denial,
 successful verification and readback, then denial after restoring the earlier
-unverified session. This does not close the remaining transparent/vendor-file
-policy audit or claim reset coverage from save-state restoration alone.
+unverified session. Separate controller-driven activation checks restart an
+authenticated card, then disconnect/reinsert/reactivate it; both produce ATR
+and require fresh VERIFY before IMSI readback. These are isolated socket/card
+contracts, not handset hot-plug acceptance. They do not close the remaining
+transparent/vendor-file policy audit.
 These record-file conditions follow GSM 11.11 sections 10.2.8 and 10.3
 ([ETSI specification](https://www.etsi.org/deliver/etsi_i_ets/300600_300699/300608/08_60/ets_300608e08p.pdf)).
 No retained handset trace uses SEEK;
