@@ -2282,7 +2282,7 @@ shifted immediate loads, direct DP-relative loads and STL/STH stores, and
 short indirect loads using plain, post-decrement, post-increment or
 pre-increment addressing, and ANDM/ORM with DP-relative, plain/post-decrement/
 post-increment short indirect or three-word absolute (`f8`) operands, and
-RETF/RETFD with one-word load/NOP delay slots.
+RETF/RETFD with one-word load/NOP or two-word immediate-load delay slots.
 SP-relative, other indirect and other multiword forms stop at Decode without
 atomic fallback.
 
@@ -2303,9 +2303,13 @@ forms on base and extended program pages, restoring either pre-Access or
 post-Access checkpoints. With interrupt acceptance at 3, return Access is
 at 8, target Fetch at 9, return Execute at 10, delayed loads Execute at
 11/12 and the resumed target Execute at 13 (example 7-18). No replay
-increments SP twice or reads the stacked continuation. Multiword delay
-slots and pending interrupts during return remain unverified; these tests
-do not establish general control-flow or hazard completeness.
+increments SP twice or reads the stacked continuation. Four additional
+RETFD cases fill both delay words with one two-word immediate load, on
+base/extended pages. They restore partial Decode at cycle 8 or completed
+Decode at 9, require one literal Fetch at 8, retire the load at 12 and
+resume the target at 13 without treating the literal as an opcode.
+Pending interrupts during return remain unverified; these tests do not
+establish general control-flow or hazard completeness.
 
 Separate empty-frontend IRQ and NMI fixtures accept at cycle 1, fetch the
 vector at 4, write the continuation at 5 and retire the first ISR load at 8.

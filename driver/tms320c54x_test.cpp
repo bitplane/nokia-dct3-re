@@ -2687,9 +2687,10 @@ private:
 		}
 		program.write_word(base + 0x600, 0xe811);
 		program.write_word(base + 0x601, 0xe844);
-		program.write_word(base + 0x40, variant & 1 ? 0xf49b : 0xf69b);
-		program.write_word(base + 0x41, 0xe822);
-		program.write_word(base + 0x42, 0xe933);
+		bool const multiword = variant >= 8;
+		program.write_word(base + 0x40, !multiword && (variant & 1) ? 0xf49b : 0xf69b);
+		program.write_word(base + 0x41, multiword ? 0xf020 : 0xe822);
+		program.write_word(base + 0x42, multiword ? 0x1234 : 0xe933);
 		m_cpu->set_input_line(0, CLEAR_LINE);
 		m_cpu->set_state_int(tms320c54x_device::STATE_TCR, 0x10);
 		m_cpu->set_state_int(tms320c54x_device::STATE_ILLEGAL, 0);
@@ -2706,6 +2707,14 @@ private:
 		m_pipeline_expected_cycle = 1;
 		m_pipeline_operand_reads = m_vector_acks = 0;
 		m_pipeline_drained_fetches = 0;
+		m_pipeline_extensions_reads = 0;
+		if (multiword)
+			m_pipeline_write_tap = program.install_read_tap(base + 0x42, base + 0x42, "fast_return_delay_literal",
+				[this](offs_t, u16 &value, u16) {
+					if (machine().side_effects_disabled()) return;
+					expect(m_cpu->pipeline_cycles() == 8 && value == 0x1234, "Two-word delay instruction fetches its literal once");
+					++m_pipeline_extensions_reads;
+				});
 		m_pipeline_fetch_tap = program.install_read_tap(base + 0x601, base + 0x601, "fast_return_target_fetch",
 			[this](offs_t, u16 &, u16) {
 				if (machine().side_effects_disabled()) return;
@@ -23040,13 +23049,14 @@ private:
 		if (m_phase == 251150)
 		{
 			u64 const cycle = m_cpu->pipeline_cycles();
-			bool const delayed = !(m_pipeline_return_case & 1);
-			u64 const checkpoint = m_pipeline_return_case & 4 ? 8 : 7;
+			bool const multiword = m_pipeline_return_case >= 8;
+			bool const delayed = multiword || !(m_pipeline_return_case & 1);
+			u64 const checkpoint = multiword ? (m_pipeline_return_case & 1 ? 9 : 8) : (m_pipeline_return_case & 4 ? 8 : 7);
 			expect(cycle == m_pipeline_expected_cycle && !m_cpu->state_int(tms320c54x_device::STATE_ILLEGAL), "Fast return advances one frontend cycle");
 			expect(m_cpu->state_int(tms320c54x_device::STATE_SP) == (cycle >= 5 && cycle < 8 ? 0xfff : 0x1000), "Fast return increments SP in Access only");
 			expect(bool(m_cpu->state_int(tms320c54x_device::STATE_ST1) & 0x800) == (cycle >= 6 && cycle < 10), "Fast return clears INTM in Execute");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle < 6 ? 0 : cycle >= 13 ? 0x44 : delayed && cycle >= 11 ? 0x22 : 0x11), "Fast return preserves or discards the two delay words");
-			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == (delayed && cycle >= 12 ? 0x33 : 0), "Second return delay word retires before the target");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_A) == (cycle < 6 ? 0 : cycle >= 13 ? 0x44 : multiword ? (cycle >= 12 ? 0x1234 : 0x11) : delayed && cycle >= 11 ? 0x22 : 0x11), "Fast return preserves or discards the two delay words");
+			expect(m_cpu->state_int(tms320c54x_device::STATE_B) == (!multiword && delayed && cycle >= 12 ? 0x33 : 0), "Return delay words belong to complete instructions, not independent literal opcodes");
 			if (cycle == 2) m_cpu->set_input_line(0, ASSERT_LINE);
 			if (cycle == checkpoint && !m_pipeline_replay)
 			{
@@ -23056,10 +23066,11 @@ private:
 			if (cycle == 13)
 			{
 				expect(m_vector_acks == 1 && !m_pipeline_operand_reads && m_pipeline_drained_fetches == 2, "Fast return uses RTN without reading stack memory and fetches its continuation once");
+				expect(!multiword || m_pipeline_extensions_reads == 1, "Restored delay instruction does not reread its retained literal");
 				if (!m_pipeline_replay)
 				{
 					m_pipeline_replay = true;
-					m_pipeline_drained_fetches = 1;
+					m_pipeline_drained_fetches = checkpoint >= 9 ? 2 : 1;
 					m_saved_pipeline.clear(); m_saved_pipeline.seekg(0);
 					expect(machine().save().read_stream(m_saved_pipeline) == STATERR_NONE && m_cpu->pipeline_cycles() == checkpoint, "Restore fast-return redirect and delay ownership");
 					m_cpu->suspend(SUSPEND_REASON_DISABLE, true);
@@ -23070,9 +23081,11 @@ private:
 				}
 				m_pipeline_operand_tap.remove();
 				m_pipeline_fetch_tap.remove();
+				if (multiword) m_pipeline_write_tap.remove();
 				m_cpu->set_pipeline_frontend(false);
-				if (m_pipeline_return_case < 7) { start_pipeline_return_case(m_pipeline_return_case + 1); return; }
+				if (m_pipeline_return_case < 11) { start_pipeline_return_case(m_pipeline_return_case + 1); return; }
 				osd_printf_info("TMS320C54x staged fast returns: PASS cases=8 target_fetch=9 return_execute=10 delay_execute=11,12 resumed_execute=13 stack_reads=0 restore=8\n");
+				osd_printf_info("TMS320C54x staged return multiword delay: PASS cases=4 partial_decode_restore=2 completed_decode_restore=2 delay_execute=12 resumed_execute=13\n");
 				osd_printf_info("TMS320C54x core conformance: PASS\n");
 				throw emu_fatalerror(0, "TMS320C54x core tests complete");
 			}
@@ -23082,7 +23095,8 @@ private:
 		}
 		if (m_phase == 251160)
 		{
-			expect(m_cpu->pipeline_cycles() == (m_pipeline_return_case & 4 ? 8 : 7), "Settlement retains the fast-return checkpoint");
+			u64 const checkpoint = m_pipeline_return_case >= 8 ? (m_pipeline_return_case & 1 ? 9 : 8) : (m_pipeline_return_case & 4 ? 8 : 7);
+			expect(m_cpu->pipeline_cycles() == checkpoint, "Settlement retains the fast-return checkpoint");
 			m_cpu->resume(SUSPEND_REASON_DISABLE);
 			m_phase = 251150;
 			m_check_timer->adjust(attotime::from_ticks(1, m_cpu->clock()));
